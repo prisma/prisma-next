@@ -28,7 +28,7 @@ function tableNode(
 }
 
 function extraTableNode(name: string, status: 'fail' | 'warn'): SchemaVerificationNode {
-  return { ...tableNode(`table ${name}`, status, 'extra_table') };
+  return { ...tableNode(`table ${name}`, status, 'extra_table'), reason: 'not-expected' };
 }
 
 function makeResult(args: {
@@ -87,7 +87,7 @@ describe('stripExtraFindings', () => {
       ok: false,
       children: [tableNode('user', 'pass'), extraTableNode('legacy', 'fail')],
       counts: { pass: 1, warn: 0, fail: 2, totalNodes: 3 },
-      issues: [{ kind: 'extra_table', table: 'legacy', message: 'x' }],
+      issues: [{ kind: 'extra_table', table: 'legacy', reason: 'not-expected', message: 'x' }],
     });
 
     const stripped = stripExtraFindings(result);
@@ -107,8 +107,14 @@ describe('stripExtraFindings', () => {
       children: [tableNode('user', 'fail', 'missing_column'), extraTableNode('legacy', 'fail')],
       counts: { pass: 0, warn: 0, fail: 3, totalNodes: 3 },
       issues: [
-        { kind: 'missing_column', table: 'user', column: 'email', message: 'm' },
-        { kind: 'extra_table', table: 'legacy', message: 'x' },
+        {
+          kind: 'missing_column',
+          table: 'user',
+          column: 'email',
+          reason: 'not-found',
+          message: 'm',
+        },
+        { kind: 'extra_table', table: 'legacy', reason: 'not-expected', message: 'x' },
       ],
     });
 
@@ -128,8 +134,8 @@ describe('stripExtraFindings', () => {
       children: [extraTableNode('a', 'fail'), extraTableNode('b', 'fail')],
       counts: { pass: 0, warn: 0, fail: 2, totalNodes: 2 },
       issues: [
-        { kind: 'extra_table', table: 'a', message: 'x' },
-        { kind: 'extra_table', table: 'b', message: 'x' },
+        { kind: 'extra_table', table: 'a', reason: 'not-expected', message: 'x' },
+        { kind: 'extra_table', table: 'b', reason: 'not-expected', message: 'x' },
       ],
     });
 
@@ -147,7 +153,7 @@ describe('stripExtraFindings', () => {
       ok: true,
       children: [tableNode('user', 'pass'), extraTableNode('legacy', 'warn')],
       counts: { pass: 1, warn: 1, fail: 0, totalNodes: 2 },
-      issues: [{ kind: 'extra_table', table: 'legacy', message: 'x' }],
+      issues: [{ kind: 'extra_table', table: 'legacy', reason: 'not-expected', message: 'x' }],
     });
 
     const stripped = stripExtraFindings(result);
@@ -157,7 +163,7 @@ describe('stripExtraFindings', () => {
     expect(stripped.ok).toBe(true);
   });
 
-  it('keeps an extra column on a declared table in Part 1 as the space’s own drift', () => {
+  it('keeps an extra column on a declared table as the space’s own drift', () => {
     // An extra column lives INSIDE a declared table's subtree; its fail is baked
     // into the tree and counts. Stripping the issue while the failure stays
     // would make the space fail with an empty issue list.
@@ -176,7 +182,15 @@ describe('stripExtraFindings', () => {
       ok: false,
       children: [tableNode('user', 'fail', 'extra_column', [columnNode])],
       counts: { pass: 0, warn: 0, fail: 3, totalNodes: 3 },
-      issues: [{ kind: 'extra_column', table: 'user', column: 'stale', message: 'x' }],
+      issues: [
+        {
+          kind: 'extra_column',
+          table: 'user',
+          column: 'stale',
+          reason: 'not-expected',
+          message: 'x',
+        },
+      ],
     });
 
     const stripped = stripExtraFindings(result);
@@ -198,6 +212,7 @@ describe('stripExtraFindings', () => {
     const policyIssue = {
       path: ['public', 'user', 'policy_rogue'],
       outcome: 'extra' as const,
+      reason: 'not-expected' as const,
       message: "RLS policy 'policy_rogue' is present in the database but not in the contract",
     };
     const result = makeResult({
@@ -206,7 +221,9 @@ describe('stripExtraFindings', () => {
       // Faithful SQL counts: computeCounts (root fail + user pass + extra fail)
       // then the family fold adds the policy: fail = 2 + 1 = 3.
       counts: { pass: 1, warn: 0, fail: 3, totalNodes: 3 },
-      issues: [{ kind: 'extra_table', table: 'cipher_state', message: 'x' }],
+      issues: [
+        { kind: 'extra_table', table: 'cipher_state', reason: 'not-expected', message: 'x' },
+      ],
       schemaDiffIssues: [policyIssue],
     });
 
@@ -219,7 +236,7 @@ describe('stripExtraFindings', () => {
     expect(stripped.ok).toBe(false);
   });
 
-  it('keeps an extra-policy schemaDiffIssue in Part 1 as the space’s own drift', () => {
+  it('keeps an extra-policy schemaDiffIssue as the space’s own drift', () => {
     const result = makeResult({
       ok: false,
       children: [tableNode('user', 'pass')],
@@ -228,6 +245,7 @@ describe('stripExtraFindings', () => {
         {
           path: ['public', 'user', 'policy_rogue'],
           outcome: 'extra',
+          reason: 'not-expected',
           message: "RLS policy 'policy_rogue' is present in the database but not in the contract",
         },
       ],
@@ -236,7 +254,7 @@ describe('stripExtraFindings', () => {
     const stripped = stripExtraFindings(result);
 
     // Policy extras are the space's own drift evidence; the family already
-    // folded them into the verdict, so they must stay visible in Part 1.
+    // folded them into the verdict, so they must stay visible in the space view.
     expect(stripped).toBe(result);
     expect(stripped.schema.schemaDiffIssues).toHaveLength(1);
     expect(stripped.ok).toBe(false);
@@ -250,17 +268,18 @@ describe('collectExtraElementNames', () => {
       children: [],
       counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
       issues: [
-        { kind: 'extra_table', table: 'legacy', message: 'x' },
-        { kind: 'missing_table', table: 'wanted', message: 'm' },
+        { kind: 'extra_table', table: 'legacy', reason: 'not-expected', message: 'x' },
+        { kind: 'missing_table', table: 'wanted', reason: 'not-found', message: 'm' },
       ],
       schemaDiffIssues: [
         {
           path: ['public', 'audit', 'p'],
           outcome: 'extra',
+          reason: 'not-expected',
           message: 'e',
           actual: { tableName: 'audit' } as never,
         },
-        { path: ['public', 'x', 'p'], outcome: 'missing', message: 'm' },
+        { path: ['public', 'x', 'p'], outcome: 'missing', reason: 'not-found', message: 'm' },
       ],
     });
 

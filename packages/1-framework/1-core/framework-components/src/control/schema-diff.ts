@@ -1,15 +1,24 @@
-import type { SchemaIssue } from './control-result-types';
+import type { ExpectationFailureReason, SchemaIssue } from './control-result-types';
 
+/**
+ * Legacy vocabulary for the failure reason, mirrored by
+ * {@link ExpectationFailureReason} (`extra` → `not-expected`, `missing` →
+ * `not-found`, `mismatch` → `not-equal`). Both fields are stamped at the one
+ * producer site ({@link diffSchemas}), so they cannot drift; `outcome` and its
+ * target/family-internal consumers retire with the issue-type merge.
+ */
 export type SchemaDiffOutcome = 'missing' | 'extra' | 'mismatch';
 
 export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   /** Path from the root node down to the diffed node, as a sequence of local keys. */
   readonly path: readonly string[];
   readonly outcome: SchemaDiffOutcome;
+  /** Why the actual state fails the expectation. Consumers filter on this field. */
+  readonly reason: ExpectationFailureReason;
   readonly message: string;
-  /** The expected (contract-side) node, when available. Absent for `extra` outcomes. */
+  /** The expected (desired-side) node, when available. Absent for `not-expected` issues. */
   readonly expected?: TNode;
-  /** The actual (live-DB-side) node, when available. Absent for `missing` outcomes. */
+  /** The actual (current-side) node, when available. Absent for `not-found` issues. */
   readonly actual?: TNode;
 }
 
@@ -42,7 +51,13 @@ function outcomeMessage(outcome: SchemaDiffOutcome, path: readonly string[]): st
 function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
   const path = [...parentPath, node.id];
   return [
-    { path, outcome: 'missing', message: outcomeMessage('missing', path), expected: node },
+    {
+      path,
+      outcome: 'missing',
+      reason: 'not-found',
+      message: outcomeMessage('missing', path),
+      expected: node,
+    },
     ...node.children().flatMap((c) => emitMissingSubtree(c, path)),
   ];
 }
@@ -50,7 +65,13 @@ function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): 
 function emitExtraSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
   const path = [...parentPath, node.id];
   return [
-    { path, outcome: 'extra', message: outcomeMessage('extra', path), actual: node },
+    {
+      path,
+      outcome: 'extra',
+      reason: 'not-expected',
+      message: outcomeMessage('extra', path),
+      actual: node,
+    },
     ...node.children().flatMap((c) => emitExtraSubtree(c, path)),
   ];
 }
@@ -82,6 +103,7 @@ function diffPair(
     issues.push({
       path,
       outcome: 'mismatch',
+      reason: 'not-equal',
       message: outcomeMessage('mismatch', path),
       expected,
       actual,

@@ -126,27 +126,32 @@ describe('synthStrategy', () => {
     const missingIssue: DiffIssue = {
       kind: 'missing_table',
       table: 'cipher_state',
+      reason: 'not-found',
       message: 'missing',
     };
     const siblingExtraIssue: DiffIssue = {
       kind: 'extra_table',
       table: 'cipher_state',
+      reason: 'not-expected',
       message: 'extra',
     };
     const undeclaredExtraIssue: DiffIssue = {
       kind: 'extra_table',
       table: 'orphan_table',
+      reason: 'not-expected',
       message: 'extra',
     };
     const siblingExtraDiffIssue: DiffIssue = {
       path: ['public', 'cipher_state'],
       outcome: 'extra',
+      reason: 'not-expected',
       message: 'extra',
       actual: { tableName: 'cipher_state' } as never,
     };
     const missingDiffIssue: DiffIssue = {
       path: ['public', 'app_user', 'policy_x'],
       outcome: 'missing',
+      reason: 'not-found',
       message: 'missing',
     };
     expect(keep(missingIssue)).toBe(true);

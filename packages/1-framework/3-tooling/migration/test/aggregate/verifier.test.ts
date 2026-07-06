@@ -57,6 +57,7 @@ function extraTableNode(name: string): SchemaVerificationNode {
     expected: undefined,
     actual: undefined,
     children: [],
+    reason: 'not-expected',
   };
 }
 
@@ -86,6 +87,7 @@ const FULL_SCHEMA_VERIFY = (
       issues: extras.map((name) => ({
         kind: 'extra_table' as const,
         table: name,
+        reason: 'not-expected' as const,
         message: `Extra table "${name}"`,
       })),
       schemaDiffIssues: [],
@@ -112,10 +114,10 @@ function extraTables(result: VerifyDatabaseSchemaResult | undefined): string[] {
     .sort();
 }
 
-/** The names of any grafted extra-table nodes that survive in a space view (should be none). */
+/** The names of any grafted not-expected nodes that survive in a space view (should be none). */
 function extraNodeNames(result: VerifyDatabaseSchemaResult | undefined): string[] {
   return (result?.schema.root.children ?? [])
-    .flatMap((node) => (node.code === 'extra_table' ? [node.name] : []))
+    .flatMap((node) => (node.reason === 'not-expected' ? [node.name] : []))
     .sort();
 }
 
@@ -229,7 +231,7 @@ describe('verifyMigration', () => {
   });
 
   describe('schemaCheck', () => {
-    it('Part 1: each space view shows its declared nodes only, no extras', () => {
+    it('each space view shows its declared nodes only, no extras', () => {
       const aggregate = makeAggregate({
         app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [
@@ -265,7 +267,7 @@ describe('verifyMigration', () => {
       expect(extraNodeNames(schemaCheck.perSpace.get('cipher'))).toEqual([]);
     });
 
-    it('Part 2: reports a table no space declares once in the unclaimed list', () => {
+    it('reports a table no space declares once in the unclaimed list', () => {
       const aggregate = makeAggregate({
         app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [
@@ -297,7 +299,7 @@ describe('verifyMigration', () => {
       expect(result.assertOk().schemaCheck.unclaimed).toEqual(['orphan_table']);
     });
 
-    it('Part 2: deduplicates and sorts multiple undeclared tables into one list', () => {
+    it('deduplicates and sorts multiple undeclared tables into one list', () => {
       const aggregate = makeAggregate({
         app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [

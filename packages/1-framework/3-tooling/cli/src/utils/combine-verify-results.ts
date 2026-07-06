@@ -1,8 +1,8 @@
 import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
 
 /**
- * The combined per-space contract-satisfaction result (Part 1) plus the
- * standalone unclaimed-elements list (Part 2), reported once. The CLI renders
+ * The combined per-space contract-satisfaction result plus the standalone
+ * unclaimed-elements list, reported once. The CLI renders
  * both; `unclaimed` is never folded into the combined tree or its issues.
  */
 export interface CombinedVerifyResult {
@@ -12,8 +12,8 @@ export interface CombinedVerifyResult {
 
 /**
  * Collapse the aggregate verifier's per-space contract-satisfaction results
- * (Part 1) into a single {@link VerifyDatabaseSchemaResult} for the existing CLI
- * display surface, and carry the deduplicated unclaimed-elements list (Part 2)
+ * into a single {@link VerifyDatabaseSchemaResult} for the existing CLI
+ * display surface, and carry the deduplicated unclaimed-elements list
  * alongside it. Concatenates issues across spaces; sums counts; uses the app
  * space's result as the structural envelope (storage hash, target). Extras are
  * already stripped from each per-space result, so nothing here duplicates an

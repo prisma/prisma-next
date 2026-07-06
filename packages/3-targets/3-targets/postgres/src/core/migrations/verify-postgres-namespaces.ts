@@ -83,6 +83,7 @@ export function verifyPostgresNamespacePresence(input: {
     if (existing.has(ddlName)) continue;
     issues.push({
       kind: 'missing_schema',
+      reason: 'not-found',
       namespaceId,
       message: `Schema "${ddlName}" is missing from database`,
     });

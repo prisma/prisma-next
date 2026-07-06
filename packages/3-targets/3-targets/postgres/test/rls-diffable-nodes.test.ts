@@ -3,6 +3,7 @@
  * they do not implement DiffableNode (no `id`, `children`, or `isEqualTo`).
  * The DiffableNode role belongs to PostgresPolicySchemaNode / PostgresRoleSchemaNode.
  */
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
 import { PostgresRole } from '../src/core/postgres-role';
@@ -53,7 +54,7 @@ describe('PostgresRlsPolicy — Contract-IR entity, not a DiffableNode', () => {
 });
 
 describe('PostgresRole — Contract-IR entity, not a DiffableNode', () => {
-  const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
+  const role = new PostgresRole({ name: 'app_user', namespaceId: UNBOUND_NAMESPACE_ID });
 
   it('has no id property', () => {
     expect('id' in role).toBe(false);
@@ -70,7 +71,7 @@ describe('PostgresRole — Contract-IR entity, not a DiffableNode', () => {
   it('retains kind, name, and namespaceId', () => {
     expect(role.kind).toBe('role');
     expect(role.name).toBe('app_user');
-    expect(role.namespaceId).toBe('public');
+    expect(role.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
   });
 
   it('is frozen', () => {

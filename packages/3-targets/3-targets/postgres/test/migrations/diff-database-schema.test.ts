@@ -176,7 +176,7 @@ describe('diffPostgresSchema', () => {
     const issues = diffPostgresSchema(expected, actual);
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ outcome: 'missing' });
+    expect(issues[0]).toMatchObject({ outcome: 'missing', reason: 'not-found' });
     expect(issues[0]?.expected).toMatchObject({ name: 'read_own_profiles_a1b2c3d4' });
   });
 
@@ -189,7 +189,7 @@ describe('diffPostgresSchema', () => {
     const issues = diffPostgresSchema(expected, actual);
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ outcome: 'extra' });
+    expect(issues[0]).toMatchObject({ outcome: 'extra', reason: 'not-expected' });
     expect(issues[0]?.actual).toMatchObject({ name: 'read_own_profiles_deadbeef' });
   });
 
@@ -264,7 +264,7 @@ describe('diffPostgresSchema', () => {
     const issues = diffPostgresSchema(expected, actual);
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ outcome: 'extra' });
+    expect(issues[0]).toMatchObject({ outcome: 'extra', reason: 'not-expected' });
   });
 
   it('ignores DB policies in namespaces the contract does not own (cross-space)', () => {
@@ -483,7 +483,7 @@ describe('diffPostgresSchema', () => {
     const issues = filterIssuesByOwnership(rawIssues, ownedSchemaNamesOf(expected));
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ outcome: 'extra' });
+    expect(issues[0]).toMatchObject({ outcome: 'extra', reason: 'not-expected' });
     expect(issues[0]?.actual).toMatchObject({ name: 'auth_extra_99887766' });
   });
 
@@ -821,7 +821,7 @@ describe('diffPostgresSchema', () => {
     const issues = filterIssuesByOwnership(rawIssues, ownedSchemaNamesOf(expected));
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ outcome: 'missing' });
+    expect(issues[0]).toMatchObject({ outcome: 'missing', reason: 'not-found' });
     expect(issues[0]?.expected).toMatchObject({ name: 'missing_policy_a1b2c3d4' });
   });
 

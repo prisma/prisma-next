@@ -1,39 +1,9 @@
 import type {
-  BaseSchemaIssue,
   SchemaDiffIssue,
-  SchemaIssue,
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-
-/**
- * True for a top-level entity verify-node: a SQL `table` or a Mongo `collection`.
- */
-function isEntityNode(node: SchemaVerificationNode): boolean {
-  return node.kind === 'table' || node.kind === 'collection';
-}
-
-/** True when an issue reports an element present in the database but declared by no contract (an extra). */
-function isExtraIssue(issue: SchemaIssue): issue is BaseSchemaIssue {
-  return (
-    issue.kind === 'extra_table' ||
-    issue.kind === 'extra_column' ||
-    issue.kind === 'extra_primary_key' ||
-    issue.kind === 'extra_foreign_key' ||
-    issue.kind === 'extra_unique_constraint' ||
-    issue.kind === 'extra_index' ||
-    issue.kind === 'extra_validator' ||
-    issue.kind === 'extra_default'
-  );
-}
-
-/** The bare entity name an extra `SchemaDiffIssue` addresses, read off its actual (live-DB) node. */
-function schemaDiffIssueEntityName(issue: SchemaDiffIssue): string | undefined {
-  const actual = issue.actual;
-  if (actual === undefined) return undefined;
-  const name = (actual as { readonly tableName?: unknown }).tableName;
-  return typeof name === 'string' ? name : undefined;
-}
+import { blindCast } from '@prisma-next/utils/casts';
 
 function aggregateStatus(children: readonly SchemaVerificationNode[]): 'pass' | 'warn' | 'fail' {
   let status: 'pass' | 'warn' | 'fail' = 'pass';
@@ -71,31 +41,36 @@ function countTree(node: SchemaVerificationNode): Counts {
 }
 
 /**
- * Part 1 — a contract space's contract-satisfaction view. Strips the
- * **top-level entity extras only**: `extra_table` issues and the grafted
- * top-level extra-entity nodes (a SQL `table` / a Mongo `collection` the family
- * added for a live element declared by no contract). Those belong to the
- * separate unclaimed list ({@link collectExtraElementNames}), never a
- * contract-tree node.
+ * A contract space's contract-satisfaction view. Strips the top-level entity
+ * extras: the grafted root children the family stamped `reason:
+ * 'not-expected'` (a live entity no contract expects has no declared
+ * counterpart in the tree) and the `extra_table` issues describing them. Those
+ * belong to the standalone unclaimed-elements list
+ * ({@link collectExtraElementNames}), never a contract-tree node.
  *
- * Nested `extra_*` findings (an extra column on the space's own declared
+ * Nested `not-expected` findings (an extra column on the space's own declared
  * table…) and extra-policy `schemaDiffIssues` are the space's **own drift** and
- * stay in Part 1: their contribution is baked into the declared table's subtree
- * and the family's verdict, so stripping the issue would leave a failing space
- * with no visible evidence.
+ * stay: their contribution is baked into the declared table's subtree and the
+ * family's verdict, so stripping the issue would leave a failing space with no
+ * visible evidence. On the legacy coordinate-based issue type the entity level
+ * is not yet a structural field, so the issue filter narrows by the
+ * framework-declared `extra_table` kind; the kind narrowing retires when the
+ * issue-type merge makes issues node-typed.
  *
  * Counts: when nothing was dropped, the family's authoritative counts and
  * verdict are untouched. When a node was dropped, both are recomputed from the
- * pruned tree with a plain self-consistent walk ({@link countTree}) —
- * family-agnostic, correct in the SQL (root-counted) and Mongo (root-not-
- * counted) bases alike, and free of family-specific count arithmetic.
+ * pruned tree with a plain self-consistent walk ({@link countTree}) plus the
+ * re-folded `schemaDiffIssues` count (they carry no tree node; the family
+ * folds their count into `counts.fail` after its own walk).
  */
 export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDatabaseSchemaResult {
-  const issues = result.schema.issues.filter((issue) => issue.kind !== 'extra_table');
+  const issues = result.schema.issues.filter(
+    (issue) => !(issue.reason === 'not-expected' && issue.kind === 'extra_table'),
+  );
   const keptChildren: SchemaVerificationNode[] = [];
   const dropped: SchemaVerificationNode[] = [];
   for (const child of result.schema.root.children) {
-    if (isEntityNode(child) && isExtraTableNode(child)) dropped.push(child);
+    if (child.reason === 'not-expected') dropped.push(child);
     else keptChildren.push(child);
   }
 
@@ -111,9 +86,6 @@ export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDa
     children: keptChildren,
   };
   const counts = countTree(root);
-  // schemaDiffIssues (extra RLS policies…) carry no tree node; the family folds
-  // their count into `counts.fail` after its own tree walk. Re-fold them here,
-  // or a policy-only failure would vanish from the recomputed verdict.
   counts.fail += result.schema.schemaDiffIssues.length;
   const ok = counts.fail === 0;
   return {
@@ -126,27 +98,38 @@ export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDa
 }
 
 /**
- * A top-level entity node the family grafted for a live element declared by no
- * contract. The family sets `code: 'extra_table'` (SQL) or
- * `code: 'EXTRA_COLLECTION'` (Mongo) on these nodes, whatever disposition the
- * control policy reconciled the node status to.
+ * The bare entity name a `not-expected` `SchemaDiffIssue` addresses, read off
+ * its actual (current-side) node. The `tableName` read is the one remaining
+ * family-node-shape access here — kept because in a tolerant verify the
+ * relational walk emits no `extra_table` issue, so an undeclared table that
+ * carries an RLS policy is only nameable through the policy's node; it retires
+ * when the issue-type merge makes issues node-typed.
  */
-function isExtraTableNode(node: SchemaVerificationNode): boolean {
-  return node.code === 'extra_table' || node.code === 'EXTRA_COLLECTION';
+function schemaDiffIssueEntityName(issue: SchemaDiffIssue): string | undefined {
+  const actual = issue.actual;
+  if (actual === undefined) return undefined;
+  const tableName = blindCast<
+    { readonly tableName?: unknown },
+    'entity-name collection reads the optional target-specific tableName off a diff node'
+  >(actual).tableName;
+  return typeof tableName === 'string' ? tableName : undefined;
 }
 
 /**
- * Part 2 (per-space contribution) — the bare names of every live element this
- * space's diff reports as an extra. The verifier gathers these across all
- * spaces, deduplicates, and keeps only the names no contract space declares.
+ * The bare names of every live element this contract space's diff reports as
+ * `not-expected`. The verifier gathers these across all spaces, deduplicates,
+ * and keeps only the names no contract space declares — the standalone
+ * unclaimed-elements list, reported once for the whole database.
  */
 export function collectExtraElementNames(result: VerifyDatabaseSchemaResult): Set<string> {
   const names = new Set<string>();
   for (const issue of result.schema.issues) {
-    if (isExtraIssue(issue) && issue.table !== undefined) names.add(issue.table);
+    if (issue.reason === 'not-expected' && 'table' in issue && issue.table !== undefined) {
+      names.add(issue.table);
+    }
   }
   for (const issue of result.schema.schemaDiffIssues) {
-    if (issue.outcome !== 'extra') continue;
+    if (issue.reason !== 'not-expected') continue;
     const name = schemaDiffIssueEntityName(issue);
     if (name !== undefined) names.add(name);
   }

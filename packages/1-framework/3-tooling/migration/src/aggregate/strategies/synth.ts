@@ -65,19 +65,17 @@ function issueEntityName(issue: DiffIssue): string | undefined {
 }
 
 /**
- * Builds the keep-predicate the planner applies to its diff: drop the `extra`
- * findings for entities another contract space declares (so the planner never
- * emits DROP ops against a sibling space's tables), keep everything else —
- * including extras no space declares, which the planner may DROP under a
- * destructive policy.
+ * Builds the keep-predicate the planner applies to its diff: drop the
+ * `not-expected` findings for entities another contract space declares (so the
+ * planner never emits DROP ops against a sibling space's tables), keep
+ * everything else — including `not-expected` findings no space declares, which
+ * the planner may DROP under a destructive policy.
  */
 function keepIssuesOfThisSpace(
   declaredByAnotherSpace: (entityName: string) => boolean,
 ): (issue: DiffIssue) => boolean {
   return (issue) => {
-    const isExtra =
-      'outcome' in issue ? issue.outcome === 'extra' : issue.kind.startsWith('extra_');
-    if (!isExtra) return true;
+    if (issue.reason !== 'not-expected') return true;
     const name = issueEntityName(issue);
     return name === undefined || !declaredByAnotherSpace(name);
   };

@@ -235,11 +235,13 @@ describe('combineVerifyResults', () => {
     const appDiffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_app_abc'],
       outcome: 'missing',
+      reason: 'not-found',
       message: "RLS policy 'policy_app_abc' is missing from the database",
     };
     const extDiffIssue: SchemaDiffIssue = {
       path: ['public', 'audit_log', 'policy_cipher_def'],
       outcome: 'extra',
+      reason: 'not-expected',
       message: "RLS policy 'policy_cipher_def' is present in the database but not in the contract",
     };
 

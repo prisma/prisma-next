@@ -57,14 +57,14 @@ export interface MarkerCheckSection {
 
 export interface SchemaCheckSection {
   /**
-   * Part 1 — per contract space, its contract-satisfaction view: the space's
+   * Per contract space, its contract-satisfaction view: the space's
    * declared nodes only, each pass/fail by whether a missing/mismatch issue
    * concerns it. Extras are stripped; the space's verdict is missing/mismatch
    * only.
    */
   readonly perSpace: ReadonlyMap<string, VerifyDatabaseSchemaResult>;
   /**
-   * Part 2 — one deduplicated, sorted list of live element names no contract
+   * One deduplicated, sorted list of live element names no contract
    * space declares (built from the diffs' extra findings, filtered by the
    * passive aggregate's ownership query). Reported once for the whole database,
    * not per space. Strict callers fail on a non-empty list; lenient callers show
@@ -94,10 +94,10 @@ export type VerifierOutput = Result<VerifierSuccess, VerifierError>;
  *   distinct kind, not an error (callers — `db verify` strict vs
  *   `db init` precondition — choose how to interpret it).
  * - `schemaCheck`: two distinct outputs from the per-space diffs.
- *   **Part 1** (`perSpace`) — each space verified against the **full**
+ *   `perSpace` — each space verified against the **full**
  *   introspected schema, then its extras stripped, leaving the space's
  *   declared nodes (its contract-satisfaction view; verdict is
- *   missing/mismatch only). **Part 2** (`unclaimed`) — the extras gathered
+ *   missing/mismatch only). `unclaimed` — the extras gathered
  *   across every space, deduplicated, and filtered to the names no contract
  *   space declares (via the passive aggregate's ownership query); reported
  *   once for the database. No schema is pruned before verifying.
@@ -165,8 +165,8 @@ function runVerifyMigration(input: VerifierInput): VerifierOutput {
   orphanMarkers.sort((a, b) => a.spaceId.localeCompare(b.spaceId));
 
   // Schema check: verify each space against the full schema, then split the
-  // results in two. Part 1 — each space's contract-satisfaction view, extras
-  // stripped. Part 2 — every extra name across all spaces, deduplicated and kept
+  // results in two: each space's contract-satisfaction view (extras
+  // stripped), and every extra name across all spaces, deduplicated and kept
   // only when no contract space declares it.
   const schemaPerSpace = new Map<string, VerifyDatabaseSchemaResult>();
   const extraNames = new Set<string>();

@@ -31,8 +31,8 @@ export interface DbVerifyCommandSuccessResult {
     readonly strict: boolean;
   };
   /**
-   * Live element names no contract space declares (Part 2). In full success this
-   * is only ever non-empty in lenient mode — strict mode fails on it — and is
+   * Live element names no contract space declares. In full success this is
+   * only ever non-empty in lenient mode — strict mode fails on it — and is
    * rendered informationally.
    */
   readonly unclaimed?: readonly string[];
@@ -599,8 +599,8 @@ export function formatSchemaVerifyOutput(
 
 /**
  * Formats JSON output for database schema verification. The unclaimed-elements
- * list (Part 2) is a top-level field alongside the combined result, reported
- * once for the whole database.
+ * list is a top-level field alongside the combined result, reported once for
+ * the whole database.
  */
 export function formatSchemaVerifyJson(
   result: VerifyDatabaseSchemaResult,

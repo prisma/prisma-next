@@ -44,6 +44,7 @@ describe('diffSchemas', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       outcome: 'missing',
+      reason: 'not-found',
       path: ['root', 'public/policy/read_own_abcd1234'],
     });
   });
@@ -54,6 +55,7 @@ describe('diffSchemas', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       outcome: 'extra',
+      reason: 'not-expected',
       path: ['root', 'public/policy/stale_policy_deadbeef'],
     });
   });
@@ -65,6 +67,7 @@ describe('diffSchemas', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       outcome: 'mismatch',
+      reason: 'not-equal',
       path: ['root', 'public/policy/read_own_abcd1234'],
     });
   });
@@ -179,6 +182,7 @@ describe('diffSchemas', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       outcome: 'missing',
+      reason: 'not-found',
       path: ['root', 'parent', 'only_in_expected'],
     });
   });
@@ -235,7 +239,11 @@ describe('diffSchemas', () => {
     const leaf = makeNode('lone_leaf', 'data');
     const issues = diffSchemas(rootOf([leaf]), rootOf([]));
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ outcome: 'missing', path: ['root', 'lone_leaf'] });
+    expect(issues[0]).toMatchObject({
+      outcome: 'missing',
+      reason: 'not-found',
+      path: ['root', 'lone_leaf'],
+    });
   });
 });
 
@@ -244,7 +252,7 @@ function makeSchemaIssue(table: string): SchemaIssue {
 }
 
 function makeSchemaDiffIssue(path: readonly string[]): SchemaDiffIssue {
-  return { path, outcome: 'extra', message: outcomeMessageFor(path) };
+  return { path, outcome: 'extra', reason: 'not-expected', message: outcomeMessageFor(path) };
 }
 
 function outcomeMessageFor(path: readonly string[]): string {

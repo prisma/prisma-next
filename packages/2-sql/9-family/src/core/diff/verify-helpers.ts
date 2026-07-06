@@ -151,6 +151,7 @@ export function verifyPrimaryKey(
   if (!schemaPK) {
     const issue: SchemaIssue = {
       kind: 'primary_key_mismatch',
+      reason: 'not-equal',
       table: tableName,
       namespaceId,
       expected: contractPK.columns.join(', '),
@@ -163,6 +164,7 @@ export function verifyPrimaryKey(
   if (!arraysEqual(contractPK.columns, schemaPK.columns)) {
     const issue: SchemaIssue = {
       kind: 'primary_key_mismatch',
+      reason: 'not-equal',
       table: tableName,
       namespaceId,
       expected: contractPK.columns.join(', '),
@@ -220,6 +222,7 @@ export function verifyForeignKeys(
     if (!matchingFK) {
       const issue: SchemaIssue = {
         kind: 'foreign_key_mismatch',
+        reason: 'not-equal',
         table: tableName,
         namespaceId,
         expected: `${contractFK.source.columns.join(', ')} -> ${contractFK.target.tableName}(${contractFK.target.columns.join(', ')})`,
@@ -250,6 +253,7 @@ export function verifyForeignKeys(
         const combinedActual = actionMismatches.map((m) => m.actual).join(', ');
         const issue: SchemaIssue = {
           kind: 'foreign_key_mismatch',
+          reason: 'not-equal',
           table: tableName,
           namespaceId,
           indexOrConstraint: matchingFK.name ?? `fk(${contractFK.source.columns.join(',')})`,
@@ -309,6 +313,7 @@ export function verifyForeignKeys(
       if (!matchingFK) {
         const issue: SchemaIssue = {
           kind: 'extra_foreign_key',
+          reason: 'not-expected',
           table: tableName,
           namespaceId,
           indexOrConstraint: schemaFK.name ?? `fk(${schemaFK.columns.join(',')})`,
@@ -379,6 +384,7 @@ export function verifyUniqueConstraints(
     if (!matchingUnique && !matchingUniqueIndex) {
       const issue: SchemaIssue = {
         kind: 'unique_constraint_mismatch',
+        reason: 'not-equal',
         table: tableName,
         namespaceId,
         expected: contractUnique.columns.join(', '),
@@ -425,6 +431,7 @@ export function verifyUniqueConstraints(
       if (!matchingUnique) {
         const issue: SchemaIssue = {
           kind: 'extra_unique_constraint',
+          reason: 'not-expected',
           table: tableName,
           namespaceId,
           indexOrConstraint: schemaUnique.name ?? `unique(${schemaUnique.columns.join(',')})`,
@@ -501,6 +508,7 @@ export function verifyIndexes(
     if (!matchingIndex && !matchingUniqueConstraint) {
       const issue: SchemaIssue = {
         kind: 'index_mismatch',
+        reason: 'not-equal',
         table: tableName,
         namespaceId,
         expected: contractIndex.columns.join(', '),
@@ -552,6 +560,7 @@ export function verifyIndexes(
       if (!matchingIndex) {
         const issue: SchemaIssue = {
           kind: 'extra_index',
+          reason: 'not-expected',
           table: tableName,
           namespaceId,
           indexOrConstraint: schemaIndex.name ?? `idx(${schemaIndex.columns.join(',')})`,
@@ -718,6 +727,7 @@ export function verifyCheckConstraints(
     if (!liveCheck) {
       const issue: SchemaIssue = {
         kind: 'check_missing',
+        reason: 'not-found',
         table: tableName,
         namespaceId,
         indexOrConstraint: contractCheck.name,
@@ -744,6 +754,7 @@ export function verifyCheckConstraints(
     } else if (!valueSetsEqual(contractCheck.permittedValues, liveCheck.permittedValues)) {
       const issue: SchemaIssue = {
         kind: 'check_mismatch',
+        reason: 'not-equal',
         table: tableName,
         namespaceId,
         indexOrConstraint: contractCheck.name,
@@ -789,6 +800,7 @@ export function verifyCheckConstraints(
       if (!matchingContract) {
         const issue: SchemaIssue = {
           kind: 'check_removed',
+          reason: 'not-equal',
           table: tableName,
           namespaceId,
           indexOrConstraint: liveCheck.name,

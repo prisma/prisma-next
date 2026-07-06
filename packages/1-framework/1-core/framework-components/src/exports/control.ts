@@ -57,6 +57,7 @@ export type {
   BaseSchemaIssue,
   EmitContractResult,
   EnumValuesChangedIssue,
+  ExpectationFailureReason,
   IntrospectSchemaResult,
   OperationContext,
   SchemaIssue,

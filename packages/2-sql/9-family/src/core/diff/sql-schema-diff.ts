@@ -354,6 +354,7 @@ function verifySchemaTables(options: {
       if (!schemaTable) {
         const issue: SchemaIssue = {
           kind: 'missing_table',
+          reason: 'not-found',
           table: tableName,
           namespaceId,
           message: `Table "${tableName}" is missing from database`,
@@ -408,6 +409,7 @@ function verifySchemaTables(options: {
         const extraTableControlPolicy = effectiveControlPolicy(undefined, contractDefaultControl);
         const issue: SchemaIssue = {
           kind: 'extra_table',
+          reason: 'not-expected',
           table: tableName,
           message: `Extra table "${tableName}" found in database (not in contract)`,
         };
@@ -424,6 +426,7 @@ function verifySchemaTables(options: {
             expected: undefined,
             actual: undefined,
             children: [],
+            reason: 'not-expected',
           },
           issues,
           rootChildren,
@@ -548,6 +551,7 @@ function verifyTableChildren(options: {
   } else if (schemaTable.primaryKey && strict) {
     const issue: SchemaIssue = {
       kind: 'extra_primary_key',
+      reason: 'not-expected',
       table: tableName,
       namespaceId,
       message: 'Extra primary key found in database (not in contract)',
@@ -691,6 +695,7 @@ function collectContractColumnNodes(options: {
     if (!schemaColumn) {
       const issue: SchemaIssue = {
         kind: 'missing_column',
+        reason: 'not-found',
         table: tableName,
         namespaceId,
         column: columnName,
@@ -763,6 +768,7 @@ function appendExtraColumnNodes(options: {
     if (!contractTable.columns[columnName]) {
       const issue: SchemaIssue = {
         kind: 'extra_column',
+        reason: 'not-expected',
         table: tableName,
         namespaceId,
         column: columnName,
@@ -840,6 +846,7 @@ function verifyColumn(options: {
   if (!typesMatch) {
     const issue: SchemaIssue = {
       kind: 'type_mismatch',
+      reason: 'not-equal',
       table: tableName,
       namespaceId,
       column: columnName,
@@ -900,6 +907,7 @@ function verifyColumn(options: {
   if (contractColumn.nullable !== schemaColumn.nullable) {
     const issue: SchemaIssue = {
       kind: 'nullability_mismatch',
+      reason: 'not-equal',
       table: tableName,
       namespaceId,
       column: columnName,
@@ -930,6 +938,7 @@ function verifyColumn(options: {
       const defaultDescription = describeColumnDefault(contractColumn.default);
       const issue: SchemaIssue = {
         kind: 'default_missing',
+        reason: 'not-found',
         table: tableName,
         namespaceId,
         column: columnName,
@@ -964,6 +973,7 @@ function verifyColumn(options: {
       const actualDescription = schemaColumn.default;
       const issue: SchemaIssue = {
         kind: 'default_mismatch',
+        reason: 'not-equal',
         table: tableName,
         namespaceId,
         column: columnName,
@@ -991,6 +1001,7 @@ function verifyColumn(options: {
   } else if (strict && schemaColumn.default) {
     const issue: SchemaIssue = {
       kind: 'extra_default',
+      reason: 'not-expected',
       table: tableName,
       namespaceId,
       column: columnName,
