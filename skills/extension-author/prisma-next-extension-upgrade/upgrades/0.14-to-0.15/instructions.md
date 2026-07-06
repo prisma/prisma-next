@@ -54,6 +54,24 @@ changes:
         - "renderValueTypeFor"
         - "renderOutputType"
       anyMatch: true
+  - id: mongo-derive-json-schema-value-sets-param
+    summary: |
+      `deriveJsonSchema` / `derivePolymorphicJsonSchema` (from `@prisma-next/mongo-contract-psl`) now
+      source a value-set field's `$jsonSchema` `enum` keyword from a value-set map, not the domain
+      enum. Their fourth argument changed from a domain-enum map
+      (`Record<string, ContractEnum>`, read as `members.map(m => m.value)`) to a value-set map
+      (`FieldValueSets` = `Record<string, { values: readonly JsonValue[] }>`, keyed by the field's
+      `valueSet` `entityName`). If your extension calls either function directly, pass the storage
+      value sets (`contract.storage.namespaces[<ns>].entries.valueSet`) instead of `domain.enum`; the
+      values are identical for enums, so the rendered validator is unchanged. Most extensions author
+      Mongo contracts through `mongoContract(...)` / `defineContract(...)`, which call these
+      internally — those need no change.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "deriveJsonSchema"
+        - "derivePolymorphicJsonSchema"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
@@ -147,6 +165,16 @@ is unaffected. No extension-author action required. Incidental substrate diff on
 -->
 
 <!--
+TML-2955 (expose the static ExecutionContext symmetrically): the built-in target
+facades gain a client-safe `@prisma-next/{mongo,postgres,sqlite}/static` entrypoint
+(`<target>Static`) and expose `db.context` / `db.contract`. Internally, the mongo
+adapter codec now imports `ObjectId` from `bson` instead of `mongodb` so the static
+`ExecutionContext` is genuinely driver-free (client-bundle-safe). All additive /
+internal — no extension-author API or surface change; existing extensions are
+unaffected. No extension-author action required. Incidental substrate diff only.
+-->
+
+<!--
 TML-2503 (extension-supabase slice D): `@prisma-next/extension-supabase` gains a
 secondary `.supabase` admin root on `asServiceRole()` — new `ServiceRoleDb` /
 `SupabaseInternalDb` exports from `/runtime`, backed by the extension contract's own
@@ -155,4 +183,40 @@ Purely additive for extension authors — no other extension's API is affected, 
 released surface changed (the `WithExtensionNamespaces` export existed only on this
 branch's earlier, unmerged merge-design revision and was removed before merge). No
 extension-author API change. Incidental substrate diff only.
+-->
+
+<!--
+TML-2892 (migration-author ContractView): the `unboundNamespace` helper that the
+SQLite and Mongo runtimes use to unwrap their single default namespace was lifted
+into the shared foundation (`@prisma-next/framework-components/ir`); the two
+extension runtimes (`packages/3-extensions/{mongo,sqlite}/src/runtime`) now import
+it from there instead of defining a local copy. Behaviour-preserving — the runtime
+facade surface (`db.enums`, `sql`, `orm`) is byte-identical. No extension-author
+API or surface change; nothing to migrate. Incidental substrate diff only.
+-->
+
+<!--
+TML-2915 (infer an enum's `@@type` from its members): a PSL `enum` block may now
+omit `@@type` and have the codec inferred (text for bare/string members, int for
+integers). Additive: the framework gains an optional `AuthoringEntityContext.enumInferenceCodecs`
+and a `resolveEnumCodecId` export; each built-in target's config supplies its default
+codec ids, and `@prisma-next/adapter-mongo` gains a `./codec-ids` entrypoint. Explicit
+`@@type` is unchanged. No extension-author action required — the new context field is
+optional and framework-populated. Incidental substrate diff only.
+-->
+
+<!--
+TML-2912 (PSL native scalar lists, end-to-end): PSL now lowers scalar-list fields
+(`String[]`, `Int[]`, …) to native array storage columns instead of the JSONB
+fallback, gated on the adapter-reported `scalarList` capability. The review-round
+follow-up also makes the adapter capability matrix required end-to-end on the
+contract-source seam — `ContractSourceContext.capabilities`,
+`InterpretPslDocumentToSqlContractInput`, and the SQL PSL resolution inputs are no
+longer optional. These are framework-internal contract-emission types that the
+control stack always populates; extension authors do not construct them. The only
+`packages/3-extensions/` touch is a one-line test-context update in
+`postgres/test/psl-namespace-qualifier-routing.test.ts` (threading the now-required
+`capabilities` field). No extension-author API changed — re-emit absorbs the
+scalar-list contract shape. No extension-author action required. Incidental
+substrate diff only.
 -->

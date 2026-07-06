@@ -1,3 +1,4 @@
+import { MONGO_INT32_CODEC_ID, MONGO_STRING_CODEC_ID } from '@prisma-next/adapter-mongo/codec-ids';
 import {
   mongoFamilyEntityTypes,
   mongoFamilyPslBlockDescriptors,
@@ -73,6 +74,7 @@ function interpret(
     scalarTypeDescriptors: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
     authoringContributions: contributions,
+    enumInferenceCodecs: { text: MONGO_STRING_CODEC_ID, int: MONGO_INT32_CODEC_ID },
     ...overrides,
   });
 }
@@ -208,8 +210,8 @@ model Account {
     expect(roleField?.valueSet).toBeDefined();
   });
 
-  it('fails when enum is missing @@type attribute', () => {
-    const result = interpret(`
+  it('infers the string codec when @@type is omitted and members are strings', () => {
+    const contract = interpretOk(`
 enum Role {
   User = "user"
 }
@@ -218,10 +220,30 @@ model Account {
   role Role
 }
 `);
+
+    const ns = contract.domain.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(ns?.enum?.['Role']).toEqual({
+      codecId: 'mongo/string@1',
+      members: [{ name: 'User', value: 'user' }],
+    });
+  });
+
+  it('fails to infer @@type when a member is neither a string nor an integer', () => {
+    const result = interpret(`
+enum Ratio {
+  Half = 1.5
+}
+model Account {
+  id    ObjectId @id @map("_id")
+  ratio Ratio
+}
+`);
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(
-      result.failure.diagnostics.some((d: { code: string }) => d.code === 'PSL_ENUM_MISSING_TYPE'),
+      result.failure.diagnostics.some(
+        (d: { code: string }) => d.code === 'PSL_ENUM_CANNOT_INFER_TYPE',
+      ),
     ).toBe(true);
   });
 

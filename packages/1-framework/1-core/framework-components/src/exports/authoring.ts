@@ -25,6 +25,7 @@ export type {
 } from '../shared/framework-authoring';
 export {
   assertNoCrossRegistryCollisions,
+  classifyEnumMemberType,
   deriveValueSetFromEntity,
   hasRegisteredFieldNamespace,
   instantiateAuthoringEntityType,
@@ -38,6 +39,7 @@ export {
   isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
   resolveAuthoringTemplateValue,
+  resolveEnumCodecId,
   validateAuthoringHelperArguments,
 } from '../shared/framework-authoring';
 export type {

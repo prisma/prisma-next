@@ -18,12 +18,14 @@ import type { SqlNamespaceInput, SqlStorage } from '@prisma-next/sql-contract/ty
 import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject, JsonValue } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
+import { PG_INT_CODEC_ID, PG_TEXT_CODEC_ID } from './codec-ids';
 import { nativeEnumEntityKind, policyEntityKind, roleEntityKind } from './entity-kinds';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
   family: 'sql',
   target: 'postgres',
+  enumInferenceCodecs: { text: PG_TEXT_CODEC_ID, int: PG_INT_CODEC_ID },
 };
 
 function isAuthoringEntityTypeFactoryOutput(

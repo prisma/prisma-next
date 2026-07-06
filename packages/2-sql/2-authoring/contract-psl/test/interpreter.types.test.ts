@@ -17,6 +17,7 @@ const baseInput = {
   authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
+  capabilities: { sql: { scalarList: true } },
 } as const;
 
 describe('interpretPslDocumentToSqlContract types', () => {

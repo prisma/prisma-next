@@ -65,6 +65,7 @@
     "./control": "./dist/control.mjs",
     "./family": "./dist/family.mjs",
     "./runtime": "./dist/runtime.mjs",
+    "./static": "./dist/static.mjs",
     "./target": "./dist/target.mjs",
     "./package.json": "./package.json"
   },

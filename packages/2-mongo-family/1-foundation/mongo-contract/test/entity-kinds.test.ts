@@ -1,7 +1,12 @@
 import { hydrateNamespaceEntities } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
-import { collectionEntityKind, composeMongoEntityKinds } from '../src/entity-kinds';
+import {
+  collectionEntityKind,
+  composeMongoEntityKinds,
+  valueSetEntityKind,
+} from '../src/entity-kinds';
 import { MongoCollection } from '../src/ir/mongo-collection';
+import { MongoValueSet } from '../src/ir/mongo-value-set';
 
 const minimalCollectionInput = {};
 
@@ -12,10 +17,23 @@ describe('collectionEntityKind', () => {
   });
 });
 
+describe('valueSetEntityKind', () => {
+  it('construct produces MongoValueSet instances', () => {
+    const result = valueSetEntityKind.construct({ kind: 'valueSet', values: ['admin', 'reader'] });
+    expect(result).toBeInstanceOf(MongoValueSet);
+    expect(result.values).toEqual(['admin', 'reader']);
+  });
+});
+
 describe('composeMongoEntityKinds', () => {
   it('includes collection by default', () => {
     const kinds = composeMongoEntityKinds();
     expect(kinds.has('collection')).toBe(true);
+  });
+
+  it('includes valueSet by default', () => {
+    const kinds = composeMongoEntityKinds();
+    expect(kinds.has('valueSet')).toBe(true);
   });
 
   it('merges pack descriptors', () => {
@@ -47,6 +65,19 @@ describe('hydrateNamespaceEntities with Mongo kinds (carry)', () => {
       'carry',
     );
     expect(result['collection']?.['items']).toBeInstanceOf(MongoCollection);
+  });
+
+  it('constructs valueSet entries from JSON', () => {
+    const kinds = composeMongoEntityKinds();
+    const result = hydrateNamespaceEntities(
+      { collection: {}, valueSet: { Role: { kind: 'valueSet', values: ['admin', 'reader'] } } },
+      kinds,
+      'carry',
+    );
+    const roleVs = result['valueSet']?.['Role'];
+    expect(roleVs).toBeInstanceOf(MongoValueSet);
+    expect((roleVs as MongoValueSet).values).toEqual(['admin', 'reader']);
+    expect(Object.isFrozen(roleVs)).toBe(true);
   });
 
   it('carries unknown kinds frozen as-is', () => {

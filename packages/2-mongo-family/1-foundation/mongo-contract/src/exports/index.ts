@@ -2,6 +2,7 @@ export {
   createMongoContractSchema,
   createMongoNamespaceEnvelopeSchema,
   MongoContractSchema,
+  StorageValueSetSchema,
 } from '../contract-schema';
 export type {
   AnyMongoTypeMaps,
@@ -31,6 +32,8 @@ export type {
   MongoWildcardProjection,
   RootModelName,
 } from '../contract-types';
+export type { MongoContractAccessors, MongoContractView } from '../contract-view';
+export { buildMongoContractView } from '../contract-view';
 export {
   defaultMongoDomainNamespaceId,
   defaultMongoStorageNamespaceId,
@@ -80,6 +83,8 @@ export type {
   MongoValidatorValidationLevel,
 } from '../ir/mongo-validator';
 export { MongoValidator } from '../ir/mongo-validator';
+export type { MongoValueSetInput } from '../ir/mongo-value-set';
+export { MongoValueSet } from '../ir/mongo-value-set';
 export type {
   ApplyScopeResult,
   PolymorphicIndexScope,

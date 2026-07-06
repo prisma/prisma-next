@@ -15,6 +15,7 @@ export interface ResolvedAttributeArg {
   readonly kind: 'positional' | 'named';
   readonly name?: string;
   readonly value: string;
+  readonly expression?: ExpressionAst;
   readonly span: PslSpan;
 }
 
@@ -69,10 +70,12 @@ function readResolvedArgList(
   const args: ResolvedAttributeArg[] = [];
   for (const arg of argList.args()) {
     const name = arg.name()?.name();
+    const expression = arg.value();
     args.push({
       kind: name !== undefined ? 'named' : 'positional',
       ...(name !== undefined ? { name } : {}),
-      value: renderExpression(arg.value()),
+      value: renderExpression(expression),
+      ...(expression !== undefined ? { expression } : {}),
       span: nodePslSpan(arg.syntax, sourceFile),
     });
   }

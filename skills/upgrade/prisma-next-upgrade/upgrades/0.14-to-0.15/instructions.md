@@ -82,6 +82,18 @@ the primary `db.asServiceRole().sql`/`.orm` surface (plus `asUser`/`asAnon`) is
 unchanged. No user action. Incidental substrate diff only.
 -->
 
+<!--
+TML-2892 (PR #879): the `Migration` base now takes the migration's start/end
+contract JSON as typed inputs and derives `describe()` from their `storage.storageHash`,
+and generated migrations use `Migration<Start, End>` with `endContractJson`/
+`startContractJson` fields instead of hand-written from/to hashes; the base exposes
+typed `this.startContract`/`this.endContract` ContractViews for the (hand-authored)
+data-transform case. Every example `migration.ts` is regenerated to this shape; the
+`operations` bodies are preserved verbatim, so `ops.json`/`migration.json` and every
+emitted contract are byte-identical. No consumer action — re-scaffold via
+`migration plan` picks up the new shape. Incidental substrate diff only.
+-->
+
 # Upgrade 0.14 → 0.15
 
 No consumer-facing action is required for this transition.
@@ -113,6 +125,31 @@ No user action required. Incidental substrate diff only.
 -->
 
 <!--
+TML-2954 (reshaping-pipeline decode): the Mongo query builder now reifies a per-stage
+result shape, so reads through reshaping aggregation stages (`$project`/`$addFields`,
+with more stages to follow) decode their output fields through the contract codecs
+instead of returning raw BSON. Previously any reshaping stage collapsed the plan to an
+un-decoded pass-through — a projected `_id` came back as a raw `ObjectId`; it now comes
+back decoded, matching the row type the builder already declared. `$vectorSearch`
+(shape-preserving) is reclassified as identity, so the retail-store `findSimilarProducts`
+example drops its `db.raw` + `blindCast` for the typed builder. This is a runtime
+behaviour fix — no API or contract-shape change and no re-emit needed; code that relied
+on the previous un-decoded values would now observe decoded ones. Incidental to emit.
+-->
+
+<!--
+TML-2955 (expose the static ExecutionContext symmetrically): additive client-safe
+static surface. New `@prisma-next/{mongo,postgres,sqlite}/static` entrypoints export
+`<target>Static({ contractJson })`, returning the driver-free `ExecutionContext`
+plus derived `enums` / query builder / `raw` / `contract`; the facades also expose
+`db.context` (Mongo now typed `MongoExecutionContext<TContract>`) and `db.contract`.
+All additive — existing app code is unaffected. The `retail-store` example's
+`src/enums.ts` switches from the interim `buildNamespacedEnums` + `blindCast` to
+`mongoStatic(...).enums` (example-internal). No user action required. Incidental
+substrate diff only.
+-->
+
+<!--
 TML-2952 (this PR): route SQL enum/value-set column TS typing through the codec.
 A field/column restricted to a value set now derives its narrowed TS literal union
 by rendering each stored value through its codec, replacing the framework's
@@ -122,4 +159,18 @@ by rendering each stored value through its codec, replacing the framework's
 (emit-vs-no-emit agreement). The emitted contract is byte-identical (`fixtures:check`
 clean; `contract.json`, `contract.d.ts`, and both hashes unchanged). No user action
 required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2953 (this PR): Mongo enum fields now type through a storage value set, the same
+way SQL does. Authoring a Mongo enum writes a value set into
+`contract.storage.namespaces[<ns>].entries.valueSet[<Enum>]` (the codec-encoded
+member values) alongside the domain enum, and the emit typing + `$jsonSchema`
+validator source from it. The `mongo-demo` and `retail-store` example contracts
+regenerate to carry the value set (`contract.json` gains `entries.valueSet` and its
+`storageHash` updates); the emitted `contract.d.ts` field types and the `$jsonSchema`
+validator are byte-identical. `db.enums` runtime behaviour is unchanged. A re-emit
+picks up the new `contract.json` shape; existing migrations are unaffected (the value
+set is non-physical — no new migration op). No user action required. Incidental
+substrate diff only.
 -->

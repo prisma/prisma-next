@@ -31,6 +31,13 @@ import type {
   ResolvedAttribute,
   ResolvedTypeConstructorCall,
 } from '@prisma-next/psl-parser';
+import {
+  ArrayLiteralAst,
+  BooleanLiteralExprAst,
+  type ExpressionAst,
+  NumberLiteralExprAst,
+  StringLiteralExprAst,
+} from '@prisma-next/psl-parser/syntax';
 import { blindCast } from '@prisma-next/utils/casts';
 
 import {
@@ -865,6 +872,44 @@ export function parseDefaultLiteralValue(expression: string): ColumnDefault | un
   return undefined;
 }
 
+/**
+ * Result of interpreting a list-field `@default(...)` expression:
+ * - `{ kind: 'array', value }` — an array-literal default (possibly empty)
+ * - `{ kind: 'scalar' }` — a scalar literal where an array was expected
+ * - `undefined` — not an array of literals (e.g. a function call like `now()`),
+ *   so the caller falls through to function-default handling.
+ */
+type ListDefaultParse =
+  | { readonly kind: 'array'; readonly value: readonly (string | number | boolean)[] }
+  | { readonly kind: 'scalar' }
+  | undefined;
+
+function decodeLiteralElement(element: ExpressionAst): string | number | boolean | undefined {
+  if (element instanceof StringLiteralExprAst) return element.value();
+  if (element instanceof NumberLiteralExprAst) return element.value();
+  if (element instanceof BooleanLiteralExprAst) return element.value();
+  return undefined;
+}
+
+function parseListDefaultExpression(expression: ExpressionAst | undefined): ListDefaultParse {
+  if (expression === undefined) return undefined;
+  if (
+    expression instanceof StringLiteralExprAst ||
+    expression instanceof NumberLiteralExprAst ||
+    expression instanceof BooleanLiteralExprAst
+  ) {
+    return { kind: 'scalar' };
+  }
+  if (!(expression instanceof ArrayLiteralAst)) return undefined;
+  const value: (string | number | boolean)[] = [];
+  for (const element of expression.elements()) {
+    const decoded = decodeLiteralElement(element);
+    if (decoded === undefined) return undefined;
+    value.push(decoded);
+  }
+  return { kind: 'array', value };
+}
+
 export function lowerDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
@@ -874,6 +919,7 @@ export function lowerDefaultForField(input: {
   readonly sourceId: string;
   readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
   readonly diagnostics: ContractSourceDiagnostic[];
+  readonly isList?: boolean;
 }): {
   readonly defaultValue?: ColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
@@ -900,6 +946,24 @@ export function lowerDefaultForField(input: {
       span: input.defaultAttribute.span,
     });
     return {};
+  }
+
+  if (input.isList) {
+    const listParse = parseListDefaultExpression(expressionEntry.expression);
+    if (listParse?.kind === 'array') {
+      return { defaultValue: { kind: 'literal', value: [...listParse.value] } };
+    }
+    if (listParse?.kind === 'scalar') {
+      input.diagnostics.push({
+        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
+        message: `Field "${input.modelName}.${input.fieldName}" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.`,
+        sourceId: input.sourceId,
+        span: input.defaultAttribute.span,
+      });
+      return {};
+    }
+    // Not a literal at all (e.g. a function call) — fall through to the
+    // function-default path, which the list execution-default guard rejects.
   }
 
   const literalDefault = parseDefaultLiteralValue(expressionEntry.value);

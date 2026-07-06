@@ -100,6 +100,33 @@ function rewriteImports(tsSource: string): string {
     );
 }
 
+/**
+ * Write the committed contract fixtures the rendered scaffold imports —
+ * `{start,end}-contract.json` (carrying `storage.storageHash`, which the base's
+ * derived `describe()` reads) and the matching `{start,end}-contract.ts` type
+ * modules (`export type Contract`). The JSON hashes match `meta` so the derived
+ * describe() is consistent with the migration's identity.
+ */
+async function writeContractFixtures(
+  dir: string,
+  meta: { readonly from: string | null; readonly to: string },
+): Promise<void> {
+  const contractType =
+    'export type Contract = { readonly storage: { readonly storageHash: string } };\n';
+  await writeFile(
+    join(dir, 'end-contract.json'),
+    JSON.stringify({ storage: { storageHash: meta.to } }, null, 2),
+  );
+  await writeFile(join(dir, 'end-contract.ts'), contractType);
+  if (meta.from !== null) {
+    await writeFile(
+      join(dir, 'start-contract.json'),
+      JSON.stringify({ storage: { storageHash: meta.from } }, null, 2),
+    );
+    await writeFile(join(dir, 'start-contract.ts'), contractType);
+  }
+}
+
 const META = {
   from: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
   to: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
@@ -112,6 +139,12 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'postgres-render-roundtrip-'));
     await writeFile(join(tmpDir, 'package.json'), '{"type":"module"}');
     await writeFile(join(tmpDir, 'prisma-next.config.ts'), fixtureConfigSource);
+    // The rendered scaffold imports its from/to identity from committed
+    // contract JSON (the base derives describe() from `storage.storageHash`)
+    // and the matching `Contract` types. Write minimal fixtures so the
+    // executed migration resolves its imports; the from/to hashes here match
+    // META so the derived describe() is consistent.
+    await writeContractFixtures(tmpDir, META);
   });
 
   afterEach(async () => {

@@ -10,6 +10,7 @@ import { MongoCollection } from '../src/ir/mongo-collection';
 import { MongoIndex } from '../src/ir/mongo-index';
 import { MongoStorage } from '../src/ir/mongo-storage';
 import { MongoUnboundNamespace } from '../src/ir/mongo-unbound-namespace';
+import { MongoValueSet } from '../src/ir/mongo-value-set';
 
 const hash = coreHash('h_0');
 
@@ -116,6 +117,51 @@ describe('MongoStorage', () => {
       entries: { bogus: { item: {} } } as never,
     });
     expect(ns.entries['bogus']).toBeDefined();
+    expect(ns).not.toBe(MongoUnboundNamespace.instance);
+  });
+
+  it('buildMongoNamespace hydrates a valueSet slot into MongoValueSet instances', () => {
+    const ns = buildMongoNamespace({
+      id: 'default',
+      entries: {
+        collection: {},
+        valueSet: { Role: { kind: 'valueSet', values: ['admin', 'author', 'reader'] } },
+      },
+    });
+    const roleVs = ns.entries['valueSet']?.['Role'];
+    expect(roleVs).toBeInstanceOf(MongoValueSet);
+    expect((roleVs as MongoValueSet).values).toEqual(['admin', 'author', 'reader']);
+  });
+
+  it('buildMongoNamespace value set survives JSON.stringify round-trip and re-hydrates equal', () => {
+    const ns = buildMongoNamespace({
+      id: 'default',
+      entries: {
+        collection: {},
+        valueSet: { Role: { kind: 'valueSet', values: ['admin', 'reader'] } },
+      },
+    });
+    const json = JSON.parse(JSON.stringify(ns)) as { entries: Record<string, unknown> };
+    expect(json.entries['valueSet']).toEqual({
+      Role: { kind: 'valueSet', values: ['admin', 'reader'] },
+    });
+    const rehydrated = buildMongoNamespace({
+      id: 'default',
+      entries: json.entries as never,
+    });
+    expect(rehydrated.entries['valueSet']?.['Role']).toBeInstanceOf(MongoValueSet);
+    expect((rehydrated.entries['valueSet']?.['Role'] as MongoValueSet).values).toEqual([
+      'admin',
+      'reader',
+    ]);
+  });
+
+  it('buildMongoNamespace with unbound id and only a valueSet slot does not return the unbound singleton', () => {
+    const ns = buildMongoNamespace({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { valueSet: { Role: { kind: 'valueSet', values: ['admin'] } } },
+    });
+    expect(ns.entries['valueSet']?.['Role']).toBeInstanceOf(MongoValueSet);
     expect(ns).not.toBe(MongoUnboundNamespace.instance);
   });
 });

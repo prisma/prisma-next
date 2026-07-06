@@ -62,6 +62,7 @@ function interpret(source: string) {
     symbolTable,
     sourceFile,
     sourceId: 'schema.prisma',
+    capabilities: {},
     target: postgresTarget,
     scalarTypeDescriptors,
     authoringContributions: assembled,

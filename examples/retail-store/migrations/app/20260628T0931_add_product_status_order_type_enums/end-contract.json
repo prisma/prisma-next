@@ -1472,13 +1472,23 @@
                 "validationLevel": "strict"
               }
             }
+          },
+          "valueSet": {
+            "OrderType": {
+              "kind": "valueSet",
+              "values": ["delivery", "pickup"]
+            },
+            "ProductStatus": {
+              "kind": "valueSet",
+              "values": ["active", "discontinued", "out-of-stock"]
+            }
           }
         },
         "id": "__unbound__",
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:24e1562cabc8241f7fd50b830ce29ea955b5cd668488fbfb5d6744b48d174d14"
+    "storageHash": "sha256:950513819883fab7f2e961cfbea6ba069bec18ff2df023f9d0c9d6836c51feec"
   },
   "capabilities": {},
   "extensionPacks": {},

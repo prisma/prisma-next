@@ -8,6 +8,7 @@ export {
   errorContractValidationFailed,
   errorDatabaseConnectionRequired,
   errorDriverRequired,
+  errorEnumCodecNotInPackStack,
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
   errorInvalidOutputFormat,

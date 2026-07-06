@@ -1,6 +1,13 @@
-import type { ContractEnum, ContractField, ContractValueObject } from '@prisma-next/contract/types';
+import type { ContractField, ContractValueObject, JsonValue } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { MongoValidator } from '@prisma-next/mongo-contract';
+
+/**
+ * The permitted values a field's value set restricts it to, keyed by the value set's name — the
+ * storage `entries.valueSet` slot. The validator's `enum` keyword is sourced from these, not from
+ * `domain.enum`.
+ */
+export type FieldValueSets = Record<string, { readonly values: readonly JsonValue[] }>;
 
 function resolveBsonType(
   codecId: string,
@@ -13,15 +20,15 @@ function fieldToBsonSchema(
   field: ContractField,
   valueObjects: Record<string, ContractValueObject> | undefined,
   codecLookup: CodecLookup | undefined,
-  enums: Record<string, ContractEnum> | undefined,
+  valueSets: FieldValueSets | undefined,
 ): Record<string, unknown> | undefined {
   if (field.type.kind === 'scalar') {
     const bsonType = resolveBsonType(field.type.codecId, codecLookup);
     if (!bsonType) return undefined;
 
     const enumValues =
-      field.valueSet?.entityKind === 'enum'
-        ? (enums?.[field.valueSet.entityName]?.members.map((m) => m.value) ?? null)
+      field.valueSet !== undefined
+        ? (valueSets?.[field.valueSet.entityName]?.values ?? null)
         : null;
 
     if ('many' in field && field.many) {
@@ -44,7 +51,7 @@ function fieldToBsonSchema(
   if (field.type.kind === 'valueObject') {
     const vo = valueObjects?.[field.type.name];
     if (!vo) return undefined;
-    const voSchema = deriveObjectSchema(vo.fields, valueObjects, codecLookup, enums);
+    const voSchema = deriveObjectSchema(vo.fields, valueObjects, codecLookup, valueSets);
     if ('many' in field && field.many) {
       return { bsonType: 'array', items: voSchema };
     }
@@ -61,13 +68,13 @@ function deriveObjectSchema(
   fields: Record<string, ContractField>,
   valueObjects: Record<string, ContractValueObject> | undefined,
   codecLookup: CodecLookup | undefined,
-  enums: Record<string, ContractEnum> | undefined,
+  valueSets: FieldValueSets | undefined,
 ): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
 
   for (const [fieldName, field] of Object.entries(fields)) {
-    const schema = fieldToBsonSchema(field, valueObjects, codecLookup, enums);
+    const schema = fieldToBsonSchema(field, valueObjects, codecLookup, valueSets);
     if (schema) {
       properties[fieldName] = schema;
       if (!field.nullable) {
@@ -95,10 +102,10 @@ export function deriveJsonSchema(
   fields: Record<string, ContractField>,
   valueObjects?: Record<string, ContractValueObject>,
   codecLookup?: CodecLookup,
-  enums?: Record<string, ContractEnum>,
+  valueSets?: FieldValueSets,
 ): MongoValidator {
   return new MongoValidator({
-    jsonSchema: deriveObjectSchema(fields, valueObjects, codecLookup, enums),
+    jsonSchema: deriveObjectSchema(fields, valueObjects, codecLookup, valueSets),
     validationLevel: 'strict',
     validationAction: 'error',
   });
@@ -115,9 +122,9 @@ export function derivePolymorphicJsonSchema(
   variants: readonly PolymorphicVariant[],
   valueObjects?: Record<string, ContractValueObject>,
   codecLookup?: CodecLookup,
-  enums?: Record<string, ContractEnum>,
+  valueSets?: FieldValueSets,
 ): MongoValidator {
-  const baseSchema = deriveObjectSchema(baseFields, valueObjects, codecLookup, enums);
+  const baseSchema = deriveObjectSchema(baseFields, valueObjects, codecLookup, valueSets);
   const baseProperties = isRecord(baseSchema['properties']) ? baseSchema['properties'] : {};
 
   const oneOf: Record<string, unknown>[] = [];
@@ -132,7 +139,7 @@ export function derivePolymorphicJsonSchema(
     const variantProperties: Record<string, unknown> = {};
     const variantRequired: string[] = [discriminatorField];
     for (const [name, field] of Object.entries(variantOnlyFields)) {
-      const schema = fieldToBsonSchema(field, valueObjects, codecLookup, enums);
+      const schema = fieldToBsonSchema(field, valueObjects, codecLookup, valueSets);
       if (schema) {
         variantProperties[name] = schema;
         if (!field.nullable) {

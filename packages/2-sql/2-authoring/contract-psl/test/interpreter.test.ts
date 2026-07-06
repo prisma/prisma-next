@@ -32,7 +32,11 @@ describe('interpretPslDocumentToSqlContract', () => {
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts' | 'createNamespace'
+      | 'target'
+      | 'scalarTypeDescriptors'
+      | 'composedExtensionContracts'
+      | 'createNamespace'
+      | 'capabilities'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -42,6 +46,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
       ...input,
     });
 
@@ -64,6 +69,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       composedExtensionContracts: new Map(),
       controlMutationDefaults: builtinControlMutationDefaults,
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(result.ok).toBe(true);
@@ -130,6 +136,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(result.ok).toBe(true);
@@ -154,6 +161,7 @@ describe('interpretPslDocumentToSqlContract', () => {
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
+      capabilities: { sql: { scalarList: true } },
       controlMutationDefaults: {
         defaultFunctionRegistry: new Map([
           [

@@ -1,11 +1,14 @@
+import { coreHash, type JsonValue } from '@prisma-next/contract/types';
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
 import {
+  buildMongoNamespace,
   MongoCollection,
   type MongoCollectionOptions,
   type MongoCollectionOptionsInput,
   type MongoContract,
   type MongoIndex,
   type MongoIndexInput,
+  MongoStorage,
   type MongoValidator,
   type MongoValidatorInput,
 } from '@prisma-next/mongo-contract';
@@ -1658,10 +1661,14 @@ describe('MongoMigrationPlanner', () => {
 
       expect(source).toContain("import { Migration } from '@prisma-next/family-mongo/migration';");
       expect(source).toContain("import { MigrationCLI } from '@prisma-next/cli/migration-cli';");
-      expect(source).toContain('class M extends Migration');
+      expect(source).toContain('class M extends Migration<Start, End>');
       expect(source).toContain('MigrationCLI.run(import.meta.url, M);');
-      expect(source).toContain('sha256:00');
-      expect(source).toContain('sha256:01');
+      // New shape: from/to are derived from the imported contract JSON, not
+      // embedded as literals or a describe() block.
+      expect(source).toContain('override readonly endContractJson = endContract;');
+      expect(source).not.toContain('describe()');
+      expect(source).not.toContain('sha256:00');
+      expect(source).not.toContain('sha256:01');
     });
 
     it('produces a plan whose origin reflects the supplied fromHash', () => {
@@ -1682,6 +1689,48 @@ describe('MongoMigrationPlanner', () => {
       });
 
       expect(empty.origin).toBeNull();
+    });
+  });
+
+  describe('value set is non-physical', () => {
+    // Build the value-set-carrying storage through the real mongo-contract IR factories
+    // (`buildMongoNamespace` hydrates `entries.valueSet` into `MongoValueSet` nodes; `MongoStorage`
+    // wraps it) rather than patching a raw contract object — the namespace factory is the same
+    // construction path authoring uses.
+    function makeContractWithValueSet(
+      collections: Record<string, MongoCollectionData>,
+      valueSets: Record<
+        string,
+        { readonly kind: 'valueSet'; readonly values: readonly JsonValue[] }
+      >,
+    ): MongoContract {
+      const base = makeContract(collections);
+      const builtCollections: Record<string, MongoCollection> = {};
+      for (const [name, data] of Object.entries(collections)) {
+        builtCollections[name] = makeStorageCollection(data);
+      }
+      const namespace = buildMongoNamespace({
+        id: '__unbound__',
+        entries: { collection: builtCollections, valueSet: valueSets },
+      });
+      const storage = new MongoStorage({
+        storageHash: coreHash('sha256:test-storage'),
+        namespaces: { __unbound__: namespace },
+      });
+      return { ...base, storage };
+    }
+
+    it('emits no migration op when the only storage delta is a value-set addition', () => {
+      // Origin schema matches the collection exactly; the contract adds a value
+      // set. The planner reads only entries.collection, so the value set produces
+      // no op — the validator (physical artifact) is unchanged.
+      const contract = makeContractWithValueSet(
+        { users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] } },
+        { Role: { kind: 'valueSet', values: ['admin', 'author', 'reader'] } },
+      );
+      const origin = irWithCollection('users', [ascIndex('email')]);
+      const plan = planSuccess(planner, contract, origin);
+      expect(plan.operations).toHaveLength(0);
     });
   });
 });

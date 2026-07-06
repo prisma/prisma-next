@@ -25,7 +25,11 @@ import {
   isAuthoringPslBlockDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type {
+  CapabilityMatrix,
+  ExtensionPackRef,
+  TargetPackRef,
+} from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaultRegistry,
   ControlMutationDefaults,
@@ -130,6 +134,9 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
   readonly codecLookup?: CodecLookup;
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
+  /** The target's default codec ids for an `enum` block that omits `@@type`. */
+  readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
+  readonly capabilities: CapabilityMatrix;
 }
 
 function buildComposedExtensionPackRefs(
@@ -457,6 +464,7 @@ interface BuildModelNodeInput {
   /** Resolved namespace id keyed by model name — used to stamp the target namespace on FKs. */
   readonly modelNamespaceIds: ReadonlyMap<string, string>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
+  readonly capabilities: CapabilityMatrix;
   /**
    * Extension entities already lowered per namespace (the exact shape
    * `lowerExtensionBlocksForNamespace` produces), keyed by namespace id then
@@ -505,6 +513,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     sourceId,
     scalarTypeDescriptors: input.scalarTypeDescriptors,
     ...ifDefined('enumHandles', input.enumHandles),
+    capabilities: input.capabilities,
     ...ifDefined('namespaceId', modelNamespaceId),
     ...ifDefined('namespaceExtensionEntities', namespaceExtensionEntitiesForModel),
   });
@@ -1183,6 +1192,9 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
           columnName: resolvedField.columnName,
           descriptor: resolvedField.descriptor,
           nullable: resolvedField.nullable,
+          ...(resolvedField.many && resolvedField.valueObjectTypeName === undefined
+            ? { many: true as const }
+            : {}),
           ...ifDefined('default', resolvedField.defaultValue),
           ...ifDefined('executionDefaults', resolvedField.executionDefaults),
           ...ifDefined('enumTypeHandle', enumHandle),
@@ -1871,6 +1883,7 @@ export function interpretPslDocumentToSqlContract(
           );
         },
       },
+      ...ifDefined('enumInferenceCodecs', input.enumInferenceCodecs),
     },
     diagnostics,
   });
@@ -1898,6 +1911,7 @@ export function interpretPslDocumentToSqlContract(
   const extensionEntityContext: AuthoringEntityContext = {
     family: input.target.familyId,
     target: input.target.targetId,
+    ...ifDefined('enumInferenceCodecs', input.enumInferenceCodecs),
     ...ifDefined('codecLookup', input.codecLookup),
     sourceId,
     diagnostics: {
@@ -2026,6 +2040,7 @@ export function interpretPslDocumentToSqlContract(
       diagnostics,
       modelNamespaceIds,
       ...(enumHandlesByName.size > 0 ? { enumHandles: enumHandlesByName } : {}),
+      capabilities: input.capabilities,
       ...(namespaceExtensionEntities.size > 0 ? { namespaceExtensionEntities } : {}),
     });
     modelNodes.push(

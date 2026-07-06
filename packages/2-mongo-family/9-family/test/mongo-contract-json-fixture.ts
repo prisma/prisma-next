@@ -6,17 +6,30 @@ import {
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 
+function normalizeModels(
+  models: Record<string, ContractModelBase>,
+): Record<string, ContractModelBase> {
+  return Object.fromEntries(
+    Object.entries(models).map(([name, model]) => [
+      name,
+      { ...model, relations: model.relations ?? {} },
+    ]),
+  ) as Record<string, ContractModelBase>;
+}
+
 export function mongoContractJson(params: {
   readonly models?: Record<string, ContractModelBase>;
   readonly storageCollections?: Record<string, unknown>;
   readonly roots?: Record<string, ReturnType<typeof crossRef>>;
 }) {
-  const models = params.models ?? {
-    Item: {
-      fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
-      storage: { collection: 'items' },
-    },
-  };
+  const models = normalizeModels(
+    (params.models ?? {
+      Item: {
+        fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
+        storage: { collection: 'items' },
+      },
+    }) as Record<string, ContractModelBase>,
+  );
   const collections = params.storageCollections ?? { items: {} };
   return {
     targetFamily: 'mongo',

@@ -104,6 +104,7 @@ function interpretSqlPsl(schema: string) {
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,
+    capabilities: { sql: { scalarList: true } },
   });
 }
 

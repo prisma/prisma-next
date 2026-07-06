@@ -91,6 +91,7 @@ describe(
         codecLookup: stack.codecLookup,
         controlMutationDefaults: stack.controlMutationDefaults,
         resolvedInputs: [schemaPath],
+        capabilities: stack.capabilities,
       });
       expect(pslResult.ok).toBe(true);
       if (!pslResult.ok) {

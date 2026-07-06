@@ -221,6 +221,7 @@ export async function executeContractEmit(
       codecLookup: stack.codecLookup,
       controlMutationDefaults: stack.controlMutationDefaults,
       resolvedInputs: contractConfig.source.inputs ?? [],
+      capabilities: stack.capabilities,
     };
 
     startSpan(onProgress, 'resolveSource', 'Resolving contract source...');

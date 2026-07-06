@@ -7,13 +7,13 @@ import { MongoSchemaVerifierBase } from '../src/core/ir/mongo-schema-verifier-ba
 
 class FakeNamespace implements Namespace {
   readonly kind = 'fake-namespace' as const;
+  readonly entries = {};
   constructor(readonly id: string) {}
 }
 
 function makeFakeStorage(namespaces: Readonly<Record<string, Namespace>>): MongoStorage {
   return new MongoStorage({
     storageHash: coreHash('fake-hash'),
-    collections: {},
     namespaces,
   });
 }

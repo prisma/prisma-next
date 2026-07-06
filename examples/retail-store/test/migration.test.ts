@@ -1,4 +1,4 @@
-import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
+import { MongoContractView } from '@prisma-next/family-mongo/ir';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -26,8 +26,7 @@ describe('migration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   }, timeouts.spinUpMongoMemoryServer);
 
   it('contract contains expected index definitions', () => {
-    const contract = new MongoContractSerializer().deserializeContract<Contract>(contractJson);
-    const collections = contract.storage.namespaces['__unbound__'].entries.collection;
+    const collections = MongoContractView.fromJson<Contract>(contractJson).collection;
 
     expect(collections.products.indexes).toMatchObject([
       {

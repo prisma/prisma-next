@@ -76,7 +76,7 @@ describe('createMongoFamilyInstance', () => {
     expect(() =>
       instance.verifySchema({
         contract: {},
-        schema: { collections: [] } as MongoSchemaIR,
+        schema: new MongoSchemaIR([]),
         strict: false,
         frameworkComponents: [],
       }),

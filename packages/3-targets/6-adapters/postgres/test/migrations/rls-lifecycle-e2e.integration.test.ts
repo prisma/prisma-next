@@ -128,6 +128,7 @@ function buildContractFromPsl(psl: string): Contract<SqlStorage> {
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,
+    capabilities: { sql: { scalarList: true } },
   });
 
   if (!result.ok) throw new Error(`PSL interpretation failed: ${JSON.stringify(result)}`);

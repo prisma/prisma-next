@@ -1,12 +1,13 @@
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   ControlStack,
   MigrationPlan,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
 import { type } from 'arktype';
-import { errorInvalidOperationEntry } from './errors';
+import { errorInvalidOperationEntry, errorMigrationContractViewMissing } from './errors';
 import { computeMigrationHash } from './hash';
 import { deriveProvidedInvariants } from './invariants';
 import type { MigrationMetadata } from './metadata';
@@ -33,17 +34,52 @@ const MigrationMetaSchema = type({
  *
  * A `Migration` subclass is itself a `MigrationPlan`: CLI commands and the
  * runner can consume it directly via `targetId`, `operations`, `origin`, and
- * `destination`. The metadata-shaped inputs come from `describe()`, which
- * every migration must implement — `migration.json` is required for a
- * migration to be valid.
+ * `destination`.
+ *
+ * The from/to identities come from `describe()`. A migration provides them in
+ * one of two ways:
+ *  - **Contract-derived (default):** assign the committed `start-contract.json`
+ *    / `end-contract.json` imports to `startContractJson` / `endContractJson`;
+ *    the concrete `describe()` below derives `to`/`from` from their
+ *    `storage.storageHash`. The family bases additionally expose typed view
+ *    getters (`startContract` / `endContract`) over the same JSON.
+ *  - **Override (e.g. extension migrations that carry no contract):** override
+ *    `describe()` directly; the override wins and the JSON fields are unused.
+ *
+ * The `Start` / `End` generics carry each migration's precise contract types so
+ * the family-base view getters resolve to fully-typed views.
  */
 export abstract class Migration<
   _TOperation extends MigrationPlanOperation = MigrationPlanOperation,
   TFamilyId extends string = string,
   TTargetId extends string = string,
+  _Start extends Contract = Contract,
+  _End extends Contract = Contract,
 > implements MigrationPlan
 {
   abstract readonly targetId: string;
+
+  /**
+   * The migration's end-state contract JSON (the committed `end-contract.json`
+   * import). When set, the derived `describe()` reads `to` from its
+   * `storage.storageHash`. Family bases build the typed `endContract` view from
+   * it. Optional so `describe()`-overriding migrations (no contract) compile.
+   *
+   * Typed with a plain `storageHash: string`, not the branded
+   * `StorageHashBase`, so a raw `contract.json` import — whose `storageHash`
+   * is an untyped string literal — is assignable without a cast. The full
+   * `Start`/`End` contract typing is applied downstream in the family bases'
+   * view getters (via `<Family>ContractView.fromJson<…>`).
+   */
+  readonly endContractJson?: { readonly storage: { readonly storageHash: string } };
+
+  /**
+   * The migration's start-state contract JSON (the committed
+   * `start-contract.json` import). Absent for a baseline migration (`from`
+   * derives to `null`). Family bases build the typed `startContract` view from
+   * it.
+   */
+  readonly startContractJson?: { readonly storage: { readonly storageHash: string } };
 
   /**
    * Assembled `ControlStack` injected by the orchestrator (`runMigration`).
@@ -71,10 +107,25 @@ export abstract class Migration<
 
   /**
    * Metadata inputs used to build `migration.json` and to derive the plan's
-   * origin/destination identities. Every migration must provide this —
-   * omitting it would produce an invalid on-disk migration package.
+   * origin/destination identities.
+   *
+   * Default derivation: `to = endContractJson.storage.storageHash`,
+   * `from = startContractJson?.storage.storageHash ?? null`. A migration that
+   * carries no contract JSON (e.g. an extension migration) must override this;
+   * otherwise it throws, since `migration.json` requires a `to` identity.
    */
-  abstract describe(): MigrationMeta;
+  describe(): MigrationMeta {
+    const end = this.endContractJson;
+    if (end === undefined) {
+      throw new Error(
+        'Migration.describe(): provide endContractJson or override describe() — a migration needs a destination contract hash.',
+      );
+    }
+    return {
+      from: this.startContractJson?.storage.storageHash ?? null,
+      to: end.storage.storageHash,
+    };
+  }
 
   get origin(): { readonly storageHash: string } | null {
     const from = this.describe().from;
@@ -83,6 +134,49 @@ export abstract class Migration<
 
   get destination(): { readonly storageHash: string } {
     return { storageHash: this.describe().to };
+  }
+}
+
+/**
+ * Lazy-memoized `endContract` / `startContract` view accessors, one instance
+ * held per migration. Each target base (`MongoMigration`, `SqliteMigration`,
+ * `PostgresMigration`) creates one `MigrationContractViews` field from
+ * `this` — passing its own `<Family>ContractView.fromJson<…>` as `fromJson`
+ * and a name for error messages — and forwards its
+ * `endContract`/`startContract` getters to it.
+ *
+ * `endContract` throws `MIGRATION.CONTRACT_VIEW_MISSING` when the migration
+ * has no `endContractJson` (mirrors `describe()`'s own requirement).
+ * `startContract` returns `null` for a baseline migration (no
+ * `startContractJson`) instead of throwing.
+ */
+export class MigrationContractViews<TView> {
+  #endView?: TView;
+  #startView?: TView | null;
+
+  constructor(
+    private readonly migration: Migration,
+    private readonly className: string,
+    private readonly fromJson: (json: unknown) => TView,
+  ) {}
+
+  get endContract(): TView {
+    if (this.#endView === undefined) {
+      const json = this.migration.endContractJson;
+      if (json === undefined) {
+        throw errorMigrationContractViewMissing(this.className, 'endContract', 'endContractJson');
+      }
+      this.#endView = this.fromJson(json);
+    }
+    return this.#endView;
+  }
+
+  get startContract(): TView | null {
+    if (this.#startView === undefined) {
+      const json = this.migration.startContractJson;
+      this.#startView = json === undefined ? null : this.fromJson(json);
+    }
+    return this.#startView;
   }
 }
 

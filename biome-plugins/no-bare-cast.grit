@@ -1,28 +1,29 @@
-// Recognise every `as` token except `as const`, and skip test files.
+// Recognise value-level `as` casts and skip `as const` + test files.
 //
-// The pattern is at the top level (not wrapped in `file(...)`) so it iterates
-// over every match in the file — wrapping in `file($name, $body) where { $body
-// <: contains <pattern> }` only fires on the first occurrence, which would
-// undercount the cast total the CI ratchet checks.
+// Anchored on the `TsAsExpression` node (the AST node for a value-level
+// `expr as Type` assertion) rather than a bare `$x as $t` token pattern. The
+// token pattern also matched the `as` in import-specifier / re-export aliases
+// (`import type { Contract as End }`, `export { X as Y }`), which are NOT
+// type-assertion casts. The migration-scaffold generator (TML-2892) emits
+// `import type { Contract as End }` / `as Start`, so the token pattern produced
+// false positives that tripped the CI cast ratchet (scripts/lint-casts.mjs).
+// `TsAsExpression` only matches real casts, so import aliases are not counted.
 //
-// `$filename` is biome's built-in for the current file path. Biome's GritQL
-// regex matching is anchored full-match, so patterns need a `.*` prefix.
-// The three exclusion regexes mirror biome's existing test-file `overrides §
-// includes` patterns (`**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`).
+// `$ty` is the target-type child; `as const` is excluded by the `^const$`
+// guard. `$filename` is biome's built-in current-file path; biome's GritQL
+// regex matching is anchored full-match, so patterns need a `.*` prefix. The
+// three file-exclusion regexes mirror biome's test-file override includes
+// (`**/*.test.ts`, `**/*.test-d.ts`, `**/test/**/*.ts`).
 //
-// The message avoids escape sequences (e.g. `\"`) because biome's GritQL
-// engine appears to mis-parse subsequent characters in the string when an
-// escape sequence is present (`r` → CR, `t` → TAB, `n` → LF, …).
-//
-// Severity is "info" so the plugin can run repo-wide without breaking
-// existing builds (the codebase has thousands of pre-existing `as` casts
-// that this rule reports). The CI ratchet enforces the actual gate by
-// counting diagnostics from biome's JSON reporter; "info" entries still
+// Severity is "info" so the plugin runs repo-wide without breaking existing
+// builds (thousands of pre-existing casts). The CI ratchet enforces the gate by
+// counting these diagnostics from biome's JSON reporter; "info" entries still
 // appear there with the distinctive `no-bare-cast: ` prefix.
+language js
 
-`$x as $t` where {
-  not $t <: r"^const$",
+TsAsExpression(ty=$ty) as $cast where {
+  not $ty <: r"^const$",
   not $filename <: r".*\.(?:test|test-d)\.ts",
   not $filename <: r".*/test/.*\.ts",
-  register_diagnostic(span=$x, message="no-bare-cast: bare `as` cast; replace with blindCast(...) or castAs(value), or rewrite to eliminate the cast", severity="info")
+  register_diagnostic(span=$cast, message="no-bare-cast: bare `as` cast; replace with blindCast(...) or castAs(value), or rewrite to eliminate the cast", severity="info")
 }

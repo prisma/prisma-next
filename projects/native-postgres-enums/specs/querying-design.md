@@ -133,7 +133,10 @@ A **new facade root**, sibling of `db.enums`, **composed into the Postgres clien
   (`storage.namespaces[ns].entries.native_enum[name].members`) instead of the domain `enum`
   slot — the member shape is the same `{ name, value }[]`, so the accessor factory
   (`createEnumAccessor`) is reused unchanged;
-- is **Postgres-only** — Mongo/SQLite clients have no native enums and gain no such field.
+- is **Postgres-only** — Mongo/SQLite clients have no native enums and gain no such field;
+- is built inside **`buildPostgresStaticContext`** (the client-safe static surface,
+  `@prisma-next/postgres/static`), exactly where `enums` lives — so `nativeEnums` is also
+  available on the driver-free `PostgresStaticContext`, not just the connected client.
 
 ```ts
 db.nativeEnums.auth.AalLevel.values        // readonly ['aal1','aal2','aal3']

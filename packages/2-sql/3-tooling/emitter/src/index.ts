@@ -466,6 +466,7 @@ function computeColumnType(
   if (base === undefined) {
     base = renderRefinedCodecType(column, side, columnTypeParams(storage, column), codecLookup);
   }
+  if (column.many === true) base = `ReadonlyArray<${base}>`;
   return column.nullable ? `${base} | null` : base;
 }
 

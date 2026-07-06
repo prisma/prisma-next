@@ -18,7 +18,11 @@ describe('interpretPslDocumentToSqlContract value objects and list fields', () =
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts' | 'createNamespace'
+      | 'target'
+      | 'scalarTypeDescriptors'
+      | 'composedExtensionContracts'
+      | 'createNamespace'
+      | 'capabilities'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -27,6 +31,7 @@ describe('interpretPslDocumentToSqlContract value objects and list fields', () =
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
       ...input,
     });
 
@@ -150,7 +155,7 @@ model User {
     });
   });
 
-  it('emits scalar list fields with many: true', () => {
+  it('lowers scalar list fields to native array storage columns', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
@@ -187,9 +192,61 @@ model User {
               user: {
                 columns: {
                   tags: {
-                    nativeType: 'jsonb',
-                    codecId: 'pg/jsonb@1',
+                    nativeType: 'text',
+                    codecId: 'pg/text@1',
+                    many: true,
                     nullable: false,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('lowers nullable scalar list fields to native array storage columns', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model User {
+  id Int @id
+  tags String[]?
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(modelsOf(result.value)).toMatchObject({
+      User: {
+        fields: {
+          tags: {
+            nullable: true,
+            type: { kind: 'scalar', codecId: 'pg/text@1' },
+            many: true,
+          },
+        },
+      },
+    });
+
+    expect(result.value.storage).toMatchObject({
+      namespaces: {
+        public: {
+          entries: {
+            table: {
+              user: {
+                columns: {
+                  tags: {
+                    nativeType: 'text',
+                    codecId: 'pg/text@1',
+                    many: true,
+                    nullable: true,
                   },
                 },
               },

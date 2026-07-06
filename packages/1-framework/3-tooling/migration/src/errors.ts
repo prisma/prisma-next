@@ -455,3 +455,19 @@ export function errorHashNotInGraph(hash: string, graph: MigrationGraph): Migrat
     },
   );
 }
+
+export function errorMigrationContractViewMissing(
+  className: string,
+  accessor: 'endContract' | 'startContract',
+  jsonField: 'endContractJson' | 'startContractJson',
+): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.CONTRACT_VIEW_MISSING',
+    `${className}.${accessor} requires ${jsonField}`,
+    {
+      why: `${className}.${accessor} was read, but this instance has no ${jsonField} to build the view from.`,
+      fix: `Set ${jsonField} to the migration's committed contract JSON, or avoid reading ${accessor} on a migration that overrides describe() and carries no contract.`,
+      details: { className, accessor, jsonField },
+    },
+  );
+}
