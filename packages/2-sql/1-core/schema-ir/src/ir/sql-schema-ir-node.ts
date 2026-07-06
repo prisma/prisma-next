@@ -7,29 +7,32 @@ import { IRNodeBase } from '@prisma-next/framework-components/ir';
  *
  * SQL Schema IR represents the actual database state as discovered by
  * introspection (the parallel to SQL Contract IR, which represents the
- * desired state). Like the Contract side, today's Schema IR has no
- * polymorphic dispatch — verifiers and planners walk by structural
- * position, not by inspecting `kind` — so a single family-level
- * discriminator is sufficient. Future per-leaf overrides land cleanly
- * the same way as on the Contract side.
+ * desired state).
  *
  * The discriminator is installed as a non-enumerable own property,
  * matching the SqlNode pattern. This keeps `JSON.stringify(node)`
  * canonical (no `kind` field), keeps `toEqual({...})` test assertions
  * against pre-lift flat shapes passing, and keeps `node.kind` readable
- * for future polymorphic dispatch.
+ * for dispatch.
+ *
+ * Both `kind` and `nodeKind` are required: every concrete leaf is a node
+ * the generic differ can pair and compare, so every leaf must declare which
+ * node it is. `nodeKind` has no default here — every direct subclass sets its
+ * own literal value (the relational leaves via `RelationalSchemaNodeKind`,
+ * target concretions via their own vocabulary, e.g. `PostgresSchemaNodeKind`).
  */
 export abstract class SqlSchemaIRNode extends IRNodeBase {
-  readonly kind?: string;
+  declare readonly kind: string;
 
   /**
-   * Enumerable discriminant identifying which node this is (database /
-   * namespace / table / policy / role). Target concretions set a unique value;
-   * the `.is`/`.assert` guards compare against it. Unlike `kind`, it is
+   * Enumerable discriminant identifying which node this is (column / primary
+   * key / foreign key / unique / index / check / database / namespace /
+   * table / policy / role / …). Concretions set a unique value; the
+   * `.is`/`.assert` guards compare against it. Unlike `kind`, it is
    * enumerable, so it survives a spread that flattens a node into a plain
    * object.
    */
-  readonly nodeKind?: string;
+  abstract readonly nodeKind: string;
 
   constructor() {
     super();

@@ -17,7 +17,8 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:0.14.0",
-    "@prisma-next/framework-components": "workspace:0.14.0"
+    "@prisma-next/framework-components": "workspace:0.14.0",
+    "@prisma-next/utils": "workspace:0.14.0"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:0.14.0",

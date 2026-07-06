@@ -3,7 +3,8 @@ import type {
   ControlTargetDescriptor,
 } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { SqlSchemaIR, SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
 import {
@@ -64,7 +65,7 @@ describe('SqlFamilyInstance.toSchemaView', () => {
   it('stores column defaults in meta, not in label', () => {
     const familyInstance = createSqlFamilyInstance(createMockStack());
 
-    const schema: SqlSchemaIR = {
+    const schema = new SqlSchemaIR({
       tables: {
         User: {
           name: 'User',
@@ -88,7 +89,7 @@ describe('SqlFamilyInstance.toSchemaView', () => {
           indexes: [],
         },
       },
-    };
+    });
 
     const view = familyInstance.toSchemaView(schema);
     const userTable = view.root.children?.find((n) => n.id === 'table-User');
@@ -119,15 +120,16 @@ describe('SqlFamilyInstance.toSchemaView', () => {
   it('flattens tables from every namespace of a multi-namespace root', () => {
     const familyInstance = createSqlFamilyInstance(createMockStack());
 
-    const namespaceTable = (columnName: string): SqlTableIR => ({
-      name: 'ignored',
-      columns: {
-        [columnName]: { name: columnName, nativeType: 'int4', nullable: false },
-      },
-      foreignKeys: [],
-      uniques: [],
-      indexes: [],
-    });
+    const namespaceTable = (columnName: string): SqlTableIR =>
+      new SqlTableIR({
+        name: 'ignored',
+        columns: {
+          [columnName]: { name: columnName, nativeType: 'int4', nullable: false },
+        },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      });
 
     const schema = {
       namespaces: {
@@ -151,15 +153,16 @@ describe('SqlFamilyInstance.toSchemaView', () => {
   it('renders same-named tables in different namespaces with distinct ids and labels', () => {
     const familyInstance = createSqlFamilyInstance(createMockStack());
 
-    const namespaceTable = (columnName: string): SqlTableIR => ({
-      name: 'ignored',
-      columns: {
-        [columnName]: { name: columnName, nativeType: 'int4', nullable: false },
-      },
-      foreignKeys: [],
-      uniques: [],
-      indexes: [],
-    });
+    const namespaceTable = (columnName: string): SqlTableIR =>
+      new SqlTableIR({
+        name: 'ignored',
+        columns: {
+          [columnName]: { name: columnName, nativeType: 'int4', nullable: false },
+        },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      });
 
     const schema = {
       namespaces: {

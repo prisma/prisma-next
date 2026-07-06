@@ -21,11 +21,8 @@ import {
   StorageTable,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
-import type {
-  SqlReferentialAction,
-  SqlSchemaIR,
-  SqlTableIR,
-} from '@prisma-next/sql-schema-ir/types';
+import type { SqlReferentialAction } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
@@ -75,7 +72,7 @@ export function createTestContract(
  * Creates a minimal valid SqlSchemaIR for testing.
  */
 export function createTestSchemaIR(tables: Record<string, SqlTableIR>): SqlSchemaIR {
-  return { tables };
+  return new SqlSchemaIR({ tables });
 }
 
 /**
@@ -168,7 +165,7 @@ export function createSchemaTable(
     }>;
   },
 ): SqlTableIR {
-  const result: SqlTableIR = {
+  return new SqlTableIR({
     name,
     columns: Object.fromEntries(
       Object.entries(columns).map(([colName, col]) => [
@@ -184,11 +181,8 @@ export function createSchemaTable(
     foreignKeys: options?.foreignKeys ?? [],
     uniques: options?.uniques ?? [],
     indexes: options?.indexes ?? [],
-  };
-  if (options?.primaryKey) {
-    return { ...result, primaryKey: options.primaryKey };
-  }
-  return result;
+    ...ifDefined('primaryKey', options?.primaryKey),
+  });
 }
 
 /**

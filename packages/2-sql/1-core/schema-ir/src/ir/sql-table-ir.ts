@@ -1,5 +1,6 @@
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { PrimaryKey, type PrimaryKeyInput } from './primary-key';
+import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import { SqlCheckConstraintIR, type SqlCheckConstraintIRInput } from './sql-check-constraint-ir';
 import { type SqlAnnotations, SqlColumnIR, type SqlColumnIRInput } from './sql-column-ir';
 import { SqlForeignKeyIR, type SqlForeignKeyIRInput } from './sql-foreign-key-ir';
@@ -34,6 +35,7 @@ export interface SqlTableIRInput {
  * class instances.
  */
 export class SqlTableIR extends SqlSchemaIRNode {
+  override readonly nodeKind = RelationalSchemaNodeKind.table;
   readonly name: string;
   readonly columns: Readonly<Record<string, SqlColumnIR>>;
   readonly foreignKeys: ReadonlyArray<SqlForeignKeyIR>;

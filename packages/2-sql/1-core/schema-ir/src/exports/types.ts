@@ -15,6 +15,7 @@ export type {
 
 export {
   PrimaryKey,
+  RelationalSchemaNodeKind,
   SqlCheckConstraintIR,
   SqlColumnIR,
   SqlForeignKeyIR,

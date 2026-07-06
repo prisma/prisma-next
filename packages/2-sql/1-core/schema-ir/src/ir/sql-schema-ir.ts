@@ -1,4 +1,5 @@
 import { freezeNode } from '@prisma-next/framework-components/ir';
+import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
 import { SqlSchemaIRNode } from './sql-schema-ir-node';
 import { SqlTableIR, type SqlTableIRInput } from './sql-table-ir';
@@ -19,6 +20,7 @@ export interface SqlSchemaIRInput {
  * was a plain-data literal or already-constructed class instances.
  */
 export class SqlSchemaIR extends SqlSchemaIRNode {
+  override readonly nodeKind = RelationalSchemaNodeKind.schema;
   readonly tables: Readonly<Record<string, SqlTableIR>>;
   declare readonly annotations?: SqlAnnotations;
 

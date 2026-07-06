@@ -10,6 +10,7 @@
  */
 
 export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
+export { RelationalSchemaNodeKind } from './ir/schema-node-kinds';
 export {
   SqlCheckConstraintIR,
   type SqlCheckConstraintIRInput,

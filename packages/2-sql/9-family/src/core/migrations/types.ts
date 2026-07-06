@@ -105,18 +105,27 @@ export interface FieldEventContext {
 }
 
 export interface CodecControlHooks<TTargetDetails = unknown> {
+  /**
+   * `schema` is typed as the family-level `SqlSchemaIRNode` (not the concrete
+   * `SqlSchemaIR` class) because the actual value handed in is whatever
+   * per-namespace node the calling target's tree shape produces — a flat
+   * `SqlSchemaIR` for SQLite, a `PostgresNamespaceSchemaNode` for Postgres —
+   * read structurally for its `tables`/`nativeEnumTypeNames` fields. Hooks
+   * that need the concrete Postgres shape narrow via
+   * `PostgresNamespaceSchemaNode.is(schema)`.
+   */
   planTypeOperations?: (options: {
     readonly typeName: string;
     readonly typeInstance: StorageTypeInstance;
     readonly contract: Contract<SqlStorage>;
-    readonly schema: SqlSchemaIR;
+    readonly schema: SqlSchemaIRNode;
     readonly schemaName?: string;
     readonly policy: MigrationOperationPolicy;
   }) => StorageTypePlanResult<TTargetDetails>;
   verifyType?: (options: {
     readonly typeName: string;
     readonly typeInstance: StorageTypeInstance;
-    readonly schema: SqlSchemaIR;
+    readonly schema: SqlSchemaIRNode;
     readonly schemaName?: string;
   }) => readonly SchemaIssue[];
   introspectTypes?: (options: {

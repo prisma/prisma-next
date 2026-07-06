@@ -24,7 +24,8 @@ import {
   StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -1476,7 +1477,7 @@ export function verifySqlSchemaTree(options: {
   }
   // A flat actual schema (SQLite) has no named namespaces — it is the sole node.
   const soleFlatActual = actualByName.size === 0 ? actualNodes[0] : undefined;
-  const emptyNamespace: SqlSchemaIR = { tables: {} };
+  const emptyNamespace = new SqlSchemaIR({ tables: {} });
 
   let combined: VerifyDatabaseSchemaResult | undefined;
   for (const namespaceId of Object.keys(options.contract.storage.namespaces)) {
