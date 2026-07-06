@@ -12,20 +12,9 @@ import type { ArgType, AttributeSpec, InterpretCtx, OptionalArgType, Param } fro
 
 const DEFAULT_STRUCTURAL_CODE: PslDiagnosticCode = 'PSL_INVALID_ATTRIBUTE_SYNTAX';
 
-/** How an output key was bound, so a later collision is reported as the right kind. */
+/** Tracked so a later collision is reported as the right kind. */
 type Origin = 'positional' | 'named';
 
-/**
- * Interprets an attribute node against its spec in a single pass over the source
- * arguments. A positional argument binds to the next unconsumed positional
- * slot's key; a named argument binds to its key. Both write into one flat output
- * map guarded by one `seen` map: a key bound twice — whether positional-then-named
- * (the alias) or a repeated named key — is reported inline and skipped. Unknown
- * named keys and excess positional arguments are reported as they are
- * encountered. After the pass, optional defaults fill absent keys, missing
- * required keys are reported, then `refine` runs. Returns the spec-inferred
- * output or the accumulated diagnostics.
- */
 export function interpretAttribute<Out>(
   attrNode: FieldAttributeAst | ModelAttributeAst,
   spec: AttributeSpec<Out>,
@@ -154,12 +143,6 @@ export function interpretAttribute<Out>(
   return ok(value);
 }
 
-/**
- * Reports a key bound twice. A repeated named key is anchored to the offending
- * argument; an alias collision between a positional and a named binding (in
- * either order) is anchored to the whole attribute, keeping each error path's
- * span no coarser than the previous engine.
- */
 function duplicateDiagnostic(
   key: string,
   storedOrigin: Origin | undefined,

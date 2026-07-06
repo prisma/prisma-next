@@ -41,7 +41,6 @@ function fieldAttr(source: string): { node: FieldAttributeAst; ctx: InterpretCtx
   return { node, ctx: makeCtx(cursor.sourceFile) };
 }
 
-/** Parses a quoted-string argument into its decoded value; otherwise fails purely. */
 function str(): ArgType<string> {
   return {
     kind: 'str',
@@ -70,7 +69,6 @@ const FAILING_DIAGNOSTIC: PslDiagnostic = {
   span: { start: { offset: 0, line: 1, column: 1 }, end: { offset: 0, line: 1, column: 1 } },
 };
 
-/** A leaf that always fails, returning its diagnostic in the Result rather than a sink. */
 function failing(): ArgType<never> {
   return {
     kind: 'failing',
@@ -332,7 +330,6 @@ describe('interpretAttribute leaf purity', () => {
   });
 });
 
-/** A leaf that emits a diagnostic carrying whatever code the context threads to it. */
 function codeEcho(): ArgType<never> {
   return {
     kind: 'codeEcho',

@@ -43,7 +43,6 @@ function makeCtx(
   };
 }
 
-/** Parses `@x(<exprSource>)` and returns the first argument's expression plus a context. */
 function argOf(exprSource: string): { expr: ExpressionAst; ctx: InterpretCtx } {
   const cursor = new Cursor(`@x(${exprSource})`);
   const node = FieldAttributeAst.cast(createSyntaxTree(parseAttribute(cursor)));

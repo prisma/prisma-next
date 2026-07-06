@@ -4,7 +4,6 @@ import { StringLiteralExprAst } from '../../syntax/ast/expressions';
 import type { ArgType } from '../types';
 import { leafDiagnostic } from './diagnostic';
 
-/** Parses a quoted string-literal argument into its decoded value. */
 export function str(): ArgType<string> {
   return {
     kind: 'str',

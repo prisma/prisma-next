@@ -8,18 +8,13 @@ import type { ExpressionAst } from '../syntax/ast/expressions';
 export type AttributeLevel = 'field' | 'model' | 'block';
 
 /**
- * Parses one attribute argument from the parser's CST into a value of type `T`,
- * carrying that type at the type level so an attribute's output object can be
- * inferred from its spec.
- *
  * Parsing is pure: a leaf returns its diagnostics in the `Result` rather than
  * pushing them into a shared sink, so an alternative can be tried and discarded
  * without leaving stray errors behind.
  */
 export interface ArgType<T> {
-  /** Discriminant for visitor dispatch (print, completion, doc generation). */
+  /** Discriminant for visitor dispatch. */
   readonly kind: string;
-  /** Human-readable label, for "expected …" diagnostics. */
   readonly label: string;
   /** Phantom carrier for `T`; never read at runtime. */
   readonly _out?: T;
@@ -27,10 +22,6 @@ export interface ArgType<T> {
 }
 
 /**
- * The resolution context threaded through every `parse`. It carries the source
- * coordinates the engine anchors diagnostics to (`sourceId` + `sourceFile`) and
- * the PSL symbol-table handles reference combinators resolve against.
- *
  * Deliberately lean: codec-lookup / default-function-registry handles are added
  * only once a combinator needs them, so the kit does not pull those dependencies
  * into the parser layer before they are used.
@@ -38,31 +29,22 @@ export interface ArgType<T> {
 export interface InterpretCtx {
   readonly level: AttributeLevel;
   /**
-   * The code a leaf stamps onto the diagnostics it emits. `interpretAttribute`
-   * populates it from the active spec's `diagnosticCode` before calling any
-   * leaf, so a combinator emits with the attribute's code rather than a
-   * hard-coded generic. When a leaf is exercised directly (outside the engine),
-   * the caller sets it.
+   * `interpretAttribute` populates this from the active spec's `diagnosticCode`
+   * so a combinator emits with the attribute's code rather than a hard-coded
+   * generic.
    */
   readonly diagnosticCode: PslDiagnosticCode;
-  /** Identifier of the source the attribute was parsed from; stamped onto diagnostics. */
   readonly sourceId: string;
-  /** The parsed source, used to resolve node offsets into diagnostic spans. */
   readonly sourceFile: SourceFile;
   readonly symbols: SymbolTable;
-  /** The declaring model; the resolution target for a self-scoped field reference. */
   readonly selfModel: ModelSymbol;
-  /** A relation's target model; the resolution target for a referenced-scoped field reference. */
   resolveReferencedModel(): ModelSymbol | undefined;
-  /** The resolved declaring field; present only at field level. */
   readonly field?: FieldSymbol;
 }
 
 /**
- * An optional parameter: a flavoured `ArgType` carrying the optionality marker
- * and, when `hasDefault`, the default value applied when the argument is absent.
- * Because it extends `ArgType`, the engine parses it directly and detects
- * optionality from the `optional` marker.
+ * Because it extends `ArgType`, the engine parses an optional parameter directly
+ * and detects optionality from the `optional` marker.
  */
 export interface OptionalArgType<T> extends ArgType<T> {
   readonly optional: true;
@@ -70,11 +52,9 @@ export interface OptionalArgType<T> extends ArgType<T> {
   readonly defaultValue?: T;
 }
 
-/** A parameter slot's arg type; an `optional(...)` param is a flavoured `ArgType`. */
 export type Param<T> = ArgType<T>;
 
 export interface PositionalParam<T = unknown> {
-  /** The output key this slot writes into. */
   readonly key: string;
   readonly type: Param<T>;
 }
@@ -86,9 +66,8 @@ export interface AttributeSpec<Out> {
   readonly named: Readonly<Record<string, Param<unknown>>>;
   readonly refine?: (parsed: Out, ctx: InterpretCtx) => readonly PslDiagnostic[];
   /**
-   * Code for engine-emitted structural diagnostics (unknown argument, excess
-   * positional argument, alias conflict). Defaults to `PSL_INVALID_ATTRIBUTE_SYNTAX`;
-   * an attribute that must preserve a specific code overrides it here.
+   * Defaults to `PSL_INVALID_ATTRIBUTE_SYNTAX`; an attribute that must preserve a
+   * specific code overrides it here.
    */
   readonly diagnosticCode?: PslDiagnosticCode;
 }
@@ -116,10 +95,10 @@ export type AttributeOut<
 > = Simplify<PosOut<Pos> & NamedOut<Named>>;
 
 /**
- * Recovers a spec's inferred output type. The parameter is intentionally
- * unconstrained: `Out` sits contravariantly in `AttributeSpec.refine`, so a
- * `refine`-carrying `AttributeSpec<Out>` is not assignable to
- * `AttributeSpec<unknown>` and a constraint would reject every spec that uses a
- * cross-argument `refine`. Inference still recovers `Out` precisely.
+ * The parameter is intentionally unconstrained: `Out` sits contravariantly in
+ * `AttributeSpec.refine`, so a `refine`-carrying `AttributeSpec<Out>` is not
+ * assignable to `AttributeSpec<unknown>` and a constraint would reject every
+ * spec that uses a cross-argument `refine`. Inference still recovers `Out`
+ * precisely.
  */
 export type InferAttr<S> = S extends AttributeSpec<infer Out> ? Out : never;

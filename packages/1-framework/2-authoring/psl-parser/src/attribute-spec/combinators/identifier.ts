@@ -5,11 +5,8 @@ import type { ArgType } from '../types';
 import { leafDiagnostic } from './diagnostic';
 
 /**
- * Matches a bare identifier whose name equals `name`, returning that name with
- * its literal type preserved. Pinned-only: there is no open form, so several
- * `identifier`s composed under `oneOf` infer the precise union of names. A
- * non-identifier token, or an identifier with a different name, is rejected with
- * the threaded code, anchored to the argument node.
+ * Pinned-only: there is no open form, so several `identifier`s composed under
+ * `oneOf` infer the precise union of names.
  */
 export function identifier<const N extends string>(name: N): ArgType<N> {
   return {

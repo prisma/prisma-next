@@ -72,9 +72,9 @@ export function fkRelationPairKey(declaringModelName: string, targetModelName: s
 }
 
 /**
- * Maps a validated referential-action token to its contract action. The action
- * set is validated upstream by the `@relation` spec's `oneOf(identifier(...))`,
- * so this is a pure lookup with no second validation path.
+ * The action set is validated upstream by the `@relation` spec's
+ * `oneOf(identifier(...))`, so this is a pure lookup with no second validation
+ * path.
  */
 export function normalizeReferentialAction(actionToken: string): ReferentialAction | undefined {
   return REFERENTIAL_ACTION_MAP[actionToken];
@@ -82,8 +82,7 @@ export function normalizeReferentialAction(actionToken: string): ReferentialActi
 
 /**
  * Cross-argument rules the engine cannot express through per-argument leaves:
- * `fields` and `references` are both-or-neither. Anchored to the attribute span
- * with the legacy code, preserving codes-and-spans parity for that error path.
+ * `fields` and `references` are both-or-neither.
  */
 function relationInvariants(
   parsed: { readonly fields?: readonly string[]; readonly references?: readonly string[] },
@@ -104,15 +103,6 @@ function relationInvariants(
   return [];
 }
 
-/**
- * Declarative replacement for the hand-written `@relation` parser. The engine
- * binds the positional-or-named `name`, the `fields`/`references` field lists,
- * `map`, and the bare-identifier referential actions; `relationInvariants`
- * holds the both-or-neither rule. The action set is validated at parse via
- * `oneOf` over one `identifier` per action, which accepts the bare identifier
- * and rejects an unknown action with the attribute's own code;
- * `normalizeReferentialAction` then maps the validated token to its contract action.
- */
 const sqlRelation = fieldAttribute('relation', {
   positional: [{ key: 'name', type: optional(str()) }],
   named: {
@@ -199,12 +189,6 @@ function buildRelationInterpretCtx(input: {
   };
 }
 
-/**
- * Validates and lowers a field's `@relation` attribute through the declarative
- * `sqlRelation` spec, returning the spec's inferred output directly. The engine
- * aggregates every error path's diagnostics; like the previous first-error
- * parser, the caller skips the field when this returns `undefined`.
- */
 export function interpretRelationAttribute(input: {
   readonly selfModel: ModelSymbol;
   readonly field: FieldSymbol;

@@ -4,18 +4,11 @@ import { ArrayLiteralAst, type ExpressionAst } from '../../syntax/ast/expression
 import type { ArgType } from '../types';
 import { leafDiagnostic } from './diagnostic';
 
-/** Surface constraints a `list` enforces over its parsed elements. */
 export interface ListOptions {
   readonly nonEmpty?: boolean;
   readonly unique?: boolean;
 }
 
-/**
- * Lifts an element combinator over a `[…]` array literal into `T[]`, threading
- * each element through `of` and enforcing the optional surface constraints.
- * Element errors are collected and propagated; `nonEmpty` and `unique` add their
- * own diagnostics, anchored to the array and to each offending element.
- */
 export function list<T>(of: ArgType<T>, opts?: ListOptions): ArgType<T[]> {
   return {
     kind: 'list',

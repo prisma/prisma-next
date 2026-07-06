@@ -14,11 +14,6 @@ interface FieldAttributeConfig<
   readonly diagnosticCode?: PslDiagnosticCode;
 }
 
-/**
- * Builds a field-level `AttributeSpec`. The output type is inferred from the
- * positional and named parameters, so there is no hand-written output interface
- * to drift from the spec.
- */
 export function fieldAttribute<
   const Pos extends readonly PositionalParam[] = readonly [],
   const Named extends Record<string, Param<unknown>> = Record<never, never>,

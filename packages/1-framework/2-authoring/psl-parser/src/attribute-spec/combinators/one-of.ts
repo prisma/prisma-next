@@ -5,13 +5,9 @@ import type { ArgType, OutOf } from '../types';
 import { leafDiagnostic } from './diagnostic';
 
 /**
- * Tries each alternative in order and returns the first one that succeeds; the
- * output type is the union of the alternatives' output types. Because leaves are
- * `Result`-pure — a failed branch returns its diagnostics rather than pushing
- * them into a sink — a discarded alternative leaves no stray errors behind, so
- * when every alternative fails `oneOf` emits a single aggregate diagnostic
- * (listing the alternatives' labels) with the threaded code, anchored to the
- * argument node, rather than leaking the branches' internal failures.
+ * Because leaves are `Result`-pure — a failed branch returns its diagnostics
+ * rather than pushing them into a sink — a discarded alternative leaves no stray
+ * errors behind.
  */
 export function oneOf<Alts extends readonly [ArgType<unknown>, ...ArgType<unknown>[]]>(
   ...alts: Alts
