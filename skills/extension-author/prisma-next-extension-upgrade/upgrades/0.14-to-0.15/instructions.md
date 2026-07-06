@@ -105,3 +105,16 @@ authoring path emits a list storage column yet, so extension contracts and runti
 behaviour are unchanged. No extension-author API or surface change. Incidental
 substrate diff only.
 -->
+
+<!--
+PR #894 (postgres-rls slice 2, schema-node-tree-restructure): restructures the
+schema-diff node tree, splits `db verify` into per-space contract-satisfaction
+plus one unclaimed-elements list, and moves plan/verify scoping into the
+aggregate orchestration. The only `packages/3-extensions/` touches are test
+files: `pgvector/test/migrations/planner.*.test.ts` (planner fixtures rebuilt
+for the schema-node tree) and `supabase/test/classification.e2e.test.ts`
+(comment wording). The renamed internals (`AggregateContractSpace`,
+`combineVerifyResults`, the planner keep-predicate) are migration-tools/CLI
+internals with no references in any extension source. No extension-author API
+changed; no extension-author action. Incidental substrate diff only.
+-->
