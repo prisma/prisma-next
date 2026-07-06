@@ -1,6 +1,6 @@
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
+import type { SqlCodecLookup } from '@prisma-next/sql-contract/native-type-hook';
 import {
   type AggregateExpr,
   type AnyExpression,
@@ -72,7 +72,7 @@ const POSTGRES_INFERRABLE_NATIVE_TYPES: ReadonlySet<string> = new Set([
 function renderTypedParam(
   index: number,
   codecId: string | undefined,
-  codecLookup: CodecLookup,
+  codecLookup: SqlCodecLookup,
   many?: boolean,
   typeParams?: JsonValue,
 ): string {
@@ -123,7 +123,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 interface ParamIndexMap {
   readonly indexMap: Map<AnyParamRef, number>;
-  readonly codecLookup: CodecLookup;
+  readonly codecLookup: SqlCodecLookup;
 }
 
 /**
@@ -134,7 +134,7 @@ interface ParamIndexMap {
 export function renderLoweredSql(
   ast: AnyQueryAst,
   contract: PostgresContract,
-  codecLookup: CodecLookup,
+  codecLookup: SqlCodecLookup,
 ): { readonly sql: string; readonly params: readonly LoweredParam[] } {
   const orderedRefs = collectOrderedParamRefs(ast);
   const indexMap = new Map<AnyParamRef, number>();

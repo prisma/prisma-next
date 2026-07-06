@@ -57,8 +57,6 @@ export interface CodecLookup {
     value: JsonValue,
     side: 'output' | 'input',
   ): string | undefined;
-  /** Codec-id-keyed `nativeTypeFor` renderer — the per-instance native type for a parameterized codec (e.g. a native enum's type name from its `typeParams`). Optional so existing lookups need not provide it; returns `undefined` when the codec has no per-instance native type or the id is unknown, in which case callers fall back to the codec's static meta. */
-  nativeTypeFor?(id: string, typeParams: JsonValue | undefined): string | undefined;
 }
 
 /**

@@ -2,6 +2,7 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { RuntimeExtensionDescriptor } from '@prisma-next/framework-components/execution';
+import type { SqlCodecLookup } from '@prisma-next/sql-contract/native-type-hook';
 import {
   BinaryExpr,
   ColumnRef,
@@ -20,7 +21,7 @@ import type { PostgresContract } from '../src/core/types';
 import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 import { defineTestCodec } from './test-codec';
 
-const emptyLookup: CodecLookup = {
+const emptyLookup: SqlCodecLookup = {
   get: () => undefined,
   targetTypesFor: () => undefined,
   metaFor: () => undefined,
@@ -39,12 +40,15 @@ interface CodecMetadata {
 
 function lookupOf(
   byId: Record<string, { codec: SqlCodec; metadata?: CodecMetadata }>,
-): CodecLookup {
-  return {
+): SqlCodecLookup {
+  const base: CodecLookup = {
     get: (id) => byId[id]?.codec as Codec | undefined,
     targetTypesFor: (id) => byId[id]?.metadata?.targetTypes,
     metaFor: (id) => byId[id]?.metadata?.meta,
     renderOutputTypeFor: (id, params) => byId[id]?.metadata?.renderOutputType?.(params),
+  };
+  return {
+    ...base,
     nativeTypeFor: (id, typeParams) => byId[id]?.metadata?.nativeTypeFor?.(typeParams),
   };
 }

@@ -337,10 +337,6 @@ export function extractCodecLookup(
     string,
     (value: JsonValue, side: 'output' | 'input') => string | undefined
   >();
-  const nativeTypeRenderersById = new Map<
-    string,
-    (typeParams: JsonValue | undefined) => string | undefined
-  >();
   const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
     const codecTypes = descriptor.types?.codecTypes;
@@ -370,9 +366,6 @@ export function extractCodecLookup(
       }
       if (typeof codecDescriptor.renderValueLiteral === 'function') {
         valueLiteralRenderersById.set(codecDescriptor.codecId, codecDescriptor.renderValueLiteral);
-      }
-      if (typeof codecDescriptor.nativeTypeFor === 'function') {
-        nativeTypeRenderersById.set(codecDescriptor.codecId, codecDescriptor.nativeTypeFor);
       }
       // Materialize a representative `Codec` instance for `byId.get()` so consumers reading the lookup's instance side (e.g. SQL renderer's cast-policy lookup, or the contract emitter's literal-default `encodeJson` resolver) keep finding the codec.
       //
@@ -414,7 +407,6 @@ export function extractCodecLookup(
     renderOutputTypeFor: (id, params) => renderersById.get(id)?.(params),
     renderInputTypeFor: (id, params) => inputRenderersById.get(id)?.(params),
     renderValueLiteralFor: (id, value, side) => valueLiteralRenderersById.get(id)?.(value, side),
-    nativeTypeFor: (id, typeParams) => nativeTypeRenderersById.get(id)?.(typeParams),
   };
 }
 

@@ -57,8 +57,6 @@ export interface CodecDescriptor<P = void> {
    * per permitted value; the caller joins the results with `|`.
    */
   readonly renderValueLiteral?: (value: JsonValue, side: 'output' | 'input') => string | undefined;
-  /** Per-instance native type for a parameterized codec (e.g. a native enum's type name from its typeParams). Undefined → the codec has no per-instance native type and renderers use static meta. */
-  readonly nativeTypeFor?: (typeParams: JsonValue | undefined) => string | undefined;
   /** The curried higher-order codec. For non-parameterized codecs, the factory is constant — every call returns the same shared codec instance. For parameterized codecs, the factory is called once per `storage.types` instance (or once per inline-`typeParams` column), with `ctx` carrying the column set the resulting codec serves. */
   readonly factory: (params: P) => (ctx: CodecInstanceContext) => Codec;
 }
@@ -99,9 +97,6 @@ export abstract class CodecDescriptorImpl<TParams = void> implements CodecDescri
 
   /** Optional emit-path renderer for a single stored value. See {@link CodecDescriptor.renderValueLiteral}. */
   renderValueLiteral?(value: JsonValue, side: 'output' | 'input'): string | undefined;
-
-  /** Optional per-instance native-type renderer. See {@link CodecDescriptor.nativeTypeFor}. */
-  nativeTypeFor?(typeParams: JsonValue | undefined): string | undefined;
 
   /**
    * Materialize a curried codec factory for the given params. Concrete subclasses override with a typed return type (e.g. `factory<N>(params: { length: N }): (ctx) => VectorCodec<N>`); per-codec helpers read the typed return at the *direct* call site, which is what preserves method-level generics. Type extraction (e.g. `ReturnType<D['factory']>`) widens method generics to their constraint — that's why the column-helper surface is per-codec, not polymorphic.

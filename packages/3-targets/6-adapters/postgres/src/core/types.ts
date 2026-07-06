@@ -1,4 +1,5 @@
 import type { CodecRegistry } from '@prisma-next/framework-components/codec';
+import type { SqlCodecLookup } from '@prisma-next/sql-contract/native-type-hook';
 import type { StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
@@ -28,7 +29,7 @@ export interface PostgresAdapterOptions {
    * `SqlControlAdapterDescriptor.create(stack)`) supply the assembled stack
    * lookup so extension codecs are visible to the renderer.
    */
-  readonly codecLookup?: CodecRegistry;
+  readonly codecLookup?: CodecRegistry & SqlCodecLookup;
 }
 
 export type { PostgresContract } from '@prisma-next/target-postgres/types';

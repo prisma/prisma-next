@@ -226,7 +226,7 @@ export class PgEnumDescriptor extends CodecDescriptorImpl<PgEnumParams> {
   override renderValueLiteral(value: JsonValue): string | undefined {
     return renderTsLiteral(value);
   }
-  override nativeTypeFor(typeParams: JsonValue | undefined): string | undefined {
+  nativeTypeFor(typeParams: JsonValue | undefined): string | undefined {
     if (!isJsonObject(typeParams)) return undefined;
     const typeName = typeParams['typeName'];
     return typeof typeName === 'string' ? typeName : undefined;
