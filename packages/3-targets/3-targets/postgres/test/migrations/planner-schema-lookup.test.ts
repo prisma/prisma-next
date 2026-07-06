@@ -1,24 +1,23 @@
 import { asNamespaceId } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { ForeignKey } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlTableIRInput } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import {
   buildSchemaLookupMap,
   hasForeignKey,
 } from '../../src/core/migrations/planner-schema-lookup';
 
-function makeTable(
-  overrides: Partial<SqlSchemaIR['tables'][string]> = {},
-): SqlSchemaIR['tables'][string] {
-  return {
+function makeTable(overrides: Partial<SqlTableIRInput> = {}): SqlSchemaIR['tables'][string] {
+  return new SqlTableIR({
     name: 'test',
     columns: {},
     foreignKeys: [],
     uniques: [],
     indexes: [],
     ...overrides,
-  };
+  });
 }
 
 function fk(overrides: Partial<ForeignKey> & Pick<ForeignKey, 'source' | 'target'>): ForeignKey {
@@ -32,7 +31,7 @@ function fk(overrides: Partial<ForeignKey> & Pick<ForeignKey, 'source' | 'target
 describe('hasForeignKey — key encoding', () => {
   describe('happy paths', () => {
     it('matches an unbound-namespace FK against the unqualified key', () => {
-      const schema: SqlSchemaIR = {
+      const schema = new SqlSchemaIR({
         tables: {
           post: makeTable({
             foreignKeys: [
@@ -40,7 +39,7 @@ describe('hasForeignKey — key encoding', () => {
             ],
           }),
         },
-      };
+      });
       const lookup = buildSchemaLookupMap(schema).get('post')!;
       expect(
         hasForeignKey(
@@ -62,7 +61,7 @@ describe('hasForeignKey — key encoding', () => {
     });
 
     it('matches a bound-namespace FK against the qualified key when referencedSchema matches', () => {
-      const schema: SqlSchemaIR = {
+      const schema = new SqlSchemaIR({
         tables: {
           post: makeTable({
             foreignKeys: [
@@ -75,7 +74,7 @@ describe('hasForeignKey — key encoding', () => {
             ],
           }),
         },
-      };
+      });
       const lookup = buildSchemaLookupMap(schema).get('post')!;
       expect(
         hasForeignKey(
@@ -93,7 +92,7 @@ describe('hasForeignKey — key encoding', () => {
     });
 
     it('rejects a bound-namespace FK when namespaceId does not match referencedSchema', () => {
-      const schema: SqlSchemaIR = {
+      const schema = new SqlSchemaIR({
         tables: {
           post: makeTable({
             foreignKeys: [
@@ -106,7 +105,7 @@ describe('hasForeignKey — key encoding', () => {
             ],
           }),
         },
-      };
+      });
       const lookup = buildSchemaLookupMap(schema).get('post')!;
       expect(
         hasForeignKey(
@@ -126,7 +125,7 @@ describe('hasForeignKey — key encoding', () => {
 
   describe('identifiers containing the encoding separator', () => {
     it('matches identifiers containing a single pipe character', () => {
-      const schema: SqlSchemaIR = {
+      const schema = new SqlSchemaIR({
         tables: {
           post: makeTable({
             foreignKeys: [
@@ -138,7 +137,7 @@ describe('hasForeignKey — key encoding', () => {
             ],
           }),
         },
-      };
+      });
       const lookup = buildSchemaLookupMap(schema).get('post')!;
       expect(
         hasForeignKey(
@@ -160,7 +159,7 @@ describe('hasForeignKey — key encoding', () => {
     });
 
     it('matches identifiers containing the doubled-pipe sequence', () => {
-      const schema: SqlSchemaIR = {
+      const schema = new SqlSchemaIR({
         tables: {
           post: makeTable({
             foreignKeys: [
@@ -172,7 +171,7 @@ describe('hasForeignKey — key encoding', () => {
             ],
           }),
         },
-      };
+      });
       const lookup = buildSchemaLookupMap(schema).get('post')!;
       expect(
         hasForeignKey(
@@ -201,13 +200,13 @@ describe('hasForeignKey — key encoding', () => {
       // A separate FK with composite source columns ["a", "b"] must NOT
       // match the stored entry: they are structurally distinct, even though
       // a comma-join encoding would conflate them.
-      const schema: SqlSchemaIR = {
+      const schema = new SqlSchemaIR({
         tables: {
           post: makeTable({
             foreignKeys: [{ columns: ['a,b'], referencedTable: 'user', referencedColumns: ['id'] }],
           }),
         },
-      };
+      });
       const lookup = buildSchemaLookupMap(schema).get('post')!;
       expect(
         hasForeignKey(
@@ -233,7 +232,7 @@ describe('hasForeignKey — key encoding', () => {
       // Lookup FK: namespaceId='p',     tableName='q|r'.
       // A pipe-separator encoding would render both as 'a|p|q|r|s', a false
       // positive. They are structurally distinct and must not collide.
-      const schema: SqlSchemaIR = {
+      const schema = new SqlSchemaIR({
         tables: {
           post: makeTable({
             foreignKeys: [
@@ -246,7 +245,7 @@ describe('hasForeignKey — key encoding', () => {
             ],
           }),
         },
-      };
+      });
       const lookup = buildSchemaLookupMap(schema).get('post')!;
       expect(
         hasForeignKey(

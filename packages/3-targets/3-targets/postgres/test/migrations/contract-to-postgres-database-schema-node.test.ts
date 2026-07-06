@@ -1,6 +1,5 @@
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { contractToPostgresDatabaseSchemaNode } from '../../src/core/migrations/contract-to-postgres-database-schema-node';
@@ -10,6 +9,7 @@ import { type PostgresContract, PostgresSchema } from '../../src/core/postgres-s
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
+import type { SqlSchemaDiffNode } from '../../src/core/schema-ir/schema-node-kinds';
 import { postgresRenderDefault } from '../../src/exports/control';
 
 const TABLE_NAME = 'profiles';
@@ -125,7 +125,7 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
     );
     expect(root.roles).toContainEqual(expect.objectContaining({ name: 'app_user' }));
     for (const child of root.children()) {
-      expect(PostgresNamespaceSchemaNode.is(child as SqlSchemaIRNode)).toBe(true);
+      expect(PostgresNamespaceSchemaNode.is(child as SqlSchemaDiffNode)).toBe(true);
     }
   });
 

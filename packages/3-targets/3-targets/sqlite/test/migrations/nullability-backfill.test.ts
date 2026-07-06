@@ -3,7 +3,7 @@ import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adap
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
-import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
@@ -60,7 +60,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
 function nullableEmailSchema(): { tables: Record<string, SqlTableIR> } {
   return {
     tables: {
-      users: {
+      users: new SqlTableIR({
         name: 'users',
         columns: {
           id: {
@@ -78,7 +78,7 @@ function nullableEmailSchema(): { tables: Record<string, SqlTableIR> } {
         foreignKeys: [],
         uniques: [],
         indexes: [],
-      },
+      }),
     },
   };
 }

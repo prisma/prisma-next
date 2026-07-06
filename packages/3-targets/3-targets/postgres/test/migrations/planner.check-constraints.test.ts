@@ -7,8 +7,7 @@ import {
   StorageTable,
   StorageValueSet,
 } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { SqlCheckConstraintIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlCheckConstraintIR, SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
@@ -112,7 +111,7 @@ function makeContractWithoutCheck(): Contract<SqlStorage> {
 }
 
 function schemaWithCheck(values: readonly string[]): SqlSchemaIR {
-  return {
+  return new SqlSchemaIR({
     tables: {
       [TABLE_NAME]: {
         name: TABLE_NAME,
@@ -129,11 +128,11 @@ function schemaWithCheck(values: readonly string[]): SqlSchemaIR {
         ],
       },
     },
-  };
+  });
 }
 
 function schemaWithoutCheck(): SqlSchemaIR {
-  return {
+  return new SqlSchemaIR({
     tables: {
       [TABLE_NAME]: {
         name: TABLE_NAME,
@@ -143,7 +142,7 @@ function schemaWithoutCheck(): SqlSchemaIR {
         indexes: [],
       },
     },
-  };
+  });
 }
 
 const defaultCtx = {

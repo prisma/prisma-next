@@ -33,7 +33,7 @@ import {
   UniqueConstraint,
 } from '@prisma-next/sql-relational-core/ast';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
@@ -415,7 +415,7 @@ const DEFAULT_POLICY: MigrationOperationPolicy = {
 };
 
 function emptySchemaIR(): SqlSchemaIR {
-  return { tables: {} };
+  return new SqlSchemaIR({ tables: {} });
 }
 
 // ============================================================================

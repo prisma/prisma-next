@@ -31,7 +31,8 @@ import {
   makePslNamespaceEntries,
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
-import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlColumnIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import type { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { createPostgresDefaultMapping } from './postgres-default-mapping';
 import { createPostgresTypeMap } from './postgres-type-map';
@@ -125,10 +126,10 @@ export function inferPostgresPslContract(tree: PostgresDatabaseSchemaNode): PslD
             'output is a later slice).',
         );
       }
-      tables[tableName] = table;
+      tables[tableName] = new SqlTableIR(table);
     }
   }
-  const schemaIR: SqlSchemaIR = { tables };
+  const schemaIR = new SqlSchemaIR({ tables });
 
   const options: PslPrinterOptions = {
     typeMap: createPostgresTypeMap(new Set()),

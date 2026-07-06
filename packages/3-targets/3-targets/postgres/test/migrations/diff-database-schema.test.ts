@@ -255,6 +255,43 @@ describe('diffPostgresSchema', () => {
     expect(issues).toHaveLength(0);
   });
 
+  it('does not report column drift: table children now include columns/PK/constraints, but diffPostgresSchema stays policy-only', () => {
+    const contract = makeContract([]);
+    const expected = expectedFor(contract);
+    // Actual schema deliberately drifts on a non-policy attribute (nullable
+    // flips on the `user_id` column) — this must not surface here, because
+    // diffPostgresSchema's output is filtered to policy-subject issues only;
+    // non-policy drift belongs to the (separately ported) relational walk.
+    const actual = new PostgresDatabaseSchemaNode({
+      namespaces: {
+        [SCHEMA_NAME]: new PostgresNamespaceSchemaNode({
+          schemaName: SCHEMA_NAME,
+          tables: {
+            [TABLE_NAME]: new PostgresTableSchemaNode({
+              name: TABLE_NAME,
+              columns: {
+                id: { name: 'id', nativeType: 'int4', nullable: false },
+                user_id: { name: 'user_id', nativeType: 'int4', nullable: true },
+              },
+              foreignKeys: [],
+              uniques: [],
+              indexes: [],
+              policies: [],
+            }),
+          },
+          nativeEnumTypeNames: [],
+        }),
+      },
+      roles: [],
+      existingSchemas: [SCHEMA_NAME],
+      pgVersion: 'unknown',
+    });
+
+    const issues = diffPostgresSchema(expected, actual);
+
+    expect(issues).toHaveLength(0);
+  });
+
   it('emits extra for a DB policy on a table not in the contract (strict drop)', () => {
     const outsidePolicy = makePolicy('some_policy_aaaabbbb', 'other_table');
     const contract = makeContract([]);

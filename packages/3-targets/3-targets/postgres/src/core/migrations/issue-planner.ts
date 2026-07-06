@@ -26,7 +26,7 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import type { CodecRef, DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import * as contractFree from '@prisma-next/sql-relational-core/contract-free';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
@@ -822,7 +822,7 @@ const DEFAULT_POLICY: MigrationOperationPolicy = {
 };
 
 function emptySchemaIR(): SqlSchemaIR {
-  return { tables: {} };
+  return new SqlSchemaIR({ tables: {} });
 }
 
 function conflictKindForCall(call: PostgresOpFactoryCall): SqlPlannerConflict['kind'] {

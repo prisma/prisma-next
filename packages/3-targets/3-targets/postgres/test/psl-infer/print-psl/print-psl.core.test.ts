@@ -1,12 +1,12 @@
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { printPslFromFlat as printPslFromSql } from '../fixtures';
 
 describe('printPsl', () => {
   it('empty schema', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {},
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -16,7 +16,7 @@ describe('printPsl', () => {
   });
 
   it('simple schema with single table', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         user: {
           name: 'user',
@@ -31,7 +31,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -49,7 +49,7 @@ describe('printPsl', () => {
   });
 
   it('table without primary key', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         audit_log: {
           name: 'audit_log',
@@ -66,7 +66,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -84,7 +84,7 @@ describe('printPsl', () => {
   });
 
   it('composite primary key', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         order_item: {
           name: 'order_item',
@@ -103,7 +103,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -122,7 +122,7 @@ describe('printPsl', () => {
   });
 
   it('deterministic output: same input always produces same output', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         b_table: {
           name: 'b_table',
@@ -145,7 +145,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result1 = printPslFromSql(schemaIR);
     const result2 = printPslFromSql(schemaIR);
     expect(result1).toBe(result2);

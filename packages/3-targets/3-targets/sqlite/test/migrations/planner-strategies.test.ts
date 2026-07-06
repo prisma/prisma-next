@@ -2,7 +2,7 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { RecreateTableCall } from '../../src/core/migrations/op-factory-call';
@@ -42,14 +42,14 @@ function makeContext(overrides: Partial<StrategyContext> = {}): StrategyContext 
     fromContract: null,
     codecHooks: new Map(),
     storageTypes: {},
-    schema: { tables: {} },
+    schema: new SqlSchemaIR({ tables: {} }),
     policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     frameworkComponents: [],
     ...overrides,
   };
 }
 
-const baseTable = {
+const baseTable = new SqlTableIR({
   name: 'user',
   columns: {
     id: { name: 'id', nativeType: 'INTEGER', nullable: false },
@@ -59,7 +59,7 @@ const baseTable = {
   foreignKeys: [],
   uniques: [],
   indexes: [],
-};
+});
 
 describe('recreateTableStrategy', () => {
   it('returns no_match when there are no recreate-eligible issues', () => {
@@ -93,7 +93,7 @@ describe('recreateTableStrategy', () => {
       },
     });
 
-    const schema: SqlSchemaIR = { tables: { user: baseTable } };
+    const schema = new SqlSchemaIR({ tables: { user: baseTable } });
 
     const issues: SchemaIssue[] = [
       { kind: 'default_mismatch', table: 'user', column: 'email', message: 'differ' },
@@ -130,7 +130,7 @@ describe('recreateTableStrategy', () => {
       },
     });
 
-    const schema: SqlSchemaIR = { tables: { user: baseTable } };
+    const schema = new SqlSchemaIR({ tables: { user: baseTable } });
 
     const issues: SchemaIssue[] = [
       {
@@ -173,7 +173,7 @@ describe('recreateTableStrategy', () => {
       },
     });
 
-    const schema: SqlSchemaIR = { tables: { user: baseTable } };
+    const schema = new SqlSchemaIR({ tables: { user: baseTable } });
 
     const issues: SchemaIssue[] = [
       { kind: 'default_mismatch', table: 'user', column: 'email', message: 'd' },
@@ -214,7 +214,7 @@ describe('recreateTableStrategy', () => {
       },
     });
 
-    const schema: SqlSchemaIR = { tables: { user: baseTable } };
+    const schema = new SqlSchemaIR({ tables: { user: baseTable } });
 
     const widening = recreateTableStrategy(
       [
@@ -277,12 +277,12 @@ describe('recreateTableStrategy', () => {
       },
     });
 
-    const schema: SqlSchemaIR = {
+    const schema = new SqlSchemaIR({
       tables: {
-        a: { ...baseTable, name: 'a' },
-        b: { ...baseTable, name: 'b' },
+        a: new SqlTableIR({ ...baseTable, name: 'a' }),
+        b: new SqlTableIR({ ...baseTable, name: 'b' }),
       },
-    };
+    });
 
     const issues: SchemaIssue[] = [
       {

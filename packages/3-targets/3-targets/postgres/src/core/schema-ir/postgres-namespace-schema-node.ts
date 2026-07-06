@@ -12,9 +12,12 @@ export interface PostgresNamespaceSchemaNodeInput {
 
 /**
  * One-per-Postgres-schema diff-tree node. Groups the tables belonging to a
- * single namespace and satisfies the `SqlSchemaIR` shape so legacy per-schema
- * consumers (verifySqlSchema, the relational planner, toSchemaView) can
- * accept it unchanged in Unit 6.
+ * single namespace. Legacy per-schema consumers (verifySqlSchema, the
+ * relational planner, toSchemaView) read this node's `tables` field
+ * structurally via `blindCast`/`SqlSchemaIRNode` — not through a static
+ * `SqlSchemaIR` assignment — because `nodeKind` now carries this node's own
+ * literal (`postgres-namespace`), distinct from `SqlSchemaIR`'s own
+ * (`sql-schema`).
  *
  * `id` is the schema name. `isEqualTo` is identity — two namespace nodes are
  * equal iff their ids (schema names) match. `children()` returns the table

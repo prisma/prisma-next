@@ -377,21 +377,38 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 }
 
 /**
- * Returns the one namespace node whose tables the relational strategy layer
- * probes for live-table existence — the node matching the planner's resolved
- * schema name, or the first namespace when none matches. `undefined` when the
- * tree has no namespaces, so the strategy context uses its empty-schema default.
+ * Returns the one namespace node the relational strategy layer probes for
+ * live-table existence and reads codec-hook context off — the namespace
+ * matching the planner's resolved schema name, or the first namespace when
+ * none matches. `undefined` when the tree has no namespaces, so the strategy
+ * context uses its empty-schema default.
  *
  * The relational strategies key tables by bare name, so they can only probe one
  * namespace at a time; probing across every namespace at once is future work.
+ *
+ * Returns the real `PostgresNamespaceSchemaNode` reference rather than a
+ * projection: `storageTypePlanCallStrategy` hands this same value to codec
+ * `planTypeOperations` hooks as `schema`, and hooks read the Postgres-specific
+ * `nativeEnumTypeNames` field off it (via `PostgresNamespaceSchemaNode.is`) to
+ * decide whether a native enum type already exists — a projection that only
+ * copies `tables` would silently drop that signal. `StrategyContext.schema`'s
+ * declared type (`SqlSchemaIR`, shared with SQLite's flat shape) doesn't
+ * capture this, so the return is `blindCast` the same way `namespaceSchemaNodes`
+ * in the family's relational walk already treats a namespace node as a
+ * structurally-`SqlSchemaIR`-shaped value.
  */
 function relationalNamespaceNode(
   schema: PostgresDatabaseSchemaNode,
   schemaName: string,
 ): SqlSchemaIR | undefined {
   const namespaceNodes = Object.values(schema.namespaces);
-  const byName = namespaceNodes.find((node) => node.schemaName === schemaName);
-  return byName ?? namespaceNodes[0];
+  const namespaceNode =
+    namespaceNodes.find((node) => node.schemaName === schemaName) ?? namespaceNodes[0];
+  if (namespaceNode === undefined) return undefined;
+  return blindCast<
+    SqlSchemaIR,
+    'PostgresNamespaceSchemaNode carries tables (+ nativeEnumTypeNames, read by codec hooks via PostgresNamespaceSchemaNode.is) structurally compatible with the SqlSchemaIR shape the strategy layer declares'
+  >(namespaceNode);
 }
 
 /**
