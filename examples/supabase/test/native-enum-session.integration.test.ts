@@ -114,6 +114,12 @@ describe('native Postgres enum (auth.aal_level) on auth.sessions', () => {
           expectTypeOf(internal.nativeEnums.auth.AalLevel.values).toEqualTypeOf<
             readonly ['aal1', 'aal2', 'aal3']
           >();
+
+          // `Value` derives the same value union via plain `typeof`, with the
+          // accessor already in scope (no separate type import needed).
+          expectTypeOf<typeof internal.nativeEnums.auth.AalLevel.Value>().toEqualTypeOf<
+            'aal1' | 'aal2' | 'aal3'
+          >();
         } finally {
           await db.close();
         }

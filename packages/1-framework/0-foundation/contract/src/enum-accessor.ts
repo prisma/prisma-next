@@ -109,6 +109,11 @@ export type ContractEnumAccessor<Entry extends EnumEntry> = {
   hasName(name: string): name is Extract<EnumEntryNames<Entry>[number], string>;
   nameOf(v: EnumEntryValues<Entry>[number]): string | undefined;
   ordinalOf(v: EnumEntryValues<Entry>[number]): number;
+  /**
+   * Type-only: the enum's value union. Absent at runtime — use `typeof X.Value`
+   * to derive the type; never read `X.Value` as a value.
+   */
+  readonly Value: EnumEntryValues<Entry>[number];
 };
 
 /**

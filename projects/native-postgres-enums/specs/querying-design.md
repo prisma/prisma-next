@@ -155,6 +155,25 @@ handle (the same dual source `NamespacedEnums` already supports via its
 `enumAccessors`-vs-`enum` branch). The no-emit path must work, or `typeof contract` consumers
 lose the accessor.
 
+### 3.4 Deriving an enum's value type — `typeof X.Value`
+
+The user-facing way to name an enum's value union is the accessor's **`Value` phantom** — a
+type-only property on `ContractEnumAccessor` (absent at runtime), shared by both enum kinds:
+
+```ts
+const Priority = db.enums.public.Priority;
+type Priority = typeof Priority.Value;                       // 'low' | 'high' | 'urgent'
+type AalLevel = typeof db.nativeEnums.auth.AalLevel.Value;   // 'aal1' | 'aal2' | 'aal3'
+// no client value in scope? index the client type along the same path:
+type AalLevel2 = SupabaseInternalDb['nativeEnums']['auth']['AalLevel']['Value'];
+```
+
+The idiom is emitter-independent by construction — it derives from the client's accessor
+types, the single place the emitted and no-emit paths converge — so no-emit contracts get the
+same ergonomics wherever the accessor is literally typed. `EnumValues<A>` remains as named
+sugar; the raw `['values'][number]` derivation and internal generics (`NamespacedNativeEnums`
+applied to a contract type) are not user surface.
+
 ## 4. The runtime execution path (DSL → SQL + params → decode)
 
 ### 4.1 Codec resolution is already per-instance

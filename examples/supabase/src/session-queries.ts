@@ -1,11 +1,6 @@
-import type {
-  SupabaseExtensionContract,
-  SupabaseInternalDb,
-} from '@prisma-next/extension-supabase/runtime';
-import type { NamespacedNativeEnums } from '@prisma-next/postgres/runtime';
+import type { SupabaseInternalDb } from '@prisma-next/extension-supabase/runtime';
 
-type AalLevel =
-  NamespacedNativeEnums<SupabaseExtensionContract>['auth']['AalLevel']['values'][number];
+type AalLevel = SupabaseInternalDb['nativeEnums']['auth']['AalLevel']['Value'];
 
 export async function readSessionAal(db: SupabaseInternalDb, sessionId: string) {
   const rows = await db
