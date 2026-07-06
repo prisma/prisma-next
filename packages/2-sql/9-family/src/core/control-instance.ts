@@ -957,15 +957,32 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         },
         'structural read of the schema-IR tree own namespaces/tables records'
       >(schema);
-      const tableRecords: ReadonlyArray<Record<string, SqlTableIR>> =
+      // A multi-namespace root qualifies every table's display name with its
+      // namespace key, so same-named tables in different namespaces (e.g.
+      // public.thing and auth.thing) render distinct ids and labels. The
+      // single-namespace case (and a flat SQLite root) keeps today's bare
+      // names. Synthesized constraint/index fallback names keep the bare table
+      // name — that is the name the database derives them from.
+      const namespaceEntries: ReadonlyArray<[string | undefined, Record<string, SqlTableIR>]> =
         root.namespaces !== undefined
-          ? Object.values(root.namespaces).map((namespace) => namespace.tables)
-          : [root.tables ?? {}];
-      const tableEntries: ReadonlyArray<[string, SqlTableIR]> = tableRecords.flatMap((tables) =>
-        Object.entries(tables),
+          ? Object.entries(root.namespaces).map(
+              ([namespaceKey, namespace]): [string, Record<string, SqlTableIR>] => [
+                namespaceKey,
+                namespace.tables,
+              ],
+            )
+          : [[undefined, root.tables ?? {}]];
+      const qualify = namespaceEntries.length > 1;
+      const tableEntries: ReadonlyArray<[string, string, SqlTableIR]> = namespaceEntries.flatMap(
+        ([namespaceKey, tables]) =>
+          Object.entries(tables).map(([tableName, table]): [string, string, SqlTableIR] => [
+            qualify && namespaceKey !== undefined ? `${namespaceKey}.${tableName}` : tableName,
+            tableName,
+            table,
+          ]),
       );
       const tableNodes: readonly SchemaTreeNode[] = tableEntries.map(
-        ([tableName, table]: [string, SqlTableIR]) => {
+        ([displayName, tableName, table]: [string, string, SqlTableIR]) => {
           const children: SchemaTreeNode[] = [];
 
           const columnNodes: SchemaTreeNode[] = [];
@@ -976,7 +993,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             columnNodes.push(
               new SchemaTreeNode({
                 kind: 'field',
-                id: `column-${tableName}-${columnName}`,
+                id: `column-${displayName}-${columnName}`,
                 label,
                 meta: {
                   nativeType: column.nativeType,
@@ -991,7 +1008,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'collection',
-                id: `columns-${tableName}`,
+                id: `columns-${displayName}`,
                 label: 'columns',
                 children: columnNodes,
               }),
@@ -1003,7 +1020,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'index',
-                id: `primary-key-${tableName}`,
+                id: `primary-key-${displayName}`,
                 label: `primary key: ${pkColumns}`,
                 meta: {
                   columns: table.primaryKey.columns,
@@ -1019,7 +1036,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'index',
-                id: `unique-${tableName}-${name}`,
+                id: `unique-${displayName}-${name}`,
                 label,
                 meta: {
                   columns: unique.columns,
@@ -1035,7 +1052,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'index',
-                id: `index-${tableName}-${name}`,
+                id: `index-${displayName}-${name}`,
                 label,
                 meta: {
                   columns: index.columns,
@@ -1063,8 +1080,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
           return new SchemaTreeNode({
             kind: 'entity',
-            id: `table-${tableName}`,
-            label: `table ${tableName}`,
+            id: `table-${displayName}`,
+            label: `table ${displayName}`,
             ...(Object.keys(tableMeta).length > 0 ? { meta: tableMeta } : {}),
             ...(children.length > 0 ? { children } : {}),
           });
