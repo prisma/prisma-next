@@ -59,6 +59,23 @@ describe('SqliteControlAdapter.introspect', () => {
     await driver.close();
   });
 
+  it('stamps normalized resolvedNativeType and parsed resolvedDefault on columns', async () => {
+    const driver = createMemoryDriver();
+    driver.db.exec(
+      "CREATE TABLE docs (status TEXT NOT NULL DEFAULT 'draft', n INTEGER DEFAULT 5, note TEXT)",
+    );
+    const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
+    const schema = await adapter.introspect(driver);
+    const columns = schema.tables['docs']!.columns;
+
+    expect(columns['status']!.resolvedNativeType).toBe('text');
+    expect(columns['status']!.resolvedDefault).toEqual({ kind: 'literal', value: 'draft' });
+    expect(columns['n']!.resolvedNativeType).toBe('integer');
+    expect(columns['n']!.resolvedDefault).toEqual({ kind: 'literal', value: 5 });
+    expect(columns['note']!.resolvedDefault).toBeUndefined();
+    await driver.close();
+  });
+
   it('introspects foreign keys', async () => {
     const driver = createMemoryDriver();
     driver.db.exec('CREATE TABLE authors (id INTEGER PRIMARY KEY)');

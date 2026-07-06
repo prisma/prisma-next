@@ -1488,6 +1488,77 @@ describe('PostgresControlAdapter', () => {
       );
       expect(tablesOf(result)['user']?.uniques).toEqual([]);
     });
+
+    it('stamps normalized resolvedNativeType and parsed resolvedDefault on columns', async () => {
+      const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'doc' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              table_name: 'doc',
+              column_name: 'status',
+              data_type: 'text',
+              udt_name: 'text',
+              is_nullable: 'NO',
+              column_default: "'draft'::text",
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              table_name: 'doc',
+              column_name: 'created_at',
+              data_type: 'timestamp with time zone',
+              udt_name: 'timestamptz',
+              is_nullable: 'NO',
+              column_default: 'now()',
+              formatted_type: 'timestamp with time zone',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              table_name: 'doc',
+              column_name: 'tags',
+              data_type: 'ARRAY',
+              udt_name: '_text',
+              is_nullable: 'YES',
+              column_default: null,
+              formatted_type: 'text[]',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+          ],
+        },
+        { match: includes('PRIMARY KEY'), rows: [] },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+      const columns = tablesOf(result)['doc']?.columns;
+
+      expect(columns?.['status']?.default).toBe("'draft'::text");
+      expect(columns?.['status']?.resolvedNativeType).toBe('text');
+      expect(columns?.['status']?.resolvedDefault).toEqual({ kind: 'literal', value: 'draft' });
+
+      expect(columns?.['created_at']?.resolvedNativeType).toBe('timestamptz');
+      expect(columns?.['created_at']?.resolvedDefault).toEqual({
+        kind: 'function',
+        expression: 'now()',
+      });
+
+      expect(columns?.['tags']?.many).toBe(true);
+      expect(columns?.['tags']?.nativeType).toBe('text');
+      expect(columns?.['tags']?.resolvedNativeType).toBe('text[]');
+      expect(columns?.['tags']?.resolvedDefault).toBeUndefined();
+    });
   });
 
   describe('introspect - USER-DEFINED enum types', () => {

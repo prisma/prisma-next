@@ -955,12 +955,26 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           nativeType = normalizeSchemaNativeType(nativeType.slice(0, -2));
         }
 
+        // Resolved values comparable against the contract-derived expected
+        // side: the normalized full native type (`[]` appended for arrays)
+        // and the structured parse of the raw default. Raw fields stay
+        // untouched alongside — the relational walk still reads and
+        // normalizes them itself.
+        const resolvedNativeType = `${normalizeSchemaNativeType(nativeType)}${many ? '[]' : ''}`;
+        const rawDefault = colRow.column_default ?? undefined;
         columns[colRow.column_name] = {
           name: colRow.column_name,
           nativeType,
           nullable: colRow.is_nullable === 'YES',
-          ...ifDefined('default', colRow.column_default ?? undefined),
+          ...ifDefined('default', rawDefault),
           ...ifDefined('many', many),
+          resolvedNativeType,
+          ...ifDefined(
+            'resolvedDefault',
+            rawDefault !== undefined
+              ? parsePostgresDefault(rawDefault, resolvedNativeType)
+              : undefined,
+          ),
         };
       }
 

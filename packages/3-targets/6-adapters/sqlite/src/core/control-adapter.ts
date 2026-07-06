@@ -523,11 +523,24 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       const pkColumns: Array<{ name: string; pk: number }> = [];
 
       for (const col of columnsResult.rows) {
+        // Resolved values comparable against the contract-derived expected
+        // side: the normalized native type and the structured parse of the
+        // raw default. Raw fields stay untouched alongside — the relational
+        // walk still reads and normalizes them itself.
+        const resolvedNativeType = normalizeSqliteNativeType(col.type);
+        const rawDefault = col.dflt_value ?? undefined;
         columns[col.name] = {
           name: col.name,
           nativeType: col.type.toLowerCase(),
           nullable: col.notnull === 0 && col.pk === 0,
-          ...ifDefined('default', col.dflt_value ?? undefined),
+          ...ifDefined('default', rawDefault),
+          resolvedNativeType,
+          ...ifDefined(
+            'resolvedDefault',
+            rawDefault !== undefined
+              ? parseSqliteDefault(rawDefault, resolvedNativeType)
+              : undefined,
+          ),
         };
         if (col.pk > 0) {
           pkColumns.push({ name: col.name, pk: col.pk });
