@@ -71,13 +71,15 @@ export function combineVerifyResults(
   const ok = okAll && !unclaimedFails;
 
   // Prefer a failing space's family phrasing; else, when only the unclaimed list
-  // fails the verdict, say so; else keep the app space's phrasing.
+  // fails the verdict, say so; else keep the app space's phrasing. When `okAll`
+  // is false the loop assigned `firstFailure`, so the `?? appResult.summary`
+  // fallback is unreachable — it exists only to keep the read cast-free.
   const summary = okAll
     ? unclaimedFails
       ? `Database schema has ${unclaimed.length} unclaimed element${unclaimed.length === 1 ? '' : 's'} (not in any contract)`
       : appResult.summary
     : appResult.ok
-      ? (firstFailure as VerifyDatabaseSchemaResult).summary
+      ? (firstFailure?.summary ?? appResult.summary)
       : appResult.summary;
 
   return {
