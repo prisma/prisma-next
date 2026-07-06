@@ -8,8 +8,8 @@ Shared concepts (result consumption, script teardown, cross-target pitfalls, cap
 
 **Postgres** (`postgres<Contract>(...)` from `@prisma-next/postgres/runtime`):
 
-- **`db.orm.<Model>`** — ORM, PascalCase model name (`db.orm.User`). Fluent `.where(...).select(...).orderBy(...).all()`, fully typed against `Contract`. Default lane for CRUD with relations.
-- **`db.sql.<table>`** — SQL builder, lowercase storage name (`db.sql.user`). Produces a *plan* executed via `db.runtime().execute(plan)`. Use when the ORM is too high-level — explicit `JOIN`, computed projections, set operations, window functions.
+- **`db.orm.<ns>.<Model>`** — ORM, namespace-qualified PascalCase model name (`db.orm.public.User`). Fluent `.where(...).select(...).orderBy(...).all()`, fully typed against `Contract`. Default lane for CRUD with relations.
+- **`db.sql.<ns>.<table>`** — SQL builder, namespace-qualified lowercase storage name (`db.sql.public.user`). Produces a *plan* executed via `db.runtime().execute(plan)`. Use when the ORM is too high-level — explicit `JOIN`, computed projections, set operations, window functions.
 
 Reach for the ORM first; drop to `db.sql` when the ORM can't express the shape. Lane choice is local — one query function picks one lane, not the whole app.
 
@@ -17,7 +17,7 @@ Reach for the ORM first; drop to `db.sql` when the ORM can't express the shape. 
 
 | Need | Choose | Why |
 |---|---|---|
-| Standard CRUD with relations | **ORM (`db.orm.<Model>`)** | Highest ergonomics; fully typed; model-shaped. |
+| Standard CRUD with relations | **ORM (`db.orm.<ns>.<Model>`)** | Highest ergonomics; fully typed; model-shaped. |
 | Eager-load related records | **ORM `.include(...)`** | Composes with `.where` / `.select` / `.orderBy` / `.take` per branch. |
 | Aggregate (count, sum, avg) | **ORM `.aggregate(...)`** | Typed result; works with grouping (`.groupBy(...).aggregate(...)`). |
 | `INSERT ... RETURNING` / `UPDATE ... RETURNING` typed result | **ORM mutations** (returns updated rows) or **`db.sql.<t>.insert(...).returning(...)`** | ORM returns inserted/updated rows; SQL builder exposes `.returning(...)` explicitly. |
@@ -27,23 +27,23 @@ Reach for the ORM first; drop to `db.sql` when the ORM can't express the shape. 
 
 ## Workflow — ORM reads
 
-The concept: `db.orm.<Model>` returns a *collection* you compose method-by-method. Each call returns a new collection (immutable chaining); the terminal verb (`.all()` / `.first()` / `.count()` / `.aggregate(...)`) issues the query. Predicates are lambdas over a field proxy: `u.field.<op>(value)`.
+The concept: `db.orm.<ns>.<Model>` returns a *collection* you compose method-by-method. Each call returns a new collection (immutable chaining); the terminal verb (`.all()` / `.first()` / `.aggregate(...)`) issues the query. Predicates are lambdas over a field proxy: `u.field.<op>(value)`.
 
 ```typescript
 // src/queries/users.ts — one directory deep under src/, so the import is '../prisma/db'
 import { db } from '../prisma/db';
 
 // Find one record by primary key shorthand.
-const user = await db.orm.User.first({ id: userId });
+const user = await db.orm.public.User.first({ id: userId });
 // Returns the full row or `null`.
 
 // Find one matching a predicate.
-const alice = await db.orm.User
+const alice = await db.orm.public.User
   .where((u) => u.email.eq('alice@example.com'))
   .first();
 
 // Find many with projection, sort, and limit.
-const recentUsers = await db.orm.User
+const recentUsers = await db.orm.public.User
   .select('id', 'email', 'createdAt')
   .orderBy((u) => u.createdAt.desc())
   .take(10)
@@ -54,10 +54,10 @@ const recentUsers = await db.orm.User
 
 ```typescript
 // Lambda form — full expression power.
-db.orm.User.where((u) => u.email.eq('alice@example.com'));
+db.orm.public.User.where((u) => u.email.eq('alice@example.com'));
 
 // Shorthand object form — equality on the named fields.
-db.orm.User.where({ kind: 'admin' });
+db.orm.public.User.where({ kind: 'admin' });
 ```
 
 Operators on the field proxy include `.eq`, `.neq`, `.lt`, `.lte`, `.gt`, `.gte`, `.like`, `.ilike`, `.in([...])`, `.isNull()`, `.isNotNull()`. Extensions add target-specific operators on extension-typed columns (`pgvector`'s `.cosineDistance(...)`, `postgis`'s `.within(...)` / `.intersectsBbox(...)` / `.distanceSphere(...)`, `cipherstash`'s `.cipherstashEq(...)` / `.cipherstashGt(...)` / …).
@@ -66,14 +66,14 @@ Operators on the field proxy include `.eq`, `.neq`, `.lt`, `.lte`, `.gt`, `.gte`
 
 ```typescript
 // Chained .where() — each clause AND-composes with the previous one.
-await db.orm.Sale
+await db.orm.public.Sale
   .where((s) => s.day.gte(start))
   .where((s) => s.day.lte(end))
   .all();
 
 // Equivalent with an explicit `and(...)` inside one clause.
 import { and } from '@prisma-next/sql-orm-client'; // façade re-export pending — see *What PN doesn't do yet* in SKILL.md
-await db.orm.Sale
+await db.orm.public.Sale
   .where((s) => and(s.day.gte(start), s.day.lte(end)))
   .all();
 ```
@@ -85,7 +85,7 @@ The two forms emit the same SQL. Pick chained `.where()` when each clause adds a
 ```typescript
 import { and, or, not } from '@prisma-next/sql-orm-client';
 
-await db.orm.User
+await db.orm.public.User
   .where((u) =>
     and(
       or(u.kind.eq('admin'), u.email.ilike('%@example.com')),
@@ -98,7 +98,7 @@ await db.orm.User
 **Sorting and pagination.** `.orderBy(...)` accepts a single lambda or an array of lambdas (each calling `.asc()` / `.desc()` on a field). `.take(n)` limits; `.skip(n)` offsets.
 
 ```typescript
-await db.orm.Post
+await db.orm.public.Post
   .where((p) => p.authorId.eq(userId))
   .orderBy([(p) => p.createdAt.desc(), (p) => p.id.desc()])
   .take(20)
@@ -108,13 +108,13 @@ await db.orm.Post
 **Cursor pagination.** Call `.cursor({ field: lastValue })` after `.orderBy(...)` to resume from a known position. The cursor requires a prior `orderBy` — the type system enforces this. Direction (forward or backward) follows the sort: ascending order means "greater than the cursor value", descending means "less than".
 
 ```typescript
-const page1 = await db.orm.Post
+const page1 = await db.orm.public.Post
   .orderBy((p) => p.createdAt.desc())
   .take(20)
   .all();
 
 const last = page1[page1.length - 1]!;
-const page2 = await db.orm.Post
+const page2 = await db.orm.public.Post
   .orderBy((p) => p.createdAt.desc())
   .cursor({ createdAt: last.createdAt })
   .take(20)
@@ -130,7 +130,7 @@ Cursor keys must match fields in the active `orderBy`. For a composite `orderBy`
 The concept: `.include('<relation>', (branch) => branch.<chain>)` adds a relation branch to the parent query. The branch is its own collection — compose `.where` / `.select` / `.orderBy` / `.take` on it just like the parent.
 
 ```typescript
-await db.orm.User
+await db.orm.public.User
   .select('id', 'email')
   .include('posts', (post) =>
     post
@@ -149,27 +149,27 @@ Nested `1:N → 1:N` includes (e.g. `User → posts → comments`) require the c
 
 ```typescript
 // Create — returns the inserted row.
-const user = await db.orm.User.create({ id, email, displayName, kind, createdAt });
+const user = await db.orm.public.User.create({ id, email, displayName, kind, createdAt });
 
 // Create with selected return — narrows the return shape.
-const summary = await db.orm.User
+const summary = await db.orm.public.User
   .select('id', 'email', 'kind')
   .create({ id, email, displayName, kind, createdAt });
 
 // Update by predicate.
-await db.orm.User.where({ id }).update({ email: newEmail });
+await db.orm.public.User.where({ id }).update({ email: newEmail });
 
 // Update with selected return.
-await db.orm.User
+await db.orm.public.User
   .where({ id })
   .select('id', 'email', 'kind')
   .update({ email: newEmail });
 
 // Delete by predicate.
-await db.orm.User.where({ id }).delete();
+await db.orm.public.User.where({ id }).delete();
 
 // Upsert — typed by the create branch's shape.
-await db.orm.User
+await db.orm.public.User
   .select('id', 'email', 'kind', 'createdAt')
   .upsert({
     create: { id, email, displayName, kind, createdAt: new Date() },
@@ -182,18 +182,18 @@ The ORM returns inserted / updated rows by default. The `.returning(...)` select
 ## Workflow — Aggregates
 
 ```typescript
-const totals = await db.orm.User.aggregate((aggregate) => ({
+const totals = await db.orm.public.User.aggregate((aggregate) => ({
   totalUsers: aggregate.count(),
 }));
 
-const adminTotals = await db.orm.User
+const adminTotals = await db.orm.public.User
   .where({ kind: 'admin' })
   .aggregate((aggregate) => ({
     adminUsers: aggregate.count(),
   }));
 
 // Group-by + aggregate.
-const byKind = await db.orm.User
+const byKind = await db.orm.public.User
   .groupBy('kind')
   .having((having) => having.count().gte(minUsers))
   .aggregate((aggregate) => ({
@@ -216,7 +216,7 @@ const byKind = await db.orm.User
 This isn't a typing bug — it's faithful to what the database returns. Coalesce client-side when you want zero-fill:
 
 ```typescript
-const revenue = await db.orm.Sale
+const revenue = await db.orm.public.Sale
   .where((s) => s.day.gte(start))
   .aggregate((a) => ({ total: a.sum('amount') }));
 // revenue.total: number | null
@@ -226,16 +226,16 @@ const safe = revenue.total ?? 0;   // ← apply at the consumption site, not in 
 
 If `?? 0` is showing up on every aggregate, that's a signal you're calling `sum` (or peers) over potentially-empty filters — which is exactly when SQL returns NULL. The pattern is correct; the typing is honest.
 
-## Workflow — SQL builder (`db.sql.<table>`)
+## Workflow — SQL builder (`db.sql.<ns>.<table>`)
 
-The concept: `db.sql.<table>` is a table-shaped builder that produces a *plan*. The plan is a serialisable description of the query (AST + parameters); you execute it through the runtime with `db.runtime().execute(plan)`. The builder gives you the lanes the ORM doesn't express — explicit `JOIN`, arbitrary expression projection, target-specific operations through extension helpers — without dropping to raw SQL.
+The concept: `db.sql.<ns>.<table>` is a table-shaped builder that produces a *plan*. The plan is a serialisable description of the query (AST + parameters); you execute it through the runtime with `db.runtime().execute(plan)`. The builder gives you the lanes the ORM doesn't express — explicit `JOIN`, arbitrary expression projection, target-specific operations through extension helpers — without dropping to raw SQL.
 
 ```typescript
 // src/queries/posts.ts — adjust the relative import to match file depth.
 import { db } from '../prisma/db';
 
 // Select with predicate and limit.
-const plan = db.sql.post
+const plan = db.sql.public.post
   .select('id', 'title', 'userId', 'createdAt')
   .where((f, fns) => fns.eq(f.userId, userId))
   .limit(limit)
@@ -249,15 +249,16 @@ The `.where(...)` callback receives `(fields, fns)` — `fields` is the field pr
 ### `INSERT` / `UPDATE` / `DELETE` with `RETURNING`
 
 ```typescript
-// Insert and return selected columns.
-const plan = db.sql.user
-  .insert({ email })
+// Insert and return selected columns. Pass rows as an array — the
+// single-object form currently fails at result decoding (verified on 0.14.0).
+const plan = db.sql.public.user
+  .insert([{ email }])
   .returning('id', 'email')
   .build();
 const [row] = await db.runtime().execute(plan);
 
 // Update with predicate and returning.
-const updatePlan = db.sql.user
+const updatePlan = db.sql.public.user
   .update({ email: newEmail })
   .where((f, fns) => fns.eq(f.id, userId))
   .returning('id', 'email')
@@ -265,7 +266,7 @@ const updatePlan = db.sql.user
 const rows = await db.runtime().execute(updatePlan);
 
 // Delete with predicate.
-const deletePlan = db.sql.user
+const deletePlan = db.sql.public.user
   .delete()
   .where((f, fns) => fns.eq(f.id, userId))
   .build();
@@ -278,7 +279,7 @@ await db.runtime().execute(deletePlan);
 
 ```typescript
 // Project a computed expression alongside model fields.
-const plan = db.sql.cafe
+const plan = db.sql.public.cafe
   .select('id', 'name')
   .select('meters', (f, fns) => fns.distanceSphere(f.location, point))
   .orderBy((f, fns) => fns.distanceSphere(f.location, point), { direction: 'asc' })
@@ -288,8 +289,8 @@ const plan = db.sql.cafe
 const rows = await db.runtime().execute(plan);
 
 // Self-join with an alias.
-db.sql.post
-  .innerJoin(db.sql.post.as('p2'), (f, fns) => fns.ne(f.p1.userId, f.p2.userId))
+db.sql.public.post
+  .innerJoin(db.sql.public.post.as('p2'), (f, fns) => fns.ne(f.p1.userId, f.p2.userId))
   // ...
   .build();
 ```
@@ -330,7 +331,7 @@ const user = await db.orm.public.User.create({ id: 1, email: 'a@x.io' });
 const authUser = await db.orm.auth.User.create({ id: 2, token: 'tok' });
 ```
 
-The flat `db.sql.users` / `db.orm.User` form still works when bare names are unique across all namespaces. When the same bare name appears in more than one namespace, use the coordinate form — both the type system and the runtime require it to resolve to the right table.
+There is no flat `db.sql.users` / `db.orm.User` form: the namespace coordinate is always required on Postgres. The runtime proxy resolves only namespace keys, so a bare model access returns `undefined` (verified against 0.14.0 and current `main`; the flat fallback was removed in #778).
 
 Cross-namespace relations (e.g. `public.Profile` → `auth.User`) follow the same `.include()` syntax; the ORM resolves the correct schema-qualified join automatically.
 
@@ -346,7 +347,7 @@ Cross-namespace relations (e.g. `public.Profile` → `auth.User`) follow the sam
 8. **Setting `capabilities: { lateral: true }` in `prisma-next.config.ts`.** `defineConfig` does not take `capabilities`. Capabilities are declared by the active adapter and become part of the emitted contract; the Postgres adapter advertises `lateral`, `jsonAgg`, and `returning` out of the box. Enable extension capabilities through `extensions: [...]` in the config (see `prisma-next-contract`).
 9. **Confabulating a `db.sql.raw(...)`, TypedSQL, or `.stream()` surface.** None of those exist today. See *What Prisma Next doesn't do yet* in [`SKILL.md`](./SKILL.md).
 10. **Mixing the ORM mutation return with `runtime.execute(plan)`.** ORM terminals issue the query themselves and return rows. `runtime.execute` is for SQL-builder plans.
-11. **Top-N grouped queries written as `groupBy(...).aggregate(...).sort().slice()` in JS.** That's a fallback because the grouped collection doesn't expose `.orderBy(...)` / `.take(...)`. Fine at small cardinalities; for large grouped result sets, drop to `db.sql.<table>`.
+11. **Top-N grouped queries written as `groupBy(...).aggregate(...).sort().slice()` in JS.** That's a fallback because the grouped collection doesn't expose `.orderBy(...)` / `.take(...)`. Fine at small cardinalities; for large grouped result sets, drop to `db.sql.<ns>.<table>`.
 
 ## Reference Files
 
@@ -364,5 +365,5 @@ Cross-namespace relations (e.g. `public.Profile` → `auth.User`) follow the sam
 - [ ] For ORM combinators, imported `and` / `or` / `not` from the (currently internal) `@prisma-next/sql-orm-client` and noted the façade gap to the user.
 - [ ] Executed SQL-builder plans via `db.runtime().execute(plan)` (or `tx.execute(plan)` inside a transaction).
 - [ ] Wrapped multi-statement work in `db.transaction(async (tx) => { ... })` where atomicity matters.
-- [ ] For top-N grouped aggregates at meaningful scale, dropped to `db.sql.<table>` rather than JS-side sort + slice over `groupBy(...).aggregate(...)`.
+- [ ] For top-N grouped aggregates at meaningful scale, dropped to `db.sql.<ns>.<table>` rather than JS-side sort + slice over `groupBy(...).aggregate(...)`.
 - [ ] Did NOT confabulate `db.sql.raw`, TypedSQL, `.stream()`, `db.batch`, `.between(...)`, a `capabilities` field on `defineConfig`, or a `db.sql.from(tables.user)` API — routed to *What Prisma Next doesn't do yet* / `prisma-next-feedback` instead.
