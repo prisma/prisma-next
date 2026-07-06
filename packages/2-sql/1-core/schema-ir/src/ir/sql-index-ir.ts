@@ -63,7 +63,32 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
     return (
       this.unique === node.unique &&
       this.type === node.type &&
-      JSON.stringify(this.options ?? {}) === JSON.stringify(node.options ?? {})
+      indexOptionsLooselyEqual(this.options, node.options)
     );
   }
+}
+
+/**
+ * Option-bag equality ported from the relational walk: same key set, values
+ * compared via `String()` coercion — Postgres introspection returns
+ * reloptions values as raw strings (`'70'`, `'false'`) while contract option
+ * leaves are typed (number, boolean, string).
+ */
+function indexOptionsLooselyEqual(
+  a: Record<string, unknown> | undefined,
+  b: Record<string, unknown> | undefined,
+): boolean {
+  const aKeys = a ? Object.keys(a).sort() : [];
+  const bKeys = b ? Object.keys(b).sort() : [];
+  if (aKeys.length !== bKeys.length) return false;
+  for (let i = 0; i < aKeys.length; i += 1) {
+    if (aKeys[i] !== bKeys[i]) return false;
+  }
+  if (aKeys.length === 0) return true;
+  for (const key of aKeys) {
+    if (String(a?.[key]) !== String(b?.[key])) {
+      return false;
+    }
+  }
+  return true;
 }

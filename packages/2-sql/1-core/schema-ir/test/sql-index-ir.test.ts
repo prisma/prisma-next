@@ -48,5 +48,31 @@ describe('SqlIndexIR', () => {
       const b = new SqlIndexIR({ columns: ['email'], unique: false, options: { fillfactor: 70 } });
       expect(a.isEqualTo(b)).toBe(false);
     });
+
+    it('options compare loosely: typed contract value matches introspected string value', () => {
+      const contractSide = new SqlIndexIR({
+        columns: ['email'],
+        unique: false,
+        options: { fillfactor: 70, fastupdate: true },
+      });
+      const introspectedSide = new SqlIndexIR({
+        columns: ['email'],
+        unique: false,
+        options: { fillfactor: '70', fastupdate: 'true' },
+      });
+      expect(contractSide.isEqualTo(introspectedSide)).toBe(true);
+    });
+
+    it('absent options and empty options compare equal', () => {
+      const a = new SqlIndexIR({ columns: ['email'], unique: false });
+      const b = new SqlIndexIR({ columns: ['email'], unique: false, options: {} });
+      expect(a.isEqualTo(b)).toBe(true);
+    });
+
+    it('false when option keys differ', () => {
+      const a = new SqlIndexIR({ columns: ['email'], unique: false, options: { fillfactor: 70 } });
+      const b = new SqlIndexIR({ columns: ['email'], unique: false, options: { fastupdate: 70 } });
+      expect(a.isEqualTo(b)).toBe(false);
+    });
   });
 });

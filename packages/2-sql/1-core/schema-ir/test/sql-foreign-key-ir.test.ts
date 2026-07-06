@@ -60,6 +60,92 @@ describe('SqlForeignKeyIR', () => {
     expect(fk.children()).toEqual([]);
   });
 
+  describe('resolvedReferencedSchema', () => {
+    it('defaults to the raw referencedSchema when not supplied', () => {
+      const fk = new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+        referencedSchema: 'public',
+      });
+      expect(fk.resolvedReferencedSchema).toBe('public');
+    });
+
+    it('stays undefined when neither raw nor resolved schema is supplied', () => {
+      const fk = new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+      });
+      expect(fk.resolvedReferencedSchema).toBeUndefined();
+      expect(fk.id).toBe('foreign-key:user_id->.users(id)');
+    });
+
+    it('an explicit resolved schema overrides the raw value in the id', () => {
+      const fk = new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+        referencedSchema: '__unbound__',
+        resolvedReferencedSchema: 'public',
+      });
+      expect(fk.referencedSchema).toBe('__unbound__');
+      expect(fk.id).toBe('foreign-key:user_id->public.users(id)');
+    });
+
+    it('an unbound-namespace expected FK pairs with an introspected public FK by id', () => {
+      const expected = new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+        referencedSchema: '__unbound__',
+        resolvedReferencedSchema: 'public',
+      });
+      const actual = new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+        referencedSchema: 'public',
+      });
+      expect(expected.id).toBe(actual.id);
+    });
+  });
+
+  describe('isEqualTo referential-action directionality (this = expected)', () => {
+    function fk(actions: {
+      onDelete?: 'noAction' | 'cascade' | 'restrict';
+      onUpdate?: 'noAction' | 'cascade' | 'setNull';
+    }) {
+      return new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+        ...actions,
+      });
+    }
+
+    it('an expected side that declares no action never flags drift', () => {
+      expect(fk({}).isEqualTo(fk({ onDelete: 'cascade' }))).toBe(true);
+      expect(fk({}).isEqualTo(fk({ onUpdate: 'setNull' }))).toBe(true);
+    });
+
+    it('an expected noAction is equivalent to undeclared (never flags drift)', () => {
+      expect(fk({ onDelete: 'noAction' }).isEqualTo(fk({ onDelete: 'cascade' }))).toBe(true);
+    });
+
+    it('an actual noAction is equivalent to undeclared', () => {
+      expect(fk({ onDelete: 'noAction' }).isEqualTo(fk({}))).toBe(true);
+    });
+
+    it('a declared expected action flags a missing actual action', () => {
+      expect(fk({ onDelete: 'cascade' }).isEqualTo(fk({}))).toBe(false);
+    });
+
+    it('a declared expected action flags an actual noAction', () => {
+      expect(fk({ onDelete: 'cascade' }).isEqualTo(fk({ onDelete: 'noAction' }))).toBe(false);
+    });
+  });
+
   describe('isEqualTo', () => {
     it('true when referential actions match', () => {
       const a = new SqlForeignKeyIR({

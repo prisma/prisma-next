@@ -17,6 +17,15 @@ export interface SqlForeignKeyIRInput {
   readonly onDelete?: SqlReferentialAction;
   readonly onUpdate?: SqlReferentialAction;
   readonly annotations?: SqlAnnotations;
+  /**
+   * The real live DDL schema of the referenced table, comparable across the
+   * two diff sides. Contract-derived trees stamp it explicitly (resolving
+   * namespace ids — including the unbound sentinel — to the DDL schema);
+   * introspected FKs default it to `referencedSchema`, whose value already
+   * is the live schema. Folded into `id` in place of the raw value so an
+   * unbound-namespace contract FK pairs with its introspected counterpart.
+   */
+  readonly resolvedReferencedSchema?: string;
 }
 
 /**
@@ -46,6 +55,7 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode implements DiffableNode {
   declare readonly onDelete?: SqlReferentialAction;
   declare readonly onUpdate?: SqlReferentialAction;
   declare readonly annotations?: SqlAnnotations;
+  declare readonly resolvedReferencedSchema?: string;
 
   constructor(input: SqlForeignKeyIRInput) {
     super();
@@ -57,11 +67,15 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode implements DiffableNode {
     if (input.onDelete !== undefined) this.onDelete = input.onDelete;
     if (input.onUpdate !== undefined) this.onUpdate = input.onUpdate;
     if (input.annotations !== undefined) this.annotations = input.annotations;
+    const resolvedReferencedSchema = input.resolvedReferencedSchema ?? input.referencedSchema;
+    if (resolvedReferencedSchema !== undefined) {
+      this.resolvedReferencedSchema = resolvedReferencedSchema;
+    }
     freezeNode(this);
   }
 
   get id(): string {
-    const referencedSchema = this.referencedSchema ?? '';
+    const referencedSchema = this.resolvedReferencedSchema ?? '';
     return `foreign-key:${this.columns.join(',')}->${referencedSchema}.${this.referencedTable}(${this.referencedColumns.join(',')})`;
   }
 
@@ -69,11 +83,30 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode implements DiffableNode {
     return [];
   }
 
+  /**
+   * Referential-action comparison with `this` as the expected side, matching
+   * the relational walk's `getReferentialActionMismatches`: `noAction` is the
+   * database default and equivalent to an undeclared action, and drift is
+   * flagged only when the expected side declares a (normalized) action.
+   */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
       SqlForeignKeyIR,
       'every diff-tree node the differ pairs at this position is a SqlForeignKeyIR; the id scheme keeps foreign keys from pairing with other node kinds'
     >(other);
-    return this.onDelete === node.onDelete && this.onUpdate === node.onUpdate;
+    return (
+      referentialActionMatches(this.onDelete, node.onDelete) &&
+      referentialActionMatches(this.onUpdate, node.onUpdate)
+    );
   }
+}
+
+function referentialActionMatches(
+  expected: SqlReferentialAction | undefined,
+  actual: SqlReferentialAction | undefined,
+): boolean {
+  const normalizedExpected = expected === 'noAction' ? undefined : expected;
+  if (normalizedExpected === undefined) return true;
+  const normalizedActual = actual === 'noAction' ? undefined : actual;
+  return normalizedExpected === normalizedActual;
 }
