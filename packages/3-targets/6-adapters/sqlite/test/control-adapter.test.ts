@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import type { CliStructuredError } from '@prisma-next/errors/control';
+import { PrimaryKey } from '@prisma-next/sql-schema-ir/types';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { describe, expect, it } from 'vitest';
@@ -44,7 +45,7 @@ describe('SqliteControlAdapter.introspect', () => {
     expect(users.columns['id']!.nativeType).toBe('integer');
     expect(users.columns['name']!.nullable).toBe(false);
     expect(users.columns['bio']!.nullable).toBe(true);
-    expect(users.primaryKey).toEqual({ columns: ['id'] });
+    expect(users.primaryKey).toEqual(new PrimaryKey({ columns: ['id'] }));
     await driver.close();
   });
 
@@ -54,7 +55,7 @@ describe('SqliteControlAdapter.introspect', () => {
     const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
     const schema = await adapter.introspect(driver);
 
-    expect(schema.tables['kv']!.primaryKey).toEqual({ columns: ['ns', 'key'] });
+    expect(schema.tables['kv']!.primaryKey).toEqual(new PrimaryKey({ columns: ['ns', 'key'] }));
     await driver.close();
   });
 

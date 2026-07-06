@@ -20,7 +20,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import { buildSynthMigrationEdge } from '@prisma-next/migration-tools/aggregate';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { field } from '@prisma-next/sqlite/contract-builder';
 import sqliteTargetDescriptor, { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
@@ -88,7 +88,7 @@ function createTestDb() {
 }
 
 const CONTROL_TABLES = new Set(['_prisma_marker', '_prisma_ledger']);
-const emptySchema: SqlSchemaIR = { tables: {} };
+const emptySchema = new SqlSchemaIR({ tables: {} });
 
 function synthEdges(plan: {
   readonly origin?: { readonly storageHash: string } | null;
@@ -227,7 +227,7 @@ export async function applyMigration(
     }
     await runAssertions({
       driver,
-      schema: { ...freshSchema, tables: userTables },
+      schema: new SqlSchemaIR({ ...freshSchema, tables: userTables }),
       operationsExecuted: runResult.value.perSpaceResults[0]?.value.operationsExecuted ?? 0,
       plannedOperationIds: (await Promise.all(planResult.plan.operations)).map((op) => op.id),
     });

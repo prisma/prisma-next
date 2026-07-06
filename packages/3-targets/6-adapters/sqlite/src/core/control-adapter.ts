@@ -23,15 +23,14 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
-  PrimaryKey,
-  SqlColumnIR,
-  SqlForeignKeyIR,
-  SqlIndexIR,
+  PrimaryKeyInput,
+  SqlColumnIRInput,
+  SqlForeignKeyIRInput,
+  SqlIndexIRInput,
   SqlReferentialAction,
-  SqlSchemaIR,
-  SqlTableIR,
-  SqlUniqueIR,
+  SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -520,7 +519,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         `PRAGMA index_list("${escapePragmaArg(tableName)}")`,
       );
 
-      const columns: Record<string, SqlColumnIR> = {};
+      const columns: Record<string, SqlColumnIRInput> = {};
       const pkColumns: Array<{ name: string; pk: number }> = [];
 
       for (const col of columnsResult.rows) {
@@ -536,7 +535,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       }
 
       pkColumns.sort((a, b) => a.pk - b.pk);
-      const primaryKey: PrimaryKey | undefined =
+      const primaryKey: PrimaryKeyInput | undefined =
         pkColumns.length > 0 ? { columns: pkColumns.map((c) => c.name) } : undefined;
 
       const fkMap = new Map<number, FkAccumulator>();
@@ -555,7 +554,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
           });
         }
       }
-      const foreignKeys: readonly SqlForeignKeyIR[] = Array.from(fkMap.values()).map((fk) => ({
+      const foreignKeys: readonly SqlForeignKeyIRInput[] = Array.from(fkMap.values()).map((fk) => ({
         columns: Object.freeze([...fk.columns]) as readonly string[],
         referencedTable: fk.referencedTable,
         referencedColumns: Object.freeze([...fk.referencedColumns]) as readonly string[],
@@ -563,8 +562,8 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         ...ifDefined('onUpdate', mapSqliteReferentialAction(fk.onUpdate)),
       }));
 
-      const uniques: SqlUniqueIR[] = [];
-      const indexes: SqlIndexIR[] = [];
+      const uniques: SqlUniqueIRInput[] = [];
+      const indexes: SqlIndexIRInput[] = [];
 
       for (const idx of indexListResult.rows) {
         // origin: 'c' = CREATE INDEX, 'u' = UNIQUE constraint, 'pk' = PRIMARY KEY
@@ -589,19 +588,19 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         // Skip 'pk' origin — already captured in primaryKey
       }
 
-      tables[tableName] = {
+      tables[tableName] = new SqlTableIR({
         name: tableName,
         columns,
         ...ifDefined('primaryKey', primaryKey),
         foreignKeys,
         uniques,
         indexes,
-      };
+      });
     }
 
-    return {
+    return new SqlSchemaIR({
       tables,
-    };
+    });
   }
 }
 

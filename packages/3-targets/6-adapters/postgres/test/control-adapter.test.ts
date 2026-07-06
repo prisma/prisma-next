@@ -1,5 +1,11 @@
 import { CliStructuredError } from '@prisma-next/errors/control';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
+import {
+  PrimaryKey,
+  SqlForeignKeyIR,
+  SqlIndexIR,
+  SqlUniqueIR,
+} from '@prisma-next/sql-schema-ir/types';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import type {
   PostgresDatabaseSchemaNode,
@@ -181,10 +187,9 @@ describe('PostgresControlAdapter', () => {
       expect(tablesOf(result)['user']?.columns['id']?.nativeType).toBe('int4');
       expect(tablesOf(result)['user']?.columns['email']?.nativeType).toBe('character varying(255)');
       expect(tablesOf(result)['user']?.columns['id']?.nullable).toBe(false);
-      expect(tablesOf(result)['user']?.primaryKey).toEqual({
-        columns: ['id'],
-        name: 'user_pkey',
-      });
+      expect(tablesOf(result)['user']?.primaryKey).toEqual(
+        new PrimaryKey({ columns: ['id'], name: 'user_pkey' }),
+      );
     });
 
     it('handles character varying without length', async () => {
@@ -676,13 +681,13 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['post']?.foreignKeys).toEqual([
-        {
+        new SqlForeignKeyIR({
           columns: ['user_id'],
           referencedTable: 'user',
           referencedSchema: 'public',
           referencedColumns: ['id'],
           name: 'post_user_id_fkey',
-        },
+        }),
       ]);
     });
 
@@ -762,14 +767,14 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['order']?.foreignKeys).toEqual([
-        {
+        new SqlForeignKeyIR({
           columns: ['user_id', 'account_id'],
           referencedTable: 'account',
           referencedSchema: 'public',
           referencedColumns: ['user_id', 'id'],
           name: 'order_account_fkey',
           onDelete: 'cascade',
-        },
+        }),
       ]);
     });
 
@@ -833,10 +838,7 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['user']?.uniques).toEqual([
-        {
-          columns: ['email'],
-          name: 'user_email_key',
-        },
+        new SqlUniqueIR({ columns: ['email'], name: 'user_email_key' }),
       ]);
     });
 
@@ -899,10 +901,7 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['user']?.uniques).toEqual([
-        {
-          columns: ['email', 'tenant_id'],
-          name: 'user_email_tenant_key',
-        },
+        new SqlUniqueIR({ columns: ['email', 'tenant_id'], name: 'user_email_tenant_key' }),
       ]);
     });
 
@@ -967,11 +966,7 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['user']?.indexes).toEqual([
-        {
-          columns: ['name'],
-          name: 'user_name_idx',
-          unique: false,
-        },
+        new SqlIndexIR({ columns: ['name'], name: 'user_name_idx', unique: false }),
       ]);
     });
 
@@ -1036,11 +1031,11 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['user']?.indexes).toEqual([
-        {
+        new SqlIndexIR({
           columns: ['email', 'tenant_id'],
           name: 'user_email_tenant_idx',
           unique: false,
-        },
+        }),
       ]);
     });
 
@@ -1326,9 +1321,7 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(tablesOf(result)['user']?.primaryKey).toEqual({
-        columns: ['id'],
-      });
+      expect(tablesOf(result)['user']?.primaryKey).toEqual(new PrimaryKey({ columns: ['id'] }));
       expect(tablesOf(result)['user']?.primaryKey?.name).toBeUndefined();
     });
 
@@ -1490,10 +1483,9 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(tablesOf(result)['user']?.primaryKey).toEqual({
-        columns: ['tenant_id', 'id'],
-        name: 'user_pkey',
-      });
+      expect(tablesOf(result)['user']?.primaryKey).toEqual(
+        new PrimaryKey({ columns: ['tenant_id', 'id'], name: 'user_pkey' }),
+      );
       expect(tablesOf(result)['user']?.uniques).toEqual([]);
     });
   });
