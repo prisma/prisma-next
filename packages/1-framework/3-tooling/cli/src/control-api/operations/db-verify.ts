@@ -7,13 +7,13 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
-  type ContractSpaceMember,
+  type AggregateContractSpace,
   collectAggregateNamespaces,
   requireHeadRef,
   type VerifierOutput,
   verifyMigration,
 } from '@prisma-next/migration-tools/aggregate';
-import { blindCast, castAs } from '@prisma-next/utils/casts';
+import { castAs } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from '../../utils/cli-errors';
 import {
@@ -37,9 +37,9 @@ const SPAN_IDS = {
  *
  * Loader → verifier pipeline. The loader (sole descriptor-import
  * boundary) builds a {@link import('@prisma-next/migration-tools/aggregate').ContractSpaceAggregate};
- * the aggregate verifier bundles `markerCheck` + per-space pre-projected
- * `schemaCheck`. `mode: 'strict' | 'lenient'` maps directly to the user
- * facing `--strict` flag.
+ * the aggregate verifier bundles `markerCheck` + per-space `schemaCheck`
+ * (each contract space verified against the full schema; extras stripped to its own view).
+ * `mode: 'strict' | 'lenient'` maps directly to the user facing `--strict` flag.
  */
 export interface ExecuteDbVerifyOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
@@ -63,13 +63,19 @@ export interface ExecuteDbVerifyOptions<TFamilyId extends string, TTargetId exte
  * emitted, so downstream tooling and integration tests assert on the
  * same shape).
  *
- * On success, the per-space schema results are returned for the CLI to
+ * On success, the per-space verify results are returned for the CLI to
  * render. When `skipSchema` is true (`--marker-only`), the schema map
  * is empty.
  */
 export interface ExecuteDbVerifySuccess {
   readonly schemaResults: ReadonlyMap<string, VerifyDatabaseSchemaResult>;
-  readonly memberOrder: readonly string[];
+  /**
+   * Live element names no contract space declares, deduplicated and reported
+   * once for the whole database (never per space). Strict mode fails on a
+   * non-empty list; lenient mode surfaces it informationally.
+   */
+  readonly unclaimed: readonly string[];
+  readonly spaceOrder: readonly string[];
   readonly appSpaceId: string;
 }
 
@@ -85,11 +91,11 @@ export type ExecuteDbVerifyResult = Result<ExecuteDbVerifySuccess, CliStructured
  *    structured CLI error.
  * 2. **Read DB state**: marker rows + (when `skipSchema` is `false`)
  *    schema introspection.
- * 3. **Verify**: {@link verifyMigration} returns per-space
- *    `markerCheck` + per-space pre-projected `schemaCheck` (closes F23).
- *    Marker mismatches map to `CliStructuredError` (code `5002`) so
- *    callers (CLI command) can render and exit. Schema results are
- *    returned to the caller verbatim.
+ * 3. **Verify**: {@link verifyMigration} returns per-space `markerCheck` +
+ *    per-space `schemaCheck` (each contract space verified against the full schema,
+ *    then scoped to its own contract space). Marker mismatches map to
+ *    `CliStructuredError` (code `5002`) so callers (CLI command) can render
+ *    and exit. Verify results are returned to the caller verbatim.
  */
 export async function executeDbVerify<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbVerifyOptions<TFamilyId, TTargetId>,
@@ -115,7 +121,7 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
     markersBySpaceId,
     schemaIntrospection,
     mode: options.mode,
-    verifySchemaForMember: createPerMemberVerifier(options),
+    verifySchemaForSpace: createPerSpaceVerifier(options),
   });
   return finaliseVerifyResult({ verifyResult, aggregate, skipMarker, onProgress });
 }
@@ -166,30 +172,27 @@ async function runIntrospection<TFamilyId extends string, TTargetId extends stri
 }
 
 /**
- * Build the per-member schema callback handed to the aggregate verifier.
+ * Build the per-space schema callback handed to the aggregate verifier.
  * When `skipSchema` is true the callback short-circuits with a synthetic
  * `ok` result so the verifier still runs the (cheap) schemaCheck loop
  * without invoking the family's verification path.
  */
-export function createPerMemberVerifier<TFamilyId extends string, TTargetId extends string>(
+export function createPerSpaceVerifier<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbVerifyOptions<TFamilyId, TTargetId>,
 ): (
-  projectedSchema: unknown,
-  member: ContractSpaceMember,
+  schema: unknown,
+  space: AggregateContractSpace,
   verifyMode: 'strict' | 'lenient',
 ) => VerifyDatabaseSchemaResult {
   const { skipSchema, familyInstance, frameworkComponents } = options;
-  return (projectedSchema, member, verifyMode) => {
-    if (skipSchema) return buildSkippedSchemaResult(member);
+  return (schema, space, verifyMode) => {
+    if (skipSchema) return buildSkippedSchemaResult(space);
     return familyInstance.verifySchema({
-      contract: member.contract(),
-      // The family's `TSchemaIR` is opaque to migration-tools; the
-      // aggregate verifier passes through whatever we hand it. The
-      // family expects its own IR shape on the way back.
-      schema: blindCast<
-        never,
-        'family TSchemaIR is opaque to migration-tools; projectedSchema is passed straight through'
-      >(projectedSchema),
+      contract: space.contract(),
+      // `familyInstance` is `ControlFamilyInstance<_, unknown>`, so `verifySchema`
+      // takes its `TSchemaIR` as `unknown` — the introspected schema passes
+      // straight through; the family narrows to its own IR node internally.
+      schema,
       strict: verifyMode === 'strict',
       frameworkComponents,
     });
@@ -223,7 +226,7 @@ function emitVerifySpan(
  * by the CLI's `--schema-only` mode.
  */
 function finaliseVerifyResult(args: {
-  verifyResult: VerifierOutput<VerifyDatabaseSchemaResult>;
+  verifyResult: VerifierOutput;
   aggregate: {
     readonly app: { readonly spaceId: string };
     readonly extensions: ReadonlyArray<{ readonly spaceId: string }>;
@@ -253,14 +256,15 @@ function finaliseVerifyResult(args: {
   emitVerifySpan(onProgress, 'spanEndOk');
   return ok({
     schemaResults: verifyResult.value.schemaCheck.perSpace,
-    memberOrder: [aggregate.app.spaceId, ...aggregate.extensions.map((e) => e.spaceId)],
+    unclaimed: verifyResult.value.schemaCheck.unclaimed,
+    spaceOrder: [aggregate.app.spaceId, ...aggregate.extensions.map((e) => e.spaceId)],
     appSpaceId: aggregate.app.spaceId,
   });
 }
 
-function buildSkippedSchemaResult(member: ContractSpaceMember): VerifyDatabaseSchemaResult {
-  const contract = member.contract();
-  const headRef = requireHeadRef(member);
+function buildSkippedSchemaResult(space: AggregateContractSpace): VerifyDatabaseSchemaResult {
+  const contract = space.contract();
+  const headRef = requireHeadRef(space);
   const profileHash = castAs<{ profileHash?: string }>(contract).profileHash;
   return {
     ok: true,
@@ -276,7 +280,7 @@ function buildSkippedSchemaResult(member: ContractSpaceMember): VerifyDatabaseSc
       root: {
         status: 'pass',
         kind: 'skipped',
-        name: member.spaceId,
+        name: space.spaceId,
         contractPath: '',
         code: 'SKIPPED',
         message: 'Schema verification skipped',

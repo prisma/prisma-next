@@ -1,8 +1,15 @@
-import type { ControlFamilyDescriptor } from '@prisma-next/framework-components/control';
+import type {
+  ControlFamilyDescriptor,
+  ControlTargetDescriptor,
+} from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
+import {
+  stubTargetDiffDatabaseSchema,
+  stubTargetVerifyDatabaseSchema,
+} from './schema-verify.helpers';
 
 function createMockStack() {
   return createControlStack({
@@ -36,8 +43,10 @@ function createMockStack() {
         deserializeContract: (json) => json as never,
         serializeContract: (contract) => contract as never,
       },
+      diffDatabaseSchema: stubTargetDiffDatabaseSchema,
+      verifyDatabaseSchema: stubTargetVerifyDatabaseSchema,
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
-    },
+    } as ControlTargetDescriptor<'sql', 'postgres'>,
     adapter: {
       kind: 'adapter',
       id: 'postgres',
@@ -105,5 +114,91 @@ describe('SqlFamilyInstance.toSchemaView', () => {
       nullable: false,
       default: "'draft'::text",
     });
+  });
+
+  it('flattens tables from every namespace of a multi-namespace root', () => {
+    const familyInstance = createSqlFamilyInstance(createMockStack());
+
+    const namespaceTable = (columnName: string): SqlTableIR => ({
+      name: 'ignored',
+      columns: {
+        [columnName]: { name: columnName, nativeType: 'int4', nullable: false },
+      },
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+    });
+
+    const schema = {
+      namespaces: {
+        public: { schemaName: 'public', tables: { User: namespaceTable('id') } },
+        audit: { schemaName: 'audit', tables: { Log: namespaceTable('event') } },
+      },
+    } as unknown as SqlSchemaIRNode;
+
+    const view = familyInstance.toSchemaView(schema);
+    const tableIds = view.root.children?.map((n) => n.id) ?? [];
+    expect(tableIds).toContain('table-public.User');
+    expect(tableIds).toContain('table-audit.Log');
+
+    const userColumn = view.root.children
+      ?.find((n) => n.id === 'table-public.User')
+      ?.children?.find((n) => n.id === 'columns-public.User')
+      ?.children?.find((n) => n.id === 'column-public.User-id');
+    expect(userColumn?.label).toBe('id: int4 (not nullable)');
+  });
+
+  it('renders same-named tables in different namespaces with distinct ids and labels', () => {
+    const familyInstance = createSqlFamilyInstance(createMockStack());
+
+    const namespaceTable = (columnName: string): SqlTableIR => ({
+      name: 'ignored',
+      columns: {
+        [columnName]: { name: columnName, nativeType: 'int4', nullable: false },
+      },
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+    });
+
+    const schema = {
+      namespaces: {
+        public: { schemaName: 'public', tables: { thing: namespaceTable('id') } },
+        auth: { schemaName: 'auth', tables: { thing: namespaceTable('uid') } },
+      },
+    } as unknown as SqlSchemaIRNode;
+
+    const view = familyInstance.toSchemaView(schema);
+    const tables = view.root.children ?? [];
+    const ids = tables.map((n) => n.id);
+    expect(ids).toEqual(['table-public.thing', 'table-auth.thing']);
+    expect(new Set(ids).size).toBe(2);
+    expect(tables.map((n) => n.label)).toEqual(['table public.thing', 'table auth.thing']);
+  });
+
+  it('keeps unqualified ids and labels for a single-namespace root', () => {
+    const familyInstance = createSqlFamilyInstance(createMockStack());
+
+    const schema = {
+      namespaces: {
+        public: {
+          schemaName: 'public',
+          tables: {
+            users: {
+              name: 'users',
+              columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+              foreignKeys: [],
+              uniques: [],
+              indexes: [],
+            },
+          },
+        },
+      },
+    } as unknown as SqlSchemaIRNode;
+
+    const view = familyInstance.toSchemaView(schema);
+    const tables = view.root.children ?? [];
+    expect(tables.map((n) => n.id)).toEqual(['table-users']);
+    expect(tables.map((n) => n.label)).toEqual(['table users']);
   });
 });

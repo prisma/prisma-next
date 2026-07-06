@@ -1,8 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { createContract } from '@prisma-next/test-utils';
-import { createContractSpaceMember } from '../src/aggregate/aggregate';
-import type { ContractSpaceMember } from '../src/aggregate/types';
+import { createAggregateContractSpace } from '../src/aggregate/aggregate';
+import type { AggregateContractSpace } from '../src/aggregate/types';
 import { EMPTY_CONTRACT_HASH } from '../src/constants';
 import { computeMigrationHash } from '../src/hash';
 import { deriveProvidedInvariants } from '../src/invariants';
@@ -60,13 +60,13 @@ export function createAttestedPackage(
 }
 
 /**
- * Build a {@link ContractSpaceMember} for engine tests from the fields a
+ * Build a {@link AggregateContractSpace} for engine tests from the fields a
  * test cares about. `graph()` is reconstructed from `packages` and
  * `contract()` returns the supplied (already-deserialized) contract.
  * Defaults: empty packages / refs, an empty-contract head ref, and a
  * blank SQL/postgres contract.
  */
-export function makeContractSpaceMember(args: {
+export function makeAggregateContractSpace(args: {
   spaceId: string;
   contract?: Contract;
   headRef?: ContractSpaceHeadRecord | null;
@@ -74,10 +74,10 @@ export function makeContractSpaceMember(args: {
   refs?: Refs;
   refsDir?: string;
   deserializeContract?: (raw: unknown) => Contract;
-}): ContractSpaceMember {
+}): AggregateContractSpace {
   const contract = args.contract ?? createContract();
   const deserializeContract = args.deserializeContract ?? ((raw: unknown) => raw as Contract);
-  return createContractSpaceMember({
+  return createAggregateContractSpace({
     spaceId: args.spaceId,
     packages: args.packages ?? [],
     refs: args.refs ?? {},

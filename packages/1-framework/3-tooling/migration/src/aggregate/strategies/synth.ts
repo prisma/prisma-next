@@ -2,23 +2,30 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import type {
   ControlAdapterInstance,
   ControlFamilyInstance,
+  DiffIssue,
   MigrationOperationPolicy,
   MigrationPlan,
   MigrationPlannerConflict,
   MigrationPlannerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { ContractMarkerRecordLike } from '../marker-types';
 import type { PerSpacePlan } from '../planner-types';
-import { projectSchemaToSpace } from '../project-schema-to-space';
 import { buildSynthMigrationEdge } from '../synth-migration-edge';
-import type { ContractSpaceMember } from '../types';
+import type { AggregateContractSpace } from '../types';
 
 export interface SynthStrategyInputs<TFamilyId extends string, TTargetId extends string> {
   readonly aggregateTargetId: string;
   readonly currentMarker: ContractMarkerRecordLike | null;
-  readonly member: ContractSpaceMember;
-  readonly otherMembers: ReadonlyArray<ContractSpaceMember>;
+  readonly space: AggregateContractSpace;
+  /**
+   * Ownership query over the passive contract-space aggregate: does a contract
+   * space OTHER than this one declare a storage entity with this bare name?
+   * The strategy uses it to scope the planner's diff (see
+   * {@link keepIssuesOfThisSpace}); it runs no diff of its own.
+   */
+  readonly declaredByAnotherSpace: (entityName: string) => boolean;
   readonly schemaIntrospection: unknown;
   readonly adapter: ControlAdapterInstance<TFamilyId, TTargetId>;
   readonly migrations: TargetMigrationsCapability<
@@ -43,15 +50,47 @@ export type SynthStrategyOutcome =
  */
 type MaybeAsyncPlannerResult = MigrationPlannerResult | Promise<MigrationPlannerResult>;
 
+/** The bare entity name a diff issue addresses, for ownership scoping. */
+function issueEntityName(issue: DiffIssue): string | undefined {
+  if ('outcome' in issue) {
+    const actual = issue.actual;
+    if (actual === undefined) return undefined;
+    const tableName = blindCast<
+      { readonly tableName?: unknown },
+      'entity-name scoping reads the optional target-specific tableName off a diff node'
+    >(actual).tableName;
+    return typeof tableName === 'string' ? tableName : undefined;
+  }
+  return 'table' in issue ? issue.table : undefined;
+}
+
 /**
- * Synthesise a migration plan for a single member by projecting the
- * live schema down to that member's claimed slice and delegating to
- * the family's `createPlanner(...).plan(...)`.
+ * Builds the keep-predicate the planner applies to its diff: drop the
+ * `not-expected` findings for entities another contract space declares (so the
+ * planner never emits DROP ops against a sibling space's tables), keep
+ * everything else — including `not-expected` findings no space declares, which
+ * the planner may DROP under a destructive policy.
+ */
+function keepIssuesOfThisSpace(
+  declaredByAnotherSpace: (entityName: string) => boolean,
+): (issue: DiffIssue) => boolean {
+  return (issue) => {
+    if (issue.reason !== 'not-expected') return true;
+    const name = issueEntityName(issue);
+    return name === undefined || !declaredByAnotherSpace(name);
+  };
+}
+
+/**
+ * Synthesise a migration plan for a single contract space from the full live
+ * schema, delegating to the family's `createPlanner(...).plan(...)`.
  *
- * Pre-projection (via {@link projectSchemaToSpace}) closes the F23
- * concern: without it, the family's planner sees other members'
- * tables as "extras" and emits destructive ops to drop them. With it,
- * the planner only sees the slice this member claims.
+ * The planner diffs the whole introspected schema, so it sees other contract
+ * spaces' tables as "extras"; the orchestration scopes the diff by handing the
+ * planner a keep-predicate (built over the passive aggregate's ownership
+ * query) that drops exactly those extras, so the planner never emits a
+ * destructive drop for a sibling space's table and holds no ownership logic.
+ * The schema is never pruned before planning.
  *
  * The synthesised plan's `targetId` is set from `aggregateTargetId`
  * (the aggregate's ambient target). The family's planner does not
@@ -60,29 +99,24 @@ type MaybeAsyncPlannerResult = MigrationPlannerResult | Promise<MigrationPlanner
  *
  * Used by:
  *
- * - The app member by default (CLI policy
+ * - The app space by default (CLI policy
  *   `ignoreGraphFor: { app.spaceId }`).
- * - Any extension member whose `headRef.invariants` is empty (the
+ * - Any extension space whose `headRef.invariants` is empty (the
  *   strategy selector falls back to synth when graph-walk isn't
  *   required).
  */
 export async function synthStrategy<TFamilyId extends string, TTargetId extends string>(
   input: SynthStrategyInputs<TFamilyId, TTargetId>,
 ): Promise<SynthStrategyOutcome> {
-  const projectedSchema = projectSchemaToSpace(
-    input.schemaIntrospection,
-    input.member,
-    input.otherMembers,
-  );
-
   const planner = input.migrations.createPlanner(input.adapter);
   const plannerResult: MigrationPlannerResult = await (planner.plan({
-    contract: input.member.contract(),
-    schema: projectedSchema,
+    contract: input.space.contract(),
+    schema: input.schemaIntrospection,
     policy: input.operationPolicy,
     fromContract: null,
     frameworkComponents: input.frameworkComponents,
-    spaceId: input.member.spaceId,
+    spaceId: input.space.spaceId,
+    keepDiffIssue: keepIssuesOfThisSpace(input.declaredByAnotherSpace),
   }) as MaybeAsyncPlannerResult);
 
   if (plannerResult.kind === 'failure') {
@@ -120,7 +154,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
     result: {
       plan,
       displayOps: synthedOps,
-      destinationContract: input.member.contract(),
+      destinationContract: input.space.contract(),
       strategy: 'synth',
       ...(plannerResult.warnings && plannerResult.warnings.length > 0
         ? { warnings: plannerResult.warnings }

@@ -321,11 +321,11 @@ async function executeMigrationPlanCommand(
   if (!tolerantAggregateResult.ok) {
     return notOk(tolerantAggregateResult.failure);
   }
-  const resolutionMember = tolerantAggregateResult.value.app;
+  const resolutionSpace = tolerantAggregateResult.value.app;
 
   const resolutionResult = await resolveFromForPlan({
     optionsFrom: options.from,
-    member: resolutionMember,
+    space: resolutionSpace,
   });
 
   if (!resolutionResult.ok) {
@@ -365,7 +365,7 @@ async function executeMigrationPlanCommand(
   // change.
   if (options.to !== undefined) {
     const toResolution = await resolveToForPlan(options.to, {
-      member: resolutionMember,
+      space: resolutionSpace,
     });
     if (!toResolution.ok) {
       return notOk(toResolution.failure);

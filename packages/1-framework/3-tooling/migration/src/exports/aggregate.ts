@@ -1,7 +1,7 @@
 export {
   collectAggregateNamespaces,
+  createAggregateContractSpace,
   createContractSpaceAggregate,
-  createContractSpaceMember,
   requireHeadRef,
 } from '../aggregate/aggregate';
 export {
@@ -23,7 +23,6 @@ export {
   type PlannerSuccess,
   planMigration,
 } from '../aggregate/planner';
-export { projectSchemaToSpace } from '../aggregate/project-schema-to-space';
 export {
   type GraphWalkOutcome,
   type GraphWalkStrategyInputs,
@@ -31,15 +30,14 @@ export {
 } from '../aggregate/strategies/graph-walk';
 export { buildSynthMigrationEdge } from '../aggregate/synth-migration-edge';
 export type {
+  AggregateContractSpace,
   ContractAtOptions,
   ContractAtResult,
   ContractSpaceAggregate,
-  ContractSpaceMember,
 } from '../aggregate/types';
 export {
   type MarkerCheckResult,
   type MarkerCheckSection,
-  type OrphanElement,
   type SchemaCheckSection,
   type VerifierError,
   type VerifierInput,

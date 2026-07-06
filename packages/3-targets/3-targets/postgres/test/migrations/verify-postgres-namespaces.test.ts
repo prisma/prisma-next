@@ -1,12 +1,12 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type SqlStorageInput } from '@prisma-next/sql-contract/types';
-import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, type SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { verifyPostgresNamespacePresence } from '../../src/core/migrations/verify-postgres-namespaces';
 import { PostgresSchema, PostgresUnboundSchema } from '../../src/core/postgres-schema';
-import { PostgresSchemaIR } from '../../src/core/schema-ir/postgres-schema-ir';
+import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
 
 function makeContract(
   namespaceIds: readonly string[],
@@ -40,17 +40,18 @@ function makeContract(
   };
 }
 
-function makeSchema(existingSchemas?: readonly string[]): SqlSchemaIR {
+function makeSchema(existingSchemas?: readonly string[]): SqlSchemaIRNode {
+  // `existingSchemas` is database-level, on the root node. A bare flat schema
+  // (no root) exercises the `['public']` default — proving the consumer reads
+  // `existingSchemas` from the database root (CF-1), not a per-namespace node.
   if (existingSchemas === undefined) {
     return new SqlSchemaIR({ tables: {} });
   }
-  return new PostgresSchemaIR({
-    tables: {},
-    pgSchemaName: 'public',
-    pgVersion: 'unknown',
+  return new PostgresDatabaseSchemaNode({
+    namespaces: {},
     roles: [],
     existingSchemas,
-    nativeEnumTypeNames: [],
+    pgVersion: 'unknown',
   });
 }
 

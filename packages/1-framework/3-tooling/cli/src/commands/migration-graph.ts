@@ -154,13 +154,13 @@ export async function executeMigrationGraphCommand(
   const treeSections: MigrationGraphTreeSection[] = [];
   const spaces: MigrationSpaceGraphEntry[] = [];
   for (const spaceEntry of scopedSpaces) {
-    const member = aggregate.space(spaceEntry.space);
-    if (member === undefined) {
+    const space = aggregate.space(spaceEntry.space);
+    if (space === undefined) {
       continue;
     }
-    const graph = member.graph();
+    const graph = space.graph();
     const isAppSpace = spaceEntry.space === aggregate.app.spaceId;
-    const refsByHash = listRefsByContractHash(member);
+    const refsByHash = listRefsByContractHash(space);
     const tree =
       spaceEntry.migrations.length === 0
         ? ''

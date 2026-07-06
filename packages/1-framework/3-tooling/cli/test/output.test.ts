@@ -613,6 +613,7 @@ describe('formatSchemaVerifyOutput', () => {
           {
             path: ['public', 'profiles', policyWireName],
             outcome: 'missing',
+            reason: 'not-found',
             message: `RLS policy "${policyWireName}" on table "profiles" is missing from the database`,
           },
         ],

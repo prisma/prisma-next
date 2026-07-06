@@ -18,16 +18,16 @@ import type { ContractSpaceAggregate } from './types';
  * Caller-provided policy for {@link planMigration}. Today this carries
  * just one knob:
  *
- * - `ignoreGraphFor`: `Set<spaceId>`. For listed members, the planner
+ * - `ignoreGraphFor`: `Set<spaceId>`. For listed contract spaces, the planner
  *   forces the **synth** strategy (synthesise a plan from the contract
  *   IR via `familyInstance.createPlanner(...).plan(...)`) regardless of
  *   whether a graph is available. The CLI's daily-driver `db init` /
  *   `db update` pipelines pass `new Set([aggregate.app.spaceId])` to
  *   keep today's app-space behaviour: the user's authored
- *   `migrations/` directory is **not** walked for the app member, the
- *   plan is synthesised on the fly. Extension members are walked.
+ *   `migrations/` directory is **not** walked for the app space, the
+ *   plan is synthesised on the fly. Extension spaces are walked.
  *
- *   Listing a member here whose `headRef.invariants` is non-empty is
+ *   Listing a contract space here whose `headRef.invariants` is non-empty is
  *   a `policyConflict` — synth cannot satisfy authored invariants.
  */
 export interface CallerPolicy {
@@ -42,9 +42,10 @@ export interface CallerPolicy {
  *   marker yet (greenfield space). The planner treats the marker's
  *   `storageHash` as the graph-walk's `from` node, falling back to
  *   {@link import('../constants').EMPTY_CONTRACT_HASH} when absent.
- * - `schemaIntrospection`: the family's full live schema IR. Fed into
- *   the synth strategy after per-space pre-projection via
- *   {@link import('./project-schema-to-space').projectSchemaToSpace}.
+ * - `schemaIntrospection`: the family's full live schema IR. Fed into the
+ *   synth strategy in full; the strategy hands the planner a keep-predicate
+ *   that scopes the diff to each contract space's own findings, so no schema
+ *   is pruned up front and the planner holds no ownership logic.
  *
  * Callers (CLI commands) gather this via the family's
  * `readAllMarkers` + `introspect` calls before invoking the planner.
@@ -58,7 +59,7 @@ export interface AggregateCurrentDBState {
 /**
  * Inputs to {@link planMigration}.
  *
- * The planner is target-agnostic but family-aware: per-member synth
+ * The planner is target-agnostic but family-aware: per-space synth
  * delegates to the family's `createPlanner(adapter).plan(...)`,
  * which is why `adapter`, `migrations` (the
  * `TargetMigrationsCapability`), and `frameworkComponents` are all
@@ -84,7 +85,7 @@ export interface PlannerInput<TFamilyId extends string, TTargetId extends string
 }
 
 /**
- * Per-member output of the planner. The runner ingests this
+ * Per-space output of the planner. The runner ingests this
  * shape directly via a thin `toRunnerInput` adapter at the CLI.
  *
  * - `plan`: ready-to-execute `MigrationPlan` with `targetId` already
@@ -92,8 +93,8 @@ export interface PlannerInput<TFamilyId extends string, TTargetId extends string
  * - `displayOps`: same operation list, surfaced separately so plan-mode
  *   output can render without touching the runner-bound `plan`.
  * - `destinationContract`: the typed contract value the runner uses
- *   for post-apply verification. For the app member, the user's
- *   contract; for extension members, the on-disk `contract.json`.
+ *   for post-apply verification. For the app space, the user's
+ *   contract; for extension spaces, the on-disk `contract.json`.
  * - `strategy`: which strategy produced this plan (`'graph-walk'` or
  *   `'synth'`). Surfaced for diagnostics; not consumed by the runner.
  */
@@ -131,7 +132,7 @@ export interface PerSpacePlan {
    * invariants, per-edge invariants). Populated by the graph-walk
    * strategy; absent for synth-produced plans.
    *
-   * `migrate` surfaces this for the app member as
+   * `migrate` surfaces this for the app space as
    * `MigrateSuccess.pathDecision` (back-compat with single-
    * space callers).
    */
@@ -153,7 +154,7 @@ export interface PlannerSuccess {
 
 /**
  * Discriminated failure variants for {@link planMigration}. Each
- * variant short-circuits the plan; per-member errors carry the
+ * variant short-circuits the plan; per-space errors carry the
  * `spaceId` so the CLI can surface a precise envelope.
  */
 export type PlannerError =

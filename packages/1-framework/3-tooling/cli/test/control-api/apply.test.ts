@@ -6,8 +6,8 @@ import type {
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import type {
+  AggregateContractSpace,
   ContractSpaceAggregate,
-  ContractSpaceMember,
   PerSpacePlan,
 } from '@prisma-next/migration-tools/aggregate';
 import {
@@ -21,10 +21,10 @@ import type { ControlProgressEvent } from '../../src/control-api/types';
 
 const APP_HASH = `sha256:${'a'.repeat(64)}`;
 
-function makeAppMember(): ContractSpaceMember {
+function makeAppSpace(): AggregateContractSpace {
   const contract = {
     storage: { storageHash: APP_HASH, tables: {}, namespaces: {} },
-  } as unknown as ReturnType<ContractSpaceMember['contract']>;
+  } as unknown as ReturnType<AggregateContractSpace['contract']>;
   return {
     spaceId: 'app',
     packages: [],
@@ -44,7 +44,7 @@ function makeAppMember(): ContractSpaceMember {
 function makeAggregate(): ContractSpaceAggregate {
   return createContractSpaceAggregate({
     targetId: 'postgres',
-    app: makeAppMember(),
+    app: makeAppSpace(),
     extensions: [],
     checkIntegrity: () => [],
   });
@@ -62,7 +62,7 @@ function makePerSpacePlan(): PerSpacePlan {
   return {
     plan,
     displayOps: [],
-    destinationContract: makeAppMember().contract,
+    destinationContract: makeAppSpace().contract,
     strategy: 'graph-walk',
     migrationEdges: [
       buildSynthMigrationEdge({

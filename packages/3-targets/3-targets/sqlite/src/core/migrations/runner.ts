@@ -12,7 +12,6 @@ import type {
   SqlMigrationRunnerSuccessValue,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
-import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { MigrationRunnerResult } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
@@ -22,8 +21,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
 import { MARKER_TABLE_NAME } from '../control-tables';
-import { parseSqliteDefault } from '../default-normalizer';
-import { normalizeSqliteNativeType } from '../native-type-normalizer';
+import { verifySqliteDatabaseSchema } from './diff-database-schema';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 
 export function createSqliteMigrationRunner(
@@ -92,20 +90,16 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     }
 
     if (space === APP_SPACE_ID) {
-      const schemaIR = await this.family.introspect({
+      const schemaNode = await this.family.introspect({
         driver,
         contract: options.destinationContract,
       });
-
-      const schemaVerifyResult = verifySqlSchema({
+      const schemaVerifyResult = verifySqliteDatabaseSchema({
         contract: options.destinationContract,
-        schema: schemaIR,
+        actualSchema: schemaNode,
         strict: options.strictVerification ?? true,
-        context: options.context ?? {},
         typeMetadataRegistry: this.family.typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
-        normalizeDefault: parseSqliteDefault,
-        normalizeNativeType: normalizeSqliteNativeType,
       });
       if (!schemaVerifyResult.ok) {
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {

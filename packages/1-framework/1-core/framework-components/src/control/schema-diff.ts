@@ -1,14 +1,25 @@
+import type { ExpectationFailureReason, SchemaIssue } from './control-result-types';
+
+/**
+ * Legacy vocabulary for the failure reason, mirrored by
+ * {@link ExpectationFailureReason} (`extra` → `not-expected`, `missing` →
+ * `not-found`, `mismatch` → `not-equal`). Both fields are stamped at the one
+ * producer site ({@link diffSchemas}), so they cannot drift; `outcome` and its
+ * target/family-internal consumers retire with the issue-type merge.
+ */
 export type SchemaDiffOutcome = 'missing' | 'extra' | 'mismatch';
 
-export interface SchemaDiffIssue {
+export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   /** Path from the root node down to the diffed node, as a sequence of local keys. */
   readonly path: readonly string[];
   readonly outcome: SchemaDiffOutcome;
+  /** Why the actual state fails the expectation. Consumers filter on this field. */
+  readonly reason: ExpectationFailureReason;
   readonly message: string;
-  /** The expected (contract-side) node, when available. Absent for `extra` outcomes. */
-  readonly expected?: DiffableNode;
-  /** The actual (live-DB-side) node, when available. Absent for `missing` outcomes. */
-  readonly actual?: DiffableNode;
+  /** The expected (desired-side) node, when available. Absent for `not-expected` issues. */
+  readonly expected?: TNode;
+  /** The actual (current-side) node, when available. Absent for `not-found` issues. */
+  readonly actual?: TNode;
 }
 
 /**
@@ -40,7 +51,13 @@ function outcomeMessage(outcome: SchemaDiffOutcome, path: readonly string[]): st
 function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
   const path = [...parentPath, node.id];
   return [
-    { path, outcome: 'missing', message: outcomeMessage('missing', path), expected: node },
+    {
+      path,
+      outcome: 'missing',
+      reason: 'not-found',
+      message: outcomeMessage('missing', path),
+      expected: node,
+    },
     ...node.children().flatMap((c) => emitMissingSubtree(c, path)),
   ];
 }
@@ -48,7 +65,13 @@ function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): 
 function emitExtraSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
   const path = [...parentPath, node.id];
   return [
-    { path, outcome: 'extra', message: outcomeMessage('extra', path), actual: node },
+    {
+      path,
+      outcome: 'extra',
+      reason: 'not-expected',
+      message: outcomeMessage('extra', path),
+      actual: node,
+    },
     ...node.children().flatMap((c) => emitExtraSubtree(c, path)),
   ];
 }
@@ -80,6 +103,7 @@ function diffPair(
     issues.push({
       path,
       outcome: 'mismatch',
+      reason: 'not-equal',
       message: outcomeMessage('mismatch', path),
       expected,
       actual,
@@ -129,4 +153,50 @@ function diffChildren(
   }
 
   return issues;
+}
+
+/**
+ * The two issue representations a `SchemaDiff` carries: `SchemaIssue` from the
+ * legacy relational differ (coordinate-based) and `SchemaDiffIssue` from the
+ * generic node differ (carrying the schema-IR node it concerns).
+ */
+export type DiffIssue<TNode extends DiffableNode = DiffableNode> =
+  | SchemaIssue
+  | SchemaDiffIssue<TNode>;
+
+/**
+ * The result of diffing a contract's expected schema against the introspected
+ * actual schema: two issue lists, kept distinct because two diffing mechanisms
+ * produce them (the relational check and the generic node differ). Carries no
+ * verdict, verification tree, or counts — those are the verifier's own
+ * presentation, built from the same underlying comparison.
+ *
+ * `TNode` is the concrete schema-IR node the `schemaDiffIssues` carry; it
+ * defaults to `DiffableNode`, so this is purely additive — a caller that wants
+ * the concrete node opts in (the Postgres planner uses the concrete node type),
+ * everyone else keeps the default unchanged.
+ */
+export class SchemaDiff<TNode extends DiffableNode = DiffableNode> {
+  readonly issues: readonly SchemaIssue[];
+  readonly schemaDiffIssues: readonly SchemaDiffIssue<TNode>[];
+
+  constructor(issues: readonly SchemaIssue[], schemaDiffIssues: readonly SchemaDiffIssue<TNode>[]) {
+    this.issues = issues;
+    this.schemaDiffIssues = schemaDiffIssues;
+  }
+
+  /** Fans `keep` across both issue lists, returning a new `SchemaDiff` narrowed to the survivors. */
+  filter(keep: (issue: DiffIssue<TNode>) => boolean): SchemaDiff<TNode> {
+    return new SchemaDiff(this.issues.filter(keep), this.schemaDiffIssues.filter(keep));
+  }
+}
+
+/**
+ * The SPI a SQL target implements to compare a contract's expected schema
+ * against the introspected actual schema. How the comparison is computed —
+ * relational check, generic node differ, namespace pairing — is private to
+ * the implementer; verify and plan consume only the returned `SchemaDiff`.
+ */
+export interface SchemaDiffer<TInput> {
+  diff(input: TInput): SchemaDiff;
 }

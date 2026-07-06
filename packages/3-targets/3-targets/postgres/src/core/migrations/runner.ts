@@ -12,7 +12,6 @@ import type {
   SqlMigrationRunnerSuccessValue,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
-import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { MigrationRunnerResult } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -23,8 +22,6 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
-import { parsePostgresDefault } from '../default-normalizer';
-import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 interface ApplyPlanSuccessValue {
@@ -124,30 +121,30 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       applyValue = applyResult.value;
     }
 
-    // Schema verification on app-space only — extension spaces don't
-    // own user-facing tables in the live schema, and `verifySqlSchema`
-    // matches the destination contract against the database, which
-    // would flag every app-space table as "extra" when called against
-    // an extension contract.
+    // Verify the schema on app-space only: extension spaces don't own
+    // user-facing tables, so verifying the destination contract against the
+    // database would flag every app-space table as "extra". Delegates to the
+    // family `verifySchema` — the same comparison the CLI verify runs.
     if (space === APP_SPACE_ID) {
-      const schemaIR = await this.family.introspect({
+      const schemaNode = await this.family.introspect({
         driver,
         contract: options.destinationContract,
       });
-      const schemaVerifyResult = verifySqlSchema({
+      const schemaVerifyResult = this.family.verifySchema({
         contract: options.destinationContract,
-        schema: schemaIR,
+        schema: schemaNode,
         strict: options.strictVerification ?? true,
-        context: options.context ?? {},
-        typeMetadataRegistry: this.family.typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
-        normalizeDefault: parsePostgresDefault,
-        normalizeNativeType: normalizeSchemaNativeType,
       });
       if (!schemaVerifyResult.ok) {
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
           why: 'The resulting database schema does not satisfy the destination contract.',
-          meta: { issues: schemaVerifyResult.schema.issues },
+          meta: {
+            issues: [
+              ...schemaVerifyResult.schema.issues,
+              ...schemaVerifyResult.schema.schemaDiffIssues,
+            ],
+          },
         });
       }
     }

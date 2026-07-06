@@ -128,10 +128,10 @@ describe('loadContractSpaceAggregate', () => {
       await writeHeadRef('supabase', { hash: headHash, invariants: [] });
 
       const aggregate = await load();
-      const member = aggregate.space('supabase');
-      expect(member).toBeDefined();
-      expect(member?.packages).toHaveLength(0);
-      expect(member?.headRef).toEqual({ hash: headHash, invariants: [] });
+      const space = aggregate.space('supabase');
+      expect(space).toBeDefined();
+      expect(space?.packages).toHaveLength(0);
+      expect(space?.headRef).toEqual({ hash: headHash, invariants: [] });
     });
 
     it('produces no headRefNotInGraph violation when packages is empty and head.json is on disk', async () => {
@@ -184,7 +184,7 @@ describe('loadContractSpaceAggregate', () => {
     });
   });
 
-  describe('app member', () => {
+  describe('app space', () => {
     it('synthesises the app head ref from the live contract storage hash', async () => {
       const aggregate = await load();
       expect(aggregate.app.headRef).toEqual({
@@ -219,9 +219,9 @@ describe('loadContractSpaceAggregate', () => {
       await writeContractJson('cipherstash', extContract);
 
       const aggregate = await load();
-      const member = aggregate.space('cipherstash');
-      const first = member?.contract();
-      expect(first).toBe(member?.contract());
+      const space = aggregate.space('cipherstash');
+      const first = space?.contract();
+      expect(first).toBe(space?.contract());
       expect(first?.target).toBe('postgres');
     });
   });

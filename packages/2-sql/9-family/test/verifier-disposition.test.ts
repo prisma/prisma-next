@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifySqlVerifierIssueKind,
   verifierDisposition,
-} from '../src/core/schema-verify/verifier-disposition';
+} from '../src/core/diff/verifier-disposition';
 
 describe('classifySqlVerifierIssueKind', () => {
   it('classifies the extra nested element (column)', () => {

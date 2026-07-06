@@ -1,8 +1,8 @@
 import { loadConfig } from '@prisma-next/config-loader';
 import type { LedgerEntryRecord } from '@prisma-next/contract/types';
 import type {
+  AggregateContractSpace,
   ContractMarkerRecordLike,
-  ContractSpaceMember,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import {
@@ -130,7 +130,7 @@ function buildStatusMigrations(
 }
 
 function renderSpaceTree(args: {
-  readonly member: ContractSpaceMember;
+  readonly space: AggregateContractSpace;
   readonly liveContractHash: string;
   readonly migrations: readonly MigrationListEntry[];
   readonly markerHash: string | undefined;
@@ -142,7 +142,7 @@ function renderSpaceTree(args: {
   readonly globalMaxEdgeTreePrefixWidth?: number;
   readonly globalMaxDirNameWidth?: number;
 }): string {
-  const graph = args.member.graph();
+  const graph = args.space.graph();
   if (graph.nodes.size === 0) {
     return '';
   }
@@ -150,7 +150,7 @@ function renderSpaceTree(args: {
     graph,
     migrations: args.migrations,
     liveContractHash: args.liveContractHash,
-    refsByHash: listRefsByContractHash(args.member),
+    refsByHash: listRefsByContractHash(args.space),
     statusOverlayByHash: args.statusOverlay,
     colorize: args.colorize,
     glyphMode: args.glyphMode,
@@ -493,12 +493,12 @@ export async function executeMigrationStatusCommand(
     globalLayoutInputs.length > 0 ? computeGlobalMaxDirNameWidth(globalLayoutInputs) : undefined;
 
   for (const spaceEntry of scopedSpaces) {
-    const member = aggregate.space(spaceEntry.space);
-    if (member === undefined) {
+    const space = aggregate.space(spaceEntry.space);
+    if (space === undefined) {
       continue;
     }
-    const graph = member.graph();
-    const spaceContractHash = member.contract().storage.storageHash;
+    const graph = space.graph();
+    const spaceContractHash = space.contract().storage.storageHash;
     const targetHash = resolveTarget(spaceContractHash, activeRefHash);
     if (spaceEntry.space === aggregate.app.spaceId) {
       headlineTargetHash = targetHash;
@@ -547,7 +547,7 @@ export async function executeMigrationStatusCommand(
     });
     const isAppSpace = spaceEntry.space === aggregate.app.spaceId;
     const tree = renderSpaceTree({
-      member,
+      space,
       liveContractHash: contractHash,
       migrations: spaceEntry.migrations,
       markerHash,

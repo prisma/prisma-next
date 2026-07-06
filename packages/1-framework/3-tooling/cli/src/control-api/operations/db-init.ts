@@ -20,7 +20,7 @@ import { executeRun } from './db-run';
  *    {@link import('@prisma-next/migration-tools/aggregate').loadContractSpaceAggregate}
  *    from the supplied descriptor set + on-disk on-disk artefacts.
  * 2. The aggregate planner runs with `callerPolicy.ignoreGraphFor`
- *    locked to the app member — synth strategy for the app, graph-walk
+ *    locked to the app space — synth strategy for the app, graph-walk
  *    for every extension.
  * 3. The runner's `execute` applies the per-space plans
  *    inside one outer transaction.
@@ -53,7 +53,7 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
   /**
    * Declared extension descriptors. Defaults to an empty list, which
    * routes through the same loader → planner → runner pipeline with no
-   * extension members in the aggregate.
+   * extension spaces in the aggregate.
    */
   readonly extensionPacks?: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   /** Optional progress callback for observing operation progress */
