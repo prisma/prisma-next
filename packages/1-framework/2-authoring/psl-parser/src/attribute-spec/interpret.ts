@@ -12,9 +12,6 @@ import type { ArgType, AttributeSpec, InterpretCtx, OptionalArgType, Param } fro
 
 const DEFAULT_STRUCTURAL_CODE: PslDiagnosticCode = 'PSL_INVALID_ATTRIBUTE_SYNTAX';
 
-/** Tracked so a later collision is reported as the right kind. */
-type Origin = 'positional' | 'named';
-
 export function interpretAttribute<Out>(
   attrNode: FieldAttributeAst | ModelAttributeAst,
   spec: AttributeSpec<Out>,
@@ -26,16 +23,18 @@ export function interpretAttribute<Out>(
   const attributeSpan = nodePslSpan(attrNode.syntax, ctx.sourceFile);
 
   const output: Record<string, unknown> = {};
-  const seen = new Map<string, Origin>();
+  const seen = new Set<string>();
   let positionalSlot = 0;
   let reportedExcess = false;
 
   for (const arg of attrNode.argList()?.args() ?? []) {
     const name = arg.name()?.name();
 
+    let key: string;
+    let param: Param<unknown>;
     if (name === undefined) {
-      const param = spec.positional[positionalSlot];
-      if (param === undefined) {
+      const posParam = spec.positional[positionalSlot];
+      if (posParam === undefined) {
         if (!reportedExcess) {
           diagnostics.push(
             diagnostic(
@@ -50,48 +49,39 @@ export function interpretAttribute<Out>(
         continue;
       }
       positionalSlot += 1;
-      if (seen.has(param.key)) {
+      key = posParam.key;
+      param = posParam.type;
+    } else {
+      const namedParam = Object.hasOwn(spec.named, name) ? spec.named[name] : undefined;
+      if (namedParam === undefined) {
         diagnostics.push(
-          duplicateDiagnostic(
-            param.key,
-            seen.get(param.key),
-            false,
-            spec.name,
-            ctx,
-            arg,
-            attributeSpan,
+          diagnostic(
             code,
+            `Attribute "${spec.name}" received unknown argument "${name}"`,
+            ctx,
+            nodePslSpan(arg.syntax, ctx.sourceFile),
           ),
         );
         continue;
       }
-      seen.set(param.key, 'positional');
-      const result = parseArgValue(arg, param.type, leafCtx, diagnostics, code);
-      if (result.ok) output[param.key] = result.value;
-      continue;
+      key = name;
+      param = namedParam;
     }
 
-    const param = Object.hasOwn(spec.named, name) ? spec.named[name] : undefined;
-    if (param === undefined) {
+    if (seen.has(key)) {
       diagnostics.push(
         diagnostic(
           code,
-          `Attribute "${spec.name}" received unknown argument "${name}"`,
+          `Attribute "${spec.name}" received duplicate argument "${key}"`,
           ctx,
           nodePslSpan(arg.syntax, ctx.sourceFile),
         ),
       );
       continue;
     }
-    if (seen.has(name)) {
-      diagnostics.push(
-        duplicateDiagnostic(name, seen.get(name), true, spec.name, ctx, arg, attributeSpan, code),
-      );
-      continue;
-    }
-    seen.set(name, 'named');
+    seen.add(key);
     const result = parseArgValue(arg, param, leafCtx, diagnostics, code);
-    if (result.ok) output[name] = result.value;
+    if (result.ok) output[key] = result.value;
   }
 
   const finalized = new Set<string>();
@@ -141,32 +131,6 @@ export function interpretAttribute<Out>(
     }
   }
   return ok(value);
-}
-
-function duplicateDiagnostic(
-  key: string,
-  storedOrigin: Origin | undefined,
-  currentIsNamed: boolean,
-  attributeName: string,
-  ctx: InterpretCtx,
-  arg: AttributeArgAst,
-  attributeSpan: PslSpan,
-  code: PslDiagnosticCode,
-): PslDiagnostic {
-  if (currentIsNamed && storedOrigin === 'named') {
-    return diagnostic(
-      code,
-      `Attribute "${attributeName}" received duplicate argument "${key}"`,
-      ctx,
-      nodePslSpan(arg.syntax, ctx.sourceFile),
-    );
-  }
-  return diagnostic(
-    code,
-    `Attribute "${attributeName}" received duplicate values for "${key}" both positionally and by name`,
-    ctx,
-    attributeSpan,
-  );
 }
 
 function parseArgValue(
