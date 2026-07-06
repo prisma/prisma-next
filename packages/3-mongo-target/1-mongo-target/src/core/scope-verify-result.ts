@@ -59,11 +59,13 @@ function aggregateStatus(children: readonly SchemaVerificationNode[]): 'pass' | 
 type Counts = { pass: number; warn: number; fail: number; totalNodes: number };
 
 /**
- * Counts the pass/warn/fail statuses over a verification tree (root included).
- * Used only when scoping actually dropped a node — the pruned tree is then
- * self-consistent, so the recomputed `fail` is the honest verdict signal.
+ * Counts the pass/warn/fail statuses over the root's subtrees — the root itself
+ * is excluded, matching Mongo's authoritative count basis (`diffMongoSchemas`
+ * tallies per collection and never counts the root). Used only when scoping
+ * actually dropped a node — the pruned tree is then self-consistent, so the
+ * recomputed `fail` is the honest verdict signal.
  */
-function countTree(node: SchemaVerificationNode): Counts {
+function countTree(root: SchemaVerificationNode): Counts {
   let pass = 0;
   let warn = 0;
   let fail = 0;
@@ -75,7 +77,7 @@ function countTree(node: SchemaVerificationNode): Counts {
     else fail += 1;
     for (const child of n.children) visit(child);
   };
-  visit(node);
+  for (const child of root.children) visit(child);
   return { pass, warn, fail, totalNodes };
 }
 

@@ -120,9 +120,11 @@ describe('scopeVerifyResultToSpace', () => {
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
 
     // The sibling's collection is dropped; the truly undeclared `junk` stays,
-    // so the runner still fails on genuine drift.
+    // so the runner still fails on genuine drift. Counts recompute on Mongo's
+    // basis: one tally per collection, the root never counted.
     expect(scoped.schema.root.children.map((c) => c.name)).toEqual(['user', 'junk']);
     expect(scoped.schema.issues.map((i) => ('table' in i ? i.table : ''))).toEqual(['junk']);
+    expect(scoped.schema.counts).toEqual({ pass: 1, warn: 0, fail: 1, totalNodes: 2 });
     expect(scoped.ok).toBe(false);
   });
 
@@ -137,7 +139,9 @@ describe('scopeVerifyResultToSpace', () => {
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
 
     expect(scoped.ok).toBe(true);
-    expect(scoped.schema.counts.fail).toBe(0);
+    // Exact Mongo basis after the prune: the one surviving collection, root
+    // excluded — not collection count + 1.
+    expect(scoped.schema.counts).toEqual({ pass: 1, warn: 0, fail: 0, totalNodes: 1 });
     expect(scoped.schema.issues).toEqual([]);
   });
 
