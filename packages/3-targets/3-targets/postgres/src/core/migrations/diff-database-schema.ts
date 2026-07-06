@@ -9,6 +9,7 @@ import { diffSchemas, SchemaDiff } from '@prisma-next/framework-components/contr
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import type { PostgresContract } from '../postgres-schema';
@@ -16,6 +17,7 @@ import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schem
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
 import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
+import { buildNativeTypeExpander } from './native-type-expander';
 
 interface PostgresDiffDatabaseSchemaInput {
   readonly contract: Contract<SqlStorage>;
@@ -50,6 +52,17 @@ function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput)
     'diffPostgresDatabaseSchema is only called with a postgres contract'
   >(input.contract);
 
+  // The expected trees stamp resolved values onto their leaf nodes (resolved
+  // native types via the codec expandNativeType hooks, structured defaults,
+  // resolved FK schemas) so leaves are comparable against the introspected
+  // side. The legacy relational walk below does not read them — it verifies
+  // from the contract directly and self-normalizes.
+  const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
+  const projectionOptions = {
+    annotationNamespace: 'pg',
+    ...ifDefined('expandNativeType', expandNativeType),
+  };
+
   // Relational diff: per-namespace-paired so a multi-schema database checks each
   // contract namespace against its own actual node.
   const relational = verifySqlSchemaTree({
@@ -61,7 +74,7 @@ function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput)
           PostgresContract | null,
           'the relational pairing projects a scoped postgres contract'
         >(scopedContract),
-        { annotationNamespace: 'pg' },
+        projectionOptions,
       ),
     strict: input.strict,
     typeMetadataRegistry: input.typeMetadataRegistry,
@@ -76,9 +89,7 @@ function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput)
   // Postgres database root in production — assert it, matching the prior
   // `collectSchemaDiffIssues` / `planPostgresSchemaDiff` behaviour.
   PostgresDatabaseSchemaNode.assert(input.actualSchema);
-  const expected = contractToPostgresDatabaseSchemaNode(postgresContract, {
-    annotationNamespace: 'pg',
-  });
+  const expected = contractToPostgresDatabaseSchemaNode(postgresContract, projectionOptions);
   const schemaDiffIssues = filterIssuesByOwnership(
     diffPostgresSchema(expected, input.actualSchema),
     ownedSchemaNames(expected),

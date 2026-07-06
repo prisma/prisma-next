@@ -1,8 +1,6 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { SqlControlTargetDescriptor } from '@prisma-next/family-sql/control';
-import { extractCodecControlHooks } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlTargetInstance,
   MigrationRunner,
@@ -16,6 +14,7 @@ import {
   diffPostgresDatabaseSchema,
   verifyPostgresDatabaseSchema,
 } from '../core/migrations/diff-database-schema';
+import { buildNativeTypeExpander } from '../core/migrations/native-type-expander';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
@@ -25,26 +24,6 @@ import type { PostgresContract } from '../core/postgres-schema';
 import { PostgresSchemaVerifier } from '../core/postgres-schema-verifier';
 import { inferPostgresPslContract } from '../core/psl-infer/infer-psl-contract';
 import { PostgresDatabaseSchemaNode } from '../core/schema-ir/postgres-database-schema-node';
-
-function buildNativeTypeExpander(
-  frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>,
-) {
-  if (!frameworkComponents) {
-    return undefined;
-  }
-  const codecHooks = extractCodecControlHooks(frameworkComponents);
-  return (input: {
-    readonly nativeType: string;
-    readonly codecId?: string;
-    readonly typeParams?: Record<string, unknown>;
-  }) => {
-    if (!input.typeParams) return input.nativeType;
-    if (!input.codecId) return input.nativeType;
-    const hooks = codecHooks.get(input.codecId);
-    if (!hooks?.expandNativeType) return input.nativeType;
-    return hooks.expandNativeType(input);
-  };
-}
 
 export function postgresRenderDefault(def: ColumnDefault, column: StorageColumn): string {
   if (def.kind === 'function') {

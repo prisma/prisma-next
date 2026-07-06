@@ -98,6 +98,12 @@ function convertColumn(
       'default',
       column.default != null && renderDefault ? renderDefault(column.default, column) : undefined,
     ),
+    // Contract-derived columns are resolved by construction: the computed
+    // full native type doubles as the resolved value, and the contract's
+    // structured default is the resolved default (the introspected side
+    // stamps its normalizer's parse of the raw expression).
+    resolvedNativeType: nativeType,
+    ...ifDefined('resolvedDefault', column.default ?? undefined),
   };
 }
 
