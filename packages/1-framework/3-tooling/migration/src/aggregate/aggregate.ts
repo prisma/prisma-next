@@ -253,10 +253,26 @@ export function collectAggregateNamespaces(aggregate: ContractSpaceAggregate): {
   const merged: Record<string, StorageNamespace> = {};
   for (const space of aggregate.spaces()) {
     for (const [key, ns] of Object.entries(space.contract().storage.namespaces)) {
-      merged[key] = ns;
+      const existing = merged[key];
+      merged[key] = existing === undefined ? ns : mergeNamespaceEntries(existing, ns);
     }
   }
   return { storage: { namespaces: merged } };
+}
+
+/**
+ * Union two contract spaces' declarations for the same namespace id, per
+ * entity kind. Two spaces may legitimately share a namespace (e.g. both
+ * declaring tables in `public`); element-level disjointness is enforced by
+ * `checkIntegrity`, so the kind maps never collide on a name — replacing the
+ * whole namespace would silently drop the earlier space's entities.
+ */
+function mergeNamespaceEntries(a: StorageNamespace, b: StorageNamespace): StorageNamespace {
+  const entries: Record<string, Readonly<Record<string, unknown>>> = { ...a.entries };
+  for (const [entityKind, kindMap] of Object.entries(b.entries)) {
+    entries[entityKind] = { ...entries[entityKind], ...kindMap };
+  }
+  return { ...a, entries };
 }
 
 /**
