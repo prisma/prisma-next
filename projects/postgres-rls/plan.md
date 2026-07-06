@@ -54,7 +54,7 @@ Top-level Postgres policy helpers taking the model handle (not a model-builder m
 ## Out of scope / follow-on projects
 
 - Role-ref **authoring** validation — roles are platform-provided; policies only reference them by name (slice 4 checks existence in the DB, nothing more).
-- **A** — promoted to slice 2.5 (`one-differ-two-ir-planner`). **B** — dependency-aware planner ordering (slice 4's edges seed it). **C** — a generic project-from-contract / project-from-database registration surface, once a second node type needs the shared shape. **D1** ([TML-2958](https://linear.app/prisma-company/issue/TML-2958)) — walk the schema-node tree in PSL inference instead of gathering it to a flat document; a fail-loud throw guards the same-name collision until then. (No planned slice owns this — it is not the RLS slices 3–6.)
+- **A** — promoted to slice 2.5 (`one-differ-two-ir-planner`). **B** — dependency-aware planner ordering (slice 4's edges seed it). **C** — a generic project-from-contract / project-from-database registration surface, once a second node type needs the shared shape. **D1** ([TML-2958](https://linear.app/prisma-company/issue/TML-2958)) — walk the schema-node tree in PSL inference instead of gathering it to a flat document; a fail-loud throw guards the same-name collision until then. **D2** ([TML-2974](https://linear.app/prisma-company/issue/TML-2974)) — `db verify` renders the per-space results + unclaimed list natively; delete the CLI's `combineVerifyResults` fold (absorbs the multi-namespace verify-tree shaping residual). (No planned slice owns these — they are not the RLS slices 3–6.)
 
 ## Linear
 

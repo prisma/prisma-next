@@ -116,7 +116,7 @@ Behaviour to preserve: `db verify` output (the per-space pass/fail view and unde
 ## 13. Out of scope (follow-ons)
 
 - **Relational port / one issue type:** merge the relational check into the generic node differ so there is a single, node-typed issue type (which also node-types `SchemaIssue`). Until then `SchemaDiff` carries two lists.
-- **Multi-namespace verify-tree shaping:** the family verify retains only the first namespace's tree while its counts sum every namespace (`mergeVerifyResults`), so a stripped extra in a non-first namespace can leave a conservative false-*fail* in SQL-strict. Rooted in that pre-existing partial-root limitation; rides with the tree-shaping follow-on.
+- **Native per-space `db verify` rendering ([TML-2974](https://linear.app/prisma-company/issue/TML-2974)):** the CLI folds the per-space results into one envelope (`combineVerifyResults`, a synthetic aggregate root) because its render/json surface predates multi-space. The fix renders the per-space map + the unclaimed list natively and deletes the fold; it also absorbs the multi-namespace verify-tree shaping residual (the family verify retains only the first namespace's tree while its counts sum every namespace).
 - **PSL-inference tree-walk (TML-2958):** inference still flattens the schema-IR tree into a flat document, fail-loud guarded.
 - **`annotations.pg` full retirement (TML-2936).**
 
