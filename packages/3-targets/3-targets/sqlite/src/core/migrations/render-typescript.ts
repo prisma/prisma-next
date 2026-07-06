@@ -35,15 +35,19 @@ export function renderCallsToTypeScript(
   calls: ReadonlyArray<OpFactoryCall>,
   meta: RenderMigrationMeta,
 ): string {
-  const imports = buildImports(calls);
+  const imports = buildImports(calls, meta);
   const operationsBody = calls.map((c) => c.renderTypeScript()).join(',\n');
+  const hasStart = meta.from !== null;
+  const startField = hasStart ? ['  override readonly startContractJson = startContract;'] : [];
 
   return [
     shebangLineFor(detectScaffoldRuntime()),
     imports,
     '',
-    'export default class M extends Migration {',
-    buildDescribeMethod(meta),
+    `export default class M extends Migration<${hasStart ? 'Start' : 'never'}, End> {`,
+    ...startField,
+    '  override readonly endContractJson = endContract;',
+    '',
     '  override get operations() {',
     '    return [',
     indent(operationsBody, 6),
@@ -56,8 +60,8 @@ export function renderCallsToTypeScript(
   ].join('\n');
 }
 
-function buildImports(calls: ReadonlyArray<OpFactoryCall>): string {
-  const requirements: ImportRequirement[] = [...BASE_IMPORTS];
+function buildImports(calls: ReadonlyArray<OpFactoryCall>, meta: RenderMigrationMeta): string {
+  const requirements: ImportRequirement[] = [...BASE_IMPORTS, ...contractImports(meta)];
   for (const call of calls) {
     for (const req of call.importRequirements()) {
       requirements.push(req);
@@ -66,16 +70,39 @@ function buildImports(calls: ReadonlyArray<OpFactoryCall>): string {
   return renderImports(requirements);
 }
 
-function buildDescribeMethod(meta: RenderMigrationMeta): string {
-  const lines: string[] = [];
-  lines.push('  override describe() {');
-  lines.push('    return {');
-  lines.push(`      from: ${JSON.stringify(meta.from)},`);
-  lines.push(`      to: ${JSON.stringify(meta.to)},`);
-  lines.push('    };');
-  lines.push('  }');
-  lines.push('');
-  return lines.join('\n');
+/**
+ * The committed contract-JSON imports the scaffold reads its from/to identity
+ * from. `end-contract.json` is always present; `start-contract.json` is added
+ * only for a non-baseline migration (`meta.from !== null`). The matching
+ * `Contract` type imports (aliased `Start`/`End`) feed the
+ * `Migration<Start, End>` generics. Baseline emits `Migration<never, End>` with
+ * no start imports — `never` is the honest "no prior contract" Start.
+ */
+function contractImports(meta: RenderMigrationMeta): readonly ImportRequirement[] {
+  const reqs: ImportRequirement[] = [
+    {
+      moduleSpecifier: './end-contract.json',
+      symbol: 'endContract',
+      kind: 'default',
+      attributes: { type: 'json' },
+    },
+    { moduleSpecifier: './end-contract', symbol: 'Contract', alias: 'End', typeOnly: true },
+  ];
+  if (meta.from !== null) {
+    reqs.push({
+      moduleSpecifier: './start-contract.json',
+      symbol: 'startContract',
+      kind: 'default',
+      attributes: { type: 'json' },
+    });
+    reqs.push({
+      moduleSpecifier: './start-contract',
+      symbol: 'Contract',
+      alias: 'Start',
+      typeOnly: true,
+    });
+  }
+  return reqs;
 }
 
 function indent(text: string, spaces: number): string {

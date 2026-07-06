@@ -30,7 +30,7 @@ describe('MongoContractSerializerBase', () => {
       const result = serializer.deserializeContract(json);
 
       expect(result.contract.targetFamily).toBe('mongo');
-      expect(result.contract.domain.namespaces.__unbound__!.models['Item']).toBeDefined();
+      expect(result.contract.domain.namespaces['__unbound__']!.models['Item']).toBeDefined();
     });
 
     it('rejects non-Mongo targetFamily', () => {
@@ -49,6 +49,7 @@ describe('MongoContractSerializerBase', () => {
               _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
             },
             storage: { collection: 'missing_collection' },
+            relations: {},
           },
         },
       });
@@ -66,6 +67,7 @@ describe('MongoContractSerializerBase', () => {
               data: { type: { kind: 'valueObject', name: 'Missing' }, nullable: false },
             },
             storage: { collection: 'items' },
+            relations: {},
           },
         },
       });

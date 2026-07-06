@@ -72,7 +72,7 @@ describe('Mongo runtime decode integration via query-builder', () => {
     });
   });
 
-  it('project narrows the row type at compile time; runtime emits the projected key set', async () => {
+  it('project narrows the row type at compile time; runtime decodes the projected keys', async () => {
     await withMongod(async (ctx) => {
       const createdAt = new Date('2024-05-01T00:00:00.000Z');
       await ctx.client
@@ -87,20 +87,21 @@ describe('Mongo runtime decode integration via query-builder', () => {
 
       const plan = q.from('users').project('_id', 'name').build();
 
-      // Runtime: `$project` is a shape-rewriting stage so the lane emits
-      // `kind: 'unknown'` (per ADR 209) and rows pass through untouched.
-      // The user gets the projected key set (Mongo's `$project` honours
-      // the projection at the wire level) but values are not decoded —
-      // `_id` stays as the raw `ObjectId`. Decode for projected
-      // pipelines is the per-stage value-level reification work
-      // ADR 209 § "Consequences/Positive" calls out as additive
-      // follow-up.
-      expect(plan.resultShape).toEqual({ kind: 'unknown' });
+      // `$project` with a key-list (all-`1`) projection is reified by the
+      // lane: `_id` (implicitly retained) and `name` both trace to model
+      // fields, so the runtime decodes them per their codecs.
+      expect(plan.resultShape).toEqual({
+        kind: 'document',
+        fields: {
+          _id: { kind: 'leaf', codecId: 'mongo/objectId@1', nullable: false },
+          name: { kind: 'leaf', codecId: 'mongo/string@1', nullable: false },
+        },
+      });
       const rows = await ctx.runtime.execute(plan).toArray();
       expect(rows).toHaveLength(1);
       const row = rows[0] as Record<string, unknown>;
       expect(Object.keys(row).sort()).toEqual(['_id', 'name']);
-      expect(Object.getPrototypeOf(row['_id']).constructor.name).toBe('ObjectId');
+      expect(typeof row['_id']).toBe('string');
       expect(row['name']).toBe('Bob');
     });
   });

@@ -32,7 +32,8 @@
     "@prisma-next/mongo-wire": "workspace:0.14.0",
     "@prisma-next/operations": "workspace:0.14.0",
     "@prisma-next/utils": "workspace:0.14.0",
-    "arktype": "catalog:"
+    "arktype": "catalog:",
+    "bson": "^7.2.0"
   },
   "devDependencies": {
     "mongodb": "catalog:",
@@ -64,7 +65,9 @@
   "types": "./dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
+    "./codec-ids": "./dist/codec-ids.mjs",
     "./codec-types": "./dist/codec-types.mjs",
+    "./codecs": "./dist/codecs.mjs",
     "./control": "./dist/control.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"

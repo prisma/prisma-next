@@ -2,7 +2,6 @@ import { MongoFieldFilter, MongoOrExpr } from '@prisma-next/mongo-query-ast/exec
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import type { FieldOutputTypes } from '../contract';
 import type { Db } from '../db';
-import { collectResults } from './execute-raw';
 
 type Product = FieldOutputTypes['__unbound__']['Product'];
 
@@ -16,7 +15,7 @@ export async function findProductsPaginated(
   take: number,
 ): Promise<Product[]> {
   const plan = db.query.from('products').sort({ _id: 1 }).skip(skip).limit(take).build();
-  return collectResults<Product>(db, plan);
+  return db.execute(plan);
 }
 
 export function findProductById(db: Db, id: string) {
@@ -35,40 +34,33 @@ export async function searchProducts(db: Db, query: string): Promise<Product[]> 
     MongoFieldFilter.of('articleType', '$regex', regex),
   ]);
   const plan = db.query.from('products').match(filter).build();
-  return collectResults<Product>(db, plan);
+  return db.execute(plan);
 }
 
 export async function getRandomProducts(db: Db, count: number): Promise<Product[]> {
   const plan = db.query.from('products').sample(count).build();
-  return collectResults<Product>(db, plan);
+  return db.execute(plan);
 }
 
 /**
  * Vector similarity search via $vectorSearch aggregation stage.
  * Requires an Atlas cluster with a vector search index on the
  * `products.embedding` field. Not available with mongodb-memory-server.
- *
- * Uses raw aggregate instead of the pipeline builder because $vectorSearch
- * is an Atlas-specific stage not yet supported by the pipeline builder API.
  */
 export async function findSimilarProducts(
   db: Db,
   embedding: number[],
   limit: number,
 ): Promise<Product[]> {
-  const plan = db.raw
-    .collection('products')
-    .aggregate([
-      {
-        $vectorSearch: {
-          index: 'product_embedding_index',
-          path: 'embedding',
-          queryVector: embedding,
-          numCandidates: limit * 10,
-          limit,
-        },
-      },
-    ])
+  const plan = db.query
+    .from('products')
+    .vectorSearch({
+      index: 'product_embedding_index',
+      path: 'embedding',
+      queryVector: embedding,
+      numCandidates: limit * 10,
+      limit,
+    })
     .build();
-  return collectResults<Product>(db, plan);
+  return db.execute(plan);
 }

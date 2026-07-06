@@ -1174,9 +1174,6 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:0.14.0
         version: link:../../packages/2-mongo-family/1-foundation/mongo-contract
-      '@prisma-next/mongo-orm':
-        specifier: workspace:0.14.0
-        version: link:../../packages/2-mongo-family/5-query-builders/orm
       '@prisma-next/mongo-query-ast':
         specifier: workspace:0.14.0
         version: link:../../packages/2-mongo-family/4-query/query-ast
@@ -1192,6 +1189,9 @@ importers:
       '@prisma-next/target-mongo':
         specifier: workspace:0.14.0
         version: link:../../packages/3-mongo-target/1-mongo-target
+      '@prisma-next/utils':
+        specifier: workspace:0.14.0
+        version: link:../../packages/1-framework/0-foundation/utils
       '@radix-ui/react-dropdown-menu':
         specifier: ^2.1.16
         version: 2.1.16(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -1563,6 +1563,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:0.14.0
         version: link:../../1-core/framework-components
+      '@prisma-next/utils':
+        specifier: workspace:0.14.0
+        version: link:../../0-foundation/utils
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:0.14.0
@@ -1790,6 +1793,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:0.14.0
         version: link:../../0-foundation/utils
+      '@vercel/detect-agent':
+        specifier: ^1.2.3
+        version: 1.2.3
       arktype:
         specifier: 'catalog:'
         version: 2.2.0
@@ -2223,6 +2229,12 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/0-foundation/contract
+      '@prisma-next/contract-authoring':
+        specifier: workspace:0.14.0
+        version: link:../../../1-framework/2-authoring/contract
+      '@prisma-next/errors':
+        specifier: workspace:0.14.0
+        version: link:../../../1-framework/1-core/errors
       '@prisma-next/framework-components':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/1-core/framework-components
@@ -2272,6 +2284,9 @@ importers:
       '@prisma-next/contract-authoring':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/2-authoring/contract
+      '@prisma-next/errors':
+        specifier: workspace:0.14.0
+        version: link:../../../1-framework/1-core/errors
       '@prisma-next/framework-components':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/1-core/framework-components
@@ -2318,6 +2333,9 @@ importers:
       '@prisma-next/mongo-contract':
         specifier: workspace:0.14.0
         version: link:../../1-foundation/mongo-contract
+      '@prisma-next/utils':
+        specifier: workspace:0.14.0
+        version: link:../../../1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:0.14.0
@@ -3348,6 +3366,12 @@ importers:
         specifier: ^2.0.3
         version: 2.0.3
     devDependencies:
+      '@prisma-next/emitter':
+        specifier: workspace:0.14.0
+        version: link:../../1-framework/3-tooling/emitter
+      '@prisma-next/mongo-emitter':
+        specifier: workspace:0.14.0
+        version: link:../../2-mongo-family/3-tooling/emitter
       '@prisma-next/test-utils':
         specifier: workspace:0.14.0
         version: link:../../../test/utils
@@ -4067,6 +4091,9 @@ importers:
       arktype:
         specifier: 'catalog:'
         version: 2.2.0
+      bson:
+        specifier: ^7.2.0
+        version: 7.2.0
     devDependencies:
       '@prisma-next/driver-mongo':
         specifier: workspace:0.14.0
@@ -7798,6 +7825,10 @@ packages:
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
+  '@vercel/detect-agent@1.2.3':
+    resolution: {integrity: sha512-VYNCgUc0nOmC4WJmWw9GkrKdfr8Zl4/rxhC5SvgacBgxiW9W/9NRttUoHHXV8xdII3MaRgkZZVX8Ikzc/Jmjag==}
+    engines: {node: '>=14'}
+
   '@vitejs/plugin-react-swc@4.3.1':
     resolution: {integrity: sha512-PaeokKjAGraNN+s5SIApgsktnJprIyt3zgEIu7awnEdfn29QiB2crTcCzyi2XGpX9rUnTc0cKU07Wm0N0g7H2w==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -10200,6 +10231,7 @@ packages:
   tsconfck@3.1.6:
     resolution: {integrity: sha512-ks6Vjr/jEw0P1gmOVwutM3B7fWxoWBL2KRDb1JfqGVawBmO5UsvmWOQFGHBPl5yxYz4eERr19E6L7NMv+Fej4w==}
     engines: {node: ^18 || >=20}
+    deprecated: unmaintained
     hasBin: true
     peerDependencies:
       typescript: ^5.0.0
@@ -13001,6 +13033,8 @@ snapshots:
   '@types/ws@8.18.1':
     dependencies:
       '@types/node': 25.9.2
+
+  '@vercel/detect-agent@1.2.3': {}
 
   '@vitejs/plugin-react-swc@4.3.1(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))':
     dependencies:

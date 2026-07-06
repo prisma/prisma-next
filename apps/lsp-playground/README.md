@@ -41,8 +41,8 @@ Monaco editor + VS Code API shim  --LSP/WebSocket-->  ws bridge  --spawn+stdio--
 ```
 
 - `src/bridge.ts` — `ws` + `vscode-ws-jsonrpc/server` (`createServerProcess` + `forward`), adapted from the TypeFox example (MIT). Each browser WebSocket connection spawns `node <built-cli> lsp --stdio` and forwards JSON-RPC between the browser and the language server process.
-- `src/cli.ts` — arg parsing, config resolution, runtime module generation, and startup for the shared HTTP server that hosts Vite plus the LSP WebSocket bridge.
-- `src/client/main.ts` — Monaco editor setup via `EditorApp`, VS Code API service overrides, and `LanguageClientWrapper` startup for the `prisma` language id.
+- `src/cli.ts` — arg parsing, config resolution, startup for the shared HTTP server that hosts Vite plus the LSP WebSocket bridge, and serving launch-time client config as same-origin JSON at `/__psl_playground_runtime.json` without rewriting tracked source files.
+- `src/client/main.ts` — Monaco editor setup via `EditorApp`, VS Code API service overrides, runtime config fetch/validation, and `LanguageClientWrapper` startup for the `prisma` language id.
 
 ## Semantic tokens
 

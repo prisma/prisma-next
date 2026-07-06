@@ -39,10 +39,15 @@ export async function getUsers(orm: Db['orm']) {
   return orm.users.all();
 }
 
+export function getRoles(enums: Db['enums']) {
+  return enums.UserRole.values;
+}
+
 export type PostsResponse = SimplifyDeep<Awaited<ReturnType<typeof getPosts>>>;
 export type ArticlesResponse = SimplifyDeep<Awaited<ReturnType<typeof getArticles>>>;
 export type TutorialsResponse = SimplifyDeep<Awaited<ReturnType<typeof getTutorials>>>;
 export type UsersResponse = SimplifyDeep<Awaited<ReturnType<typeof getUsers>>>;
+export type RolesResponse = ReturnType<typeof getRoles>;
 
 // ---------------------------------------------------------------------------
 // Pipeline DSL queries — type-safe aggregation pipelines
@@ -144,7 +149,7 @@ async function main() {
     console.log(`In-memory MongoDB ready at ${uri}`);
   }
 
-  const { orm, runtime, query } = await createClient(uri, DB_NAME);
+  const { orm, runtime, query, enums } = await createClient(uri, DB_NAME);
 
   if (!externalUrl) {
     console.log('Seeding data...');
@@ -162,6 +167,8 @@ async function main() {
         jsonResponse(res, await getTutorials(orm));
       } else if (req.method === 'GET' && req.url === '/api/users') {
         jsonResponse(res, await getUsers(orm));
+      } else if (req.method === 'GET' && req.url === '/api/roles') {
+        jsonResponse(res, getRoles(enums));
       } else if (req.method === 'GET' && req.url === '/api/pipeline/leaderboard') {
         jsonResponse(res, await getAuthorLeaderboard(query, runtime));
       } else if (req.method === 'GET' && req.url === '/api/pipeline/recent') {
@@ -186,6 +193,7 @@ async function main() {
     console.log(`  GET http://localhost:${PORT}/api/posts/articles   (variant: Article)`);
     console.log(`  GET http://localhost:${PORT}/api/posts/tutorials  (variant: Tutorial)`);
     console.log(`  GET http://localhost:${PORT}/api/users`);
+    console.log(`  GET http://localhost:${PORT}/api/roles          (enum values via db.enums)`);
     console.log('Pipeline DSL endpoints:');
     console.log(`  GET http://localhost:${PORT}/api/pipeline/leaderboard`);
     console.log(`  GET http://localhost:${PORT}/api/pipeline/recent`);

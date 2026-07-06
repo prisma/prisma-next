@@ -16,8 +16,12 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  postgresEnumInferenceCodecs,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  sqliteEnumInferenceCodecs,
+  sqliteScalarTypeDescriptors,
+  sqliteTarget,
   symbolTableInputFromParseArgs,
   testEnumEntityContributions,
 } from './fixtures';
@@ -48,16 +52,32 @@ const int4Codec: Codec = {
   },
 };
 
+const pgIntCodec: Codec = { ...int4Codec, id: 'pg/int@1' };
+const sqliteTextCodec: Codec = { ...textCodec, id: 'sqlite/text@1' };
+const sqliteIntegerCodec: Codec = { ...int4Codec, id: 'sqlite/integer@1' };
+
+const codecsById: Record<string, Codec> = {
+  'pg/text@1': textCodec,
+  'pg/int4@1': int4Codec,
+  'pg/int@1': pgIntCodec,
+  'sqlite/text@1': sqliteTextCodec,
+  'sqlite/integer@1': sqliteIntegerCodec,
+};
+
+const targetTypesById: Record<string, readonly string[]> = {
+  'pg/text@1': ['text'],
+  'pg/int4@1': ['int4'],
+  'pg/int@1': ['int4'],
+  'sqlite/text@1': ['text'],
+  'sqlite/integer@1': ['integer'],
+};
+
 const testCodecLookup: CodecLookup = {
   get(id: string): Codec | undefined {
-    if (id === 'pg/text@1') return textCodec;
-    if (id === 'pg/int4@1') return int4Codec;
-    return undefined;
+    return codecsById[id];
   },
   targetTypesFor(id: string): readonly string[] | undefined {
-    if (id === 'pg/text@1') return ['text'];
-    if (id === 'pg/int4@1') return ['int4'];
-    return undefined;
+    return targetTypesById[id];
   },
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
@@ -98,6 +118,8 @@ function interpret(schema: string, overrides?: Partial<InterpretPslDocumentToSql
     authoringContributions: contributions,
     codecLookup: testCodecLookup,
     createNamespace: createTestSqlNamespace,
+    enumInferenceCodecs: postgresEnumInferenceCodecs,
+    capabilities: { sql: { scalarList: true } },
     ...overrides,
   });
 }
@@ -265,10 +287,10 @@ model Post {
 // ---------------------------------------------------------------------------
 
 describe('enum diagnostics', () => {
-  it('missing @@type emits diagnostic', () => {
+  it('missing @@type with non-inferable members emits PSL_ENUM_CANNOT_INFER_TYPE', () => {
     const result = interpret(`
 enum Priority {
-  Low = "low"
+  Low = 1.5
 }
 model Post {
   id Int @id
@@ -277,7 +299,7 @@ model Post {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'PSL_ENUM_MISSING_TYPE' })]),
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_ENUM_CANNOT_INFER_TYPE' })]),
     );
   });
 
@@ -573,6 +595,203 @@ model User {
     const domainNs = result.value.domain.namespaces['public'];
     expect(domainNs?.enum?.['Role']).toBeDefined();
     expect(domainNs?.enum?.['Priority']).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// @@type inference from members (TML-2915)
+// ---------------------------------------------------------------------------
+
+describe.each([
+  {
+    targetName: 'postgres',
+    target: postgresTarget,
+    scalarTypeDescriptors: postgresScalarTypeDescriptors,
+    enumInferenceCodecs: postgresEnumInferenceCodecs,
+  },
+  {
+    targetName: 'sqlite',
+    target: sqliteTarget,
+    scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+    enumInferenceCodecs: sqliteEnumInferenceCodecs,
+  },
+])('enum @@type inference ($targetName)', ({
+  target,
+  scalarTypeDescriptors,
+  enumInferenceCodecs,
+}) => {
+  const namespaceId = target.defaultNamespaceId;
+
+  it('no @@type, all-bare members infers the target text codec', () => {
+    const result = interpret(
+      `
+enum Role {
+  Admin
+  User
+}
+model Post {
+  id   Int  @id
+  role Role
+}
+`,
+      { target, scalarTypeDescriptors, enumInferenceCodecs },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const domainNs = result.value.domain.namespaces[namespaceId];
+    expect(domainNs?.enum?.['Role']).toMatchObject({ codecId: enumInferenceCodecs.text });
+    const ns = (result.value.storage as unknown as SqlStorage).namespaces[namespaceId];
+    expect(ns?.entries.valueSet?.['Role']).toMatchObject({
+      kind: 'valueSet',
+      values: ['Admin', 'User'],
+    });
+  });
+
+  it('no @@type, all-string-value members infers the target text codec', () => {
+    const result = interpret(
+      `
+enum Role {
+  Admin = "admin"
+  User  = "user"
+}
+model Post {
+  id   Int  @id
+  role Role
+}
+`,
+      { target, scalarTypeDescriptors, enumInferenceCodecs },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const domainNs = result.value.domain.namespaces[namespaceId];
+    expect(domainNs?.enum?.['Role']).toMatchObject({ codecId: enumInferenceCodecs.text });
+    const ns = (result.value.storage as unknown as SqlStorage).namespaces[namespaceId];
+    expect(ns?.entries.valueSet?.['Role']).toMatchObject({
+      kind: 'valueSet',
+      values: ['admin', 'user'],
+    });
+  });
+
+  it('no @@type, all-integer-value members infers the target int codec', () => {
+    const result = interpret(
+      `
+enum Priority {
+  Low  = 1
+  High = 2
+}
+model Post {
+  id       Int      @id
+  priority Priority
+}
+`,
+      { target, scalarTypeDescriptors, enumInferenceCodecs },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const domainNs = result.value.domain.namespaces[namespaceId];
+    expect(domainNs?.enum?.['Priority']).toMatchObject({ codecId: enumInferenceCodecs.int });
+    const ns = (result.value.storage as unknown as SqlStorage).namespaces[namespaceId];
+    expect(ns?.entries.valueSet?.['Priority']).toMatchObject({
+      kind: 'valueSet',
+      values: [1, 2],
+    });
+  });
+
+  it('explicit @@type is unchanged: same codec and diagnostics as before this slice', () => {
+    const result = interpret(
+      `
+enum Priority {
+  @@type("${enumInferenceCodecs.text}")
+  Low  = "low"
+  High = "high"
+}
+model Post {
+  id       Int      @id
+  priority Priority
+}
+`,
+      { target, scalarTypeDescriptors, enumInferenceCodecs },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const domainNs = result.value.domain.namespaces[namespaceId];
+    expect(domainNs?.enum?.['Priority']).toMatchObject({ codecId: enumInferenceCodecs.text });
+  });
+
+  it('no @@type, a mix of string and integer member values cannot be inferred', () => {
+    const result = interpret(
+      `
+enum Mixed {
+  Low  = "low"
+  High = 2
+}
+model Post {
+  id    Int   @id
+  mixed Mixed
+}
+`,
+      { target, scalarTypeDescriptors, enumInferenceCodecs },
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_ENUM_CANNOT_INFER_TYPE',
+          message: expect.stringMatching(/Mixed/),
+        }),
+      ]),
+    );
+    expect(
+      result.failure.diagnostics.find((d) => d.code === 'PSL_ENUM_CANNOT_INFER_TYPE')?.message,
+    ).toMatch(/@@type/);
+  });
+
+  it('no @@type, a float member value cannot be inferred', () => {
+    const result = interpret(
+      `
+enum Priority {
+  Low = 1.5
+}
+model Post {
+  id       Int      @id
+  priority Priority
+}
+`,
+      { target, scalarTypeDescriptors, enumInferenceCodecs },
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_ENUM_CANNOT_INFER_TYPE' })]),
+    );
+  });
+
+  it('no @@type, a boolean member value cannot be inferred', () => {
+    const result = interpret(
+      `
+enum Flag {
+  On = true
+}
+model Post {
+  id   Int  @id
+  flag Flag
+}
+`,
+      { target, scalarTypeDescriptors, enumInferenceCodecs },
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_ENUM_CANNOT_INFER_TYPE' })]),
+    );
   });
 });
 

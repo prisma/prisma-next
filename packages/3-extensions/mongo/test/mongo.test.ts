@@ -1,11 +1,12 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
+  AnyMongoTypeMaps,
   MongoContract,
   MongoContractWithTypeMaps,
-  MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-type AnyMongoContract = MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>;
+type AnyMongoContract = MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>;
 
 // Hoisted mocks so they are observable from inside vi.mock() factories.
 const mocks = vi.hoisted(() => ({
@@ -19,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   deserializeContract: vi.fn(),
   mongoOrm: vi.fn(),
   mongoQuery: vi.fn(),
+  mongoRaw: vi.fn(),
 }));
 
 vi.mock('@prisma-next/adapter-mongo/runtime', () => ({
@@ -52,6 +54,7 @@ vi.mock('@prisma-next/family-mongo/ir', () => ({
 
 vi.mock('@prisma-next/mongo-orm', () => ({
   mongoOrm: mocks.mongoOrm,
+  mongoRaw: mocks.mongoRaw,
 }));
 
 vi.mock('@prisma-next/mongo-query-builder', () => ({
@@ -60,12 +63,17 @@ vi.mock('@prisma-next/mongo-query-builder', () => ({
 
 import mongo from '../src/runtime/mongo';
 
-const fakeContract = { roots: {}, models: {} } as unknown as AnyMongoContract;
+const fakeContract = {
+  roots: {},
+  models: {},
+  domain: { namespaces: { [UNBOUND_NAMESPACE_ID]: { models: {} } } },
+} as unknown as AnyMongoContract;
 const fakeRuntime = { id: 'runtime-instance', close: vi.fn().mockResolvedValue(undefined) };
 const fakeDriverClose = vi.fn().mockResolvedValue(undefined);
 const fakeDriverFromDbClose = vi.fn().mockResolvedValue(undefined);
 const fakeOrm = { id: 'orm-instance' };
 const fakeQuery = { id: 'query-instance' };
+const fakeRaw = { id: 'raw-instance', collection: vi.fn() };
 
 describe('mongo() facade', () => {
   beforeEach(() => {
@@ -84,6 +92,8 @@ describe('mongo() facade', () => {
     mocks.createMongoRuntime.mockReturnValue(fakeRuntime);
     mocks.mongoOrm.mockReturnValue(fakeOrm);
     mocks.mongoQuery.mockReturnValue(fakeQuery);
+    mocks.mongoRaw.mockReturnValue(fakeRaw);
+    fakeRaw.collection.mockClear();
     fakeRuntime.close.mockClear();
     fakeDriverClose.mockClear();
     fakeDriverFromDbClose.mockClear();
@@ -116,7 +126,7 @@ describe('mongo() facade', () => {
       'mydb',
     );
 
-    // Per buildRuntime invocation: one stack, one context, threaded into runtime.
+    // Stack and context are built upfront at construction time; each appears exactly once.
     expect(mocks.createMongoExecutionStack).toHaveBeenCalledTimes(1);
     expect(mocks.createMongoExecutionStack).toHaveBeenCalledWith({
       target: mocks.mongoRuntimeTarget,
@@ -446,13 +456,48 @@ describe('mongo() facade', () => {
     expect(fakeRuntime.close).not.toHaveBeenCalled();
   });
 
-  it('validates the contract via the SPI deserializer for both authoring modes', () => {
-    const json = { models: {} };
-    mongo({ contractJson: json, url: 'mongodb://localhost:27017/mydb' });
-    expect(mocks.deserializeContract).toHaveBeenLastCalledWith(json);
+  describe('db.execute', () => {
+    it('lazily instantiates the runtime on first consumption', async () => {
+      const fakeRows = [{ id: 1 }, { id: 2 }];
+      const fakePlan = { id: 'fake-plan' };
+      const fakeRuntimeWithExecute = {
+        ...fakeRuntime,
+        execute: vi.fn(async function* () {
+          yield* fakeRows;
+        }),
+      };
+      mocks.createMongoRuntime.mockReturnValue(fakeRuntimeWithExecute);
 
-    mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
-    expect(mocks.deserializeContract).toHaveBeenLastCalledWith(fakeContract);
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      const result = db.execute(fakePlan as never);
+
+      // Runtime is NOT built at construction time or at execute() call time.
+      expect(mocks.createMongoRuntime).not.toHaveBeenCalled();
+      expect(mocks.driverFromConnection).not.toHaveBeenCalled();
+
+      // Consuming the result triggers lazy runtime initialization.
+      const collected: unknown[] = [];
+      for await (const row of result) {
+        collected.push(row);
+      }
+      expect(collected).toEqual(fakeRows);
+      expect(mocks.driverFromConnection).toHaveBeenCalledTimes(1);
+      expect(fakeRuntimeWithExecute.execute).toHaveBeenCalledWith(fakePlan);
+    });
+
+    it('rejects after close()', async () => {
+      const fakeRuntimeWithExecute = {
+        ...fakeRuntime,
+        execute: vi.fn(async function* () {}),
+      };
+      mocks.createMongoRuntime.mockReturnValue(fakeRuntimeWithExecute);
+
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      await db.close();
+
+      const iter = db.execute({ id: 'plan' } as never)[Symbol.asyncIterator]();
+      await expect(iter.next()).rejects.toThrow('Mongo client is closed');
+    });
   });
 
   it('threads the middleware option to createMongoRuntime', async () => {
@@ -478,5 +523,106 @@ describe('mongo() facade', () => {
 
     const runtimeArgs = mocks.createMongoRuntime.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(runtimeArgs).not.toHaveProperty('middleware');
+  });
+
+  describe('db.enums (facade)', () => {
+    const roleEnum = {
+      codecId: 'mongo/string@1',
+      members: [
+        { name: 'User', value: 'user' },
+        { name: 'Admin', value: 'admin' },
+      ],
+    } as const;
+
+    const contractWithEnum = {
+      domain: {
+        namespaces: {
+          __unbound__: { models: {}, enum: { Role: roleEnum } },
+        },
+      },
+    } as unknown as AnyMongoContract;
+
+    beforeEach(() => {
+      mocks.deserializeContract.mockReturnValue(contractWithEnum);
+    });
+
+    function roleAccessor() {
+      const db = mongo({ contract: contractWithEnum, url: 'mongodb://localhost:27017/mydb' });
+      return db.enums['Role']!;
+    }
+
+    it('exposes the enum accessor at db.enums.Role', () => {
+      expect(roleAccessor().values).toEqual(['user', 'admin']);
+    });
+
+    it('.has returns true for a member value and false otherwise', () => {
+      const role = roleAccessor();
+      expect(role.has('user')).toBe(true);
+      expect(role.has('unknown')).toBe(false);
+    });
+
+    it('.nameOf returns the member name for a value', () => {
+      expect(roleAccessor().nameOf('admin')).toBe('Admin');
+    });
+
+    it('.ordinalOf returns the zero-based index', () => {
+      const role = roleAccessor();
+      expect(role.ordinalOf('user')).toBe(0);
+      expect(role.ordinalOf('admin')).toBe(1);
+      expect(role.ordinalOf('unknown')).toBe(-1);
+    });
+
+    it('.members exposes accessor map keyed by member name', () => {
+      expect(roleAccessor().members['User']).toBe('user');
+      expect(roleAccessor().members['Admin']).toBe('admin');
+    });
+
+    it('.names returns the ordered member name tuple', () => {
+      expect(roleAccessor().names).toEqual(['User', 'Admin']);
+    });
+
+    it('builds the enums surface eagerly, without connecting the driver', () => {
+      const db = mongo({ contract: contractWithEnum, url: 'mongodb://localhost:27017/mydb' });
+
+      expect(db.enums['Role']!.values).toEqual(['user', 'admin']);
+      expect(mocks.driverFromConnection).not.toHaveBeenCalled();
+      expect(mocks.createMongoRuntime).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('db.context (facade)', () => {
+    it('exposes a context object before any driver connection', () => {
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      expect(db.context).toBeDefined();
+      expect(mocks.driverFromConnection).not.toHaveBeenCalled();
+    });
+
+    it('context matches what createMongoExecutionContext returns', () => {
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      expect(db.context).toEqual({ id: 'context-instance' });
+    });
+
+    it('createMongoExecutionContext is called upfront (before runtime()) with the resolved contract', () => {
+      mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      expect(mocks.createMongoExecutionContext).toHaveBeenCalledTimes(1);
+      expect(mocks.createMongoExecutionContext).toHaveBeenCalledWith({
+        contract: fakeContract,
+        stack: { id: 'stack-instance' },
+      });
+    });
+
+    it('createMongoExecutionContext is called only once (buildRuntime reuses the upfront context)', async () => {
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      await db.runtime();
+      expect(mocks.createMongoExecutionContext).toHaveBeenCalledTimes(1);
+    });
+
+    it('buildRuntime passes the upfront context to createMongoRuntime', async () => {
+      const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+      await db.runtime();
+      expect(mocks.createMongoRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({ context: { id: 'context-instance' } }),
+      );
+    });
   });
 });

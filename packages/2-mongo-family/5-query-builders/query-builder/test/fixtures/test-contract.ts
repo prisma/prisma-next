@@ -194,7 +194,45 @@ export type TestCodecTypes = {
   readonly 'mongo/date@1': { readonly output: Date };
 };
 
-export type TestTypeMaps = MongoTypeMaps<TestCodecTypes>;
+type TestFieldOutputTypes = {
+  readonly __unbound__: {
+    readonly Order: {
+      readonly _id: string;
+      readonly status: string;
+      readonly amount: number;
+      readonly customerId: string;
+      readonly notes: string | null;
+      readonly tags: string[];
+    };
+    readonly User: {
+      readonly _id: string;
+      readonly firstName: string;
+      readonly lastName: string;
+      readonly email: string;
+    };
+    readonly Customer: {
+      readonly _id: string;
+      readonly name: string;
+      readonly address: {
+        street: string;
+        city: string;
+        zip: string | null;
+        geo: { lat: number; lng: number };
+      };
+      readonly workAddress: {
+        street: string;
+        city: string;
+        zip: string | null;
+        geo: { lat: number; lng: number };
+      } | null;
+      readonly stats: { visits: number; lastSeen: Date | null };
+    };
+  };
+};
+
+type TestFieldInputTypes = TestFieldOutputTypes;
+
+export type TestTypeMaps = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes, TestFieldInputTypes>;
 export type TContract = MongoContractWithTypeMaps<TestContract, TestTypeMaps>;
 
 export const testContractJson = {

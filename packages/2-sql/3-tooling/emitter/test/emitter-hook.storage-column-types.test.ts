@@ -4,6 +4,11 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
 import { createEmitterTestContract as createContract } from './create-emitter-test-contract';
+import {
+  identityCodecLookup,
+  NON_IDENTITY_CODEC_ID,
+  nonIdentityCodecLookup,
+} from './value-set-codec-lookups';
 
 const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-hash' };
 
@@ -94,7 +99,14 @@ describe('StorageColumnTypes', () => {
       },
     });
 
-    const dts = generateContractDts(contract, sqlEmission, [], testHashes);
+    const dts = generateContractDts(
+      contract,
+      sqlEmission,
+      [],
+      testHashes,
+      undefined,
+      identityCodecLookup,
+    );
 
     expect(dts).toContain('export type StorageColumnTypes =');
     // The column entry must be a plain literal union — no ContractBase[...] expression.
@@ -225,7 +237,14 @@ describe('StorageColumnTypes', () => {
       },
     });
 
-    const dts = generateContractDts(contract, sqlEmission, [], testHashes);
+    const dts = generateContractDts(
+      contract,
+      sqlEmission,
+      [],
+      testHashes,
+      undefined,
+      identityCodecLookup,
+    );
 
     expect(dts).toContain('readonly level: 1 | 2');
     // Must be plain literals, not a codec reference or ContractBase expression.
@@ -337,7 +356,14 @@ describe('StorageColumnTypes', () => {
       },
     });
 
-    const dts = generateContractDts(contract, sqlEmission, [], testHashes);
+    const dts = generateContractDts(
+      contract,
+      sqlEmission,
+      [],
+      testHashes,
+      undefined,
+      identityCodecLookup,
+    );
 
     expect(dts).toContain("readonly action: 'create' | 'update' | 'delete'");
     const fieldOutputMatch = dts.match(/export type FieldOutputTypes = ({[\s\S]*?});/);
@@ -347,7 +373,7 @@ describe('StorageColumnTypes', () => {
     expect(fieldOutputBlock).toContain('id');
   });
 
-  it('derives FieldOutputTypes enum entry as plain literal union from StorageColumnTypes (A4)', () => {
+  it('derives FieldOutputTypes enum entry as plain literal union from StorageColumnTypes', () => {
     const contract = createContract({
       domain: {
         namespaces: {
@@ -421,7 +447,14 @@ describe('StorageColumnTypes', () => {
       },
     });
 
-    const dts = generateContractDts(contract, sqlEmission, [], testHashes);
+    const dts = generateContractDts(
+      contract,
+      sqlEmission,
+      [],
+      testHashes,
+      undefined,
+      identityCodecLookup,
+    );
 
     // FieldOutputTypes must show the plain literal union, not a ContractBase expression.
     expect(dts).toContain("readonly priority: 'low' | 'high' | 'urgent'");
@@ -638,7 +671,14 @@ describe('StorageColumnTypes', () => {
       },
     });
 
-    const dts = generateContractDts(contract, sqlEmission, [], testHashes);
+    const dts = generateContractDts(
+      contract,
+      sqlEmission,
+      [],
+      testHashes,
+      undefined,
+      identityCodecLookup,
+    );
 
     const inputMatch = dts.match(/export type StorageColumnInputTypes = ({.+?});/s);
     expect(inputMatch).not.toBeNull();
@@ -690,5 +730,193 @@ describe('StorageColumnTypes', () => {
     const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
     expect(storageColumnMatch).not.toBeNull();
     expect(storageColumnMatch![0]).toContain("readonly tags: CodecTypes['pg/jsonb@1']['output']");
+  });
+
+  function nonIdentityEnumColumnContract() {
+    return createContract({
+      domain: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            models: {
+              Item: {
+                storage: {
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  table: 'item',
+                  fields: { level: { column: 'level' } },
+                },
+                fields: {
+                  level: {
+                    nullable: false,
+                    type: { kind: 'scalar', codecId: NON_IDENTITY_CODEC_ID },
+                  },
+                },
+                relations: {},
+              },
+            },
+          },
+        },
+      },
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {
+                item: {
+                  columns: {
+                    level: {
+                      nativeType: 'int4',
+                      codecId: NON_IDENTITY_CODEC_ID,
+                      nullable: false,
+                      valueSet: {
+                        plane: 'storage',
+                        entityKind: 'valueSet',
+                        namespaceId: UNBOUND_NAMESPACE_ID,
+                        entityName: 'Level',
+                      },
+                    },
+                  },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+              valueSet: {
+                // Encoded form is integers; the codec decodes them to string literals.
+                Level: { kind: 'valueSet', values: [0, 1, 2] },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  it("types a non-identity enum column as the codec's decoded output, not the encoded literal", () => {
+    const dts = generateContractDts(
+      nonIdentityEnumColumnContract(),
+      sqlEmission,
+      [],
+      testHashes,
+      undefined,
+      nonIdentityCodecLookup,
+    );
+
+    const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+    expect(storageColumnMatch).not.toBeNull();
+    // Codec OUTPUT (decoded literals), not the raw encoded ints 0 | 1 | 2.
+    expect(storageColumnMatch![0]).toContain("readonly level: 'low' | 'high' | 'urgent'");
+    expect(storageColumnMatch![0]).not.toContain('0 | 1 | 2');
+  });
+
+  it('falls back to the codec output type when a value is not literal-expressible', () => {
+    const fallbackLookup: CodecLookup = {
+      get: () => undefined,
+      targetTypesFor: () => undefined,
+      metaFor: () => undefined,
+      renderOutputTypeFor: (id) => (id === NON_IDENTITY_CODEC_ID ? 'Level' : undefined),
+      // Returns undefined for every value, forcing the codec-output fallback.
+      renderValueLiteralFor: () => undefined,
+    };
+
+    const dts = generateContractDts(
+      nonIdentityEnumColumnContract(),
+      sqlEmission,
+      [],
+      testHashes,
+      undefined,
+      fallbackLookup,
+    );
+
+    const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+    expect(storageColumnMatch).not.toBeNull();
+    expect(storageColumnMatch![0]).toContain(
+      `readonly level: CodecTypes['${NON_IDENTITY_CODEC_ID}']['output']`,
+    );
+    expect(storageColumnMatch![0]).not.toContain('0 | 1 | 2');
+  });
+
+  it('falls back to the codec output type when no codec lookup is supplied', () => {
+    const dts = generateContractDts(nonIdentityEnumColumnContract(), sqlEmission, [], testHashes);
+
+    const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+    expect(storageColumnMatch).not.toBeNull();
+    expect(storageColumnMatch![0]).toContain(
+      `readonly level: CodecTypes['${NON_IDENTITY_CODEC_ID}']['output']`,
+    );
+  });
+
+  it("types a non-identity enum FIELD (via its column) as the codec's decoded output, not the encoded literal", () => {
+    const dts = generateContractDts(
+      nonIdentityEnumColumnContract(),
+      sqlEmission,
+      [],
+      testHashes,
+      undefined,
+      nonIdentityCodecLookup,
+    );
+
+    const fieldOutputMatch = dts.match(/export type FieldOutputTypes = ({.+?});/s);
+    expect(fieldOutputMatch).not.toBeNull();
+    // The SQL field resolves through its column's value set, so the FIELD type matches the COLUMN
+    // type: the codec OUTPUT (decoded literals), not the raw encoded ints 0 | 1 | 2.
+    expect(fieldOutputMatch![0]).toContain("readonly level: 'low' | 'high' | 'urgent'");
+    expect(fieldOutputMatch![0]).not.toContain('0 | 1 | 2');
+
+    // Field type and column type must be byte-identical.
+    const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+    expect(storageColumnMatch![0]).toContain("readonly level: 'low' | 'high' | 'urgent'");
+  });
+
+  it('wraps StorageColumnTypes/StorageColumnInputTypes in ReadonlyArray for a native many[] column', () => {
+    const contract = createContract({
+      models: {
+        Post: {
+          storage: {
+            table: 'post',
+            fields: { tags: { column: 'tags' }, labels: { column: 'labels' } },
+          },
+          fields: {
+            tags: { nullable: false, many: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+            labels: { nullable: true, many: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          post: {
+            columns: {
+              tags: { nativeType: 'text', codecId: 'pg/text@1', nullable: false, many: true },
+              labels: { nativeType: 'text', codecId: 'pg/text@1', nullable: true, many: true },
+            },
+            primaryKey: { columns: ['tags'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const dts = generateContractDts(contract, sqlEmission, [], testHashes);
+
+    const outputMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+    expect(outputMatch).not.toBeNull();
+    expect(outputMatch![0]).toContain(
+      "readonly tags: ReadonlyArray<CodecTypes['pg/text@1']['output']>",
+    );
+    expect(outputMatch![0]).toContain(
+      "readonly labels: ReadonlyArray<CodecTypes['pg/text@1']['output']> | null",
+    );
+
+    const inputMatch = dts.match(/export type StorageColumnInputTypes = ({.+?});/s);
+    expect(inputMatch).not.toBeNull();
+    expect(inputMatch![0]).toContain(
+      "readonly tags: ReadonlyArray<CodecTypes['pg/text@1']['input']>",
+    );
+    expect(inputMatch![0]).toContain(
+      "readonly labels: ReadonlyArray<CodecTypes['pg/text@1']['input']> | null",
+    );
   });
 });

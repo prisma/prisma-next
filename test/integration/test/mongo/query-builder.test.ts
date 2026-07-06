@@ -77,7 +77,26 @@ type TestCodecTypes = {
   readonly 'mongo/bool@1': { readonly output: boolean };
 };
 
-type TestTypeMaps = MongoTypeMaps<TestCodecTypes>;
+type TestFieldOutputTypes = {
+  readonly __unbound__: {
+    readonly Product: {
+      readonly _id: string;
+      readonly name: string;
+      readonly category: string;
+      readonly price: number;
+      readonly tags: unknown[];
+      readonly createdAt: Date;
+    };
+    readonly Order: {
+      readonly _id: string;
+      readonly productName: string;
+      readonly quantity: number;
+      readonly status: string;
+    };
+  };
+};
+
+type TestTypeMaps = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes, TestFieldOutputTypes>;
 type TContract = MongoContractWithTypeMaps<PipelineContract, TestTypeMaps>;
 
 const scalarField = <TCodecId extends string>(codecId: TCodecId) => ({
@@ -343,6 +362,20 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
       const results = await exec(plan);
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({ name: 'Laptop', upperCategory: 'ELECTRONICS' });
+    });
+
+    it('decodes codec-mapped fields through a reshaping $project stage', async () => {
+      await seed();
+
+      const plan = products().project('_id', 'name').build();
+
+      const results = await exec(plan);
+      expect(results).toHaveLength(5);
+      const laptop = results.find((r) => r['name'] === 'Laptop')!;
+      expect(typeof laptop['_id']).toBe('string');
+      expect(laptop['_id']).not.toHaveProperty('_bsontype');
+      expect(typeof laptop['name']).toBe('string');
+      expect(laptop['name']).toBe('Laptop');
     });
   });
 

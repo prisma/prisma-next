@@ -14,7 +14,6 @@ export {
 export { createMongoAdapter } from '../mongo-adapter';
 export type { MongoControlDriverInstance };
 
-import { mongoCodecDescriptors } from '../core/codecs';
 import { MongoControlAdapterImpl } from '../core/mongo-control-adapter';
 
 export const mongoAdapterDescriptor: MongoControlAdapterDescriptor<'mongo'> = {
@@ -33,7 +32,6 @@ export const mongoAdapterDescriptor: MongoControlAdapterDescriptor<'mongo'> = {
   ]),
   types: {
     codecTypes: {
-      codecDescriptors: mongoCodecDescriptors,
       import: {
         package: '@prisma-next/adapter-mongo/codec-types',
         named: 'CodecTypes',

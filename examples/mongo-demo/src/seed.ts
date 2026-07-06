@@ -6,15 +6,17 @@ export async function seed(orm: Db['orm']) {
       name: 'Alice Chen',
       email: 'alice@example.com',
       bio: 'Full-stack engineer and tech blogger',
+      role: 'author',
       address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
     },
     {
       name: 'Bob Kumar',
       email: 'bob@example.com',
       bio: 'DevOps enthusiast',
+      role: 'author',
       address: { street: '456 Oak Ave', city: 'Portland', zip: null, country: 'US' },
     },
-    { name: 'Carol Santos', email: 'carol@example.com', bio: null, address: null },
+    { name: 'Carol Santos', email: 'carol@example.com', bio: null, role: 'reader', address: null },
   ]);
   const alice = createdUsers[0];
   const bob = createdUsers[1];

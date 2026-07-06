@@ -3,6 +3,7 @@ import type {
   ControlStack,
 } from '@prisma-next/framework-components/control';
 import { mongoEmission } from '@prisma-next/mongo-emitter';
+import { mongoFamilyEntityTypes, mongoFamilyPslBlockDescriptors } from './authoring-entity-types';
 import { createMongoFamilyInstance, type MongoControlFamilyInstance } from './control-instance';
 
 class MongoFamilyDescriptor
@@ -13,6 +14,10 @@ class MongoFamilyDescriptor
   readonly familyId = 'mongo' as const;
   readonly version = '0.0.1';
   readonly emission = mongoEmission;
+  readonly authoring = {
+    entityTypes: mongoFamilyEntityTypes,
+    pslBlockDescriptors: mongoFamilyPslBlockDescriptors,
+  } as const;
 
   create<TTargetId extends string>(
     stack: ControlStack<'mongo', TTargetId>,

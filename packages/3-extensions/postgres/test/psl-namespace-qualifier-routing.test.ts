@@ -70,6 +70,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: postgresCreateNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -106,6 +107,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: postgresCreateNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -135,6 +137,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: postgresCreateNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
     expect(result.ok).toBe(true);
     if (!result.ok) {

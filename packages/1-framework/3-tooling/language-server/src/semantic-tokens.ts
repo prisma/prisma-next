@@ -13,6 +13,7 @@ import {
   FieldDeclarationAst,
   FunctionCallAst,
   filterChildren,
+  findChildToken,
   type GenericBlockMemberAst,
   IdentifierAst,
   ModelDeclarationAst,
@@ -352,13 +353,15 @@ function collectAttribute(
   tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
-  collectDecoratorName(attribute.name(), source.sourceFile.text, tokens);
+  const marker =
+    findChildToken(attribute.syntax, 'At') ?? findChildToken(attribute.syntax, 'DoubleAt');
+  collectDecoratorName(attribute.name(), marker, tokens);
   collectAttributeArgList(attribute.argList(), source, tokens, namespace);
 }
 
 function collectDecoratorName(
   name: QualifiedNameAst | undefined,
-  sourceText: string,
+  marker: SyntaxToken | undefined,
   tokens: PendingSemanticToken[],
 ): void {
   if (name === undefined) {
@@ -366,7 +369,7 @@ function collectDecoratorName(
   }
   const segments = identifierSegments(name);
   for (const [index, segment] of segments.entries()) {
-    tokens.push(rangeForDecoratorIdentifier(segment.identifier, sourceText, index === 0));
+    tokens.push(rangeForDecoratorIdentifier(segment.identifier, index === 0 ? marker : undefined));
   }
 }
 
@@ -622,20 +625,14 @@ function rangeForIdentifier(
 
 function rangeForDecoratorIdentifier(
   identifier: IdentifierAst,
-  sourceText: string,
-  includePrefix: boolean,
+  marker: SyntaxToken | undefined,
 ): PendingSemanticToken {
   const range = rangeForIdentifier(identifier, 'decorator');
-  if (!includePrefix) {
+  if (marker === undefined || marker.offset >= range.startOffset) {
     return range;
   }
-
-  let startOffset = range.startOffset;
-  while (startOffset > 0 && sourceText.charAt(startOffset - 1) === '@') {
-    startOffset--;
-  }
   return createPendingSemanticToken(
-    startOffset,
+    marker.offset,
     range.endOffset,
     'decorator',
     range.modifierBitset,

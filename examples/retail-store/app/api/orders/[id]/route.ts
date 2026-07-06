@@ -5,7 +5,7 @@ import {
   getOrderWithUser,
   updateOrderStatus,
 } from '../../../../src/data/orders';
-import { getDb } from '../../../../src/db-singleton';
+import { getDb } from '../../../../src/db';
 import { getAuthUserId } from '../../../../src/lib/auth';
 
 const unauthorized = () => NextResponse.json({ error: 'Not authenticated' }, { status: 401 });

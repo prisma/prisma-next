@@ -9,14 +9,11 @@ import {
   rawSql,
   unique,
 } from '@prisma-next/target-postgres/migration';
+import type { Contract as End } from './end-contract';
+import endContract from './end-contract.json' with { type: 'json' };
 
-export default class M extends Migration {
-  override describe() {
-    return {
-      from: null,
-      to: 'sha256:9f49f8f9e51a9cc016f1ec2098ebae9406521a3cc2cf00207adc795078333d8b',
-    };
-  }
+export default class M extends Migration<never, End> {
+  override readonly endContractJson = endContract;
 
   override get operations() {
     return [

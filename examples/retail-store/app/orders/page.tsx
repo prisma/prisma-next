@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { Badge } from '../../src/components/ui/badge';
 import { Card, CardContent } from '../../src/components/ui/card';
 import { getUserOrders } from '../../src/data/orders';
-import { getDb } from '../../src/db-singleton';
+import { getDb } from '../../src/db';
 import { getAuthUserId } from '../../src/lib/auth';
 
 export const dynamic = 'force-dynamic';

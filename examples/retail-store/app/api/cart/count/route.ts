@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCartByUserId } from '../../../../src/data/carts';
-import { getDb } from '../../../../src/db-singleton';
+import { getDb } from '../../../../src/db';
 import { getAuthUserId } from '../../../../src/lib/auth';
 
 export async function GET() {

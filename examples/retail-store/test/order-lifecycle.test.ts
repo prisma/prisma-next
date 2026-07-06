@@ -9,6 +9,7 @@ import {
   getUserOrders,
   updateOrderStatus,
 } from '../src/data/orders';
+import { enums } from '../src/enums';
 import { setupTestDb } from './setup';
 
 const ITEM = {
@@ -38,7 +39,7 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
       userId: user._id,
       items: cart!.items,
       shippingAddress: '123 Main St',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date('2026-03-01T10:00:00Z') }],
     });
 
@@ -62,7 +63,7 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
       userId: user._id,
       items: [ITEM],
       shippingAddress: '456 Oak Ave',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date('2026-03-01T10:00:00Z') }],
     });
 
@@ -105,7 +106,7 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
       userId: user._id,
       items: [ITEM],
       shippingAddress: '789 Elm',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -125,14 +126,14 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
       userId: user._id,
       items: [ITEM],
       shippingAddress: 'Addr 1',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
     await createOrder(ctx.db, {
       userId: user._id,
       items: [{ ...ITEM, productId: 'prod-2', name: 'Chinos' }],
       shippingAddress: 'Addr 2',
-      type: 'bopis',
+      type: enums.OrderType.members.Pickup,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 
@@ -151,7 +152,7 @@ describe('order lifecycle (integration)', { timeout: timeouts.spinUpMongoMemoryS
       userId: user._id,
       items: [ITEM],
       shippingAddress: '101 Pine',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 

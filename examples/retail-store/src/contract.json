@@ -36,6 +36,38 @@
   "domain": {
     "namespaces": {
       "__unbound__": {
+        "enum": {
+          "OrderType": {
+            "codecId": "mongo/string@1",
+            "members": [
+              {
+                "name": "Delivery",
+                "value": "delivery"
+              },
+              {
+                "name": "Pickup",
+                "value": "pickup"
+              }
+            ]
+          },
+          "ProductStatus": {
+            "codecId": "mongo/string@1",
+            "members": [
+              {
+                "name": "Active",
+                "value": "active"
+              },
+              {
+                "name": "Discontinued",
+                "value": "discontinued"
+              },
+              {
+                "name": "OutOfStock",
+                "value": "out-of-stock"
+              }
+            ]
+          }
+        },
         "models": {
           "AddToCartEvent": {
             "base": {
@@ -327,6 +359,12 @@
                 "type": {
                   "codecId": "mongo/string@1",
                   "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "OrderType",
+                  "namespaceId": "__unbound__",
+                  "plane": "domain"
                 }
               },
               "userId": {
@@ -451,6 +489,12 @@
                 "type": {
                   "codecId": "mongo/string@1",
                   "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ProductStatus",
+                  "namespaceId": "__unbound__",
+                  "plane": "domain"
                 }
               },
               "subCategory": {
@@ -1316,7 +1360,11 @@
                       }
                     },
                     "type": {
-                      "bsonType": "string"
+                      "bsonType": "string",
+                      "enum": [
+                        "delivery",
+                        "pickup"
+                      ]
                     },
                     "userId": {
                       "bsonType": "objectId"
@@ -1453,7 +1501,12 @@
                       "bsonType": "string"
                     },
                     "status": {
-                      "bsonType": "string"
+                      "bsonType": "string",
+                      "enum": [
+                        "active",
+                        "discontinued",
+                        "out-of-stock"
+                      ]
                     },
                     "subCategory": {
                       "bsonType": "string"
@@ -1549,13 +1602,30 @@
                 "validationLevel": "strict"
               }
             }
+          },
+          "valueSet": {
+            "OrderType": {
+              "kind": "valueSet",
+              "values": [
+                "delivery",
+                "pickup"
+              ]
+            },
+            "ProductStatus": {
+              "kind": "valueSet",
+              "values": [
+                "active",
+                "discontinued",
+                "out-of-stock"
+              ]
+            }
           }
         },
         "id": "__unbound__",
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c"
+    "storageHash": "sha256:950513819883fab7f2e961cfbea6ba069bec18ff2df023f9d0c9d6836c51feec"
   },
   "capabilities": {},
   "extensionPacks": {},

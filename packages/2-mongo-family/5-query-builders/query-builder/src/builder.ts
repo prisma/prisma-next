@@ -1,10 +1,10 @@
 import { domainModelsAtDefaultNamespace, type PlanMeta } from '@prisma-next/contract/types';
 import type {
+  AnyMongoTypeMaps,
   ExtractMongoCodecTypes,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoModelDefinition,
-  MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import type {
   MongoAggAccumulator,
@@ -56,6 +56,7 @@ import {
   UpdateManyCommand,
   UpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
+import { castAs } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createFieldAccessor, type Expression, type FieldAccessor } from './field-accessor';
 import {
@@ -65,7 +66,7 @@ import {
   type LookupResult,
 } from './lookup-builder';
 import type { FindAndModifyEnabled, LeadingMatch, UpdateEnabled } from './markers';
-import { pipelineSupportsFlatResultShape } from './pipeline-result-shape';
+import { computePipelineResultShape } from './pipeline-result-shape';
 import type { ModelArrayField, NestedDocShape } from './resolve-path';
 import { contractModelToMongoResultShape } from './result-shape';
 import type {
@@ -114,7 +115,7 @@ interface PipelineChainState {
  * `docs/architecture docs/adrs/ADR 201 - State-machine pattern for typed DSL builders.md`.
  */
 export class PipelineChain<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   Shape extends DocShape,
   U extends UpdateEnabled = 'update-ok',
   F extends FindAndModifyEnabled = 'fam-ok',
@@ -819,14 +820,12 @@ export class PipelineChain<
     const contractNarrow = this.#contract as MongoContract;
     let resultShape: MongoResultShape | undefined;
     if (modelName !== undefined) {
-      if (pipelineSupportsFlatResultShape(this.#state.stages)) {
-        const model = domainModelsAtDefaultNamespace(contractNarrow.domain)[modelName] as
-          | MongoModelDefinition
-          | undefined;
-        resultShape = model ? contractModelToMongoResultShape(model) : { kind: 'unknown' as const };
-      } else {
-        resultShape = { kind: 'unknown' as const };
-      }
+      const model = castAs<MongoModelDefinition | undefined>(
+        domainModelsAtDefaultNamespace(contractNarrow.domain)[modelName],
+      );
+      resultShape = model
+        ? computePipelineResultShape(this.#state.stages, contractModelToMongoResultShape(model))
+        : { kind: 'unknown' as const };
     }
     return {
       collection: this.#state.collection,

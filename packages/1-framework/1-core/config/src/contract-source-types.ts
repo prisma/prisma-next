@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CapabilityMatrix } from '@prisma-next/framework-components/components';
 import type {
   AssembledAuthoringContributions,
   ControlMutationDefaults,
@@ -45,6 +46,7 @@ export interface ContractSourceContext {
   readonly codecLookup: CodecLookup;
   readonly controlMutationDefaults: ControlMutationDefaults;
   readonly resolvedInputs: readonly string[];
+  readonly capabilities: CapabilityMatrix;
 }
 
 /** Lets format-aware tooling avoid file-extension sniffing and opaque loader introspection. */

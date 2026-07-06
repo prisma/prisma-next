@@ -19,6 +19,7 @@ const baseInput = {
   controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
+  capabilities: { sql: { scalarList: true } },
 } as const;
 
 function interpretSchema(schema: string) {

@@ -46,4 +46,32 @@ describe('parsePostgresDefault array literals', () => {
     const result = parsePostgresDefault("'{hello world}'::text[]", 'text[]');
     expect(result?.kind).not.toBe('literal');
   });
+
+  it('keeps a comma inside a quoted element as part of that element', () => {
+    expect(parsePostgresDefault('\'{"a,b","c"}\'::text[]', 'text[]')).toEqual({
+      kind: 'literal',
+      value: ['a,b', 'c'],
+    });
+  });
+
+  it('unescapes a doubled quote inside a quoted element', () => {
+    expect(parsePostgresDefault('\'{"a""b"}\'::text[]', 'text[]')).toEqual({
+      kind: 'literal',
+      value: ['a"b'],
+    });
+  });
+
+  it('unescapes a backslash-escaped quote inside a quoted element', () => {
+    expect(parsePostgresDefault('\'{"a\\"b"}\'::text[]', 'text[]')).toEqual({
+      kind: 'literal',
+      value: ['a"b'],
+    });
+  });
+
+  it('keeps a quoted element that looks like NULL as the literal string', () => {
+    expect(parsePostgresDefault('\'{"NULL"}\'::text[]', 'text[]')).toEqual({
+      kind: 'literal',
+      value: ['NULL'],
+    });
+  });
 });

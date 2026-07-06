@@ -58,6 +58,7 @@ namespace public {
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(pslResult.ok).toBe(true);
@@ -183,6 +184,7 @@ namespace public {
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map([['supabase', syntheticExtensionContract]]),
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(pslResult.ok).toBe(true);
@@ -253,6 +255,7 @@ namespace public {
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(result.ok).toBe(false);

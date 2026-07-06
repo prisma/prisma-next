@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AuthoringTypeConstructorDescriptor } from '../src/shared/framework-authoring';
 import {
+  classifyEnumMemberType,
   hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
@@ -10,6 +11,10 @@ import {
   resolveAuthoringTemplateValue,
   validateAuthoringHelperArguments,
 } from '../src/shared/framework-authoring';
+import type {
+  PslExtensionBlock,
+  PslExtensionBlockParamValue,
+} from '../src/shared/psl-extension-block';
 
 describe('authoring template resolution', () => {
   it('detects authoring descriptor kinds', () => {
@@ -488,5 +493,82 @@ describe('authoring template resolution', () => {
       kind: 'function',
       expression: '123',
     });
+  });
+});
+
+describe('classifyEnumMemberType', () => {
+  const testSpan = {
+    start: { offset: 0, line: 1, column: 1 },
+    end: { offset: 0, line: 1, column: 1 },
+  };
+
+  function testBlock(parameters: Record<string, PslExtensionBlockParamValue>): PslExtensionBlock {
+    return { kind: 'enum', name: 'TestEnum', parameters, blockAttributes: [], span: testSpan };
+  }
+
+  const bare: PslExtensionBlockParamValue = { kind: 'bare', span: testSpan };
+  const value = (raw: string): PslExtensionBlockParamValue => ({
+    kind: 'value',
+    raw,
+    span: testSpan,
+  });
+  const ref: PslExtensionBlockParamValue = { kind: 'ref', identifier: 'Foo', span: testSpan };
+  const option: PslExtensionBlockParamValue = { kind: 'option', token: 'Foo', span: testSpan };
+  const list: PslExtensionBlockParamValue = { kind: 'list', items: [], span: testSpan };
+
+  it('classifies all-bare members as text', () => {
+    expect(classifyEnumMemberType(testBlock({ Admin: bare, User: bare }))).toBe('text');
+  });
+
+  it('classifies all-string-value members as text', () => {
+    expect(
+      classifyEnumMemberType(testBlock({ Admin: value('"admin"'), User: value('"user"') })),
+    ).toBe('text');
+  });
+
+  it('classifies a mix of bare and string-value members as text', () => {
+    expect(classifyEnumMemberType(testBlock({ Admin: bare, User: value('"user"') }))).toBe('text');
+  });
+
+  it('classifies all-integer-value members as int', () => {
+    expect(classifyEnumMemberType(testBlock({ Low: value('1'), High: value('10') }))).toBe('int');
+  });
+
+  it('returns null for a float value', () => {
+    expect(classifyEnumMemberType(testBlock({ Low: value('1.5') }))).toBeNull();
+  });
+
+  it('returns null for a boolean value', () => {
+    expect(classifyEnumMemberType(testBlock({ Flag: value('true') }))).toBeNull();
+  });
+
+  it('returns null for a mix of string and integer values', () => {
+    expect(
+      classifyEnumMemberType(testBlock({ Low: value('1'), High: value('"high"') })),
+    ).toBeNull();
+  });
+
+  it('returns null for a mix of bare and integer values', () => {
+    expect(classifyEnumMemberType(testBlock({ Admin: bare, Low: value('1') }))).toBeNull();
+  });
+
+  it('returns null for a ref parameter', () => {
+    expect(classifyEnumMemberType(testBlock({ Admin: ref }))).toBeNull();
+  });
+
+  it('returns null for an option parameter', () => {
+    expect(classifyEnumMemberType(testBlock({ Admin: option }))).toBeNull();
+  });
+
+  it('returns null for a list parameter', () => {
+    expect(classifyEnumMemberType(testBlock({ Admin: list }))).toBeNull();
+  });
+
+  it('returns null for invalid JSON in a value parameter', () => {
+    expect(classifyEnumMemberType(testBlock({ Admin: value('notjson') }))).toBeNull();
+  });
+
+  it('returns null for an enum with no members', () => {
+    expect(classifyEnumMemberType(testBlock({}))).toBeNull();
   });
 });

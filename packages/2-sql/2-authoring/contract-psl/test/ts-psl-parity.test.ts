@@ -379,6 +379,7 @@ describe('TS and PSL authoring parity', () => {
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions: target.authoringContributions,
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(interpreted.ok).toBe(true);
@@ -430,6 +431,7 @@ model Post {
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions,
       createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(pslContract.ok).toBe(true);

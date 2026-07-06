@@ -8,6 +8,7 @@ import {
   errorContractValidationFailed,
   errorDatabaseConnectionRequired,
   errorDriverRequired,
+  errorEnumCodecNotInPackStack,
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
   errorInvalidOutputFormat,
@@ -439,6 +440,15 @@ describe('Config Errors', () => {
     expect(error.code).toBe('4015');
     expect(envelope.code).toBe('PN-CLI-4015');
     expect(error.message).toMatch(/--format pretty.*--json/i);
+  });
+
+  it('errorEnumCodecNotInPackStack produces PN-CON-4016', () => {
+    const error = errorEnumCodecNotInPackStack({ codecId: 'mongo/string@1' });
+    const envelope = error.toEnvelope();
+    expect(error.code).toBe('4016');
+    expect(envelope.code).toBe('PN-CON-4016');
+    expect(error.message).toContain('mongo/string@1');
+    expect(error.meta).toEqual({ codecId: 'mongo/string@1' });
   });
 });
 

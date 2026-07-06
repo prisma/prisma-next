@@ -1,20 +1,14 @@
 import type { JsonValue } from '@prisma-next/contract/types';
-import type {
-  AuthoringEntityContext,
-  AuthoringEntityTypeDescriptor,
-  AuthoringEntityTypeNamespace,
-  AuthoringPslBlockDescriptorNamespace,
-  PslExtensionBlock,
+import {
+  type AuthoringEntityContext,
+  type AuthoringEntityTypeDescriptor,
+  type AuthoringEntityTypeNamespace,
+  type AuthoringPslBlockDescriptorNamespace,
+  type PslExtensionBlock,
+  resolveEnumCodecId,
 } from '@prisma-next/framework-components/authoring';
 import { type EnumTypeHandle, enumType } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
-
-function parseQuotedString(raw: string): string | undefined {
-  if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
-    return raw.slice(1, -1);
-  }
-  return undefined;
-}
 
 export const sqlFamilyEnumEntityDescriptor = {
   kind: 'entity' as const,
@@ -27,49 +21,30 @@ export const sqlFamilyEnumEntityDescriptor = {
       const sourceId = ctx.sourceId ?? 'unknown';
       const diagnostics = ctx.diagnostics;
 
-      const typeAttr = block.blockAttributes.find((a) => a.name === 'type');
-      if (!typeAttr) {
-        diagnostics?.push({
-          code: 'PSL_ENUM_MISSING_TYPE',
-          message: `enum "${block.name}" is missing a @@type("codecId") attribute`,
-          sourceId,
-          span: block.span,
-        });
+      const resolved = resolveEnumCodecId(block, ctx);
+      if (resolved === undefined) {
         return undefined;
       }
-
-      const rawCodecArg = typeAttr.args[0]?.value;
-      const codecId = rawCodecArg !== undefined ? parseQuotedString(rawCodecArg) : undefined;
-      if (!codecId) {
-        diagnostics?.push({
-          code: 'PSL_ENUM_MISSING_TYPE',
-          message: `enum "${block.name}" @@type attribute must have a quoted codec id argument`,
-          sourceId,
-          span: typeAttr.span,
-        });
-        return undefined;
-      }
+      const { codecId, codecSpan } = resolved;
 
       const nativeType = ctx.codecLookup?.targetTypesFor(codecId)?.[0];
       if (nativeType === undefined) {
-        const typeArgSpan = typeAttr.args[0]?.span ?? typeAttr.span;
         diagnostics?.push({
           code: 'PSL_EXTENSION_INVALID_VALUE',
           message: `enum "${block.name}" @@type references unknown codec "${codecId}"`,
           sourceId,
-          span: typeArgSpan,
+          span: codecSpan,
         });
         return undefined;
       }
 
       const codec = ctx.codecLookup?.get(codecId);
       if (codec === undefined) {
-        const typeArgSpan = typeAttr.args[0]?.span ?? typeAttr.span;
         diagnostics?.push({
           code: 'PSL_EXTENSION_INVALID_VALUE',
           message: `enum "${block.name}" @@type codec "${codecId}" resolves in targetTypesFor but is absent from codecLookup.get`,
           sourceId,
-          span: typeArgSpan,
+          span: codecSpan,
         });
         return undefined;
       }

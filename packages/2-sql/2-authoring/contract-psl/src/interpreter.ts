@@ -24,7 +24,11 @@ import {
   isAuthoringPslBlockDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type {
+  CapabilityMatrix,
+  ExtensionPackRef,
+  TargetPackRef,
+} from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaultRegistry,
   ControlMutationDefaults,
@@ -129,6 +133,9 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
   readonly codecLookup?: CodecLookup;
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
+  /** The target's default codec ids for an `enum` block that omits `@@type`. */
+  readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
+  readonly capabilities: CapabilityMatrix;
 }
 
 function buildComposedExtensionPackRefs(
@@ -381,7 +388,7 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
   }
 
   for (const decl of input.enumBlocks) {
-    const handle = instantiateAuthoringEntityType(
+    const handle = instantiateAuthoringEntityType<EnumTypeHandle | undefined>(
       'enum',
       enumDescriptor,
       [decl],
@@ -390,11 +397,10 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
 
     if (handle === undefined || handle === null) continue;
 
-    const enumHandle = blindCast<EnumTypeHandle, 'enum factory returns EnumTypeHandle'>(handle);
-    enumHandles[decl.name] = enumHandle;
+    enumHandles[decl.name] = handle;
     enumTypeDescriptors.set(decl.name, {
-      codecId: enumHandle.codecId,
-      nativeType: enumHandle.nativeType,
+      codecId: handle.codecId,
+      nativeType: handle.nativeType,
     });
   }
 
@@ -444,6 +450,7 @@ interface BuildModelNodeInput {
   /** Resolved namespace id keyed by model name — used to stamp the target namespace on FKs. */
   readonly modelNamespaceIds: ReadonlyMap<string, string>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
+  readonly capabilities: CapabilityMatrix;
 }
 
 interface BuildModelNodeResult {
@@ -476,6 +483,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     sourceId,
     scalarTypeDescriptors: input.scalarTypeDescriptors,
     ...ifDefined('enumHandles', input.enumHandles),
+    capabilities: input.capabilities,
   });
 
   const inlineIdFields = resolvedFields.filter((field) => field.isId);
@@ -1152,6 +1160,9 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
           columnName: resolvedField.columnName,
           descriptor: resolvedField.descriptor,
           nullable: resolvedField.nullable,
+          ...(resolvedField.many && resolvedField.valueObjectTypeName === undefined
+            ? { many: true as const }
+            : {}),
           ...ifDefined('default', resolvedField.defaultValue),
           ...ifDefined('executionDefaults', resolvedField.executionDefaults),
           ...ifDefined('enumTypeHandle', enumHandle),
@@ -1840,6 +1851,7 @@ export function interpretPslDocumentToSqlContract(
           );
         },
       },
+      ...ifDefined('enumInferenceCodecs', input.enumInferenceCodecs),
     },
     diagnostics,
   });
@@ -1918,6 +1930,7 @@ export function interpretPslDocumentToSqlContract(
       diagnostics,
       modelNamespaceIds,
       ...(enumHandlesByName.size > 0 ? { enumHandles: enumHandlesByName } : {}),
+      capabilities: input.capabilities,
     });
     modelNodes.push(
       namespaceId !== undefined ? { ...result.modelNode, namespaceId } : result.modelNode,
@@ -2017,6 +2030,7 @@ export function interpretPslDocumentToSqlContract(
   const extensionEntityContext: AuthoringEntityContext = {
     family: input.target.familyId,
     target: input.target.targetId,
+    ...ifDefined('enumInferenceCodecs', input.enumInferenceCodecs),
   };
   const namespaceExtensionEntities = new Map<
     string,
@@ -2140,10 +2154,8 @@ export function interpretPslDocumentToSqlContract(
                 patchedModels[modelCoordinateKey(namespaceId, modelName)] ?? model,
               ]),
             ),
-            ...(namespaceSlice.enum !== undefined ? { enum: namespaceSlice.enum } : {}),
-            ...(namespaceSlice.valueObjects !== undefined
-              ? { valueObjects: namespaceSlice.valueObjects }
-              : {}),
+            ...ifDefined('enum', namespaceSlice.enum),
+            ...ifDefined('valueObjects', namespaceSlice.valueObjects),
             ...(namespaceId === input.target.defaultNamespaceId &&
             Object.keys(valueObjects).length > 0
               ? { valueObjects }
