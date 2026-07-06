@@ -26,7 +26,12 @@ The relational walk is what produced the `SchemaVerificationNode` tree and `coun
 
 - No new diffable entity kinds beyond porting what the relational verifier checks today (roles stay held-not-diffed — slice 4; RLS enablement — slice 3).
 - No CLI schema-view rework beyond the cut (TML-2974).
-- Mongo's verifier is ported the same way only if it shares the machinery being deleted; otherwise it keeps returning issues and is untouched.
+- Mongo's diff **algorithm** is untouched (it never shared the SQL walk or the generic differ). But Mongo constructs the shared result shapes (`SchemaVerificationNode`, `root`/`counts`, `BaseSchemaIssue`), so deleting those forces a Mongo **result-envelope** rewrite to issue-only output — in scope as its own unit.
+
+## Recorded vocabulary/scope decisions (from grounding)
+
+- **`type_metadata_missing` / `type_consistency_warning` die with the tree.** They are tree-node-only warnings with no issue counterpart, and the planning path always passes an empty registry (the check never fires there). Deliberate removal, not an omission.
+- **`check_removed` reclassifies to `reason: 'not-expected'`.** The legacy kind stamped `not-equal` despite being semantically an extra — a pre-existing inconsistency the one-vocabulary port resolves. Verdict-neutral (strict-only failure either way).
 
 ## Acceptance criteria
 

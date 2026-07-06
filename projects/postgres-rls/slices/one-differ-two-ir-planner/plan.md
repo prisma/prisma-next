@@ -1,0 +1,45 @@
+# Slice 2.5 — dispatch plan
+
+Spec: [`spec.md`](./spec.md). Branch: `slice/one-differ-two-ir-planner` (off merged main `720677e43`). Grounding inventory: the scout report (2026-07-06) — key figures below are file:line-grounded from it.
+
+Six units, sequential, one persistent implementer + one persistent reviewer. Every unit behaviour-neutral except W4 (the sanctioned tree-view cut). The legacy walk keeps running until W4 deletes it — new machinery lands **in parallel**, then consumers switch, then legacy dies (the slice-2 `compute*` pattern).
+
+## W1 — Leaf nodes + required discriminants
+
+**Outcome:** the six relational IR classes (`SqlColumnIR`, `SqlForeignKeyIR`, `SqlUniqueIR`, `SqlIndexIR`, `SqlCheckConstraintIR`, `PrimaryKey` — none implement `DiffableNode` today) implement `DiffableNode`: `id` derived from existing fields (column = name; PK = fixed sentinel; FK/unique/index = deterministic column-tuple key; check = name), `isEqualTo` comparing **own attributes only** (never children), `children() => []`. `PostgresTableSchemaNode.children()` yields columns/PK/FKs/uniques/indexes/checks **+ policies**. `kind`/`nodeKind` become **required** on `SqlSchemaIRNode` (A08) — the relational node-kind vocabulary lands here.
+**Behaviour-neutral:** additive; the legacy walk doesn't consume `children()`. Fixtures clean.
+**Completed when:** node unit tests pin id/isEqualTo/children per class; typecheck across all packages (the required-discriminant ripple the A08 attempt measured — ~90+ construction sites — is resolved properly, not cast around); `fixtures:check` clean.
+
+## W2 — Resolution at derivation (parallel, unconsumed)
+
+**Outcome:** both sides carry resolved values on the new leaf nodes. Expected: `contractNamespaceToSchemaIR`/`contractToPostgresDatabaseSchemaNode` stamp resolved native types (codec `expandNativeType`), rendered defaults (`postgresRenderDefault`), and resolved value-sets onto the leaves at contract→IR. Actual: introspection stamps normalized values (`parsePostgresDefault`/`normalizeSchemaNativeType`; SQLite equivalents) at IR construction. `isEqualTo` compares the resolved/normalized values. The legacy walk is untouched (it still reads raw fields + self-normalizes) — raw fields remain alongside until W4.
+**Completed when:** derivation tests pin resolved leaves both sides; legacy schema-verify suites (~3.8k lines) still green untouched; fixtures clean.
+
+## W3 — The port: one differ detects the relational drift set
+
+**Outcome:** `diffSchemas` over the two new trees reproduces the full §1-inventory drift set (missing/extra/changed table, column type/nullability/default drift, PK/FK/unique/index/check semantics — incl. semantic satisfaction: unique-by-index, index-by-unique-constraint, FK referential-action compare, name-insensitive PK). Semantic-satisfaction rules live in the nodes' `isEqualTo`/id design, not in the differ. Strict gating + control-policy disposition become **reason/category post-diff filters** in the SQL family verify (`classifySqlVerifierIssueKind` re-keyed on node kind + reason). The SQL family `verifySchema` verdict derives from the filtered issue list (`control-instance.ts:735-751`'s `counts.fail` read dies). `check_removed` → `not-expected` per spec. Legacy walk still present; a parity test suite proves differ-vs-legacy verdict equality across the ported schema-verify scenarios.
+**Completed when:** the ported scenario suites (rewritten from the ~3.8k-line schema-verify cluster, keyed on reason + node) are green; parity pinned; verdicts identical in all modes; runner post-apply unaffected.
+
+## W4 — Cut the tree (the deliberate output change)
+
+**Outcome:** the legacy walk (`verifySqlSchema`/`verifySqlSchemaTree`/verify-helpers/control-verify-emit) is **deleted**; `SchemaVerificationNode`, `root`/`counts`, the `verifyDatabaseSchema` tree-producer hook, and grafted-node machinery are deleted from framework-components + families + targets. `db verify` renders verdict + issues + unclaimed (human + `--json`); `combine-verify-results` reshapes (no root/counts); `unclaimed-elements` operates on issues only; **Mongo result-envelope rewrite** — `diffMongoSchemas` keeps its algorithm but returns issue-only output; `verifyMongoSchema` verdict from issues; `scope-verify-result.ts` issues-only. `type_metadata_missing` warn channel dies here (recorded).
+**Behaviour:** verdicts/ops unchanged; the rendered output change is the spec's sanctioned one. CLI output tests (~1.1k lines) rewritten to the issue-based shape.
+**Completed when:** grep-clean for `SchemaVerificationNode`/`root`/`counts`-on-verify; all verify verdict tests green; guards green; Mongo suites (1.4k-line `schema-verify.test.ts` rewritten) green.
+
+## W5 — `plan(start, end)`
+
+**Outcome:** framework `MigrationPlanner.plan` takes two schema IRs + policy (no `contract`, no `keepDiffIssue`, no issue vocabulary — `control-migration-types.ts:371-437` reshaped). Postgres + SQLite planners diff via the one differ and map node-typed issues to ops — both `issue-planner.ts` switches (Postgres 1004 lines; SQLite parallel) dispatch on node kind + reason, reading nodes not coordinate strings. `verify-postgres-namespaces` emits node-typed issues. Callers derive both sides: `synthStrategy` derives expected via `contractToSchema`; the offline `migration plan` op derives **both** (today it derives only the from-side, `migration-plan.ts:93-149`). `ISSUE_KIND_ORDER` dependency ordering re-keyed on node kind + reason.
+**Completed when:** `fixtures:check` byte-identical (the hard gate); planner/issue-planner/strategy suites (both targets) ported and green; no issue types in `plan()`'s signature.
+
+## W6 — One issue type: delete the legacy vocabulary
+
+**Outcome:** `BaseSchemaIssue`/`SchemaIssue`/`EnumValuesChangedIssue` (as a coordinate union), the `outcome` field, the two-list `SchemaDiff` split, and the unclaimed `tableName` residual read are deleted; `SchemaDiff` carries one node-typed list; framework exports shrink; Mongo's issue construction moves to the node-typed shape (coordinates carried on its own nodes). Sweep: `partitionIssuesByControlPolicy` resolver callbacks, disposition classifiers, synth predicate — single-branch.
+**Completed when:** AC-1 grep-clean (`SchemaVerificationNode`, `verifySqlSchemaTree`, `BaseSchemaIssue`, `outcome`); full slice gate (AC-6) green.
+
+## Sequencing & gates
+
+`W1 → W2 → W3 → W4 → W5 → W6`, strictly. Per-unit gate: build, forced typecheck, `fixtures:check`, `lint:deps`/`lint:casts`, scoped `--filter` suites for touched packages, the four multi-space guards. Slice gate (W6): the full set incl. `check:upgrade-coverage --mode pr --prev $(git merge-base bot/main HEAD)` and all three suites. **This slice DOES touch the public framework export surface** — expect upgrade-coverage to demand real entries (deleted exports: `SchemaVerificationNode`, `SchemaIssue`, changed `plan()` SPI); record them via the `record-upgrade-instructions` skill, don't declare incidental.
+
+## Known blast radius (from grounding)
+
+~30 test files / ~11k+ lines pin the tree/counts/coordinate-issue shapes: sql-family schema-verify cluster (~3.8k), Mongo `schema-verify.test.ts` (1.4k), CLI `output.test.ts` (1.1k), `diff-database-schema.test.ts` (841), SQLite `issue-planner.test.ts` (638), plus aggregate/combine/unclaimed/synth/planner suites. Postgres `issue-planner.ts` has **no direct unit test** — its coverage is via planner/strategy integration tests; W5 adds direct coverage while porting.
