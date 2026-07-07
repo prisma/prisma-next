@@ -4,6 +4,7 @@ import { LiteralExpr } from '@prisma-next/sql-relational-core/ast';
 import {
   buildOperation,
   type CodecExpression,
+  type CodecIdsWithTrait,
   type CodecValue,
   codecOf,
   type Expression,
@@ -238,6 +239,90 @@ export function postgresQueryOperations<CT extends CodecTypesBase>(): QueryOpera
           args: [toExpr(self), arrayOperandToExpr(other)],
           returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
           lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} && {{arg0}}' },
+        });
+      },
+    },
+    eq: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['equality']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'eq',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} = {{arg0}}' },
+        });
+      },
+    },
+    ne: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['equality']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'ne',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} <> {{arg0}}' },
+        });
+      },
+    },
+    gt: {
+      self: { many: true, elementTraits: ['order'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['order']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'gt',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} > {{arg0}}' },
+        });
+      },
+    },
+    lt: {
+      self: { many: true, elementTraits: ['order'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['order']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'lt',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} < {{arg0}}' },
+        });
+      },
+    },
+    gte: {
+      self: { many: true, elementTraits: ['order'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['order']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'gte',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} >= {{arg0}}' },
+        });
+      },
+    },
+    lte: {
+      self: { many: true, elementTraits: ['order'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['order']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'lte',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} <= {{arg0}}' },
         });
       },
     },

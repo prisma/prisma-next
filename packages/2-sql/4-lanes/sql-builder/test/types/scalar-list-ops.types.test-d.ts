@@ -14,6 +14,8 @@
 
 import type {
   CodecExpression,
+  CodecIdsWithTrait,
+  CodecValue,
   Expression,
   ScalarListExpression,
 } from '@prisma-next/sql-relational-core/expression';
@@ -31,7 +33,17 @@ type CT = {
 
 type BoolExpr = Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
 
-// Same shape as the real postgres `has` operation entry.
+// Same shape as the real postgres registry entries (`has` plus the six
+// list-comparison ops). sql-builder can't import the adapter layer, so the
+// list-comparison overloads reach `fns.eq`/`fns.gt`/… through
+// `DeriveExtFunctions<QueryOps>` here exactly as they do off the real registry.
+type ListCompare<RequiredTraits extends readonly string[]> = <
+  CodecId extends CodecIdsWithTrait<CT, RequiredTraits>,
+>(
+  self: ScalarListExpression<CodecId, false>,
+  other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+) => BoolExpr;
+
 type QueryOps = {
   has: {
     self: { many: true };
@@ -40,6 +52,12 @@ type QueryOps = {
       elem: CodecExpression<CodecId, false, CT>,
     ) => BoolExpr;
   };
+  eq: { self: { many: true; elementTraits: ['equality'] }; impl: ListCompare<['equality']> };
+  ne: { self: { many: true; elementTraits: ['equality'] }; impl: ListCompare<['equality']> };
+  gt: { self: { many: true; elementTraits: ['order'] }; impl: ListCompare<['order']> };
+  lt: { self: { many: true; elementTraits: ['order'] }; impl: ListCompare<['order']> };
+  gte: { self: { many: true; elementTraits: ['order'] }; impl: ListCompare<['order']> };
+  lte: { self: { many: true; elementTraits: ['order'] }; impl: ListCompare<['order']> };
 };
 
 // A scope shaped like a `Post` table: scalar `name`, list `tags String[]`,
@@ -90,18 +108,20 @@ test('the list op rejects a scalar receiver and a wrong-typed element', () => {
 });
 
 test('equality builtins accept whole-list operands (literal array or list expression)', () => {
-  expectTypeOf(fns.eq(f.tags, ['a', 'b'])).toEqualTypeOf<CmpExpr>();
-  expectTypeOf(fns.eq(f.tags, f.tags)).toEqualTypeOf<CmpExpr>();
-  expectTypeOf(fns.ne(f.tags, ['a'])).toEqualTypeOf<CmpExpr>();
+  // a whole-list comparison is always non-null (`BoolExpr`), unlike the scalar
+  // builtin whose declared return carries `nullable: boolean` (`CmpExpr`).
+  expectTypeOf(fns.eq(f.tags, ['a', 'b'])).toEqualTypeOf<BoolExpr>();
+  expectTypeOf(fns.eq(f.tags, f.tags)).toEqualTypeOf<BoolExpr>();
+  expectTypeOf(fns.ne(f.tags, ['a'])).toEqualTypeOf<BoolExpr>();
   // a Boolean[] list is comparable by equality (bool carries the `equality` trait)
   fns.eq(f.flags, [true]);
 });
 
 test('ordering builtins accept whole-list operands over an orderable element', () => {
-  expectTypeOf(fns.gt(f.tags, ['a'])).toEqualTypeOf<CmpExpr>();
-  expectTypeOf(fns.gte(f.tags, f.tags)).toEqualTypeOf<CmpExpr>();
-  expectTypeOf(fns.lt(f.tags, ['z'])).toEqualTypeOf<CmpExpr>();
-  expectTypeOf(fns.lte(f.tags, ['z'])).toEqualTypeOf<CmpExpr>();
+  expectTypeOf(fns.gt(f.tags, ['a'])).toEqualTypeOf<BoolExpr>();
+  expectTypeOf(fns.gte(f.tags, f.tags)).toEqualTypeOf<BoolExpr>();
+  expectTypeOf(fns.lt(f.tags, ['z'])).toEqualTypeOf<BoolExpr>();
+  expectTypeOf(fns.lte(f.tags, ['z'])).toEqualTypeOf<BoolExpr>();
 });
 
 test('comparison builtins reject a wrong-typed list element', () => {
