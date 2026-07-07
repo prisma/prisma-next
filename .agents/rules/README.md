@@ -49,6 +49,7 @@ Rules below are listed by bare filename; the canonical file is `.agents/rules/<n
 - `avoid-cleavage-in-prose.mdc` — Don't use "cleavage" as a metaphor in prose; prefer split/boundary/distinction
 - `git-staging.mdc` — Git commit best practices: stage files explicitly, avoid `git add -A`, sign off
 - `running-tests.mdc` — How to run tests (and other slow verification commands): save output to a file once, read the file; don't re-run to grep different lines
+- `fix-the-class-not-the-instance.mdc` — A review comment names a class of defect; sweep the whole diff for the class, fix every instance in one round
 
 ## Testing
 - `test-import-patterns.mdc` — Test import patterns (source files, relative paths, don't export for tests)
@@ -77,6 +78,7 @@ Rules below are listed by bare filename; the canonical file is `.agents/rules/<n
 
 ## Imports & Layering
 - `import-validation.mdc` — Layering rules and exceptions
+- `no-family-vocabulary-in-framework.mdc` — No family/target vocabulary in packages/1-framework; enforced by lint:framework-vocabulary
 - `no-inline-imports.mdc` — Prohibit inline type imports in source files
 - `shared-plane-packages.mdc` — Pattern for creating shared plane packages
 - `multi-plane-packages.mdc` — Packages that span multiple planes (shared, migration, runtime)

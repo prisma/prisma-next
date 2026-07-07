@@ -162,6 +162,16 @@ required. Incidental substrate diff only.
 -->
 
 <!--
+Slow-query warning middleware example (PR #912): the `prisma-next-demo` example
+gains a `slowQueryWarning` custom middleware (`src/prisma/slow-query-warning.ts`,
+wired into the runtime `middleware: [...]` chain in `src/prisma/db.ts`, with
+offline unit tests). Documentation-driven example code only — it exercises the
+existing public `SqlMiddleware` `afterExecute` hook and changes no framework
+surface, contract shape, or emitted artefact. No user action required.
+Incidental substrate diff only.
+-->
+
+<!--
 TML-2953 (this PR): Mongo enum fields now type through a storage value set, the same
 way SQL does. Authoring a Mongo enum writes a value set into
 `contract.storage.namespaces[<ns>].entries.valueSet[<Enum>]` (the codec-encoded
