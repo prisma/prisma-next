@@ -80,12 +80,11 @@ export interface AuthoringTypeConstructorDescriptor {
  * hook reports no diagnostics of its own).
  *
  * The returned payload is an opaque `object` — its shape is defined by the
- * consuming family, not by this framework type, so no family vocabulary
- * (codec ids, native types, value-set enforcement strategies, …) appears
- * here. The consumer narrows the object with its own structural predicate
- * (e.g. the SQL family's `isSqlEntityRefResolution`); a payload that fails
- * that predicate is a contributor bug in the pack that registered this
- * descriptor, not a user-schema error.
+ * consuming family, not by this framework type, so no family-specific fields
+ * appear here. The consumer narrows the object with its own structural
+ * predicate (each family provides one); a payload that fails that predicate is
+ * a contributor bug in the pack that registered this descriptor, not a
+ * user-schema error.
  *
  * Deliberately narrower than a general "run arbitrary code during field
  * resolution" hook: `resolve` is a pure function over `(ref, entities,

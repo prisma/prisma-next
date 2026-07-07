@@ -26,9 +26,9 @@ export type ColumnTypeDescriptor<TCodecId extends string = string> = {
    * Storage-plane value-set ref, set by an authoring path that resolves a
    * field's type against a value-set-deriving entity (e.g. a PSL entity-ref
    * type constructor like `pg.enum(Ref)`, or a TS `enumType` handle).
-   * Threaded straight onto the `StorageColumn` this descriptor builds — this
-   * is what drives value-set → codec typing (`computeColumnType` gating on
-   * `column.valueSet`). Every codec's own descriptor leaves this unset.
+   * Threaded straight onto the storage node this descriptor builds, where it
+   * drives value-set → codec typing. Every codec's own descriptor leaves this
+   * unset.
    */
   readonly valueSet?: ValueSetRef;
 };
