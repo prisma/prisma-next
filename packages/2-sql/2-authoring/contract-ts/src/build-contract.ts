@@ -31,7 +31,6 @@ import {
   type IndexTypeMap,
   type IndexTypeRegistration,
 } from '@prisma-next/sql-contract/index-types';
-import { codecEnforcesValueSet } from '@prisma-next/sql-contract/native-type-hook';
 import {
   applyFkDefaults,
   type CheckConstraintInput,
@@ -385,6 +384,7 @@ export function buildSqlContractFromDefinition(
     const fieldToColumn: Record<string, string> = {};
     const domainFields: Record<string, ContractField> = {};
     const domainFieldRefs: Record<string, DomainFieldRef> = {};
+    const checksForTable: CheckConstraintInput[] = [];
 
     for (const field of semanticModel.fields) {
       const executionDefaultPhases =
@@ -430,6 +430,27 @@ export function buildSqlContractFromDefinition(
       const column = buildStorageColumn(field, storageValueSetRef, codecLookup);
       columns[field.columnName] = column;
       fieldToColumn[field.fieldName] = field.columnName;
+
+      // A domain enum (`storageValueSetRef`, from an `enumType()` handle) is
+      // stored as a plain scalar column (`text`, `int4`, …) with no native
+      // type of its own to enforce membership, so it needs an explicit
+      // CHECK. A value set resolved by an entity-ref type constructor
+      // (`field.descriptor.valueSet`, e.g. `pg.enum(Ref)`) binds the column
+      // to a codec/native-type pairing that IS the storage-level
+      // enforcement (a Postgres native enum type, or another target's
+      // equivalent) — no CHECK for those, except a `many` (list) column:
+      // a native per-instance type only constrains a scalar column, not
+      // each element of an array.
+      if (
+        column.valueSet !== undefined &&
+        (field.many === true || storageValueSetRef !== undefined)
+      ) {
+        checksForTable.push({
+          name: `${tableName}_${field.columnName}_check`,
+          column: field.columnName,
+          valueSet: column.valueSet,
+        });
+      }
 
       domainFields[field.fieldName] = buildDomainField(field, column, domainValueSetRef);
 
@@ -521,20 +542,6 @@ export function buildSqlContractFromDefinition(
     // materialised onto the base `ModelNode`, so the variant builds a domain
     // model (below) but no storage table of its own.
     if (!semanticModel.sharesBaseTable) {
-      const checksForTable: CheckConstraintInput[] = Object.entries(columns).flatMap(
-        ([columnName, col]) => {
-          const valueSet = col.valueSet;
-          if (valueSet === undefined) return [];
-          // A list (`many`) value-set column always gets a CHECK: a codec's
-          // per-instance native type enforces membership for a scalar column,
-          // not for each element of an array column.
-          if (col.many !== true && codecEnforcesValueSet(codecLookup, col.codecId)) {
-            return [];
-          }
-          return [{ name: `${tableName}_${columnName}_check`, column: columnName, valueSet }];
-        },
-      );
-
       const tableInput: StorageTableInput = {
         columns,
         ...ifDefined('control', semanticModel.control),

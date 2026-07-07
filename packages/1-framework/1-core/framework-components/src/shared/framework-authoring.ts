@@ -431,94 +431,68 @@ function isAuthoringTemplateRecord(value: unknown): value is Record<string, unkn
 export function isAuthoringTypeConstructorDescriptor(
   value: unknown,
 ): value is AuthoringTypeConstructorDescriptor {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { kind?: unknown }).kind === 'typeConstructor' &&
-    typeof (value as { output?: unknown }).output === 'object' &&
-    (value as { output?: unknown }).output !== null
-  );
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('kind' in value) || value.kind !== 'typeConstructor') return false;
+  if (!('output' in value)) return false;
+  const output = value.output;
+  return typeof output === 'object' && output !== null;
 }
 
 export function isAuthoringEntityRefTypeConstructorDescriptor(
   value: unknown,
 ): value is AuthoringEntityRefTypeConstructorDescriptor {
   if (typeof value !== 'object' || value === null) return false;
-  const candidate = blindCast<
-    { kind?: unknown; resolve?: unknown },
-    'runtime shape check on an otherwise-unknown value; narrowed by the typeof/null guard above'
-  >(value);
-  return candidate.kind === 'entityRefTypeConstructor' && typeof candidate.resolve === 'function';
+  if (!('kind' in value) || value.kind !== 'entityRefTypeConstructor') return false;
+  if (!('resolve' in value)) return false;
+  return typeof value.resolve === 'function';
 }
 
 export function isAuthoringFieldPresetDescriptor(
   value: unknown,
 ): value is AuthoringFieldPresetDescriptor {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { kind?: unknown }).kind === 'fieldPreset' &&
-    typeof (value as { output?: unknown }).output === 'object' &&
-    (value as { output?: unknown }).output !== null
-  );
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('kind' in value) || value.kind !== 'fieldPreset') return false;
+  if (!('output' in value)) return false;
+  const output = value.output;
+  return typeof output === 'object' && output !== null;
 }
 
 export function isAuthoringEntityTypeDescriptor(
   value: unknown,
 ): value is AuthoringEntityTypeDescriptor {
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    (value as { kind?: unknown }).kind !== 'entity'
-  ) {
-    return false;
-  }
-  const discriminator = (value as { discriminator?: unknown }).discriminator;
-  if (typeof discriminator !== 'string' || discriminator.length === 0) {
-    return false;
-  }
-  const output = (value as { output?: unknown }).output;
-  if (typeof output !== 'object' || output === null) {
-    return false;
-  }
-  const factory = (output as { factory?: unknown }).factory;
-  const template = (output as { template?: unknown }).template;
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('kind' in value) || value.kind !== 'entity') return false;
+  if (!('discriminator' in value) || typeof value.discriminator !== 'string') return false;
+  if (value.discriminator.length === 0) return false;
+  if (!('output' in value)) return false;
+  const output = value.output;
+  if (typeof output !== 'object' || output === null) return false;
+  const factory = 'factory' in output ? output.factory : undefined;
+  const template = 'template' in output ? output.template : undefined;
   return typeof factory === 'function' || template !== undefined;
 }
 
 export function isAuthoringPslBlockDescriptor(
   value: unknown,
 ): value is AuthoringPslBlockDescriptor {
-  if (typeof value !== 'object' || value === null) {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('kind' in value) || value.kind !== 'pslBlock') return false;
+  if (!('keyword' in value) || typeof value.keyword !== 'string' || value.keyword.length === 0) {
     return false;
   }
-  const record = blindCast<
-    Record<string, unknown>,
-    'type-guard probing an unknown candidate-descriptor object for known property names'
-  >(value);
-  if (record['kind'] !== 'pslBlock') {
+  if (
+    !('discriminator' in value) ||
+    typeof value.discriminator !== 'string' ||
+    value.discriminator.length === 0
+  ) {
     return false;
   }
-  const keyword = record['keyword'];
-  if (typeof keyword !== 'string' || keyword.length === 0) {
-    return false;
-  }
-  const discriminator = record['discriminator'];
-  if (typeof discriminator !== 'string' || discriminator.length === 0) {
-    return false;
-  }
-  const name = record['name'];
-  if (typeof name !== 'object' || name === null) {
-    return false;
-  }
-  const nameRecord = blindCast<
-    Record<string, unknown>,
-    'type-guard probing the name property of a candidate pslBlock descriptor'
-  >(name);
-  if (typeof nameRecord['required'] !== 'boolean') {
-    return false;
-  }
-  const parameters = record['parameters'];
+  if (!('name' in value)) return false;
+  const name = value.name;
+  if (typeof name !== 'object' || name === null) return false;
+  if (!('required' in name) || typeof name.required !== 'boolean') return false;
+  if (!('parameters' in value)) return false;
+  const parameters = value.parameters;
   return typeof parameters === 'object' && parameters !== null && !Array.isArray(parameters);
 }
 

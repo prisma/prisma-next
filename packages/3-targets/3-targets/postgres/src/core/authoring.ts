@@ -10,7 +10,7 @@ import type {
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlEntityRefResolution } from '@prisma-next/sql-contract/entity-ref-resolution';
+import type { SqlColumnBinding } from '@prisma-next/sql-contract/entity-ref-resolution';
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { DEFAULT_NAMESPACE_ID } from './namespace-ids';
@@ -28,17 +28,18 @@ export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespa
 
 /**
  * Resolves `pg.enum(<ref>)` against the namespace's already-lowered `native_enum`
- * entities: the `pg/enum@1` codec, the enum's type name as both the column
- * `nativeType` and the codec-instance `typeParams.typeName`, and the block name
- * as the `valueSetEntityName` (the entity derives a same-named value-set). The
- * type name is schema-qualified for a named non-default schema (matching
- * `format_type()`); `public` and the unbound namespace stay bare (`search_path`).
+ * entities: the `pg/enum@1` codec, the enum's type name as the codec-instance
+ * `typeParams.typeName` (the codec's `nativeTypeFor` hook derives the column's
+ * native type from this), and the block name as the `valueSetEntityName` (the
+ * entity derives a same-named value-set). The type name is schema-qualified for
+ * a named non-default schema (matching `format_type()`); `public` and the
+ * unbound namespace stay bare (`search_path`).
  */
 function resolvePgEnumRef(
   ref: string,
   entities: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
   namespaceId?: string,
-): SqlEntityRefResolution | undefined {
+): SqlColumnBinding | undefined {
   const nativeEnums = entities?.['native_enum'];
   const entity = nativeEnums?.[ref];
   if (!PostgresNativeEnum.is(entity)) return undefined;
@@ -49,7 +50,6 @@ function resolvePgEnumRef(
   const typeName = qualifyNativeType ? `${namespaceId}.${entity.typeName}` : entity.typeName;
   return {
     codecId: PG_ENUM_CODEC_ID,
-    nativeType: typeName,
     typeParams: { typeName },
     valueSetEntityName: ref,
   };

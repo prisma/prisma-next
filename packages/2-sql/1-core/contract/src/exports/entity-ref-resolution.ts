@@ -1,2 +1,2 @@
-export type { SqlEntityRefResolution } from '../entity-ref-resolution';
-export { isSqlEntityRefResolution } from '../entity-ref-resolution';
+export type { SqlColumnBinding } from '../entity-ref-resolution';
+export { isSqlColumnBinding } from '../entity-ref-resolution';

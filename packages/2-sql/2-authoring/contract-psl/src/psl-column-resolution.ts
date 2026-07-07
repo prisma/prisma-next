@@ -38,7 +38,7 @@ import {
   NumberLiteralExprAst,
   StringLiteralExprAst,
 } from '@prisma-next/psl-parser/syntax';
-import { isSqlEntityRefResolution } from '@prisma-next/sql-contract/entity-ref-resolution';
+import { isSqlColumnBinding } from '@prisma-next/sql-contract/entity-ref-resolution';
 import { blindCast } from '@prisma-next/utils/casts';
 
 import {
@@ -471,14 +471,28 @@ function resolveEntityRefTypeConstructorCall(input: {
     return { ok: false, alreadyReported: true };
   }
 
-  if (!isSqlEntityRefResolution(resolved)) {
+  if (!isSqlColumnBinding(resolved)) {
     throw new Error(
-      `Entity-ref type constructor "${helperPath}" resolved to a payload that does not satisfy SqlEntityRefResolution (missing/invalid "codecId"/"nativeType" strings). This is a contributor bug in the pack registering "${helperPath}", not a user-schema error.`,
+      `Entity-ref type constructor "${helperPath}" resolved to a payload that does not satisfy the SQL column-binding shape (missing/invalid "codecId" string). This is a contributor bug in the pack registering "${helperPath}", not a user-schema error.`,
     );
   }
-  const resolution = resolved;
+  const binding = resolved;
 
-  if (resolution.valueSetEntityName !== undefined && input.namespaceId === undefined) {
+  // The native type is not part of the binding — it is derived from
+  // `typeParams.typeName`, the same field the codec's own `nativeTypeFor`
+  // hook reads (see `native-type-hook.ts`), so the column's declared native
+  // type and the render-time cast agree.
+  const typeName =
+    binding.typeParams !== undefined && typeof binding.typeParams['typeName'] === 'string'
+      ? binding.typeParams['typeName']
+      : undefined;
+  if (typeName === undefined) {
+    throw new Error(
+      `Entity-ref type constructor "${helperPath}" resolved to a column binding with no string "typeParams.typeName", so its native type cannot be derived. This is a contributor bug in the pack registering "${helperPath}", not a user-schema error.`,
+    );
+  }
+
+  if (binding.valueSetEntityName !== undefined && input.namespaceId === undefined) {
     input.diagnostics.push({
       code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       message: `${input.entityLabel} type constructor "${helperPath}(${ref})" resolves to a value-set-typed entity, but the field has no resolvable namespace to scope the value-set ref to`,
@@ -489,21 +503,21 @@ function resolveEntityRefTypeConstructorCall(input: {
   }
 
   const valueSet: ValueSetRef | undefined =
-    resolution.valueSetEntityName !== undefined && input.namespaceId !== undefined
+    binding.valueSetEntityName !== undefined && input.namespaceId !== undefined
       ? {
           plane: 'storage',
           entityKind: 'valueSet',
           namespaceId: input.namespaceId,
-          entityName: resolution.valueSetEntityName,
+          entityName: binding.valueSetEntityName,
         }
       : undefined;
 
   return {
     ok: true,
     descriptor: {
-      codecId: resolution.codecId,
-      nativeType: resolution.nativeType,
-      ...(resolution.typeParams !== undefined ? { typeParams: resolution.typeParams } : {}),
+      codecId: binding.codecId,
+      nativeType: typeName,
+      ...(binding.typeParams !== undefined ? { typeParams: binding.typeParams } : {}),
       ...(valueSet !== undefined ? { valueSet } : {}),
     },
   };

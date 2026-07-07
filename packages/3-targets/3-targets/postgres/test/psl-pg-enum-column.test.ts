@@ -28,11 +28,12 @@ import { pgEnumDescriptor } from '../src/core/codecs';
 import type { PostgresSchema } from '../src/core/postgres-schema';
 import { postgresCreateNamespace } from '../src/core/postgres-schema';
 
-// Production always resolves `pg.enum(Ref)` through a real `CodecLookup`
-// (the CLI/config-loading pipeline supplies `stack.codecLookup`); build-contract's
-// CHECK-suppression consults the `pg/enum@1` codec's descriptor through this lookup
-// (`codecEnforcesValueSet`), so this test double must expose it for the "no CHECK"
-// assertions below to exercise the real mechanism rather than passing vacuously.
+// Production always resolves `pg.enum(Ref)` through a real `CodecLookup` (the
+// CLI/config-loading pipeline supplies `stack.codecLookup`), so this test
+// double mirrors that shape. The "no CHECK" assertions below don't depend on
+// it — a `pg.enum(Ref)` column resolves through the entity-ref path
+// (`resolvePgEnumRef`), which is what decides CHECK presence — but other
+// interpreter paths (e.g. encoding column defaults) do read the lookup.
 const pgEnumCodec = {
   id: PG_ENUM_CODEC_ID,
   descriptor: pgEnumDescriptor,

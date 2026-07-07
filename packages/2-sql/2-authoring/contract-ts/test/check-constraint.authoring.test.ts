@@ -1,5 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import {
   CheckConstraint,
@@ -177,38 +176,20 @@ describe('check-constraint lowering', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CHECK suppression: codec-owned `enforcesValueSet` marker
+// CHECK is always written for a domain enum (`enumType()` + `namedType()`):
+// this authoring surface has no entity-ref-resolved, storage-enforced-type
+// path (that only exists via PSL's `pg.enum(Ref)` — see
+// `target-postgres/test/psl-pg-enum-column.test.ts` for the no-CHECK case),
+// so a domain enum's column is always a plain scalar column and always
+// needs a CHECK to enforce its member set, regardless of the codec bound to
+// it.
 // ---------------------------------------------------------------------------
 
-function stubCodecWithDescriptor(id: string, descriptor: unknown): Codec {
-  const codec = {
-    id,
-    descriptor,
-    encode: () => Promise.reject(new Error('unused')),
-    decode: () => Promise.reject(new Error('unused')),
-    encodeJson: (value: unknown) => value,
-    decodeJson: (json: unknown) => json,
-  };
-  return codec as Codec;
-}
-
-describe('check-constraint suppression via codec-owned enforcesValueSet marker', () => {
-  it('writes no CHECK for a value-set column whose codec enforces its value-set', () => {
-    const nativeEnumCodecId = 'test/native-enum@1';
-    const codec = stubCodecWithDescriptor(nativeEnumCodecId, {
-      codecId: nativeEnumCodecId,
-      enforcesValueSet: true,
-    });
-    const codecLookup: CodecLookup = {
-      get: (id) => (id === nativeEnumCodecId ? codec : undefined),
-      targetTypesFor: () => undefined,
-      metaFor: () => undefined,
-      renderOutputTypeFor: () => undefined,
-    };
-
+describe('check-constraint always written for a domain enum, regardless of codec', () => {
+  it('still writes a CHECK for a domain enum using a codec id other than pg/text@1', () => {
     const NativeRole = enumType(
       'NativeRole',
-      { codecId: nativeEnumCodecId, nativeType: 'native_role' },
+      { codecId: 'test/native-enum@1', nativeType: 'native_role' },
       member('User', 'user'),
       member('Admin', 'admin'),
     );
@@ -219,7 +200,6 @@ describe('check-constraint suppression via codec-owned enforcesValueSet marker',
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
         enums: { NativeRole },
-        codecLookup,
       },
       ({ field: f, model: m }) =>
         ({
@@ -228,42 +208,6 @@ describe('check-constraint suppression via codec-owned enforcesValueSet marker',
               fields: {
                 id: f.text().id(),
                 role: f.namedType(NativeRole),
-              },
-            }),
-          },
-        }) as const,
-    ) as Contract<SqlStorage>;
-
-    const storageNs = contract.storage.namespaces['public'];
-    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
-
-    expect(userTable?.checks).toBeUndefined();
-  });
-
-  it('still writes a CHECK when the codec has no enforcesValueSet marker (unaffected path)', () => {
-    const Role = enumType('Role', pgText, member('User', 'user'), member('Admin', 'admin'));
-    const codecLookup: CodecLookup = {
-      get: (id) => (id === 'pg/text@1' ? stubCodecWithDescriptor('pg/text@1', {}) : undefined),
-      targetTypesFor: () => undefined,
-      metaFor: () => undefined,
-      renderOutputTypeFor: () => undefined,
-    };
-
-    const contract = defineContract(
-      {
-        family: sqlFamilyPack,
-        target: postgresTargetPack,
-        createNamespace: createTestSqlNamespace,
-        enums: { Role },
-        codecLookup,
-      },
-      ({ field: f, model: m }) =>
-        ({
-          models: {
-            User: m('User', {
-              fields: {
-                id: f.text().id(),
-                role: f.namedType(Role),
               },
             }),
           },

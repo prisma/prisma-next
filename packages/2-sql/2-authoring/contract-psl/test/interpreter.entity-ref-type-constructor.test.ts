@@ -17,7 +17,7 @@ import type {
   AuthoringPslBlockDescriptorNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
-import type { SqlEntityRefResolution } from '@prisma-next/sql-contract/entity-ref-resolution';
+import type { SqlColumnBinding } from '@prisma-next/sql-contract/entity-ref-resolution';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
@@ -59,7 +59,7 @@ function resolvePgEnumRef(
   ref: string,
   entities: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
   namespaceId?: string,
-): SqlEntityRefResolution | undefined {
+): SqlColumnBinding | undefined {
   const enums = entities?.[NATIVE_ENUM_DISCRIMINATOR];
   const entity = enums?.[ref] as { readonly typeName: string } | undefined;
   if (!entity) return undefined;
@@ -67,22 +67,29 @@ function resolvePgEnumRef(
     namespaceId !== undefined ? `${namespaceId}.${entity.typeName}` : entity.typeName;
   return {
     codecId: 'test/native-enum@1',
-    nativeType: typeName,
     typeParams: { typeName },
     valueSetEntityName: ref,
   };
 }
 
-function resolvePlainRef(): SqlEntityRefResolution {
-  return { codecId: 'test/plain-ref@1', nativeType: 'plain_ref' };
+function resolvePlainRef(): SqlColumnBinding {
+  return { codecId: 'test/plain-ref@1', typeParams: { typeName: 'plain_ref' } };
 }
 
-function resolveUnscopedValueSetRef(): SqlEntityRefResolution {
-  return { codecId: 'test/native-enum@1', nativeType: 'unscoped', valueSetEntityName: 'Whatever' };
+function resolveUnscopedValueSetRef(): SqlColumnBinding {
+  return {
+    codecId: 'test/native-enum@1',
+    typeParams: { typeName: 'unscoped' },
+    valueSetEntityName: 'Whatever',
+  };
 }
 
 function resolveBrokenRef(): object {
   return { notCodecId: true, notNativeType: true };
+}
+
+function resolveNoTypeNameRef(): SqlColumnBinding {
+  return { codecId: 'test/no-type-name@1' };
 }
 
 const entityRefTypeConstructors: AuthoringEntityRefTypeConstructorNamespace = {
@@ -91,6 +98,7 @@ const entityRefTypeConstructors: AuthoringEntityRefTypeConstructorNamespace = {
     plain: { kind: 'entityRefTypeConstructor', resolve: resolvePlainRef },
     always: { kind: 'entityRefTypeConstructor', resolve: resolveUnscopedValueSetRef },
     broken: { kind: 'entityRefTypeConstructor', resolve: resolveBrokenRef },
+    notype: { kind: 'entityRefTypeConstructor', resolve: resolveNoTypeNameRef },
   },
 };
 
@@ -308,7 +316,7 @@ model Placeholder {
     );
   });
 
-  it('throws when a contributed resolve() returns a payload that does not satisfy SqlEntityRefResolution', () => {
+  it('throws when a contributed resolve() returns a payload that does not satisfy the SQL column-binding shape', () => {
     expect(() =>
       interpretWith(`
 type Broken {
@@ -319,6 +327,20 @@ model Placeholder {
   id Int @id
 }
 `),
-    ).toThrow(/does not satisfy SqlEntityRefResolution/);
+    ).toThrow(/does not satisfy the SQL column-binding shape/);
+  });
+
+  it('throws when a contributed resolve() returns a binding with no typeParams.typeName', () => {
+    expect(() =>
+      interpretWith(`
+type Broken {
+  status pg.notype(AnyRef)
+}
+
+model Placeholder {
+  id Int @id
+}
+`),
+    ).toThrow(/typeParams\.typeName/);
   });
 });
