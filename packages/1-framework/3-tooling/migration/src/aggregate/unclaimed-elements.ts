@@ -1,113 +1,92 @@
 import type {
   SchemaDiffIssue,
-  SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { blindCast } from '@prisma-next/utils/casts';
 
-function aggregateStatus(children: readonly SchemaVerificationNode[]): 'pass' | 'warn' | 'fail' {
-  let status: 'pass' | 'warn' | 'fail' = 'pass';
-  for (const child of children) {
-    if (child.status === 'fail') return 'fail';
-    if (child.status === 'warn') status = 'warn';
-  }
-  return status;
+/**
+ * The declared verdict-classification role of a diff issue's subject node,
+ * read structurally (`diffRole` is declared by every SQL schema-diff node;
+ * the aggregate never imports family node classes). Absent for issues whose
+ * nodes carry no role (non-SQL families).
+ */
+function issueNodeRole(issue: SchemaDiffIssue): string | undefined {
+  const node = issue.actual ?? issue.expected;
+  if (node === undefined) return undefined;
+  const role = blindCast<
+    { readonly diffRole?: unknown },
+    'structural read of the declared diffRole discriminant on a schema-diff node'
+  >(node).diffRole;
+  return typeof role === 'string' ? role : undefined;
 }
 
-type Counts = { pass: number; warn: number; fail: number; totalNodes: number };
-
-/**
- * Counts the pass/warn/fail statuses over a verification tree (root included).
- * Used only when the strip actually dropped a node — the pruned tree is then
- * self-consistent regardless of family, so the recomputed `fail` is the honest
- * verdict signal in both count bases (SQL counts the root at its recomputed
- * status; Mongo's root was never a failure carrier, so a fresh walk of the
- * surviving collection nodes matches its tally).
- */
-function countTree(node: SchemaVerificationNode): Counts {
-  let pass = 0;
-  let warn = 0;
-  let fail = 0;
-  let totalNodes = 0;
-  const visit = (n: SchemaVerificationNode): void => {
-    totalNodes += 1;
-    if (n.status === 'pass') pass += 1;
-    else if (n.status === 'warn') warn += 1;
-    else fail += 1;
-    for (const child of n.children) visit(child);
-  };
-  visit(node);
-  return { pass, warn, fail, totalNodes };
+function pathIsUnder(path: readonly string[], prefix: readonly string[]): boolean {
+  if (path.length < prefix.length) return false;
+  return prefix.every((segment, i) => path[i] === segment);
 }
 
 /**
  * A contract space's contract-satisfaction view. Strips the top-level entity
- * extras: the grafted root children the family stamped `reason:
- * 'not-expected'` (a live entity no contract expects has no declared
- * counterpart in the tree) and the `extra_table` issues describing them. Those
- * belong to the standalone unclaimed-elements list
- * ({@link collectExtraElementNames}), never a contract-tree node.
+ * extras — the `not-expected` findings on table-role nodes (plus the
+ * findings the differ's total descent reported under those tables) and the
+ * `extra_table` coordinate issues describing the same entities. Those belong
+ * to the standalone unclaimed-elements list
+ * ({@link collectExtraElementNames}), never a space's own verdict.
  *
- * Nested `not-expected` findings (an extra column on the space's own declared
- * table…) and extra-policy `schemaDiffIssues` are the space's **own drift** and
- * stay: their contribution is baked into the declared table's subtree and the
- * family's verdict, so stripping the issue would leave a failing space with no
- * visible evidence. On the legacy coordinate-based issue type the entity level
- * is not yet a structural field, so the issue filter narrows by the
- * framework-declared `extra_table` kind; the kind narrowing retires when the
- * issue-type merge makes issues node-typed.
+ * Nested `not-expected` findings (an extra column on the space's own
+ * declared table…) and structural findings (an undeclared RLS policy) are
+ * the space's **own drift** and stay. On the legacy coordinate-based issue
+ * type the entity level is not a structural field, so the issue filter
+ * narrows by the framework-declared `extra_table` kind; that narrowing
+ * retires with the issue-type merge.
  *
- * Counts: when nothing was dropped, the family's authoritative counts and
- * verdict are untouched. When a node was dropped, both are recomputed from the
- * pruned tree with a plain self-consistent walk ({@link countTree}) plus the
- * re-folded `schemaDiffIssues` count (they carry no tree node; the family
- * folds their count into `counts.fail` after its own walk).
+ * The verdict recomputes from the surviving lists: the per-space result is
+ * issue-based (`ok` ⇔ both lists empty), so a space whose only failures
+ * were top-level extras passes after the strip.
  */
 export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDatabaseSchemaResult {
   const issues = result.schema.issues.filter(
     (issue) => !(issue.reason === 'not-expected' && issue.kind === 'extra_table'),
   );
-  const keptChildren: SchemaVerificationNode[] = [];
-  const dropped: SchemaVerificationNode[] = [];
-  for (const child of result.schema.root.children) {
-    if (child.reason === 'not-expected') dropped.push(child);
-    else keptChildren.push(child);
-  }
+  const droppedTablePaths = result.schema.schemaDiffIssues
+    .filter((issue) => issue.reason === 'not-expected' && issueNodeRole(issue) === 'table')
+    .map((issue) => issue.path);
+  const schemaDiffIssues = result.schema.schemaDiffIssues.filter((issue) => {
+    if (issue.reason !== 'not-expected') return true;
+    if (issueNodeRole(issue) === 'structural') return true;
+    return !droppedTablePaths.some((prefix) => pathIsUnder(issue.path, prefix));
+  });
 
-  const strippedIssues = issues.length !== result.schema.issues.length;
-  if (!strippedIssues && dropped.length === 0) return result;
-  if (dropped.length === 0) {
-    return { ...result, schema: { ...result.schema, issues } };
-  }
+  const strippedNothing =
+    issues.length === result.schema.issues.length &&
+    schemaDiffIssues.length === result.schema.schemaDiffIssues.length;
+  if (strippedNothing) return result;
 
-  const root: SchemaVerificationNode = {
-    ...result.schema.root,
-    status: aggregateStatus(keptChildren),
-    children: keptChildren,
-  };
-  const counts = countTree(root);
-  counts.fail += result.schema.schemaDiffIssues.length;
-  const ok = counts.fail === 0;
+  const ok = issues.length === 0 && schemaDiffIssues.length === 0;
+  const { code: staleCode, ...envelope } = result;
+  void staleCode;
   return {
-    ...result,
+    ...envelope,
     ok,
     ...(ok ? {} : { code: result.code ?? 'PN-RUN-3010' }),
     summary: ok ? 'Database schema satisfies contract' : result.summary,
-    schema: { ...result.schema, issues, root, counts },
+    schema: { issues, schemaDiffIssues },
   };
 }
 
 /**
- * The bare entity name a `not-expected` `SchemaDiffIssue` addresses, read off
- * its actual (current-side) node. The `tableName` read is the one remaining
- * family-node-shape access here — kept because in a tolerant verify the
- * relational walk emits no `extra_table` issue, so an undeclared table that
- * carries an RLS policy is only nameable through the policy's node; it retires
- * when the issue-type merge makes issues node-typed.
+ * The bare entity name a `not-expected` `SchemaDiffIssue` addresses. A
+ * table-role node names itself (its diff id is the table name); a structural
+ * leaf (an RLS policy on an undeclared table) names its subject table via
+ * `tableName` — the one remaining family-node-shape access here, kept
+ * because in a tolerant verify the strict gating drops table extras from the
+ * verdict, so an undeclared table that carries an RLS policy is only
+ * nameable through the policy's node. It retires with the issue-type merge.
  */
 function schemaDiffIssueEntityName(issue: SchemaDiffIssue): string | undefined {
   const actual = issue.actual;
   if (actual === undefined) return undefined;
+  if (issueNodeRole(issue) === 'table') return actual.id;
   const tableName = blindCast<
     { readonly tableName?: unknown },
     'entity-name collection reads the optional target-specific tableName off a diff node'

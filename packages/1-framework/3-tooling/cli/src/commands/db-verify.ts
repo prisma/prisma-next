@@ -437,7 +437,6 @@ async function executeDbVerifyCommand(
       ...ifDefined('codecCoverageSkipped', verifyResult.codecCoverageSkipped),
       schema: {
         summary: combined.result.summary,
-        counts: combined.result.schema.counts,
         strict: combined.result.meta?.strict ?? false,
       },
       unclaimed: combined.unclaimed,

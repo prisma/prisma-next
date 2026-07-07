@@ -47,18 +47,6 @@ describe('defineConfig', () => {
           schema: {
             issues: [],
             schemaDiffIssues: [],
-            root: {
-              status: 'pass' as const,
-              kind: 'root',
-              name: 'root',
-              contractPath: '',
-              code: '',
-              message: '',
-              expected: null,
-              actual: null,
-              children: [],
-            },
-            counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
           },
           timings: { total: 0 },
         }),

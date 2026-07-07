@@ -2,7 +2,6 @@ import type {
   CoreSchemaView,
   IntrospectSchemaResult,
   SchemaTreeNode,
-  SchemaVerificationNode,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
@@ -27,7 +26,6 @@ export interface DbVerifyCommandSuccessResult {
   readonly codecCoverageSkipped?: VerifyDatabaseResult['codecCoverageSkipped'];
   readonly schema?: {
     readonly summary: string;
-    readonly counts: VerifyDatabaseSchemaResult['schema']['counts'];
     readonly strict: boolean;
   };
   /**
@@ -76,11 +74,6 @@ export function formatVerifyOutput(
   lines.push(`${formatDimText(`  storageHash: ${result.contract.storageHash}`)}`);
   if (result.contract.profileHash) {
     lines.push(`${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
-  }
-  if (result.mode === 'full' && result.schema && isVerbose(flags, 1)) {
-    lines.push(
-      `${formatDimText(`  schema: pass=${result.schema.counts.pass} warn=${result.schema.counts.warn} fail=${result.schema.counts.fail}`)}`,
-    );
   }
   if (result.unclaimed && result.unclaimed.length > 0) {
     lines.push('');
@@ -139,7 +132,7 @@ export function formatIntrospectJson(result: IntrospectSchemaResult<unknown>): s
 
 /**
  * Renders a schema tree structure from CoreSchemaView.
- * Matches the style of renderSchemaVerificationTree for consistency.
+ * Status-glyph tree styling shared with the retired verification-tree renderer.
  */
 function renderSchemaTree(
   node: SchemaTreeNode,
@@ -326,207 +319,6 @@ export function formatIntrospectOutput(
 }
 
 /**
- * Renders a schema verification tree structure from SchemaVerificationNode.
- * Similar to renderSchemaTree but for verification nodes with status-based colors and glyphs.
- */
-function renderSchemaVerificationTree(
-  node: SchemaVerificationNode,
-  flags: GlobalFlags,
-  options: {
-    readonly isLast: boolean;
-    readonly prefix: string;
-    readonly useColor: boolean;
-    readonly formatDimText: (text: string) => string;
-    readonly isRoot?: boolean;
-  },
-): string[] {
-  const { isLast, prefix, useColor, formatDimText, isRoot = false } = options;
-  const lines: string[] = [];
-
-  // Format status glyph and color based on status
-  let statusGlyph = '';
-  let statusColor: (text: string) => string = (text) => text;
-  if (useColor) {
-    switch (node.status) {
-      case 'pass':
-        statusGlyph = '✔';
-        statusColor = green;
-        break;
-      case 'warn':
-        statusGlyph = '⚠';
-        statusColor = (text) => (useColor ? yellow(text) : text);
-        break;
-      case 'fail':
-        statusGlyph = '✖';
-        statusColor = red;
-        break;
-    }
-  } else {
-    switch (node.status) {
-      case 'pass':
-        statusGlyph = '✔';
-        break;
-      case 'warn':
-        statusGlyph = '⚠';
-        break;
-      case 'fail':
-        statusGlyph = '✖';
-        break;
-    }
-  }
-
-  // Format node label with color based on kind
-  // For column nodes, we need to parse the name to color code different parts
-  let labelColor: (text: string) => string = (text) => text;
-  let formattedLabel: string = node.name;
-
-  if (useColor) {
-    switch (node.kind) {
-      case 'contract':
-      case 'schema':
-        labelColor = bold;
-        formattedLabel = labelColor(node.name);
-        break;
-      case 'table': {
-        // Parse "table tableName" format - color "table" dim, tableName cyan
-        const tableMatch = node.name.match(/^table\s+(.+)$/);
-        if (tableMatch?.[1]) {
-          const tableName = tableMatch[1];
-          formattedLabel = `${dim('table')} ${cyan(tableName)}`;
-        } else {
-          formattedLabel = dim(node.name);
-        }
-        break;
-      }
-      case 'columns':
-        labelColor = dim;
-        formattedLabel = labelColor(node.name);
-        break;
-      case 'column': {
-        // Parse column name format: "columnName: contractType -> nativeType (nullability)"
-        // Color code: column name (cyan), contract type (default), native type (dim), nullability (dim)
-        const columnMatch = node.name.match(/^([^:]+):\s*(.+)$/);
-        if (columnMatch?.[1] && columnMatch[2]) {
-          const columnName = columnMatch[1];
-          const rest = columnMatch[2];
-          // Parse rest: "contractType -> nativeType (nullability)"
-          // Match contract type (can contain /, @, etc.), arrow, native type, then nullability in parentheses
-          const typeMatch = rest.match(/^([^\s→]+)\s*→\s*([^\s(]+)\s*(\([^)]+\))$/);
-          if (typeMatch?.[1] && typeMatch[2] && typeMatch[3]) {
-            const contractType = typeMatch[1];
-            const nativeType = typeMatch[2];
-            const nullability = typeMatch[3];
-            formattedLabel = `${cyan(columnName)}: ${contractType} → ${dim(nativeType)} ${dim(nullability)}`;
-          } else {
-            // Fallback if format doesn't match (e.g., no native type or no nullability)
-            formattedLabel = `${cyan(columnName)}: ${rest}`;
-          }
-        } else {
-          formattedLabel = node.name;
-        }
-        break;
-      }
-      case 'type':
-      case 'nullability':
-        labelColor = (text) => text; // Default color
-        formattedLabel = labelColor(node.name);
-        break;
-      case 'primaryKey': {
-        // Parse "primary key: columnName" format - color "primary key" dim, columnName cyan
-        const pkMatch = node.name.match(/^primary key:\s*(.+)$/);
-        if (pkMatch?.[1]) {
-          const columnNames = pkMatch[1];
-          formattedLabel = `${dim('primary key')}: ${cyan(columnNames)}`;
-        } else {
-          formattedLabel = dim(node.name);
-        }
-        break;
-      }
-      case 'foreignKey':
-      case 'unique':
-      case 'index':
-        labelColor = dim;
-        formattedLabel = labelColor(node.name);
-        break;
-      case 'dependency': {
-        // Parse specific extension message formats
-        // "database is postgres" -> dim "database is", cyan "postgres"
-        const dbMatch = node.name.match(/^database is\s+(.+)$/);
-        if (dbMatch?.[1]) {
-          const dbName = dbMatch[1];
-          formattedLabel = `${dim('database is')} ${cyan(dbName)}`;
-        } else {
-          // "vector extension is enabled" -> dim everything except extension name
-          // Match pattern: "extensionName extension is enabled"
-          const extMatch = node.name.match(/^([^\s]+)\s+(extension is enabled)$/);
-          if (extMatch?.[1] && extMatch[2]) {
-            const extName = extMatch[1];
-            const rest = extMatch[2];
-            formattedLabel = `${cyan(extName)} ${dim(rest)}`;
-          } else {
-            // Fallback: color entire name with magenta
-            labelColor = magenta;
-            formattedLabel = labelColor(node.name);
-          }
-        }
-        break;
-      }
-      default:
-        formattedLabel = node.name;
-        break;
-    }
-  } else {
-    formattedLabel = node.name;
-  }
-
-  const statusGlyphColored = statusColor(statusGlyph);
-
-  // Build the label with optional message for failure/warn nodes
-  let nodeLabel = formattedLabel;
-  if (
-    (node.status === 'fail' || node.status === 'warn') &&
-    node.message &&
-    node.message.length > 0
-  ) {
-    // Always show message for failure/warn nodes - it provides crucial context
-    // For parent nodes, the message summarizes child failures
-    // For leaf nodes, the message explains the specific issue
-    const messageText = formatDimText(`(${node.message})`);
-    nodeLabel = `${formattedLabel} ${messageText}`;
-  }
-
-  // Root node renders without tree characters or | prefix
-  // Root node renders without tree characters or prefix
-  if (isRoot) {
-    lines.push(`${statusGlyphColored} ${nodeLabel}`);
-  } else {
-    const treeChar = isLast ? '└' : '├';
-    const treePrefix = `${formatDimText(treeChar)}─ `;
-    lines.push(`${prefix}${treePrefix}${statusGlyphColored} ${nodeLabel}`);
-  }
-
-  // Render children if present
-  if (node.children && node.children.length > 0) {
-    const childPrefix = isRoot ? '' : `${prefix}${isLast ? '   ' : `${formatDimText('│')}  `}`;
-    for (let i = 0; i < node.children.length; i++) {
-      const child = node.children[i];
-      if (!child) continue;
-      const isLastChild = i === node.children.length - 1;
-      const childLines = renderSchemaVerificationTree(child, flags, {
-        isLast: isLastChild,
-        prefix: childPrefix,
-        useColor,
-        formatDimText,
-        isRoot: false,
-      });
-      lines.push(...childLines);
-    }
-  }
-
-  return lines;
-}
-
-/**
  * Formats human-readable output for database schema verification.
  */
 export function formatSchemaVerifyOutput(
@@ -546,27 +338,20 @@ export function formatSchemaVerifyOutput(
   const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  // Render verification tree first
-  const treeLines = renderSchemaVerificationTree(result.schema.root, flags, {
-    isLast: true,
-    prefix: '',
-    useColor,
-    formatDimText,
-    isRoot: true,
-  });
-  lines.push(...treeLines);
-
-  if (result.schema.schemaDiffIssues.length > 0) {
-    lines.push('');
-    lines.push(formatRed('Schema drift:'));
-    for (const issue of result.schema.schemaDiffIssues) {
-      lines.push(`  ${formatRed('✖')} ${issue.message}`);
+  const issueMessages = [
+    ...result.schema.issues.map((issue) => issue.message),
+    ...result.schema.schemaDiffIssues.map((issue) => issue.message),
+  ];
+  if (issueMessages.length > 0) {
+    lines.push(formatRed('Schema issues:'));
+    for (const message of issueMessages) {
+      lines.push(`  ${formatRed('✖')} ${message}`);
     }
   }
 
   if (unclaimed.length > 0) {
     const strict = result.meta?.strict ?? false;
-    lines.push('');
+    if (lines.length > 0) lines.push('');
     lines.push(
       (strict ? formatRed : formatYellow)('Unclaimed elements (declared by no contract):'),
     );
@@ -575,18 +360,14 @@ export function formatSchemaVerifyOutput(
     }
   }
 
-  // Add counts and timings in verbose mode
   if (isVerbose(flags, 1)) {
     lines.push(`${formatDimText(`  Total time: ${result.timings.total}ms`)}`);
-    lines.push(
-      `${formatDimText(`  pass=${result.schema.counts.pass} warn=${result.schema.counts.warn} fail=${result.schema.counts.fail}`)}`,
-    );
   }
 
   // Blank line before summary
-  lines.push('');
+  if (lines.length > 0) lines.push('');
 
-  // Summary line at the end: summary with status glyph
+  // Summary line at the end: verdict with status glyph
   if (result.ok) {
     lines.push(`${formatGreen('✔')} ${result.summary}`);
   } else {

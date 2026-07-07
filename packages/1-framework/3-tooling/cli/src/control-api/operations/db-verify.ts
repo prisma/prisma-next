@@ -277,18 +277,6 @@ function buildSkippedSchemaResult(space: AggregateContractSpace): VerifyDatabase
     schema: {
       issues: [],
       schemaDiffIssues: [],
-      root: {
-        status: 'pass',
-        kind: 'skipped',
-        name: space.spaceId,
-        contractPath: '',
-        code: 'SKIPPED',
-        message: 'Schema verification skipped',
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      },
-      counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
     },
     timings: { total: 0 },
   };

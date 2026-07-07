@@ -1,8 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type {
-  SchemaVerificationNode,
-  VerifyDatabaseSchemaResult,
-} from '@prisma-next/framework-components/control';
+import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -46,21 +43,6 @@ function makeAggregate(args: {
   });
 }
 
-function extraTableNode(name: string): SchemaVerificationNode {
-  return {
-    status: 'warn',
-    kind: 'table',
-    name: `table ${name}`,
-    contractPath: `storage.namespaces.*.entries.table.${name}`,
-    code: 'extra_table',
-    message: '',
-    expected: undefined,
-    actual: undefined,
-    children: [],
-    reason: 'not-expected',
-  };
-}
-
 /**
  * A per-space verifier standing in for a family's: it verifies the space's
  * contract against the **full** live schema and flags every live table the
@@ -77,7 +59,6 @@ const FULL_SCHEMA_VERIFY = (
     Object.keys(space.contract().storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries['table'] ?? {}),
   );
   const extras = liveTables.filter((name) => !declared.has(name));
-  const children = extras.map(extraTableNode);
   return {
     ok: true,
     summary: 'Database schema satisfies contract',
@@ -91,18 +72,6 @@ const FULL_SCHEMA_VERIFY = (
         message: `Extra table "${name}"`,
       })),
       schemaDiffIssues: [],
-      root: {
-        status: children.some((c) => c.status === 'warn') ? 'warn' : 'pass',
-        kind: 'contract',
-        name: 'contract',
-        contractPath: '',
-        code: '',
-        message: '',
-        expected: undefined,
-        actual: undefined,
-        children,
-      },
-      counts: { pass: 1, warn: children.length, fail: 0, totalNodes: children.length + 1 },
     },
     timings: { total: 0 },
   };
@@ -111,13 +80,6 @@ const FULL_SCHEMA_VERIFY = (
 function extraTables(result: VerifyDatabaseSchemaResult | undefined): string[] {
   return (result?.schema.issues ?? [])
     .flatMap((issue) => (issue.kind === 'extra_table' && issue.table ? [issue.table] : []))
-    .sort();
-}
-
-/** The names of any grafted not-expected nodes that survive in a space view (should be none). */
-function extraNodeNames(result: VerifyDatabaseSchemaResult | undefined): string[] {
-  return (result?.schema.root.children ?? [])
-    .flatMap((node) => (node.reason === 'not-expected' ? [node.name] : []))
     .sort();
 }
 
@@ -263,8 +225,6 @@ describe('verifyMigration', () => {
       // (nor a sibling's table) — extras are stripped from every per-space view.
       expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual([]);
       expect(extraTables(schemaCheck.perSpace.get('cipher'))).toEqual([]);
-      expect(extraNodeNames(schemaCheck.perSpace.get('app'))).toEqual([]);
-      expect(extraNodeNames(schemaCheck.perSpace.get('cipher'))).toEqual([]);
     });
 
     it('reports a table no space declares once in the unclaimed list', () => {
@@ -348,7 +308,6 @@ describe('verifyMigration', () => {
 
       const schemaCheck = result.assertOk().schemaCheck;
       expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual([]);
-      expect(extraNodeNames(schemaCheck.perSpace.get('app'))).toEqual([]);
       expect(schemaCheck.unclaimed).toEqual(['legacy_events']);
     });
 

@@ -1,7 +1,8 @@
 import type {
   CoreSchemaView,
   IntrospectSchemaResult,
-  SchemaVerificationNode,
+  SchemaDiffIssue,
+  SchemaIssue,
   SignDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
@@ -332,63 +333,11 @@ describe('formatIntrospectJson', () => {
 });
 
 describe('formatSchemaVerifyOutput', () => {
-  const createVerificationNode = (): SchemaVerificationNode => ({
-    status: 'pass',
-    kind: 'schema',
-    name: 'schema',
-    contractPath: '',
-    code: '',
-    message: '',
-    expected: undefined,
-    actual: undefined,
-    children: [
-      {
-        status: 'pass',
-        kind: 'table',
-        name: 'user',
-        contractPath: 'storage.tables.user',
-        code: '',
-        message: '',
-        expected: undefined,
-        actual: undefined,
-        children: [
-          {
-            status: 'pass',
-            kind: 'column',
-            name: 'user.id: pg/int4@1 not null',
-            contractPath: 'storage.tables.user.columns.id',
-            code: '',
-            message: '',
-            expected: undefined,
-            actual: undefined,
-            children: [],
-          },
-          {
-            status: 'pass',
-            kind: 'column',
-            name: 'user.email: pg/text@1 not null',
-            contractPath: 'storage.tables.user.columns.email',
-            code: '',
-            message: '',
-            expected: undefined,
-            actual: undefined,
-            children: [],
-          },
-        ],
-      },
-      {
-        status: 'fail',
-        kind: 'table',
-        name: 'post',
-        contractPath: 'storage.tables.post',
-        code: 'missing_table',
-        message: 'Table "post" is missing',
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      },
-    ],
-  });
+  const missingTableIssue: SchemaIssue = {
+    kind: 'missing_table',
+    table: 'post',
+    message: 'Table "post" is missing from database',
+  };
 
   const createResult = (): VerifyDatabaseSchemaResult => ({
     ok: false,
@@ -402,21 +351,8 @@ describe('formatSchemaVerifyOutput', () => {
       actual: 'postgres',
     },
     schema: {
-      issues: [
-        {
-          kind: 'missing_table',
-          table: 'post',
-          message: 'Table "post" is missing from database',
-        },
-      ],
+      issues: [missingTableIssue],
       schemaDiffIssues: [],
-      root: createVerificationNode(),
-      counts: {
-        pass: 3,
-        warn: 0,
-        fail: 1,
-        totalNodes: 4,
-      },
     },
     meta: {
       contractPath: './contract.json',
@@ -427,71 +363,62 @@ describe('formatSchemaVerifyOutput', () => {
     },
   });
 
-  it('renders verification tree with status glyphs', () => {
+  it('renders a "Schema issues:" header with one ✖ line per issue message', () => {
     const result = createResult();
     const flags = parseGlobalFlags({ 'no-color': true });
 
     const output = formatSchemaVerifyOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    // Summary line should be present
-    expect(stripped).toContain('✖ Database schema does not satisfy contract');
-    // Tree should be present
-    expect(stripped).toContain('schema');
-    expect(stripped).toContain('user');
-    expect(stripped).toContain('post');
-    // Status glyphs should be present
-    expect(stripped).toContain('✔');
-    expect(stripped).toContain('✖');
+    expect(stripped).toContain('Schema issues:');
+    expect(stripped).toContain('✖ Table "post" is missing from database');
+    expect(stripped).toContain('✖ Database schema does not satisfy contract (1 failure)');
   });
 
-  it('renders success summary when ok=true', () => {
+  it('renders schemaDiffIssues after issues, each on its own line', () => {
+    const diffIssue: SchemaDiffIssue = {
+      path: ['public', 'profiles', 'policy_abc'],
+      outcome: 'missing',
+      reason: 'not-found',
+      message: 'RLS policy "policy_abc" is missing from the database',
+    };
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
+      schema: {
+        issues: [missingTableIssue],
+        schemaDiffIssues: [diffIssue],
+      },
+    };
+    const flags = parseGlobalFlags({ 'no-color': true });
+
+    const output = formatSchemaVerifyOutput(result, flags);
+    const lines = output.split('\n').map(stripAnsi);
+
+    const issueLineIndex = lines.findIndex((line) => line.includes(missingTableIssue.message));
+    const diffLineIndex = lines.findIndex((line) => line.includes(diffIssue.message));
+
+    expect(issueLineIndex).toBeGreaterThanOrEqual(0);
+    expect(diffLineIndex).toBeGreaterThan(issueLineIndex);
+  });
+
+  it('omits the "Schema issues:" header and renders the success summary when both lists are empty', () => {
+    const { code: _code, ...rest } = createResult();
+    const result: VerifyDatabaseSchemaResult = {
+      ...rest,
       ok: true,
       summary: 'Database schema satisfies contract',
-      schema: {
-        ...createResult().schema,
-        root: {
-          status: 'pass',
-          kind: 'schema',
-          name: 'schema',
-          contractPath: '',
-          code: '',
-          message: '',
-          expected: undefined,
-          actual: undefined,
-          children: [
-            {
-              status: 'pass',
-              kind: 'table',
-              name: 'user',
-              contractPath: 'storage.tables.user',
-              code: '',
-              message: '',
-              expected: undefined,
-              actual: undefined,
-              children: [],
-            },
-          ],
-        },
-        counts: {
-          pass: 2,
-          warn: 0,
-          fail: 0,
-          totalNodes: 2,
-        },
-      },
+      schema: { issues: [], schemaDiffIssues: [] },
     };
     const flags = parseGlobalFlags({ 'no-color': true });
 
     const output = formatSchemaVerifyOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('✔ Database schema satisfies contract');
+    expect(stripped).not.toContain('Schema issues:');
+    expect(stripped).toBe('✔ Database schema satisfies contract');
   });
 
-  it('includes code in failure summary', () => {
+  it('includes the code in the failure summary', () => {
     const result = createResult();
     const flags = parseGlobalFlags({ 'no-color': true });
 
@@ -501,16 +428,14 @@ describe('formatSchemaVerifyOutput', () => {
     expect(stripped).toContain('(PN-SCHEMA-0001)');
   });
 
-  it('renders tree structure with proper indentation', () => {
+  it('renders the issues header first and the summary line last', () => {
     const result = createResult();
     const flags = parseGlobalFlags({ 'no-color': true });
 
     const output = formatSchemaVerifyOutput(result, flags);
     const lines = output.split('\n').map(stripAnsi);
 
-    // Tree should be first (root node)
-    expect(lines[0]).toContain('schema');
-    // Summary should be last line
+    expect(lines[0]).toBe('Schema issues:');
     const summaryLine = lines[lines.length - 1];
     expect(summaryLine).toContain('Database schema does not satisfy contract');
   });
@@ -524,7 +449,7 @@ describe('formatSchemaVerifyOutput', () => {
     expect(output).toBe('');
   });
 
-  it('includes timings and counts in verbose mode', () => {
+  it('includes total time in verbose mode', () => {
     const result = createResult();
     const flags = parseGlobalFlags({ verbose: true, 'no-color': true });
 
@@ -532,9 +457,6 @@ describe('formatSchemaVerifyOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('Total time: 123ms');
-    expect(stripped).toContain('pass=3');
-    expect(stripped).toContain('warn=0');
-    expect(stripped).toContain('fail=1');
   });
 
   it('applies colors when enabled', () => {
@@ -543,8 +465,8 @@ describe('formatSchemaVerifyOutput', () => {
 
     const output = formatSchemaVerifyOutput(result, flags);
 
-    // Output should be non-empty
     expect(output.length).toBeGreaterThan(0);
+    expect(stripAnsi(output)).toContain('Schema issues:');
   });
 
   it('does not apply colors when disabled', () => {
@@ -557,48 +479,51 @@ describe('formatSchemaVerifyOutput', () => {
     expect(output).not.toContain('\u001b[');
   });
 
-  it('renders warn status nodes', () => {
+  it('renders unclaimed elements in strict mode with a red header and ✖ glyphs', () => {
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
-      schema: {
-        ...createResult().schema,
-        root: {
-          status: 'warn',
-          kind: 'schema',
-          name: 'schema',
-          contractPath: '',
-          code: '',
-          message: '',
-          expected: undefined,
-          actual: undefined,
-          children: [
-            {
-              status: 'warn',
-              kind: 'table',
-              name: 'user',
-              contractPath: 'storage.tables.user',
-              code: '',
-              message: '',
-              expected: undefined,
-              actual: undefined,
-              children: [],
-            },
-          ],
-        },
-        counts: {
-          pass: 0,
-          warn: 2,
-          fail: 0,
-          totalNodes: 2,
-        },
-      },
+      ok: false,
+      schema: { issues: [], schemaDiffIssues: [] },
+      meta: { contractPath: './contract.json', strict: true },
     };
-    const flags = parseGlobalFlags({ 'no-color': true });
+    const flags = parseGlobalFlags({ color: true });
 
-    const output = formatSchemaVerifyOutput(result, flags);
+    const output = formatSchemaVerifyOutput(result, flags, ['legacy_events']);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('⚠');
+    expect(stripped).toContain('Unclaimed elements (declared by no contract):');
+    expect(stripped).toContain('✖ legacy_events');
+  });
+
+  it('renders unclaimed elements in lenient mode with a yellow header and ⚠ glyphs', () => {
+    const { code: _code, ...rest } = createResult();
+    const result: VerifyDatabaseSchemaResult = {
+      ...rest,
+      ok: true,
+      summary: 'Database schema satisfies contract',
+      schema: { issues: [], schemaDiffIssues: [] },
+      meta: { contractPath: './contract.json', strict: false },
+    };
+    const flags = parseGlobalFlags({ color: true });
+
+    const output = formatSchemaVerifyOutput(result, flags, ['legacy_events']);
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('Unclaimed elements (declared by no contract):');
+    expect(stripped).toContain('⚠ legacy_events');
+  });
+
+  it('separates the issues block from the unclaimed block with a blank line', () => {
+    const result = createResult();
+    const flags = parseGlobalFlags({ 'no-color': true });
+
+    const output = formatSchemaVerifyOutput(result, flags, ['legacy_events']);
+    const lines = output.split('\n').map(stripAnsi);
+
+    const blankIndex = lines.findIndex((line) => line === '');
+    expect(blankIndex).toBeGreaterThan(0);
+    expect(lines[blankIndex - 1]).toContain('Table "post" is missing from database');
+    expect(lines[blankIndex + 1]).toBe('Unclaimed elements (declared by no contract):');
   });
 
   it('renders RLS policy drift issues via schemaDiffIssues, naming each drifted policy', () => {
@@ -608,7 +533,7 @@ describe('formatSchemaVerifyOutput', () => {
       ok: false,
       summary: 'Database schema does not satisfy contract (1 failure)',
       schema: {
-        ...createResult().schema,
+        issues: [],
         schemaDiffIssues: [
           {
             path: ['public', 'profiles', policyWireName],
@@ -625,7 +550,7 @@ describe('formatSchemaVerifyOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain(policyWireName);
-    expect(stripped).toContain('Schema drift');
+    expect(stripped).toContain('Schema issues:');
     expect(stripped).toContain('✖ Database schema does not satisfy contract (1 failure)');
   });
 });
@@ -646,23 +571,6 @@ describe('formatSchemaVerifyJson', () => {
       schema: {
         issues: [],
         schemaDiffIssues: [],
-        root: {
-          status: 'pass',
-          kind: 'schema',
-          name: 'schema',
-          contractPath: '',
-          code: '',
-          message: '',
-          expected: undefined,
-          actual: undefined,
-          children: [],
-        },
-        counts: {
-          pass: 1,
-          warn: 0,
-          fail: 0,
-          totalNodes: 1,
-        },
       },
       meta: {
         contractPath: './contract.json',
@@ -682,9 +590,8 @@ describe('formatSchemaVerifyJson', () => {
     expect(parsed.contract.storageHash).toBe('sha256:test');
     expect(parsed.contract.profileHash).toBe('sha256:profile');
     expect(parsed.target.expected).toBe('postgres');
-    expect(parsed.schema.counts.pass).toBe(1);
-    expect(parsed.schema.counts.fail).toBe(0);
-    expect(parsed.schema.root.status).toBe('pass');
+    expect(parsed.schema.issues).toEqual([]);
+    expect(parsed.schema.schemaDiffIssues).toEqual([]);
     expect(parsed.meta?.contractPath).toBe('./contract.json');
     expect(parsed.meta?.strict).toBe(false);
     expect(parsed.timings.total).toBe(123);
@@ -704,23 +611,6 @@ describe('formatSchemaVerifyJson', () => {
       schema: {
         issues: [],
         schemaDiffIssues: [],
-        root: {
-          status: 'pass',
-          kind: 'schema',
-          name: 'schema',
-          contractPath: '',
-          code: '',
-          message: '',
-          expected: undefined,
-          actual: undefined,
-          children: [],
-        },
-        counts: {
-          pass: 1,
-          warn: 0,
-          fail: 0,
-          totalNodes: 1,
-        },
       },
       meta: {
         contractPath: './contract.json',
@@ -752,23 +642,6 @@ describe('formatSchemaVerifyJson', () => {
       schema: {
         issues: [],
         schemaDiffIssues: [],
-        root: {
-          status: 'pass',
-          kind: 'schema',
-          name: 'schema',
-          contractPath: '',
-          code: '',
-          message: '',
-          expected: undefined,
-          actual: undefined,
-          children: [],
-        },
-        counts: {
-          pass: 1,
-          warn: 0,
-          fail: 0,
-          totalNodes: 1,
-        },
       },
       meta: {
         contractPath: './contract.json',
@@ -786,7 +659,7 @@ describe('formatSchemaVerifyJson', () => {
     expect(parsed.code).toBeUndefined();
   });
 
-  it('includes all schema fields', () => {
+  it('includes issues and schemaDiffIssues', () => {
     const result: VerifyDatabaseSchemaResult = {
       ok: false,
       code: 'PN-SCHEMA-0001',
@@ -806,36 +679,14 @@ describe('formatSchemaVerifyJson', () => {
             message: 'Table "post" is missing',
           },
         ],
-        schemaDiffIssues: [],
-        root: {
-          status: 'fail',
-          kind: 'schema',
-          name: 'schema',
-          contractPath: '',
-          code: '',
-          message: '',
-          expected: undefined,
-          actual: undefined,
-          children: [
-            {
-              status: 'fail',
-              kind: 'table',
-              name: 'post',
-              contractPath: 'storage.tables.post',
-              code: 'missing_table',
-              message: 'Table "post" is missing',
-              expected: undefined,
-              actual: undefined,
-              children: [],
-            },
-          ],
-        },
-        counts: {
-          pass: 0,
-          warn: 0,
-          fail: 2,
-          totalNodes: 2,
-        },
+        schemaDiffIssues: [
+          {
+            path: ['public', 'profiles', 'policy_abc'],
+            outcome: 'missing',
+            reason: 'not-found',
+            message: 'RLS policy "policy_abc" is missing from the database',
+          },
+        ],
       },
       meta: {
         contractPath: './contract.json',
@@ -852,10 +703,42 @@ describe('formatSchemaVerifyJson', () => {
 
     expect(parsed.ok).toBe(false);
     expect(parsed.code).toBe('PN-SCHEMA-0001');
-    expect(parsed.schema.issues.length).toBe(1);
-    expect(parsed.schema.root.status).toBe('fail');
-    expect(parsed.schema.counts.fail).toBe(2);
+    expect(parsed.schema.issues).toHaveLength(1);
+    expect(parsed.schema.schemaDiffIssues).toHaveLength(1);
     expect(parsed.meta?.strict).toBe(true);
+  });
+
+  it('includes the unclaimed list as a top-level field', () => {
+    const result: VerifyDatabaseSchemaResult = {
+      ok: false,
+      code: 'PN-RUN-3010',
+      summary: 'Database schema has 1 unclaimed element (not in any contract)',
+      contract: {
+        storageHash: 'sha256:test',
+      },
+      target: {
+        expected: 'postgres',
+        actual: 'postgres',
+      },
+      schema: {
+        issues: [],
+        schemaDiffIssues: [],
+      },
+      meta: {
+        contractPath: './contract.json',
+        strict: true,
+      },
+      timings: {
+        total: 12,
+      },
+    };
+
+    const output = formatSchemaVerifyJson(result, ['legacy_events']);
+    const parsed = JSON.parse(output) as VerifyDatabaseSchemaResult & {
+      unclaimed: readonly string[];
+    };
+
+    expect(parsed.unclaimed).toEqual(['legacy_events']);
   });
 });
 
