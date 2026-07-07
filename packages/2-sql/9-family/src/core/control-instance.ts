@@ -48,6 +48,10 @@ import type { SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/typ
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
+import type {
+  SqlControlTargetDescriptor,
+  SqlDescribedContractSpace,
+} from './control-target-descriptor';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
 import type { DiffDatabaseSchemaInput } from './migrations/schema-differ';
 import type {
@@ -535,19 +539,20 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   // maps and walks its own schema tree), so it is read off the descriptor like
   // `contractSerializer`. Absent for targets without `contract infer` (Mongo).
   const targetInferPslContract = blindCast<
-    {
-      readonly inferPslContract?: (
-        schema: SqlSchemaIRNode,
-        describedContracts?: readonly Contract<SqlStorage>[],
-      ) => PslDocumentAst;
-    },
+    SqlControlTargetDescriptor<TTargetId, unknown>,
     'reading the optional target-descriptor inferPslContract hook'
   >(target).inferPslContract;
   // `contract infer` needs each extension pack's already-assembled contract,
   // carried as-is (no merging — that is the contract-spaces machinery's
-  // concern), so the target hook can omit elements those contracts describe.
-  const describedContracts: readonly Contract<SqlStorage>[] = extensions.flatMap((extension) =>
-    extension.contractSpace ? [extension.contractSpace.contractJson] : [],
+  // concern), paired with the `spaceId` its descriptor was registered under
+  // (neither the contract JSON nor `ContractSpace` self-declares it), so the
+  // target hook can omit elements those contracts describe and qualify a
+  // cross-space relation with the owning pack's space id.
+  const describedContracts: readonly SqlDescribedContractSpace[] = extensions.flatMap(
+    (extension) =>
+      extension.contractSpace
+        ? [{ spaceId: extension.id, contract: extension.contractSpace.contractJson }]
+        : [],
   );
   // The combined database-schema verify is a required target-descriptor
   // operation: every SQL target provides it, wrapping the same comparison

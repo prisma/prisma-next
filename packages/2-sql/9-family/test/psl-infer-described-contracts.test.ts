@@ -20,6 +20,7 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
+import type { SqlDescribedContractSpace } from '../src/core/control-target-descriptor';
 import type { SqlControlExtensionDescriptor } from '../src/core/migrations/types';
 import {
   stubTargetDiffDatabaseSchema,
@@ -45,11 +46,11 @@ class TestSchemaTree extends SqlSchemaIRNode {
 }
 
 function isTableDescribed(
-  describedContracts: readonly Contract<SqlStorage>[],
+  describedContracts: readonly SqlDescribedContractSpace[],
   schemaName: string,
   tableName: string,
 ): boolean {
-  return describedContracts.some((contract) =>
+  return describedContracts.some(({ contract }) =>
     Object.values(contract.storage.namespaces).some(
       (ns) =>
         ns.id === schemaName && ns.entries.table && Object.hasOwn(ns.entries.table, tableName),
@@ -68,7 +69,7 @@ function stubModel(name: string): PslModel {
  */
 function stubInferPslContract(
   schema: SqlSchemaIRNode,
-  describedContracts?: readonly Contract<SqlStorage>[],
+  describedContracts?: readonly SqlDescribedContractSpace[],
 ): PslDocumentAst {
   const tree = schema instanceof TestSchemaTree ? schema : new TestSchemaTree([]);
   const contracts = describedContracts ?? [];

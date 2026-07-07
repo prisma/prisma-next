@@ -56,6 +56,23 @@ export function* elementCoordinates(
 }
 
 /**
+ * Canonical, collision-safe key for an {@link EntityCoordinate}. Encodes the
+ * three axes as a JSON array rather than joining them with a delimiter, so no
+ * namespace id, entity kind, or entity name can forge a collision by
+ * embedding the delimiter itself (e.g. a delimiter of `:` would let
+ * `('a', 'b:c', 'd')` collide with `('a:b', 'c', 'd')`).
+ *
+ * The single shared key every coordinate-driven ownership/omission/collision
+ * check should use — `contract infer`'s pack-described-element omission and
+ * the migration tools' cross-space disjointness check both key on this.
+ */
+export function coordinateKey(
+  coordinate: Pick<EntityCoordinate, 'namespaceId' | 'entityKind' | 'entityName'>,
+): string {
+  return JSON.stringify([coordinate.namespaceId, coordinate.entityKind, coordinate.entityName]);
+}
+
+/**
  * Looks up a single entity in a `Storage`-shaped value by its full coordinate.
  * Returns `undefined` if the namespace, entity kind, or entity name is absent.
  * The type parameter is a caller assertion — the walk itself is structural

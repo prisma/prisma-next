@@ -1,6 +1,9 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
+import type {
+  SqlControlExtensionDescriptor,
+  SqlDescribedContractSpace,
+} from '@prisma-next/family-sql/control';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import type { ContractSpace, ControlStack } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
@@ -49,11 +52,13 @@ function tree(namespaces: Record<string, PostgresNamespaceSchemaNode>) {
  * Builds a described contract — one of the values `inferPostgresPslContract`
  * receives in its `describedContracts` array — declaring the given tables
  * under each namespace id. Each namespace's record key is its own `.id`,
- * matching how a real contract space's storage is keyed.
+ * matching how a real contract space's storage is keyed. Carries no domain
+ * models: only the tests exercising cross-space FK resolution need one (see
+ * {@link describedContractWithModel}).
  */
 function describedContract(
   namespaces: Readonly<Record<string, readonly string[]>>,
-): Contract<SqlStorage> {
+): SqlDescribedContractSpace {
   const storageNamespaces: Record<string, PostgresSchema> = {};
   for (const [namespaceId, tables] of Object.entries(namespaces)) {
     storageNamespaces[namespaceId] = new PostgresSchema({
@@ -69,9 +74,9 @@ function describedContract(
     });
   }
 
-  return {
-    target: 'postgres',
-    targetFamily: 'sql',
+  const contract: Contract<SqlStorage> = {
+    target: TARGET,
+    targetFamily: TARGET_FAMILY,
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
       storageHash: coreHash('sha256:contract'),
@@ -83,6 +88,68 @@ function describedContract(
     extensionPacks: {},
     meta: {},
   };
+
+  return { spaceId: 'pack', contract };
+}
+
+/**
+ * Builds a described contract that declares exactly one table AND the domain
+ * model that maps to it — the shape `inferPostgresPslContract` needs to
+ * resolve a cross-space foreign key into a qualified relation: the owning
+ * `spaceId`, the domain model name, and the pack's own field-name mapping
+ * (so `references` resolves to the pack's field names, not a generic
+ * column-name guess).
+ */
+function describedContractWithModel(options: {
+  readonly spaceId: string;
+  readonly namespaceId: string;
+  readonly modelName: string;
+  readonly tableName: string;
+  readonly fields: Readonly<Record<string, string>>;
+}): SqlDescribedContractSpace {
+  const { spaceId, namespaceId, modelName, tableName, fields } = options;
+
+  const contract: Contract<SqlStorage> = {
+    target: TARGET,
+    targetFamily: TARGET_FAMILY,
+    profileHash: profileHash('sha256:test'),
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:contract'),
+      namespaces: {
+        [namespaceId]: new PostgresSchema({
+          id: namespaceId,
+          entries: {
+            table: { [tableName]: { columns: {}, uniques: [], indexes: [], foreignKeys: [] } },
+          },
+        }),
+      },
+    }),
+    roots: {},
+    domain: {
+      namespaces: {
+        [namespaceId]: {
+          models: {
+            [modelName]: {
+              fields: {},
+              relations: {},
+              storage: {
+                namespaceId,
+                table: tableName,
+                fields: Object.fromEntries(
+                  Object.entries(fields).map(([fieldName, column]) => [fieldName, { column }]),
+                ),
+              },
+            },
+          },
+        },
+      },
+    },
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
+
+  return { spaceId, contract };
 }
 
 describe('inferPostgresPslContract — described-contract omission', () => {
@@ -134,17 +201,20 @@ describe('inferPostgresPslContract — described-contract omission', () => {
     const database = tree({
       public: namespaceNode('public', { widgets: idColumnTable('widgets') }),
     });
-    const contractWithNonTableEntity: Contract<SqlStorage> = {
-      ...describedContract({}),
-      storage: new SqlStorage({
-        storageHash: coreHash('sha256:contract'),
-        namespaces: {
-          public: new PostgresSchema({
-            id: 'public',
-            entries: { widget: { widgets: {} } },
-          }),
-        },
-      }),
+    const contractWithNonTableEntity: SqlDescribedContractSpace = {
+      spaceId: 'pack',
+      contract: {
+        ...describedContract({}).contract,
+        storage: new SqlStorage({
+          storageHash: coreHash('sha256:contract'),
+          namespaces: {
+            public: new PostgresSchema({
+              id: 'public',
+              entries: { widget: { widgets: {} } },
+            }),
+          },
+        }),
+      },
     };
 
     const ast = inferPostgresPslContract(database, [contractWithNonTableEntity]);
@@ -152,19 +222,24 @@ describe('inferPostgresPslContract — described-contract omission', () => {
     expect(flatPslModels(ast).map((m) => m.name)).toContain('Widgets');
   });
 
-  it('strips a foreign key referencing an omitted table, leaving no dangling relation', () => {
+  it('resolves a cross-space FK into a described contract as the qualified relation, omitting the target table', () => {
     const database = tree({
       public: namespaceNode('public', {
-        t_owned: idColumnTable('t_owned'),
-        posts: new PostgresTableSchemaNode({
-          name: 'posts',
+        profile: new PostgresTableSchemaNode({
+          name: 'profile',
           columns: {
-            id: { name: 'id', nativeType: 'int4', nullable: false },
-            owned_id: { name: 'owned_id', nativeType: 'int4', nullable: false },
+            id: { name: 'id', nativeType: 'uuid', nullable: false },
+            userId: { name: 'userId', nativeType: 'uuid', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           foreignKeys: [
-            { columns: ['owned_id'], referencedTable: 't_owned', referencedColumns: ['id'] },
+            {
+              columns: ['userId'],
+              referencedTable: 'users',
+              referencedSchema: 'auth',
+              referencedColumns: ['id'],
+              onDelete: 'cascade',
+            },
           ],
           uniques: [],
           indexes: [],
@@ -173,12 +248,144 @@ describe('inferPostgresPslContract — described-contract omission', () => {
       }),
     });
 
-    const ast = inferPostgresPslContract(database, [describedContract({ public: ['t_owned'] })]);
+    const pack = describedContractWithModel({
+      spaceId: 'supabase',
+      namespaceId: 'auth',
+      modelName: 'AuthUser',
+      tableName: 'users',
+      fields: { id: 'id', email: 'email' },
+    });
+
+    const ast = inferPostgresPslContract(database, [pack]);
+    const modelNames = flatPslModels(ast).map((m) => m.name);
+    const profileModel = flatPslModels(ast).find((m) => m.name === 'Profile');
+
+    expect(modelNames).toContain('Profile');
+    expect(modelNames).not.toContain('Users');
+    expect(modelNames).not.toContain('AuthUser');
+
+    const relationField = profileModel?.fields.find((f) => f.name === 'user');
+    expect(relationField?.typeName).toBe('AuthUser');
+    expect(relationField?.typeNamespaceId).toBe('auth');
+    expect(relationField?.typeContractSpaceId).toBe('supabase');
+
+    const printed = printPsl(ast);
+    expect(printed).toContain('supabase:auth.AuthUser');
+    expect(printed).toContain('@relation(fields: [userId], references: [id], onDelete: Cascade)');
+  });
+
+  it('resolves the cross-space FK even when a same-bare-named local table survives (pack-owned coordinate wins over the local shadow)', () => {
+    const database = tree({
+      public: namespaceNode('public', {
+        users: idColumnTable('users'),
+        profile: new PostgresTableSchemaNode({
+          name: 'profile',
+          columns: {
+            id: { name: 'id', nativeType: 'uuid', nullable: false },
+            userId: { name: 'userId', nativeType: 'uuid', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              referencedTable: 'users',
+              referencedSchema: 'auth',
+              referencedColumns: ['id'],
+              onDelete: 'cascade',
+            },
+          ],
+          uniques: [],
+          indexes: [],
+          policies: [],
+        }),
+      }),
+    });
+
+    const pack = describedContractWithModel({
+      spaceId: 'supabase',
+      namespaceId: 'auth',
+      modelName: 'AuthUser',
+      tableName: 'users',
+      fields: { id: 'id', email: 'email' },
+    });
+
+    const ast = inferPostgresPslContract(database, [pack]);
+    const models = flatPslModels(ast);
+    const modelNames = models.map((m) => m.name);
+    const profileModel = models.find((m) => m.name === 'Profile');
+
+    expect(modelNames).toContain('Profile');
+    expect(modelNames).toContain('Users');
+
+    const relationField = profileModel?.fields.find((f) => f.name === 'user');
+    expect(relationField?.typeName).toBe('AuthUser');
+    expect(relationField?.typeNamespaceId).toBe('auth');
+    expect(relationField?.typeContractSpaceId).toBe('supabase');
+
+    expect(profileModel?.fields.some((f) => f.typeName === 'Users')).toBe(false);
+
+    const printed = printPsl(ast);
+    expect(printed).toContain('supabase:auth.AuthUser');
+  });
+
+  it('throws when a described contract owns the referenced storage coordinate but declares no domain model mapped to it', () => {
+    const database = tree({
+      public: namespaceNode('public', {
+        profile: new PostgresTableSchemaNode({
+          name: 'profile',
+          columns: {
+            id: { name: 'id', nativeType: 'uuid', nullable: false },
+            userId: { name: 'userId', nativeType: 'uuid', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [
+            {
+              columns: ['userId'],
+              referencedTable: 'users',
+              referencedSchema: 'auth',
+              referencedColumns: ['id'],
+              onDelete: 'cascade',
+            },
+          ],
+          uniques: [],
+          indexes: [],
+          policies: [],
+        }),
+      }),
+    });
+
+    expect(() =>
+      inferPostgresPslContract(database, [describedContract({ auth: ['users'] })]),
+    ).toThrow(/owns storage coordinate "auth\.users" but declares no domain model/);
+  });
+
+  it('drops a genuinely dangling FK (target neither in the tree nor owned by any described contract), keeping the scalar column', () => {
+    const database = tree({
+      public: namespaceNode('public', {
+        posts: new PostgresTableSchemaNode({
+          name: 'posts',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+            ownerId: { name: 'ownerId', nativeType: 'int4', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [
+            { columns: ['ownerId'], referencedTable: 'owners', referencedColumns: ['id'] },
+          ],
+          uniques: [],
+          indexes: [],
+          policies: [],
+        }),
+      }),
+    });
+
+    const ast = inferPostgresPslContract(database, []);
     const modelNames = flatPslModels(ast).map((m) => m.name);
     const postsModel = flatPslModels(ast).find((m) => m.name === 'Posts');
 
-    expect(modelNames).not.toContain('TOwned');
-    expect(postsModel?.fields.some((f) => f.typeName === 'TOwned')).toBe(false);
+    expect(modelNames).toContain('Posts');
+    expect(modelNames).not.toContain('Owners');
+    expect(postsModel?.fields.some((f) => f.name === 'ownerId')).toBe(true);
     expect(postsModel?.fields.some((f) => f.attributes.some((a) => a.name === 'relation'))).toBe(
       false,
     );

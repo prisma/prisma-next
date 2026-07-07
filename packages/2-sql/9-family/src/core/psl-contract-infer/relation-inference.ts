@@ -136,7 +136,15 @@ function deriveRelationName(
   return fk.columns.join('_');
 }
 
-function buildChildRelationField(
+/**
+ * Builds the child-side {@link RelationField} for a single foreign key:
+ * `typeName` is the parent model name, `fields`/`references` are the FK's raw
+ * columns, and `onDelete`/`onUpdate` are normalized to their PSL spelling.
+ * Exported so a caller resolving a foreign key against a model outside
+ * `tables` (e.g. a cross-space reference into another contract) can reuse the
+ * same normalization instead of duplicating it.
+ */
+export function buildChildRelationField(
   fieldName: string,
   parentModelName: string,
   fk: SqlForeignKeyIR,
