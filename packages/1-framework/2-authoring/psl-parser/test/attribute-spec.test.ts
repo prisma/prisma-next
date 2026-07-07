@@ -27,7 +27,6 @@ function makeCtx(
     level: 'field',
     sourceId: 'schema.prisma',
     sourceFile,
-    symbols: table,
     selfModel,
     resolveReferencedModel: () => undefined,
     diagnosticCode,

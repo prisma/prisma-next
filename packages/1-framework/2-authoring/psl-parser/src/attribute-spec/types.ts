@@ -2,7 +2,7 @@ import type { PslDiagnostic, PslDiagnosticCode } from '@prisma-next/framework-co
 import type { Result } from '@prisma-next/utils/result';
 import type { Simplify, UnionToIntersection } from '@prisma-next/utils/types';
 import type { SourceFile } from '../source-file';
-import type { FieldSymbol, ModelSymbol, SymbolTable } from '../symbol-table';
+import type { FieldSymbol, ModelSymbol } from '../symbol-table';
 import type { ExpressionAst } from '../syntax/ast/expressions';
 
 export type AttributeLevel = 'field' | 'model' | 'block';
@@ -36,7 +36,6 @@ export interface InterpretCtx {
   readonly diagnosticCode: PslDiagnosticCode;
   readonly sourceId: string;
   readonly sourceFile: SourceFile;
-  readonly symbols: SymbolTable;
   readonly selfModel: ModelSymbol;
   resolveReferencedModel(): ModelSymbol | undefined;
   readonly field?: FieldSymbol;
@@ -97,7 +96,7 @@ export type AttributeOut<
 /**
  * The parameter is intentionally unconstrained: `Out` sits contravariantly in
  * `AttributeSpec.refine`, so a `refine`-carrying `AttributeSpec<Out>` is not
- * assignable to `AttributeSpec<unknown>` and a constraint would reject every
+ assignable to `AttributeSpec<unknown>` and a type bound would reject every
  * spec that uses a cross-argument `refine`. Inference still recovers `Out`
  * precisely.
  */

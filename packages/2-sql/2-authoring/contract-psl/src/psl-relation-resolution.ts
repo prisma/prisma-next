@@ -182,7 +182,6 @@ function buildRelationInterpretCtx(input: {
     diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
     sourceId: input.sourceId,
     sourceFile: input.sourceFile,
-    symbols: input.symbols,
     selfModel: input.selfModel,
     field: input.field,
     resolveReferencedModel: () => resolveReferencedModel(input.symbols, input.field),
