@@ -53,12 +53,12 @@ Both targets share the contract and connection on one `db` value. Reach for the 
 
 ## Namespace-aware accessors
 
-On Postgres, models and tables are **always** addressed by namespace coordinate (since #778 removed the flat fallback):
+On Postgres, models and tables are **always** addressed by namespace coordinate:
 
 - **ORM**: `db.orm.<namespace>.<Model>` — e.g. `db.orm.public.User`, `db.orm.auth.User`
 - **SQL builder**: `db.sql.<namespace>.<table>` — e.g. `db.sql.public.users`, `db.sql.auth.users`
 
-The flat `db.orm.User` / `db.sql.users` form does **not** work on Postgres, even for single-namespace contracts: the ORM proxy resolves only namespace keys, so `db.orm.User` is `undefined` at runtime (verified against 0.14.0 and current `main`). Single-namespace targets (SQLite, Mongo) keep flat access.
+The flat `db.orm.User` / `db.sql.users` form does **not** work on Postgres, even for single-namespace contracts: `db.orm.User` is `undefined` at runtime. Models declared at the top level of the PSL live in the default `public` namespace; models declared inside a `namespace <name> { ... }` block use that namespace. Single-namespace targets (SQLite, Mongo) keep flat access.
 
 See [`postgres.md` § Namespace-aware accessors](./postgres.md#namespace-aware-accessors) for a worked example.
 
@@ -76,7 +76,7 @@ You do **not** need a `collect()` / `toArray()` helper — `await` is enough. In
 ```typescript
 // Explicit buffering — same outcome as `await ... .all()`, useful when you
 // want a named Promise<Row[]> to thread through downstream code.
-const rows: Promise<User[]> = db.orm.public.User.select('id', 'email').all().toArray();
+const rows: Promise<Row[]> = db.orm.public.User.select('id', 'email').all().toArray();
 
 // Streaming — process rows one at a time without buffering the whole result.
 // Use for genuinely large result sets (anything that wouldn't fit comfortably
@@ -120,6 +120,11 @@ When the user is running a one-off `tsx my-script.ts` (not a long-lived server),
 ```typescript
 // src/scripts/seed.ts
 import { db } from '../prisma/db';
+
+const users = [
+  { email: 'alice@example.com', displayName: 'Alice' },
+  { email: 'bob@example.com', displayName: 'Bob' },
+];
 
 // Postgres — namespace-qualified PascalCase model root from contract
 for (const u of users) {

@@ -11,6 +11,8 @@ Shared concepts (result consumption, script teardown, cross-target pitfalls, cap
 - **`db.orm.<ns>.<Model>`** — ORM, namespace-qualified PascalCase model name (`db.orm.public.User`). Fluent `.where(...).select(...).orderBy(...).all()`, fully typed against `Contract`. Default lane for CRUD with relations.
 - **`db.sql.<ns>.<table>`** — SQL builder, namespace-qualified lowercase storage name (`db.sql.public.user`). Produces a *plan* executed via `db.runtime().execute(plan)`. Use when the ORM is too high-level — explicit `JOIN`, computed projections, set operations, window functions.
 
+The namespace coordinate comes from your PSL: models declared at the top level of the schema live in the default `public` namespace, and models declared inside a `namespace <name> { ... }` block are addressed by that namespace (`db.orm.<ns>.<Model>`, `db.sql.<ns>.<table>`). The examples below use `public`; substitute your own namespace where a model is declared in one.
+
 Reach for the ORM first; drop to `db.sql` when the ORM can't express the shape. Lane choice is local — one query function picks one lane, not the whole app.
 
 **Lane decision table:**
@@ -113,12 +115,14 @@ const page1 = await db.orm.public.Post
   .take(20)
   .all();
 
-const last = page1[page1.length - 1]!;
-const page2 = await db.orm.public.Post
-  .orderBy((p) => p.createdAt.desc())
-  .cursor({ createdAt: last.createdAt })
-  .take(20)
-  .all();
+const last = page1[page1.length - 1];
+const page2 = last
+  ? await db.orm.public.Post
+      .orderBy((p) => p.createdAt.desc())
+      .cursor({ createdAt: last.createdAt })
+      .take(20)
+      .all()
+  : [];
 ```
 
 Cursor keys must match fields in the active `orderBy`. For a composite `orderBy`, pass a value for each ordering column — a partial cursor seeks only on the columns you supply, which gives an incomplete keyset. An empty cursor object is a no-op: you get the unfiltered first page back.
@@ -331,7 +335,7 @@ const user = await db.orm.public.User.create({ id: 1, email: 'a@x.io' });
 const authUser = await db.orm.auth.User.create({ id: 2, token: 'tok' });
 ```
 
-There is no flat `db.sql.users` / `db.orm.User` form: the namespace coordinate is always required on Postgres. The runtime proxy resolves only namespace keys, so a bare model access returns `undefined` (verified against 0.14.0 and current `main`; the flat fallback was removed in #778).
+There is no flat `db.sql.users` / `db.orm.User` form: the namespace coordinate is always required on Postgres. A bare model access returns `undefined`, so the first chained call throws.
 
 Cross-namespace relations (e.g. `public.Profile` → `auth.User`) follow the same `.include()` syntax; the ORM resolves the correct schema-qualified join automatically.
 
