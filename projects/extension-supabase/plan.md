@@ -67,7 +67,7 @@ Current state of the example:
 
 **Non-blocking follow-on:** enum-typed `auth.*` columns (enums-as-domain-concept project) can attach to this slice or land later.
 
-### Slice D — `service_role` queries Supabase-internal namespaces via a secondary `db.supabase` root
+### Slice D — `service_role` queries Supabase-internal namespaces via a secondary `db.supabase` root ✅ merged (#845)
 
 **Gate:** none — facade composition, independent of postgres-rls #771. (Reframed from "explicit `auth.users` query off the app db": that doesn't work and isn't meant to — cross-space *querying* off the app db was deliberately not built, and only `service_role` has `auth.*` grants. See decision [C15](../supabase-integration/decisions.md). Slice contract: [`slices/d-service-role-internal-namespaces/spec.md`](slices/d-service-role-internal-namespaces/spec.md).)
 
@@ -79,9 +79,35 @@ Current state of the example:
 - [ ] Type-level test (against the app contract): `asServiceRole().supabase.{sql,orm}` carry `auth`/`storage`; the primary `asServiceRole().sql` does not; `asAnon()`/`asUser()` have no `.supabase`.
 - [ ] `overview.md` + decision [C15](../supabase-integration/decisions.md) reflect the secondary-root surface (done in this slice).
 
+### Slice F — Complete, faithful Supabase contract
+
+**Gate:** native enums (in flight). Supabase's `auth` schema uses native Postgres enum types (`aal_level`, `factor_type`, `factor_status`, `code_challenge_method`, `one_time_token_type`) with enum-typed columns; the shipped contract can't faithfully represent those tables until native-enum support lands.
+
+**Goal:** the extension ships a **complete, faithful** contract of everything it owns — all `auth`/`storage` (and any other owned) tables, the native enum types, and roles — not the 4-table minimum. This is the source of truth for *what the extension owns*, consumed by (a) `db verify` against a real Supabase DB, (b) the `db.supabase` admin surface, and (c) Slice G's infer-subtraction. Per decision [C8](../supabase-integration/decisions.md), generate it by **introspecting a reference Supabase project** and emitting `contract.json` (hand-authoring ~25 tables + enums is toil and drift-prone).
+
+**DoD tasks:**
+- [ ] Introspect a reference Supabase project; emit the full `contract.json` (all owned tables + native enum types + roles), `defaultControl: 'external'`.
+- [ ] `db verify` against a real Supabase DB passes (declared shapes match; extras tolerated under `external`).
+- [ ] The `db.supabase` admin surface exposes the full owned table set.
+- [ ] Round-trip property holds: introspect → emit → re-introspect → diff empty.
+
+**Shaping needed at pickup:** the introspection→emit pipeline for extension contracts, and how far "owned" extends (`auth`/`storage` certainly; `realtime`/`extensions`/`vault`/`pgsodium`?).
+
+### Slice G — Extension-aware `contract infer` in a Supabase environment
+
+**Gate:** none for the mechanism (TML-2962, in progress) — it subtracts whatever the stack packs' contract spaces declare *today*; it does not need Slice F's complete contract to exist. The Supabase-environment acceptance below deepens automatically once F ships (the pack then declares more, so infer omits more).
+
+**Goal:** running `contract infer` with the Supabase pack in the stack writes a **meaningful `contract.prisma` that omits every element the aggregate contract already describes** — the app author gets only their own schema (`managed`); the pack supplies `auth`/`storage`/… (`external`) via `extensionPacks`. Design (shaped, see the slice spec: [`slices/g-extension-aware-infer/spec.md`](slices/g-extension-aware-infer/spec.md)): the family instance passes the packs' contract spaces as-is into the target `inferPslContract` hook, and the inferrer skips tree elements the aggregate declares, matched by `(schemaName, tableName)` — infer = introspected schema − aggregate. The same seam carries the re-infer future (aggregate gains the app's own space → infer reconciles it via the schema diff instead of subtracting).
+
+**DoD tasks:**
+- [ ] Mechanism vertical (TML-2962): the inferrer omits aggregate-declared tables, namespace-correct by construction, with tests per the slice spec.
+- [ ] `contract infer --db <supabase-url>` with `extensionPacks: [supabasePack]` writes a `contract.prisma` containing only the app's own (un-owned) schema — no `auth`/`storage`/pack-owned tables, enum types, or roles. (Completes fully once Slice F's complete contract lands.)
+- [ ] The inferred contract + the pack compose to the full picture and `db verify` passes clean.
+- [ ] Integration test proving the omission against a shim/real Supabase DB.
+
 ### Slice E — Docs + real-Supabase acceptance + close-out
 
-**Gate:** B, C, D done; explicit-namespace-dsl project close-out.
+**Gate:** B, C, D, F, G done; explicit-namespace-dsl project close-out.
 
 **Goal:** the package is launch-ready.
 
