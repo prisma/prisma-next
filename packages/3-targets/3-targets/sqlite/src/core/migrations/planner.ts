@@ -19,7 +19,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildSqlitePlanDiff } from './diff-database-schema';
-import { coalesceSubtreeIssues, planIssues } from './issue-planner';
+import { coalesceSubtreeIssues, filterSiblingOwnedIssues, planIssues } from './issue-planner';
 import {
   type SqliteMigrationDestinationInfo,
   TypeScriptRenderableSqliteMigration,
@@ -84,6 +84,12 @@ export class SqliteMigrationPlanner
      * the marker row by the right space.
      */
     readonly spaceId: string;
+    /**
+     * Bare entity names declared by some OTHER contract space in the
+     * aggregate (never this plan's own contract) — see
+     * {@link SqlMigrationPlannerPlanOptions.siblingOwnedEntityNames}.
+     */
+    readonly siblingOwnedEntityNames?: ReadonlySet<string>;
   }): SqlitePlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
@@ -187,13 +193,14 @@ export class SqliteMigrationPlanner
    *    call already accounts for the whole subtree. Runs FIRST, over the
    *    complete diff: a sibling-owned extra table's column issues must
    *    collapse into its one table-level issue before ownership scoping
-   *    runs, because a bare column node carries no table reference for
-   *    `keepDiffIssue` to resolve ownership by — if coalescing ran after
-   *    scoping filtered the table-level issue away, the orphaned column
-   *    issues would survive and the planner would emit drops against a
-   *    sibling space's table.
-   * 2. `keepDiffIssue` — caller-supplied sibling-space ownership scoping,
-   *    applied blindly (the planner holds no ownership logic of its own).
+   *    runs, because a bare column node carries no table reference to
+   *    resolve ownership by — if coalescing ran after scoping filtered the
+   *    table-level issue away, the orphaned column issues would survive
+   *    and the planner would emit drops against a sibling space's table.
+   * 2. `filterSiblingOwnedIssues` — drops `not-expected` findings whose
+   *    owning table is declared by a sibling contract space
+   *    (`options.siblingOwnedEntityNames`, the orchestration's ownership
+   *    query for multi-space plans).
    * 3. Strict-mode extras gating — `not-expected` (extra table/column/
    *    constraint) issues are dropped entirely outside strict mode, mirroring
    *    the retired coordinate walk's `if (strict) { ...extra_* } }` guards:
@@ -217,7 +224,7 @@ export class SqliteMigrationPlanner
       frameworkComponents: options.frameworkComponents,
     });
     const coalesced = coalesceSubtreeIssues(rawIssues);
-    const scoped = options.keepDiffIssue ? coalesced.filter(options.keepDiffIssue) : coalesced;
+    const scoped = filterSiblingOwnedIssues(coalesced, options.siblingOwnedEntityNames);
     const issues = strict ? scoped : scoped.filter((issue) => issue.reason !== 'not-expected');
     return { expected, actual, issues };
   }

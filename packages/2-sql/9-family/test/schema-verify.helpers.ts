@@ -11,7 +11,6 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import { SchemaDiff } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyFkDefaults,
@@ -291,14 +290,4 @@ export function createMockPostgresComponent(): TargetBoundComponentDescriptor<'s
       },
     },
   } as TargetBoundComponentDescriptor<'sql', 'postgres'>;
-}
-
-/**
- * A no-op `diffDatabaseSchema` for target-descriptor stubs in tests that
- * construct a family instance but never call `verifySchema`. Every SQL target
- * descriptor must provide `diffDatabaseSchema`; this satisfies that requirement
- * for construction-only tests.
- */
-export function stubTargetDiffDatabaseSchema(): SchemaDiff {
-  return new SchemaDiff([], []);
 }

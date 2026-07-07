@@ -6,7 +6,6 @@ import type {
 } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander, contractToSchemaIR } from '@prisma-next/family-sql/control';
 import {
-  collectSqlSchemaIssuesPerNamespace,
   neutralizeFlatExpectedFkSchemas,
   normalizeFlatActualForDiff,
   verifySqlSchemaByDiff,
@@ -16,7 +15,7 @@ import type {
   SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import { diffSchemas, SchemaDiff } from '@prisma-next/framework-components/control';
+import { diffSchemas } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type {
   SqlColumnIRInput,
@@ -27,8 +26,6 @@ import type {
 import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { parseSqliteDefault } from '../default-normalizer';
-import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import { renderDefaultLiteral } from './planner-ddl-builders';
 import { buildSqliteColumnOpRender } from './sqlite-column-op-render';
 
@@ -72,33 +69,6 @@ export function sqliteContractToSchema(
     ...ifDefined('expandNativeType', extras?.expandNativeType),
     ...ifDefined('renderColumnOps', extras?.renderColumnOps),
   });
-}
-
-/**
- * The SQLite `SchemaDiffer` — relational only, the migration planner's diff
- * input. SQLite has a single flat schema and no structural (policy) diff, so
- * it runs the shared per-namespace relational issue diff and returns no
- * `schemaDiffIssues`. Retires when the planner takes `plan(start, end)`.
- */
-export function diffSqliteDatabaseSchema(input: SqliteDiffDatabaseSchemaInput): SchemaDiff {
-  const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
-  const storageTypes = input.contract.storage.types ?? {};
-  const renderColumnOps: ColumnOpRenderer = (name, column, table) =>
-    buildSqliteColumnOpRender(name, column, table, storageTypes);
-  const issues = collectSqlSchemaIssuesPerNamespace({
-    contract: input.contract,
-    actualSchema: input.actualSchema,
-    buildExpectedSchema: (scoped) =>
-      sqliteContractToSchema(scoped, {
-        ...ifDefined('expandNativeType', expandNativeType),
-        renderColumnOps,
-      }),
-    strict: input.strict,
-    frameworkComponents: input.frameworkComponents,
-    normalizeDefault: parseSqliteDefault,
-    normalizeNativeType: normalizeSqliteNativeType,
-  });
-  return new SchemaDiff(issues, []);
 }
 
 /**

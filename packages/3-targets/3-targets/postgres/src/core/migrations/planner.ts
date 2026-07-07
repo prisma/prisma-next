@@ -35,7 +35,7 @@ import {
   resolvePostgresNodeIssueCreationFactoryName,
 } from './control-policy';
 import { buildPostgresPlanDiff } from './diff-database-schema';
-import { coalesceSubtreeIssues, planIssues } from './issue-planner';
+import { coalesceSubtreeIssues, filterSiblingOwnedIssues, planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import {
   CreatePostgresRlsPolicyCall,
@@ -130,6 +130,12 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
      * the marker row by the right space.
      */
     readonly spaceId: string;
+    /**
+     * Bare entity names declared by some OTHER contract space in the
+     * aggregate (never this plan's own contract) — see
+     * {@link SqlMigrationPlannerPlanOptions.siblingOwnedEntityNames}.
+     */
+    readonly siblingOwnedEntityNames?: ReadonlySet<string>;
   }): PostgresPlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
@@ -163,9 +169,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // become structural DDL via `planIssues`, policy findings become RLS ops
     // via `planPostgresSchemaDiff`. Verify runs its own full-tree node diff
     // (`diffSchemaForVerdict`) over the same schema and rejects on a
-    // surviving failure. The caller-supplied `keepDiffIssue` predicate is
-    // applied blindly — any scoping (e.g. multi-space ownership) is the
-    // orchestration's, never worked out here.
+    // surviving failure. `siblingOwnedEntityNames` (the orchestration's
+    // multi-space ownership query) is resolved to a filter here — the
+    // planner reads its own diff issues' node structure, no scoping logic
+    // lives outside it.
     PostgresDatabaseSchemaNode.assert(options.schema);
     const { issues: rawIssues } = buildPostgresPlanDiff({
       contract: options.contract,
@@ -181,13 +188,14 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // subtree coalescing (a missing/extra table also emits an issue for
     // every child under it — redundant once the table-level Create/Drop call
     // already accounts for the whole subtree) are both post-diff planner
-    // steps. Coalescing MUST run before `keepDiffIssue`: a bare column node
-    // carries no table reference for ownership scoping to resolve by.
+    // steps. Coalescing MUST run before the sibling-space filter: a bare
+    // column node carries no table reference for ownership scoping to
+    // resolve by.
     const strict =
       options.policy.allowedOperationClasses.includes('widening') ||
       options.policy.allowedOperationClasses.includes('destructive');
     const coalesced = coalesceSubtreeIssues(relationalDiffIssues);
-    const scoped = options.keepDiffIssue ? coalesced.filter(options.keepDiffIssue) : coalesced;
+    const scoped = filterSiblingOwnedIssues(coalesced, options.siblingOwnedEntityNames);
     const gated = strict ? scoped : scoped.filter((issue) => issue.reason !== 'not-expected');
 
     // Namespace presence (`CREATE SCHEMA`) is a planner-only op-generation
@@ -198,7 +206,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // their path is an ancestor of every table path under that schema, so
     // running them through the same coalesce would swallow the table-level
     // `not-found` issues that drive `CREATE TABLE`) and are NOT subject to
-    // `keepDiffIssue`, matching the retired coordinate walk exactly.
+    // sibling-space scoping, matching the retired coordinate walk exactly.
     const namespaceIssues = verifyPostgresNamespacePresence({
       contract: options.contract,
       schema: options.schema,

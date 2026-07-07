@@ -71,7 +71,7 @@ function existingSchemasFromSchema(schema: SqlSchemaIRNode): readonly string[] {
  * `coalesceSubtreeIssues` alongside the table diff (it would swallow the
  * table-level `not-found` issues that drive `CREATE TABLE`); the planner
  * adds these AFTER coalescing the relational issues, and they are not
- * subject to sibling-space `keepDiffIssue` scoping (mirrors the retired
+ * subject to sibling-space ownership scoping (mirrors the retired
  * coordinate walk, which prepended namespace issues after that filter).
  */
 export function verifyPostgresNamespacePresence(input: {

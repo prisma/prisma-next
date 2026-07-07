@@ -1,9 +1,10 @@
 /**
  * SQL relational schema-diff exports.
  *
- * The shared relational diff that each SQL target descriptor's
- * `diffDatabaseSchema` composes (Postgres adds its structural policy diff on
- * top; SQLite is relational only). Pure — no database connection required.
+ * The generic node differ (`buildPostgresPlanDiff` / `buildSqlitePlanDiff`)
+ * drives both plan and verify; this module surfaces the shared
+ * semantic-satisfaction predicates and verify-verdict machinery that survive
+ * it. Pure — no database connection required.
  */
 
 export type {
@@ -24,14 +25,9 @@ export {
   resolveSemanticSatisfaction,
   verifySqlSchemaByDiff,
 } from '../core/diff/schema-diff-verify';
-export type {
-  CollectSqlSchemaIssuesOptions,
-  NativeTypeNormalizer,
-} from '../core/diff/sql-schema-diff';
+export type { NativeTypeNormalizer } from '../core/diff/sql-schema-diff';
 export {
   arraysEqual,
-  collectSqlSchemaIssues,
-  collectSqlSchemaIssuesPerNamespace,
   isIndexSatisfied,
   isUniqueConstraintSatisfied,
 } from '../core/diff/sql-schema-diff';

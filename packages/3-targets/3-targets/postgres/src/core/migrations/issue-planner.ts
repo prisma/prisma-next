@@ -48,7 +48,7 @@ import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
 import type { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
-import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
+import { PostgresSchemaNodeKind, type SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import { quoteIdentifier } from '../sql-utils';
 import { resolveNamespaceIdForDdlSchema } from './control-policy';
 import {
@@ -464,6 +464,48 @@ function isStrictDescendantPath(path: readonly string[], ancestor: readonly stri
     if (path[i] !== ancestor[i]) return false;
   }
   return true;
+}
+
+// ----------------------------------------------------------------------------
+// Sibling-space scoping (the aggregate orchestration's ownership, resolved here)
+// ----------------------------------------------------------------------------
+
+/**
+ * Drops `not-expected` (extra) issues whose owning table is declared by a
+ * sibling contract space, so the planner never emits a destructive op
+ * against another space's table. `siblingOwnedEntityNames` is the
+ * aggregate's ownership query, precomputed once per space and handed
+ * straight through `plan()`; the planner holds no ownership logic beyond
+ * resolving which table an issue belongs to.
+ *
+ * A table-level issue's own id sits at `path[2]` (database → namespace →
+ * table); every issue for a node under a table (column, constraint,
+ * policy, …) carries the same table id at the same path position, so one
+ * path read covers both cases. Namespace/root-level issues have no
+ * `path[2]` and are never sibling-scoped here — namespace ownership is
+ * handled separately inside `buildPostgresPlanDiff`.
+ */
+function keepIssueOutsideSiblingSpaces(
+  issue: SchemaDiffIssue<SqlSchemaDiffNode>,
+  siblingOwnedEntityNames: ReadonlySet<string>,
+): boolean {
+  if (issue.reason !== 'not-expected') return true;
+  const tableName = issue.path[2];
+  return tableName === undefined || !siblingOwnedEntityNames.has(tableName);
+}
+
+/**
+ * Filters `not-expected` issues to those NOT owned by a sibling contract
+ * space. A no-op (returns `issues` unchanged) when
+ * `siblingOwnedEntityNames` is absent or empty — single-space plans never
+ * pay for the filter.
+ */
+export function filterSiblingOwnedIssues(
+  issues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
+  siblingOwnedEntityNames: ReadonlySet<string> | undefined,
+): readonly SchemaDiffIssue<SqlSchemaDiffNode>[] {
+  if (siblingOwnedEntityNames === undefined || siblingOwnedEntityNames.size === 0) return issues;
+  return issues.filter((issue) => keepIssueOutsideSiblingSpaces(issue, siblingOwnedEntityNames));
 }
 
 // ----------------------------------------------------------------------------

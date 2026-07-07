@@ -5,7 +5,6 @@ import type {
   ContractSpace,
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
-  DiffIssue,
   MigratableTargetDescriptor,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -36,7 +35,7 @@ import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/ty
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlAdapter } from '../control-adapter';
 import type { SqlControlFamilyInstance } from '../control-instance';
-import type { SqlDiffDatabaseSchema, SqlDiffSchemaForVerdict } from './schema-differ';
+import type { SqlDiffSchemaForVerdict } from './schema-differ';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
 
@@ -361,15 +360,16 @@ export interface SqlMigrationPlannerPlanOptions {
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   /**
-   * Caller-supplied keep-predicate the planner applies to its schema diff
-   * (via `SchemaDiff.filter`) before building operations. The orchestration
-   * constructs it so the diff findings reaching op-building are exactly the
-   * contract space's own — e.g. dropping the `extra` findings for elements a
-   * sibling contract space declares, so the planner never emits DROP ops
-   * against another space's tables. The planner applies it blindly and holds
-   * no ownership logic. Absent for single-space plans.
+   * Bare entity names declared by some OTHER contract space in the
+   * aggregate (never this plan's own contract) — the orchestration's
+   * passive ownership query, precomputed once per space. The planner
+   * drops `not-expected` diff findings whose owning entity is in this
+   * set, so it never emits a destructive op against a sibling space's
+   * table; scoping logic lives entirely in the planner, which reads its
+   * own diff issues' node structure to resolve each finding's owning
+   * entity. Absent for single-space plans.
    */
-  readonly keepDiffIssue?: (issue: DiffIssue) => boolean;
+  readonly siblingOwnedEntityNames?: ReadonlySet<string>;
 }
 
 export interface SqlMigrationPlanner<TTargetDetails> {
@@ -509,15 +509,6 @@ export interface SqlControlTargetDescriptor<
    * infer` (Mongo) omit it, and the family instance throws when it is absent.
    */
   readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst;
-  /**
-   * The single combined database-schema diff of two derived representations —
-   * the target's black-box comparison. Every SQL target provides it (Postgres
-   * returns relational + policy issues; SQLite returns relational only). It is
-   * schema logic on the target, not database I/O, so it lives here rather than
-   * on the control adapter. How it computes the two issue sets is private.
-   * See {@link SqlDiffDatabaseSchema}.
-   */
-  readonly diffDatabaseSchema: SqlDiffDatabaseSchema;
   /**
    * The full-tree node diff the family verify verdict derives from —
    * expected-tree derivation, pre-diff normalization, the generic differ,
