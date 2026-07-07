@@ -1,6 +1,6 @@
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { DdlNode } from '@prisma-next/sql-relational-core/ast';
-import { col, fn, foreignKey, lit } from '@prisma-next/sql-relational-core/contract-free';
+import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { createSchema, createTable } from './ddl';
 
 const markerColumns = [
@@ -28,12 +28,14 @@ const ledgerColumns = [
   col('operations', 'jsonb', { notNull: true }),
 ] as const;
 
-// 1:1 companion to `ledger`: the contract IR of the row's destination
-// state. The primary key doubles as the relation (at most one snapshot
-// per ledger row); a row's *before* state is its predecessor's snapshot,
-// so it is never stored twice.
+// Content-addressed contract store: one row per distinct contract,
+// keyed by its storage hash. The ledger's `origin_core_hash` /
+// `destination_core_hash` are contract identifiers that resolve here by
+// hash equality (no FK — a baseline origin has no stored contract by
+// definition), so both endpoints of every edge are direct lookups and a
+// contract revisited by a rollback cycle is stored exactly once.
 const contractColumns = [
-  col('ledger_id', 'int8', { notNull: true, primaryKey: true }),
+  col('core_hash', 'text', { notNull: true, primaryKey: true }),
   col('created_at', 'timestamptz', { notNull: true, default: fn('now()') }),
   col('contract_json', 'jsonb', { notNull: true }),
 ] as const;
@@ -57,9 +59,6 @@ const contractTable = createTable({
   table: 'contract',
   ifNotExists: true,
   columns: contractColumns,
-  constraints: [
-    foreignKey(['ledger_id'], 'prisma_contract.ledger', ['id'], { onDelete: 'cascade' }),
-  ],
 });
 
 const controlSchema = createSchema({ schema: 'prisma_contract', ifNotExists: true });

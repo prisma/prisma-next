@@ -34,6 +34,7 @@ interface LedgerRow {
   readonly origin_core_hash: string | null;
   readonly destination_core_hash: string;
   readonly contract_json: unknown;
+  readonly origin_contract_json: unknown;
   readonly operations: unknown;
 }
 
@@ -55,9 +56,11 @@ function expectReadLedger(
 async function readLedgerRows(driver: PostgresControlDriver): Promise<LedgerRow[]> {
   const result = await driver.query<LedgerRow>(
     `select l.space, l.migration_name, l.migration_hash, l.origin_core_hash,
-      l.destination_core_hash, l.operations, c.contract_json
+      l.destination_core_hash, l.operations,
+      ca.contract_json, cb.contract_json as origin_contract_json
      from prisma_contract.ledger l
-     left join prisma_contract.contract c on c.ledger_id = l.id
+     left join prisma_contract.contract ca on ca.core_hash = l.destination_core_hash
+     left join prisma_contract.contract cb on cb.core_hash = l.origin_core_hash
      order by l.id`,
   );
   return result.rows;
@@ -183,7 +186,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     ]);
   });
 
-  it('persists each edge destination snapshot as a 1:1 prisma_contract.contract row', {
+  it('persists each edge destination snapshot in the hash-keyed contract store', {
     timeout: testTimeout,
   }, async () => {
     const runner = postgresTargetDescriptor.createRunner(familyInstance);
@@ -261,16 +264,16 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]!.contract_json).toEqual(midContract);
     expect(rows[1]!.contract_json).toEqual(endContract);
-    // Exactly one contract row per snapshot-carrying ledger row, keyed 1:1.
+    // The second edge's *before* state resolves directly through its
+    // origin hash — no chain reconstruction; the baseline edge has none.
+    expect(rows[0]!.origin_contract_json).toBeNull();
+    expect(rows[1]!.origin_contract_json).toEqual(midContract);
+    // Content-addressed store: one row per distinct contract, keyed by hash.
     expect(await countContractRows(driver!)).toBe(2);
-    const joined = await driver!.query<{ id: string; ledger_id: string }>(
-      `select l.id, c.ledger_id from prisma_contract.ledger l
-       join prisma_contract.contract c on c.ledger_id = l.id order by l.id`,
+    const stored = await driver!.query<{ core_hash: string }>(
+      `select core_hash from prisma_contract.contract order by core_hash`,
     );
-    expect(joined.rows).toHaveLength(2);
-    for (const row of joined.rows) {
-      expect(String(row.ledger_id)).toBe(String(row.id));
-    }
+    expect(stored.rows.map((row) => row.core_hash).sort()).toEqual([midHash, destHash].sort());
   });
 
   it('throws when migrationEdges operationCount sum does not match plan.operations length', {

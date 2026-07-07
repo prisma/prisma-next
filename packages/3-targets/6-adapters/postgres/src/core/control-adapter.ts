@@ -475,9 +475,11 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   /**
-   * Appends a ledger entry for `space`, plus — when the edge carries a
-   * destination contract snapshot — the row's 1:1 companion in
-   * `prisma_contract.contract` keyed by the fresh ledger id. See the
+   * Appends a ledger entry for `space`. When the edge carries a
+   * destination contract snapshot, the content-addressed
+   * `prisma_contract.contract` store is populated first (keyed by the
+   * destination hash, DO NOTHING on revisit) so a reader never sees a
+   * ledger row whose stored destination contract is missing. See the
    * `SqlControlAdapter.writeLedgerEntry` contract.
    */
   async writeLedgerEntry(
@@ -494,7 +496,18 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     },
   ): Promise<void> {
     const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
-    const inserted = await execute(
+    if (entry.destinationContractJson !== undefined) {
+      await execute(
+        lower,
+        driver,
+        ledgerContract
+          .upsert({ core_hash: entry.to, contract_json: entry.destinationContractJson })
+          .onConflict(ledgerContract.core_hash)
+          .doNothing()
+          .build(),
+      );
+    }
+    await execute(
       lower,
       driver,
       ledger
@@ -506,24 +519,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           destination_core_hash: entry.to,
           operations: entry.operations,
         })
-        .returning(ledgerReadShape.id)
-        .build(),
-    );
-    if (entry.destinationContractJson === undefined) {
-      return;
-    }
-    const ledgerId = inserted[0]?.['id'];
-    if (ledgerId === undefined || ledgerId === null) {
-      throw new Error(
-        'ledger INSERT returned no id — cannot attach the contract snapshot row. ' +
-          'The driver must surface RETURNING rows for control-plane writes.',
-      );
-    }
-    await execute(
-      lower,
-      driver,
-      ledgerContract
-        .insert({ ledger_id: ledgerId, contract_json: entry.destinationContractJson })
         .build(),
     );
   }

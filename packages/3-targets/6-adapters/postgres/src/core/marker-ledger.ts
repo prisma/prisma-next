@@ -49,15 +49,16 @@ export const ledger = pgTable(
 );
 
 /**
- * 1:1 companion of `prisma_contract.ledger`: the contract IR snapshot of a
- * ledger row's destination state, keyed by the row's `id`. A row's *before*
- * state is its predecessor's snapshot by chain construction, so only the
- * after-state is ever stored.
+ * Content-addressed contract store: one row per distinct contract, keyed
+ * by its storage hash. The ledger's `origin_core_hash` /
+ * `destination_core_hash` resolve here by hash equality, so both
+ * endpoints of every edge are direct lookups and a contract revisited by
+ * a rollback cycle is stored exactly once (upsert DO NOTHING).
  */
 export const ledgerContract = pgTable(
   { name: 'contract', schema: 'prisma_contract' },
   {
-    ledger_id: int8(),
+    core_hash: text(),
     contract_json: jsonb(),
   },
 );
