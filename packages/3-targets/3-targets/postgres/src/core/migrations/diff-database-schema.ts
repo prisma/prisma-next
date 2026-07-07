@@ -1,5 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { verifySqlSchemaTree } from '@prisma-next/family-sql/diff';
+import type { SqlSchemaDiffForVerdict } from '@prisma-next/family-sql/control';
+import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
+import { resolveSemanticSatisfaction, verifySqlSchemaTree } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   SchemaDiffIssue,
@@ -14,10 +16,11 @@ import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import type { PostgresContract } from '../postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
+import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
+import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
-import { buildNativeTypeExpander } from './native-type-expander';
 
 interface PostgresDiffDatabaseSchemaInput {
   readonly contract: Contract<SqlStorage>;
@@ -199,4 +202,101 @@ export function filterIssuesByOwnership(
     if (i.actual === undefined) return false;
     return PostgresPolicySchemaNode.is(i.actual) && ownedSchemaNameSet.has(i.actual.namespaceId);
   });
+}
+
+/**
+ * Applies the family's semantic-satisfaction normalization across a Postgres
+ * tree pair: every actual table with an expected counterpart (paired by
+ * namespace id, then table id) gets its unique/index child lists adjusted;
+ * everything else passes through untouched.
+ */
+export function normalizePostgresActualForDiff(
+  expected: PostgresDatabaseSchemaNode,
+  actual: PostgresDatabaseSchemaNode,
+): PostgresDatabaseSchemaNode {
+  const namespaces: Record<string, PostgresNamespaceSchemaNode> = {};
+  for (const [nsId, actualNs] of Object.entries(actual.namespaces)) {
+    const expectedNs = expected.namespaces[nsId];
+    if (expectedNs === undefined) {
+      namespaces[nsId] = actualNs;
+      continue;
+    }
+    const tables: Record<string, PostgresTableSchemaNode> = {};
+    for (const [tableName, actualTable] of Object.entries(actualNs.tables)) {
+      const expectedTable = expectedNs.tables[tableName];
+      if (expectedTable === undefined) {
+        tables[tableName] = actualTable;
+        continue;
+      }
+      const adjusted = resolveSemanticSatisfaction({
+        expectedUniques: expectedTable.uniques,
+        expectedIndexes: expectedTable.indexes,
+        actualUniques: actualTable.uniques,
+        actualIndexes: actualTable.indexes,
+      });
+      tables[tableName] = new PostgresTableSchemaNode({
+        name: actualTable.name,
+        columns: actualTable.columns,
+        foreignKeys: actualTable.foreignKeys,
+        uniques: adjusted.actualUniques,
+        indexes: adjusted.actualIndexes,
+        ...ifDefined('primaryKey', actualTable.primaryKey),
+        ...ifDefined('annotations', actualTable.annotations),
+        ...ifDefined('checks', actualTable.checks),
+        policies: [...actualTable.policies],
+      });
+    }
+    namespaces[nsId] = new PostgresNamespaceSchemaNode({
+      schemaName: actualNs.schemaName,
+      tables,
+      nativeEnumTypeNames: actualNs.nativeEnumTypeNames,
+    });
+  }
+  return new PostgresDatabaseSchemaNode({
+    namespaces,
+    roles: [...actual.roles],
+    existingSchemas: [...actual.existingSchemas],
+    pgVersion: actual.pgVersion,
+  });
+}
+
+/**
+ * The Postgres full-tree node diff for the family verify verdict: derive
+ * the expected tree (resolved leaf values, expander threaded, FK schemas
+ * resolved, table control policies stamped), normalize the actual tree for
+ * semantic satisfaction, run the generic differ, and scope out
+ * `not-expected` findings under namespaces the contract does not own — the
+ * legacy per-namespace walk never visited unowned schemas, so their
+ * contents are invisible to verify. The codec `verifyType` hooks run once
+ * per contract namespace with tables against that namespace's paired
+ * actual node (the hooks read namespace-scoped state such as
+ * `nativeEnumTypeNames`).
+ */
+export function diffPostgresSchemaForVerdict(input: {
+  readonly contract: Contract<SqlStorage>;
+  readonly schema: SqlSchemaIRNode;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+}): SqlSchemaDiffForVerdict {
+  const postgresContract = blindCast<
+    PostgresContract,
+    'diffPostgresSchemaForVerdict is only called with a postgres contract'
+  >(input.contract);
+  PostgresDatabaseSchemaNode.assert(input.schema);
+  const actual = input.schema;
+  const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
+  const expected = contractToPostgresDatabaseSchemaNode(postgresContract, {
+    annotationNamespace: 'pg',
+    ...ifDefined('expandNativeType', expandNativeType),
+  });
+  const normalizedActual = normalizePostgresActualForDiff(expected, actual);
+  const owned = ownedSchemaNames(expected);
+  const issues = diffSchemas(expected, normalizedActual).filter((issue) => {
+    if (issue.reason !== 'not-expected') return true;
+    const namespaceSegment = issue.path[1];
+    return namespaceSegment === undefined || owned.has(namespaceSegment);
+  });
+  const namespacePairs = Object.values(expected.namespaces)
+    .filter((ns) => Object.keys(ns.tables).length > 0)
+    .map((ns) => ({ actual: actual.namespaces[ns.schemaName] }));
+  return { issues, expectedRoot: expected, namespacePairs };
 }

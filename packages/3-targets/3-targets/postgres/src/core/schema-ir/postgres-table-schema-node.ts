@@ -1,3 +1,4 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import {
@@ -46,6 +47,7 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
   declare readonly primaryKey?: PrimaryKey;
   declare readonly annotations?: SqlAnnotations;
   declare readonly checks?: ReadonlyArray<SqlCheckConstraintIR>;
+  declare readonly controlPolicy?: ControlPolicy;
   readonly policies: readonly PostgresPolicySchemaNode[];
 
   constructor(input: PostgresTableSchemaNodeInput) {
@@ -82,6 +84,7 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
         ),
       );
     }
+    if (input.controlPolicy !== undefined) this.controlPolicy = input.controlPolicy;
     this.policies = Object.freeze([...(input.policies ?? [])]);
     freezeNode(this);
   }

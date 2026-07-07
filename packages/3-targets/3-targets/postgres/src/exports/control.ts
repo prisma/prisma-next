@@ -1,5 +1,6 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { SqlControlTargetDescriptor } from '@prisma-next/family-sql/control';
+import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type {
   ControlTargetInstance,
@@ -12,9 +13,9 @@ import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import { contractToPostgresDatabaseSchemaNode } from '../core/migrations/contract-to-postgres-database-schema-node';
 import {
   diffPostgresDatabaseSchema,
+  diffPostgresSchemaForVerdict,
   verifyPostgresDatabaseSchema,
 } from '../core/migrations/diff-database-schema';
-import { buildNativeTypeExpander } from '../core/migrations/native-type-expander';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
@@ -58,6 +59,9 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
         typeMetadataRegistry: input.typeMetadataRegistry,
         frameworkComponents: input.frameworkComponents,
       });
+    },
+    diffSchemaForVerdict(input) {
+      return diffPostgresSchemaForVerdict(input);
     },
     migrations: {
       createPlanner(adapter: SqlControlAdapter<'postgres'>) {

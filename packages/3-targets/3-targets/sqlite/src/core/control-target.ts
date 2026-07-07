@@ -10,6 +10,7 @@ import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqliteTargetDescriptorMeta } from './descriptor-meta';
 import {
   diffSqliteDatabaseSchema,
+  diffSqliteSchemaForVerdict,
   sqliteContractToSchema,
   verifySqliteDatabaseSchema,
 } from './migrations/diff-database-schema';
@@ -45,6 +46,9 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
         typeMetadataRegistry: input.typeMetadataRegistry,
         frameworkComponents: input.frameworkComponents,
       });
+    },
+    diffSchemaForVerdict(input) {
+      return diffSqliteSchemaForVerdict(input);
     },
     migrations: {
       createPlanner(adapter: SqlControlAdapter<'sqlite'>): MigrationPlanner<'sql', 'sqlite'> {
