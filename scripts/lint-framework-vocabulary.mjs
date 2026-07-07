@@ -41,8 +41,8 @@ const CONFIG_PATH = join(GIT_ROOT, 'scripts', 'lint-framework-vocabulary.config.
 
 export function isScannableFile(relPath) {
   if (!/\.(ts|tsx)$/.test(relPath)) return false;
-  if (/\.test\.ts$/.test(relPath)) return false;
-  if (/\.test-d\.ts$/.test(relPath)) return false;
+  if (/\.test\.tsx?$/.test(relPath)) return false;
+  if (/\.test-d\.tsx?$/.test(relPath)) return false;
   if (/(^|\/)test\//.test(relPath)) return false;
   if (/(^|\/)dist\//.test(relPath)) return false;
   return true;

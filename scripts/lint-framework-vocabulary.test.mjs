@@ -88,6 +88,8 @@ describe('isScannableFile', () => {
   it('rejects test files and dirs', () => {
     assert.equal(isScannableFile('framework/src/foo.test.ts'), false);
     assert.equal(isScannableFile('framework/src/foo.test-d.ts'), false);
+    assert.equal(isScannableFile('framework/src/foo.test.tsx'), false);
+    assert.equal(isScannableFile('framework/src/foo.test-d.tsx'), false);
     assert.equal(isScannableFile('framework/test/foo.ts'), false);
     assert.equal(isScannableFile('framework/src/test/foo.ts'), false);
   });
