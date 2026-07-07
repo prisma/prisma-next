@@ -48,7 +48,7 @@ export type SqlitePlanResult =
  * constraint changes at once); anything not absorbed by a strategy flows
  * through `mapIssueToCall` in the issue planner as a one-off call.
  *
- * FK-backing indexes are surfaced by `verifySqlSchema`'s index expansion
+ * FK-backing indexes are surfaced by `collectSqlSchemaIssues`'s index expansion
  * (see `verify-sql-schema.ts:459-469`), so `mapIssueToCall` handles them
  * uniformly alongside user-declared indexes.
  */

@@ -1,12 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlSchemaDiffForVerdict } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
-import { resolveSemanticSatisfaction, verifySqlSchemaTree } from '@prisma-next/family-sql/diff';
+import {
+  collectSqlSchemaIssuesPerNamespace,
+  resolveSemanticSatisfaction,
+} from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type {
-  SchemaDiffIssue,
-  VerifyDatabaseSchemaResult,
-} from '@prisma-next/framework-components/control';
+import type { SchemaDiffIssue, SchemaIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas, SchemaDiff } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
@@ -31,23 +31,22 @@ interface PostgresDiffDatabaseSchemaInput {
 }
 
 /**
- * The single combined database-schema comparison — the one computation the
- * migration planner and the family schema verify both consume. Composes,
- * once each:
+ * The combined database-schema comparison the migration planner consumes.
+ * Composes, once each:
  *
- * - the per-namespace-paired relational diff (`verifySqlSchemaTree`) → table /
- *   column / constraint findings as framework `SchemaIssue`s (with the
- *   verification-tree `root` and pass/warn/fail counts);
+ * - the per-namespace-paired relational issue diff
+ *   (`collectSqlSchemaIssuesPerNamespace`) → table / column / constraint
+ *   findings as framework `SchemaIssue`s;
  * - the policy diff (`diffPostgresSchema` over the two trees) → RLS policy
  *   presence as `SchemaDiffIssue`s, ownership-filtered to the contract's owned
  *   schemas.
  *
- * `diffPostgresDatabaseSchema` and `verifyPostgresDatabaseSchema` both read
- * this single result, so the relational walk runs once per caller — never
- * once for the diff and again for the verify tree.
+ * Verify does not read this: the family verify verdict runs on the full-tree
+ * node diff (`diffPostgresSchemaForVerdict`). This issue-based comparison
+ * retires when the planner takes `plan(start, end)`.
  */
 function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput): {
-  readonly relational: VerifyDatabaseSchemaResult;
+  readonly relationalIssues: readonly SchemaIssue[];
   readonly schemaDiffIssues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[];
 } {
   const postgresContract = blindCast<
@@ -68,7 +67,7 @@ function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput)
 
   // Relational diff: per-namespace-paired so a multi-schema database checks each
   // contract namespace against its own actual node.
-  const relational = verifySqlSchemaTree({
+  const relationalIssues = collectSqlSchemaIssuesPerNamespace({
     contract: input.contract,
     actualSchema: input.actualSchema,
     buildExpectedSchema: (scopedContract) =>
@@ -80,7 +79,6 @@ function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput)
         projectionOptions,
       ),
     strict: input.strict,
-    typeMetadataRegistry: input.typeMetadataRegistry,
     frameworkComponents: input.frameworkComponents,
     normalizeDefault: parsePostgresDefault,
     normalizeNativeType: normalizeSchemaNativeType,
@@ -98,7 +96,7 @@ function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput)
     ownedSchemaNames(expected),
   );
 
-  return { relational, schemaDiffIssues };
+  return { relationalIssues, schemaDiffIssues };
 }
 
 /**
@@ -114,24 +112,8 @@ function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput)
 export function diffPostgresDatabaseSchema(
   input: PostgresDiffDatabaseSchemaInput,
 ): SchemaDiff<SqlSchemaDiffNode> {
-  const { relational, schemaDiffIssues } = computePostgresSchemaComparison(input);
-  return new SchemaDiff(relational.schema.issues, schemaDiffIssues);
-}
-
-/**
- * The same combined comparison as {@link diffPostgresDatabaseSchema}, wrapped
- * in the verify envelope (`ok`/`summary`/`code`/`target`/`timings`) plus the
- * pass/warn/fail tree the CLI renders — i.e. exactly the existing verify-result
- * schema shape, so nothing downstream changes.
- */
-export function verifyPostgresDatabaseSchema(
-  input: PostgresDiffDatabaseSchemaInput,
-): VerifyDatabaseSchemaResult {
-  const { relational, schemaDiffIssues } = computePostgresSchemaComparison(input);
-  return {
-    ...relational,
-    schema: { ...relational.schema, schemaDiffIssues },
-  };
+  const { relationalIssues, schemaDiffIssues } = computePostgresSchemaComparison(input);
+  return new SchemaDiff(relationalIssues, schemaDiffIssues);
 }
 
 function ownedSchemaNames(expected: PostgresDatabaseSchemaNode): ReadonlySet<string> {

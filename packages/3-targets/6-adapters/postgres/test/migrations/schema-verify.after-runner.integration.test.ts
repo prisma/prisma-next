@@ -206,11 +206,10 @@ describe.sequential('Schema verification after runner - integration', () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(result.schema.schemaDiffIssues).toContainEqual(
         expect.objectContaining({
-          kind: 'nullability_mismatch',
-          table: 'user',
-          column: 'email',
+          reason: 'not-equal',
+          path: ['database', 'public', 'user', 'column:email'],
         }),
       );
     });
@@ -233,11 +232,10 @@ describe.sequential('Schema verification after runner - integration', () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(result.schema.schemaDiffIssues).toContainEqual(
         expect.objectContaining({
-          kind: 'missing_column',
-          table: 'user',
-          column: 'email',
+          reason: 'not-found',
+          path: ['database', 'public', 'user', 'column:email'],
         }),
       );
     });
@@ -261,12 +259,10 @@ describe.sequential('Schema verification after runner - integration', () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(result.schema.schemaDiffIssues).toContainEqual(
         expect.objectContaining({
-          kind: 'type_mismatch',
-          table: 'user',
-          column: 'email',
-          expected: 'text',
+          reason: 'not-equal',
+          path: ['database', 'public', 'user', 'column:email'],
         }),
       );
     });

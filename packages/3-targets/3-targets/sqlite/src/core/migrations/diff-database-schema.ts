@@ -2,9 +2,10 @@ import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type { SqlSchemaDiffForVerdict } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander, contractToSchemaIR } from '@prisma-next/family-sql/control';
 import {
+  collectSqlSchemaIssuesPerNamespace,
   neutralizeFlatExpectedFkSchemas,
   normalizeFlatActualForDiff,
-  verifySqlSchemaTree,
+  verifySqlSchemaByDiff,
 } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
@@ -45,40 +46,40 @@ export function sqliteContractToSchema(contract: Contract<SqlStorage> | null): S
   });
 }
 
-function computeSqliteSchemaComparison(
-  input: SqliteDiffDatabaseSchemaInput,
-): VerifyDatabaseSchemaResult {
-  return verifySqlSchemaTree({
+/**
+ * The SQLite `SchemaDiffer` — relational only, the migration planner's diff
+ * input. SQLite has a single flat schema and no structural (policy) diff, so
+ * it runs the shared per-namespace relational issue diff and returns no
+ * `schemaDiffIssues`. Retires when the planner takes `plan(start, end)`.
+ */
+export function diffSqliteDatabaseSchema(input: SqliteDiffDatabaseSchemaInput): SchemaDiff {
+  const issues = collectSqlSchemaIssuesPerNamespace({
     contract: input.contract,
     actualSchema: input.actualSchema,
     buildExpectedSchema: sqliteContractToSchema,
     strict: input.strict,
-    typeMetadataRegistry: input.typeMetadataRegistry,
     frameworkComponents: input.frameworkComponents,
     normalizeDefault: parseSqliteDefault,
     normalizeNativeType: normalizeSqliteNativeType,
   });
+  return new SchemaDiff(issues, []);
 }
 
 /**
- * The SQLite `SchemaDiffer` — relational only. SQLite has a single flat
- * schema and no structural (policy) diff, so it runs the shared per-schema
- * relational diff and returns no `schemaDiffIssues`.
- */
-export function diffSqliteDatabaseSchema(input: SqliteDiffDatabaseSchemaInput): SchemaDiff {
-  const relational = computeSqliteSchemaComparison(input);
-  return new SchemaDiff(relational.schema.issues, relational.schema.schemaDiffIssues);
-}
-
-/**
- * The same comparison as {@link diffSqliteDatabaseSchema}, wrapped in the
- * verify envelope (`ok`/`summary`/`code`/`target`/`timings`) plus the
- * pass/warn/fail tree the CLI renders.
+ * The SQLite schema verify: the full-tree node-diff verdict wrapped in the
+ * issue-based result envelope. Used by the runner's post-apply check; the
+ * family `verifySchema` runs the same composition via the descriptor hook.
  */
 export function verifySqliteDatabaseSchema(
   input: SqliteDiffDatabaseSchemaInput,
 ): VerifyDatabaseSchemaResult {
-  return computeSqliteSchemaComparison(input);
+  return verifySqlSchemaByDiff({
+    contract: input.contract,
+    schema: input.actualSchema,
+    strict: input.strict,
+    frameworkComponents: input.frameworkComponents,
+    diffSchemaForVerdict: diffSqliteSchemaForVerdict,
+  });
 }
 
 /**

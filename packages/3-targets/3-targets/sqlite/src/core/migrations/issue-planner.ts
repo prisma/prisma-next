@@ -1,7 +1,7 @@
 /**
  * SQLite migration issue planner.
  *
- * Takes schema issues (from `verifySqlSchema`) and emits migration IR
+ * Takes schema issues (from `collectSqlSchemaIssues`) and emits migration IR
  * (`SqliteOpFactoryCall[]`). Strategies consume issues they recognize and
  * produce specialized call sequences (e.g. recreateTableStrategy absorbs
  * type/nullability/default/constraint mismatches into a single recreate op);

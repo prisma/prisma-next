@@ -183,7 +183,8 @@ describe.sequential('AC1 — cross-namespace FK end-to-end (PGlite)', () => {
         );
       }
       expect(verifyResult.ok).toBe(true);
-      expect(verifyResult.schema.counts.fail).toBe(0);
+      expect(verifyResult.schema.issues).toEqual([]);
+      expect(verifyResult.schema.schemaDiffIssues).toEqual([]);
 
       // Round-trip: insert into auth.user, then insert into public.post with a valid FK
       await driver.query('INSERT INTO "auth"."user" (id) VALUES (1)');

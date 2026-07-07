@@ -14,7 +14,6 @@ import { contractToPostgresDatabaseSchemaNode } from '../core/migrations/contrac
 import {
   diffPostgresDatabaseSchema,
   diffPostgresSchemaForVerdict,
-  verifyPostgresDatabaseSchema,
 } from '../core/migrations/diff-database-schema';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
@@ -44,15 +43,6 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     },
     diffDatabaseSchema(input) {
       return diffPostgresDatabaseSchema({
-        contract: input.contract,
-        actualSchema: input.schema,
-        strict: input.strict,
-        typeMetadataRegistry: input.typeMetadataRegistry,
-        frameworkComponents: input.frameworkComponents,
-      });
-    },
-    verifyDatabaseSchema(input) {
-      return verifyPostgresDatabaseSchema({
         contract: input.contract,
         actualSchema: input.schema,
         strict: input.strict,

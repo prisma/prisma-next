@@ -7,7 +7,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 /**
  * Postgres target `SchemaVerifier` concretion. Plugs into the
  * SQL-shared verification surface; production verification today still
- * routes through the legacy `verifySqlSchema` entry point, which
+ * routes through the relational issue diff (`collectSqlSchemaIssues`), which
  * carries options (codec hooks, normalizers, framework components)
  * that the framework-level `SchemaVerifyOptions` shape does not yet
  * surface.
