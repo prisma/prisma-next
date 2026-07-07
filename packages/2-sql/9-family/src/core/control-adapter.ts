@@ -158,7 +158,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
       readonly migrationName: string;
       readonly migrationHash: string;
       readonly operations: readonly unknown[];
-      readonly contractJsonAfter?: unknown;
+      readonly destinationContractJson?: unknown;
     },
   ): Promise<void>;
 

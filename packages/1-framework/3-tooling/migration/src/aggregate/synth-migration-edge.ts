@@ -13,7 +13,7 @@ export function buildSynthMigrationEdge(args: {
     to: args.destinationStorageHash,
     operationCount: args.operationCount,
     ...(args.destinationContractJson != null
-      ? { contractJsonAfter: args.destinationContractJson }
+      ? { destinationContractJson: args.destinationContractJson }
       : {}),
   };
 }

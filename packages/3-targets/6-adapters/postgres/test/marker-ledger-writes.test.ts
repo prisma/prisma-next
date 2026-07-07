@@ -149,7 +149,7 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
       migrationName: '002_add_post',
       migrationHash: 'sha256:mig',
       operations: [],
-      contractJsonAfter: { models: ['user', 'post'] },
+      destinationContractJson: { models: ['user', 'post'] },
     });
 
     expect(driver.calls).toHaveLength(2);
@@ -172,7 +172,7 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
         migrationName: '003_orphan',
         migrationHash: 'sha256:mig',
         operations: [],
-        contractJsonAfter: { models: [] },
+        destinationContractJson: { models: [] },
       }),
     ).rejects.toThrow(/returned no id/);
     expect(driver.calls).toHaveLength(1);

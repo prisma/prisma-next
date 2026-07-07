@@ -121,7 +121,7 @@ export interface AggregateMigrationEdgeRef {
    * the previous row's snapshot by chain construction. Absent when the
    * source bundle carries no snapshot.
    */
-  readonly contractJsonAfter?: unknown;
+  readonly destinationContractJson?: unknown;
 }
 
 export interface PerSpacePlan {

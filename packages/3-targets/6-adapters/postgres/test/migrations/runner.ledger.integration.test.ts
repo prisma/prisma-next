@@ -198,7 +198,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
         from: EMPTY_CONTRACT_HASH,
         to: midHash,
         operationCount: 1,
-        contractJsonAfter: midContract,
+        destinationContractJson: midContract,
       },
       {
         migrationHash: 'sha256:mig-snap-b',
@@ -206,7 +206,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
         from: midHash,
         to: destHash,
         operationCount: 1,
-        contractJsonAfter: endContract,
+        destinationContractJson: endContract,
       },
     ];
     const plan = createLedgerTestPlan<PostgresPlanTargetDetails>({

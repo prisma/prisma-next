@@ -90,7 +90,9 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
       from: edge.from,
       to: edge.to,
       operationCount: pkg.ops.length,
-      ...(pkg.endContractJson !== undefined ? { contractJsonAfter: pkg.endContractJson } : {}),
+      ...(pkg.endContractJson !== undefined
+        ? { destinationContractJson: pkg.endContractJson }
+        : {}),
     });
   }
 

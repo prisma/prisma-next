@@ -490,7 +490,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       readonly migrationName: string;
       readonly migrationHash: string;
       readonly operations: readonly unknown[];
-      readonly contractJsonAfter?: unknown;
+      readonly destinationContractJson?: unknown;
     },
   ): Promise<void> {
     const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
@@ -509,7 +509,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         .returning(ledgerReadShape.id)
         .build(),
     );
-    if (entry.contractJsonAfter === undefined) {
+    if (entry.destinationContractJson === undefined) {
       return;
     }
     const ledgerId = inserted[0]?.['id'];
@@ -523,7 +523,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       lower,
       driver,
       ledgerContract
-        .insert({ ledger_id: ledgerId, contract_json: entry.contractJsonAfter })
+        .insert({ ledger_id: ledgerId, contract_json: entry.destinationContractJson })
         .build(),
     );
   }

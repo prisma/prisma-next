@@ -103,7 +103,7 @@ describe('synthStrategy', () => {
         from: '',
         to: 'sha256:synth',
         operationCount: 1,
-        contractJsonAfter: appMember.contract(),
+        destinationContractJson: appMember.contract(),
       },
     ]);
 

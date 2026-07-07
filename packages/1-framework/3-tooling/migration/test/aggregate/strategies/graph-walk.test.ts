@@ -60,8 +60,8 @@ describe('graphWalkStrategy', () => {
     expect(outcome.kind).toBe('ok');
     if (outcome.kind !== 'ok') return;
     expect(outcome.result.migrationEdges).toHaveLength(2);
-    expect(outcome.result.migrationEdges[0]?.contractJsonAfter).toEqual({ models: ['user'] });
-    expect(outcome.result.migrationEdges[1]?.contractJsonAfter).toEqual({
+    expect(outcome.result.migrationEdges[0]?.destinationContractJson).toEqual({ models: ['user'] });
+    expect(outcome.result.migrationEdges[1]?.destinationContractJson).toEqual({
       models: ['user', 'post'],
     });
   });
@@ -78,7 +78,7 @@ describe('graphWalkStrategy', () => {
 
     expect(outcome.kind).toBe('ok');
     if (outcome.kind !== 'ok') return;
-    expect(outcome.result.migrationEdges[0]?.contractJsonAfter).toBeUndefined();
+    expect(outcome.result.migrationEdges[0]?.destinationContractJson).toBeUndefined();
   });
 
   it('returns unreachable when the live marker is not connected to the head', () => {
