@@ -19,7 +19,8 @@ The relational walk is what produced the `SchemaVerificationNode` tree and `coun
 
 ## Behaviour contract
 
-- **Unchanged (hard):** planner ops byte-identical (`fixtures:check` clean); verify **verdicts** identical in every mode (strict/lenient, single- and multi-space, SQL/SQLite/Mongo); `contract infer` unchanged; the runner's post-apply check verdict unchanged; the multi-space guards green.
+- **Unchanged (hard):** planner ops byte-identical; verify **verdicts** identical in every mode (strict/lenient, single- and multi-space, SQL/SQLite/Mongo); `contract infer` unchanged; the runner's post-apply check verdict unchanged; the multi-space guards green.
+  - **How planner-op parity is actually proven (correction, 2026-07-07):** `fixtures:check` does **not** gate planner ops — the example `migration.ts` files carry **hand-frozen** `operations` (literal op-factory calls), and `regen-example-migrations.mjs` re-emits the contract + re-serializes those frozen ops; it never calls `plan()`. So `fixtures:check` gates only **contract emission** (`contract.json`/`.d.ts`). Planner-op parity is proven by the **suites** (`postgres-issue-planner`, `rls-planner`/`rls-ops`/`check-constraints`, the SQLite `issue-planner`/`planner-strategies`/`recreate-postchecks`, adapter-postgres/sqlite integration, and the four multi-space guards) plus a **golden diff of real `plan()` output against the committed example ops**. The SQLite pilot's greenlight cited fixtures:check for Postgres — that premise was wrong; the SQLite verdict itself stood on suite assertions, which is the correct bar.
 - **Changed (deliberate, this spec):** `db verify`'s rendered output — the pass/warn/fail tree and `counts` are gone; output is verdict + issues + unclaimed.
 
 ## Non-goals
