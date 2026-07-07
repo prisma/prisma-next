@@ -141,12 +141,35 @@ describe('synthStrategy', () => {
       reason: 'not-expected',
       message: 'extra',
     };
+    // An auxiliary/structural node (e.g. a Postgres RLS policy) references
+    // its owning table via `tableName` — the entity name a sibling space
+    // declares is the table, not the policy itself.
     const siblingExtraDiffIssue: DiffIssue = {
       path: ['public', 'cipher_state'],
       outcome: 'extra',
       reason: 'not-expected',
       message: 'extra',
       actual: { tableName: 'cipher_state' } as never,
+    };
+    // A relational table node's own identity is `name` (`SqlTableIR` /
+    // `PostgresTableSchemaNode`), gated on `diffRole: 'table'` so an
+    // unrelated node's own `name` (a column, index, or constraint) is never
+    // mistaken for an entity to scope by.
+    const siblingExtraTableNodeIssue: DiffIssue = {
+      path: ['public', 'cipher_state'],
+      outcome: 'extra',
+      reason: 'not-expected',
+      message: 'extra',
+      actual: { name: 'cipher_state', diffRole: 'table' } as never,
+    };
+    // A column node also carries `name`, but no `diffRole: 'table'` — its
+    // own name must never be read as an entity to scope by.
+    const undeclaredExtraColumnNodeIssue: DiffIssue = {
+      path: ['public', 'app_user', 'column:cipher_state'],
+      outcome: 'extra',
+      reason: 'not-expected',
+      message: 'extra',
+      actual: { name: 'cipher_state', diffRole: 'column' } as never,
     };
     const missingDiffIssue: DiffIssue = {
       path: ['public', 'app_user', 'policy_x'],
@@ -158,6 +181,8 @@ describe('synthStrategy', () => {
     expect(keep(siblingExtraIssue)).toBe(false);
     expect(keep(undeclaredExtraIssue)).toBe(true);
     expect(keep(siblingExtraDiffIssue)).toBe(false);
+    expect(keep(siblingExtraTableNodeIssue)).toBe(false);
+    expect(keep(undeclaredExtraColumnNodeIssue)).toBe(true);
     expect(keep(missingDiffIssue)).toBe(true);
   });
 

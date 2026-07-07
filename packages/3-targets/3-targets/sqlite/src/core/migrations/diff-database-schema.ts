@@ -18,7 +18,12 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { diffSchemas, SchemaDiff } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import type {
+  SqlColumnIRInput,
+  SqlSchemaIRInput,
+  SqlSchemaIRNode,
+  SqlTableIRInput,
+} from '@prisma-next/sql-schema-ir/types';
 import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -186,14 +191,63 @@ export function buildSqlitePlanDiff(input: {
       renderColumnOps,
     }),
   );
-  const actualRaw =
-    input.actualSchema instanceof SqlSchemaIR
-      ? input.actualSchema
-      : blindCast<
-          SqlSchemaIR,
-          'the SQLite introspection adapter always produces a flat SqlSchemaIR root'
-        >(input.actualSchema);
+  // The differ dispatches polymorphically (`.isEqualTo()` / `.children()`), so
+  // the actual tree must be genuine `SqlSchemaIR`/`SqlTableIR`/`SqlColumnIR`
+  // instances, not plain data shaped like them. `new SqlSchemaIR(...)`
+  // normalizes either input uniformly (an already-real tree passes through
+  // untouched — its nested values are already instances) and is a no-op
+  // rebuild in the common (real-instance) case, so this is always safe to run.
+  const actualRaw = new SqlSchemaIR(withRecordKeyNames(input.actualSchema));
   const actual = normalizeFlatActualForDiff(expected, actualRaw);
   const issues = diffSchemas(expected, actual);
   return { expected, actual, issues };
+}
+
+/**
+ * Every schema-tree builder in this codebase derives a table's / column's
+ * `name` from the record key it's stored under (`contractToSchemaIR`,
+ * the SQLite introspection adapter) rather than trusting a redundant
+ * embedded field — the record key IS the identity. Mirrors that discipline
+ * for the actual/live tree before construction, so `SqlTableIR.id` /
+ * `SqlColumnIR.id` (both derived from `.name`) are always correct without
+ * requiring every caller to duplicate the key onto the value. A no-op for a
+ * tree that already carries matching names (the real introspection adapter
+ * always does).
+ */
+function withRecordKeyNames(actualSchema: SqlSchemaIRNode): SqlSchemaIRInput {
+  const raw = blindCast<
+    { readonly tables?: Readonly<Record<string, unknown>> },
+    'the SQLite introspection adapter always produces a flat, tables-keyed root'
+  >(actualSchema);
+  const tables: Record<string, SqlTableIRInput> = {};
+  for (const [tableName, table] of Object.entries(raw.tables ?? {})) {
+    const rawTable = blindCast<
+      Omit<SqlTableIRInput, 'name' | 'columns'>,
+      'every table value in a tables record is SqlTableIR(Input)-shaped'
+    >(table);
+    const columns: Record<string, SqlColumnIRInput> = {};
+    for (const [columnName, column] of Object.entries(
+      blindCast<
+        { readonly columns?: Readonly<Record<string, unknown>> },
+        'every SqlTableIR(Input) carries a columns record keyed by column name'
+      >(table).columns ?? {},
+    )) {
+      columns[columnName] = {
+        ...blindCast<
+          SqlColumnIRInput,
+          'every column value in a columns record is SqlColumnIR(Input)-shaped'
+        >(column),
+        name: columnName,
+      };
+    }
+    tables[tableName] = {
+      ...rawTable,
+      name: tableName,
+      columns,
+      foreignKeys: rawTable.foreignKeys ?? [],
+      uniques: rawTable.uniques ?? [],
+      indexes: rawTable.indexes ?? [],
+    };
+  }
+  return { tables };
 }

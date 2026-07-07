@@ -50,16 +50,33 @@ export type SynthStrategyOutcome =
  */
 type MaybeAsyncPlannerResult = MigrationPlannerResult | Promise<MigrationPlannerResult>;
 
-/** The bare entity name a diff issue addresses, for ownership scoping. */
+/**
+ * The bare entity name a diff issue addresses, for ownership scoping.
+ *
+ * Node-typed issues carry the entity name one of two ways: an auxiliary or
+ * structural node (e.g. a Postgres RLS policy) references its owning table
+ * via `tableName`; a table (or namespace) node's own identity is its `name`.
+ * `diffRole` (declared on every SQL schema-diff node, read here structurally
+ * since this framework-level module can't import the SQL family's type)
+ * disambiguates the second case from an auxiliary node's own `name` (e.g. a
+ * column, index, or constraint name), which is never an entity to scope by.
+ */
 function issueEntityName(issue: DiffIssue): string | undefined {
   if ('outcome' in issue) {
     const actual = issue.actual;
     if (actual === undefined) return undefined;
-    const tableName = blindCast<
-      { readonly tableName?: unknown },
-      'entity-name scoping reads the optional target-specific tableName off a diff node'
-    >(actual).tableName;
-    return typeof tableName === 'string' ? tableName : undefined;
+    const node = blindCast<
+      { readonly tableName?: unknown; readonly name?: unknown; readonly diffRole?: unknown },
+      'entity-name scoping reads the optional target-specific tableName/name/diffRole off a diff node'
+    >(actual);
+    if (typeof node.tableName === 'string') return node.tableName;
+    if (
+      (node.diffRole === 'table' || node.diffRole === 'namespace') &&
+      typeof node.name === 'string'
+    ) {
+      return node.name;
+    }
+    return undefined;
   }
   return 'table' in issue ? issue.table : undefined;
 }

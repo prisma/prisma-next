@@ -15,12 +15,11 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import type {
   MigrationPlanner,
   MigrationScaffoldContext,
-  SchemaIssue,
+  SchemaDiffIssue,
 } from '@prisma-next/framework-components/control';
-import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
-import { blindCast } from '@prisma-next/utils/casts';
-import { diffSqliteDatabaseSchema } from './diff-database-schema';
-import { planIssues } from './issue-planner';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { buildSqlitePlanDiff } from './diff-database-schema';
+import { coalesceSubtreeIssues, planIssues } from './issue-planner';
 import {
   type SqliteMigrationDestinationInfo,
   TypeScriptRenderableSqliteMigration,
@@ -41,16 +40,18 @@ export type SqlitePlanResult =
 /**
  * SQLite migration planner — a thin wrapper over `planIssues`.
  *
- * `plan()` verifies the live schema against the target contract (producing
- * `SchemaIssue[]`) and delegates to `planIssues` with the registered
- * strategies. Strategies absorb groups of related issues into composite
- * recipes (e.g. recreating a table to apply type/nullability/default/
- * constraint changes at once); anything not absorbed by a strategy flows
- * through `mapIssueToCall` in the issue planner as a one-off call.
+ * `plan()` diffs the live schema against the target contract via the one
+ * differ (`buildSqlitePlanDiff`, producing node-typed `SchemaDiffIssue[]`)
+ * and delegates to `planIssues` with the registered strategies. Strategies
+ * absorb groups of related issues into composite recipes (e.g. recreating a
+ * table to apply type/nullability/default/constraint changes at once);
+ * anything not absorbed by a strategy flows through `mapNodeIssueToCall` in
+ * the issue planner as a one-off call.
  *
- * FK-backing indexes are surfaced by `collectSqlSchemaIssues`'s index expansion
- * (see `verify-sql-schema.ts:459-469`), so `mapIssueToCall` handles them
- * uniformly alongside user-declared indexes.
+ * FK-backing indexes are already merged into the expected table node's
+ * `indexes` at derivation (`contractToSchemaIR`'s `convertTable`), so
+ * `mapNodeIssueToCall` handles them uniformly alongside user-declared
+ * indexes — no separate expansion step in the planner.
  */
 export class SqliteMigrationPlanner
   implements SqlMigrationPlanner<SqlitePlanTargetDetails>, MigrationPlanner<'sql', 'sqlite'>
@@ -107,17 +108,13 @@ export class SqliteMigrationPlanner
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) return policyResult;
 
-    const schemaIssues = this.collectSchemaIssues(options);
+    const { expected, actual, issues } = this.collectSchemaIssues(options);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
-    const storageTypes = options.contract.storage.types ?? {};
 
     const result = planIssues({
-      issues: schemaIssues,
-      toContract: options.contract,
-      fromContract: options.fromContract,
-      codecHooks,
-      storageTypes,
-      schema: sqliteFlatSchema(options.schema),
+      issues,
+      expected,
+      actual,
       policy: options.policy,
       frameworkComponents: options.frameworkComponents,
       strategies: sqlitePlannerStrategies,
@@ -178,30 +175,50 @@ export class SqliteMigrationPlanner
     return null;
   }
 
-  private collectSchemaIssues(options: SqlMigrationPlannerPlanOptions): readonly SchemaIssue[] {
+  /**
+   * Diffs the target contract against the live schema via the one differ
+   * (the same tree-building `diffSqliteSchemaForVerdict` uses, plus the
+   * op-render stamper) and prepares the issue list `planIssues` consumes.
+   *
+   * Three passes, in order:
+   * 1. Subtree coalescing — the differ is total (a missing/extra table also
+   *    emits an issue for every column/constraint under it); those nested
+   *    issues are redundant once the table-level `CreateTable`/`DropTable`
+   *    call already accounts for the whole subtree. Runs FIRST, over the
+   *    complete diff: a sibling-owned extra table's column issues must
+   *    collapse into its one table-level issue before ownership scoping
+   *    runs, because a bare column node carries no table reference for
+   *    `keepDiffIssue` to resolve ownership by — if coalescing ran after
+   *    scoping filtered the table-level issue away, the orphaned column
+   *    issues would survive and the planner would emit drops against a
+   *    sibling space's table.
+   * 2. `keepDiffIssue` — caller-supplied sibling-space ownership scoping,
+   *    applied blindly (the planner holds no ownership logic of its own).
+   * 3. Strict-mode extras gating — `not-expected` (extra table/column/
+   *    constraint) issues are dropped entirely outside strict mode, mirroring
+   *    the retired coordinate walk's `if (strict) { ...extra_* } }` guards:
+   *    an additive-only plan must never even consider dropping an unclaimed
+   *    object, not just refuse to emit the drop.
+   */
+  private collectSchemaIssues(options: SqlMigrationPlannerPlanOptions): {
+    readonly expected: SqlSchemaIR;
+    readonly actual: SqlSchemaIR;
+    readonly issues: readonly SchemaDiffIssue[];
+  } {
     const allowed = options.policy.allowedOperationClasses;
     const strict = allowed.includes('widening') || allowed.includes('destructive');
-    const rawDiff = diffSqliteDatabaseSchema({
+    const {
+      expected,
+      actual,
+      issues: rawIssues,
+    } = buildSqlitePlanDiff({
       contract: options.contract,
       actualSchema: options.schema,
-      strict,
-      typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
     });
-    // The caller-supplied predicate is applied blindly — any scoping (e.g.
-    // multi-space ownership) is the orchestration's, never worked out here.
-    const diff = options.keepDiffIssue ? rawDiff.filter(options.keepDiffIssue) : rawDiff;
-    return diff.issues;
+    const coalesced = coalesceSubtreeIssues(rawIssues);
+    const scoped = options.keepDiffIssue ? coalesced.filter(options.keepDiffIssue) : coalesced;
+    const issues = strict ? scoped : scoped.filter((issue) => issue.reason !== 'not-expected');
+    return { expected, actual, issues };
   }
-}
-
-/**
- * SQLite has a single, flat schema — its introspected node IS a per-schema
- * `SqlSchemaIR`, never the multi-namespace tree the Postgres target builds. The
- * planner consumes that flat shape directly when building ops.
- */
-function sqliteFlatSchema(schema: SqlSchemaIRNode): SqlSchemaIR {
-  return blindCast<SqlSchemaIR, 'the SQLite introspected node is a flat per-schema SqlSchemaIR'>(
-    schema,
-  );
 }
