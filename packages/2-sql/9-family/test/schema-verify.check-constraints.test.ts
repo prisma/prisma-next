@@ -12,9 +12,9 @@ import { SqlCheckConstraintIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
-import { classifySqlVerifierIssueKind } from '../src/core/schema-verify/verifier-disposition';
-import { verifyCheckConstraints } from '../src/core/schema-verify/verify-helpers';
-import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
+import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
+import { classifySqlVerifierIssueKind } from '../src/core/diff/verifier-disposition';
+import { verifyCheckConstraints } from '../src/core/diff/verify-helpers';
 import {
   createSchemaTable,
   createTestSchemaIR,

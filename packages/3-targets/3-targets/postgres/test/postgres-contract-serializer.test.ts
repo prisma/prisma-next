@@ -24,10 +24,10 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
+import { PostgresNativeEnum } from '../src/core/postgres-native-enum';
+import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
+import { PostgresRole } from '../src/core/postgres-role';
 import { PostgresSchema, postgresCreateNamespace } from '../src/core/postgres-schema';
-import { PostgresNativeEnum } from '../src/core/schema-ir/postgres-native-enum';
-import { PostgresRlsPolicy } from '../src/core/schema-ir/postgres-rls-policy';
-import { PostgresRole } from '../src/core/schema-ir/postgres-role';
 import postgresTargetDescriptor from '../src/exports/control';
 
 function makeValidContractJson() {

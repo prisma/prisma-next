@@ -5,6 +5,7 @@ import type {
   ContractSpace,
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
+  DiffIssue,
   MigratableTargetDescriptor,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -21,6 +22,7 @@ import type {
   SchemaIssue,
   SchemaVerifier,
 } from '@prisma-next/framework-components/control';
+import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import type {
   SqlControlDriverInstance,
@@ -30,10 +32,11 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlAdapter } from '../control-adapter';
 import type { SqlControlFamilyInstance } from '../control-instance';
+import type { SqlDiffDatabaseSchema, SqlVerifyDatabaseSchema } from './schema-differ';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
 
@@ -308,7 +311,12 @@ export type SqlPlannerResult<TTargetDetails> =
 
 export interface SqlMigrationPlannerPlanOptions {
   readonly contract: Contract<SqlStorage>;
-  readonly schema: SqlSchemaIR;
+  /**
+   * The "from"/live schema as the target's introspected node (SQLite a flat
+   * `SqlSchemaIR`, Postgres a `PostgresDatabaseSchemaNode` root). Structure-aware
+   * consumers narrow the concrete shape before walking it.
+   */
+  readonly schema: SqlSchemaIRNode;
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   /**
@@ -343,6 +351,16 @@ export interface SqlMigrationPlannerPlanOptions {
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  /**
+   * Caller-supplied keep-predicate the planner applies to its schema diff
+   * (via `SchemaDiff.filter`) before building operations. The orchestration
+   * constructs it so the diff findings reaching op-building are exactly the
+   * contract space's own — e.g. dropping the `extra` findings for elements a
+   * sibling contract space declares, so the planner never emits DROP ops
+   * against another space's tables. The planner applies it blindly and holds
+   * no ownership logic. Absent for single-space plans.
+   */
+  readonly keepDiffIssue?: (issue: DiffIssue) => boolean;
 }
 
 export interface SqlMigrationPlanner<TTargetDetails> {
@@ -476,6 +494,29 @@ export interface SqlControlTargetDescriptor<
    * the base, the target-specific dispatch on the subclass.
    */
   readonly schemaVerifier: SchemaVerifier<TContract, SqlSchemaIR>;
+  /**
+   * Database→PSL inference for `contract infer`. Target logic (owns the dialect
+   * maps), so it lives on the descriptor. Optional: targets without `contract
+   * infer` (Mongo) omit it, and the family instance throws when it is absent.
+   */
+  readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst;
+  /**
+   * The single combined database-schema diff of two derived representations —
+   * the target's black-box comparison. Every SQL target provides it (Postgres
+   * returns relational + policy issues; SQLite returns relational only). It is
+   * schema logic on the target, not database I/O, so it lives here rather than
+   * on the control adapter. How it computes the two issue sets is private.
+   * See {@link SqlDiffDatabaseSchema} / {@link SqlVerifyDatabaseSchema}.
+   */
+  readonly diffDatabaseSchema: SqlDiffDatabaseSchema;
+  /**
+   * The same combined comparison as {@link diffDatabaseSchema}, wrapped in the
+   * verify envelope (`ok`/`summary`/`code`/`target`/`timings`) plus the
+   * pass/warn/fail tree the CLI renders. Verify calls this instead of
+   * `diffDatabaseSchema` so the relational walk that produces the tree runs
+   * once per verify, not once for the diff and again for the tree.
+   */
+  readonly verifyDatabaseSchema: SqlVerifyDatabaseSchema;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

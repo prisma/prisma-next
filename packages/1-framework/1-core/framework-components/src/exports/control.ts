@@ -57,6 +57,7 @@ export type {
   BaseSchemaIssue,
   EmitContractResult,
   EnumValuesChangedIssue,
+  ExpectationFailureReason,
   IntrospectSchemaResult,
   OperationContext,
   SchemaIssue,
@@ -103,10 +104,12 @@ export {
 } from '../control/control-stack';
 export type {
   DiffableNode,
+  DiffIssue,
+  SchemaDiffer,
   SchemaDiffIssue,
   SchemaDiffOutcome,
 } from '../control/schema-diff';
-export { diffSchemas } from '../control/schema-diff';
+export { diffSchemas, SchemaDiff } from '../control/schema-diff';
 export type {
   SchemaVerifier,
   SchemaVerifyOptions,

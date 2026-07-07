@@ -19,6 +19,7 @@ import type {
   ControlFamilyInstance,
 } from './control-instances';
 import type { OperationContext } from './control-result-types';
+import type { DiffIssue } from './schema-diff';
 
 // ============================================================================
 // Migration Package Metadata
@@ -407,6 +408,16 @@ export interface MigrationPlanner<
      * per-extension callers pass the extension's space id.
      */
     readonly spaceId: string;
+    /**
+     * Caller-supplied keep-predicate the planner applies to its schema diff
+     * (via `SchemaDiff.filter`) before building operations. The orchestration
+     * constructs it so the diff findings reaching op-building are exactly the
+     * contract space's own — e.g. dropping the `extra` findings for elements
+     * a sibling contract space declares, so the planner never emits DROP ops
+     * against another space's tables. The planner applies it blindly and
+     * holds no ownership logic. Absent for single-space plans.
+     */
+    readonly keepDiffIssue?: (issue: DiffIssue) => boolean;
   }): MigrationPlannerResult;
 
   /**

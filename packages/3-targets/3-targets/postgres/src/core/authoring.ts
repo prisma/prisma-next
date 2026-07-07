@@ -14,15 +14,15 @@ import type { SqlEntityRefResolution } from '@prisma-next/sql-contract/entity-re
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { DEFAULT_NAMESPACE_ID } from './namespace-ids';
+import { PostgresNativeEnum } from './postgres-native-enum';
+import { PostgresRlsPolicy } from './postgres-rls-policy';
+import { PostgresRole, type PostgresRoleInput } from './postgres-role';
 import {
   PostgresNativeEnumSchema,
   PostgresRlsPolicySchema,
   PostgresRoleSchema,
 } from './postgres-validators';
 import { computeContentHash, normalizePredicate } from './rls/canonicalize';
-import { PostgresNativeEnum } from './schema-ir/postgres-native-enum';
-import { PostgresRlsPolicy } from './schema-ir/postgres-rls-policy';
-import { PostgresRole, type PostgresRoleInput } from './schema-ir/postgres-role';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
 

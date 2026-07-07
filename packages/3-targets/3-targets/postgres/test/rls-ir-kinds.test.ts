@@ -1,9 +1,9 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
+import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
+import { PostgresRole } from '../src/core/postgres-role';
 import { PostgresSchema } from '../src/core/postgres-schema';
-import { PostgresRlsPolicy } from '../src/core/schema-ir/postgres-rls-policy';
-import { PostgresRole } from '../src/core/schema-ir/postgres-role';
 
 const emptyTableInput = {
   columns: {},

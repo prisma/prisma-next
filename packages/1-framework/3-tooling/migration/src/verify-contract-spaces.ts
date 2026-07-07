@@ -157,7 +157,7 @@ export type VerifyContractSpacesResult =
  * Algorithm:
  *
  * - For every extension space declared in `loadedSpaces` (`'app'`
- *   excluded — the per-space verifier is scoped to extension members;
+ *   excluded — the per-space verifier is scoped to extension spaces;
  *   the app is verified through the aggregate path):
  *   - If no contract-space dir on disk → `declaredButUnmigrated`.
  *   - Else if `markerRowsBySpace` lacks an entry → no violation here;

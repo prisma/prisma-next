@@ -319,17 +319,17 @@ describe('migration read commands pretty parity', () => {
         graph: aggregate.app.graph(),
         spaces: [],
         treeSections: listResult.value.spaces.map((spaceEntry) => {
-          const member = aggregate.space(spaceEntry.space)!;
+          const space = aggregate.space(spaceEntry.space)!;
           const tree =
             spaceEntry.migrations.length === 0
               ? ''
               : renderMigrationGraphSpaceTree({
-                  graph: member.graph(),
+                  graph: space.graph(),
                   migrations: spaceEntry.migrations,
                   liveContractHash: LIVE_CONTRACT_HASH,
                   glyphMode: 'unicode',
                   colorize: true,
-                  refsByHash: listRefsByContractHash(member),
+                  refsByHash: listRefsByContractHash(space),
                   ...globalWidths,
                 });
           return {
@@ -379,8 +379,8 @@ describe('migration read commands pretty parity', () => {
       showSpaceHeadings,
     );
     const treeSections = listResult.value.spaces.map((spaceEntry) => {
-      const member = aggregate.space(spaceEntry.space)!;
-      const graph = member.graph();
+      const space = aggregate.space(spaceEntry.space)!;
+      const graph = space.graph();
       const targetHash =
         spaceEntry.space === 'postgis'
           ? HASH_POSTGIS
@@ -403,7 +403,7 @@ describe('migration read commands pretty parity', () => {
               liveContractHash: LIVE_CONTRACT_HASH,
               glyphMode: 'unicode',
               colorize: true,
-              refsByHash: listRefsByContractHash(member),
+              refsByHash: listRefsByContractHash(space),
               statusOverlayByHash: statusOverlay,
               ...globalWidths,
             });

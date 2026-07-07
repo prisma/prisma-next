@@ -5,6 +5,7 @@
  * introspection, and asserts the produced `SqlColumnIR` carries
  * `many: true` with the element codec's native type.
  */
+import { PostgresDatabaseSchemaNode } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createDriver,
@@ -42,39 +43,36 @@ describe.sequential('array column introspection', () => {
   it('text[] column → nativeType:text + many:true', { timeout: testTimeout }, async () => {
     await driver!.query('CREATE TABLE arr_test (id int4 PRIMARY KEY, tags text[] NOT NULL)');
 
-    const schema = await familyInstance.introspect({ driver: driver! });
-    const col = schema.tables['arr_test']?.columns['tags'];
-    expect(col).toBeDefined();
-    expect(col?.nativeType).toBe('text');
-    expect(col?.many).toBe(true);
-    expect(col?.nullable).toBe(false);
+    const result = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(result);
+    const col = result.namespaces['public']!.tables['arr_test']?.columns['tags'];
+    expect(col).toMatchObject({ nativeType: 'text', many: true, nullable: false });
   });
 
   it('int4[] column → nativeType:int4 + many:true', { timeout: testTimeout }, async () => {
     await driver!.query('CREATE TABLE arr_test (id int4 PRIMARY KEY, scores integer[] NOT NULL)');
 
-    const schema = await familyInstance.introspect({ driver: driver! });
-    const col = schema.tables['arr_test']?.columns['scores'];
-    expect(col).toBeDefined();
-    expect(col?.nativeType).toBe('int4');
-    expect(col?.many).toBe(true);
+    const result = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(result);
+    const col = result.namespaces['public']!.tables['arr_test']?.columns['scores'];
+    expect(col).toMatchObject({ nativeType: 'int4', many: true });
   });
 
   it('nullable text[] column → many:true + nullable:true', { timeout: testTimeout }, async () => {
     await driver!.query('CREATE TABLE arr_test (id int4 PRIMARY KEY, labels text[])');
 
-    const schema = await familyInstance.introspect({ driver: driver! });
-    const col = schema.tables['arr_test']?.columns['labels'];
-    expect(col).toBeDefined();
-    expect(col?.many).toBe(true);
-    expect(col?.nullable).toBe(true);
+    const result = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(result);
+    const col = result.namespaces['public']!.tables['arr_test']?.columns['labels'];
+    expect(col).toMatchObject({ many: true, nullable: true });
   });
 
   it('scalar text column carries no many property', { timeout: testTimeout }, async () => {
     await driver!.query('CREATE TABLE arr_test (id int4 PRIMARY KEY, name text NOT NULL)');
 
-    const schema = await familyInstance.introspect({ driver: driver! });
-    const col = schema.tables['arr_test']?.columns['name'];
+    const result = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(result);
+    const col = result.namespaces['public']!.tables['arr_test']?.columns['name'];
     expect(col).toBeDefined();
     expect(col?.many).toBeUndefined();
     expect(col?.nativeType).toBe('text');

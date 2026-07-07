@@ -38,6 +38,7 @@ export function diffMongoSchemas(
       const controlPolicy = collectionControlPolicy(name);
       const issue: SchemaIssue = {
         kind: 'missing_table',
+        reason: 'not-found',
         table: name,
         message: `Collection "${name}" is missing from the database`,
       };
@@ -67,6 +68,7 @@ export function diffMongoSchemas(
       const controlPolicy = collectionControlPolicy(name);
       const issue: SchemaIssue = {
         kind: 'extra_table',
+        reason: 'not-expected',
         table: name,
         message: `Extra collection "${name}" exists in the database but not in the contract`,
       };
@@ -84,6 +86,7 @@ export function diffMongoSchemas(
           expected: null,
           actual: name,
           children: [],
+          reason: 'not-expected',
         },
         issues,
         collectionChildren,
@@ -201,6 +204,7 @@ function diffIndexes(
     } else {
       const issue: SchemaIssue = {
         kind: 'index_mismatch',
+        reason: 'not-equal',
         table: collName,
         indexOrConstraint: formatIndexName(idx),
         message: `Index ${formatIndexName(idx)} missing on collection "${collName}"`,
@@ -229,6 +233,7 @@ function diffIndexes(
     if (!expectedLookup.has(key)) {
       const issue: SchemaIssue = {
         kind: 'extra_index',
+        reason: 'not-expected',
         table: collName,
         indexOrConstraint: formatIndexName(idx),
         message: `Extra index ${formatIndexName(idx)} on collection "${collName}"`,
@@ -270,6 +275,7 @@ function diffValidator(
   if (expected.validator && !live.validator) {
     const issue: SchemaIssue = {
       kind: 'type_missing',
+      reason: 'not-found',
       table: collName,
       message: `Validator missing on collection "${collName}"`,
     };
@@ -297,6 +303,7 @@ function diffValidator(
   if (!expected.validator && live.validator) {
     const issue: SchemaIssue = {
       kind: 'extra_validator',
+      reason: 'not-expected',
       table: collName,
       message: `Extra validator on collection "${collName}"`,
     };
@@ -334,6 +341,7 @@ function diffValidator(
   ) {
     const issue: SchemaIssue = {
       kind: 'type_mismatch',
+      reason: 'not-equal',
       table: collName,
       expected: expectedSchema,
       actual: liveSchema,
@@ -396,6 +404,7 @@ function diffOptions(
   if (!expected.options && live.options) {
     const issue: SchemaIssue = {
       kind: 'type_mismatch',
+      reason: 'not-equal',
       table: collName,
       actual: canonicalize(live.options),
       message: `Extra collection options on "${collName}"`,
@@ -440,6 +449,7 @@ function diffOptions(
 
   const issue: SchemaIssue = {
     kind: 'type_mismatch',
+    reason: 'not-equal',
     table: collName,
     expected: canonicalize(expected.options),
     actual: canonicalize(live.options),

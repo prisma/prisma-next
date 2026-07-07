@@ -12,22 +12,22 @@ import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createContractSpaceAggregate } from '../../src/aggregate/aggregate';
 import { planMigration } from '../../src/aggregate/planner';
-import type { ContractSpaceAggregate, ContractSpaceMember } from '../../src/aggregate/types';
+import type { AggregateContractSpace, ContractSpaceAggregate } from '../../src/aggregate/types';
 import { EMPTY_CONTRACT_HASH } from '../../src/constants';
 import type { OnDiskMigrationPackage } from '../../src/package';
-import { createAttestedPackage, makeContractSpaceMember } from '../fixtures';
+import { createAttestedPackage, makeAggregateContractSpace } from '../fixtures';
 
 const POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening'],
 };
 
-function makeMember(args: {
+function makeSpace(args: {
   spaceId: string;
   contract?: Contract;
   headRef?: { hash: string; invariants: readonly string[] };
   packages?: readonly OnDiskMigrationPackage[];
-}): ContractSpaceMember {
-  return makeContractSpaceMember({
+}): AggregateContractSpace {
+  return makeAggregateContractSpace({
     spaceId: args.spaceId,
     contract: args.contract ?? createSqlContract({ target: 'postgres' }),
     headRef: args.headRef ?? { hash: EMPTY_CONTRACT_HASH, invariants: [] },
@@ -36,8 +36,8 @@ function makeMember(args: {
 }
 
 function makeAggregate(args: {
-  app: ContractSpaceMember;
-  extensions?: ContractSpaceMember[];
+  app: AggregateContractSpace;
+  extensions?: AggregateContractSpace[];
   targetId?: string;
 }): ContractSpaceAggregate {
   return createContractSpaceAggregate({
@@ -90,9 +90,9 @@ function makeSyntheticPlan(targetId: string): MigrationPlanWithAuthoringSurface 
 }
 
 describe('planMigration', () => {
-  it('selects synth for the app member when callerPolicy.ignoreGraphFor includes its spaceId', async () => {
+  it('selects synth for the app space when callerPolicy.ignoreGraphFor includes its spaceId', async () => {
     const aggregate = makeAggregate({
-      app: makeMember({ spaceId: 'app' }),
+      app: makeSpace({ spaceId: 'app' }),
     });
     const stubPlan = makeSyntheticPlan('placeholder-target-id-from-stub');
     const planner = makeStubPlanner({ kind: 'success', plan: stubPlan });
@@ -118,16 +118,16 @@ describe('planMigration', () => {
     expect(success.perSpace.get('app')?.plan.targetId).toBe('postgres');
   });
 
-  it('selects graph-walk for an extension member with a non-empty graph reaching its head ref', async () => {
+  it('selects graph-walk for an extension space with a non-empty graph reaching its head ref', async () => {
     const headHash = 'sha256:cipher-head';
     const cipherPkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
-    const extension = makeMember({
+    const extension = makeSpace({
       spaceId: 'cipherstash',
       headRef: { hash: headHash, invariants: [] },
       packages: [cipherPkg],
     });
     const aggregate = makeAggregate({
-      app: makeMember({ spaceId: 'app' }),
+      app: makeSpace({ spaceId: 'app' }),
       extensions: [extension],
     });
 
@@ -160,12 +160,12 @@ describe('planMigration', () => {
   });
 
   it('falls back to synth when an extension graph is empty and no invariants are required', async () => {
-    const extension = makeMember({
+    const extension = makeSpace({
       spaceId: 'cipherstash',
       headRef: { hash: EMPTY_CONTRACT_HASH, invariants: [] },
     });
     const aggregate = makeAggregate({
-      app: makeMember({ spaceId: 'app' }),
+      app: makeSpace({ spaceId: 'app' }),
       extensions: [extension],
     });
 
@@ -189,13 +189,13 @@ describe('planMigration', () => {
     expect(result.assertOk().perSpace.get('cipherstash')?.strategy).toBe('synth');
   });
 
-  it('rejects with policyConflict when ignoreGraphFor covers a member that declares non-empty invariants', async () => {
-    const extension = makeMember({
+  it('rejects with policyConflict when ignoreGraphFor covers a space that declares non-empty invariants', async () => {
+    const extension = makeSpace({
       spaceId: 'cipherstash',
       headRef: { hash: EMPTY_CONTRACT_HASH, invariants: ['cipher:create-v1'] },
     });
     const aggregate = makeAggregate({
-      app: makeMember({ spaceId: 'app' }),
+      app: makeSpace({ spaceId: 'app' }),
       extensions: [extension],
     });
 
@@ -227,13 +227,13 @@ describe('planMigration', () => {
     expect(failure.detail).toContain('cipher:create-v1');
   });
 
-  it('rejects with extensionPathUnsatisfiable when the empty-graph member declares non-empty invariants', async () => {
-    const extension = makeMember({
+  it('rejects with extensionPathUnsatisfiable when the empty-graph space declares non-empty invariants', async () => {
+    const extension = makeSpace({
       spaceId: 'cipherstash',
       headRef: { hash: EMPTY_CONTRACT_HASH, invariants: ['cipher:create-v1'] },
     });
     const aggregate = makeAggregate({
-      app: makeMember({ spaceId: 'app' }),
+      app: makeSpace({ spaceId: 'app' }),
       extensions: [extension],
     });
 
@@ -267,7 +267,7 @@ describe('planMigration', () => {
 
   it('forwards synth-strategy planner failures as appSynthFailure', async () => {
     const aggregate = makeAggregate({
-      app: makeMember({ spaceId: 'app' }),
+      app: makeSpace({ spaceId: 'app' }),
     });
     const failingPlanner = makeStubPlanner({
       kind: 'failure',

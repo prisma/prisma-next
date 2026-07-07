@@ -11,7 +11,7 @@ import {
   dropRlsPolicy,
   enableRowLevelSecurity,
 } from '../../src/core/migrations/operations/rls';
-import { PostgresRlsPolicy } from '../../src/core/schema-ir/postgres-rls-policy';
+import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresCreatePolicy, PostgresDropPolicy } from '../../src/exports/ddl';
 
 function recordingCheckLowerer(): { lowerer: ExecuteRequestLowerer; received: unknown[] } {

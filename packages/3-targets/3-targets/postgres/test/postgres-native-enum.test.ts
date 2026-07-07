@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { PostgresNativeEnum } from '../src/core/postgres-native-enum';
+import { PostgresRole } from '../src/core/postgres-role';
 import { PostgresSchema } from '../src/core/postgres-schema';
-import { PostgresNativeEnum } from '../src/core/schema-ir/postgres-native-enum';
-import { PostgresRole } from '../src/core/schema-ir/postgres-role';
 
 const aalLevelInput = {
   typeName: 'aal_level',
@@ -63,42 +63,20 @@ describe('PostgresNativeEnum', () => {
     expect(node.members).not.toBe(members);
   });
 
-  describe('DiffableNode surface', () => {
-    it('id returns the type name', () => {
+  describe('Contract-IR entity, not a DiffableNode', () => {
+    it('has no id property', () => {
       const node = new PostgresNativeEnum(aalLevelInput);
-      expect(node.id).toBe('aal_level');
+      expect('id' in node).toBe(false);
     });
 
-    it('children() returns an empty list (leaf node)', () => {
+    it('has no children method', () => {
       const node = new PostgresNativeEnum(aalLevelInput);
-      expect(node.children()).toEqual([]);
+      expect('children' in node).toBe(false);
     });
 
-    it('isEqualTo() returns true for two native enums with the same type name and members', () => {
-      const a = new PostgresNativeEnum(aalLevelInput);
-      const b = new PostgresNativeEnum({ ...aalLevelInput });
-      expect(a.isEqualTo(b)).toBe(true);
-    });
-
-    it('isEqualTo() returns false when members differ in order', () => {
-      const a = new PostgresNativeEnum(aalLevelInput);
-      const b = new PostgresNativeEnum({
-        ...aalLevelInput,
-        members: [...aalLevelInput.members].reverse(),
-      });
-      expect(a.isEqualTo(b)).toBe(false);
-    });
-
-    it('isEqualTo() returns false for different type names', () => {
-      const a = new PostgresNativeEnum(aalLevelInput);
-      const b = new PostgresNativeEnum({ ...aalLevelInput, typeName: 'other_type' });
-      expect(a.isEqualTo(b)).toBe(false);
-    });
-
-    it('isEqualTo() throws when other is not a PostgresNativeEnum', () => {
+    it('has no isEqualTo method', () => {
       const node = new PostgresNativeEnum(aalLevelInput);
-      const notANativeEnum = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
-      expect(() => node.isEqualTo(notANativeEnum)).toThrow();
+      expect('isEqualTo' in node).toBe(false);
     });
   });
 

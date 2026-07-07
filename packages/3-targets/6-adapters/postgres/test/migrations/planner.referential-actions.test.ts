@@ -11,7 +11,11 @@ import {
   SqlStorage,
 } from '@prisma-next/sql-contract/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
-import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -81,13 +85,17 @@ function createRefActionContract(
   };
 }
 
-const emptySchema = new PostgresSchemaIR({
-  tables: {},
-  pgSchemaName: 'public',
+const emptySchema = new PostgresDatabaseSchemaNode({
+  namespaces: {
+    public: new PostgresNamespaceSchemaNode({
+      schemaName: 'public',
+      tables: {},
+      nativeEnumTypeNames: [],
+    }),
+  },
   pgVersion: '',
   roles: [],
   existingSchemas: [],
-  nativeEnumTypeNames: [],
 });
 
 async function planAndGetFkSql(

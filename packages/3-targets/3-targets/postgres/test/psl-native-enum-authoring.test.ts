@@ -24,8 +24,8 @@ import {
   postgresAuthoringEntityTypes,
   postgresAuthoringPslBlockDescriptors,
 } from '../src/core/authoring';
+import { PostgresNativeEnum } from '../src/core/postgres-native-enum';
 import { PostgresSchema, postgresCreateNamespace } from '../src/core/postgres-schema';
-import { PostgresNativeEnum } from '../src/core/schema-ir/postgres-native-enum';
 
 const assembled = assembleAuthoringContributions([
   {

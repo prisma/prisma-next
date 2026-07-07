@@ -20,9 +20,9 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresTableSource } from './ast/table-source';
 import { PG_TEXT_CODEC_ID } from './codec-ids';
 import { nativeEnumEntityKind, policyEntityKind, roleEntityKind } from './entity-kinds';
-import type { PostgresNativeEnum } from './schema-ir/postgres-native-enum';
-import type { PostgresRlsPolicy } from './schema-ir/postgres-rls-policy';
-import type { PostgresRole } from './schema-ir/postgres-role';
+import type { PostgresNativeEnum } from './postgres-native-enum';
+import type { PostgresRlsPolicy } from './postgres-rls-policy';
+import type { PostgresRole } from './postgres-role';
 import { escapeLiteral } from './sql-utils';
 
 export type PostgresContract = Contract<SqlStorage> & { readonly target: 'postgres' };

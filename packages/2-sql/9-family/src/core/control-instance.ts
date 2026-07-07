@@ -44,18 +44,17 @@ import type {
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
-import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
+import type { DiffDatabaseSchemaInput } from './migrations/schema-differ';
 import type {
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
 } from './migrations/types';
 import { sqlOperationsToPreview } from './operation-preview';
-import { sqlSchemaIrToPslAst } from './psl-contract-infer/sql-schema-ir-to-psl-ast';
-import { verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds } from './verify';
 
 function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
@@ -192,9 +191,9 @@ interface SqlFamilyInstanceState {
 }
 
 export interface SqlControlFamilyInstance
-  extends ControlFamilyInstance<'sql', SqlSchemaIR>,
-    SchemaViewCapable<SqlSchemaIR>,
-    PslContractInferCapable<SqlSchemaIR>,
+  extends ControlFamilyInstance<'sql', SqlSchemaIRNode>,
+    SchemaViewCapable<SqlSchemaIRNode>,
+    PslContractInferCapable<SqlSchemaIRNode>,
     OperationPreviewCapable,
     SqlFamilyInstanceState {
   /**
@@ -216,18 +215,17 @@ export interface SqlControlFamilyInstance
   }): Promise<VerifyDatabaseResult>;
 
   /**
-   * Verify a contract against an already-introspected schema slice.
+   * Verify a contract against an already-introspected schema.
    *
    * Callers that need to verify against the live database compose
    * `introspect({ driver })` + `verifySchema({ contract, schema, ... })`.
-   * The aggregate verifier projects each member's claimed slice via
-   * `projectSchemaToSpace` and hands the projected slice in — this
-   * keeps per-member verification from surfacing sibling-space tables
-   * as `extras`.
+   * The aggregate verifier hands in the full introspected schema and scopes
+   * the returned result to each member's contract space afterwards — so
+   * sibling-space tables never survive as `extras`.
    */
   verifySchema(options: {
     readonly contract: unknown;
-    readonly schema: SqlSchemaIR;
+    readonly schema: SqlSchemaIRNode;
     readonly strict: boolean;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): VerifyDatabaseSchemaResult;
@@ -242,9 +240,9 @@ export interface SqlControlFamilyInstance
   introspect(options: {
     readonly driver: SqlControlDriverInstance<string>;
     readonly contract?: unknown;
-  }): Promise<SqlSchemaIR>;
+  }): Promise<SqlSchemaIRNode>;
 
-  inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst;
+  inferPslContract(schemaIR: SqlSchemaIRNode): PslDocumentAst;
 
   lowerAst(
     ast: AnyQueryAst | DdlNode,
@@ -299,8 +297,6 @@ export interface SqlControlFamilyInstance
   }): Promise<void>;
 
   bootstrapControlTableQueries(): readonly DdlNode[];
-
-  bootstrapSignMarkerQueries(): readonly DdlNode[];
 
   toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview;
 }
@@ -535,6 +531,31 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       };
     }
   ).contractSerializer;
+  // Database→PSL inference is target logic (it owns the dialect type/default
+  // maps and walks its own schema tree), so it is read off the descriptor like
+  // `contractSerializer`. Absent for targets without `contract infer` (Mongo).
+  const targetInferPslContract = blindCast<
+    { readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst },
+    'reading the optional target-descriptor inferPslContract hook'
+  >(target).inferPslContract;
+  // The combined database-schema verify is a required target-descriptor
+  // operation: every SQL target provides it, wrapping the same comparison
+  // `diffDatabaseSchema` runs in the verify envelope plus the pass/warn/fail
+  // tree the CLI renders. Read it off the descriptor like the other
+  // target-owned hooks.
+  const verifyDatabaseSchema = blindCast<
+    {
+      readonly verifyDatabaseSchema?: (
+        input: DiffDatabaseSchemaInput,
+      ) => VerifyDatabaseSchemaResult;
+    },
+    'reading the required target-descriptor verifyDatabaseSchema hook'
+  >(target).verifyDatabaseSchema;
+  if (!verifyDatabaseSchema) {
+    throw new Error(
+      `SQL target "${target.targetId}" is missing the required verifyDatabaseSchema descriptor operation`,
+    );
+  }
   const deserializeWithTargetSerializer = (contractOrJson: unknown): Contract<SqlStorage> => {
     const serializer = targetSerializer ?? new SqlContractSerializer();
     const json =
@@ -687,29 +708,36 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
     verifySchema(options: {
       readonly contract: unknown;
-      readonly schema: SqlSchemaIR;
+      readonly schema: SqlSchemaIRNode;
       readonly strict: boolean;
       readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
     }): VerifyDatabaseSchemaResult {
       const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
-      const controlAdapter = getControlAdapter();
-      const sqlResult = verifySqlSchema({
+      // Verify is a thin consumer of the target's black-box comparison: it
+      // introspects the actual schema (already in `options.schema`), calls the
+      // target's required `verifyDatabaseSchema`, and rejects when a surviving
+      // issue is a failure. It composes no diffing itself and is blind to how
+      // the comparison works.
+      const sqlResult = verifyDatabaseSchema({
         contract,
         schema: options.schema,
         strict: options.strict,
         typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
-        ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
-        ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
       });
-      const rawSchemaDiffIssues =
-        controlAdapter.collectSchemaDiffIssues?.(contract, options.schema) ?? [];
+      // Control-policy suppression of the structural (e.g. RLS policy) diff
+      // issues is a verify-side post-step — the combined diff returns them
+      // ownership-filtered, and a suppressed control policy drops them here.
       const schemaDiffIssues = filterSchemaDiffIssues(
-        rawSchemaDiffIssues,
+        sqlResult.schema.schemaDiffIssues,
         contract.defaultControlPolicy,
       );
-      if (schemaDiffIssues.length === 0) return sqlResult;
-      const totalFails = sqlResult.schema.counts.fail + schemaDiffIssues.length;
+      const relationalFails = sqlResult.schema.counts.fail;
+      if (schemaDiffIssues.length === 0) {
+        if (schemaDiffIssues === sqlResult.schema.schemaDiffIssues) return sqlResult;
+        return { ...sqlResult, schema: { ...sqlResult.schema, schemaDiffIssues } };
+      }
+      const totalFails = relationalFails + schemaDiffIssues.length;
       return {
         ...sqlResult,
         ok: false,
@@ -885,12 +913,17 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     async introspect(options: {
       readonly driver: SqlControlDriverInstance<string>;
       readonly contract?: unknown;
-    }): Promise<SqlSchemaIR> {
+    }): Promise<SqlSchemaIRNode> {
       return getControlAdapter().introspect(options.driver, options.contract);
     },
 
-    inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst {
-      return sqlSchemaIrToPslAst(schemaIR);
+    inferPslContract(schemaIR: SqlSchemaIRNode): PslDocumentAst {
+      if (!targetInferPslContract) {
+        throw new Error(
+          `Target "${target.targetId}" does not support contract infer (no inferPslContract on its descriptor).`,
+        );
+      }
+      return targetInferPslContract(schemaIR);
     },
 
     lowerAst(
@@ -904,17 +937,52 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       return getControlAdapter().bootstrapControlTableQueries();
     },
 
-    bootstrapSignMarkerQueries(): readonly DdlNode[] {
-      return getControlAdapter().bootstrapSignMarkerQueries();
-    },
-
     toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview {
       return sqlOperationsToPreview(operations);
     },
 
-    toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
-      const tableNodes: readonly SchemaTreeNode[] = Object.entries(schema.tables).map(
-        ([tableName, table]: [string, SqlTableIR]) => {
+    toSchemaView(schema: SqlSchemaIRNode): CoreSchemaView {
+      // Walk the schema-IR tree's own structure (root → namespaces → tables)
+      // into one flat list of table nodes. A root that exposes a `namespaces`
+      // record (Postgres) contributes each namespace's tables; a flat root
+      // (SQLite) is its own single namespace. The single-schema common case
+      // renders the same table-level view as today — no synthetic namespace
+      // level.
+      const root = blindCast<
+        {
+          readonly namespaces?: Readonly<
+            Record<string, { readonly tables: Record<string, SqlTableIR> }>
+          >;
+          readonly tables?: Record<string, SqlTableIR>;
+        },
+        'structural read of the schema-IR tree own namespaces/tables records'
+      >(schema);
+      // A multi-namespace root qualifies every table's display name with its
+      // namespace key, so same-named tables in different namespaces (e.g.
+      // public.thing and auth.thing) render distinct ids and labels. The
+      // single-namespace case (and a flat SQLite root) keeps today's bare
+      // names. Synthesized constraint/index fallback names keep the bare table
+      // name — that is the name the database derives them from.
+      const namespaceEntries: ReadonlyArray<[string | undefined, Record<string, SqlTableIR>]> =
+        root.namespaces !== undefined
+          ? Object.entries(root.namespaces).map(
+              ([namespaceKey, namespace]): [string, Record<string, SqlTableIR>] => [
+                namespaceKey,
+                namespace.tables,
+              ],
+            )
+          : [[undefined, root.tables ?? {}]];
+      const qualify = namespaceEntries.length > 1;
+      const tableEntries: ReadonlyArray<[string, string, SqlTableIR]> = namespaceEntries.flatMap(
+        ([namespaceKey, tables]) =>
+          Object.entries(tables).map(([tableName, table]): [string, string, SqlTableIR] => [
+            qualify && namespaceKey !== undefined ? `${namespaceKey}.${tableName}` : tableName,
+            tableName,
+            table,
+          ]),
+      );
+      const tableNodes: readonly SchemaTreeNode[] = tableEntries.map(
+        ([displayName, tableName, table]: [string, string, SqlTableIR]) => {
           const children: SchemaTreeNode[] = [];
 
           const columnNodes: SchemaTreeNode[] = [];
@@ -925,7 +993,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             columnNodes.push(
               new SchemaTreeNode({
                 kind: 'field',
-                id: `column-${tableName}-${columnName}`,
+                id: `column-${displayName}-${columnName}`,
                 label,
                 meta: {
                   nativeType: column.nativeType,
@@ -940,7 +1008,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'collection',
-                id: `columns-${tableName}`,
+                id: `columns-${displayName}`,
                 label: 'columns',
                 children: columnNodes,
               }),
@@ -952,7 +1020,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'index',
-                id: `primary-key-${tableName}`,
+                id: `primary-key-${displayName}`,
                 label: `primary key: ${pkColumns}`,
                 meta: {
                   columns: table.primaryKey.columns,
@@ -968,7 +1036,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'index',
-                id: `unique-${tableName}-${name}`,
+                id: `unique-${displayName}-${name}`,
                 label,
                 meta: {
                   columns: unique.columns,
@@ -984,7 +1052,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'index',
-                id: `index-${tableName}-${name}`,
+                id: `index-${displayName}-${name}`,
                 label,
                 meta: {
                   columns: index.columns,
@@ -1012,8 +1080,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
           return new SchemaTreeNode({
             kind: 'entity',
-            id: `table-${tableName}`,
-            label: `table ${tableName}`,
+            id: `table-${displayName}`,
+            label: `table ${displayName}`,
             ...(Object.keys(tableMeta).length > 0 ? { meta: tableMeta } : {}),
             ...(children.length > 0 ? { children } : {}),
           });
@@ -1033,8 +1101,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 }
 
 /**
- * Filters schema diff issues (from `collectSchemaDiffIssues`) through the
- * contract's `defaultControlPolicy`. Issues whose outcome maps to a suppressed
+ * Filters the structural schema-diff issues (from `diffDatabaseSchema`) through
+ * the contract's `defaultControlPolicy`. Issues whose outcome maps to a suppressed
  * category under the effective policy are removed. This mirrors the control-policy
  * filtering applied by `verifySqlSchema` for table/column-level findings.
  *

@@ -38,14 +38,13 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
   }): Promise<VerifyDatabaseResult>;
 
   /**
-   * Verify a contract against an already-introspected schema slice.
+   * Verify a contract against an already-introspected schema.
    *
    * Callers that need to verify against the live database compose
-   * {@link introspect} + `verifySchema` directly; the family
-   * interface deliberately exposes the introspection step so callers
-   * can pre-project the schema (e.g. the aggregate verifier projects
-   * each member's claimed slice via
-   * {@link import('@prisma-next/migration-tools/aggregate').projectSchemaToSpace}).
+   * {@link introspect} + `verifySchema` directly. The aggregate verifier
+   * verifies each member against the full introspected schema and scopes the
+   * result to that member's contract space afterwards — it never prunes the
+   * schema up front.
    *
    * Synchronous — no I/O. Idempotent.
    */

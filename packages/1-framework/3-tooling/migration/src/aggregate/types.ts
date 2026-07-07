@@ -27,10 +27,10 @@ export type ContractAtResult =
     };
 
 /**
- * One contract space — app or extension — as a member of a
- * {@link ContractSpaceAggregate}. Every member has the same shape.
+ * One contract space — app or extension — as the aggregate holds it.
+ * Every space in a {@link ContractSpaceAggregate} has the same shape.
  *
- * A member is a tolerant snapshot of one space's on-disk state, not a
+ * A value of this type is a tolerant snapshot of one space's on-disk state, not a
  * validated value: `packages` is the raw migration-package list as read
  * from disk (a hash- or invariants-mismatched package is retained here;
  * a genuinely unparseable one is omitted), and integrity is judged
@@ -44,12 +44,12 @@ export type ContractAtResult =
  * - `headRef`: the system head ref read from
  *   `migrations/<spaceId>/refs/head.json`, or `null` when absent
  *   (represented as a `headRefMissing` violation, never fatal). The app
- *   member's head ref is always synthesised from its live contract's
+ *   space's head ref is always synthesised from its live contract's
  *   storage hash, so it is never `null`.
  * - `graph()`: the migration graph this space's packages induce —
  *   lazily reconstructed on first call and memoised. Pure structure: a
  *   `from === to` self-edge is represented, not rejected.
- * - `contract()`: the deserialized contract for this member — lazily
+ * - `contract()`: the deserialized contract for this space — lazily
  *   produced on first call and memoised. For the app it is the live
  *   contract the caller supplied; for an extension it is the on-disk
  *   `migrations/<spaceId>/contract.json` run through the family's
@@ -62,7 +62,7 @@ export type ContractAtResult =
  *   its `end-contract.*`. Lazy per `(hash, refName?)` memoisation; throws
  *   typed {@link MigrationToolsError} values compatible with CLI mappers.
  */
-export interface ContractSpaceMember {
+export interface AggregateContractSpace {
   readonly spaceId: string;
   readonly packages: readonly OnDiskMigrationPackage[];
   readonly refs: Refs;
@@ -75,14 +75,14 @@ export interface ContractSpaceMember {
 /**
  * Tolerant, queryable snapshot of a project's on-disk migration state:
  * the app contract space plus every extension contract space, each a
- * {@link ContractSpaceMember}.
+ * {@link AggregateContractSpace}.
  *
  * Produced once per CLI invocation by `loadContractSpaceAggregate`.
  * Building the aggregate never throws on disk content; every consumer
  * obtains spaces / packages / refs / graphs from this one value rather
  * than re-deriving them from disk.
  *
- * - `targetId`: the app contract's target; every member is expected to
+ * - `targetId`: the app contract's target; every space is expected to
  *   share it (a mismatch surfaces as a `targetMismatch` violation under
  *   `checkContracts`).
  * - `app` / `extensions`: retained as fields for the existing planner /
@@ -91,6 +91,11 @@ export interface ContractSpaceMember {
  * - `listSpaces()` / `hasSpace()` / `space()` / `spaces()`: the query
  *   surface the read commands consume — `app` first, then extension ids
  *   lex-ascending.
+ * - `declaresEntity(name)` / `declaringSpaces(name)`: ownership queries —
+ *   does any contract space declare a storage entity with this bare name,
+ *   and which spaces do? The verifier's unclaimed-elements pass and the
+ *   plan orchestration's diff scoping ask these of the diff's extra
+ *   findings; the passive aggregate answers, it runs no diff.
  * - `checkIntegrity()`: judges the loaded model and returns every
  *   violation (never bailing at the first). Config/contract-dependent
  *   checks run only when the matching {@link IntegrityQueryOptions} opt
@@ -98,11 +103,13 @@ export interface ContractSpaceMember {
  */
 export interface ContractSpaceAggregate {
   readonly targetId: string;
-  readonly app: ContractSpaceMember;
-  readonly extensions: readonly ContractSpaceMember[];
+  readonly app: AggregateContractSpace;
+  readonly extensions: readonly AggregateContractSpace[];
   listSpaces(): readonly string[];
   hasSpace(id: string): boolean;
-  space(id: string): ContractSpaceMember | undefined;
-  spaces(): readonly ContractSpaceMember[];
+  space(id: string): AggregateContractSpace | undefined;
+  spaces(): readonly AggregateContractSpace[];
+  declaresEntity(entityName: string): boolean;
+  declaringSpaces(entityName: string): readonly string[];
   checkIntegrity(opts?: IntegrityQueryOptions): readonly IntegrityViolation[];
 }

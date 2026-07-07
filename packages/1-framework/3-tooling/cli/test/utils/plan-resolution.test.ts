@@ -1,8 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { CliStructuredError } from '@prisma-next/errors/control';
 import {
-  type ContractSpaceMember,
-  createContractSpaceMember,
+  type AggregateContractSpace,
+  createAggregateContractSpace,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
@@ -81,12 +81,12 @@ function contractAtResult(
   };
 }
 
-function makeMember(
+function makeSpace(
   packages: readonly OnDiskMigrationPackage[],
   refs: Refs = {},
   contractAtImpl?: ReturnType<typeof vi.fn>,
 ) {
-  const member = createContractSpaceMember({
+  const space = createAggregateContractSpace({
     spaceId: 'app',
     packages,
     refs,
@@ -99,15 +99,15 @@ function makeMember(
     deserializeContract: (json) => json as Contract,
   });
   if (contractAtImpl) {
-    vi.spyOn(member, 'contractAt').mockImplementation(
-      contractAtImpl as ContractSpaceMember['contractAt'],
+    vi.spyOn(space, 'contractAt').mockImplementation(
+      contractAtImpl as AggregateContractSpace['contractAt'],
     );
   }
-  return member;
+  return space;
 }
 
 function baseInput(
-  overrides: Partial<ResolveFromForPlanInput> & Pick<ResolveFromForPlanInput, 'member'>,
+  overrides: Partial<ResolveFromForPlanInput> & Pick<ResolveFromForPlanInput, 'space'>,
 ): ResolveFromForPlanInput {
   return {
     optionsFrom: undefined,
@@ -126,8 +126,8 @@ describe('resolveFromForPlan', () => {
   });
 
   it('returns greenfield when db ref is absent and --from is omitted', async () => {
-    const member = makeMember([]);
-    const result = await resolveFromForPlan(baseInput({ member }));
+    const space = makeSpace([]);
+    const result = await resolveFromForPlan(baseInput({ space }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -136,12 +136,12 @@ describe('resolveFromForPlan', () => {
   });
 
   it('returns auto-baseline when graph is empty and db ref has a paired snapshot', async () => {
-    const member = makeMember(
+    const space = makeSpace(
       [],
       { db: { hash: HASH_ORPHAN, invariants: [] } },
       vi.fn().mockResolvedValue(contractAtResult(HASH_ORPHAN)),
     );
-    const result = await resolveFromForPlan(baseInput({ member }));
+    const result = await resolveFromForPlan(baseInput({ space }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -151,16 +151,16 @@ describe('resolveFromForPlan', () => {
         expect(result.value.contractDts).toContain('Contract');
       }
     }
-    expect(member.contractAt).toHaveBeenCalledWith(HASH_ORPHAN, { refName: 'db' });
+    expect(space.contractAt).toHaveBeenCalledWith(HASH_ORPHAN, { refName: 'db' });
   });
 
   it('returns auto-baseline for explicit ref name on an empty graph', async () => {
-    const member = makeMember(
+    const space = makeSpace(
       [],
       { staging: { hash: HASH_ORPHAN, invariants: [] } },
       vi.fn().mockResolvedValue(contractAtResult(HASH_ORPHAN)),
     );
-    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: 'staging' }));
+    const result = await resolveFromForPlan(baseInput({ space, optionsFrom: 'staging' }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -170,12 +170,12 @@ describe('resolveFromForPlan', () => {
 
   it('returns snapshot for db ref at graph tip with paired snapshot', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
-    const member = makeMember(
+    const space = makeSpace(
       bundles,
       { db: { hash: HASH_B, invariants: [] } },
       vi.fn().mockResolvedValue(contractAtResult(HASH_B)),
     );
-    const result = await resolveFromForPlan(baseInput({ member }));
+    const result = await resolveFromForPlan(baseInput({ space }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -185,12 +185,12 @@ describe('resolveFromForPlan', () => {
 
   it('returns snapshot for db ref at a non-tip graph node with paired snapshot', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
-    const member = makeMember(
+    const space = makeSpace(
       bundles,
       { db: { hash: HASH_A, invariants: [] } },
       vi.fn().mockResolvedValue(contractAtResult(HASH_A)),
     );
-    const result = await resolveFromForPlan(baseInput({ member }));
+    const result = await resolveFromForPlan(baseInput({ space }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -200,7 +200,7 @@ describe('resolveFromForPlan', () => {
 
   it('refuses forgot-the-flag when db ref hash is not a graph node', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
-    const member = makeMember(
+    const space = makeSpace(
       bundles,
       {
         db: { hash: HASH_ORPHAN, invariants: [] },
@@ -208,7 +208,7 @@ describe('resolveFromForPlan', () => {
       },
       vi.fn().mockResolvedValue(contractAtResult(HASH_ORPHAN)),
     );
-    const result = await resolveFromForPlan(baseInput({ member }));
+    const result = await resolveFromForPlan(baseInput({ space }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -219,12 +219,12 @@ describe('resolveFromForPlan', () => {
 
   it('refuses forgot-the-flag for explicit ref name whose hash is not a graph node', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const member = makeMember(
+    const space = makeSpace(
       bundles,
       { staging: { hash: HASH_ORPHAN, invariants: [] } },
       vi.fn().mockResolvedValue(contractAtResult(HASH_ORPHAN)),
     );
-    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: 'staging' }));
+    const result = await resolveFromForPlan(baseInput({ space, optionsFrom: 'staging' }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -234,8 +234,8 @@ describe('resolveFromForPlan', () => {
 
   it('refuses forgot-the-flag for explicit full hash not in graph on non-empty graph', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const member = makeMember(bundles, { tip: { hash: HASH_A, invariants: [] } });
-    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: HASH_ORPHAN }));
+    const space = makeSpace(bundles, { tip: { hash: HASH_A, invariants: [] } });
+    const result = await resolveFromForPlan(baseInput({ space, optionsFrom: HASH_ORPHAN }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -245,8 +245,8 @@ describe('resolveFromForPlan', () => {
   });
 
   it('refuses snapshot-missing for explicit full hash not in graph on empty graph', async () => {
-    const member = makeMember([]);
-    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: HASH_ORPHAN }));
+    const space = makeSpace([]);
+    const result = await resolveFromForPlan(baseInput({ space, optionsFrom: HASH_ORPHAN }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -261,8 +261,8 @@ describe('resolveFromForPlan', () => {
       .mockResolvedValue(
         contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
       );
-    const member = makeMember(bundles, {}, contractAt);
-    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: HASH_A }));
+    const space = makeSpace(bundles, {}, contractAt);
+    const result = await resolveFromForPlan(baseInput({ space, optionsFrom: HASH_A }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -276,7 +276,7 @@ describe('resolveFromForPlan', () => {
   });
 
   it('refuses snapshot-missing for legacy db ref without snapshot when hash is not a graph node', async () => {
-    const member = makeMember(
+    const space = makeSpace(
       [],
       { db: { hash: HASH_ORPHAN, invariants: [] } },
       vi.fn().mockRejectedValue(
@@ -291,7 +291,7 @@ describe('resolveFromForPlan', () => {
         ),
       ),
     );
-    const result = await resolveFromForPlan(baseInput({ member }));
+    const result = await resolveFromForPlan(baseInput({ space }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -302,7 +302,7 @@ describe('resolveFromForPlan', () => {
 
   it('falls back to graph-node bundle source for legacy db ref without snapshot when hash is in graph', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const member = makeMember(
+    const space = makeSpace(
       bundles,
       { db: { hash: HASH_A, invariants: [] } },
       vi
@@ -311,7 +311,7 @@ describe('resolveFromForPlan', () => {
           contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
         ),
     );
-    const result = await resolveFromForPlan(baseInput({ member }));
+    const result = await resolveFromForPlan(baseInput({ space }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -325,7 +325,7 @@ describe('resolveFromForPlan', () => {
 
   it('returns graph-node for explicit ref when snapshot is missing but hash is a graph node', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const member = makeMember(
+    const space = makeSpace(
       bundles,
       { staging: { hash: HASH_A, invariants: [] } },
       vi
@@ -334,7 +334,7 @@ describe('resolveFromForPlan', () => {
           contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
         ),
     );
-    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: 'staging' }));
+    const result = await resolveFromForPlan(baseInput({ space, optionsFrom: 'staging' }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -344,11 +344,11 @@ describe('resolveFromForPlan', () => {
         sourceDir: '/migrations/app/m1',
       });
     }
-    expect(member.contractAt).toHaveBeenCalledWith(HASH_A, { refName: 'staging' });
+    expect(space.contractAt).toHaveBeenCalledWith(HASH_A, { refName: 'staging' });
   });
 
   it('refuses snapshot-missing for explicit ref name without snapshot when hash is not a graph node', async () => {
-    const member = makeMember(
+    const space = makeSpace(
       [],
       { staging: { hash: HASH_ORPHAN, invariants: [] } },
       vi.fn().mockRejectedValue(
@@ -363,7 +363,7 @@ describe('resolveFromForPlan', () => {
         ),
       ),
     );
-    const result = await resolveFromForPlan(baseInput({ member, optionsFrom: 'staging' }));
+    const result = await resolveFromForPlan(baseInput({ space, optionsFrom: 'staging' }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -372,7 +372,7 @@ describe('resolveFromForPlan', () => {
   });
 
   it('surfaces contract validation failure for bad snapshot contract shape', async () => {
-    const member = makeMember(
+    const space = makeSpace(
       [],
       { db: { hash: HASH_A, invariants: [] } },
       vi.fn().mockRejectedValue(
@@ -390,7 +390,7 @@ describe('resolveFromForPlan', () => {
         ),
       ),
     );
-    const result = await resolveFromForPlan(baseInput({ member }));
+    const result = await resolveFromForPlan(baseInput({ space }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -399,7 +399,7 @@ describe('resolveFromForPlan', () => {
   });
 
   it('surfaces INVALID_REF_FILE when paired contract.d.ts is missing', async () => {
-    const member = makeMember(
+    const space = makeSpace(
       [],
       { db: { hash: HASH_A, invariants: [] } },
       vi.fn().mockRejectedValue(
@@ -409,7 +409,7 @@ describe('resolveFromForPlan', () => {
         }),
       ),
     );
-    const result = await resolveFromForPlan(baseInput({ member }));
+    const result = await resolveFromForPlan(baseInput({ space }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -418,13 +418,13 @@ describe('resolveFromForPlan', () => {
   });
 
   it('treats explicit --from db identically to implicit default', async () => {
-    const member = makeMember(
+    const space = makeSpace(
       [],
       { db: { hash: HASH_ORPHAN, invariants: [] } },
       vi.fn().mockResolvedValue(contractAtResult(HASH_ORPHAN)),
     );
-    const implicit = await resolveFromForPlan(baseInput({ member }));
-    const explicit = await resolveFromForPlan(baseInput({ member, optionsFrom: 'db' }));
+    const implicit = await resolveFromForPlan(baseInput({ space }));
+    const explicit = await resolveFromForPlan(baseInput({ space, optionsFrom: 'db' }));
 
     expect(implicit.ok).toBe(true);
     expect(explicit.ok).toBe(true);
@@ -435,7 +435,7 @@ describe('resolveFromForPlan', () => {
 });
 
 function baseToInput(
-  overrides: Partial<ResolveToForPlanInput> & Pick<ResolveToForPlanInput, 'member'>,
+  overrides: Partial<ResolveToForPlanInput> & Pick<ResolveToForPlanInput, 'space'>,
 ): ResolveToForPlanInput {
   return { ...overrides };
 }
@@ -447,12 +447,12 @@ describe('resolveToForPlan', () => {
 
   it('resolves a ref name with a paired snapshot to its materialized contract', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
-    const member = makeMember(
+    const space = makeSpace(
       bundles,
       { staging: { hash: HASH_A, invariants: [] } },
       vi.fn().mockResolvedValue(contractAtResult(HASH_A)),
     );
-    const result = await resolveToForPlan('staging', baseToInput({ member }));
+    const result = await resolveToForPlan('staging', baseToInput({ space }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -469,8 +469,8 @@ describe('resolveToForPlan', () => {
       .mockResolvedValue(
         contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
       );
-    const member = makeMember(bundles, {}, contractAt);
-    const result = await resolveToForPlan(HASH_A, baseToInput({ member }));
+    const space = makeSpace(bundles, {}, contractAt);
+    const result = await resolveToForPlan(HASH_A, baseToInput({ space }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -487,8 +487,8 @@ describe('resolveToForPlan', () => {
       .mockResolvedValue(
         contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
       );
-    const member = makeMember(bundles, {}, contractAt);
-    const result = await resolveToForPlan('m2^', baseToInput({ member }));
+    const space = makeSpace(bundles, {}, contractAt);
+    const result = await resolveToForPlan('m2^', baseToInput({ space }));
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -499,8 +499,8 @@ describe('resolveToForPlan', () => {
 
   it('maps a not-found reference to a structured error', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
-    const member = makeMember(bundles);
-    const result = await resolveToForPlan('does-not-exist', baseToInput({ member }));
+    const space = makeSpace(bundles);
+    const result = await resolveToForPlan('does-not-exist', baseToInput({ space }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
