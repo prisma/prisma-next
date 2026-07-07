@@ -20,10 +20,7 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
-import type {
-  SqlControlExtensionDescriptor,
-  SqlPslInferContext,
-} from '../src/core/migrations/types';
+import type { SqlControlExtensionDescriptor } from '../src/core/migrations/types';
 import {
   stubTargetDiffDatabaseSchema,
   stubTargetVerifyDatabaseSchema,
@@ -47,13 +44,13 @@ class TestSchemaTree extends SqlSchemaIRNode {
   }
 }
 
-function isTableDescribedByAggregate(
-  aggregate: SqlPslInferContext['aggregate'],
+function isTableDescribed(
+  describedContracts: readonly Contract<SqlStorage>[],
   schemaName: string,
   tableName: string,
 ): boolean {
-  return aggregate.some((member) =>
-    Object.values(member.contract.storage.namespaces).some(
+  return describedContracts.some((contract) =>
+    Object.values(contract.storage.namespaces).some(
       (ns) =>
         ns.id === schemaName && ns.entries.table && Object.hasOwn(ns.entries.table, tableName),
     ),
@@ -65,19 +62,18 @@ function stubModel(name: string): PslModel {
 }
 
 /**
- * The stub target hook under test: it applies the same `(schemaName,
- * tableName)` aggregate-membership omission `inferPostgresPslContract` uses,
- * so this test proves the family instance threads a real pack-derived
- * aggregate into the hook — not that this stub reimplements Postgres inference.
+ * The stub target hook under test: it proves the family instance forwards
+ * the stack's extension-pack contracts as `describedContracts` — not that
+ * this stub reimplements Postgres inference.
  */
 function stubInferPslContract(
   schema: SqlSchemaIRNode,
-  context?: SqlPslInferContext,
+  describedContracts?: readonly Contract<SqlStorage>[],
 ): PslDocumentAst {
   const tree = schema instanceof TestSchemaTree ? schema : new TestSchemaTree([]);
-  const aggregate = context?.aggregate ?? [];
+  const contracts = describedContracts ?? [];
   const survivingTables = tree.appTables.filter(
-    (tableName) => !isTableDescribedByAggregate(aggregate, 'public', tableName),
+    (tableName) => !isTableDescribed(contracts, 'public', tableName),
   );
   return {
     kind: 'document',
@@ -191,8 +187,8 @@ function modelNames(ast: PslDocumentAst): readonly string[] {
   return ast.namespaces.flatMap((ns) => Object.keys(ns.entries['model'] ?? {}));
 }
 
-describe('SqlFamilyInstance#inferPslContract — aggregate threading', () => {
-  it('threads the stack extension packs into the target hook as the aggregate, omitting a pack-described table', () => {
+describe('SqlFamilyInstance#inferPslContract — describedContracts threading', () => {
+  it('threads the stack extension packs’ contracts into the target hook, omitting a pack-described table', () => {
     const pack = buildExtensionWithPublicTable('supabase', 'auth_users');
     const familyInstance = createSqlFamilyInstance(makeStack([pack]));
     const tree = new TestSchemaTree(['app_table', 'auth_users']);

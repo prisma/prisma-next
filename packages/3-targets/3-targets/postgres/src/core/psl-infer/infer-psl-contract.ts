@@ -1,8 +1,4 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
-import type {
-  SqlAggregateContractMember,
-  SqlPslInferContext,
-} from '@prisma-next/family-sql/control';
+import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type {
   DefaultMappingOptions,
   PslNativeTypeAttribute,
@@ -18,6 +14,7 @@ import {
   toModelName,
   toNamedTypeName,
 } from '@prisma-next/family-sql/psl-infer';
+import { elementCoordinates } from '@prisma-next/framework-components/ir';
 import type {
   PslAttribute,
   PslAttributeArgument,
@@ -35,6 +32,7 @@ import {
   makePslNamespaceEntries,
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import type { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { createPostgresDefaultMapping } from './postgres-default-mapping';
@@ -81,25 +79,34 @@ type TopLevelNameResult = {
 };
 
 /**
- * Tests whether an aggregate member's contract already declares the table at
- * `(schemaName, tableName)`. Matches on the member namespace's `.id`, not the
- * record key it is stored under in `storage.namespaces` — the serializer does
- * not guarantee the two are the same string.
+ * Canonical key for an entity coordinate, joining the three axes
+ * `elementCoordinates` yields (namespace, entity kind, entity name). Entity-
+ * agnostic by construction: a table lives at `(schemaName, 'table',
+ * tableName)` today, but a pack-declared enum or policy reaching the tree
+ * later would key exactly the same way.
  */
-function isTableDescribedByAggregate(
-  aggregate: readonly SqlAggregateContractMember[],
-  schemaName: string,
-  tableName: string,
-): boolean {
-  for (const member of aggregate) {
-    for (const namespace of Object.values(member.contract.storage.namespaces)) {
-      if (namespace.id !== schemaName) continue;
-      if (namespace.entries.table && Object.hasOwn(namespace.entries.table, tableName)) {
-        return true;
-      }
+function coordinateKey(namespaceId: string, entityKind: string, entityName: string): string {
+  return `${namespaceId} ${entityKind} ${entityName}`;
+}
+
+/**
+ * Coordinates every element a set of already-assembled contracts declare,
+ * keyed by {@link coordinateKey}. `contract infer` uses this set to omit
+ * database elements a stack extension pack's contract space already
+ * describes — reusing the same coordinate walk the contract-space aggregate
+ * and cross-space collision check use (`elementCoordinates`), rather than a
+ * bespoke per-entity-kind membership test.
+ */
+function declaredCoordinateKeys(
+  describedContracts: readonly Contract<SqlStorage>[],
+): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const contract of describedContracts) {
+    for (const coordinate of elementCoordinates(contract.storage)) {
+      keys.add(coordinateKey(coordinate.namespaceId, coordinate.entityKind, coordinate.entityName));
     }
   }
-  return false;
+  return keys;
 }
 
 /**
@@ -141,18 +148,19 @@ function stripDanglingForeignKeys(
  * emitted as one `UNSPECIFIED_PSL_NAMESPACE_ID` bucket. Top-level entities
  * (policies/roles → PSL extension blocks) are a later slice.
  *
- * `context.aggregate` — the stack's extension packs — is consulted while
- * gathering tables: a table already described by an aggregate member at its
- * `(schemaName, tableName)` is omitted, before the duplicate-name check below
- * and before relation inference, so it cannot spuriously collide with an app
- * table and never contributes a relation field.
+ * `describedContracts` — the stack's extension packs' already-assembled
+ * contracts — is consulted while gathering tables: a table whose coordinate
+ * `(schemaName, 'table', tableName)` one of those contracts already declares
+ * is omitted, before the duplicate-name check below and before relation
+ * inference, so it cannot spuriously collide with an app table and never
+ * contributes a relation field.
  */
 export function inferPostgresPslContract(
   tree: PostgresDatabaseSchemaNode,
-  context?: SqlPslInferContext,
+  describedContracts?: readonly Contract<SqlStorage>[],
 ): PslDocumentAst {
   const namespaces = Object.values(tree.namespaces);
-  const aggregate = context?.aggregate ?? [];
+  const declaredKeys = declaredCoordinateKeys(describedContracts ?? []);
 
   // Native Postgres enums (CREATE TYPE … AS ENUM) are not adoptable by
   // `contract infer`; throw an actionable diagnostic naming the type(s). Enum
@@ -180,7 +188,7 @@ export function inferPostgresPslContract(
   const omittedTableNames = new Set<string>();
   for (const namespace of namespaces) {
     for (const [tableName, table] of Object.entries(namespace.tables)) {
-      if (isTableDescribedByAggregate(aggregate, namespace.schemaName, tableName)) {
+      if (declaredKeys.has(coordinateKey(namespace.schemaName, 'table', tableName))) {
         omittedTableNames.add(tableName);
         continue;
       }

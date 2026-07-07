@@ -474,26 +474,6 @@ export interface SqlMigrationRunner<TTargetDetails> {
   ): Promise<SqlMigrationRunnerResult>;
 }
 
-/**
- * One stack extension pack's contract, as seen by `contract infer`: the
- * pack's id alongside its already-assembled contract space contract. Carried
- * as-is — no merging across members — so the inferrer can test membership
- * without the caller pre-computing an omission set.
- */
-export interface SqlAggregateContractMember {
-  readonly id: string;
-  readonly contract: Contract<SqlStorage>;
-}
-
-/**
- * Context passed to the `inferPslContract` target hook: the partially
- * assembled contract aggregate (today, the stack's extension packs) so the
- * inferrer can omit database elements the aggregate already describes.
- */
-export interface SqlPslInferContext {
-  readonly aggregate: readonly SqlAggregateContractMember[];
-}
-
 export interface SqlControlTargetDescriptor<
   TTargetId extends string,
   TTargetDetails,
@@ -518,12 +498,12 @@ export interface SqlControlTargetDescriptor<
    * Database→PSL inference for `contract infer`. Target logic (owns the dialect
    * maps), so it lives on the descriptor. Optional: targets without `contract
    * infer` (Mongo) omit it, and the family instance throws when it is absent.
-   * `context.aggregate` carries the stack's extension packs so the inferrer
-   * can omit elements they already describe.
+   * `describedContracts` carries the stack's extension packs' already-assembled
+   * contracts so the inferrer can omit elements they already describe.
    */
   readonly inferPslContract?: (
     schema: SqlSchemaIRNode,
-    context?: SqlPslInferContext,
+    describedContracts?: readonly Contract<SqlStorage>[],
   ) => PslDocumentAst;
   /**
    * The single combined database-schema diff of two derived representations —

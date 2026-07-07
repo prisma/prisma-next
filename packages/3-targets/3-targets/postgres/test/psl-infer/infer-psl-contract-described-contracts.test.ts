@@ -1,9 +1,6 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type {
-  SqlAggregateContractMember,
-  SqlControlExtensionDescriptor,
-} from '@prisma-next/family-sql/control';
+import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import type { ContractSpace, ControlStack } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
@@ -49,20 +46,17 @@ function tree(namespaces: Record<string, PostgresNamespaceSchemaNode>) {
 }
 
 /**
- * Builds an aggregate member's `Contract<SqlStorage>`. Each namespace's
- * record key (the object property under which it is stored in `namespaces`)
- * can differ from its own `.id` — the inferrer must match by `.id`, not by
- * record key.
+ * Builds a described contract — one of the values `inferPostgresPslContract`
+ * receives in its `describedContracts` array — declaring the given tables
+ * under each namespace id. Each namespace's record key is its own `.id`,
+ * matching how a real contract space's storage is keyed.
  */
-function aggregateMember(
-  id: string,
-  namespaces: Readonly<
-    Record<string, { readonly namespaceId: string; readonly tables: readonly string[] }>
-  >,
-): SqlAggregateContractMember {
+function describedContract(
+  namespaces: Readonly<Record<string, readonly string[]>>,
+): Contract<SqlStorage> {
   const storageNamespaces: Record<string, PostgresSchema> = {};
-  for (const [recordKey, { namespaceId, tables }] of Object.entries(namespaces)) {
-    storageNamespaces[recordKey] = new PostgresSchema({
+  for (const [namespaceId, tables] of Object.entries(namespaces)) {
+    storageNamespaces[namespaceId] = new PostgresSchema({
       id: namespaceId,
       entries: {
         table: Object.fromEntries(
@@ -75,7 +69,7 @@ function aggregateMember(
     });
   }
 
-  const contract: Contract<SqlStorage> = {
+  return {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
@@ -89,30 +83,25 @@ function aggregateMember(
     extensionPacks: {},
     meta: {},
   };
-
-  return { id, contract };
 }
 
-describe('inferPostgresPslContract — aggregate omission', () => {
-  it('omits a table an aggregate member describes, keeps the rest', () => {
+describe('inferPostgresPslContract — described-contract omission', () => {
+  it('omits a table a described contract declares, keeps the rest', () => {
     const database = tree({
       public: namespaceNode('public', {
         app_table: idColumnTable('app_table'),
         t_owned: idColumnTable('t_owned'),
       }),
     });
-    const aggregate = [
-      aggregateMember('pack', { public: { namespaceId: 'public', tables: ['t_owned'] } }),
-    ];
 
-    const ast = inferPostgresPslContract(database, { aggregate });
+    const ast = inferPostgresPslContract(database, [describedContract({ public: ['t_owned'] })]);
     const modelNames = flatPslModels(ast).map((m) => m.name);
 
     expect(modelNames).toContain('AppTable');
     expect(modelNames).not.toContain('TOwned');
   });
 
-  it('produces byte-identical output for an empty aggregate and for no context at all', () => {
+  it('produces byte-identical output for empty and absent describedContracts', () => {
     const database = tree({
       public: namespaceNode('public', {
         app_table: idColumnTable('app_table'),
@@ -120,39 +109,47 @@ describe('inferPostgresPslContract — aggregate omission', () => {
       }),
     });
 
-    const withoutContext = printPsl(inferPostgresPslContract(database));
-    const withEmptyAggregate = printPsl(inferPostgresPslContract(database, { aggregate: [] }));
+    const withoutArgument = printPsl(inferPostgresPslContract(database));
+    const withEmptyList = printPsl(inferPostgresPslContract(database, []));
 
-    expect(withEmptyAggregate).toBe(withoutContext);
+    expect(withEmptyList).toBe(withoutArgument);
   });
 
-  it('keeps a table when the aggregate describes a same-named table in a different namespace', () => {
+  it('keeps a table when a described contract declares a same-named table in a different namespace', () => {
     const database = tree({
       public: namespaceNode('public', { users: idColumnTable('users') }),
     });
-    const aggregate = [
-      aggregateMember('auth-pack', { auth: { namespaceId: 'auth', tables: ['users'] } }),
-    ];
 
-    const ast = inferPostgresPslContract(database, { aggregate });
+    const ast = inferPostgresPslContract(database, [describedContract({ auth: ['users'] })]);
 
     expect(flatPslModels(ast).map((m) => m.name)).toContain('Users');
   });
 
-  it('matches an aggregate namespace by its id, not the record key it is stored under', () => {
+  it('is entity-kind-precise: a non-table entity of the same name in the same namespace does not omit the table', () => {
+    // The described contract declares "widgets" under a pack-contributed
+    // entity kind, not `table`. The coordinate key includes `entityKind`, so
+    // this must never suppress the introspected `widgets` table — proving
+    // the omission is keyed on (namespaceId, entityKind, entityName), not a
+    // table-specific predicate.
     const database = tree({
-      public: namespaceNode('public', { t_owned: idColumnTable('t_owned') }),
+      public: namespaceNode('public', { widgets: idColumnTable('widgets') }),
     });
-    // The namespace is stored under the record key "not-public" but its own
-    // `.id` is "public" — matching by record key would miss this and fail to
-    // omit; matching by `.id` (the required behaviour) omits it.
-    const aggregate = [
-      aggregateMember('pack', { 'not-public': { namespaceId: 'public', tables: ['t_owned'] } }),
-    ];
+    const contractWithNonTableEntity: Contract<SqlStorage> = {
+      ...describedContract({}),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:contract'),
+        namespaces: {
+          public: new PostgresSchema({
+            id: 'public',
+            entries: { widget: { widgets: {} } },
+          }),
+        },
+      }),
+    };
 
-    const ast = inferPostgresPslContract(database, { aggregate });
+    const ast = inferPostgresPslContract(database, [contractWithNonTableEntity]);
 
-    expect(flatPslModels(ast).map((m) => m.name)).not.toContain('TOwned');
+    expect(flatPslModels(ast).map((m) => m.name)).toContain('Widgets');
   });
 
   it('strips a foreign key referencing an omitted table, leaving no dangling relation', () => {
@@ -175,11 +172,8 @@ describe('inferPostgresPslContract — aggregate omission', () => {
         }),
       }),
     });
-    const aggregate = [
-      aggregateMember('pack', { public: { namespaceId: 'public', tables: ['t_owned'] } }),
-    ];
 
-    const ast = inferPostgresPslContract(database, { aggregate });
+    const ast = inferPostgresPslContract(database, [describedContract({ public: ['t_owned'] })]);
     const modelNames = flatPslModels(ast).map((m) => m.name);
     const postsModel = flatPslModels(ast).find((m) => m.name === 'Posts');
 
@@ -211,11 +205,8 @@ describe('inferPostgresPslContract — aggregate omission', () => {
         }),
       }),
     });
-    const aggregate = [
-      aggregateMember('pack', { auth: { namespaceId: 'auth', tables: ['users'] } }),
-    ];
 
-    const ast = inferPostgresPslContract(database, { aggregate });
+    const ast = inferPostgresPslContract(database, [describedContract({ auth: ['users'] })]);
     const modelNames = flatPslModels(ast).map((m) => m.name);
     const postsModel = flatPslModels(ast).find((m) => m.name === 'Posts');
 
@@ -227,17 +218,15 @@ describe('inferPostgresPslContract — aggregate omission', () => {
     );
   });
 
-  it('omits a pack-claimed table before the cross-schema duplicate-name check', () => {
+  it('omits a described-contract-claimed table before the cross-schema duplicate-name check', () => {
     const database = tree({
       public: namespaceNode('public', { t_owned: idColumnTable('t_owned') }),
       other: namespaceNode('other', { t_owned: idColumnTable('t_owned') }),
     });
-    const aggregate = [
-      aggregateMember('pack', { other: { namespaceId: 'other', tables: ['t_owned'] } }),
-    ];
+    const describedContracts = [describedContract({ other: ['t_owned'] })];
 
-    expect(() => inferPostgresPslContract(database, { aggregate })).not.toThrow();
-    const ast = inferPostgresPslContract(database, { aggregate });
+    expect(() => inferPostgresPslContract(database, describedContracts)).not.toThrow();
+    const ast = inferPostgresPslContract(database, describedContracts);
     expect(flatPslModels(ast).map((m) => m.name)).toContain('TOwned');
   });
 });

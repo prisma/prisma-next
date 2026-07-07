@@ -58,9 +58,9 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     ...postgresTargetDescriptorMeta,
     contractSerializer: new PostgresContractSerializer(),
     schemaVerifier: new PostgresSchemaVerifier(),
-    inferPslContract(schema, context) {
+    inferPslContract(schema, describedContracts) {
       PostgresDatabaseSchemaNode.assert(schema);
-      return inferPostgresPslContract(schema, context);
+      return inferPostgresPslContract(schema, describedContracts);
     },
     diffDatabaseSchema(input) {
       return diffPostgresDatabaseSchema({

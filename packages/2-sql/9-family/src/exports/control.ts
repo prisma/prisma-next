@@ -50,7 +50,6 @@ export type {
   FieldEvent,
   FieldEventContext,
   ResolveIdentityValueInput,
-  SqlAggregateContractMember,
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
   SqlControlTargetDescriptor,
@@ -75,7 +74,6 @@ export type {
   SqlPlannerResult,
   SqlPlannerSuccessResult,
   SqlPlanTargetDetails,
-  SqlPslInferContext,
   StorageTypePlanResult,
 } from '../core/migrations/types';
 export {
