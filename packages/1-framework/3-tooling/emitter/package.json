@@ -20,8 +20,8 @@
     "@prisma-next/operations": "workspace:0.14.0",
     "@prisma-next/ts-render": "workspace:0.14.0",
     "@prisma-next/utils": "workspace:0.14.0",
-    "arktype": "^2.2.0",
-    "prettier": "^3.8.3"
+    "arktype": "^2.2.1",
+    "prettier": "^3.9.0"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:0.14.0",
