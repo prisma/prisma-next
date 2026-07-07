@@ -17,7 +17,25 @@ import {
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
+import { contractToMongoSchemaIR } from '../src/core/contract-to-schema';
+import { diffMongoSchemas } from '../src/core/schema-diff';
+import { canonicalizeSchemasForVerification } from '../src/core/schema-verify/canonicalize-introspection';
 import { verifyMongoSchema } from '../src/core/schema-verify/verify-mongo-schema';
+
+/**
+ * Runs the same diff `verifyMongoSchema` runs internally (contract →
+ * expected IR, canonicalize, diff under a `managed` policy) so tests can
+ * assert on `warnings`, which the verify envelope no longer carries.
+ */
+function diffFromContractAndLive(
+  contract: MongoContract,
+  liveSchema: MongoSchemaIR,
+  strict: boolean,
+) {
+  const expectedIR = contractToMongoSchemaIR(contract);
+  const { live, expected } = canonicalizeSchemasForVerification(liveSchema, expectedIR);
+  return diffMongoSchemas(live, expected, strict, () => 'managed');
+}
 
 type MongoCollectionData = {
   readonly indexes?: readonly (MongoIndex | MongoIndexInput)[];
@@ -101,7 +119,6 @@ describe('verifyMongoSchema', () => {
       expect(result.ok).toBe(true);
       expect(result.code).toBeUndefined();
       expect(result.schema.issues).toEqual([]);
-      expect(result.schema.counts.fail).toBe(0);
       expect(result.contract.storageHash).toBe('sha256:test');
       expect(result.contract.profileHash).toBe('sha256:profile');
       expect(result.target.expected).toBe('mongo');
@@ -130,7 +147,6 @@ describe('verifyMongoSchema', () => {
 
       expect(result.ok).toBe(true);
       expect(result.schema.issues).toEqual([]);
-      expect(result.schema.counts.fail).toBe(0);
     });
   });
 
@@ -145,7 +161,7 @@ describe('verifyMongoSchema', () => {
 
       expect(result.ok).toBe(false);
       expect(result.code).toBe('PN-RUN-3010');
-      expect(result.schema.counts.fail).toBeGreaterThan(0);
+      expect(result.schema.issues.length).toBeGreaterThan(0);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({ kind: 'missing_table', table: 'users' }),
       );
@@ -185,7 +201,7 @@ describe('verifyMongoSchema', () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.schema.counts.fail).toBeGreaterThan(0);
+      expect(result.schema.issues.length).toBeGreaterThan(0);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({ kind: 'extra_index', table: 'users' }),
       );
@@ -206,9 +222,13 @@ describe('verifyMongoSchema', () => {
 
       expect(result.ok).toBe(true);
       expect(result.code).toBeUndefined();
-      expect(result.schema.counts.fail).toBe(0);
-      expect(result.schema.counts.warn).toBeGreaterThan(0);
+      expect(result.schema.issues.length).toBe(0);
       expect(result.meta?.strict).toBe(false);
+
+      const diff = diffFromContractAndLive(contract, liveSchema, false);
+      expect(diff.warnings).toContainEqual(
+        expect.objectContaining({ kind: 'extra_index', table: 'users' }),
+      );
     });
 
     it('fails when the contract requires a validator that the live schema does not have', () => {
@@ -535,7 +555,7 @@ describe('verifyMongoSchema', () => {
         });
 
         expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
+        expect(result.schema.issues.length).toBeGreaterThan(0);
       });
 
       it('surfaces drift when live default_language is non-default but the contract authored none', () => {
@@ -573,7 +593,7 @@ describe('verifyMongoSchema', () => {
         });
 
         expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
+        expect(result.schema.issues.length).toBeGreaterThan(0);
       });
 
       it('surfaces drift when live language_override is non-default but the contract authored none', () => {
@@ -611,7 +631,7 @@ describe('verifyMongoSchema', () => {
         });
 
         expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
+        expect(result.schema.issues.length).toBeGreaterThan(0);
       });
     });
 
@@ -689,7 +709,7 @@ describe('verifyMongoSchema', () => {
         });
 
         expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
+        expect(result.schema.issues.length).toBeGreaterThan(0);
       });
     });
 
@@ -754,7 +774,7 @@ describe('verifyMongoSchema', () => {
         });
 
         expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
+        expect(result.schema.issues.length).toBeGreaterThan(0);
       });
     });
 
@@ -837,7 +857,7 @@ describe('verifyMongoSchema', () => {
         });
 
         expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
+        expect(result.schema.issues.length).toBeGreaterThan(0);
       });
     });
 
@@ -904,7 +924,7 @@ describe('verifyMongoSchema', () => {
         });
 
         expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
+        expect(result.schema.issues.length).toBeGreaterThan(0);
       });
     });
 
@@ -995,7 +1015,7 @@ describe('verifyMongoSchema', () => {
         });
 
         expect(result.ok).toBe(false);
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
+        expect(result.schema.issues.length).toBeGreaterThan(0);
       });
     });
   });
@@ -1167,7 +1187,9 @@ describe('verifyMongoSchema', () => {
       // and that the no-match path through `findExpectedIndexCounterpart`
       // does not crash on absent expected indexes.
       expect(result.ok).toBe(true);
-      expect(result.schema.counts.warn).toBeGreaterThan(0);
+
+      const diff = diffFromContractAndLive(contract, liveSchema, false);
+      expect(diff.warnings.length).toBeGreaterThan(0);
     });
 
     it('keeps the scalar prefix of a compound text index in place', () => {
@@ -1310,7 +1332,7 @@ describe('verifyMongoSchema', () => {
       // live collation is `{locale, strength}` which doesn't match the
       // contract's three-field collation, so verification surfaces drift.
       expect(result.ok).toBe(false);
-      expect(result.schema.counts.fail).toBeGreaterThan(0);
+      expect(result.schema.issues.length).toBeGreaterThan(0);
     });
 
     it('returns live keys unchanged for a live _fts index that has no weights map', () => {
@@ -1349,7 +1371,7 @@ describe('verifyMongoSchema', () => {
       // project the live index back to that shape, so the contract index
       // shows as missing and the live `_fts` index as extra.
       expect(result.ok).toBe(false);
-      expect(result.schema.counts.fail).toBeGreaterThan(0);
+      expect(result.schema.issues.length).toBeGreaterThan(0);
     });
   });
 
@@ -1388,7 +1410,7 @@ describe('verifyMongoSchema', () => {
       });
 
       expect(result.ok).toBe(true);
-      expect(result.schema.counts.fail).toBe(0);
+      expect(result.schema.issues.length).toBe(0);
     });
   });
 });

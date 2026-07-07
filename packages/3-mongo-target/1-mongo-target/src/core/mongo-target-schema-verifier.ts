@@ -44,8 +44,8 @@ export class MongoTargetSchemaVerifier extends MongoSchemaVerifierBase<
     const { live, expected } = canonicalizeSchemasForVerification(options.schema, expectedIR);
     const collectionControlPolicy = (name: string) =>
       this.collectionControlPolicyForName(options.contract, name);
-    const { issues } = diffMongoSchemas(live, expected, false, collectionControlPolicy);
-    return issues;
+    const { failures, warnings } = diffMongoSchemas(live, expected, false, collectionControlPolicy);
+    return [...failures, ...warnings];
   }
 
   protected verifyTargetExtensions(

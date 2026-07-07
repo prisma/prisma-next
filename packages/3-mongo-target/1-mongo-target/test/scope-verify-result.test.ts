@@ -1,6 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
-  SchemaVerificationNode,
+  SchemaIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
@@ -15,57 +15,17 @@ function makeContract(collections: readonly string[]): Contract {
   } as unknown as Contract;
 }
 
-function collectionNode(
-  name: string,
-  status: SchemaVerificationNode['status'],
-  children: SchemaVerificationNode[] = [],
-): SchemaVerificationNode {
-  return {
-    status,
-    kind: 'collection',
-    name,
-    contractPath: `storage.namespaces.mongo.entries.collection.${name}`,
-    code: status === 'pass' ? 'MATCH' : 'EXTRA_COLLECTION',
-    message: '',
-    expected: undefined,
-    actual: undefined,
-    children,
-  };
-}
-
 function makeResult(args: {
   ok: boolean;
-  children: SchemaVerificationNode[];
-  counts: VerifyDatabaseSchemaResult['schema']['counts'];
-  issues?: VerifyDatabaseSchemaResult['schema']['issues'];
+  issues: readonly SchemaIssue[];
 }): VerifyDatabaseSchemaResult {
-  const rootStatus = args.children.some((c) => c.status === 'fail')
-    ? 'fail'
-    : args.children.some((c) => c.status === 'warn')
-      ? 'warn'
-      : 'pass';
   return {
     ok: args.ok,
     ...(args.ok ? {} : { code: 'PN-RUN-3010' }),
     summary: args.ok ? 'Database schema satisfies contract' : 'does not satisfy',
     contract: { storageHash: 'sha256:x' },
     target: { expected: 'mongo' },
-    schema: {
-      issues: args.issues ?? [],
-      schemaDiffIssues: [],
-      root: {
-        status: rootStatus,
-        kind: 'schema',
-        name: 'schema',
-        contractPath: '',
-        code: rootStatus === 'pass' ? 'MATCH' : 'DRIFT',
-        message: '',
-        expected: undefined,
-        actual: undefined,
-        children: args.children,
-      },
-      counts: args.counts,
-    },
+    schema: { issues: args.issues, schemaDiffIssues: [] },
     timings: { total: 0 },
   };
 }
@@ -82,35 +42,18 @@ describe('entityNamesDeclaredBy', () => {
 
 describe('scopeVerifyResultToSpace', () => {
   it('returns the input unchanged when no names are owned by other spaces', () => {
-    const result = makeResult({
-      ok: true,
-      children: [collectionNode('user', 'pass')],
-      counts: { pass: 1, warn: 0, fail: 0, totalNodes: 1 },
-    });
+    const result = makeResult({ ok: true, issues: [] });
     expect(scopeVerifyResultToSpace(result, new Set())).toBe(result);
   });
 
-  it('preserves the authoritative counts when a non-empty owned set drops nothing', () => {
-    const result = makeResult({
-      ok: true,
-      children: [collectionNode('user', 'pass')],
-      counts: { pass: 1, warn: 0, fail: 0, totalNodes: 1 },
-    });
-    const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
-    expect(scoped.schema.counts).toEqual({ pass: 1, warn: 0, fail: 0, totalNodes: 1 });
-    expect(scoped.ok).toBe(true);
+  it('returns the input unchanged when a non-empty owned set drops nothing', () => {
+    const result = makeResult({ ok: true, issues: [] });
+    expect(scopeVerifyResultToSpace(result, new Set(['cipher_state']))).toBe(result);
   });
 
-  it('drops a sibling space’s collection, keeps the undeclared extra, and flips ok', () => {
-    // Mongo basis: fail per collection, root not counted. Both extras fail.
+  it('drops a sibling space’s extra collection, keeps the undeclared extra, and stays failing', () => {
     const result = makeResult({
       ok: false,
-      children: [
-        collectionNode('user', 'pass'),
-        collectionNode('cipher_state', 'fail'),
-        collectionNode('junk', 'fail'),
-      ],
-      counts: { pass: 1, warn: 0, fail: 2, totalNodes: 3 },
       issues: [
         { kind: 'extra_table', table: 'cipher_state', message: 'extra' },
         { kind: 'extra_table', table: 'junk', message: 'extra' },
@@ -120,58 +63,59 @@ describe('scopeVerifyResultToSpace', () => {
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
 
     // The sibling's collection is dropped; the truly undeclared `junk` stays,
-    // so the runner still fails on genuine drift. Counts recompute on Mongo's
-    // basis: one tally per collection, the root never counted.
-    expect(scoped.schema.root.children.map((c) => c.name)).toEqual(['user', 'junk']);
-    expect(scoped.schema.issues.map((i) => ('table' in i ? i.table : ''))).toEqual(['junk']);
-    expect(scoped.schema.counts).toEqual({ pass: 1, warn: 0, fail: 1, totalNodes: 2 });
+    // so the runner still fails on genuine drift.
+    expect(scoped.schema.issues).toEqual([
+      expect.objectContaining({ kind: 'extra_table', table: 'junk' }),
+    ]);
     expect(scoped.ok).toBe(false);
+    expect(scoped.code).toBe('PN-RUN-3010');
   });
 
   it('flips ok to true when the only failures were sibling collections', () => {
     const result = makeResult({
       ok: false,
-      children: [collectionNode('user', 'pass'), collectionNode('cipher_state', 'fail')],
-      counts: { pass: 1, warn: 0, fail: 1, totalNodes: 2 },
       issues: [{ kind: 'extra_table', table: 'cipher_state', message: 'extra' }],
     });
 
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
 
     expect(scoped.ok).toBe(true);
-    // Exact Mongo basis after the prune: the one surviving collection, root
-    // excluded — not collection count + 1.
-    expect(scoped.schema.counts).toEqual({ pass: 1, warn: 0, fail: 0, totalNodes: 1 });
+    expect(scoped.summary).toBe('Database schema satisfies contract');
     expect(scoped.schema.issues).toEqual([]);
   });
 
-  it('never drops a space’s own field node named like a sibling collection', () => {
-    const fieldNode: SchemaVerificationNode = {
-      status: 'fail',
-      kind: 'field',
-      name: 'cipher_state',
-      contractPath: 'storage.namespaces.mongo.entries.collection.user.fields.cipher_state',
-      code: 'MISSING_FIELD',
-      message: '',
-      expected: undefined,
-      actual: undefined,
-      children: [],
-    };
+  it('never drops a non-extra issue even when its table name matches a sibling', () => {
+    // Only `extra_*` kinds are droppable — a genuine drift finding (e.g. a
+    // missing column) on a table that happens to share a name with a
+    // sibling-owned collection must survive, so the space still fails on
+    // its own drift.
     const result = makeResult({
       ok: false,
-      children: [collectionNode('user', 'fail', [fieldNode])],
-      counts: { pass: 0, warn: 0, fail: 1, totalNodes: 2 },
       issues: [
-        { kind: 'missing_column', table: 'user', column: 'cipher_state', message: 'missing' },
+        { kind: 'missing_column', table: 'cipher_state', column: 'ssn', message: 'missing' },
       ],
     });
 
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
 
-    // Only top-level collection nodes are droppable; the nested field node and
-    // its failure survive, so the space still fails on its own drift.
-    expect(scoped.schema.root.children.map((c) => c.name)).toEqual(['user']);
-    expect(scoped.schema.root.children[0]?.children.map((c) => c.name)).toEqual(['cipher_state']);
+    expect(scoped).toBe(result);
+    expect(scoped.ok).toBe(false);
+  });
+
+  it('drops nested extra-column issues scoped to a sibling table', () => {
+    const result = makeResult({
+      ok: false,
+      issues: [
+        { kind: 'extra_column', table: 'cipher_state', column: 'secret', message: 'extra' },
+        { kind: 'missing_column', table: 'user', column: 'email', message: 'missing' },
+      ],
+    });
+
+    const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
+
+    expect(scoped.schema.issues).toEqual([
+      expect.objectContaining({ kind: 'missing_column', table: 'user' }),
+    ]);
     expect(scoped.ok).toBe(false);
   });
 });

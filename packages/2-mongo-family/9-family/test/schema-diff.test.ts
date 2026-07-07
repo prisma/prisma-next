@@ -58,21 +58,18 @@ function validator(
 
 describe('diffMongoSchemas', () => {
   describe('empty schemas', () => {
-    it('returns pass for two empty schemas', () => {
+    it('returns no failures or warnings for two empty schemas', () => {
       const result = diffMongoSchemasManaged(emptyIR, emptyIR, false);
-      expect(result.root.status).toBe('pass');
-      expect(result.issues).toEqual([]);
-      expect(result.counts.fail).toBe(0);
-      expect(result.counts.warn).toBe(0);
+      expect(result.failures).toEqual([]);
+      expect(result.warnings).toEqual([]);
     });
   });
 
   describe('collections', () => {
-    it('returns pass when collections match', () => {
+    it('returns no failures when collections match', () => {
       const schema = ir({ users: coll('users') });
       const result = diffMongoSchemasManaged(schema, schema, false);
-      expect(result.root.status).toBe('pass');
-      expect(result.counts.fail).toBe(0);
+      expect(result.failures).toEqual([]);
     });
 
     it('fails on missing collection', () => {
@@ -80,13 +77,9 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users') });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.root.status).toBe('fail');
-      expect(result.counts.fail).toBe(1);
-      expect(result.issues).toEqual([
+      expect(result.failures).toEqual([
         expect.objectContaining({ kind: 'missing_table', table: 'users' }),
       ]);
-      const node = result.root.children![0]!;
-      expect(node.code).toBe('MISSING_COLLECTION');
     });
 
     it('warns on extra collection in non-strict mode', () => {
@@ -94,12 +87,10 @@ describe('diffMongoSchemas', () => {
       const expected = emptyIR;
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.root.status).toBe('warn');
-      expect(result.counts.warn).toBe(1);
-      expect(result.counts.fail).toBe(0);
-      const node = result.root.children![0]!;
-      expect(node.status).toBe('warn');
-      expect(node.code).toBe('EXTRA_COLLECTION');
+      expect(result.failures).toEqual([]);
+      expect(result.warnings).toEqual([
+        expect.objectContaining({ kind: 'extra_table', table: 'users' }),
+      ]);
     });
 
     it('fails on extra collection in strict mode', () => {
@@ -107,24 +98,23 @@ describe('diffMongoSchemas', () => {
       const expected = emptyIR;
       const result = diffMongoSchemasManaged(live, expected, true);
 
-      expect(result.root.status).toBe('fail');
-      expect(result.counts.fail).toBe(1);
-      const node = result.root.children![0]!;
-      expect(node.status).toBe('fail');
-      expect(node.code).toBe('EXTRA_COLLECTION');
+      expect(result.failures).toEqual([
+        expect.objectContaining({ kind: 'extra_table', table: 'users' }),
+      ]);
+      expect(result.warnings).toEqual([]);
     });
   });
 
   describe('indexes', () => {
-    it('returns pass when indexes match', () => {
+    it('returns no failures or warnings when indexes match', () => {
       const schema = ir({
         users: coll('users', {
           indexes: [idx([{ field: 'email', direction: 1 }], { unique: true })],
         }),
       });
       const result = diffMongoSchemasManaged(schema, schema, false);
-      expect(result.counts.fail).toBe(0);
-      expect(result.counts.warn).toBe(0);
+      expect(result.failures).toEqual([]);
+      expect(result.warnings).toEqual([]);
     });
 
     it('fails on missing index', () => {
@@ -136,8 +126,7 @@ describe('diffMongoSchemas', () => {
       });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.counts.fail).toBe(1);
-      expect(result.issues).toEqual([
+      expect(result.failures).toEqual([
         expect.objectContaining({ kind: 'index_mismatch', table: 'users' }),
       ]);
     });
@@ -149,8 +138,10 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users') });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.counts.warn).toBe(1);
-      expect(result.counts.fail).toBe(0);
+      expect(result.failures).toEqual([]);
+      expect(result.warnings).toEqual([
+        expect.objectContaining({ kind: 'extra_index', table: 'users' }),
+      ]);
     });
 
     it('fails on extra index in strict mode', () => {
@@ -160,7 +151,9 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users') });
       const result = diffMongoSchemasManaged(live, expected, true);
 
-      expect(result.counts.fail).toBe(1);
+      expect(result.failures).toEqual([
+        expect.objectContaining({ kind: 'extra_index', table: 'users' }),
+      ]);
     });
   });
 
@@ -168,16 +161,16 @@ describe('diffMongoSchemas', () => {
     const schema1 = { bsonType: 'object', required: ['name'] };
     const schema2 = { bsonType: 'object', required: ['email'] };
 
-    it('returns pass when both have no validator', () => {
+    it('returns no failures when both have no validator', () => {
       const schema = ir({ users: coll('users') });
       const result = diffMongoSchemasManaged(schema, schema, false);
-      expect(result.counts.fail).toBe(0);
+      expect(result.failures).toEqual([]);
     });
 
-    it('returns pass when validators match', () => {
+    it('returns no failures when validators match', () => {
       const schema = ir({ users: coll('users', { validator: validator(schema1) }) });
       const result = diffMongoSchemasManaged(schema, schema, false);
-      expect(result.counts.fail).toBe(0);
+      expect(result.failures).toEqual([]);
     });
 
     it('fails on missing validator', () => {
@@ -185,8 +178,7 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users', { validator: validator(schema1) }) });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.counts.fail).toBe(1);
-      expect(result.issues).toEqual([
+      expect(result.failures).toEqual([
         expect.objectContaining({ kind: 'type_missing', table: 'users' }),
       ]);
     });
@@ -196,8 +188,10 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users') });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.counts.warn).toBe(1);
-      expect(result.counts.fail).toBe(0);
+      expect(result.failures).toEqual([]);
+      expect(result.warnings).toEqual([
+        expect.objectContaining({ kind: 'extra_validator', table: 'users' }),
+      ]);
     });
 
     it('fails on extra validator in strict mode', () => {
@@ -205,7 +199,9 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users') });
       const result = diffMongoSchemasManaged(live, expected, true);
 
-      expect(result.counts.fail).toBe(1);
+      expect(result.failures).toEqual([
+        expect.objectContaining({ kind: 'extra_validator', table: 'users' }),
+      ]);
     });
 
     it('fails on schema mismatch', () => {
@@ -213,8 +209,7 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users', { validator: validator(schema2) }) });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.counts.fail).toBe(1);
-      expect(result.issues).toEqual([
+      expect(result.failures).toEqual([
         expect.objectContaining({ kind: 'type_mismatch', table: 'users' }),
       ]);
     });
@@ -224,7 +219,7 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users', { validator: validator(schema1, 'strict') }) });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.counts.fail).toBe(1);
+      expect(result.failures.length).toBe(1);
     });
 
     it('fails when validationAction differs', () => {
@@ -236,7 +231,7 @@ describe('diffMongoSchemas', () => {
       });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.counts.fail).toBe(1);
+      expect(result.failures.length).toBe(1);
     });
   });
 
@@ -244,16 +239,16 @@ describe('diffMongoSchemas', () => {
     const cappedOpts = new MongoSchemaCollectionOptions({ capped: { size: 1048576 } });
     const differentOpts = new MongoSchemaCollectionOptions({ capped: { size: 2097152 } });
 
-    it('returns pass when both have no options', () => {
+    it('returns no failures when both have no options', () => {
       const schema = ir({ users: coll('users') });
       const result = diffMongoSchemasManaged(schema, schema, false);
-      expect(result.counts.fail).toBe(0);
+      expect(result.failures).toEqual([]);
     });
 
-    it('returns pass when options match', () => {
+    it('returns no failures when options match', () => {
       const schema = ir({ logs: coll('logs', { options: cappedOpts }) });
       const result = diffMongoSchemasManaged(schema, schema, false);
-      expect(result.counts.fail).toBe(0);
+      expect(result.failures).toEqual([]);
     });
 
     it('warns on extra options in non-strict mode', () => {
@@ -261,8 +256,8 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ logs: coll('logs') });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.counts.warn).toBe(1);
-      expect(result.counts.fail).toBe(0);
+      expect(result.failures).toEqual([]);
+      expect(result.warnings.length).toBe(1);
     });
 
     it('fails on extra options in strict mode', () => {
@@ -270,7 +265,7 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ logs: coll('logs') });
       const result = diffMongoSchemasManaged(live, expected, true);
 
-      expect(result.counts.fail).toBe(1);
+      expect(result.failures.length).toBe(1);
     });
 
     it('fails on options mismatch', () => {
@@ -278,8 +273,7 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ logs: coll('logs', { options: differentOpts }) });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.counts.fail).toBe(1);
-      expect(result.issues).toEqual([
+      expect(result.failures).toEqual([
         expect.objectContaining({ kind: 'type_mismatch', table: 'logs' }),
       ]);
     });
@@ -302,8 +296,8 @@ describe('diffMongoSchemas', () => {
 
       const result = diffMongoSchemasManaged(schema, schema, true);
 
-      expect(result.counts.fail).toBe(0);
-      expect(result.issues).toEqual([]);
+      expect(result.failures).toEqual([]);
+      expect(result.warnings).toEqual([]);
     });
 
     it('treats indexes that differ only in sparse/TTL/partial/wildcard as distinct', () => {
@@ -330,8 +324,8 @@ describe('diffMongoSchemas', () => {
 
       // Different lookup keys → expected index is missing and live index is
       // extra. Both reach `fail` under strict mode.
-      expect(result.counts.fail).toBeGreaterThanOrEqual(1);
-      expect(result.issues).toEqual(
+      expect(result.failures.length).toBeGreaterThanOrEqual(1);
+      expect(result.failures).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ kind: 'index_mismatch', table: 'events' }),
           expect.objectContaining({ kind: 'extra_index', table: 'events' }),
