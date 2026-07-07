@@ -66,8 +66,10 @@ function tokenMatches(lineToken, termToken) {
   return lineToken === termToken || lineToken === `${termToken}s`;
 }
 
-// True if the term's token sequence appears as a consecutive subsequence of the line's tokens.
-export function lineMatchesTermTokens(lineTokens, tt) {
+// Every [start, end) token range where the term's token sequence appears as a
+// consecutive subsequence of the line's tokens (end exclusive).
+export function termMatchRanges(lineTokens, tt) {
+  const ranges = [];
   for (let i = 0; i + tt.length <= lineTokens.length; i++) {
     let ok = true;
     for (let j = 0; j < tt.length; j++) {
@@ -76,21 +78,38 @@ export function lineMatchesTermTokens(lineTokens, tt) {
         break;
       }
     }
-    if (ok) return true;
+    if (ok) ranges.push([i, i + tt.length]);
   }
-  return false;
+  return ranges;
+}
+
+// True if the term's token sequence appears as a consecutive subsequence of the line's tokens.
+export function lineMatchesTermTokens(lineTokens, tt) {
+  return termMatchRanges(lineTokens, tt).length > 0;
 }
 
 // Distinct matching lines. Each returned entry is one line (counted once even if several terms match it).
+//
+// An optional `scope.allow` lists framework-neutral compound terms (e.g. `SymbolTable`).
+// A forbidden-term occurrence is shielded — and does not count — when its matched token
+// range is fully contained within a single allowed compound's range on the same line. This
+// lets `SymbolTable`/`symbol-table` stop matching the bare `table` term while a bare `table`
+// elsewhere on the line (or file) still counts. Absent/empty `allow` ⇒ unchanged behaviour.
 export function findMatchingLines(content, scope) {
   const termSeqs = scope.forbidden.map(termTokens);
+  const allowSeqs = (scope.allow ?? []).map(termTokens);
   const out = [];
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const lineTokens = tokenize(lines[i]);
+    const allowRanges = allowSeqs.flatMap((tt) => termMatchRanges(lineTokens, tt));
     const matched = [];
     for (let k = 0; k < termSeqs.length; k++) {
-      if (lineMatchesTermTokens(lineTokens, termSeqs[k])) matched.push(scope.forbidden[k]);
+      const ranges = termMatchRanges(lineTokens, termSeqs[k]);
+      const hasUnshielded = ranges.some(
+        (r) => !allowRanges.some((a) => a[0] <= r[0] && r[1] <= a[1]),
+      );
+      if (hasUnshielded) matched.push(scope.forbidden[k]);
     }
     if (matched.length > 0) out.push({ line: i + 1, terms: matched, text: lines[i].trim() });
   }

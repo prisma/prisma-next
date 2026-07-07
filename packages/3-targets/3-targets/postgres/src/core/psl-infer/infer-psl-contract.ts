@@ -1,4 +1,5 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { SqlDescribedContractSpace } from '@prisma-next/family-sql/control';
 import type {
   DefaultMappingOptions,
   PslNativeTypeAttribute,
@@ -7,6 +8,8 @@ import type {
   RelationField,
 } from '@prisma-next/family-sql/psl-infer';
 import {
+  buildChildRelationField,
+  deriveRelationFieldName,
   inferRelations,
   mapDefault,
   parseRawDefault,
@@ -14,6 +17,7 @@ import {
   toModelName,
   toNamedTypeName,
 } from '@prisma-next/family-sql/psl-infer';
+import { coordinateKey, elementCoordinates } from '@prisma-next/framework-components/ir';
 import type {
   PslAttribute,
   PslAttributeArgument,
@@ -31,7 +35,15 @@ import {
   makePslNamespaceEntries,
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
-import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlModelStorage } from '@prisma-next/sql-contract/types';
+import type {
+  SqlColumnIR,
+  SqlForeignKeyIR,
+  SqlSchemaIR,
+  SqlTableIR,
+} from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { createPostgresDefaultMapping } from './postgres-default-mapping';
 import { createPostgresTypeMap } from './postgres-type-map';
@@ -77,6 +89,179 @@ type TopLevelNameResult = {
 };
 
 /**
+ * Coordinates every element a set of already-assembled contracts declare,
+ * mapped to the {@link SqlDescribedContractSpace} that owns it and keyed by
+ * the shared {@link coordinateKey} helper. `contract infer` uses this to omit
+ * database elements a stack extension pack's contract space already
+ * describes — reusing the same coordinate walk the contract-space aggregate
+ * and cross-space collision check use (`elementCoordinates`), rather than a
+ * bespoke per-entity-kind membership test — and, for a foreign key whose
+ * referenced table an entry owns, to resolve the qualified cross-space
+ * relation it describes.
+ */
+function describedContractOwners(
+  describedContracts: readonly SqlDescribedContractSpace[],
+): ReadonlyMap<string, SqlDescribedContractSpace> {
+  const owners = new Map<string, SqlDescribedContractSpace>();
+  for (const entry of describedContracts) {
+    for (const coordinate of elementCoordinates(entry.contract.storage)) {
+      owners.set(coordinateKey(coordinate), entry);
+    }
+  }
+  return owners;
+}
+
+/**
+ * The domain model a described contract maps a `(namespaceId, tableName)`
+ * storage coordinate to, plus the pack's own space id and column→field-name
+ * mapping — everything `buildModel`/`buildRelationField` need to emit the
+ * cross-space relation `<spaceId>:<namespaceId>.<modelName>` and resolve its
+ * `references` argument to the pack's own field names rather than a generic
+ * column-name guess.
+ */
+type CrossSpaceTarget = {
+  readonly spaceId: string;
+  readonly namespaceId: string;
+  readonly modelName: string;
+  readonly fieldNamesByColumn: TableColumnFieldNameMap;
+};
+
+function resolveCrossSpaceTarget(
+  owner: SqlDescribedContractSpace,
+  namespaceId: string,
+  tableName: string,
+): CrossSpaceTarget | undefined {
+  const domainNamespace = owner.contract.domain.namespaces[namespaceId];
+  if (domainNamespace === undefined) {
+    return undefined;
+  }
+
+  for (const [modelName, model] of Object.entries(domainNamespace.models)) {
+    const storage = blindCast<SqlModelStorage, 'SQL contract model storage'>(model.storage);
+    if (storage.namespaceId !== namespaceId || storage.table !== tableName) {
+      continue;
+    }
+
+    const fieldNamesByColumn = new Map<string, ResolvedColumnFieldName>();
+    for (const [fieldName, fieldStorage] of Object.entries(storage.fields)) {
+      fieldNamesByColumn.set(fieldStorage.column, { fieldName });
+    }
+
+    return { spaceId: owner.spaceId, namespaceId, modelName, fieldNamesByColumn };
+  }
+
+  return undefined;
+}
+
+type ForeignKeyResolution = {
+  /** `tables`, with every cross-space or dangling foreign key removed. */
+  readonly tables: Record<string, SqlTableIR>;
+  /** Cross-space relation fields to merge onto `inferRelations`'s output, keyed by host table name. */
+  readonly extraRelationsByTable: ReadonlyMap<string, readonly RelationField[]>;
+  /** Synthetic field-name maps for cross-space-referenced pack tables, merged into `fieldNamesByTable`. */
+  readonly crossSpaceFieldNamesByTable: ReadonlyMap<string, TableColumnFieldNameMap>;
+};
+
+/**
+ * Classifies every foreign key on a surviving table into one of three cases.
+ * A foreign key that carries a `referencedSchema` is checked against the
+ * pack-owned coordinates first, so a pack-owned target wins even when a local
+ * table happens to share its bare name; only foreign keys with no owned
+ * coordinate fall through to the local/dangling distinction.
+ *
+ * - **Cross-space**: `referencedSchema` is set and a described contract owns
+ *   the coordinate `(referencedSchema, 'table', referencedTable)`. The
+ *   referenced table is absent from the tree (omitted because the pack
+ *   describes it, or never introspected — `contract infer` walks a single
+ *   namespace). Removed from `foreignKeys` (so `inferRelations` never falls
+ *   back to a bare, unqualified table name for it) and replaced with a
+ *   `RelationField` qualified with the owning pack's space id and namespace
+ *   id. `owners` holds only pack-declared coordinates, so an app's own table
+ *   (e.g. `public.users`) is never owned and cannot be captured here.
+ * - **Local**: not a pack-owned coordinate, and the referenced table survived
+ *   introspection — left untouched, `inferRelations` handles it as before.
+ * - **Dangling**: not a pack-owned coordinate, and the referenced table is
+ *   neither in the tree nor owned by any described contract. Removed from
+ *   `foreignKeys`, keeping the scalar column, rather than emitting a relation
+ *   to a model that was never defined.
+ *
+ * A pack that owns the referenced coordinate but declares no domain model
+ * mapped to it is malformed; that case throws rather than degrading to a
+ * silent drop, which would contradict the dangling definition above.
+ */
+function resolveForeignKeys(
+  tables: Readonly<Record<string, SqlTableIR>>,
+  owners: ReadonlyMap<string, SqlDescribedContractSpace>,
+): ForeignKeyResolution {
+  const resultTables: Record<string, SqlTableIR> = {};
+  const extraRelationsByTable = new Map<string, RelationField[]>();
+  const crossSpaceFieldNamesByTable = new Map<string, TableColumnFieldNameMap>();
+
+  for (const [tableName, table] of Object.entries(tables)) {
+    const keptForeignKeys: SqlForeignKeyIR[] = [];
+
+    for (const fk of table.foreignKeys) {
+      if (fk.referencedSchema !== undefined) {
+        const owner = owners.get(
+          coordinateKey({
+            namespaceId: fk.referencedSchema,
+            entityKind: 'table',
+            entityName: fk.referencedTable,
+          }),
+        );
+        if (owner !== undefined) {
+          const target = resolveCrossSpaceTarget(owner, fk.referencedSchema, fk.referencedTable);
+          if (target === undefined) {
+            throw new Error(
+              `contract infer: described contract space "${owner.spaceId}" owns storage ` +
+                `coordinate "${fk.referencedSchema}.${fk.referencedTable}" but declares no ` +
+                'domain model mapped to it. A pack that describes a table must also declare the ' +
+                'domain model it maps to; this pack is malformed.',
+            );
+          }
+
+          if (!crossSpaceFieldNamesByTable.has(fk.referencedTable)) {
+            crossSpaceFieldNamesByTable.set(fk.referencedTable, target.fieldNamesByColumn);
+          }
+
+          const fieldName = deriveRelationFieldName(fk.columns, fk.referencedTable);
+          const optional = fk.columns.some(
+            (columnName) => table.columns[columnName]?.nullable ?? false,
+          );
+          const relationField: RelationField = {
+            ...buildChildRelationField(fieldName, target.modelName, fk, optional),
+            typeNamespaceId: target.namespaceId,
+            typeContractSpaceId: target.spaceId,
+          };
+
+          const existingRelations = extraRelationsByTable.get(tableName);
+          if (existingRelations) {
+            existingRelations.push(relationField);
+          } else {
+            extraRelationsByTable.set(tableName, [relationField]);
+          }
+          continue;
+        }
+      }
+
+      // Not a pack-owned coordinate: keep the foreign key if the referenced
+      // table survived introspection (local), otherwise drop it while keeping
+      // the scalar column (dangling).
+      if (tables[fk.referencedTable] !== undefined) {
+        keptForeignKeys.push(fk);
+      }
+    }
+
+    resultTables[tableName] =
+      keptForeignKeys.length === table.foreignKeys.length
+        ? table
+        : { ...table, foreignKeys: keptForeignKeys };
+  }
+
+  return { tables: resultTables, extraRelationsByTable, crossSpaceFieldNamesByTable };
+}
+
+/**
  * Infers a PSL AST (for `printPsl`) from an introspected Postgres schema tree.
  *
  * Target-owned inference: it walks the `PostgresDatabaseSchemaNode` tree and
@@ -89,9 +274,23 @@ type TopLevelNameResult = {
  * introspects a single live namespace) are gathered into the model set and
  * emitted as one `UNSPECIFIED_PSL_NAMESPACE_ID` bucket. Top-level entities
  * (policies/roles → PSL extension blocks) are a later slice.
+ *
+ * `describedContracts` — the stack's extension packs' already-assembled
+ * contracts, each paired with its space id — is consulted while gathering
+ * tables: a table whose coordinate `(schemaName, 'table', tableName)` one of
+ * those contracts already declares is omitted, before the duplicate-name
+ * check below and before relation inference, so it cannot spuriously
+ * collide with an app table and never contributes a bare relation field. A
+ * surviving table's foreign key into an omitted, pack-owned table is not
+ * dropped: {@link resolveForeignKeys} rewrites it into a relation qualified
+ * with the pack's space id (`<spaceId>:<namespaceId>.<Model>`) instead.
  */
-export function inferPostgresPslContract(tree: PostgresDatabaseSchemaNode): PslDocumentAst {
+export function inferPostgresPslContract(
+  tree: PostgresDatabaseSchemaNode,
+  describedContracts?: readonly SqlDescribedContractSpace[],
+): PslDocumentAst {
   const namespaces = Object.values(tree.namespaces);
+  const owners = describedContractOwners(describedContracts ?? []);
 
   // Native Postgres enums (CREATE TYPE … AS ENUM) are not adoptable by
   // `contract infer`; throw an actionable diagnostic naming the type(s). Enum
@@ -118,6 +317,17 @@ export function inferPostgresPslContract(tree: PostgresDatabaseSchemaNode): PslD
   const tables: Record<string, SqlTableIR> = {};
   for (const namespace of namespaces) {
     for (const [tableName, table] of Object.entries(namespace.tables)) {
+      if (
+        owners.has(
+          coordinateKey({
+            namespaceId: namespace.schemaName,
+            entityKind: 'table',
+            entityName: tableName,
+          }),
+        )
+      ) {
+        continue;
+      }
       if (tables[tableName] !== undefined) {
         throw new Error(
           `contract infer: duplicate table name "${tableName}" across schemas is not yet supported ` +
@@ -128,7 +338,13 @@ export function inferPostgresPslContract(tree: PostgresDatabaseSchemaNode): PslD
       tables[tableName] = table;
     }
   }
-  const schemaIR: SqlSchemaIR = { tables };
+
+  const {
+    tables: resolvedTables,
+    extraRelationsByTable,
+    crossSpaceFieldNamesByTable,
+  } = resolveForeignKeys(tables, owners);
+  const schemaIR: SqlSchemaIR = { tables: resolvedTables };
 
   const options: PslPrinterOptions = {
     typeMap: createPostgresTypeMap(new Set()),
@@ -136,11 +352,22 @@ export function inferPostgresPslContract(tree: PostgresDatabaseSchemaNode): PslD
     parseRawDefault,
   };
 
-  return buildPslDocumentAst(schemaIR, options);
+  return buildPslDocumentAst(schemaIR, options, {
+    extraRelationsByTable,
+    crossSpaceFieldNamesByTable,
+  });
 }
 
-function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions): PslDocumentAst {
+function buildPslDocumentAst(
+  schemaIR: SqlSchemaIR,
+  options: PslPrinterOptions,
+  foreignKeyExtras: Pick<
+    ForeignKeyResolution,
+    'extraRelationsByTable' | 'crossSpaceFieldNamesByTable'
+  >,
+): PslDocumentAst {
   const { typeMap, defaultMapping, parseRawDefault: rawDefaultParser } = options;
+  const { extraRelationsByTable, crossSpaceFieldNamesByTable } = foreignKeyExtras;
 
   const modelNames = buildTopLevelNameMap(
     Object.keys(schemaIR.tables),
@@ -154,7 +381,14 @@ function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions):
   );
   const reservedNamedTypeNames = createReservedNamedTypeNames(modelNames);
 
-  const fieldNamesByTable = buildFieldNamesByTable(schemaIR.tables);
+  // Cross-space entries are seeded first so a real local table of the same
+  // bare name (an existing single-namespace-flat-bucket limitation, not new
+  // here) always wins the merge, matching `resolveForeignKeys`'s own
+  // precedence: a surviving local table is never treated as cross-space.
+  const fieldNamesByTable = new Map([
+    ...crossSpaceFieldNamesByTable,
+    ...buildFieldNamesByTable(schemaIR.tables),
+  ]);
   const { relationsByTable } = inferRelations(schemaIR.tables, modelNameMap);
   const namedTypes = seedNamedTypeRegistry(schemaIR, typeMap, new Map(), reservedNamedTypeNames);
 
@@ -169,7 +403,10 @@ function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions):
         namedTypes,
         defaultMapping,
         rawDefaultParser,
-        relationsByTable.get(table.name) ?? [],
+        [
+          ...(relationsByTable.get(table.name) ?? []),
+          ...(extraRelationsByTable.get(table.name) ?? []),
+        ],
       ),
     );
   }
@@ -452,6 +689,8 @@ function buildRelationField(
     kind: 'field',
     name: fieldName,
     typeName: rel.typeName,
+    ...ifDefined('typeNamespaceId', rel.typeNamespaceId),
+    ...ifDefined('typeContractSpaceId', rel.typeContractSpaceId),
     optional: rel.optional,
     list: rel.list,
     attributes: attrs,

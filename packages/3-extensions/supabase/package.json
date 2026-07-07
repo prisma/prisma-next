@@ -42,6 +42,7 @@
   "devDependencies": {
     "@prisma-next/cli": "workspace:0.14.0",
     "@prisma-next/operations": "workspace:0.14.0",
+    "@prisma-next/psl-printer": "workspace:0.14.0",
     "@prisma-next/sql-contract-psl": "workspace:0.14.0",
     "@prisma-next/test-utils": "workspace:0.14.0",
     "@prisma-next/tsconfig": "workspace:0.14.0",

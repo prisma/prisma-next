@@ -45,6 +45,7 @@
     "./redact-db-url": "./dist/redact-db-url.mjs",
     "./result": "./dist/result.mjs",
     "./simplify-deep": "./dist/simplify-deep.mjs",
+    "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
   },
   "engines": {

@@ -102,9 +102,9 @@ import {
   applyBackrelationCandidates,
   type FkRelationMetadata,
   indexFkRelations,
+  interpretRelationAttribute,
   type ModelBackrelationCandidate,
   normalizeReferentialAction,
-  parseRelationAttribute,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
 
@@ -461,6 +461,8 @@ interface BuildModelNodeInput {
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly sourceId: string;
+  readonly sourceFile: SourceFile;
+  readonly symbolTable: SymbolTable;
   readonly diagnostics: ContractSourceDiagnostic[];
   /** Resolved namespace id keyed by model name — used to stamp the target namespace on FKs. */
   readonly modelNamespaceIds: ReadonlyMap<string, string>;
@@ -558,10 +560,11 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     const relationAttribute = getAttribute(field.attributes, 'relation');
     let relationName: string | undefined;
     if (relationAttribute) {
-      const parsedRelation = parseRelationAttribute({
-        attribute: relationAttribute,
-        modelName: model.name,
-        fieldName: field.name,
+      const parsedRelation = interpretRelationAttribute({
+        selfModel: model,
+        field,
+        symbols: input.symbolTable,
+        sourceFile: input.sourceFile,
         sourceId,
         diagnostics,
       });
@@ -586,7 +589,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         });
         continue;
       }
-      relationName = parsedRelation.relationName;
+      relationName = parsedRelation.name;
     }
     if (!attributesValid) {
       continue;
@@ -887,10 +890,11 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         continue;
       }
 
-      const parsedRelation = parseRelationAttribute({
-        attribute: relationAttribute.relation,
-        modelName: model.name,
-        fieldName: relationAttribute.field.name,
+      const parsedRelation = interpretRelationAttribute({
+        selfModel: model,
+        field: relationAttribute.field,
+        symbols: input.symbolTable,
+        sourceFile: input.sourceFile,
         sourceId,
         diagnostics,
       });
@@ -936,26 +940,10 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       }
 
       const onDelete = parsedRelation.onDelete
-        ? normalizeReferentialAction({
-            modelName: model.name,
-            fieldName: relationAttribute.field.name,
-            actionName: 'onDelete',
-            actionToken: parsedRelation.onDelete,
-            sourceId,
-            span: relationAttribute.field.span,
-            diagnostics,
-          })
+        ? normalizeReferentialAction(parsedRelation.onDelete)
         : undefined;
       const onUpdate = parsedRelation.onUpdate
-        ? normalizeReferentialAction({
-            modelName: model.name,
-            fieldName: relationAttribute.field.name,
-            actionName: 'onUpdate',
-            actionToken: parsedRelation.onUpdate,
-            sourceId,
-            span: relationAttribute.field.span,
-            diagnostics,
-          })
+        ? normalizeReferentialAction(parsedRelation.onUpdate)
         : undefined;
 
       // Target namespace: use the colon-prefix namespace qualifier, or `__unbound__` when the
@@ -999,7 +987,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
           namespaceId: crossTargetNamespaceId,
           spaceId: fieldTypeContractSpaceId,
         },
-        ...ifDefined('name', parsedRelation.constraintName),
+        ...ifDefined('name', parsedRelation.map),
         ...ifDefined('onDelete', onDelete),
         ...ifDefined('onUpdate', onUpdate),
       });
@@ -1058,10 +1046,11 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
 
-    const parsedRelation = parseRelationAttribute({
-      attribute: relationAttribute.relation,
-      modelName: model.name,
-      fieldName: relationAttribute.field.name,
+    const parsedRelation = interpretRelationAttribute({
+      selfModel: model,
+      field: relationAttribute.field,
+      symbols: input.symbolTable,
+      sourceFile: input.sourceFile,
       sourceId,
       diagnostics,
     });
@@ -1129,26 +1118,10 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     }
 
     const onDelete = parsedRelation.onDelete
-      ? normalizeReferentialAction({
-          modelName: model.name,
-          fieldName: relationAttribute.field.name,
-          actionName: 'onDelete',
-          actionToken: parsedRelation.onDelete,
-          sourceId,
-          span: relationAttribute.field.span,
-          diagnostics,
-        })
+      ? normalizeReferentialAction(parsedRelation.onDelete)
       : undefined;
     const onUpdate = parsedRelation.onUpdate
-      ? normalizeReferentialAction({
-          modelName: model.name,
-          fieldName: relationAttribute.field.name,
-          actionName: 'onUpdate',
-          actionToken: parsedRelation.onUpdate,
-          sourceId,
-          span: relationAttribute.field.span,
-          diagnostics,
-        })
+      ? normalizeReferentialAction(parsedRelation.onUpdate)
       : undefined;
 
     const targetNamespaceId =
@@ -1163,7 +1136,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         columns: referencedColumns,
         ...ifDefined('namespaceId', targetNamespaceId),
       },
-      ...ifDefined('name', parsedRelation.constraintName),
+      ...ifDefined('name', parsedRelation.map),
       ...ifDefined('onDelete', onDelete),
       ...ifDefined('onUpdate', onUpdate),
     });
@@ -1176,7 +1149,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       targetModelName: targetMapping.model.name,
       targetTableName: targetMapping.tableName,
       ...ifDefined('targetNamespaceId', targetNamespaceId),
-      ...ifDefined('relationName', parsedRelation.relationName),
+      ...ifDefined('relationName', parsedRelation.name),
       localColumns,
       referencedColumns,
     });
@@ -2038,6 +2011,8 @@ export function interpretPslDocumentToSqlContract(
       generatorDescriptorById,
       scalarTypeDescriptors: input.scalarTypeDescriptors,
       sourceId,
+      sourceFile,
+      symbolTable: input.symbolTable,
       diagnostics,
       modelNamespaceIds,
       ...(enumHandlesByName.size > 0 ? { enumHandles: enumHandlesByName } : {}),

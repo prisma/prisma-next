@@ -244,8 +244,18 @@ sibling of `db.enums` for reading external native enum columns.
 contract (`src/contract/contract.{prisma,json,d.ts}`) to carry the `auth.aal_level`
 native enum. A new `sql-orm-client` type test
 (`test/native-enum.field-output.test-d.ts`) pins native-enum field-output typing.
-All additive — the existing extension-author SPI is unchanged (the codec descriptor's
-new native-type hook is optional; a codec that omits it emits no cast), and re-emit
-absorbs the contract shape. No extension-author action required. Incidental substrate
-diff only.
+All additive — the existing extension-author SPI is unchanged, and re-emit absorbs the
+contract shape. No extension-author action required. Incidental substrate diff only.
+
+TML-2962 (extension-aware contract infer, PR #919): `contract infer` now omits DB
+elements a stack extension pack's contract space already describes, and resolves an
+app table's foreign key into pack-owned space to the qualified cross-space relation
+(`<spaceId>:<namespace>.<Model>`, e.g. `supabase:auth.AuthUser`) rather than a bare
+local reference. The only `packages/3-extensions/` touch is the `supabase` package
+gaining an `infer-cross-space-fk.integration.test.ts` and a `@prisma-next/psl-printer`
+devDependency for it — no extension-author API changed. One new behavior worth noting
+for pack authors: a pack that declares a table's storage coordinate but no domain
+model mapped to it now makes `contract infer` throw (malformed pack); packs normally
+ship storage + domain together, so no action for well-formed packs. No extension-author
+action required. Incidental substrate diff only.
 -->

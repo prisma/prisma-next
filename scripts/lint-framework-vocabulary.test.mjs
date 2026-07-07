@@ -155,6 +155,28 @@ describe('token matcher — distinct-line counting', () => {
   });
 });
 
+describe('allow shielding', () => {
+  it('shields a forbidden token whose range is covered by an allowed compound', () => {
+    const scope = { forbidden: ['table'], allow: ['SymbolTable'] };
+    assert.deepEqual(findMatchingLines('const t: SymbolTable = x;\n', scope), []);
+    assert.deepEqual(findMatchingLines('import { X } from "./symbol-table";\n', scope), []);
+  });
+
+  it('still counts a bare forbidden token elsewhere', () => {
+    const scope = { forbidden: ['table'], allow: ['SymbolTable'] };
+    const matches = findMatchingLines('interface Table { id: string }\n', scope);
+    assert.equal(matches.length, 1);
+    assert.deepEqual(matches[0].terms, ['table']);
+  });
+
+  it('counts a bare forbidden token on a line that also has an allowed compound', () => {
+    const scope = { forbidden: ['table'], allow: ['SymbolTable'] };
+    const matches = findMatchingLines('const s: SymbolTable = table;\n', scope);
+    assert.equal(matches.length, 1);
+    assert.deepEqual(matches[0].terms, ['table']);
+  });
+});
+
 describe('tokenize', () => {
   it('splits camelCase, digit humps, and non-alphanumerics into lowercase tokens', () => {
     assert.deepEqual(tokenize('getNativeType()'), ['get', 'native', 'type']);
