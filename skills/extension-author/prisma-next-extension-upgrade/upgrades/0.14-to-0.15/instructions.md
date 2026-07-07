@@ -233,3 +233,19 @@ control stack always populates; extension authors do not construct them. The onl
 scalar-list contract shape. No extension-author action required. Incidental
 substrate diff only.
 -->
+
+<!--
+TML-2976 (native Postgres enums, external Supabase types — this PR): the
+`packages/3-extensions/` diff is additive. `@prisma-next/extension-postgres` gains a
+`db.nativeEnums` accessor (new `src/runtime/native-enums.ts`; `runtime/postgres.ts`,
+`exports/runtime.ts`, and `static/postgres-static.ts` expose it) — a Postgres-only
+sibling of `db.enums` for reading external native enum columns.
+`@prisma-next/extension-supabase` gains the same accessor and regenerates its bundled
+contract (`src/contract/contract.{prisma,json,d.ts}`) to carry the `auth.aal_level`
+native enum. A new `sql-orm-client` type test
+(`test/native-enum.field-output.test-d.ts`) pins native-enum field-output typing.
+All additive — the existing extension-author SPI is unchanged (the codec descriptor's
+new native-type hook is optional; a codec that omits it emits no cast), and re-emit
+absorbs the contract shape. No extension-author action required. Incidental substrate
+diff only.
+-->
