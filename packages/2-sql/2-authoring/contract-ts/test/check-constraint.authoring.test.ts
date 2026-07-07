@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import {
   CheckConstraint,
@@ -172,6 +173,107 @@ describe('check-constraint lowering', () => {
     const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
     expect(userTable?.checks?.[0]).toHaveProperty('valueSet');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CHECK suppression: codec-owned `enforcesValueSet` marker
+// ---------------------------------------------------------------------------
+
+function stubCodecWithDescriptor(id: string, descriptor: unknown): Codec {
+  const codec = {
+    id,
+    descriptor,
+    encode: () => Promise.reject(new Error('unused')),
+    decode: () => Promise.reject(new Error('unused')),
+    encodeJson: (value: unknown) => value,
+    decodeJson: (json: unknown) => json,
+  };
+  return codec as Codec;
+}
+
+describe('check-constraint suppression via codec-owned enforcesValueSet marker', () => {
+  it('writes no CHECK for a value-set column whose codec enforces its value-set', () => {
+    const nativeEnumCodecId = 'test/native-enum@1';
+    const codec = stubCodecWithDescriptor(nativeEnumCodecId, {
+      codecId: nativeEnumCodecId,
+      enforcesValueSet: true,
+    });
+    const codecLookup: CodecLookup = {
+      get: (id) => (id === nativeEnumCodecId ? codec : undefined),
+      targetTypesFor: () => undefined,
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
+    };
+
+    const NativeRole = enumType(
+      'NativeRole',
+      { codecId: nativeEnumCodecId, nativeType: 'native_role' },
+      member('User', 'user'),
+      member('Admin', 'admin'),
+    );
+
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+        enums: { NativeRole },
+        codecLookup,
+      },
+      ({ field: f, model: m }) =>
+        ({
+          models: {
+            User: m('User', {
+              fields: {
+                id: f.text().id(),
+                role: f.namedType(NativeRole),
+              },
+            }),
+          },
+        }) as const,
+    ) as Contract<SqlStorage>;
+
+    const storageNs = contract.storage.namespaces['public'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
+
+    expect(userTable?.checks).toBeUndefined();
+  });
+
+  it('still writes a CHECK when the codec has no enforcesValueSet marker (unaffected path)', () => {
+    const Role = enumType('Role', pgText, member('User', 'user'), member('Admin', 'admin'));
+    const codecLookup: CodecLookup = {
+      get: (id) => (id === 'pg/text@1' ? stubCodecWithDescriptor('pg/text@1', {}) : undefined),
+      targetTypesFor: () => undefined,
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
+    };
+
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+        enums: { Role },
+        codecLookup,
+      },
+      ({ field: f, model: m }) =>
+        ({
+          models: {
+            User: m('User', {
+              fields: {
+                id: f.text().id(),
+                role: f.namedType(Role),
+              },
+            }),
+          },
+        }) as const,
+    ) as Contract<SqlStorage>;
+
+    const storageNs = contract.storage.namespaces['public'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
+
+    expect(userTable?.checks).toHaveLength(1);
   });
 });
 

@@ -3,10 +3,8 @@ export type {
   AuthoringArgumentDescriptor,
   AuthoringColumnDefaultTemplate,
   AuthoringContributions,
-  AuthoringDerivedValueSet,
   AuthoringDiagnosticSink,
   AuthoringEntityContext,
-  AuthoringEntityRefResolution,
   AuthoringEntityRefTypeConstructorDescriptor,
   AuthoringEntityRefTypeConstructorNamespace,
   AuthoringEntityTypeDescriptor,
@@ -26,7 +24,6 @@ export type {
 export {
   assertNoCrossRegistryCollisions,
   classifyEnumMemberType,
-  deriveValueSetFromEntity,
   hasRegisteredFieldNamespace,
   instantiateAuthoringEntityType,
   instantiateAuthoringFieldPreset,

@@ -1,8 +1,8 @@
 import { temporalAuthoringPresets } from '@prisma-next/family-sql/control';
 import type {
   AuthoringEntityContext,
-  AuthoringEntityRefResolution,
   AuthoringEntityRefTypeConstructorNamespace,
+  AuthoringEntityTypeFactoryOutput,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
   AuthoringPslBlockDescriptorNamespace,
@@ -10,6 +10,8 @@ import type {
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlEntityRefResolution } from '@prisma-next/sql-contract/entity-ref-resolution';
+import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { DEFAULT_NAMESPACE_ID } from './namespace-ids';
 import {
@@ -36,7 +38,7 @@ function resolvePgEnumRef(
   ref: string,
   entities: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
   namespaceId?: string,
-): AuthoringEntityRefResolution | undefined {
+): SqlEntityRefResolution | undefined {
   const nativeEnums = entities?.['native_enum'];
   const entity = nativeEnums?.[ref];
   if (!PostgresNativeEnum.is(entity)) return undefined;
@@ -50,7 +52,6 @@ function resolvePgEnumRef(
     nativeType: typeName,
     typeParams: { typeName },
     valueSetEntityName: ref,
-    valueSetEnforcement: 'native-type',
   };
 }
 
@@ -220,6 +221,24 @@ function lowerNativeEnumFromBlock(
   return new PostgresNativeEnum({ typeName, members });
 }
 
+/**
+ * `native_enum`'s entity-type factory output, checked separately from the assembled
+ * `postgresAuthoringEntityTypes` map below: `deriveValueSet` is SQL-family surface
+ * ({@link SqlValueSetDerivingEntityTypeOutput}), not part of the framework
+ * `AuthoringEntityTypeFactoryOutput` shape, so folding it directly into the map's single
+ * `satisfies AuthoringEntityTypeNamespace` check would trip an excess-property error. Checking it
+ * here against the intersection of both shapes keeps it structurally valid against each without
+ * widening the map's own check.
+ */
+const nativeEnumEntityTypeOutput = {
+  factory: lowerNativeEnumFromBlock,
+  deriveValueSet: (entity: PostgresNativeEnum) => ({
+    kind: 'valueSet' as const,
+    values: entity.members.map((m) => m.value),
+  }),
+} satisfies AuthoringEntityTypeFactoryOutput<PslExtensionBlock, PostgresNativeEnum | undefined> &
+  SqlValueSetDerivingEntityTypeOutput;
+
 export const postgresAuthoringEntityTypes = {
   role: {
     kind: 'entity',
@@ -241,13 +260,7 @@ export const postgresAuthoringEntityTypes = {
     kind: 'entity',
     discriminator: 'native_enum',
     validatorSchema: PostgresNativeEnumSchema,
-    output: {
-      factory: lowerNativeEnumFromBlock,
-      deriveValueSet: (entity: PostgresNativeEnum) => ({
-        kind: 'valueSet',
-        values: entity.members.map((m) => m.value),
-      }),
-    },
+    output: nativeEnumEntityTypeOutput,
   },
 } as const satisfies AuthoringEntityTypeNamespace;
 

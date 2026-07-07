@@ -12,6 +12,7 @@
  *  3. Nullable variant (`pg.enum(E)?`).
  */
 
+import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { assembleAuthoringContributions } from '@prisma-next/framework-components/control';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
@@ -22,8 +23,31 @@ import {
   postgresAuthoringEntityTypes,
   postgresAuthoringPslBlockDescriptors,
 } from '../src/core/authoring';
+import { PG_ENUM_CODEC_ID } from '../src/core/codec-ids';
+import { pgEnumDescriptor } from '../src/core/codecs';
 import type { PostgresSchema } from '../src/core/postgres-schema';
 import { postgresCreateNamespace } from '../src/core/postgres-schema';
+
+// Production always resolves `pg.enum(Ref)` through a real `CodecLookup`
+// (the CLI/config-loading pipeline supplies `stack.codecLookup`); build-contract's
+// CHECK-suppression consults the `pg/enum@1` codec's descriptor through this lookup
+// (`codecEnforcesValueSet`), so this test double must expose it for the "no CHECK"
+// assertions below to exercise the real mechanism rather than passing vacuously.
+const pgEnumCodec = {
+  id: PG_ENUM_CODEC_ID,
+  descriptor: pgEnumDescriptor,
+  encode: () => Promise.reject(new Error('unused')),
+  decode: () => Promise.reject(new Error('unused')),
+  encodeJson: (value) => value,
+  decodeJson: (json) => json,
+} as Codec;
+
+const codecLookup: CodecLookup = {
+  get: (id) => (id === PG_ENUM_CODEC_ID ? pgEnumCodec : undefined),
+  targetTypesFor: () => undefined,
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
+};
 
 const assembled = assembleAuthoringContributions([
   {
@@ -68,6 +92,7 @@ function interpret(source: string) {
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,
+    codecLookup,
   });
 }
 

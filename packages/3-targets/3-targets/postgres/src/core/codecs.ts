@@ -223,6 +223,8 @@ export class PgEnumDescriptor extends CodecDescriptorImpl<PgEnumParams> {
   override readonly targetTypes = ['text'] as const;
   override readonly meta = PG_TEXT_META;
   override readonly paramsSchema = pgEnumParamsSchema satisfies StandardSchemaV1<PgEnumParams>;
+  /** This codec's storage type (a Postgres native enum) intrinsically enforces its value-set via `CREATE TYPE … AS ENUM (…)`, so the family-shared column builder writes no `CHECK` for its columns. */
+  readonly enforcesValueSet = true as const;
   override renderValueLiteral(value: JsonValue): string | undefined {
     return renderTsLiteral(value);
   }

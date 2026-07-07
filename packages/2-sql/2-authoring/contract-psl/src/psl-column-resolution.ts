@@ -38,6 +38,7 @@ import {
   NumberLiteralExprAst,
   StringLiteralExprAst,
 } from '@prisma-next/psl-parser/syntax';
+import { isSqlEntityRefResolution } from '@prisma-next/sql-contract/entity-ref-resolution';
 import { blindCast } from '@prisma-next/utils/casts';
 
 import {
@@ -68,13 +69,6 @@ export type ColumnDescriptor = {
    * unset.
    */
   readonly valueSet?: ValueSetRef;
-  /**
-   * How `valueSet` membership is enforced at the database level — `'check'`
-   * (default; auto-generate a `CHECK`) or `'native-type'` (the column's
-   * `nativeType` itself enforces membership; no `CHECK` is generated).
-   * Meaningless without `valueSet`.
-   */
-  readonly valueSetEnforcement?: 'check' | 'native-type';
 };
 
 export function toNamedTypeFieldDescriptor(
@@ -462,12 +456,12 @@ function resolveEntityRefTypeConstructorCall(input: {
     return { ok: false, alreadyReported: true };
   }
 
-  const resolution = input.descriptor.resolve(
+  const resolved = input.descriptor.resolve(
     ref,
     input.namespaceExtensionEntities,
     input.namespaceId,
   );
-  if (resolution === undefined) {
+  if (resolved === undefined) {
     input.diagnostics.push({
       code: 'PSL_UNKNOWN_ENTITY_REF',
       message: `${input.entityLabel} type constructor "${helperPath}(${ref})" does not resolve — no entity named "${ref}" was found in namespace "${input.namespaceId ?? '(unspecified)'}"`,
@@ -476,6 +470,13 @@ function resolveEntityRefTypeConstructorCall(input: {
     });
     return { ok: false, alreadyReported: true };
   }
+
+  if (!isSqlEntityRefResolution(resolved)) {
+    throw new Error(
+      `Entity-ref type constructor "${helperPath}" resolved to a payload that does not satisfy SqlEntityRefResolution (missing/invalid "codecId"/"nativeType" strings). This is a contributor bug in the pack registering "${helperPath}", not a user-schema error.`,
+    );
+  }
+  const resolution = resolved;
 
   if (resolution.valueSetEntityName !== undefined && input.namespaceId === undefined) {
     input.diagnostics.push({
@@ -504,9 +505,6 @@ function resolveEntityRefTypeConstructorCall(input: {
       nativeType: resolution.nativeType,
       ...(resolution.typeParams !== undefined ? { typeParams: resolution.typeParams } : {}),
       ...(valueSet !== undefined ? { valueSet } : {}),
-      ...(resolution.valueSetEnforcement !== undefined
-        ? { valueSetEnforcement: resolution.valueSetEnforcement }
-        : {}),
     },
   };
 }

@@ -1,6 +1,11 @@
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
-import { attachNativeTypeFor, providesNativeTypeFor } from '../src/native-type-hook';
+import {
+  attachNativeTypeFor,
+  codecEnforcesValueSet,
+  providesEnforcesValueSet,
+  providesNativeTypeFor,
+} from '../src/native-type-hook';
 
 const baseLookup: CodecLookup = {
   get: () => undefined,
@@ -82,5 +87,85 @@ describe('attachNativeTypeFor', () => {
     });
     expect(lookup.renderInputTypeFor?.('pg/enum@1', {})).toBe('AalLevel');
     expect(lookup.renderValueLiteralFor?.('pg/enum@1', 'aal2', 'output')).toBe('aal2');
+  });
+});
+
+describe('providesEnforcesValueSet', () => {
+  it('true for a descriptor with enforcesValueSet: true', () => {
+    expect(providesEnforcesValueSet({ codecId: 'pg/enum@1', enforcesValueSet: true })).toBe(true);
+  });
+
+  it('false for a descriptor without enforcesValueSet', () => {
+    expect(providesEnforcesValueSet({ codecId: 'pg/text@1' })).toBe(false);
+  });
+
+  it('false when enforcesValueSet is not exactly true', () => {
+    expect(providesEnforcesValueSet({ codecId: 'pg/text@1', enforcesValueSet: false })).toBe(false);
+  });
+
+  it('false for null and non-object values', () => {
+    expect(providesEnforcesValueSet(null)).toBe(false);
+    expect(providesEnforcesValueSet(undefined)).toBe(false);
+  });
+});
+
+function stubCodecWithDescriptor(id: string, descriptor: unknown): Codec {
+  const codec = {
+    id,
+    descriptor,
+    encode: () => Promise.reject(new Error('unused')),
+    decode: () => Promise.reject(new Error('unused')),
+    encodeJson: (value: unknown) => value,
+    decodeJson: (json: unknown) => json,
+  };
+  return codec as Codec;
+}
+
+describe('codecEnforcesValueSet', () => {
+  it('true when the codec instance carries a descriptor with enforcesValueSet: true', () => {
+    const codec = stubCodecWithDescriptor('pg/enum@1', {
+      codecId: 'pg/enum@1',
+      enforcesValueSet: true,
+    });
+    const lookup: CodecLookup = {
+      ...baseLookup,
+      get: (id) => (id === 'pg/enum@1' ? codec : undefined),
+    };
+
+    expect(codecEnforcesValueSet(lookup, 'pg/enum@1')).toBe(true);
+  });
+
+  it('false when the codec instance carries a descriptor without the marker', () => {
+    const codec = stubCodecWithDescriptor('pg/text@1', { codecId: 'pg/text@1' });
+    const lookup: CodecLookup = {
+      ...baseLookup,
+      get: (id) => (id === 'pg/text@1' ? codec : undefined),
+    };
+
+    expect(codecEnforcesValueSet(lookup, 'pg/text@1')).toBe(false);
+  });
+
+  it('false when the codec instance carries no descriptor back-reference', () => {
+    const codec: Codec = {
+      id: 'pg/text@1',
+      encode: () => Promise.reject(new Error('unused')),
+      decode: () => Promise.reject(new Error('unused')),
+      encodeJson: (value) => value,
+      decodeJson: (json) => json,
+    };
+    const lookup: CodecLookup = {
+      ...baseLookup,
+      get: (id) => (id === 'pg/text@1' ? codec : undefined),
+    };
+
+    expect(codecEnforcesValueSet(lookup, 'pg/text@1')).toBe(false);
+  });
+
+  it('false for an unknown codec id', () => {
+    expect(codecEnforcesValueSet(baseLookup, 'pg/enum@1')).toBe(false);
+  });
+
+  it('false when the lookup itself is undefined', () => {
+    expect(codecEnforcesValueSet(undefined, 'pg/enum@1')).toBe(false);
   });
 });

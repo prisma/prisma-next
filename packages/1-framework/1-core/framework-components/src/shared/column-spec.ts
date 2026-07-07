@@ -31,16 +31,6 @@ export type ColumnTypeDescriptor<TCodecId extends string = string> = {
    * `column.valueSet`). Every codec's own descriptor leaves this unset.
    */
   readonly valueSet?: ValueSetRef;
-  /**
-   * How membership in `valueSet` is enforced at the database level. Defaults
-   * to `'check'` (auto-generate a `CHECK` constraint, today's only strategy)
-   * when `valueSet` is set and this is absent. `'native-type'` means the
-   * column's `nativeType` itself enforces membership (e.g. a Postgres native
-   * enum) — the contract-building code that auto-generates a `CHECK` per
-   * value-set column skips a column with this enforcement. Meaningless
-   * without `valueSet`.
-   */
-  readonly valueSetEnforcement?: 'check' | 'native-type';
 };
 
 /**

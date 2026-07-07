@@ -31,6 +31,7 @@ import {
   type IndexTypeMap,
   type IndexTypeRegistration,
 } from '@prisma-next/sql-contract/index-types';
+import { codecEnforcesValueSet } from '@prisma-next/sql-contract/native-type-hook';
 import {
   applyFkDefaults,
   type CheckConstraintInput,
@@ -384,10 +385,6 @@ export function buildSqlContractFromDefinition(
     const fieldToColumn: Record<string, string> = {};
     const domainFields: Record<string, ContractField> = {};
     const domainFieldRefs: Record<string, DomainFieldRef> = {};
-    // Columns whose value-set membership is enforced by the native type
-    // itself (`field.descriptor.valueSetEnforcement === 'native-type'`, e.g.
-    // a Postgres native enum) — excluded from the auto-generated CHECK below.
-    const nativeTypeEnforcedColumns = new Set<string>();
 
     for (const field of semanticModel.fields) {
       const executionDefaultPhases =
@@ -433,13 +430,6 @@ export function buildSqlContractFromDefinition(
       const column = buildStorageColumn(field, storageValueSetRef, codecLookup);
       columns[field.columnName] = column;
       fieldToColumn[field.fieldName] = field.columnName;
-      if (
-        !isValueObjectField(field) &&
-        !field.many &&
-        field.descriptor.valueSetEnforcement === 'native-type'
-      ) {
-        nativeTypeEnforcedColumns.add(field.columnName);
-      }
 
       domainFields[field.fieldName] = buildDomainField(field, column, domainValueSetRef);
 
@@ -534,7 +524,11 @@ export function buildSqlContractFromDefinition(
       const checksForTable: CheckConstraintInput[] = Object.entries(columns).flatMap(
         ([columnName, col]) => {
           const valueSet = col.valueSet;
-          if (valueSet === undefined || nativeTypeEnforcedColumns.has(columnName)) {
+          if (valueSet === undefined) return [];
+          // A list (`many`) value-set column always gets a CHECK: a codec's
+          // per-instance native type enforces membership for a scalar column,
+          // not for each element of an array column.
+          if (col.many !== true && codecEnforcesValueSet(codecLookup, col.codecId)) {
             return [];
           }
           return [{ name: `${tableName}_${columnName}_check`, column: columnName, valueSet }];

@@ -19,7 +19,6 @@ import type {
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import {
-  deriveValueSetFromEntity,
   instantiateAuthoringEntityType,
   isAuthoringEntityTypeDescriptor,
   isAuthoringPslBlockDescriptor,
@@ -54,6 +53,7 @@ import type {
   SqlNamespaceBase,
   SqlNamespaceInput,
 } from '@prisma-next/sql-contract/types';
+import { deriveValueSetFromEntity } from '@prisma-next/sql-contract/value-set-derivation-hook';
 import {
   buildSqlContractFromDefinition,
   type EnumTypeHandle,
@@ -317,12 +317,13 @@ function buildEntityTypesByDiscriminator(
  *
  * This pass is intentionally generic: no discriminator value is named here.
  * The factory (registered by the target pack) owns all block-specific logic.
- * A descriptor may also opt into value-set derivation via its
- * {@link AuthoringEntityTypeFactoryOutput.deriveValueSet} hook — when present,
- * the derived value-set is folded into the namespace's `valueSet` slot
- * (keyed by block name), so a value-set-carrying pack entity (e.g. Postgres
- * `native_enum`) contributes the value-set that drives value-set → codec
- * typing without this pass inspecting a target-specific shape.
+ * A descriptor's factory output may also opt into value-set derivation via
+ * the SQL family's `SqlValueSetDerivingEntityTypeOutput.deriveValueSet` hook
+ * (probed by {@link deriveValueSetFromEntity}) — when present, the derived
+ * value-set is folded into the namespace's `valueSet` slot (keyed by block
+ * name), so a value-set-carrying pack entity (e.g. Postgres `native_enum`)
+ * contributes the value-set that drives value-set → codec typing without
+ * this pass inspecting a target-specific shape.
  *
  * The `namespaceId` is attached to the block before the factory call so the
  * factory can record the namespace coordinate without the interpreter
@@ -358,7 +359,7 @@ function lowerExtensionBlocksForNamespace(
     result[entriesKey] = slot;
     slot[block.name] = entity;
 
-    const derivedValueSet = deriveValueSetFromEntity(descriptor, entity);
+    const derivedValueSet = deriveValueSetFromEntity(descriptor.output, entity);
     if (derivedValueSet !== undefined) {
       const valueSetSlot = result['valueSet'] ?? {};
       result['valueSet'] = valueSetSlot;
@@ -2163,30 +2164,33 @@ export function interpretPslDocumentToSqlContract(
     return createNamespace(extended);
   };
 
-  const contract = buildSqlContractFromDefinition({
-    target: input.target,
-    ...ifDefined(
-      'extensionPacks',
-      buildComposedExtensionPackRefs(
-        input.target,
-        [...composedExtensions].sort(compareStrings),
-        input.composedExtensionPackRefs,
+  const contract = buildSqlContractFromDefinition(
+    {
+      target: input.target,
+      ...ifDefined(
+        'extensionPacks',
+        buildComposedExtensionPackRefs(
+          input.target,
+          [...composedExtensions].sort(compareStrings),
+          input.composedExtensionPackRefs,
+        ),
       ),
-    ),
-    ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
-    ...(Object.keys(validEnumHandles).length > 0 ? { enums: validEnumHandles } : {}),
-    createNamespace: createNamespaceWithExtensions,
-    models: stiColumnModelNodes.map((model) => ({
-      ...model,
-      ...(modelRelations.has(model.modelName)
-        ? {
-            relations: [...(modelRelations.get(model.modelName) ?? [])].sort((left, right) =>
-              compareStrings(left.fieldName, right.fieldName),
-            ),
-          }
-        : {}),
-    })),
-  });
+      ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
+      ...(Object.keys(validEnumHandles).length > 0 ? { enums: validEnumHandles } : {}),
+      createNamespace: createNamespaceWithExtensions,
+      models: stiColumnModelNodes.map((model) => ({
+        ...model,
+        ...(modelRelations.has(model.modelName)
+          ? {
+              relations: [...(modelRelations.get(model.modelName) ?? [])].sort((left, right) =>
+                compareStrings(left.fieldName, right.fieldName),
+              ),
+            }
+          : {}),
+      })),
+    },
+    input.codecLookup,
+  );
 
   // Include namespace in patch keys so same bare model names across namespaces
   // stay distinct; same-coordinate duplicates were already collapsed first-wins.

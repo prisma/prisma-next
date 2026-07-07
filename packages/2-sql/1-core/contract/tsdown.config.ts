@@ -14,5 +14,7 @@ export default defineConfig({
     'src/exports/index-type-validation.ts',
     'src/exports/canonicalization-hooks.ts',
     'src/exports/native-type-hook.ts',
+    'src/exports/entity-ref-resolution.ts',
+    'src/exports/value-set-derivation-hook.ts',
   ],
 });

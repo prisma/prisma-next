@@ -1,10 +1,12 @@
 /**
- * SQL-family extension to the framework codec lookup: a per-instance native type for a
- * parameterized codec (e.g. a native enum's Postgres type name from its `typeParams`).
+ * SQL-family codec-descriptor hooks: a per-instance native type for a parameterized codec (e.g. a
+ * native enum's Postgres type name from its `typeParams`), and a marker for a codec whose storage
+ * type intrinsically enforces its value-set (so the family-shared column builder skips
+ * auto-generating a `CHECK`).
  *
- * `StorageColumn.nativeType` already lives in this package — it is the SQL-layer concept
- * `nativeType` names. The framework `CodecDescriptor`/`CodecLookup` stay family-agnostic;
- * this hook and its wiring live here instead.
+ * `StorageColumn.nativeType` and `CHECK` constraints already live in this package — they are
+ * SQL-layer concepts. The framework `CodecDescriptor`/`CodecLookup` stay family-agnostic; these
+ * hooks and their wiring live here instead.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
@@ -49,6 +51,60 @@ export interface SqlCodecLookup extends CodecLookup {
  */
 export interface CodecIdentifiedDescriptor {
   readonly codecId: string;
+}
+
+/**
+ * Structural shape a codec descriptor may implement to mark that its storage type intrinsically
+ * enforces its value-set — the family-shared column builder (`contract-ts`'s `build-contract.ts`)
+ * writes no `CHECK` constraint for a column whose codec declares this. Explicit rather than
+ * inferred from {@link NativeTypeForCodecDescriptor}'s presence: "has a per-instance type name"
+ * and "that type enforces the value-set" are different facts.
+ */
+export interface EnforcesValueSetCodecDescriptor {
+  readonly enforcesValueSet: true;
+}
+
+/** Structural check for {@link EnforcesValueSetCodecDescriptor}: no casts. */
+export function providesEnforcesValueSet(
+  descriptor: unknown,
+): descriptor is EnforcesValueSetCodecDescriptor {
+  if (
+    typeof descriptor !== 'object' ||
+    descriptor === null ||
+    !('enforcesValueSet' in descriptor)
+  ) {
+    return false;
+  }
+  return descriptor.enforcesValueSet === true;
+}
+
+/**
+ * Structural shape a materialized `Codec` instance may carry: a back-reference to the descriptor
+ * that built it. `CodecImpl` (the base class every framework codec author extends) declares
+ * `descriptor` generically for every family, so {@link codecEnforcesValueSet} reaches a codec's
+ * descriptor through the `CodecLookup` authoring code already receives, with no extra
+ * descriptor-array plumbing (contrast {@link attachNativeTypeFor}, which needs the raw descriptor
+ * array because the SQL renderer consults `nativeTypeFor` before any `Codec` instance is
+ * materialized).
+ */
+interface CodecWithDescriptor {
+  readonly descriptor: unknown;
+}
+
+function hasDescriptor(value: object): value is CodecWithDescriptor {
+  return 'descriptor' in value;
+}
+
+/**
+ * True when the codec identified by `codecId` enforces its value-set intrinsically (see
+ * {@link EnforcesValueSetCodecDescriptor}). `build-contract`'s CHECK-generation consults this so a
+ * value-set column whose codec enforces its value-set gets no auto-generated `CHECK`.
+ */
+export function codecEnforcesValueSet(lookup: CodecLookup | undefined, codecId: string): boolean {
+  const codec = lookup?.get(codecId);
+  if (codec === undefined) return false;
+  if (!hasDescriptor(codec)) return false;
+  return providesEnforcesValueSet(codec.descriptor);
 }
 
 /**

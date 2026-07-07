@@ -66,54 +66,26 @@ export interface AuthoringTypeConstructorDescriptor {
 }
 
 /**
- * The result of resolving an {@link AuthoringEntityRefTypeConstructorDescriptor}
- * call against a document-local entity ref (e.g. `pg.enum(AalLevel)` resolving
- * `AalLevel`).
- *
- * `valueSetEntityName`, when present, names a value-set entry already derived
- * for the same namespace (`entries.valueSet[valueSetEntityName]` — see
- * {@link AuthoringEntityTypeFactoryOutput.deriveValueSet}); the caller builds
- * the storage-plane `ValueSetRef` from this name plus the field's own
- * namespace id. This type does not import the ref shape itself so the
- * framework-shared authoring surface stays family-agnostic (mirroring
- * {@link AuthoringDerivedValueSet}'s own convention).
- *
- * `valueSetEnforcement` names how membership in the value-set is enforced at
- * the database level, so the family-shared column-building code (which
- * auto-generates a `CHECK` constraint for every value-set column) can skip
- * that generation for a column whose enforcement is intrinsic to its native
- * type. Defaults to `'check'` (today's only enforcement strategy) when
- * absent, so every existing resolver keeps generating a `CHECK` unchanged.
- * `'native-type'` means the column's `nativeType` itself enforces membership
- * (e.g. a Postgres native enum's `CREATE TYPE … AS ENUM (…)`) — no `CHECK`
- * is written.
- */
-export interface AuthoringEntityRefResolution {
-  readonly codecId: string;
-  readonly nativeType: string;
-  /** Codec-instance params threaded onto the column (e.g. a native enum's `{ typeName }`), for codecs whose per-instance behavior is parameterized. */
-  readonly typeParams?: Record<string, unknown>;
-  readonly valueSetEntityName?: string;
-  readonly valueSetEnforcement?: 'check' | 'native-type';
-}
-
-/**
  * Declarative-template type constructors ({@link AuthoringTypeConstructorDescriptor})
  * only map scalar call arguments through a static template — they have no
  * access to other entities parsed from the same document. An entity-ref type
  * constructor is the escape hatch for a field type that names another
- * document-local entity (e.g. Postgres's `pg.enum(<native_enum ref>)`
- * resolving the ref against an already-lowered `native_enum` block): its
- * `resolve` function is handed the call's sole positional-argument string, the
- * namespace-scoped map of already-lowered extension entities (the exact shape
+ * document-local entity: its `resolve` function is handed the call's sole
+ * positional-argument string, the namespace-scoped map of already-lowered
+ * extension entities (the exact shape
  * {@link AuthoringEntityTypeFactoryOutput.factory} output is collected into,
  * keyed by entries-slot discriminator then block name), and the field's own
- * namespace id (so a target can qualify its resolved `nativeType` by schema,
- * e.g. Postgres's `pg.enum` prefixing a non-default-schema enum's type name
- * with its schema). It returns the resolved storage-type triple plus an
- * optional value-set-derivation pointer, or `undefined` when the ref does not
- * resolve (the caller reports the diagnostic — this hook reports no
- * diagnostics of its own).
+ * namespace id. It returns the resolved field-type payload, or `undefined`
+ * when the ref does not resolve (the caller reports the diagnostic — this
+ * hook reports no diagnostics of its own).
+ *
+ * The returned payload is an opaque `object` — its shape is defined by the
+ * consuming family, not by this framework type, so no family vocabulary
+ * (codec ids, native types, value-set enforcement strategies, …) appears
+ * here. The consumer narrows the object with its own structural predicate
+ * (e.g. the SQL family's `isSqlEntityRefResolution`); a payload that fails
+ * that predicate is a contributor bug in the pack that registered this
+ * descriptor, not a user-schema error.
  *
  * Deliberately narrower than a general "run arbitrary code during field
  * resolution" hook: `resolve` is a pure function over `(ref, entities,
@@ -128,7 +100,7 @@ export interface AuthoringEntityRefTypeConstructorDescriptor {
       | Readonly<Record<string, Readonly<Record<string, unknown>>>>
       | undefined,
     namespaceId?: string,
-  ) => AuthoringEntityRefResolution | undefined;
+  ) => object | undefined;
 }
 
 export interface AuthoringColumnDefaultTemplateLiteral {
@@ -335,37 +307,6 @@ export interface AuthoringEntityTypeTemplateOutput {
  */
 export interface AuthoringEntityTypeFactoryOutput<Input = never, Output = unknown> {
   readonly factory: (input: Input, ctx: AuthoringEntityContext) => Output;
-  /**
-   * Optional, opt-in hook: derive a value-set from an entity this factory
-   * produced. When present, the generic extension-block lowering pass folds
-   * the returned value-set into the same namespace's `valueSet` slot, keyed
-   * by the entity's block name. Return `undefined` to derive nothing.
-   *
-   * This is the generic mechanism by which a value-set-carrying pack entity
-   * (e.g. Postgres `native_enum`) contributes the value-set that drives
-   * value-set → codec typing — without the family-layer pass naming any
-   * target discriminator or inspecting a target-specific shape.
-   *
-   * The parameter is `never` here (not `Output`) for the same contravariant
-   * reason the base `factory` input is `never` (see this type's docstring): a
-   * pack literal declaring `deriveValueSet: (e: PostgresNativeEnum) => …` is
-   * only assignable to the base shape when the base's parameter is the bottom
-   * type. The pack still authors the hook against its real IR class with no
-   * cast; the runtime bridge lives in {@link deriveValueSetFromEntity}.
-   */
-  readonly deriveValueSet?: (entity: never) => AuthoringDerivedValueSet | undefined;
-}
-
-/**
- * The canonical value-set shape a {@link AuthoringEntityTypeFactoryOutput.deriveValueSet}
- * hook returns — the on-disk `StorageValueSet` envelope (`kind: 'valueSet'`,
- * ordered codec-encoded values). Declared here (not imported from the SQL
- * family) so the framework-shared authoring surface stays family-agnostic;
- * it is structurally identical to `StorageValueSetInput`.
- */
-export interface AuthoringDerivedValueSet {
-  readonly kind: 'valueSet';
-  readonly values: readonly unknown[];
 }
 
 export interface AuthoringEntityTypeDescriptor<Input = never, Output = unknown> {
@@ -448,12 +389,12 @@ export interface AuthoringContributions {
   /**
    * Registry of {@link AuthoringEntityRefTypeConstructorDescriptor} leaves —
    * field types that resolve a call argument against another entity parsed
-   * from the same document (e.g. Postgres's `pg.enum(<native_enum ref>)`).
-   * Kept separate from `type` (not a nested shape within it) because a
-   * declarative `type` leaf and an entity-ref leaf resolve through
-   * fundamentally different call paths in PSL field resolution — merging
-   * them would force every generic `type`-namespace walker (TS-helper
-   * generation, collision detection) to learn a second leaf shape.
+   * from the same document. Kept separate from `type` (not a nested shape
+   * within it) because a declarative `type` leaf and an entity-ref leaf
+   * resolve through fundamentally different call paths in PSL field
+   * resolution — merging them would force every generic `type`-namespace
+   * walker (TS-helper generation, collision detection) to learn a second
+   * leaf shape.
    */
   readonly entityRefTypeConstructors?: AuthoringEntityRefTypeConstructorNamespace;
   /**
@@ -1197,32 +1138,6 @@ export function instantiateAuthoringEntityType<TOutput = unknown>(
   validateAuthoringHelperArguments(helperPath, descriptor.args, args);
   return blindCast<TOutput, 'template-output resolves to the declared TOutput by convention'>(
     resolveAuthoringTemplateValue(descriptor.output.template, args),
-  );
-}
-
-/**
- * If the descriptor's factory output supplies a
- * {@link AuthoringEntityTypeFactoryOutput.deriveValueSet} hook, invoke it on
- * `entity` and return the derived value-set; otherwise return `undefined`.
- *
- * The generic extension-block lowering pass calls this after building each
- * entity so a value-set-carrying pack entity can contribute its value-set
- * without the pass naming any target discriminator. The hook is invoked with
- * the already-built entity (typed as the pack's `Output` at the descriptor's
- * declaration site).
- */
-export function deriveValueSetFromEntity(
-  descriptor: AuthoringEntityTypeDescriptor,
-  entity: unknown,
-): AuthoringDerivedValueSet | undefined {
-  if (!('factory' in descriptor.output)) return undefined;
-  const { deriveValueSet } = descriptor.output;
-  if (deriveValueSet === undefined) return undefined;
-  return deriveValueSet(
-    blindCast<
-      never,
-      "entity is this descriptor's factory Output; deriveValueSet's parameter is that same Output at the declaration site"
-    >(entity),
   );
 }
 
