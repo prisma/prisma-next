@@ -23,9 +23,11 @@ import {
   type StorageColumn,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
+import { SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
 import { postgresRenderDefault } from '@prisma-next/target-postgres/control';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
+import { resolveDdlSchemaForNamespaceStorage } from '@prisma-next/target-postgres/schema-ir-annotations';
 import {
   PostgresDatabaseSchemaNode,
   PostgresNamespaceSchemaNode,
@@ -113,7 +115,35 @@ function contractToSchemaIR(
       new PostgresTableSchemaNode({
         name: t.name,
         columns: t.columns,
-        foreignKeys: t.foreignKeys,
+        // The flat family `contractToSchemaIR` stamps `referencedSchema`
+        // verbatim (the raw contract namespace id) and never resolves
+        // `resolvedReferencedSchema` — that fixup is `contractToPostgresDatabaseSchemaNode`'s
+        // own responsibility. The differ pairs FK nodes by id, which folds in
+        // `resolvedReferencedSchema`, so this test double must apply the same
+        // resolution the real Postgres tree-builder does, or an unresolved FK
+        // here never pairs with the differ's Postgres-tree-derived expected
+        // side and shows up as a spurious drop+recreate.
+        foreignKeys:
+          contract === null
+            ? t.foreignKeys
+            : t.foreignKeys.map(
+                (fk) =>
+                  new SqlForeignKeyIR({
+                    columns: fk.columns,
+                    referencedTable: fk.referencedTable,
+                    referencedColumns: fk.referencedColumns,
+                    ...(fk.referencedSchema !== undefined
+                      ? { referencedSchema: fk.referencedSchema }
+                      : {}),
+                    ...(fk.name !== undefined ? { name: fk.name } : {}),
+                    ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
+                    ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
+                    resolvedReferencedSchema: resolveDdlSchemaForNamespaceStorage(
+                      contract.storage,
+                      fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
+                    ),
+                  }),
+              ),
         uniques: t.uniques,
         indexes: t.indexes,
         ...(t.primaryKey !== undefined ? { primaryKey: t.primaryKey } : {}),

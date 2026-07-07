@@ -8,7 +8,7 @@ import {
   coalesceSubtreeIssues,
   mapNodeIssueToCall,
   nodeIssueOrder,
-  planNodeIssues,
+  planIssues as planNodeIssues,
 } from '../../src/core/migrations/issue-planner';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
@@ -17,10 +17,13 @@ import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table
 
 /**
  * Direct coverage for the node-based Postgres planner (the one-differ path):
- * `buildPostgresPlanDiff` (tree diff) → `mapNodeIssueToCall` / `planNodeIssues`
- * (node → op). Additive, inert machinery — not yet wired into
- * `PostgresMigrationPlanner`. Node strategies land with the cutover, so this
- * suite drives the default per-issue mapper (empty strategy list).
+ * `buildPostgresPlanDiff` (tree diff) → `mapNodeIssueToCall` / `planIssues`
+ * (node → op), now wired into `PostgresMigrationPlanner`. This suite passes
+ * `strategies: []` deliberately, so it drives the default per-issue mapper
+ * directly — the real `postgresPlannerStrategies` list (NOT-NULL backfill,
+ * type-change, nullable-tightening, check constraints, codec storage types,
+ * shared-temp-default add-column) is covered by the cross-package planner /
+ * control-policy suites and `rls-planner.test.ts`.
  */
 
 type TableSpec = ConstructorParameters<typeof StorageTable>[0];
@@ -102,6 +105,9 @@ function planFor(contract: Contract<SqlStorage>, actual: PostgresDatabaseSchemaN
     schemaName: 'public',
     codecHooks: new Map(),
     storageTypes: contract.storage.types ?? {},
+    // The default per-issue mapper is what this suite pins — the real
+    // strategy list is covered elsewhere (see module docstring).
+    strategies: [],
   });
   if (!result.ok) throw new Error(`expected ok, got conflicts: ${JSON.stringify(result.failure)}`);
   return result.value.calls;

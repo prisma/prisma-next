@@ -818,6 +818,13 @@ function buildPostTableSchema(): PostgresTableSchemaNode {
         referencedTable: 'user',
         referencedColumns: ['id'],
         name: 'post_userId_fkey',
+        // The differ pairs FK nodes by id, which folds in
+        // `resolvedReferencedSchema` — match what
+        // `contractToPostgresDatabaseSchemaNode` stamps on the expected side
+        // for an unbound-namespace FK target (resolves to the live `public`
+        // DDL schema), or this hand-built actual node never pairs and shows
+        // up as a spurious drop+recreate.
+        resolvedReferencedSchema: 'public',
       },
     ],
     indexes: [{ columns: ['userId'], name: 'post_userId_idx', unique: false }],

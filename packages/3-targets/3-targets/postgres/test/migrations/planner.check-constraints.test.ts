@@ -1,5 +1,5 @@
-import type { Contract } from '@prisma-next/contract/types';
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   CheckConstraint,
@@ -151,20 +151,49 @@ const defaultCtx = {
   storageTypes: {},
 };
 
+/** Node-typed check-constraint issue, matching the shape the one differ produces. */
+function checkIssue(options: {
+  readonly reason: 'not-found' | 'not-expected' | 'not-equal';
+  readonly expectedValues?: readonly string[];
+  readonly actualValues?: readonly string[];
+}): SchemaDiffIssue {
+  const path = ['database', UNBOUND_NAMESPACE_ID, TABLE_NAME, `check:${CHECK_NAME}`];
+  const expected =
+    options.expectedValues !== undefined
+      ? new SqlCheckConstraintIR({
+          name: CHECK_NAME,
+          column: COLUMN_NAME,
+          permittedValues: [...options.expectedValues],
+        })
+      : undefined;
+  const actual =
+    options.actualValues !== undefined
+      ? new SqlCheckConstraintIR({
+          name: CHECK_NAME,
+          column: COLUMN_NAME,
+          permittedValues: [...options.actualValues],
+        })
+      : undefined;
+  return {
+    path,
+    outcome:
+      options.reason === 'not-found'
+        ? 'missing'
+        : options.reason === 'not-expected'
+          ? 'extra'
+          : 'mismatch',
+    reason: options.reason,
+    message: `check drift on "${TABLE_NAME}"`,
+    ...(expected !== undefined ? { expected } : {}),
+    ...(actual !== undefined ? { actual } : {}),
+  };
+}
+
 describe('checkConstraintPlanCallStrategy', () => {
   it('emits AddCheckConstraintCall when contract has a check absent from live schema', () => {
     const contract = makeContractWithCheck(['active', 'inactive']);
     const result = checkConstraintPlanCallStrategy(
-      [
-        {
-          kind: 'check_missing',
-          table: TABLE_NAME,
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          indexOrConstraint: CHECK_NAME,
-          expected: 'active, inactive',
-          message: `Table "${TABLE_NAME}" is missing check "${CHECK_NAME}"`,
-        },
-      ],
+      [checkIssue({ reason: 'not-found', expectedValues: ['active', 'inactive'] })],
       {
         ...defaultCtx,
         toContract: contract,
@@ -192,15 +221,11 @@ describe('checkConstraintPlanCallStrategy', () => {
     const contract = makeContractWithCheck(['active', 'inactive', 'pending']);
     const result = checkConstraintPlanCallStrategy(
       [
-        {
-          kind: 'check_mismatch',
-          table: TABLE_NAME,
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          indexOrConstraint: CHECK_NAME,
-          expected: 'active, inactive, pending',
-          actual: 'active, inactive',
-          message: `Table "${TABLE_NAME}" check "${CHECK_NAME}" has different values`,
-        },
+        checkIssue({
+          reason: 'not-equal',
+          expectedValues: ['active', 'inactive', 'pending'],
+          actualValues: ['active', 'inactive'],
+        }),
       ],
       {
         ...defaultCtx,
@@ -232,16 +257,7 @@ describe('checkConstraintPlanCallStrategy', () => {
   it('emits DropCheckConstraintCall when live has a check absent from contract', () => {
     const contract = makeContractWithoutCheck();
     const result = checkConstraintPlanCallStrategy(
-      [
-        {
-          kind: 'check_removed',
-          table: TABLE_NAME,
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          indexOrConstraint: CHECK_NAME,
-          actual: 'active, inactive',
-          message: `Table "${TABLE_NAME}" has extra check "${CHECK_NAME}"`,
-        },
-      ],
+      [checkIssue({ reason: 'not-expected', actualValues: ['active', 'inactive'] })],
       {
         ...defaultCtx,
         toContract: contract,
@@ -253,24 +269,16 @@ describe('checkConstraintPlanCallStrategy', () => {
     );
 
     // Contract has no checks — the strategy has nothing to iterate over.
-    // The check_removed issue falls through (no tables with checks in contract).
-    // The DropCheckConstraintCall should come from mapIssueToCall via check_removed.
+    // The not-expected issue falls through (no tables with checks in contract).
+    // The DropCheckConstraintCall should come from mapNodeIssueToCall via
+    // the not-expected default handler.
     expect(result.kind).toBe('no_match');
   });
 
   it('emits no calls and consumes the issue when value sets match (no-op)', () => {
     const contract = makeContractWithCheck(['active', 'inactive']);
     const result = checkConstraintPlanCallStrategy(
-      [
-        {
-          kind: 'check_missing',
-          table: TABLE_NAME,
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          indexOrConstraint: CHECK_NAME,
-          expected: 'active, inactive',
-          message: 'stale issue: already satisfied',
-        },
-      ],
+      [checkIssue({ reason: 'not-found', expectedValues: ['active', 'inactive'] })],
       {
         ...defaultCtx,
         toContract: contract,
@@ -289,20 +297,11 @@ describe('checkConstraintPlanCallStrategy', () => {
 });
 
 describe('planIssues — check constraint strategy', () => {
-  it('check_removed produces DropCheckConstraintCall when contract has no check', () => {
+  it('a not-expected check produces DropCheckConstraintCall when contract has no check', () => {
     const contract = makeContractWithoutCheck();
     const result = planIssues({
       ...defaultCtx,
-      issues: [
-        {
-          kind: 'check_removed',
-          table: TABLE_NAME,
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          indexOrConstraint: CHECK_NAME,
-          actual: 'active, inactive',
-          message: `Table "${TABLE_NAME}" has extra check "${CHECK_NAME}"`,
-        },
-      ],
+      issues: [checkIssue({ reason: 'not-expected', actualValues: ['active', 'inactive'] })],
       toContract: contract,
       fromContract: null,
       schema: schemaWithCheck(['active', 'inactive']),
@@ -318,20 +317,11 @@ describe('planIssues — check constraint strategy', () => {
     });
   });
 
-  it('check_missing produces AddCheckConstraintCall in the unique bucket', () => {
+  it('a not-found check produces AddCheckConstraintCall in the unique bucket', () => {
     const contract = makeContractWithCheck(['active', 'inactive']);
     const result = planIssues({
       ...defaultCtx,
-      issues: [
-        {
-          kind: 'check_missing',
-          table: TABLE_NAME,
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          indexOrConstraint: CHECK_NAME,
-          expected: 'active, inactive',
-          message: `Table "${TABLE_NAME}" is missing check "${CHECK_NAME}"`,
-        },
-      ],
+      issues: [checkIssue({ reason: 'not-found', expectedValues: ['active', 'inactive'] })],
       toContract: contract,
       fromContract: null,
       schema: schemaWithoutCheck(),
@@ -347,20 +337,16 @@ describe('planIssues — check constraint strategy', () => {
     });
   });
 
-  it('check_mismatch produces DropCheckConstraintCall + AddCheckConstraintCall', () => {
+  it('a not-equal check produces DropCheckConstraintCall + AddCheckConstraintCall', () => {
     const contract = makeContractWithCheck(['active', 'inactive', 'pending']);
     const result = planIssues({
       ...defaultCtx,
       issues: [
-        {
-          kind: 'check_mismatch',
-          table: TABLE_NAME,
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          indexOrConstraint: CHECK_NAME,
-          expected: 'active, inactive, pending',
-          actual: 'active, inactive',
-          message: `Table "${TABLE_NAME}" check "${CHECK_NAME}" values mismatch`,
-        },
+        checkIssue({
+          reason: 'not-equal',
+          expectedValues: ['active', 'inactive', 'pending'],
+          actualValues: ['active', 'inactive'],
+        }),
       ],
       toContract: contract,
       fromContract: null,

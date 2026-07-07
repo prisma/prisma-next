@@ -1,11 +1,18 @@
 /**
- * Postgres migration planner.
+ * Postgres migration issue planner.
  *
- * Takes schema issues (from collectSqlSchemaIssues) and emits migration IR
- * (`PostgresOpFactoryCall[]`). Strategies consume issues they recognize and
- * produce specialized call sequences (e.g. NOT NULL backfill →
+ * Takes node-typed schema-diff issues (from the one differ — see
+ * `buildPostgresPlanDiff` in `diff-database-schema.ts`) and emits migration
+ * IR (`PostgresOpFactoryCall[]`). Strategies consume issues they recognize
+ * and produce specialized call sequences (e.g. NOT NULL backfill →
  * addColumn(nullable) + dataTransform + setNotNull); remaining issues flow
- * through `mapIssueToCall` for the default case.
+ * through `mapNodeIssueToCall` for the default case.
+ *
+ * Structural op-render (column type/default DDL) is a direct read of the
+ * node's derivation-stamped `opRender` payload — never recomputed from the
+ * contract. The retained subsystems (codec type-operations, the NOT-NULL
+ * temp-default deferred DDL, control-policy disposition) still read the
+ * contract via the strategy context, per the slice's scope.
  */
 
 import type { Contract, JsonValue } from '@prisma-next/contract/types';
@@ -15,13 +22,12 @@ import type {
   SqlPlannerConflict,
   SqlPlannerConflictLocation,
 } from '@prisma-next/family-sql/control';
-import { arraysEqual } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { SchemaDiffIssue, SchemaIssue } from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   SqlStorage,
   StorageColumn,
-  StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { CodecRef, DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
@@ -44,6 +50,7 @@ import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespac
 import type { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
 import { quoteIdentifier } from '../sql-utils';
+import { resolveNamespaceIdForDdlSchema } from './control-policy';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -66,17 +73,11 @@ import {
   SetNotNullCall,
 } from './op-factory-call';
 import type { ForeignKeySpec } from './operations/shared';
-import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
-import { buildExpectedFormatType } from './planner-sql-checks';
+import { buildColumnTypeSql } from './planner-ddl-builders';
 import {
   type CallMigrationStrategy,
-  type NodeCallMigrationStrategy,
-  postgresNodePlannerStrategies,
   postgresPlannerStrategies,
-  resolveDdlSchemaForNamespace,
-  resolveNamespaceIdForIssue,
   type StrategyContext,
-  tableAt,
 } from './planner-strategies';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
 import { columnOpRenderOf } from './postgres-column-op-render';
@@ -104,58 +105,6 @@ function elementNonNullCheckExpression(columnName: string): string {
 }
 
 // ============================================================================
-// Issue kind ordering (dependency order)
-// ============================================================================
-
-const ISSUE_KIND_ORDER: Record<string, number> = {
-  // Schemas first — the database container must exist before any DDL
-  // that targets it can run.
-  missing_schema: 1,
-
-  // Types next
-  type_missing: 2,
-  type_values_mismatch: 3,
-  enum_values_changed: 3,
-
-  // Drops (reconciliation — clear the way for creates)
-  // FKs dropped first (they depend on other constraints)
-  extra_foreign_key: 10,
-  extra_unique_constraint: 11,
-  extra_primary_key: 12,
-  extra_index: 13,
-  extra_default: 14,
-  extra_column: 15,
-  extra_table: 16,
-
-  // Tables before columns
-  missing_table: 20,
-
-  // Columns before constraints
-  missing_column: 30,
-
-  // Reconciliation alters (on existing objects)
-  type_mismatch: 40,
-  nullability_mismatch: 41,
-  default_missing: 42,
-  default_mismatch: 43,
-
-  // Constraints after columns exist
-  primary_key_mismatch: 50,
-  unique_constraint_mismatch: 51,
-  index_mismatch: 52,
-  foreign_key_mismatch: 60,
-
-  // Check constraints
-  check_missing: 53,
-  check_mismatch: 54,
-  check_removed: 55,
-};
-
-function issueOrder(issue: SchemaIssue): number {
-  return ISSUE_KIND_ORDER[issue.kind] ?? 99;
-}
-
-// ============================================================================
 // Conflict helpers
 // ============================================================================
 
@@ -170,44 +119,6 @@ function issueConflict(
     why: 'Use `migration new` to author a custom migration for this change.',
     ...(location ? { location } : {}),
   };
-}
-
-function isMissing(issue: SchemaIssue): boolean {
-  if (issue.kind === 'enum_values_changed') return false;
-  return issue.actual === undefined;
-}
-
-// ============================================================================
-// Issue planner
-// ============================================================================
-
-export interface IssuePlannerOptions {
-  readonly issues: readonly SchemaIssue[];
-  readonly toContract: Contract<SqlStorage>;
-  readonly fromContract: Contract<SqlStorage> | null;
-  readonly schemaName: string;
-  readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
-  /**
-   * Current database schema IR. Strategies read this to detect whether a
-   * structure already exists (e.g. `buildSchemaLookupMap` for shared-temp-
-   * default safety, extension dependency checks). Defaults to an empty schema
-   * when omitted so the planner can still run over "fresh DB" contract
-   * snapshots.
-   */
-  readonly schema?: SqlSchemaIR;
-  /**
-   * Operation-class policy. `planIssues` filters calls whose `operationClass`
-   * is not in `policy.allowedOperationClasses` and surfaces them as conflicts
-   * instead of emitting disallowed DDL. Defaults to additive-only.
-   */
-  readonly policy?: MigrationOperationPolicy;
-  /**
-   * Framework components participating in this composition. Available to
-   * future strategies that may consult component metadata at plan time.
-   */
-  readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
-  readonly strategies?: readonly CallMigrationStrategy[];
 }
 
 export interface IssuePlannerValue {
@@ -244,496 +155,6 @@ export function toDdlColumn(
     ...ifDefined('default', ddlDefault),
     ...ifDefined('codecRef', codecRef),
   });
-}
-
-function mapIssueToCall(
-  issue: SchemaIssue,
-  ctx: StrategyContext,
-): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  const { schemaName, codecHooks, storageTypes } = ctx;
-  // Per-table effective schema. `extra_table` issues intentionally
-  // omit `namespaceId` — the live DB carries a table that
-  // is not claimed by any contract namespace, so there is no contract
-  // coordinate to project from. Those issues fall back to the planner's
-  // global `ctx.schemaName`; every other issue dispatches through the
-  // resolved namespace's polymorphic `ddlSchemaName`.
-  const tableSchema = (issue: SchemaIssue): string => {
-    if (issue.kind === 'extra_table') return schemaName;
-    if (!('table' in issue) || !issue.table) return schemaName;
-    return resolveDdlSchemaForNamespace(ctx, resolveNamespaceIdForIssue(issue));
-  };
-
-  switch (issue.kind) {
-    case 'missing_schema': {
-      const namespaceId = issue.namespaceId;
-      if (!namespaceId)
-        return notOk(
-          issueConflict('unsupportedOperation', 'Missing schema issue has no namespaceId'),
-        );
-      const ddlSchemaName = resolveDdlSchemaForNamespace(ctx, namespaceId);
-      return ok([new CreateSchemaCall(ddlSchemaName)]);
-    }
-
-    case 'missing_table': {
-      if (!issue.table)
-        return notOk(
-          issueConflict('unsupportedOperation', 'Missing table issue has no table name'),
-        );
-      const namespaceId = resolveNamespaceIdForIssue(issue);
-      const contractTable = tableAt(ctx.toContract.storage, namespaceId, issue.table);
-      if (!contractTable) {
-        return notOk(
-          issueConflict(
-            'unsupportedOperation',
-            `Table "${issue.table}" in namespace "${namespaceId}" reported missing but not found in destination contract`,
-          ),
-        );
-      }
-      const schemaForTable = tableSchema(issue);
-      const missingTableName = issue.table;
-      const ddlColumns: DdlColumn[] = Object.entries(contractTable.columns).map(([name, column]) =>
-        toDdlColumn(name, column, codecHooks, storageTypes),
-      );
-      const primaryKeyConstraints: DdlTableConstraint[] = contractTable.primaryKey
-        ? [
-            contractFree.primaryKey(contractTable.primaryKey.columns, {
-              ...(contractTable.primaryKey.name ? { name: contractTable.primaryKey.name } : {}),
-            }),
-          ]
-        : [];
-      const elementNonNullChecks: DdlTableConstraint[] = Object.entries(contractTable.columns)
-        .filter(([, column]) => column.many === true)
-        .map(([columnName]) =>
-          contractFree.checkExpression(
-            elementNonNullCheckName(missingTableName, columnName),
-            elementNonNullCheckExpression(columnName),
-          ),
-        );
-      const allTableConstraints = [...primaryKeyConstraints, ...elementNonNullChecks];
-      const ddlConstraints: DdlTableConstraint[] | undefined =
-        allTableConstraints.length > 0 ? allTableConstraints : undefined;
-      const calls: PostgresOpFactoryCall[] = [
-        new CreateTableCall(schemaForTable, issue.table, ddlColumns, ddlConstraints),
-      ];
-      for (const index of contractTable.indexes) {
-        const indexName = index.name ?? `${issue.table}_${index.columns.join('_')}_idx`;
-        const extras: { type?: string; options?: Record<string, unknown> } = {};
-        if (index.type !== undefined) extras.type = index.type;
-        if (index.options !== undefined) extras.options = index.options;
-        calls.push(
-          new CreateIndexCall(schemaForTable, issue.table, indexName, [...index.columns], extras),
-        );
-      }
-      const explicitIndexColumnSets = new Set(
-        contractTable.indexes.map((idx) => idx.columns.join(',')),
-      );
-      for (const fk of contractTable.foreignKeys) {
-        if (fk.constraint) {
-          const fkName = fk.name ?? `${issue.table}_${fk.source.columns.join('_')}_fkey`;
-          const fkSpec: ForeignKeySpec = {
-            name: fkName,
-            columns: fk.source.columns,
-            references: {
-              schema: fk.target.namespaceId,
-              table: fk.target.tableName,
-              columns: fk.target.columns,
-            },
-            ...(fk.onDelete !== undefined && { onDelete: fk.onDelete }),
-            ...(fk.onUpdate !== undefined && { onUpdate: fk.onUpdate }),
-          };
-          calls.push(new AddForeignKeyCall(schemaForTable, issue.table, fkSpec));
-        }
-        if (fk.index && !explicitIndexColumnSets.has(fk.source.columns.join(','))) {
-          const indexName = `${issue.table}_${fk.source.columns.join('_')}_idx`;
-          calls.push(
-            new CreateIndexCall(schemaForTable, issue.table, indexName, [...fk.source.columns]),
-          );
-        }
-      }
-      for (const unique of contractTable.uniques) {
-        const constraintName = unique.name ?? `${issue.table}_${unique.columns.join('_')}_key`;
-        calls.push(
-          new AddUniqueCall(schemaForTable, issue.table, constraintName, [...unique.columns]),
-        );
-      }
-      return ok(calls);
-    }
-
-    case 'missing_column':
-      if (!issue.table || !issue.column)
-        return notOk(
-          issueConflict('unsupportedOperation', 'Missing column issue has no table/column name'),
-        );
-      {
-        const namespaceId = resolveNamespaceIdForIssue(issue);
-        const column = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[
-          issue.column
-        ];
-        if (!column)
-          return notOk(
-            issueConflict(
-              'unsupportedOperation',
-              `Column "${issue.table}"."${issue.column}" not in destination contract`,
-            ),
-          );
-        return ok([
-          new AddColumnCall(
-            tableSchema(issue),
-            issue.table,
-            toDdlColumn(issue.column, column, codecHooks, storageTypes),
-          ),
-        ]);
-      }
-
-    case 'default_missing':
-      if (!issue.table || !issue.column)
-        return notOk(
-          issueConflict('unsupportedOperation', 'Default missing issue has no table/column name'),
-        );
-      {
-        const namespaceId = resolveNamespaceIdForIssue(issue);
-        const column = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[
-          issue.column
-        ];
-        if (!column?.default) {
-          return notOk(
-            issueConflict(
-              'unsupportedOperation',
-              `Column "${issue.table}"."${issue.column}" has no default in contract`,
-            ),
-          );
-        }
-        const defaultSql = buildColumnDefaultSql(column.default, column);
-        if (!defaultSql) return ok([]);
-        return ok([new SetDefaultCall(tableSchema(issue), issue.table, issue.column, defaultSql)]);
-      }
-
-    case 'extra_table':
-      if (!issue.table)
-        return notOk(issueConflict('unsupportedOperation', 'Extra table issue has no table name'));
-      return ok([new DropTableCall(tableSchema(issue), issue.table)]);
-
-    case 'extra_column':
-      if (!issue.table || !issue.column)
-        return notOk(
-          issueConflict('unsupportedOperation', 'Extra column issue has no table/column name'),
-        );
-      return ok([new DropColumnCall(tableSchema(issue), issue.table, issue.column)]);
-
-    case 'extra_index':
-      if (!issue.table || !issue.indexOrConstraint)
-        return notOk(
-          issueConflict('unsupportedOperation', 'Extra index issue has no table/index name'),
-        );
-      return ok([new DropIndexCall(tableSchema(issue), issue.table, issue.indexOrConstraint)]);
-
-    case 'extra_unique_constraint':
-    case 'extra_foreign_key':
-    case 'extra_primary_key': {
-      if (!issue.table)
-        return notOk(
-          issueConflict(
-            'unsupportedOperation',
-            'Extra constraint issue has no table/constraint name',
-          ),
-        );
-      // `extra_primary_key` issues don't carry a constraint name — the
-      // verifier only has the table. Fall back to `<table>_pkey`, matching
-      // Postgres' default PK constraint naming and the old reconciliation
-      // planner's behavior.
-      const constraintName =
-        issue.indexOrConstraint ??
-        (issue.kind === 'extra_primary_key' ? `${issue.table}_pkey` : undefined);
-      if (!constraintName)
-        return notOk(
-          issueConflict(
-            'unsupportedOperation',
-            'Extra constraint issue has no table/constraint name',
-          ),
-        );
-      const kindMap = {
-        extra_unique_constraint: 'unique' as const,
-        extra_foreign_key: 'foreignKey' as const,
-        extra_primary_key: 'primaryKey' as const,
-      };
-      return ok([
-        new DropConstraintCall(
-          tableSchema(issue),
-          issue.table,
-          constraintName,
-          kindMap[issue.kind],
-        ),
-      ]);
-    }
-
-    case 'extra_default':
-      if (!issue.table || !issue.column)
-        return notOk(
-          issueConflict('unsupportedOperation', 'Extra default issue has no table/column name'),
-        );
-      return ok([new DropDefaultCall(tableSchema(issue), issue.table, issue.column)]);
-
-    case 'nullability_mismatch': {
-      if (!issue.table || !issue.column)
-        return notOk(
-          issueConflict('nullabilityConflict', 'Nullability mismatch has no table/column name'),
-        );
-      const namespaceId = resolveNamespaceIdForIssue(issue);
-      const column = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[
-        issue.column
-      ];
-      if (!column)
-        return notOk(
-          issueConflict(
-            'nullabilityConflict',
-            `Column "${issue.table}"."${issue.column}" not found in destination contract`,
-          ),
-        );
-      const schemaForTable = tableSchema(issue);
-      return ok(
-        column.nullable
-          ? [new DropNotNullCall(schemaForTable, issue.table, issue.column)]
-          : [new SetNotNullCall(schemaForTable, issue.table, issue.column)],
-      );
-    }
-
-    case 'type_mismatch':
-      if (!issue.table || !issue.column)
-        return notOk(issueConflict('typeMismatch', 'Type mismatch has no table/column name'));
-      {
-        const namespaceId = resolveNamespaceIdForIssue(issue);
-        const column = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[
-          issue.column
-        ];
-        if (!column)
-          return notOk(
-            issueConflict(
-              'typeMismatch',
-              `Column "${issue.table}"."${issue.column}" not in destination contract`,
-            ),
-          );
-        const hooksMap = codecHooks as Map<string, CodecControlHooks>;
-        const typesMap = storageTypes as Record<string, StorageTypeInstance>;
-        const qualifiedTargetType = buildColumnTypeSql(column, hooksMap, typesMap, false);
-        const formatTypeExpected = buildExpectedFormatType(column, hooksMap, typesMap);
-        return ok([
-          new AlterColumnTypeCall(tableSchema(issue), issue.table, issue.column, {
-            qualifiedTargetType,
-            formatTypeExpected,
-            rawTargetTypeForLabel: qualifiedTargetType,
-          }),
-        ]);
-      }
-
-    case 'default_mismatch':
-      if (!issue.table || !issue.column)
-        return notOk(
-          issueConflict('unsupportedOperation', 'Default mismatch has no table/column name'),
-        );
-      {
-        const namespaceId = resolveNamespaceIdForIssue(issue);
-        const column = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.columns[
-          issue.column
-        ];
-        if (!column?.default) return ok([]);
-        const defaultSql = buildColumnDefaultSql(column.default, column);
-        if (!defaultSql) return ok([]);
-        return ok([
-          new SetDefaultCall(tableSchema(issue), issue.table, issue.column, defaultSql, 'widening'),
-        ]);
-      }
-
-    case 'primary_key_mismatch':
-      if (!issue.table)
-        return notOk(issueConflict('indexIncompatible', 'Primary key issue has no table name'));
-      if (isMissing(issue)) {
-        const namespaceId = resolveNamespaceIdForIssue(issue);
-        const pk = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.primaryKey;
-        if (!pk)
-          return notOk(
-            issueConflict('indexIncompatible', `No primary key in contract for "${issue.table}"`),
-          );
-        const constraintName = pk.name ?? `${issue.table}_pkey`;
-        return ok([
-          new AddPrimaryKeyCall(tableSchema(issue), issue.table, constraintName, pk.columns),
-        ]);
-      }
-      return notOk(
-        issueConflict(
-          'indexIncompatible',
-          `Primary key on "${issue.table}" has different columns (expected: ${issue.expected}, actual: ${issue.actual})`,
-          { table: issue.table },
-        ),
-      );
-
-    case 'unique_constraint_mismatch':
-      if (!issue.table)
-        return notOk(
-          issueConflict('indexIncompatible', 'Unique constraint issue has no table name'),
-        );
-      if (isMissing(issue) && issue.expected) {
-        const columns = issue.expected.split(', ');
-        const constraintName = `${issue.table}_${columns.join('_')}_key`;
-        return ok([new AddUniqueCall(tableSchema(issue), issue.table, constraintName, columns)]);
-      }
-      return notOk(
-        issueConflict(
-          'indexIncompatible',
-          `Unique constraint on "${issue.table}" differs (expected: ${issue.expected}, actual: ${issue.actual})`,
-          { table: issue.table },
-        ),
-      );
-
-    case 'index_mismatch':
-      if (!issue.table)
-        return notOk(issueConflict('indexIncompatible', 'Index issue has no table name'));
-      if (isMissing(issue) && issue.expected) {
-        const namespaceId = resolveNamespaceIdForIssue(issue);
-        const columns = issue.expected.split(', ');
-        const contractIndex = tableAt(
-          ctx.toContract.storage,
-          namespaceId,
-          issue.table,
-        )?.indexes.find((idx: StorageTable['indexes'][number]) =>
-          arraysEqual(idx.columns, columns),
-        );
-        const indexName = contractIndex?.name ?? `${issue.table}_${columns.join('_')}_idx`;
-        const extras: { type?: string; options?: Record<string, unknown> } = {};
-        if (contractIndex?.type !== undefined) extras.type = contractIndex.type;
-        if (contractIndex?.options !== undefined) extras.options = contractIndex.options;
-        return ok([
-          new CreateIndexCall(tableSchema(issue), issue.table, indexName, columns, extras),
-        ]);
-      }
-      return notOk(
-        issueConflict(
-          'indexIncompatible',
-          `Index on "${issue.table}" differs (expected: ${issue.expected}, actual: ${issue.actual})`,
-          { table: issue.table },
-        ),
-      );
-
-    case 'check_missing': {
-      if (!issue.table || !issue.indexOrConstraint)
-        return notOk(
-          issueConflict('unsupportedOperation', 'Check missing issue has no table/constraint name'),
-        );
-      // check_missing is normally consumed by checkConstraintPlanCallStrategy.
-      // This case handles any that arrive here (e.g. in tests that invoke
-      // mapIssueToCall directly or skip the strategy).
-      return notOk(
-        issueConflict(
-          'unsupportedOperation',
-          `Check constraint "${issue.indexOrConstraint}" missing on "${issue.table}" — handled by checkConstraintPlanCallStrategy`,
-        ),
-      );
-    }
-
-    case 'check_mismatch': {
-      if (!issue.table || !issue.indexOrConstraint)
-        return notOk(
-          issueConflict(
-            'unsupportedOperation',
-            'Check mismatch issue has no table/constraint name',
-          ),
-        );
-      return notOk(
-        issueConflict(
-          'unsupportedOperation',
-          `Check constraint "${issue.indexOrConstraint}" values mismatch on "${issue.table}" — handled by checkConstraintPlanCallStrategy`,
-        ),
-      );
-    }
-
-    case 'check_removed': {
-      if (!issue.table || !issue.indexOrConstraint)
-        return notOk(
-          issueConflict('unsupportedOperation', 'Check removed issue has no table/constraint name'),
-        );
-      return ok([
-        new DropCheckConstraintCall(tableSchema(issue), issue.table, issue.indexOrConstraint),
-      ]);
-    }
-
-    case 'foreign_key_mismatch':
-      if (!issue.table)
-        return notOk(issueConflict('foreignKeyConflict', 'Foreign key issue has no table name'));
-      if (isMissing(issue) && issue.expected) {
-        const arrowIdx = issue.expected.indexOf(' -> ');
-        if (arrowIdx >= 0) {
-          const namespaceId = resolveNamespaceIdForIssue(issue);
-          const columns = issue.expected.slice(0, arrowIdx).split(', ');
-          const fkName = `${issue.table}_${columns.join('_')}_fkey`;
-          const fk = tableAt(ctx.toContract.storage, namespaceId, issue.table)?.foreignKeys.find(
-            (k) => k.source.columns.join(', ') === columns.join(', '),
-          );
-          if (fk) {
-            const fkSpec: ForeignKeySpec = {
-              name: fkName,
-              columns: fk.source.columns,
-              references: {
-                schema: fk.target.namespaceId,
-                table: fk.target.tableName,
-                columns: fk.target.columns,
-              },
-              ...(fk.onDelete !== undefined && { onDelete: fk.onDelete }),
-              ...(fk.onUpdate !== undefined && { onUpdate: fk.onUpdate }),
-            };
-            return ok([new AddForeignKeyCall(tableSchema(issue), issue.table, fkSpec)]);
-          }
-          return notOk(
-            issueConflict(
-              'foreignKeyConflict',
-              `Foreign key on "${issue.table}" (${columns.join(', ')}) not found in destination contract`,
-              { table: issue.table },
-            ),
-          );
-        }
-      }
-      return notOk(
-        issueConflict(
-          'foreignKeyConflict',
-          `Foreign key on "${issue.table}" differs (expected: ${issue.expected}, actual: ${issue.actual})`,
-          { table: issue.table },
-        ),
-      );
-
-    case 'type_missing': {
-      if (!issue.typeName)
-        return notOk(issueConflict('unsupportedOperation', 'Type missing issue has no typeName'));
-      const typeInstance = ctx.toContract.storage.types?.[issue.typeName];
-      if (!typeInstance) {
-        return notOk(
-          issueConflict(
-            'unsupportedOperation',
-            `Type "${issue.typeName}" reported missing but not found in destination contract`,
-          ),
-        );
-      }
-      return notOk(
-        issueConflict(
-          'unsupportedOperation',
-          `Type "${issue.typeName}" uses codec "${typeInstance.codecId}" — only value-set types are supported`,
-        ),
-      );
-    }
-
-    case 'type_values_mismatch':
-      return notOk(
-        issueConflict(
-          'unsupportedOperation',
-          `Type "${issue.typeName ?? 'unknown'}" values differ — type alteration not yet supported`,
-        ),
-      );
-
-    default:
-      return notOk(
-        issueConflict(
-          'unsupportedOperation',
-          `Unhandled issue kind: ${(issue as SchemaIssue).kind}`,
-        ),
-      );
-  }
 }
 
 /**
@@ -816,17 +237,6 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
   }
 }
 
-/** Stable lexical key used to order issues within the same kind bucket. */
-function issueKey(issue: SchemaIssue): string {
-  const table = 'table' in issue && typeof issue.table === 'string' ? issue.table : '';
-  const column = 'column' in issue && typeof issue.column === 'string' ? issue.column : '';
-  const name =
-    'indexOrConstraint' in issue && typeof issue.indexOrConstraint === 'string'
-      ? issue.indexOrConstraint
-      : '';
-  return `${table}\u0000${column}\u0000${name}`;
-}
-
 // When no policy is explicitly supplied (test-only path; production callers
 // always pass one), allow every class so strategies that gate on
 // `'data'` (data-safe placeholders) still fire — the test is treated as
@@ -898,126 +308,6 @@ function conflictForDisallowedCall(
   };
 }
 
-export function planIssues(
-  options: IssuePlannerOptions,
-): Result<IssuePlannerValue, readonly SqlPlannerConflict[]> {
-  // When no policy is supplied, `planIssues` treats the call as trusted (the
-  // caller — typically a test — has already vetted the issues). Only explicit
-  // policies gate operation classes into conflicts.
-  // `PostgresMigrationPlanner` always passes an explicit policy.
-  const policyProvided = options.policy !== undefined;
-  const policy = options.policy ?? DEFAULT_POLICY;
-  const schema = options.schema ?? emptySchemaIR();
-  const frameworkComponents = options.frameworkComponents ?? [];
-
-  const context: StrategyContext = {
-    toContract: options.toContract,
-    fromContract: options.fromContract,
-    schemaName: options.schemaName,
-    codecHooks: options.codecHooks,
-    storageTypes: options.storageTypes,
-    schema,
-    policy,
-    frameworkComponents,
-  };
-
-  const strategies = options.strategies ?? postgresPlannerStrategies;
-
-  let remaining = options.issues;
-  const recipeCalls: PostgresOpFactoryCall[] = [];
-  const bucketablePatternCalls: PostgresOpFactoryCall[] = [];
-
-  for (const strategy of strategies) {
-    const result = strategy(remaining, context);
-    if (result.kind === 'match') {
-      remaining = result.issues;
-      if (result.recipe) {
-        recipeCalls.push(...result.calls);
-      } else {
-        bucketablePatternCalls.push(...result.calls);
-      }
-    }
-  }
-
-  const sorted = [...remaining].sort((a, b) => {
-    const kindDelta = issueOrder(a) - issueOrder(b);
-    if (kindDelta !== 0) return kindDelta;
-    const keyA = issueKey(a);
-    const keyB = issueKey(b);
-    return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
-  });
-
-  const defaultCalls: PostgresOpFactoryCall[] = [];
-  const conflicts: SqlPlannerConflict[] = [];
-
-  for (const issue of sorted) {
-    const result = mapIssueToCall(issue, context);
-    if (result.ok) {
-      defaultCalls.push(...result.value);
-    } else {
-      conflicts.push(result.failure);
-    }
-  }
-
-  // Policy gating: drop calls whose operation class is not allowed and
-  // surface a conflict describing the disallowed op. Applies to both strategy
-  // output and default-mapped output. Only active when the caller explicitly
-  // supplied a policy — direct unit-test invocations (which pass no policy)
-  // stay as pass-through and keep destructive recipe steps intact.
-  const allowed = policy.allowedOperationClasses;
-  let gatedDefault = defaultCalls;
-  let gatedRecipe = recipeCalls;
-  let gatedBucketable = bucketablePatternCalls;
-  if (policyProvided) {
-    const keepIfAllowed = (bucket: PostgresOpFactoryCall[]) => (call: PostgresOpFactoryCall) => {
-      if (allowed.includes(call.operationClass)) {
-        bucket.push(call);
-        return;
-      }
-      conflicts.push(conflictForDisallowedCall(call, allowed));
-    };
-    const gatedDefaultBucket: PostgresOpFactoryCall[] = [];
-    const gatedRecipeBucket: PostgresOpFactoryCall[] = [];
-    const gatedBucketableBucket: PostgresOpFactoryCall[] = [];
-    defaultCalls.forEach(keepIfAllowed(gatedDefaultBucket));
-    recipeCalls.forEach(keepIfAllowed(gatedRecipeBucket));
-    bucketablePatternCalls.forEach(keepIfAllowed(gatedBucketableBucket));
-    gatedDefault = gatedDefaultBucket;
-    gatedRecipe = gatedRecipeBucket;
-    gatedBucketable = gatedBucketableBucket;
-  }
-
-  if (conflicts.length > 0) {
-    return notOk(conflicts);
-  }
-
-  // Recipe strategies (`notNullBackfillCallStrategy`,
-  // `nullableTighteningCallStrategy`, etc.) emit a cohesive sequence that must
-  // stay contiguous. They are inserted at a single pattern slot. Non-recipe
-  // pattern strategies (`checkConstraintPlanCallStrategy`,
-  // `storageTypePlanCallStrategy`, `notNullAddColumnCallStrategy`) produce
-  // individually classifiable calls that slot into DDL buckets alongside
-  // default-mapped calls.
-  const combinedBucketable = [...gatedDefault, ...gatedBucketable];
-  const byCategory = (cat: CallCategory) =>
-    combinedBucketable.filter((c) => classifyCall(c) === cat);
-
-  const calls: PostgresOpFactoryCall[] = [
-    ...byCategory('dep'),
-    ...byCategory('drop'),
-    ...byCategory('table'),
-    ...byCategory('column'),
-    ...gatedRecipe,
-    ...byCategory('alter'),
-    ...byCategory('primaryKey'),
-    ...byCategory('unique'),
-    ...byCategory('index'),
-    ...byCategory('foreignKey'),
-  ];
-
-  return ok({ calls });
-}
-
 // ============================================================================
 // Node-based issue planner (the one differ path — additive, wired in the flip)
 // ============================================================================
@@ -1032,7 +322,7 @@ export function planIssues(
 // context, per the slice's scope.
 
 /** The diff node an issue concerns — expected when present, else the actual (extra) node. */
-function issueNode(issue: SchemaDiffIssue): SqlSchemaIRNode | undefined {
+export function issueNode(issue: SchemaDiffIssue): SqlSchemaIRNode | undefined {
   const node = issue.expected ?? issue.actual;
   if (node === undefined) return undefined;
   return blindCast<
@@ -1042,20 +332,49 @@ function issueNode(issue: SchemaDiffIssue): SqlSchemaIRNode | undefined {
 }
 
 /** DDL schema segment of a table-or-descendant issue path: `[database, ddlSchema, table, …]`. */
-function issueSchemaName(issue: SchemaDiffIssue): string | undefined {
+export function issueSchemaName(issue: SchemaDiffIssue): string | undefined {
   return issue.path[1];
 }
 
 /** Table segment of a table-or-descendant issue path: `[database, ddlSchema, table, …]`. */
-function issueTableName(issue: SchemaDiffIssue): string | undefined {
+export function issueTableName(issue: SchemaDiffIssue): string | undefined {
   return issue.path[2];
 }
 
 /** Column name embedded in a column/default issue path segment (`column:<name>`). */
-function issueColumnName(issue: SchemaDiffIssue): string | undefined {
+export function issueColumnName(issue: SchemaDiffIssue): string | undefined {
   const segment = issue.path[3];
   if (segment === undefined || !segment.startsWith('column:')) return undefined;
   return segment.slice('column:'.length);
+}
+
+/**
+ * The DDL schema name to use when EMITTING an op against `ddlSchemaName` (the
+ * diff tree's resolved physical schema, `issueSchemaName(issue)`). The
+ * unbound namespace's diff-tree identity resolves to `public` (a concrete
+ * physical default the differ needs in order to compare its tree against
+ * introspection — `resolveDdlSchemaForNamespaceStorage`), but DDL EMISSION
+ * must stay unqualified so the live connection's `search_path` resolves it
+ * at runtime (`boundSchema`). Recovers the logical namespace id via the
+ * contract and substitutes the unbound sentinel back in when it resolves
+ * there; every other namespace's `ddlSchemaName` already agrees between the
+ * two resolution paths, so it passes through unchanged.
+ */
+export function emissionSchemaName(ctx: StrategyContext, ddlSchemaName: string): string {
+  const namespaceId = resolveNamespaceIdForDdlSchema(ctx.toContract, ddlSchemaName);
+  return namespaceId === UNBOUND_NAMESPACE_ID ? UNBOUND_NAMESPACE_ID : ddlSchemaName;
+}
+
+/**
+ * Whether a column node is a scalar-array (`many: true`) column. The family
+ * converter (`contractToSchemaIR`'s `convertColumn`) never stamps `many` on
+ * the derived node — array-ness is folded into the `[]` suffix on
+ * `nativeType` instead — so the node-derived check reads the suffix; `.many`
+ * is still checked first for nodes a caller stamps directly (e.g. hand-built
+ * test fixtures, or an adapter that populates it at introspection).
+ */
+function isManyColumn(column: SqlColumnIR): boolean {
+  return column.many === true || column.nativeType.endsWith('[]');
 }
 
 /** Whether the expected/actual native type (resolved, or raw+many fallback) differs — mirrors `SqlColumnIR.isEqualTo`'s type comparison. */
@@ -1127,9 +446,9 @@ export function nodeIssueKey(issue: SchemaDiffIssue): string {
  * relational subset ONLY (policy issues and synthesized namespace issues are
  * handled on their own paths, never coalesced against tables).
  */
-export function coalesceSubtreeIssues(
-  issues: readonly SchemaDiffIssue[],
-): readonly SchemaDiffIssue[] {
+export function coalesceSubtreeIssues<TNode extends DiffableNode = DiffableNode>(
+  issues: readonly SchemaDiffIssue<TNode>[],
+): readonly SchemaDiffIssue<TNode>[] {
   const collapsingPaths = issues
     .filter((issue) => issue.reason === 'not-found' || issue.reason === 'not-expected')
     .map((issue) => issue.path);
@@ -1192,7 +511,7 @@ function buildCreateTableCallsFromNode(
       ]
     : [];
   const elementNonNullChecks: DdlTableConstraint[] = Object.values(table.columns)
-    .filter((c) => c.many === true)
+    .filter((c) => isManyColumn(c))
     .map((c) =>
       contractFree.checkExpression(
         elementNonNullCheckName(table.name, c.name),
@@ -1468,7 +787,7 @@ function mapCheckNodeIssue(
  */
 export function mapNodeIssueToCall(
   issue: SchemaDiffIssue,
-  _ctx: StrategyContext,
+  ctx: StrategyContext,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
   const node = issueNode(issue);
   if (node === undefined) {
@@ -1492,9 +811,9 @@ export function mapNodeIssueToCall(
     return ok([new CreateSchemaCall(namespace.schemaName)]);
   }
 
-  const schemaName = issueSchemaName(issue);
+  const ddlSchemaName = issueSchemaName(issue);
   const tableName = issueTableName(issue);
-  if (schemaName === undefined || tableName === undefined) {
+  if (ddlSchemaName === undefined || tableName === undefined) {
     return notOk(
       nodeConflict(
         'unsupportedOperation',
@@ -1502,6 +821,7 @@ export function mapNodeIssueToCall(
       ),
     );
   }
+  const schemaName = emissionSchemaName(ctx, ddlSchemaName);
 
   switch (node.nodeKind) {
     case PostgresSchemaNodeKind.table:
@@ -1535,27 +855,44 @@ export function mapNodeIssueToCall(
   }
 }
 
-export interface NodeIssuePlannerOptions {
+export interface IssuePlannerOptions {
   readonly issues: readonly SchemaDiffIssue[];
   readonly toContract: Contract<SqlStorage>;
   readonly fromContract: Contract<SqlStorage> | null;
   readonly schemaName: string;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
   readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
+  /**
+   * Current database schema IR. Strategies read this to detect whether a
+   * structure already exists (e.g. `buildSchemaLookupMap` for shared-temp-
+   * default safety, extension dependency checks). Defaults to an empty schema
+   * when omitted so the planner can still run over "fresh DB" contract
+   * snapshots.
+   */
   readonly schema?: SqlSchemaIR;
+  /**
+   * Operation-class policy. `planIssues` filters calls whose `operationClass`
+   * is not in `policy.allowedOperationClasses` and surfaces them as conflicts
+   * instead of emitting disallowed DDL. Defaults to additive-only.
+   */
   readonly policy?: MigrationOperationPolicy;
+  /**
+   * Framework components participating in this composition. Available to
+   * future strategies that may consult component metadata at plan time.
+   */
   readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
-  readonly strategies?: readonly NodeCallMigrationStrategy[];
+  readonly strategies?: readonly CallMigrationStrategy[];
 }
 
 /**
- * The node-based sibling of {@link planIssues}: runs node strategies, maps
- * leftover node issues via {@link mapNodeIssueToCall}, applies the same
- * operation-class policy gating, and buckets calls into the same DDL emission
- * order. Additive — wired into the planner in the cutover commit.
+ * Runs the ordered strategy list over the node-typed diff issues, maps
+ * leftover issues via {@link mapNodeIssueToCall}, applies operation-class
+ * policy gating, and buckets calls into the fixed DDL emission order (dep →
+ * drop → table → column → recipe → alter → primaryKey → unique → index →
+ * foreignKey).
  */
-export function planNodeIssues(
-  options: NodeIssuePlannerOptions,
+export function planIssues(
+  options: IssuePlannerOptions,
 ): Result<IssuePlannerValue, readonly SqlPlannerConflict[]> {
   const policyProvided = options.policy !== undefined;
   const policy = options.policy ?? DEFAULT_POLICY;
@@ -1573,7 +910,7 @@ export function planNodeIssues(
     frameworkComponents,
   };
 
-  const strategies = options.strategies ?? postgresNodePlannerStrategies;
+  const strategies = options.strategies ?? postgresPlannerStrategies;
 
   let remaining = options.issues;
   const recipeCalls: PostgresOpFactoryCall[] = [];
