@@ -15,7 +15,7 @@ alwaysApply: false
 - Keep framework mechanisms family-blind: registries, opaque payloads (`object | undefined` narrowed by the consuming family), merge/collision plumbing.
 - Put family vocabulary (`nativeType`, CHECK constraints, schema qualification, dialect names) in the owning family layer; targets implement family interfaces structurally.
 - Express strategies as **codec-owned hooks/behavior** on the strategy owner's descriptor — never as string-enum fields threaded through shared types (see `storage-type-hooks.mdc`).
-- Run `pnpm lint:framework-vocabulary` — a merge-base ratchet over a forbidden-term list (`scripts/lint-framework-vocabulary.config.json`); the count may only shrink.
+- Run `pnpm lint:framework-vocabulary` — a committed high-water-mark threshold over a forbidden-term list (`scripts/lint-framework-vocabulary.config.json`); the count may only shrink, and the recorded threshold must be lowered whenever it does.
 
 ## Don't
 
