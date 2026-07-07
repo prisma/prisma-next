@@ -1,4 +1,4 @@
-import { elementCoordinates } from '@prisma-next/framework-components/ir';
+import { coordinateKey, elementCoordinates } from '@prisma-next/framework-components/ir';
 import { EMPTY_CONTRACT_HASH } from '../constants';
 import { MigrationToolsError } from '../errors';
 import type {
@@ -223,13 +223,13 @@ function contractViolations(input: IntegrityComputationInput): readonly Integrit
       });
     }
 
-    for (const { namespaceId, entityKind, entityName } of elementCoordinates(contract.storage)) {
-      const key = `${namespaceId}:${entityKind}:${entityName}`;
+    for (const coordinate of elementCoordinates(contract.storage)) {
+      const key = coordinateKey(coordinate);
       const claimers = elementClaimedBy.get(key);
       if (claimers) claimers.push(space.spaceId);
       else {
         elementClaimedBy.set(key, [space.spaceId]);
-        elementLabel.set(key, `${namespaceId}.${entityName}`);
+        elementLabel.set(key, `${coordinate.namespaceId}.${coordinate.entityName}`);
       }
     }
   }
