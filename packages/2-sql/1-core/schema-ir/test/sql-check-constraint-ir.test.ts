@@ -59,7 +59,7 @@ describe('SqlCheckConstraintIR', () => {
       expect(a.isEqualTo(b)).toBe(true);
     });
 
-    it('false when column differs', () => {
+    it('column is descriptive, not compared (legacy pairs by name, compares values only)', () => {
       const a = new SqlCheckConstraintIR({
         name: 'chk_status',
         column: 'status',
@@ -70,7 +70,7 @@ describe('SqlCheckConstraintIR', () => {
         column: 'state',
         permittedValues: ['active'],
       });
-      expect(a.isEqualTo(b)).toBe(false);
+      expect(a.isEqualTo(b)).toBe(true);
     });
 
     it('false when a permitted value is added', () => {

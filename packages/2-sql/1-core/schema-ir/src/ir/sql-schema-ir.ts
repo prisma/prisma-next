@@ -1,3 +1,4 @@
+import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
@@ -18,8 +19,13 @@ export interface SqlSchemaIRInput {
  * The constructor normalises nested `SqlTableIR` instances so
  * downstream walks see a uniform AST regardless of whether the input
  * was a plain-data literal or already-constructed class instances.
+ *
+ * Implements `DiffableNode` as the root of a flat (single-schema) diff
+ * tree: `id` is the fixed sentinel `'database'` (roots have no siblings),
+ * `isEqualTo` is identity (a container has no own attributes), and
+ * `children()` yields the table nodes.
  */
-export class SqlSchemaIR extends SqlSchemaIRNode {
+export class SqlSchemaIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.schema;
   readonly tables: Readonly<Record<string, SqlTableIR>>;
   declare readonly annotations?: SqlAnnotations;
@@ -36,5 +42,17 @@ export class SqlSchemaIR extends SqlSchemaIRNode {
     );
     if (input.annotations !== undefined) this.annotations = input.annotations;
     freezeNode(this);
+  }
+
+  get id(): string {
+    return 'database';
+  }
+
+  isEqualTo(other: DiffableNode): boolean {
+    return this.id === other.id;
+  }
+
+  children(): readonly DiffableNode[] {
+    return Object.values(this.tables);
   }
 }

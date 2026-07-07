@@ -2,8 +2,9 @@ import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
-import { resolvedDefaultsEqual } from './resolved-default-equality';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
+import { SqlColumnDefaultIR } from './sql-column-default-ir';
 import { SqlSchemaIRNode } from './sql-schema-ir-node';
 
 /**
@@ -87,47 +88,43 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
     return `column:${this.name}`;
   }
 
+  /**
+   * The column's default, when declared/present, is the column's one child
+   * node — it has an extra/missing/drift lifecycle of its own, so the differ
+   * recurses to it rather than `isEqualTo` comparing it. Built transiently
+   * from this column's own fields.
+   */
   children(): readonly DiffableNode[] {
-    return [];
+    if (this.resolvedDefault === undefined && this.default === undefined) {
+      return [];
+    }
+    return [
+      new SqlColumnDefaultIR({
+        ...ifDefined('resolved', this.resolvedDefault),
+        ...ifDefined('raw', this.default),
+        ...ifDefined('nativeTypeContext', this.resolvedNativeType),
+      }),
+    ];
   }
 
+  /**
+   * Compares the column's own attributes only — the default lives on the
+   * child node. When both sides carry `resolvedNativeType`, the resolved
+   * value governs (array-ness rides on its `[]` suffix); otherwise raw
+   * fields compare.
+   */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
       SqlColumnIR,
       'every diff-tree node the differ pairs at this position is a SqlColumnIR; the id scheme keeps columns from pairing with other node kinds'
     >(other);
     if (this.resolvedNativeType !== undefined && node.resolvedNativeType !== undefined) {
-      return (
-        this.resolvedNativeType === node.resolvedNativeType &&
-        this.nullable === node.nullable &&
-        this.resolvedDefaultEqualTo(node)
-      );
+      return this.resolvedNativeType === node.resolvedNativeType && this.nullable === node.nullable;
     }
     return (
       this.nativeType === node.nativeType &&
       this.nullable === node.nullable &&
-      this.default === node.default &&
       Boolean(this.many) === Boolean(node.many)
-    );
-  }
-
-  /**
-   * Resolved-mode default equality with `this` as the expected side: an
-   * expected column with no declared default requires the actual to carry
-   * none (raw or resolved); a declared expected default requires a parseable
-   * actual default that matches structurally.
-   */
-  private resolvedDefaultEqualTo(node: SqlColumnIR): boolean {
-    if (this.resolvedDefault === undefined) {
-      return node.resolvedDefault === undefined && node.default === undefined;
-    }
-    if (node.resolvedDefault === undefined) {
-      return false;
-    }
-    return resolvedDefaultsEqual(
-      this.resolvedDefault,
-      node.resolvedDefault,
-      node.resolvedNativeType ?? this.resolvedNativeType,
     );
   }
 }

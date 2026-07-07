@@ -47,14 +47,21 @@ export class SqlCheckConstraintIR extends SqlSchemaIRNode implements DiffableNod
     return [];
   }
 
+  /**
+   * Compares the permitted-value sets only (unordered), matching the
+   * relational walk's `verifyCheckConstraints`: two checks pairing by name
+   * compare their value sets — the `column` field is descriptive, not part
+   * of the comparison, so a name-paired check with equal values verifies
+   * regardless of which column carries it.
+   */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
       SqlCheckConstraintIR,
       'every diff-tree node the differ pairs at this position is a SqlCheckConstraintIR; the id scheme keeps checks from pairing with other node kinds'
     >(other);
-    if (this.column !== node.column) return false;
-    if (this.permittedValues.length !== node.permittedValues.length) return false;
+    const thisValues = new Set(this.permittedValues);
     const otherValues = new Set(node.permittedValues);
-    return this.permittedValues.every((v) => otherValues.has(v));
+    if (thisValues.size !== otherValues.size) return false;
+    return [...thisValues].every((v) => otherValues.has(v));
   }
 }

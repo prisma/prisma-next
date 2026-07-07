@@ -55,13 +55,19 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
     return [];
   }
 
+  /**
+   * Comparison with `this` as the expected side, matching the relational
+   * walk's index satisfaction: a unique actual index satisfies a non-unique
+   * expected index (stronger satisfies weaker), while an expected unique
+   * index requires a unique actual. Type and options compare as attributes.
+   */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
       SqlIndexIR,
       'every diff-tree node the differ pairs at this position is a SqlIndexIR; the id scheme keeps indexes from pairing with other node kinds'
     >(other);
     return (
-      this.unique === node.unique &&
+      (!this.unique || node.unique) &&
       this.type === node.type &&
       indexOptionsLooselyEqual(this.options, node.options)
     );

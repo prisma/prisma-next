@@ -16,6 +16,10 @@ export {
   type SqlCheckConstraintIRInput,
 } from './ir/sql-check-constraint-ir';
 export {
+  SqlColumnDefaultIR,
+  type SqlColumnDefaultIRInput,
+} from './ir/sql-column-default-ir';
+export {
   type SqlAnnotations,
   SqlColumnIR,
   type SqlColumnIRInput,

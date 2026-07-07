@@ -1,5 +1,5 @@
-import { extractCodecControlHooks } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import { extractCodecControlHooks } from '../assembly';
 
 /**
  * Builds the codec-hook-composed `expandNativeType` callback the contract→IR

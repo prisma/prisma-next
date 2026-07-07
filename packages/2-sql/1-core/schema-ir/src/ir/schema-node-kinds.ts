@@ -9,6 +9,7 @@ export const RelationalSchemaNodeKind = {
   schema: 'sql-schema',
   table: 'sql-table',
   column: 'sql-column',
+  columnDefault: 'sql-column-default',
   primaryKey: 'sql-primary-key',
   foreignKey: 'sql-foreign-key',
   unique: 'sql-unique',

@@ -1,3 +1,5 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
+import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { PrimaryKey, type PrimaryKeyInput } from './primary-key';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
@@ -18,6 +20,14 @@ export interface SqlTableIRInput {
   readonly annotations?: SqlAnnotations;
   /** Optional check constraints for enum-restricted columns. Omitted when none present. */
   readonly checks?: ReadonlyArray<SqlCheckConstraintIR | SqlCheckConstraintIRInput>;
+  /**
+   * The contract table's declared control policy, stamped by contract→IR
+   * derivation so verify's post-diff filters can grade each issue against
+   * its subject table's policy without contract access. Raw (not effective):
+   * the consumer resolves it against the contract default. Absent on
+   * introspected tables.
+   */
+  readonly controlPolicy?: ControlPolicy;
 }
 
 /**
@@ -33,8 +43,15 @@ export interface SqlTableIRInput {
  * walks see a uniform AST regardless of whether the input was a
  * plain-data literal (from introspection) or already-constructed
  * class instances.
+ *
+ * Implements `DiffableNode` so a flat (single-schema) tree is directly
+ * diffable: `id` is the table name; `isEqualTo` is identity (the table's
+ * structural drift is entirely expressed by its children); `children()`
+ * yields every column, the primary key (when present), every foreign key,
+ * unique, index, and check constraint — the same composition and order as
+ * the Postgres table node, minus policies.
  */
-export class SqlTableIR extends SqlSchemaIRNode {
+export class SqlTableIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.table;
   readonly name: string;
   readonly columns: Readonly<Record<string, SqlColumnIR>>;
@@ -44,6 +61,7 @@ export class SqlTableIR extends SqlSchemaIRNode {
   declare readonly primaryKey?: PrimaryKey;
   declare readonly annotations?: SqlAnnotations;
   declare readonly checks?: ReadonlyArray<SqlCheckConstraintIR>;
+  declare readonly controlPolicy?: ControlPolicy;
 
   constructor(input: SqlTableIRInput) {
     super();
@@ -79,6 +97,26 @@ export class SqlTableIR extends SqlSchemaIRNode {
         ),
       );
     }
+    if (input.controlPolicy !== undefined) this.controlPolicy = input.controlPolicy;
     freezeNode(this);
+  }
+
+  get id(): string {
+    return this.name;
+  }
+
+  isEqualTo(other: DiffableNode): boolean {
+    return this.id === other.id;
+  }
+
+  children(): readonly DiffableNode[] {
+    return [
+      ...Object.values(this.columns),
+      ...(this.primaryKey ? [this.primaryKey] : []),
+      ...this.foreignKeys,
+      ...this.uniques,
+      ...this.indexes,
+      ...(this.checks ?? []),
+    ];
   }
 }
