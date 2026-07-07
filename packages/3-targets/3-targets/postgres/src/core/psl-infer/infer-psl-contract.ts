@@ -1,5 +1,9 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
+  SqlAggregateContractMember,
+  SqlPslInferContext,
+} from '@prisma-next/family-sql/control';
+import type {
   DefaultMappingOptions,
   PslNativeTypeAttribute,
   PslPrinterOptions,
@@ -77,6 +81,53 @@ type TopLevelNameResult = {
 };
 
 /**
+ * Tests whether an aggregate member's contract already declares the table at
+ * `(schemaName, tableName)`. Matches on the member namespace's `.id`, not the
+ * record key it is stored under in `storage.namespaces` — the serializer does
+ * not guarantee the two are the same string.
+ */
+function isTableDescribedByAggregate(
+  aggregate: readonly SqlAggregateContractMember[],
+  schemaName: string,
+  tableName: string,
+): boolean {
+  for (const member of aggregate) {
+    for (const namespace of Object.values(member.contract.storage.namespaces)) {
+      if (namespace.id !== schemaName) continue;
+      if (namespace.entries.table && Object.hasOwn(namespace.entries.table, tableName)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Drops foreign keys on surviving tables that reference an omitted table, so
+ * no `@relation` to a nonexistent model is emitted. A foreign key is only
+ * dangling when the name it references was both omitted AND has no surviving
+ * table of the same name — under multi-namespace introspection, an omitted
+ * `auth.users` must not strip a FK that actually points at a surviving
+ * `public.users` of the same bare name. Returns tables unchanged by reference
+ * when they lose no foreign key.
+ */
+function stripDanglingForeignKeys(
+  tables: Readonly<Record<string, SqlTableIR>>,
+  omittedTableNames: ReadonlySet<string>,
+): Record<string, SqlTableIR> {
+  const result: Record<string, SqlTableIR> = {};
+  for (const [tableName, table] of Object.entries(tables)) {
+    const foreignKeys = table.foreignKeys.filter(
+      (fk) =>
+        !(omittedTableNames.has(fk.referencedTable) && tables[fk.referencedTable] === undefined),
+    );
+    result[tableName] =
+      foreignKeys.length === table.foreignKeys.length ? table : { ...table, foreignKeys };
+  }
+  return result;
+}
+
+/**
  * Infers a PSL AST (for `printPsl`) from an introspected Postgres schema tree.
  *
  * Target-owned inference: it walks the `PostgresDatabaseSchemaNode` tree and
@@ -89,9 +140,19 @@ type TopLevelNameResult = {
  * introspects a single live namespace) are gathered into the model set and
  * emitted as one `UNSPECIFIED_PSL_NAMESPACE_ID` bucket. Top-level entities
  * (policies/roles → PSL extension blocks) are a later slice.
+ *
+ * `context.aggregate` — the stack's extension packs — is consulted while
+ * gathering tables: a table already described by an aggregate member at its
+ * `(schemaName, tableName)` is omitted, before the duplicate-name check below
+ * and before relation inference, so it cannot spuriously collide with an app
+ * table and never contributes a relation field.
  */
-export function inferPostgresPslContract(tree: PostgresDatabaseSchemaNode): PslDocumentAst {
+export function inferPostgresPslContract(
+  tree: PostgresDatabaseSchemaNode,
+  context?: SqlPslInferContext,
+): PslDocumentAst {
   const namespaces = Object.values(tree.namespaces);
+  const aggregate = context?.aggregate ?? [];
 
   // Native Postgres enums (CREATE TYPE … AS ENUM) are not adoptable by
   // `contract infer`; throw an actionable diagnostic naming the type(s). Enum
@@ -116,8 +177,13 @@ export function inferPostgresPslContract(tree: PostgresDatabaseSchemaNode): PslD
   // single introspected namespace, and a same-named table in two schemas has no
   // unambiguous single-bucket model, so we throw rather than silently drop one.
   const tables: Record<string, SqlTableIR> = {};
+  const omittedTableNames = new Set<string>();
   for (const namespace of namespaces) {
     for (const [tableName, table] of Object.entries(namespace.tables)) {
+      if (isTableDescribedByAggregate(aggregate, namespace.schemaName, tableName)) {
+        omittedTableNames.add(tableName);
+        continue;
+      }
       if (tables[tableName] !== undefined) {
         throw new Error(
           `contract infer: duplicate table name "${tableName}" across schemas is not yet supported ` +
@@ -128,7 +194,7 @@ export function inferPostgresPslContract(tree: PostgresDatabaseSchemaNode): PslD
       tables[tableName] = table;
     }
   }
-  const schemaIR: SqlSchemaIR = { tables };
+  const schemaIR: SqlSchemaIR = { tables: stripDanglingForeignKeys(tables, omittedTableNames) };
 
   const options: PslPrinterOptions = {
     typeMap: createPostgresTypeMap(new Set()),

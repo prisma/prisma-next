@@ -51,8 +51,10 @@ import type { SqlControlAdapter } from './control-adapter';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
 import type { DiffDatabaseSchemaInput } from './migrations/schema-differ';
 import type {
+  SqlAggregateContractMember,
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
+  SqlPslInferContext,
 } from './migrations/types';
 import { sqlOperationsToPreview } from './operation-preview';
 import { collectSupportedCodecTypeIds } from './verify';
@@ -535,9 +537,23 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   // maps and walks its own schema tree), so it is read off the descriptor like
   // `contractSerializer`. Absent for targets without `contract infer` (Mongo).
   const targetInferPslContract = blindCast<
-    { readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst },
+    {
+      readonly inferPslContract?: (
+        schema: SqlSchemaIRNode,
+        context?: SqlPslInferContext,
+      ) => PslDocumentAst;
+    },
     'reading the optional target-descriptor inferPslContract hook'
   >(target).inferPslContract;
+  // The aggregate view `contract infer` needs: each extension pack's contract
+  // space, carried as-is (no merging — that is the contract-spaces machinery's
+  // concern). The inferrer only needs membership tests against it.
+  const pslInferAggregate: readonly SqlAggregateContractMember[] = extensions.flatMap(
+    (extension) =>
+      extension.contractSpace
+        ? [{ id: extension.id, contract: extension.contractSpace.contractJson }]
+        : [],
+  );
   // The combined database-schema verify is a required target-descriptor
   // operation: every SQL target provides it, wrapping the same comparison
   // `diffDatabaseSchema` runs in the verify envelope plus the pass/warn/fail
@@ -923,7 +939,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           `Target "${target.targetId}" does not support contract infer (no inferPslContract on its descriptor).`,
         );
       }
-      return targetInferPslContract(schemaIR);
+      return targetInferPslContract(schemaIR, { aggregate: pslInferAggregate });
     },
 
     lowerAst(
