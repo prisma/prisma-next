@@ -112,14 +112,14 @@ async function buildFixture(): Promise<{ cwd: string; appDir: string }> {
 
 /**
  * Build a fixture where the --to ref carries invariants. Used to verify that
- * planMemberPath feeds graphWalkStrategy the ref's invariants as
- * member.headRef.invariants, not the contract-derived head ref's empty invariants.
+ * planSpacePath feeds graphWalkStrategy the ref's invariants as
+ * space.headRef.invariants, not the contract-derived head ref's empty invariants.
  *
  * Graph: EMPTY → C1 → C2 (linear, both migrations provide no invariants).
  * Named ref `prod` = { hash: C2, invariants: ['inv-a'] }.
  *
- * With the old bug: member.headRef.invariants was always [], so required = [].
- * With the fix: member.headRef.invariants is ['inv-a'], so required = ['inv-a'] \ markerInvariants.
+ * With the old bug: space.headRef.invariants was always [], so required = [].
+ * With the fix: space.headRef.invariants is ['inv-a'], so required = ['inv-a'] \ markerInvariants.
  * The graphWalkStrategy call argument differs between the two — this test detects it.
  */
 async function buildInvariantFixture(): Promise<{ cwd: string; appDir: string }> {
@@ -229,11 +229,11 @@ describe('migrate --show (read-only + faithfulness)', () => {
     expect(mocks.graphWalkStrategy).toHaveBeenCalled();
     const [firstCall] = mocks.graphWalkStrategy.mock.calls;
     expect(firstCall).toBeDefined();
-    const callArg = firstCall![0] as { currentMarker: unknown; member: { headRef: unknown } };
-    // From sha256:empty — marker should be null (planMemberPath treats EMPTY as no-marker).
+    const callArg = firstCall![0] as { currentMarker: unknown; space: { headRef: unknown } };
+    // From sha256:empty — marker should be null (planSpacePath treats EMPTY as no-marker).
     expect(callArg.currentMarker).toBeNull();
-    // App member head ref invariants default to [] (synthesised from contract).
-    expect((callArg.member.headRef as { invariants: unknown }).invariants).toEqual([]);
+    // App space head ref invariants default to [] (synthesised from contract).
+    expect((callArg.space.headRef as { invariants: unknown }).invariants).toEqual([]);
   });
 
   it('faithfulness: --to ref invariants are passed to graphWalkStrategy (not silently dropped)', async () => {
@@ -241,8 +241,8 @@ describe('migrate --show (read-only + faithfulness)', () => {
     // --to ref's invariants and always using headRef.invariants = [] instead.
     //
     // Fixture: EMPTY → C1 (provides 'inv-a') → C2; named ref 'prod' = { hash: C2, invariants: ['inv-a'] }.
-    // With the old bug: member.headRef.invariants = [] (invariants dropped).
-    // With the fix:    member.headRef.invariants = ['inv-a'] (ref invariants propagated).
+    // With the old bug: space.headRef.invariants = [] (invariants dropped).
+    // With the fix:    space.headRef.invariants = ['inv-a'] (ref invariants propagated).
     //
     // On a graph where all paths from EMPTY satisfy 'inv-a' (EMPTY→C1 provides it), the
     // walk still succeeds; what changes is the required set fed to findPathWithDecision.
@@ -271,12 +271,12 @@ describe('migrate --show (read-only + faithfulness)', () => {
     expect(mocks.graphWalkStrategy).toHaveBeenCalled();
     const [firstCall] = mocks.graphWalkStrategy.mock.calls;
     expect(firstCall).toBeDefined();
-    const callArg = firstCall![0] as { member: { headRef: { hash: string; invariants: unknown } } };
-    // The ref 'prod' has invariants: ['inv-a']. planMemberPath must propagate these
-    // as member.headRef.invariants. The old bug set headRef.invariants = [] here.
-    expect(callArg.member.headRef.invariants).toEqual(['inv-a']);
+    const callArg = firstCall![0] as { space: { headRef: { hash: string; invariants: unknown } } };
+    // The ref 'prod' has invariants: ['inv-a']. planSpacePath must propagate these
+    // as space.headRef.invariants. The old bug set headRef.invariants = [] here.
+    expect(callArg.space.headRef.invariants).toEqual(['inv-a']);
     // And the target hash must be C2 (the ref's hash).
-    expect(callArg.member.headRef.hash).toBe(C2);
+    expect(callArg.space.headRef.hash).toBe(C2);
   });
 
   it('prints the ordered list of migrations that will run', async () => {
@@ -576,11 +576,11 @@ describe('migrate --show (read-only + faithfulness)', () => {
 
   it('--from/--to app-space markers do not leak into extension spaces (BUG 1)', async () => {
     // Repro: with --from <app-hash> --to <app-hash>, extension spaces must NOT receive the
-    // app --from hash as their marker. If they did, planMemberPath would try to walk
+    // app --from hash as their marker. If they did, planSpacePath would try to walk
     // extension-graph from that app hash (which doesn't exist there) and return 'unreachable',
     // producing "No migration path from sha256:76c1bd5 to sha256:... in space 'pgvector'".
     //
-    // Expected behaviour: extension members ignore --from and plan from their own live marker
+    // Expected behaviour: extension spaces ignore --from and plan from their own live marker
     // (null / greenfield in offline mode) → their own head — exactly as executeMigrate does.
     // The extension migration (EMPTY → EXT_C1) must appear in the planned migrations list,
     // confirming it was planned from greenfield and NOT from the app's --from hash.
@@ -608,7 +608,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     });
 
     // Extension space (pgvector): EMPTY → EXT_C1. Its own standalone graph; head = EXT_C1.
-    // The extension marker is absent (offline mode), so planMemberPath should treat it as
+    // The extension marker is absent (offline mode), so planSpacePath should treat it as
     // greenfield (null) and plan EMPTY → EXT_C1.
     const extMigHash = computeMigrationHash(
       { from: EMPTY, to: EXT_C1, providedInvariants: [], createdAt: '2026-01-01T09:00:00.000Z' },

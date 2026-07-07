@@ -65,7 +65,7 @@ export type IntegrityViolation =
       readonly claimedBy: readonly string[];
     }
   | { readonly kind: 'contractUnreadable'; readonly spaceId: string; readonly detail: string }
-  // genuinely unloadable — package omitted from member.packages
+  // genuinely unloadable — package omitted from space.packages
   | {
       readonly kind: 'packageUnloadable';
       readonly spaceId: string;

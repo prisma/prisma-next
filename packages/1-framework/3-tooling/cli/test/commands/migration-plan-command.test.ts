@@ -2,8 +2,8 @@ import type { Contract } from '@prisma-next/contract/types';
 import { errorUnfilledPlaceholder } from '@prisma-next/errors/migration';
 import {
   type ContractAtResult,
+  createAggregateContractSpace,
   createContractSpaceAggregate,
-  createContractSpaceMember,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
@@ -113,11 +113,11 @@ function sampleSnapshot(storageHash: string) {
   };
 }
 
-function buildResolutionMember(
+function buildResolutionSpace(
   bundles: readonly OnDiskMigrationPackage[],
   refs: Record<string, { hash: string; invariants: readonly string[] }> = {},
 ) {
-  const member = createContractSpaceMember({
+  const space = createAggregateContractSpace({
     spaceId: 'app',
     packages: bundles,
     refs,
@@ -130,7 +130,7 @@ function buildResolutionMember(
     deserializeContract: (c: unknown) => c as Contract,
   });
 
-  vi.spyOn(member, 'contractAt').mockImplementation(
+  vi.spyOn(space, 'contractAt').mockImplementation(
     async (hash, opts): Promise<ContractAtResult> => {
       if (opts?.refName !== undefined) {
         const snap = sampleSnapshot(hash);
@@ -186,7 +186,7 @@ function buildResolutionMember(
     },
   );
 
-  return member;
+  return space;
 }
 
 function setupResolutionAggregate(
@@ -197,7 +197,7 @@ function setupResolutionAggregate(
     ok(
       createContractSpaceAggregate({
         targetId: 'mongo',
-        app: buildResolutionMember(bundles, refs),
+        app: buildResolutionSpace(bundles, refs),
         extensions: [],
         checkIntegrity: () => [],
       }),
@@ -547,15 +547,15 @@ describe('migration plan command', () => {
           },
         ],
       });
-      // Hand-built aggregate in the new tolerant-member shape: `contract()`
+      // Hand-built aggregate in the new tolerant-space shape: `contract()`
       // and `graph()` are lazy methods, not eager values. `plan` only reads
-      // `app.spaceId` and `app.contract()` here, so the extension member is
+      // `app.spaceId` and `app.contract()` here, so the extension space is
       // present for completeness but its facets are never invoked.
       mocks.buildContractSpaceAggregate.mockResolvedValueOnce(
         ok(
           createContractSpaceAggregate({
             targetId: 'mongo',
-            app: createContractSpaceMember({
+            app: createAggregateContractSpace({
               spaceId: 'app',
               packages: [],
               refs: {},
@@ -565,7 +565,7 @@ describe('migration plan command', () => {
               deserializeContract: (c: unknown) => c as Contract,
             }),
             extensions: [
-              createContractSpaceMember({
+              createAggregateContractSpace({
                 spaceId: 'cipherstash',
                 packages: [],
                 refs: {},

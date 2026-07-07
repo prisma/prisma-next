@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { filterSchemaDiffIssues } from '../src/core/control-instance';
-import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
+import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
 import {
   createContractTable,
   createMockPostgresComponent,
@@ -158,11 +158,13 @@ describe('filterSchemaDiffIssues', () => {
   const extraIssue = {
     path: ['public', 'profiles', 'p_abc12345'],
     outcome: 'extra' as const,
+    reason: 'not-expected' as const,
     message: 'extra: public/profiles/p_abc12345',
   };
   const missingIssue = {
     path: ['public', 'profiles', 'p_deadbeef'],
     outcome: 'missing' as const,
+    reason: 'not-found' as const,
     message: 'missing: public/profiles/p_deadbeef',
   };
 

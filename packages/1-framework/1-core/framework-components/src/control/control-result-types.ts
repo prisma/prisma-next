@@ -38,6 +38,20 @@ export interface VerifyDatabaseResult {
   };
 }
 
+/**
+ * The three ways an actual state can fail an expectation: it contains a node
+ * that was not expected, lacks a node that was expected, or holds a node that
+ * is not equal to the expected one. Expected is the desired side and actual the
+ * current side of whatever comparison produced the issue — contract-vs-database,
+ * or contract-vs-contract in an offline plan — so the vocabulary is
+ * comparison-relative and never ambiguous about a base.
+ *
+ * The failure reason is a structural characteristic carried as a declared
+ * field: consumers filter on `reason`, never by enumerating kind strings or
+ * family-invented node codes.
+ */
+export type ExpectationFailureReason = 'not-expected' | 'not-found' | 'not-equal';
+
 export interface BaseSchemaIssue {
   readonly kind:
     | 'missing_schema'
@@ -86,6 +100,13 @@ export interface BaseSchemaIssue {
   readonly expected?: string;
   readonly actual?: string;
   readonly message: string;
+  /**
+   * Why the actual state fails the expectation. Stamped by every family
+   * verifier at issue construction; optional only because this legacy
+   * coordinate-based issue type predates the field and retires into the
+   * node-typed issue with the issue-type merge.
+   */
+  readonly reason?: ExpectationFailureReason;
 }
 
 export interface EnumValuesChangedIssue {
@@ -101,6 +122,11 @@ export interface EnumValuesChangedIssue {
   readonly addedValues: readonly string[];
   readonly removedValues: readonly string[];
   readonly message: string;
+  /**
+   * Why the actual state fails the expectation (always `'not-equal'` for a
+   * value-set change). Stamped by the family verifiers at issue construction.
+   */
+  readonly reason?: ExpectationFailureReason;
 }
 
 export type SchemaIssue = BaseSchemaIssue | EnumValuesChangedIssue;
@@ -115,6 +141,14 @@ export interface SchemaVerificationNode {
   readonly expected: unknown;
   readonly actual: unknown;
   readonly children: readonly SchemaVerificationNode[];
+  /**
+   * Why the actual state fails the expectation, for nodes a family grafts to
+   * represent a failure that has no declared counterpart (a live entity no
+   * contract expects carries `'not-expected'`). Absent on declared-node
+   * verification results. The aggregate strip filters on this field — never on
+   * family node kinds or codes.
+   */
+  readonly reason?: ExpectationFailureReason;
 }
 
 export interface VerifyDatabaseSchemaResult {

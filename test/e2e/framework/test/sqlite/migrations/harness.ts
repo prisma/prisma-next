@@ -10,8 +10,8 @@ import sqliteAdapterDescriptor, {
 import type { Contract } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
 import sqlFamilyDescriptor, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { verifySqlSchema } from '@prisma-next/family-sql/diff';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
-import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import {
   APP_SPACE_ID,
   createControlStack,

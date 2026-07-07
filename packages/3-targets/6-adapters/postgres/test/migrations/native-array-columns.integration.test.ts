@@ -89,7 +89,7 @@ describe.sequential('native array columns DDL', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('migrates many:true columns to native Postgres array types', {
     timeout: testTimeout,

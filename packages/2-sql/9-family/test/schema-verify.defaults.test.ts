@@ -1,8 +1,8 @@
 import { type ColumnDefault, type Contract, executionHash } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import type { DefaultNormalizer } from '../src/core/schema-verify/verify-sql-schema';
-import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
+import type { DefaultNormalizer } from '../src/core/diff/sql-schema-diff';
+import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
 import {
   createContractTable,
   createSchemaTable,

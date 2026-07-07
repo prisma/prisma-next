@@ -1,10 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  isStorageTable,
-  isStorageValueSet,
-  type SqlStorage,
-} from '@prisma-next/sql-contract/types';
+import { isStorageValueSet, type SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { TestSqlContractSerializer } from './test-sql-contract-serializer';
@@ -42,7 +38,7 @@ describe('SqlContractSerializer — built-in kind hydration', () => {
     const contract = serializer.deserializeContract(json) as Contract<SqlStorage>;
     const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
     expect(ns).toBeDefined();
-    expect(isStorageTable(ns!.entries.table?.['users'])).toBe(true);
+    expect(StorageTable.is(ns!.entries.table?.['users'])).toBe(true);
   });
 
   it('hydrates valueSet entries to StorageValueSet instances', () => {

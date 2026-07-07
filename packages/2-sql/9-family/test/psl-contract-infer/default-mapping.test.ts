@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { mapDefault } from '../../src/core/psl-contract-infer/default-mapping';
-import { createPostgresDefaultMapping } from '../../src/core/psl-contract-infer/postgres-default-mapping';
+import {
+  type DefaultMappingOptions,
+  mapDefault,
+} from '../../src/core/psl-contract-infer/default-mapping';
+
+// Inline dialect-mapping fixture (the Postgres maps now live in the target);
+// these cases exercise the neutral `mapDefault` with an injected mapping.
+const injectedMapping: DefaultMappingOptions = {
+  functionAttributes: { 'gen_random_uuid()': '@default(dbgenerated("gen_random_uuid()"))' },
+  fallbackFunctionAttribute: (expression) => `@default(dbgenerated(${JSON.stringify(expression)}))`,
+};
 
 describe('mapDefault', () => {
   it('maps autoincrement()', () => {
@@ -17,19 +26,14 @@ describe('mapDefault', () => {
 
   it('maps gen_random_uuid() when Postgres mapping is injected', () => {
     expect(
-      mapDefault(
-        { kind: 'function', expression: 'gen_random_uuid()' },
-        createPostgresDefaultMapping(),
-      ),
+      mapDefault({ kind: 'function', expression: 'gen_random_uuid()' }, injectedMapping),
     ).toEqual({
       attribute: '@default(dbgenerated("gen_random_uuid()"))',
     });
   });
 
   it('maps unmapped Postgres defaults to dbgenerated when Postgres mapping is injected', () => {
-    expect(
-      mapDefault({ kind: 'function', expression: "'{}'::jsonb" }, createPostgresDefaultMapping()),
-    ).toEqual({
+    expect(mapDefault({ kind: 'function', expression: "'{}'::jsonb" }, injectedMapping)).toEqual({
       attribute: `@default(dbgenerated(${JSON.stringify("'{}'::jsonb")}))`,
     });
   });

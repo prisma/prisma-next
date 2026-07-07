@@ -12,6 +12,7 @@ import {
   type MigrationRunnerFailure,
   type MigrationRunnerPerSpaceSuccessValue,
   type OperationContext,
+  type VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import type { MongoContract } from '@prisma-next/mongo-contract';
@@ -24,7 +25,6 @@ import type {
   MongoMigrationCheck,
   MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
-import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { FilterEvaluator } from './filter-evaluator';
 import { deserializeMongoOps } from './mongo-ops-serializer';
@@ -46,16 +46,16 @@ export interface MongoMigrationRunnerExecuteOptions {
   readonly strictVerification?: boolean;
   readonly context?: OperationContext;
   /**
-   * Per-space schema projection. When set, the runner applies this
-   * function to the introspected schema before invoking
-   * `verifyMongoSchema`, so per-space verification only sees the slice
-   * the destination contract actually claims.
+   * Per-space verify-result scope. When set, the runner verifies the
+   * destination contract against the **full** introspected schema, then
+   * applies this to scope the result to the space the contract claims —
+   * dropping the `extra` findings for collections a sibling space owns.
    *
-   * The target descriptor's `execute` injects this callback, derived
-   * from the sibling spaces in the aggregate. Callers that don't project
-   * leave it unset and verify against the whole introspected schema.
+   * The target descriptor's `execute` injects this callback, derived from
+   * the sibling spaces in the aggregate. Callers that don't scope leave it
+   * unset and verify against the whole introspected schema.
    */
-  readonly projectSchema?: (schema: MongoSchemaIR) => MongoSchemaIR;
+  readonly scopeVerifyResult?: (result: VerifyDatabaseSchemaResult) => VerifyDatabaseSchemaResult;
   /** Per-edge breakdown from graph-walk planning; drives per-edge ledger writes. */
   readonly migrationEdges: readonly AggregateMigrationEdgeRef[];
 }
@@ -207,19 +207,21 @@ export class MongoMigrationRunner {
 
     if (!isNoOp) {
       const liveSchema = await this.deps.introspectSchema();
-      // When an aggregate spans more than one space the live database
-      // holds collections owned by sibling spaces; the target descriptor's
-      // `execute` injects a `projectSchema` that strips them so per-space
-      // verify only checks the slice this contract claims. Callers that
-      // don't project leave the projection identity (no-op).
-      const verifySchema = options.projectSchema ? options.projectSchema(liveSchema) : liveSchema;
-      const verifyResult = verifyMongoSchema({
+      // When an aggregate spans more than one space the live database holds
+      // collections owned by sibling spaces; verify against the full schema,
+      // then let the target descriptor's `execute`-injected `scopeVerifyResult`
+      // drop the `extra` findings for the collections those siblings own.
+      // Callers that don't scope leave the result unchanged.
+      const rawVerifyResult = verifyMongoSchema({
         contract: options.destinationContract,
-        schema: verifySchema,
+        schema: liveSchema,
         strict: options.strictVerification ?? true,
         frameworkComponents: options.frameworkComponents,
         ...(options.context ? { context: options.context } : {}),
       });
+      const verifyResult = options.scopeVerifyResult
+        ? options.scopeVerifyResult(rawVerifyResult)
+        : rawVerifyResult;
       if (!verifyResult.ok) {
         return runnerFailure('SCHEMA_VERIFY_FAILED', verifyResult.summary, {
           why: 'The resulting database schema does not satisfy the destination contract.',

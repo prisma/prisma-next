@@ -2,9 +2,9 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { isPostgresSchema } from '../postgres-schema';
-import { isPostgresSchemaIR } from '../schema-ir/postgres-schema-ir';
+import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 
 /**
  * Resolves the live-database schema name for a given namespace
@@ -24,20 +24,23 @@ function resolveDdlSchemaName(storage: SqlStorage, namespaceId: string): string 
 }
 
 /**
- * Reads the introspected list of schema names from a `PostgresSchemaIR`.
- * Defaults to the always-present `public` schema when the schema IR is not a
- * `PostgresSchemaIR` — a fresh Postgres database always carries `public`
- * (unless an operator dropped it manually), so any verifier path that runs
- * without an enriched introspection still suppresses the redundant
- * `CREATE SCHEMA "public"`.
+ * Reads the introspected list of schema names from the database-root schema
+ * node. `existingSchemas` is database-level, so it lives on the
+ * `PostgresDatabaseSchemaNode` root — not on the per-schema namespace nodes.
+ *
+ * Defaults to the always-present `public` schema when the node is not the
+ * database root — a fresh Postgres database always carries `public` (unless an
+ * operator dropped it manually), so any verifier path that runs without an
+ * enriched introspection still suppresses the redundant `CREATE SCHEMA
+ * "public"`.
  *
  * Production introspection (`PostgresControlAdapter.introspect`) is the
  * authoritative source: it queries `pg_namespace` and sets `existingSchemas`
- * on the returned `PostgresSchemaIR`. Tests that want to assert against a
- * richer initial state construct a `PostgresSchemaIR` explicitly.
+ * on the returned root. Tests that want to assert against a richer initial
+ * state construct a `PostgresDatabaseSchemaNode` explicitly.
  */
-function existingSchemasFromSchema(schema: SqlSchemaIR): readonly string[] {
-  if (isPostgresSchemaIR(schema)) {
+function existingSchemasFromSchema(schema: SqlSchemaIRNode): readonly string[] {
+  if (PostgresDatabaseSchemaNode.is(schema)) {
     return schema.existingSchemas;
   }
   return ['public'];
@@ -45,7 +48,11 @@ function existingSchemasFromSchema(schema: SqlSchemaIR): readonly string[] {
 
 /**
  * Emits a `missing_schema` issue for every contract-declared Postgres
- * namespace whose live container does not yet exist.
+ * namespace whose live container does not yet exist. The planner's
+ * `collectSchemaIssues` prepends these to the relational findings so a
+ * multi-schema plan emits `CREATE SCHEMA` before the tables that need it —
+ * a planner-only concern (verify already rejects via the `missing_table` a
+ * missing schema produces), so this is not part of the shared diff.
  *
  * A namespace's live container is the schema returned by its
  * polymorphic `ddlSchemaName(storage)` method — named schemas resolve
@@ -63,7 +70,7 @@ function existingSchemasFromSchema(schema: SqlSchemaIR): readonly string[] {
  */
 export function verifyPostgresNamespacePresence(input: {
   readonly contract: Contract<SqlStorage>;
-  readonly schema: SqlSchemaIR;
+  readonly schema: SqlSchemaIRNode;
 }): readonly SchemaIssue[] {
   const { contract, schema } = input;
   const existing = new Set(existingSchemasFromSchema(schema));
@@ -76,6 +83,7 @@ export function verifyPostgresNamespacePresence(input: {
     if (existing.has(ddlName)) continue;
     issues.push({
       kind: 'missing_schema',
+      reason: 'not-found',
       namespaceId,
       message: `Schema "${ddlName}" is missing from database`,
     });

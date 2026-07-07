@@ -5,12 +5,12 @@ import type { MigrationOps, OnDiskMigrationPackage } from '../../package';
 import { requireHeadRef } from '../aggregate';
 import type { ContractMarkerRecordLike } from '../marker-types';
 import type { PerSpacePlan } from '../planner-types';
-import type { ContractSpaceMember } from '../types';
+import type { AggregateContractSpace } from '../types';
 
 /**
  * Outcome variants for the graph-walk strategy. Mirrors
  * {@link import('../../compute-extension-space-apply-path').ExtensionSpaceApplyPathOutcome}
- * but operates against the member's lazily-reconstructed `graph()`
+ * but operates against the contract space's lazily-reconstructed `graph()`
  * instead of re-reading from disk. The aggregate planner converts
  * these into {@link import('../planner-types').PlannerError}
  * variants.
@@ -22,7 +22,7 @@ export type GraphWalkOutcome =
 
 export interface GraphWalkStrategyInputs {
   readonly aggregateTargetId: string;
-  readonly member: ContractSpaceMember;
+  readonly space: AggregateContractSpace;
   readonly currentMarker: ContractMarkerRecordLike | null;
   /**
    * Optional ref name to decorate the resulting `PathDecision`. Used by
@@ -34,8 +34,8 @@ export interface GraphWalkStrategyInputs {
 }
 
 /**
- * Walk a member's hydrated migration graph from the live marker to
- * `member.headRef.hash`, covering every required invariant.
+ * Walk a contract space's hydrated migration graph from the live marker to
+ * `space.headRef.hash`, covering every required invariant.
  *
  * Pure synchronous function — no I/O. The aggregate's loader has
  * already integrity-checked every package and reconstructed the graph;
@@ -49,11 +49,11 @@ export interface GraphWalkStrategyInputs {
  * `computeExtensionSpaceApplyPath` semantics.
  */
 export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutcome {
-  const { aggregateTargetId, member, currentMarker, refName } = input;
-  const headRef = requireHeadRef(member);
-  const graph = member.graph();
+  const { aggregateTargetId, space, currentMarker, refName } = input;
+  const headRef = requireHeadRef(space);
+  const graph = space.graph();
   const packagesByMigrationHash = new Map<string, OnDiskMigrationPackage>(
-    member.packages.map((pkg) => [pkg.metadata.migrationHash, pkg]),
+    space.packages.map((pkg) => [pkg.metadata.migrationHash, pkg]),
   );
 
   const fromHash = currentMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
@@ -85,7 +85,7 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
     const pkg = packagesByMigrationHash.get(edge.migrationHash);
     if (!pkg) {
       throw new Error(
-        `Migration package missing for edge ${edge.migrationHash} in space "${member.spaceId}". The hydrated migration graph and packagesByMigrationHash map are out of sync — this should be unreachable; report.`,
+        `Migration package missing for edge ${edge.migrationHash} in space "${space.spaceId}". The hydrated migration graph and packagesByMigrationHash map are out of sync — this should be unreachable; report.`,
       );
     }
     for (const op of pkg.ops) pathOps.push(op);
@@ -101,7 +101,7 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
 
   const plan: MigrationPlan = {
     targetId: aggregateTargetId,
-    spaceId: member.spaceId,
+    spaceId: space.spaceId,
     origin: currentMarker === null ? null : { storageHash: currentMarker.storageHash },
     destination: { storageHash: headRef.hash },
     operations: pathOps,
@@ -113,7 +113,7 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
     result: {
       plan,
       displayOps: pathOps,
-      destinationContract: member.contract(),
+      destinationContract: space.contract(),
       strategy: 'graph-walk',
       migrationEdges: edgeRefs,
       pathDecision: outcome.decision,

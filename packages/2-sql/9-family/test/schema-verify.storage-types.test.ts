@@ -1,6 +1,6 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
+import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
 import type { CodecControlHooks } from '../src/exports/control';
 import {
   createTestContract,

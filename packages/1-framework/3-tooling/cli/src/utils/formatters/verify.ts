@@ -30,6 +30,12 @@ export interface DbVerifyCommandSuccessResult {
     readonly counts: VerifyDatabaseSchemaResult['schema']['counts'];
     readonly strict: boolean;
   };
+  /**
+   * Live element names no contract space declares. In full success this is
+   * only ever non-empty in lenient mode — strict mode fails on it — and is
+   * rendered informationally.
+   */
+  readonly unclaimed?: readonly string[];
   readonly warning?: string;
   readonly meta?:
     | (NonNullable<VerifyDatabaseResult['meta']> & {
@@ -76,6 +82,14 @@ export function formatVerifyOutput(
       `${formatDimText(`  schema: pass=${result.schema.counts.pass} warn=${result.schema.counts.warn} fail=${result.schema.counts.fail}`)}`,
     );
   }
+  if (result.unclaimed && result.unclaimed.length > 0) {
+    lines.push('');
+    lines.push(formatYellow('Unclaimed elements (declared by no contract):'));
+    for (const name of result.unclaimed) {
+      lines.push(`  ${formatYellow('⚠')} ${name}`);
+    }
+  }
+
   if (result.warning) {
     lines.push('');
     lines.push(`${formatYellow('⚠')} ${result.warning}`);
@@ -107,6 +121,7 @@ export function formatVerifyJson(result: DbVerifyCommandSuccessResult): string {
     ...ifDefined('missingCodecs', result.missingCodecs),
     ...ifDefined('codecCoverageSkipped', result.codecCoverageSkipped),
     ...ifDefined('schema', result.schema),
+    unclaimed: result.unclaimed ?? [],
     ...ifDefined('warning', result.warning),
     ...ifDefined('meta', result.meta),
     timings: result.timings,
@@ -517,6 +532,7 @@ function renderSchemaVerificationTree(
 export function formatSchemaVerifyOutput(
   result: VerifyDatabaseSchemaResult,
   flags: GlobalFlags,
+  unclaimed: readonly string[] = [],
 ): string {
   if (flags.quiet) {
     return '';
@@ -527,6 +543,7 @@ export function formatSchemaVerifyOutput(
   const useColor = flags.color !== false;
   const formatGreen = createColorFormatter(useColor, green);
   const formatRed = createColorFormatter(useColor, red);
+  const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   // Render verification tree first
@@ -544,6 +561,17 @@ export function formatSchemaVerifyOutput(
     lines.push(formatRed('Schema drift:'));
     for (const issue of result.schema.schemaDiffIssues) {
       lines.push(`  ${formatRed('✖')} ${issue.message}`);
+    }
+  }
+
+  if (unclaimed.length > 0) {
+    const strict = result.meta?.strict ?? false;
+    lines.push('');
+    lines.push(
+      (strict ? formatRed : formatYellow)('Unclaimed elements (declared by no contract):'),
+    );
+    for (const name of unclaimed) {
+      lines.push(`  ${(strict ? formatRed : formatYellow)(strict ? '✖' : '⚠')} ${name}`);
     }
   }
 
@@ -570,10 +598,15 @@ export function formatSchemaVerifyOutput(
 }
 
 /**
- * Formats JSON output for database schema verification.
+ * Formats JSON output for database schema verification. The unclaimed-elements
+ * list is a top-level field alongside the combined result, reported once for
+ * the whole database.
  */
-export function formatSchemaVerifyJson(result: VerifyDatabaseSchemaResult): string {
-  return JSON.stringify(result, null, 2);
+export function formatSchemaVerifyJson(
+  result: VerifyDatabaseSchemaResult,
+  unclaimed: readonly string[] = [],
+): string {
+  return JSON.stringify({ ...result, unclaimed }, null, 2);
 }
 
 // ============================================================================

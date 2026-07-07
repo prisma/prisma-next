@@ -115,6 +115,8 @@ jobs:
         run: pnpm test:scripts
       - name: Lint casts
         run: pnpm lint:casts
+      - name: Lint framework vocabulary
+        run: pnpm lint:framework-vocabulary
       - name: Check upgrade-instruction coverage
         run: pnpm check:upgrade-coverage --mode pr
       - name: Check release notes

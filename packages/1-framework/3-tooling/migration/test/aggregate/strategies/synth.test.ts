@@ -1,6 +1,7 @@
 import type {
   ControlAdapterInstance,
   ControlFamilyInstance,
+  DiffIssue,
   MigrationOperationPolicy,
   MigrationPlanner,
   MigrationPlanWithAuthoringSurface,
@@ -10,8 +11,8 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { synthStrategy } from '../../../src/aggregate/strategies/synth';
-import type { ContractSpaceMember } from '../../../src/aggregate/types';
-import { makeContractSpaceMember } from '../../fixtures';
+import type { AggregateContractSpace } from '../../../src/aggregate/types';
+import { makeAggregateContractSpace } from '../../fixtures';
 
 const POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening'],
@@ -20,8 +21,8 @@ const POLICY: MigrationOperationPolicy = {
 const STUB_ADAPTER: ControlAdapterInstance<'sql', 'postgres'> =
   {} as unknown as ControlAdapterInstance<'sql', 'postgres'>;
 
-function makeMember(spaceId: string, tables: Record<string, unknown>): ContractSpaceMember {
-  return makeContractSpaceMember({
+function makeSpace(spaceId: string, tables: Record<string, unknown>): AggregateContractSpace {
+  return makeAggregateContractSpace({
     spaceId,
     contract: createSqlContract({
       target: 'postgres',
@@ -45,11 +46,13 @@ function makeStubPlan(targetId: string): MigrationPlanWithAuthoringSurface {
 }
 
 describe('synthStrategy', () => {
-  it('projects the live schema before passing it to the family planner', async () => {
+  it('passes the full schema and a diff filter that drops only other spaces’ extras', async () => {
     let observedSchema: unknown;
+    let observedKeep: ((issue: DiffIssue) => boolean) | undefined;
     const stubPlanner: MigrationPlanner<'sql', 'postgres'> = {
-      plan: ({ schema }) => {
+      plan: ({ schema, keepDiffIssue }) => {
         observedSchema = schema;
+        observedKeep = keepDiffIssue;
         return { kind: 'success', plan: makeStubPlan('placeholder') };
       },
       emptyMigration: () => {
@@ -68,8 +71,7 @@ describe('synthStrategy', () => {
       contractToSchema: () => ({ tables: {} }),
     };
 
-    const appMember = makeMember('app', { app_user: {} });
-    const extMember = makeMember('cipher', { cipher_state: {} });
+    const appSpace = makeSpace('app', { app_user: {} });
 
     const liveSchema = {
       tables: {
@@ -82,8 +84,8 @@ describe('synthStrategy', () => {
     const outcome = await synthStrategy({
       aggregateTargetId: 'postgres',
       currentMarker: null,
-      member: appMember,
-      otherMembers: [extMember],
+      space: appSpace,
+      declaredByAnotherSpace: (name) => name === 'cipher_state',
       schemaIntrospection: liveSchema,
       adapter: STUB_ADAPTER,
       migrations: stubMigrations,
@@ -106,9 +108,57 @@ describe('synthStrategy', () => {
       },
     ]);
 
-    // Critical: the planner saw a schema with cipher_state pruned out.
+    // Critical: the planner saw the FULL schema (no pre-pruning) …
     const observed = observedSchema as { tables: Record<string, unknown> };
-    expect(Object.keys(observed.tables).sort()).toEqual(['app_user', 'orphan_table']);
+    expect(Object.keys(observed.tables).sort()).toEqual([
+      'app_user',
+      'cipher_state',
+      'orphan_table',
+    ]);
+
+    // … and a keep-predicate it applies to its diff. The planner holds no
+    // ownership logic: the predicate drops exactly the extras a sibling
+    // contract space declares, keeps every non-extra finding, and keeps
+    // extras no space declares (the planner may DROP those under policy).
+    const keep = observedKeep;
+    expect(keep).toBeDefined();
+    if (keep === undefined) return;
+    const missingIssue: DiffIssue = {
+      kind: 'missing_table',
+      table: 'cipher_state',
+      reason: 'not-found',
+      message: 'missing',
+    };
+    const siblingExtraIssue: DiffIssue = {
+      kind: 'extra_table',
+      table: 'cipher_state',
+      reason: 'not-expected',
+      message: 'extra',
+    };
+    const undeclaredExtraIssue: DiffIssue = {
+      kind: 'extra_table',
+      table: 'orphan_table',
+      reason: 'not-expected',
+      message: 'extra',
+    };
+    const siblingExtraDiffIssue: DiffIssue = {
+      path: ['public', 'cipher_state'],
+      outcome: 'extra',
+      reason: 'not-expected',
+      message: 'extra',
+      actual: { tableName: 'cipher_state' } as never,
+    };
+    const missingDiffIssue: DiffIssue = {
+      path: ['public', 'app_user', 'policy_x'],
+      outcome: 'missing',
+      reason: 'not-found',
+      message: 'missing',
+    };
+    expect(keep(missingIssue)).toBe(true);
+    expect(keep(siblingExtraIssue)).toBe(false);
+    expect(keep(undeclaredExtraIssue)).toBe(true);
+    expect(keep(siblingExtraDiffIssue)).toBe(false);
+    expect(keep(missingDiffIssue)).toBe(true);
   });
 
   it('forwards planner failures verbatim', async () => {
@@ -136,8 +186,8 @@ describe('synthStrategy', () => {
     const outcome = await synthStrategy({
       aggregateTargetId: 'postgres',
       currentMarker: null,
-      member: makeMember('app', {}),
-      otherMembers: [],
+      space: makeSpace('app', {}),
+      declaredByAnotherSpace: () => false,
       schemaIntrospection: { tables: {} },
       adapter: STUB_ADAPTER,
       migrations: stubMigrations,

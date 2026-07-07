@@ -2,7 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { createContractSpaceMember } from '../../src/aggregate/aggregate';
+import { createAggregateContractSpace } from '../../src/aggregate/aggregate';
 import type { IntegritySpaceState } from '../../src/aggregate/check-integrity';
 import { computeIntegrityViolations } from '../../src/aggregate/check-integrity';
 import { createAttestedPackage } from '../fixtures';
@@ -23,7 +23,7 @@ function contractWithTables(
 }
 
 function makeSpaceState(spaceId: string, contract: Contract, isApp = false): IntegritySpaceState {
-  const member = createContractSpaceMember({
+  const space = createAggregateContractSpace({
     spaceId,
     packages: [],
     refs: {},
@@ -32,7 +32,7 @@ function makeSpaceState(spaceId: string, contract: Contract, isApp = false): Int
     resolveContract: () => contract,
     deserializeContract: (raw) => raw as Contract,
   });
-  return { member, problems: [], refProblems: [], headRefProblem: null, isApp };
+  return { space, problems: [], refProblems: [], headRefProblem: null, isApp };
 }
 
 describe('computeIntegrityViolations', () => {
@@ -48,7 +48,7 @@ describe('computeIntegrityViolations', () => {
       { ...second, metadata: { ...second.metadata, migrationHash: sharedHash } },
     ];
 
-    const member = createContractSpaceMember({
+    const space = createAggregateContractSpace({
       spaceId: 'app',
       packages,
       refs: {},
@@ -61,7 +61,7 @@ describe('computeIntegrityViolations', () => {
     });
 
     const state: IntegritySpaceState = {
-      member,
+      space,
       problems: [],
       refProblems: [],
       headRefProblem: null,
@@ -75,7 +75,7 @@ describe('computeIntegrityViolations', () => {
       migrationHash: sharedHash,
       dirNames: ['20260101T0000_first', '20260101T0000_second'],
     });
-    expect(() => member.graph()).not.toThrow();
+    expect(() => space.graph()).not.toThrow();
   });
 
   describe('disjointness (checkContracts)', () => {
@@ -133,10 +133,10 @@ describe('computeIntegrityViolations', () => {
   });
 
   it('rethrows when graph() fails for an unexpected reason', () => {
-    // Give the member a package so packages.length > 0, which triggers the
+    // Give the space a package so packages.length > 0, which triggers the
     // graph-reachability check and therefore the graph() call.
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: 'sha256:head' });
-    const member = createContractSpaceMember({
+    const space = createAggregateContractSpace({
       spaceId: 'ext',
       packages: [pkg],
       refs: {},
@@ -147,15 +147,15 @@ describe('computeIntegrityViolations', () => {
       },
       deserializeContract: (raw) => raw as Contract,
     });
-    const faultyMember = {
-      ...member,
+    const faultySpace = {
+      ...space,
       graph() {
         throw new Error('engine fault');
       },
     };
 
     const state: IntegritySpaceState = {
-      member: faultyMember,
+      space: faultySpace,
       problems: [],
       refProblems: [],
       headRefProblem: null,

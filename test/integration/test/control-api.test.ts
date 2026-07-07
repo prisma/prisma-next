@@ -194,9 +194,14 @@ describe('control-api', () => {
 
               expect(result).toBeDefined();
               expect(typeof result).toBe('object');
-              // The result should be a schema IR with tables
+              // `introspect()` returns the target's schema-IR node — for Postgres
+              // the `PostgresDatabaseSchemaNode` tree root: namespaces keyed by
+              // DDL schema, each carrying a `tables` record (always at least the
+              // live `public` schema).
               expect(result).toMatchObject({
-                tables: expect.anything(),
+                namespaces: {
+                  public: { schemaName: 'public', tables: expect.anything() },
+                },
               });
             } finally {
               await client.close();

@@ -11,15 +11,15 @@ import {
   plannerFailure,
 } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
-import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   MigrationPlanner,
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
-import { parseSqliteDefault } from '../default-normalizer';
-import { normalizeSqliteNativeType } from '../native-type-normalizer';
+import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
+import { diffSqliteDatabaseSchema } from './diff-database-schema';
 import { planIssues } from './issue-planner';
 import {
   type SqliteMigrationDestinationInfo,
@@ -117,7 +117,7 @@ export class SqliteMigrationPlanner
       fromContract: options.fromContract,
       codecHooks,
       storageTypes,
-      schema: options.schema,
+      schema: sqliteFlatSchema(options.schema),
       policy: options.policy,
       frameworkComponents: options.frameworkComponents,
       strategies: sqlitePlannerStrategies,
@@ -181,15 +181,27 @@ export class SqliteMigrationPlanner
   private collectSchemaIssues(options: SqlMigrationPlannerPlanOptions): readonly SchemaIssue[] {
     const allowed = options.policy.allowedOperationClasses;
     const strict = allowed.includes('widening') || allowed.includes('destructive');
-    const verifyResult = verifySqlSchema({
+    const rawDiff = diffSqliteDatabaseSchema({
       contract: options.contract,
-      schema: options.schema,
+      actualSchema: options.schema,
       strict,
       typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
-      normalizeDefault: parseSqliteDefault,
-      normalizeNativeType: normalizeSqliteNativeType,
     });
-    return verifyResult.schema.issues;
+    // The caller-supplied predicate is applied blindly — any scoping (e.g.
+    // multi-space ownership) is the orchestration's, never worked out here.
+    const diff = options.keepDiffIssue ? rawDiff.filter(options.keepDiffIssue) : rawDiff;
+    return diff.issues;
   }
+}
+
+/**
+ * SQLite has a single, flat schema — its introspected node IS a per-schema
+ * `SqlSchemaIR`, never the multi-namespace tree the Postgres target builds. The
+ * planner consumes that flat shape directly when building ops.
+ */
+function sqliteFlatSchema(schema: SqlSchemaIRNode): SqlSchemaIR {
+  return blindCast<SqlSchemaIR, 'the SQLite introspected node is a flat per-schema SqlSchemaIR'>(
+    schema,
+  );
 }

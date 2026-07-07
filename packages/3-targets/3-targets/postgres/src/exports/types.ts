@@ -1,4 +1,10 @@
 export {
+  PostgresRlsPolicy,
+  type PostgresRlsPolicyInput,
+  type RlsPolicyOperation,
+} from '../core/postgres-rls-policy';
+export { PostgresRole, type PostgresRoleInput } from '../core/postgres-role';
+export {
   isPostgresSchema,
   type PostgresContract,
   PostgresSchema,
@@ -6,21 +12,23 @@ export {
   postgresCreateNamespace,
 } from '../core/postgres-schema';
 export {
-  PostgresRlsPolicy,
-  type PostgresRlsPolicyInput,
-  type RlsPolicyOperation,
-} from '../core/schema-ir/postgres-rls-policy';
-export { PostgresRole, type PostgresRoleInput } from '../core/schema-ir/postgres-role';
+  PostgresDatabaseSchemaNode,
+  type PostgresDatabaseSchemaNodeInput,
+} from '../core/schema-ir/postgres-database-schema-node';
 export {
-  assertPostgresSchemaIR,
-  ensurePostgresSchemaIR,
-  isPostgresSchemaIR,
-  PostgresSchemaIR,
-  type PostgresSchemaIRInput,
-} from '../core/schema-ir/postgres-schema-ir';
+  PostgresNamespaceSchemaNode,
+  type PostgresNamespaceSchemaNodeInput,
+} from '../core/schema-ir/postgres-namespace-schema-node';
 export {
-  isPostgresTableIR,
-  PostgresTableIR,
-  type PostgresTableIRInput,
-} from '../core/schema-ir/postgres-table-ir';
+  PostgresPolicySchemaNode,
+  type PostgresPolicySchemaNodeInput,
+} from '../core/schema-ir/postgres-policy-schema-node';
+export {
+  PostgresRoleSchemaNode,
+  type PostgresRoleSchemaNodeInput,
+} from '../core/schema-ir/postgres-role-schema-node';
+export {
+  PostgresTableSchemaNode,
+  type PostgresTableSchemaNodeInput,
+} from '../core/schema-ir/postgres-table-schema-node';
 export type { PostgresColumnDefault } from '../core/types';
