@@ -261,16 +261,40 @@ export function normalizePostgresActualForDiff(
 }
 
 /**
+ * Drops contract namespaces that declare no tables from the verdict-diff
+ * expected tree and the owned-schema set. The legacy relational walk
+ * skipped a table-less namespace (e.g. an enums-only schema) before
+ * pairing, so neither its DDL schema's absence nor that schema's live
+ * contents ever reached the verdict — the pruned tree reproduces that.
+ * Safe for the policy portion of this diff too: policies attach to tables,
+ * so a table-less namespace carries none (the projection throws on a
+ * policy referencing an absent table).
+ */
+function pruneTableLessNamespaces(
+  expected: PostgresDatabaseSchemaNode,
+): PostgresDatabaseSchemaNode {
+  const namespaces = Object.fromEntries(
+    Object.entries(expected.namespaces).filter(([, ns]) => Object.keys(ns.tables).length > 0),
+  );
+  return new PostgresDatabaseSchemaNode({
+    namespaces,
+    roles: [...expected.roles],
+    existingSchemas: expected.existingSchemas.filter((s) => namespaces[s] !== undefined),
+    pgVersion: expected.pgVersion,
+  });
+}
+
+/**
  * The Postgres full-tree node diff for the family verify verdict: derive
  * the expected tree (resolved leaf values, expander threaded, FK schemas
- * resolved, table control policies stamped), normalize the actual tree for
- * semantic satisfaction, run the generic differ, and scope out
- * `not-expected` findings under namespaces the contract does not own — the
- * legacy per-namespace walk never visited unowned schemas, so their
- * contents are invisible to verify. The codec `verifyType` hooks run once
- * per contract namespace with tables against that namespace's paired
- * actual node (the hooks read namespace-scoped state such as
- * `nativeEnumTypeNames`).
+ * resolved, table control policies stamped, table-less namespaces pruned),
+ * normalize the actual tree for semantic satisfaction, run the generic
+ * differ, and scope out `not-expected` findings under namespaces the
+ * contract does not own — the legacy per-namespace walk never visited
+ * unowned schemas, so their contents are invisible to verify. The codec
+ * `verifyType` hooks run once per contract namespace with tables against
+ * that namespace's paired actual node (the hooks read namespace-scoped
+ * state such as `nativeEnumTypeNames`).
  */
 export function diffPostgresSchemaForVerdict(input: {
   readonly contract: Contract<SqlStorage>;
@@ -284,10 +308,12 @@ export function diffPostgresSchemaForVerdict(input: {
   PostgresDatabaseSchemaNode.assert(input.schema);
   const actual = input.schema;
   const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
-  const expected = contractToPostgresDatabaseSchemaNode(postgresContract, {
-    annotationNamespace: 'pg',
-    ...ifDefined('expandNativeType', expandNativeType),
-  });
+  const expected = pruneTableLessNamespaces(
+    contractToPostgresDatabaseSchemaNode(postgresContract, {
+      annotationNamespace: 'pg',
+      ...ifDefined('expandNativeType', expandNativeType),
+    }),
+  );
   const normalizedActual = normalizePostgresActualForDiff(expected, actual);
   const owned = ownedSchemaNames(expected);
   const issues = diffSchemas(expected, normalizedActual).filter((issue) => {
@@ -295,8 +321,8 @@ export function diffPostgresSchemaForVerdict(input: {
     const namespaceSegment = issue.path[1];
     return namespaceSegment === undefined || owned.has(namespaceSegment);
   });
-  const namespacePairs = Object.values(expected.namespaces)
-    .filter((ns) => Object.keys(ns.tables).length > 0)
-    .map((ns) => ({ actual: actual.namespaces[ns.schemaName] }));
+  const namespacePairs = Object.values(expected.namespaces).map((ns) => ({
+    actual: actual.namespaces[ns.schemaName],
+  }));
   return { issues, expectedRoot: expected, namespacePairs };
 }
