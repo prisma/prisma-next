@@ -23,7 +23,6 @@ function createMongoTestContext(overrides?: Partial<ContractSourceContext>): Con
       field: {},
       type: {},
       entityTypes: {},
-      entityRefTypeConstructors: {},
       pslBlockDescriptors: {},
     },
     codecLookup: emptyCodecLookup,

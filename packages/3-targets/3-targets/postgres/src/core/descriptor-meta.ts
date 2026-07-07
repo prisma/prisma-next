@@ -1,6 +1,5 @@
 import type { CodecTypes } from '../exports/codec-types';
 import {
-  postgresAuthoringEntityRefTypeConstructors,
   postgresAuthoringEntityTypes,
   postgresAuthoringFieldPresets,
   postgresAuthoringPslBlockDescriptors,
@@ -17,7 +16,6 @@ const postgresTargetDescriptorMetaBase = {
     type: postgresAuthoringTypes,
     field: postgresAuthoringFieldPresets,
     entityTypes: postgresAuthoringEntityTypes,
-    entityRefTypeConstructors: postgresAuthoringEntityRefTypeConstructors,
     pslBlockDescriptors: postgresAuthoringPslBlockDescriptors,
     createNamespace: postgresCreateNamespace,
   },

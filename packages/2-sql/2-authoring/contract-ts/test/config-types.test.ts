@@ -30,7 +30,6 @@ const stubContext: ContractSourceContext = {
     field: {},
     type: {},
     entityTypes: {},
-    entityRefTypeConstructors: {},
     pslBlockDescriptors: {},
   },
   codecLookup: {

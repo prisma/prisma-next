@@ -19,9 +19,9 @@ import { parse } from '@prisma-next/psl-parser/syntax';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { describe, expect, it } from 'vitest';
 import {
-  postgresAuthoringEntityRefTypeConstructors,
   postgresAuthoringEntityTypes,
   postgresAuthoringPslBlockDescriptors,
+  postgresAuthoringTypes,
 } from '../src/core/authoring';
 import { PG_ENUM_CODEC_ID } from '../src/core/codec-ids';
 import { pgEnumDescriptor } from '../src/core/codecs';
@@ -30,10 +30,11 @@ import { postgresCreateNamespace } from '../src/core/postgres-schema';
 
 // Production always resolves `pg.enum(Ref)` through a real `CodecLookup` (the
 // CLI/config-loading pipeline supplies `stack.codecLookup`), so this test
-// double mirrors that shape. The "no CHECK" assertions below don't depend on
-// it — a `pg.enum(Ref)` column resolves through the entity-ref path
-// (`resolvePgEnumRef`), which is what decides CHECK presence — but other
-// interpreter paths (e.g. encoding column defaults) do read the lookup.
+// double mirrors that shape. A `pg.enum(Ref)` column resolves through the
+// entity-ref type-constructor path, which reaches `pgEnumDescriptor` via
+// `codecLookup.descriptorFor` to call its `columnFromEntity` authoring hook —
+// without `descriptorFor` below, resolution fails, so it is required, not
+// just a production-shape mirror.
 const pgEnumCodec = {
   id: PG_ENUM_CODEC_ID,
   descriptor: pgEnumDescriptor,
@@ -48,13 +49,14 @@ const codecLookup: CodecLookup = {
   targetTypesFor: () => undefined,
   metaFor: () => undefined,
   renderOutputTypeFor: () => undefined,
+  descriptorFor: (id) => (id === PG_ENUM_CODEC_ID ? pgEnumDescriptor : undefined),
 };
 
 const assembled = assembleAuthoringContributions([
   {
     authoring: {
       entityTypes: postgresAuthoringEntityTypes,
-      entityRefTypeConstructors: postgresAuthoringEntityRefTypeConstructors,
+      type: postgresAuthoringTypes,
       pslBlockDescriptors: postgresAuthoringPslBlockDescriptors,
     },
   },

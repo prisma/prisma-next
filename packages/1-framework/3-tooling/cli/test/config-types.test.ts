@@ -212,7 +212,6 @@ describe('defineConfig', () => {
         field: {},
         type: {},
         entityTypes: {},
-        entityRefTypeConstructors: {},
         pslBlockDescriptors: {},
       },
       codecLookup: {

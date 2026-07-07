@@ -16,7 +16,6 @@ const emptyContext: ContractSourceContext = {
     field: {},
     type: {},
     entityTypes: {},
-    entityRefTypeConstructors: {},
     pslBlockDescriptors: {},
   },
   codecLookup: emptyCodecLookup,

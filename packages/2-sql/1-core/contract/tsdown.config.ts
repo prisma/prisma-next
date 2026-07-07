@@ -13,7 +13,6 @@ export default defineConfig({
     'src/exports/index-types.ts',
     'src/exports/index-type-validation.ts',
     'src/exports/canonicalization-hooks.ts',
-    'src/exports/entity-ref-resolution.ts',
     'src/exports/value-set-derivation-hook.ts',
   ],
 });

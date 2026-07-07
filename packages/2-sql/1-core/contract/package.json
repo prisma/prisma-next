@@ -45,7 +45,6 @@
     "./canonicalization-hooks": "./dist/canonicalization-hooks.mjs",
     "./contract-view": "./dist/contract-view.mjs",
     "./entity-kinds": "./dist/entity-kinds.mjs",
-    "./entity-ref-resolution": "./dist/entity-ref-resolution.mjs",
     "./factories": "./dist/factories.mjs",
     "./index-type-validation": "./dist/index-type-validation.mjs",
     "./index-types": "./dist/index-types.mjs",

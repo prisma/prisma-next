@@ -1,6 +1,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Codec } from './codec';
+import type { AnyCodecDescriptor } from './codec-descriptor';
 
 export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
 
@@ -57,6 +58,16 @@ export interface CodecLookup {
     value: JsonValue,
     side: 'output' | 'input',
   ): string | undefined;
+  /**
+   * Codec-id-keyed descriptor accessor. Returns the full registered
+   * {@link AnyCodecDescriptor} for `id`, or `undefined` if no descriptor is
+   * registered. Optional so existing lookups need not provide it; a consumer
+   * that needs more than the derived per-id readers above — e.g. an
+   * authoring-time hook a target-specific descriptor exposes but this
+   * framework interface does not model generically — fetches the descriptor
+   * itself and narrows it with its own structural predicate.
+   */
+  descriptorFor?(id: string): AnyCodecDescriptor | undefined;
 }
 
 /**

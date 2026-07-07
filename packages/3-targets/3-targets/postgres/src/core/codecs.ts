@@ -26,6 +26,7 @@ import {
   renderTsLiteral,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   SqlCharCodec,
   SqlFloatCodec,
@@ -83,6 +84,8 @@ import {
   PG_VARBIT_CODEC_ID,
   PG_VARCHAR_CODEC_ID,
 } from './codec-ids';
+import { DEFAULT_NAMESPACE_ID } from './namespace-ids';
+import { PostgresNativeEnum } from './postgres-native-enum';
 
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
@@ -236,6 +239,32 @@ export class PgEnumDescriptor extends CodecDescriptorImpl<PgEnumParams> {
   }
   override factory(_params: PgEnumParams): (ctx: CodecInstanceContext) => PgEnumCodec {
     return () => new PgEnumCodec(this);
+  }
+
+  /**
+   * Authoring-time hook a `pg.enum(<ref>)` type constructor calls once it has
+   * resolved its ref argument to the referenced `native_enum` entity: given
+   * that entity and the field's namespace id, produces this codec's
+   * per-column `typeParams` and native type. The type name is schema-qualified
+   * for a named non-default schema (matching `format_type()`); `public` and
+   * the unbound namespace stay bare (`search_path`). `nativeType` mirrors
+   * `typeParams.typeName` — the same value {@link metaFor} derives at
+   * render time — so the column's declared native type and the render-time
+   * cast agree. Returns `undefined` if `entity` is not a `PostgresNativeEnum`
+   * (a contributor bug, not a user-schema error — the caller decides how to
+   * report it).
+   */
+  columnFromEntity(
+    entity: object,
+    namespaceId?: string,
+  ): { readonly typeParams: PgEnumParams; readonly nativeType: string } | undefined {
+    if (!PostgresNativeEnum.is(entity)) return undefined;
+    const qualifyNativeType =
+      namespaceId !== undefined &&
+      namespaceId !== DEFAULT_NAMESPACE_ID &&
+      namespaceId !== UNBOUND_NAMESPACE_ID;
+    const typeName = qualifyNativeType ? `${namespaceId}.${entity.typeName}` : entity.typeName;
+    return { typeParams: { typeName }, nativeType: typeName };
   }
 }
 

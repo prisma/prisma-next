@@ -22,6 +22,11 @@ The complete external-enum vertical — represent → type → cast → runtime 
 - **Why deferred:** not MVP-blocking — Supabase authors in PSL. Best sequenced with the RLS TS-authoring surface, which needs the identical attachment mechanism.
 - **Proven by:** a PSL + TS byte-identical parity test.
 
+### Parser `refKind` for entity-ref type-constructor arguments — deferred, [TML-2978]
+
+- **Outcome:** the PSL parser / symbol table knows a type-constructor argument (e.g. `AalLevel` in `pg.enum(AalLevel)`) is a reference — enabling parse-time / LSP scope validation and editor navigation (go-to-definition / rename / autocomplete) on it.
+- **Why deferred:** not a correctness dependency. The native-enum generic collapse ([`specs/native-enum-generic-collapse.md`](specs/native-enum-generic-collapse.md)) declares "argument is a ref" on the type-constructor descriptor and resolves it in the interpreter, so a bad reference is still rejected (at build time). This is the grammar/LSP layer on top — purely additive author ergonomics, and it lives in the PSL parser, a different area from the collapse. **Consider once the collapse and the Phase-1 critical path are complete.**
+
 ### Phase 2 — managed native enums (separate project; needs go-ahead)
 
 Prisma Next creates and drops the type and migrates **add-value** in place. Satisfies **R6–R10**. Design: [`spec.md`](spec.md) § Phase 2 and [`specs/migration-design.md`](specs/migration-design.md). Three vertical slices, in order, each proven against a live database:
@@ -41,4 +46,4 @@ Do **not** start Phase 2 without a fresh triage and operator go-ahead.
 
 ## Tracker
 
-Linear was intentionally skipped for the shipped Phase-1 slices (tracked in-repo). Cross-cutting follow-ups filed: **[TML-2960]** (no-emit per-instance column typing) and **[TML-2965]** (TS authoring mirror + the generic `ContractDefinition` pack-entity attachment, shared with RLS).
+Linear was intentionally skipped for the shipped Phase-1 slices (tracked in-repo). Cross-cutting follow-ups filed: **[TML-2960]** (no-emit per-instance column typing), **[TML-2965]** (TS authoring mirror + the generic `ContractDefinition` pack-entity attachment, shared with RLS), and **[TML-2978]** (parser `refKind` for entity-ref type-constructor arguments, deferred from the generic collapse — consider post-critical-path).

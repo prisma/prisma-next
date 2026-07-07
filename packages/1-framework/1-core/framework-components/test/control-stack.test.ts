@@ -132,7 +132,6 @@ describe('assembleAuthoringContributions', () => {
       field: {},
       type: {},
       entityTypes: {},
-      entityRefTypeConstructors: {},
       pslBlockDescriptors: {},
     });
   });
@@ -1030,7 +1029,6 @@ describe('createControlStack', () => {
       field: {},
       type: {},
       entityTypes: {},
-      entityRefTypeConstructors: {},
       pslBlockDescriptors: {},
     });
   });

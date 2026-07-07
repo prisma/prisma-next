@@ -5,8 +5,6 @@ export type {
   AuthoringContributions,
   AuthoringDiagnosticSink,
   AuthoringEntityContext,
-  AuthoringEntityRefTypeConstructorDescriptor,
-  AuthoringEntityRefTypeConstructorNamespace,
   AuthoringEntityTypeDescriptor,
   AuthoringEntityTypeFactoryOutput,
   AuthoringEntityTypeNamespace,
@@ -19,6 +17,7 @@ export type {
   AuthoringStorageTypeTemplate,
   AuthoringTemplateValue,
   AuthoringTypeConstructorDescriptor,
+  AuthoringTypeConstructorEntityRef,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
 export {
@@ -29,7 +28,6 @@ export {
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
   isAuthoringArgRef,
-  isAuthoringEntityRefTypeConstructorDescriptor,
   isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringPslBlockDescriptor,

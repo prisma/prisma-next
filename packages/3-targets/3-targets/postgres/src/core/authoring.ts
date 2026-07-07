@@ -1,7 +1,6 @@
 import { temporalAuthoringPresets } from '@prisma-next/family-sql/control';
 import type {
   AuthoringEntityContext,
-  AuthoringEntityRefTypeConstructorNamespace,
   AuthoringEntityTypeFactoryOutput,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
@@ -9,11 +8,8 @@ import type {
   AuthoringTypeNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlColumnBinding } from '@prisma-next/sql-contract/entity-ref-resolution';
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
-import { DEFAULT_NAMESPACE_ID } from './namespace-ids';
 import { PostgresNativeEnum } from './postgres-native-enum';
 import { PostgresRlsPolicy } from './postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './postgres-role';
@@ -24,45 +20,25 @@ import {
 } from './postgres-validators';
 import { computeContentHash, normalizePredicate } from './rls/canonicalize';
 
-export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
-
 /**
- * Resolves `pg.enum(<ref>)` against the namespace's already-lowered `native_enum`
- * entities: the `pg/enum@1` codec, the enum's type name as the codec-instance
- * `typeParams.typeName` (the codec's params-aware `metaFor` derives the column's
- * native type from this), and the block name as the `valueSetEntityName` (the
- * entity derives a same-named value-set). The type name is schema-qualified for
- * a named non-default schema (matching `format_type()`); `public` and the
- * unbound namespace stay bare (`search_path`).
+ * `pg.enum(<ref>)` registers as an ordinary type constructor whose sole
+ * positional argument names a `native_enum` entity instead of carrying a
+ * literal value. The interpreter resolves the ref to the `native_enum`
+ * entity generically (driven by `entityRefArg`); the `pg/enum@1` codec
+ * descriptor's `columnFromEntity` hook (see `codecs.ts`) converts that
+ * entity into the column's `typeParams` and native type.
  */
-function resolvePgEnumRef(
-  ref: string,
-  entities: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
-  namespaceId?: string,
-): SqlColumnBinding | undefined {
-  const nativeEnums = entities?.['native_enum'];
-  const entity = nativeEnums?.[ref];
-  if (!PostgresNativeEnum.is(entity)) return undefined;
-  const qualifyNativeType =
-    namespaceId !== undefined &&
-    namespaceId !== DEFAULT_NAMESPACE_ID &&
-    namespaceId !== UNBOUND_NAMESPACE_ID;
-  const typeName = qualifyNativeType ? `${namespaceId}.${entity.typeName}` : entity.typeName;
-  return {
-    codecId: PG_ENUM_CODEC_ID,
-    typeParams: { typeName },
-    valueSetEntityName: ref,
-  };
-}
-
-export const postgresAuthoringEntityRefTypeConstructors = {
+export const postgresAuthoringTypes = {
   pg: {
     enum: {
-      kind: 'entityRefTypeConstructor',
-      resolve: resolvePgEnumRef,
+      kind: 'typeConstructor',
+      entityRefArg: { index: 0, entityKind: 'native_enum' },
+      output: {
+        codecId: PG_ENUM_CODEC_ID,
+      },
     },
   },
-} as const satisfies AuthoringEntityRefTypeConstructorNamespace;
+} as const satisfies AuthoringTypeNamespace;
 
 export interface RlsPolicyExtensionBlock extends PslExtensionBlock {
   readonly namespaceId: string;

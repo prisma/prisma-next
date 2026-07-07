@@ -1,26 +1,38 @@
 /**
  * Tests for entity-ref type constructors — the mechanism behind `pg.enum(Ref)`
  * native-enum field typing (see `@prisma-next/target-postgres`'s
- * `postgresAuthoringEntityRefTypeConstructors.pg.enum`).
+ * `postgresAuthoringTypes.pg.enum`).
  *
- * This file stays layer-isolated: it registers its own small `native_enum`-shaped
- * PSL block, entity type, and `entityRefTypeConstructor` rather than importing
- * `@prisma-next/target-postgres` (same rationale as `pgvectorAuthoringContributions`
- * in `fixtures.ts` — interpreter unit tests should not depend on a target pack).
- * Real-pack parity for `pg.enum(Ref)` itself lives in
+ * A type constructor whose descriptor declares `entityRefArg` names another
+ * document-local entity instead of carrying a literal value. The interpreter
+ * resolves the ref generically (via `entityRefArg.entityKind`) and converts
+ * the resolved entity to column params by calling `columnFromEntity` on the
+ * codec descriptor registered for the constructor's `output.codecId`.
+ *
+ * This file stays layer-isolated: it registers its own small `native_enum`-
+ * and `plain_ref`-shaped PSL blocks, entity types, type constructors, and
+ * codec descriptors rather than importing `@prisma-next/target-postgres`
+ * (same rationale as `pgvectorAuthoringContributions` in `fixtures.ts` —
+ * interpreter unit tests should not depend on a target pack). Real-pack
+ * parity for `pg.enum(Ref)` itself lives in
  * `target-postgres/test/psl-pg-enum-column.test.ts`.
  */
 import type {
   AuthoringContributions,
-  AuthoringEntityRefTypeConstructorNamespace,
+  AuthoringEntityTypeFactoryOutput,
   AuthoringEntityTypeNamespace,
   AuthoringPslBlockDescriptorNamespace,
+  AuthoringTypeNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
-import type { SqlColumnBinding } from '@prisma-next/sql-contract/entity-ref-resolution';
+import type { AnyCodecDescriptor, CodecLookup } from '@prisma-next/framework-components/codec';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
+import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
+import { resolveFieldTypeDescriptor } from '../src/psl-column-resolution';
 import {
   postgresScalarTypeDescriptors,
   postgresTarget,
@@ -28,6 +40,7 @@ import {
 } from './fixtures';
 
 const NATIVE_ENUM_DISCRIMINATOR = 'test-native-enum';
+const PLAIN_REF_DISCRIMINATOR = 'test-plain-ref';
 
 const pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {
   native_enum: {
@@ -38,73 +51,155 @@ const pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {
     parameters: {},
     variadicParameters: true,
   },
+  plain_ref: {
+    kind: 'pslBlock',
+    keyword: 'plain_ref',
+    discriminator: PLAIN_REF_DISCRIMINATOR,
+    name: { required: true },
+    parameters: {},
+    variadicParameters: true,
+  },
 };
 
-function lowerTestNativeEnum(block: PslExtensionBlock): {
-  readonly typeName: string;
-  readonly members: readonly string[];
-} {
+type TestNativeEnum = { readonly typeName: string; readonly members: readonly string[] };
+type TestPlainRef = { readonly name: string };
+
+function lowerTestNativeEnum(block: PslExtensionBlock): TestNativeEnum {
   return { typeName: block.name, members: Object.keys(block.parameters) };
 }
+
+function lowerTestPlainRef(block: PslExtensionBlock): TestPlainRef {
+  return { name: block.name };
+}
+
+// Mirrors `nativeEnumEntityTypeOutput` in `@prisma-next/target-postgres`'s
+// authoring.ts: `deriveValueSet` is SQL-family surface
+// (`SqlValueSetDerivingEntityTypeOutput`), checked separately against the
+// intersection of both shapes so the outer `entityTypes` map's own
+// `satisfies` check doesn't see it as an excess property.
+const nativeEnumEntityTypeOutput = {
+  factory: lowerTestNativeEnum,
+  deriveValueSet: (entity: TestNativeEnum) => ({
+    kind: 'valueSet' as const,
+    values: entity.members,
+  }),
+} satisfies AuthoringEntityTypeFactoryOutput<PslExtensionBlock, TestNativeEnum> &
+  SqlValueSetDerivingEntityTypeOutput;
 
 const entityTypes: AuthoringEntityTypeNamespace = {
   native_enum: {
     kind: 'entity',
     discriminator: NATIVE_ENUM_DISCRIMINATOR,
-    output: { factory: lowerTestNativeEnum },
+    output: nativeEnumEntityTypeOutput,
+  },
+  plain_ref: {
+    kind: 'entity',
+    discriminator: PLAIN_REF_DISCRIMINATOR,
+    output: { factory: lowerTestPlainRef },
   },
 };
 
-function resolvePgEnumRef(
-  ref: string,
-  entities: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
-  namespaceId?: string,
-): SqlColumnBinding | undefined {
-  const enums = entities?.[NATIVE_ENUM_DISCRIMINATOR];
-  const entity = enums?.[ref] as { readonly typeName: string } | undefined;
-  if (!entity) return undefined;
-  const typeName =
-    namespaceId !== undefined ? `${namespaceId}.${entity.typeName}` : entity.typeName;
+type EntityRefColumnResult = { readonly typeParams?: Record<string, unknown> } & {
+  readonly nativeType: string;
+};
+
+function qualifiedTypeName(typeName: string, namespaceId?: string): string {
+  return namespaceId !== undefined ? `${namespaceId}.${typeName}` : typeName;
+}
+
+function makeCodecDescriptor(options: {
+  readonly codecId: string;
+  readonly columnFromEntity?: (
+    entity: unknown,
+    namespaceId?: string,
+  ) => EntityRefColumnResult | undefined;
+}): AnyCodecDescriptor {
   return {
-    codecId: 'test/native-enum@1',
-    typeParams: { typeName },
-    valueSetEntityName: ref,
-  };
+    codecId: options.codecId,
+    traits: ['equality'],
+    targetTypes: ['text'],
+    paramsSchema: {
+      '~standard': { version: 1, vendor: 'test', validate: (input: unknown) => ({ value: input }) },
+    },
+    isParameterized: true,
+    factory: () => () => {
+      throw new Error('unused in these tests');
+    },
+    ...(options.columnFromEntity ? { columnFromEntity: options.columnFromEntity } : {}),
+  } as AnyCodecDescriptor;
 }
 
-function resolvePlainRef(): SqlColumnBinding {
-  return { codecId: 'test/plain-ref@1', typeParams: { typeName: 'plain_ref' } };
-}
+const nativeEnumCodec = makeCodecDescriptor({
+  codecId: 'test/native-enum@1',
+  columnFromEntity: (entity, namespaceId) => {
+    const enumEntity = entity as TestNativeEnum;
+    const typeName = qualifiedTypeName(enumEntity.typeName, namespaceId);
+    return { typeParams: { typeName }, nativeType: typeName };
+  },
+});
 
-function resolveUnscopedValueSetRef(): SqlColumnBinding {
-  return {
-    codecId: 'test/native-enum@1',
-    typeParams: { typeName: 'unscoped' },
-    valueSetEntityName: 'Whatever',
-  };
-}
+const plainRefCodec = makeCodecDescriptor({
+  codecId: 'test/plain-ref@1',
+  columnFromEntity: (entity) => {
+    const plainEntity = entity as TestPlainRef;
+    return { nativeType: plainEntity.name };
+  },
+});
 
-function resolveBrokenRef(): object {
-  return { notCodecId: true, notNativeType: true };
-}
+// No `columnFromEntity` hook — used to exercise the contributor-bug throw.
+const brokenCodec = makeCodecDescriptor({ codecId: 'test/broken@1' });
 
-function resolveNoTypeNameRef(): SqlColumnBinding {
-  return { codecId: 'test/no-type-name@1' };
-}
+// A `columnFromEntity` hook that always declines the entity — used to
+// exercise the "resolves to no entity" fallback after the generic entity
+// lookup itself succeeds.
+const rejectsCodec = makeCodecDescriptor({
+  codecId: 'test/rejects@1',
+  columnFromEntity: () => undefined,
+});
 
-const entityRefTypeConstructors: AuthoringEntityRefTypeConstructorNamespace = {
+const codecsById = new Map<string, AnyCodecDescriptor>([
+  [nativeEnumCodec.codecId, nativeEnumCodec],
+  [plainRefCodec.codecId, plainRefCodec],
+  [brokenCodec.codecId, brokenCodec],
+  [rejectsCodec.codecId, rejectsCodec],
+]);
+
+const codecLookup: CodecLookup = {
+  get: () => undefined,
+  targetTypesFor: () => undefined,
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
+  descriptorFor: (id) => codecsById.get(id),
+};
+
+const type: AuthoringTypeNamespace = {
   pg: {
-    enum: { kind: 'entityRefTypeConstructor', resolve: resolvePgEnumRef },
-    plain: { kind: 'entityRefTypeConstructor', resolve: resolvePlainRef },
-    always: { kind: 'entityRefTypeConstructor', resolve: resolveUnscopedValueSetRef },
-    broken: { kind: 'entityRefTypeConstructor', resolve: resolveBrokenRef },
-    notype: { kind: 'entityRefTypeConstructor', resolve: resolveNoTypeNameRef },
+    enum: {
+      kind: 'typeConstructor',
+      entityRefArg: { index: 0, entityKind: NATIVE_ENUM_DISCRIMINATOR },
+      output: { codecId: nativeEnumCodec.codecId },
+    },
+    plain: {
+      kind: 'typeConstructor',
+      entityRefArg: { index: 0, entityKind: PLAIN_REF_DISCRIMINATOR },
+      output: { codecId: plainRefCodec.codecId },
+    },
+    broken: {
+      kind: 'typeConstructor',
+      entityRefArg: { index: 0, entityKind: NATIVE_ENUM_DISCRIMINATOR },
+      output: { codecId: brokenCodec.codecId },
+    },
+    rejects: {
+      kind: 'typeConstructor',
+      entityRefArg: { index: 0, entityKind: NATIVE_ENUM_DISCRIMINATOR },
+      output: { codecId: rejectsCodec.codecId },
+    },
   },
 };
 
 const authoringContributions: AuthoringContributions = {
   entityTypes,
-  entityRefTypeConstructors,
+  type,
   pslBlockDescriptors,
 };
 
@@ -114,6 +209,7 @@ const baseInput = {
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
   capabilities: { sql: { scalarList: true } },
+  codecLookup,
 } as const;
 
 function interpretWith(schema: string) {
@@ -205,9 +301,13 @@ namespace docs {
     expect((column as { typeRef?: unknown } | undefined)?.typeRef).toBeUndefined();
   });
 
-  it('leaves valueSet unset for an entity-ref resolution with no valueSetEntityName', () => {
+  it('leaves valueSet unset for an entity-ref resolution whose entity derives no value-set', () => {
     const result = interpretWith(`
 namespace docs {
+  plain_ref AnyName {
+    x
+  }
+
   model Thing {
     id Int @id
     ref pg.plain(AnyName)
@@ -224,7 +324,7 @@ namespace docs {
             table: {
               thing: {
                 columns: {
-                  ref: { codecId: 'test/plain-ref@1', nativeType: 'plain_ref' },
+                  ref: { codecId: 'test/plain-ref@1', nativeType: 'AnyName' },
                 },
               },
             },
@@ -232,6 +332,16 @@ namespace docs {
         },
       },
     });
+    const namespaces = (
+      result.value.storage as unknown as {
+        namespaces: Record<
+          string,
+          { entries: { table: Record<string, { columns: Record<string, unknown> }> } }
+        >;
+      }
+    ).namespaces;
+    const column = namespaces['docs']?.entries.table['thing']?.columns['ref'];
+    expect((column as { valueSet?: unknown } | undefined)?.valueSet).toBeUndefined();
   });
 
   it('rejects an unresolvable entity ref with PSL_UNKNOWN_ENTITY_REF', () => {
@@ -293,20 +403,92 @@ namespace docs {
     );
   });
 
-  it('rejects a value-set-typed entity-ref resolution when the field has no resolvable namespace', () => {
+  it('rejects an entity-ref resolution whose codec rejects the resolved entity', () => {
     const result = interpretWith(`
-type Broken {
-  status pg.always(AnyRef)
-}
+namespace docs {
+  native_enum AalLevel {
+    aal1
+  }
 
-model Placeholder {
-  id Int @id
+  model AuthSession {
+    id Int @id
+    aal pg.rejects(AalLevel)
+  }
 }
 `);
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_UNKNOWN_ENTITY_REF' })]),
+    );
+  });
+
+  it('throws when the registered codec descriptor has no columnFromEntity hook', () => {
+    expect(() =>
+      interpretWith(`
+namespace docs {
+  native_enum AalLevel {
+    aal1
+  }
+
+  model AuthSession {
+    id Int @id
+    aal pg.broken(AalLevel)
+  }
+}
+`),
+    ).toThrow(/no "columnFromEntity" authoring hook/);
+  });
+
+  it('rejects a value-set-typed entity-ref resolution when the field has no resolvable namespace', () => {
+    // Composite-type field resolution never threads a namespace id or
+    // namespace-extension-entities map (`buildValueObjects` in the
+    // interpreter), so this diagnostic is unreachable end-to-end once the
+    // generic entity lookup requires a namespace-scoped map to find
+    // anything. Drive `resolveFieldTypeDescriptor` directly instead, with a
+    // hand-built `namespaceExtensionEntities` that has already resolved the
+    // ref (mirroring what a real namespace lowering pass would have
+    // produced) but no `namespaceId` — a combination the exported function
+    // signature permits even though production never produces it.
+    const { document, sourceFile } = parse(`
+model AuthSession {
+  id Int @id
+  aal pg.enum(AalLevel)
+}
+`);
+    const { table } = buildSymbolTable({
+      document,
+      sourceFile,
+      scalarTypes: [...postgresScalarTypeDescriptors.keys()],
+      pslBlockDescriptors,
+    });
+    const field = table.topLevel.models['AuthSession']?.fields['aal'];
+    expect(field).toBeDefined();
+    if (!field) return;
+
+    const diagnostics: Parameters<typeof resolveFieldTypeDescriptor>[0]['diagnostics'] = [];
+    const result = resolveFieldTypeDescriptor({
+      field,
+      enumTypeDescriptors: new Map(),
+      namedTypeDescriptors: new Map(),
+      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      authoringContributions,
+      composedExtensions: new Set(),
+      familyId: 'sql',
+      targetId: 'postgres',
+      diagnostics,
+      sourceId: 'schema.prisma',
+      entityLabel: 'Field "AuthSession.aal"',
+      namespaceExtensionEntities: {
+        [NATIVE_ENUM_DISCRIMINATOR]: { AalLevel: { typeName: 'AalLevel', members: ['aal1'] } },
+        valueSet: { AalLevel: { kind: 'valueSet', values: ['aal1'] } },
+      },
+      codecLookup,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -314,33 +496,5 @@ model Placeholder {
         }),
       ]),
     );
-  });
-
-  it('throws when a contributed resolve() returns a payload that does not satisfy the SQL column-binding shape', () => {
-    expect(() =>
-      interpretWith(`
-type Broken {
-  status pg.broken(AnyRef)
-}
-
-model Placeholder {
-  id Int @id
-}
-`),
-    ).toThrow(/does not satisfy the SQL column-binding shape/);
-  });
-
-  it('throws when a contributed resolve() returns a binding with no typeParams.typeName', () => {
-    expect(() =>
-      interpretWith(`
-type Broken {
-  status pg.notype(AnyRef)
-}
-
-model Placeholder {
-  id Int @id
-}
-`),
-    ).toThrow(/typeParams\.typeName/);
   });
 });

@@ -479,6 +479,8 @@ interface BuildModelNodeInput {
     string,
     Readonly<Record<string, Readonly<Record<string, unknown>>>>
   >;
+  /** Codec-id-keyed descriptor lookup — forwarded to `collectResolvedFields` for entity-ref type-constructor resolution (e.g. `pg.enum(Ref)`). */
+  readonly codecLookup?: CodecLookup;
 }
 
 interface BuildModelNodeResult {
@@ -519,6 +521,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     capabilities: input.capabilities,
     ...ifDefined('namespaceId', modelNamespaceId),
     ...ifDefined('namespaceExtensionEntities', namespaceExtensionEntitiesForModel),
+    ...ifDefined('codecLookup', input.codecLookup),
   });
 
   const inlineIdFields = resolvedFields.filter((field) => field.isId);
@@ -2018,6 +2021,7 @@ export function interpretPslDocumentToSqlContract(
       ...(enumHandlesByName.size > 0 ? { enumHandles: enumHandlesByName } : {}),
       capabilities: input.capabilities,
       ...(namespaceExtensionEntities.size > 0 ? { namespaceExtensionEntities } : {}),
+      ...ifDefined('codecLookup', input.codecLookup),
     });
     modelNodes.push(
       namespaceId !== undefined ? { ...result.modelNode, namespaceId } : result.modelNode,
