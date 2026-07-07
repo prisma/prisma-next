@@ -15,6 +15,7 @@ export { assembleAuthoringContributions } from '@prisma-next/framework-component
 export { extractCodecControlHooks } from '../core/assembly';
 export type { SqlControlFamilyInstance } from '../core/control-instance';
 export type {
+  ColumnOpRenderer,
   ContractToSchemaIROptions,
   DefaultRenderer,
   EnumNamespaceSchemaResolver,

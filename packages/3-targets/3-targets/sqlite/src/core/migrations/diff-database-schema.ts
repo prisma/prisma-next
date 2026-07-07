@@ -1,5 +1,9 @@
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
-import type { SqlSchemaDiffForVerdict } from '@prisma-next/family-sql/control';
+import type {
+  ColumnOpRenderer,
+  NativeTypeExpander,
+  SqlSchemaDiffForVerdict,
+} from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander, contractToSchemaIR } from '@prisma-next/family-sql/control';
 import {
   collectSqlSchemaIssuesPerNamespace,
@@ -18,6 +22,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { parseSqliteDefault } from '../default-normalizer';
 import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import { renderDefaultLiteral } from './planner-ddl-builders';
+import { buildSqliteColumnOpRender } from './sqlite-column-op-render';
 
 interface SqliteDiffDatabaseSchemaInput {
   readonly contract: Contract<SqlStorage>;
@@ -38,11 +43,26 @@ export function sqliteRenderDefault(def: ColumnDefault, _column: StorageColumn):
   return renderDefaultLiteral(def.value);
 }
 
-/** The SQLite expected-side projection: contract → flat relational schema IR. */
-export function sqliteContractToSchema(contract: Contract<SqlStorage> | null): SqlSchemaIR {
+/**
+ * The SQLite expected-side projection: contract → flat relational schema IR.
+ *
+ * `extras` thread the plan-time derivation inputs: the native-type expander
+ * (so the expected side carries resolved native types, like the verify side)
+ * and the op-render stamper (so expected column nodes carry the SQLite DDL
+ * payload the planner reads). Verify-only callers omit them.
+ */
+export function sqliteContractToSchema(
+  contract: Contract<SqlStorage> | null,
+  extras?: {
+    readonly expandNativeType?: NativeTypeExpander;
+    readonly renderColumnOps?: ColumnOpRenderer;
+  },
+): SqlSchemaIR {
   return contractToSchemaIR(contract, {
     annotationNamespace: 'sqlite',
     renderDefault: sqliteRenderDefault,
+    ...ifDefined('expandNativeType', extras?.expandNativeType),
+    ...ifDefined('renderColumnOps', extras?.renderColumnOps),
   });
 }
 
@@ -53,10 +73,15 @@ export function sqliteContractToSchema(contract: Contract<SqlStorage> | null): S
  * `schemaDiffIssues`. Retires when the planner takes `plan(start, end)`.
  */
 export function diffSqliteDatabaseSchema(input: SqliteDiffDatabaseSchemaInput): SchemaDiff {
+  const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
+  const storageTypes = input.contract.storage.types ?? {};
+  const renderColumnOps: ColumnOpRenderer = (name, column, table) =>
+    buildSqliteColumnOpRender(name, column, table, storageTypes);
   const issues = collectSqlSchemaIssuesPerNamespace({
     contract: input.contract,
     actualSchema: input.actualSchema,
-    buildExpectedSchema: sqliteContractToSchema,
+    buildExpectedSchema: (scoped) =>
+      sqliteContractToSchema(scoped, { expandNativeType, renderColumnOps }),
     strict: input.strict,
     frameworkComponents: input.frameworkComponents,
     normalizeDefault: parseSqliteDefault,

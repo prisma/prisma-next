@@ -76,13 +76,20 @@ export type EnumNamespaceSchemaResolver = (storage: SqlStorage, namespaceId: str
  * The family stays target-agnostic (same IoC pattern as
  * {@link NativeTypeExpander}); the payload is opaque here and only the
  * producing target interprets it. Absent ⇒ no payload is stamped (verify-only
- * derivations that never plan).
+ * derivations that never plan). The owning `table` is passed so targets whose
+ * column DDL depends on table context (SQLite's sole-column AUTOINCREMENT
+ * primary key) can compute the full payload at derivation.
  */
-export type ColumnOpRenderer = (name: string, column: StorageColumn) => unknown;
+export type ColumnOpRenderer = (
+  name: string,
+  column: StorageColumn,
+  table: StorageTable,
+) => unknown;
 
 function convertColumn(
   name: string,
   column: StorageColumn,
+  table: StorageTable,
   storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
@@ -119,7 +126,7 @@ function convertColumn(
     // stamps its normalizer's parse of the raw expression).
     resolvedNativeType: nativeType,
     ...ifDefined('resolvedDefault', column.default ?? undefined),
-    ...ifDefined('opRender', renderColumnOps?.(name, column)),
+    ...ifDefined('opRender', renderColumnOps?.(name, column, table)),
   };
 }
 
@@ -260,6 +267,7 @@ function convertTable(
     columns[colName] = convertColumn(
       colName,
       colDef,
+      table,
       storageTypes,
       expandNativeType,
       renderDefault,
