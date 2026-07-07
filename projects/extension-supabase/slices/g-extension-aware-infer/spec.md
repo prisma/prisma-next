@@ -28,9 +28,16 @@ Ordering (unchanged from the substrate, still required):
 
 - **Omit before the cross-schema duplicate-name throw**, so a pack-claimed element in one namespace can't spuriously collide with a surviving same-named element in another once introspection broadens (Slice F).
 - **Omit before relation inference / name maps / topological sort** — all built from surviving nodes only.
-- **Strip surviving nodes' foreign keys** that reference an omitted table **only when the referenced name was omitted and has no surviving table** (survivor-aware), so no dangling `@relation` is emitted and a legitimate same-named relation in another namespace is never stripped.
 
-Empty/absent `describedContracts` → output byte-identical to today (fast path, return-by-reference).
+**Cross-space foreign keys — resolve, don't strip.** An app table's FK into pack-owned space (the canonical `public.profile.userId → auth.users`) is *not* dangling — it is a cross-space reference the pack provides, and PSL expresses it directly (`user supabase:auth.AuthUser @relation(fields: [userId], references: [id], …)`, as the shipped `examples/supabase/src/contract.prisma` authors). So when an introspected FK references a table a described contract owns:
+
+- Determine the reference is cross-space from the FK's `referencedSchema` (postgres introspection populates it, even single-namespace) matched against the described contracts' coordinates.
+- Resolve the owning `spaceId` and the referenced **domain model name** from the owning described contract (the pack), and emit the relation field with the qualified type `<spaceId>:<namespace>.<Model>` instead of a bare model reference.
+- The referenced table stays omitted from the inferred contract (the pack supplies it); only the relation *reference* is rewritten to its cross-space form.
+
+An FK whose referenced table is neither in the tree nor owned by any described contract is a genuine dangling reference — surface it (drop the relation field, keep the scalar column) rather than emit invalid PSL.
+
+Empty/absent `describedContracts` → output byte-identical to today (fast path, return-by-reference); no FK is rewritten.
 
 ### Space semantics (and the re-infer future)
 
@@ -42,10 +49,13 @@ Tests first, then implementation.
 
 - [ ] Target-level test (`inferPostgresPslContract`): a tree whose `public` namespace holds `app_table` + `t_owned`, one described contract declaring `public.t_owned` → PSL AST has the app model, omits the pack model. Empty/absent described contracts → output byte-identical to today (existing infer/print-psl suite stays green).
 - [ ] Namespace-correctness test: a described contract declares `users` under its `auth` namespace only; tree's `public` namespace holds `users` → the app's `Users` model is kept. (Coordinate-precise: matched on namespace `.id`/`schemaName`, never bare name.)
-- [ ] Entity-agnostic evidence: the match is coordinate-driven (`elementCoordinates`), not table-typed — a test or the shape of the code demonstrates the omission is keyed on `(namespaceId, entityKind, entityName)`, not a table-specific predicate.
-- [ ] Dangling-FK tests: (a) surviving `posts` FK→omitted `t_owned` → emitted `Posts` has no relation to the omitted table; (b) surviving `posts` FK→`users` where `auth.users` is omitted but `public.users` survives → the relation is **kept** (survivor-aware).
+- [ ] Entity-agnostic evidence: the match is coordinate-driven (a single shared collision-safe coordinate-key helper — see below — not a space-delimited join), not table-typed.
+- [ ] **Cross-space FK integration test:** introspect a DB with `public.profile.userId → auth.users` (Supabase pack in the stack) → the inferred `contract.prisma` keeps `profile`, omits `auth.users`, and emits the relation as the qualified cross-space reference `supabase:auth.AuthUser @relation(...)` (matching the hand-authored example). This is the headline proof comment 4 requires.
+- [ ] Genuinely-dangling FK: a surviving table's FK to a name neither in the tree nor owned by any described contract → relation field dropped, scalar column kept, no invalid PSL.
 - [ ] Family-instance / end-to-end test: real `postgresTargetDescriptor` + real family instance + a stack with a pack declaring a `public` table → `inferPslContract(tree)` omits it — proves the pack → hook forwarding, not a hand-built input.
 - [ ] Duplicate-name interaction test: two namespaces, same table name, one pack-declared → no throw, app table survives.
+- [ ] Consistency: one shared collision-safe coordinate-key helper (framework-components, beside `EntityCoordinate`), used by both infer and `check-integrity` (replacing its inline `:`-joined key).
+- [ ] `SqlControlTargetDescriptor` (the hook's owner) extracted out of `migrations/types.ts` into its own file; the `blindCast` inline structural type in `control-instance.ts` replaced by the real descriptor type / a named interface.
 - [ ] No new type in `migrations/types.ts`; no `SqlAggregateContractMember`/`SqlPslInferContext`/`isTableDescribedByAggregate` anywhere. `pnpm fixtures:check` clean; pack-free infer output unchanged.
 
 ## Out of scope
