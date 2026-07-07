@@ -4,13 +4,13 @@
 
 ## At a glance
 
-Replace the language server's eager, defensive artifact handling with invalidate-on-change + lazy synchronous materialize-on-read, and move diagnostics from push to pull on the same model. After this slice: `didChange` only invalidates; the first read that needs derived state calls one synchronous `ensureCurrent(project, uri)` that reparses iff `TextDocument.version` advanced; completion / semantic tokens / folding / a new `textDocument/diagnostic` handler all consume that single per-project cache; `currentDocumentArtifact` and the per-request whole-text reparse are gone; `TextDocuments` stays as the text mirror / lifecycle / version source.
+Replace the language server's eager, defensive artifact handling with invalidate-on-change + lazy synchronous materialize-on-read, and move diagnostics from push to pull on the same model. After this slice: `didChange` only invalidates; the first read that needs derived state calls one synchronous `ensureCurrent(project, uri)` that reparses iff the document was marked dirty; completion / semantic tokens / folding / a new `textDocument/diagnostic` handler all consume that single per-project cache; `currentDocumentArtifact` and the per-request whole-text reparse are gone; `TextDocuments` stays as the text mirror / lifecycle / version source.
 
 ## Chosen design
 
-- **`ensureCurrent(project, uri): CachedDocument | undefined`** — synchronous. Reads `TextDocuments` current text + `version`; if the cache's last-parsed version matches, returns the cache untouched; otherwise runs `parse` + `buildSymbolTable` once, stores the result (with the version) on the project's artifacts, and returns it. No `await` inside; no whole-document text compare.
-- **`CachedDocument` gains the parsed `version`** (and may store its computed diagnostics) so the pull handler returns without recomputing and the version check is O(1).
-- **`didChange` / `didOpen` invalidate only** — mark the document/project stale (or simply rely on the version bump that `TextDocuments` already applies). No parse, no `publishSafely` on the pull path.
+- **`ensureCurrent(project, uri): CachedDocument | undefined`** — synchronous. Reads the current text from `TextDocuments`; if a clean cache entry exists, returns it untouched; otherwise (entry evicted by a dirty mark) runs `parse` + `buildSymbolTable` once, stores the result on the project's artifacts, and returns it. No `await` inside; no whole-document text compare; no version bookkeeping — presence in the cache is currency, because every mutation point evicts.
+- **`CachedDocument` stores its computed diagnostics** so the pull handler returns without recomputing; staleness needs no per-entry key — a dirty document simply has no entry.
+- **`didChange` / `didOpen` invalidate only** — evict the document's cache entry (mark dirty). Config/watched-file reload evicts all entries. No parse, no `publishSafely` on the pull path.
 - **Reads await readiness, then derive synchronously**: `const project = await resolveProjectForDocument(uri); const cached = ensureCurrent(project, uri); …`. The only awaited step is the cached project load. Position→offset uses the post-`ensureCurrent` `SourceFile`, never a stale one.
 - **Pull diagnostics**: advertise `diagnosticProvider`; register `connection.languages.diagnostics.on` returning a full report from `ensureCurrent`. Gate on `InitializeParams.capabilities.textDocument?.diagnostic`: pull when present, push fallback otherwise — never both for one client. On config / watched-file change, send `workspace/diagnostic/refresh` when the client advertises `workspace.diagnostics.refreshSupport`.
 - **Capability flags**: `{ interFileDependencies: false, workspaceDiagnostics: false }` with a code comment: single-input implementation scope, not a PSL property; flip with the future multi-input table.
@@ -22,7 +22,7 @@ One package (`language-server`), one architectural idea (invalidate + lazy mater
 
 ## Scope
 
-**In:** `server.ts` (change/open/close handlers, `completeDocument`, `semanticTokensForDocument`, folding handler, `resolveProjectForDocument` usage, capability advert, new diagnostic pull handler, config-change refresh), `project-artifacts.ts` (`CachedDocument` version/diagnostics, `ensureCurrent` or equivalent), `document-diagnostics.ts` if the seam needs reshaping; their tests; README capability/diagnostics notes.
+**In:** `server.ts` (change/open/close handlers, `completeDocument`, `semanticTokensForDocument`, folding handler, `resolveProjectForDocument` usage, capability advert, new diagnostic pull handler, config-change refresh), `project-artifacts.ts` (`CachedDocument` diagnostics, dirty-eviction, `ensureCurrent` or equivalent), `document-diagnostics.ts` if the seam needs reshaping; their tests; README capability/diagnostics notes.
 
 **Deliberately out:** removing `TextDocuments`; the multi-input project-wide symbol table; multi-project membership; `interFileDependencies: true` / `workspace/diagnostic`; any completion/semantic-token/folding behavior change; parser changes.
 
@@ -34,7 +34,7 @@ One package (`language-server`), one architectural idea (invalidate + lazy mater
 | Client lacks `textDocument.diagnostic` | Keep the push path for that client; do not register/serve pull for it. Never run both. |
 | Config / watched-file change while open | Invalidate affected docs; issue `workspace/diagnostic/refresh` (gated) instead of republishing. |
 | Malformed PSL | Parser recovery still yields artifacts; the pull report returns recovered diagnostics, same as the push path does today. |
-| Position mapping | Always map the request position against the `SourceFile` produced by `ensureCurrent` for the current version — never a stale cached one. |
+| Position mapping | Always map the request position against the `SourceFile` produced by `ensureCurrent` for the current buffer — never a stale cached one. |
 
 ## Slice-specific done conditions
 
