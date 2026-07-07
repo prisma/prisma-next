@@ -41,7 +41,7 @@ describe('native enum inference diagnostic — end-to-end PGlite', { concurrent:
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('throws naming the native enum type when inferring from a schema that contains one', {
     timeout: testTimeout,
