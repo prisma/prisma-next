@@ -80,6 +80,7 @@ import {
   execute,
   infoSchemaTables,
   ledger,
+  ledgerContract,
   ledgerReadShape,
   marker,
   mergeInvariants,
@@ -474,7 +475,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   /**
-   * Appends a ledger entry for `space`. See the
+   * Appends a ledger entry for `space`, plus — when the edge carries a
+   * destination contract snapshot — the row's 1:1 companion in
+   * `prisma_contract.contract` keyed by the fresh ledger id. See the
    * `SqlControlAdapter.writeLedgerEntry` contract.
    */
   async writeLedgerEntry(
@@ -487,10 +490,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       readonly migrationName: string;
       readonly migrationHash: string;
       readonly operations: readonly unknown[];
+      readonly contractJsonAfter?: unknown;
     },
   ): Promise<void> {
-    await execute(
-      (query) => this.lower(query, { contract: undefined }),
+    const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
+    const inserted = await execute(
+      lower,
       driver,
       ledger
         .insert({
@@ -501,6 +506,24 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           destination_core_hash: entry.to,
           operations: entry.operations,
         })
+        .returning(ledgerReadShape.id)
+        .build(),
+    );
+    if (entry.contractJsonAfter === undefined) {
+      return;
+    }
+    const ledgerId = inserted[0]?.['id'];
+    if (ledgerId === undefined || ledgerId === null) {
+      throw new Error(
+        'ledger INSERT returned no id — cannot attach the contract snapshot row. ' +
+          'The driver must surface RETURNING rows for control-plane writes.',
+      );
+    }
+    await execute(
+      lower,
+      driver,
+      ledgerContract
+        .insert({ ledger_id: ledgerId, contract_json: entry.contractJsonAfter })
         .build(),
     );
   }

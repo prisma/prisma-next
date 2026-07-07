@@ -130,6 +130,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
           currentMarkerStorageHash: input.currentMarker?.storageHash,
           destinationStorageHash,
           operationCount: synthedOps.length,
+          destinationContractJson: input.member.contract(),
         }),
       ],
     },

@@ -39,6 +39,48 @@ describe('graphWalkStrategy', () => {
     expect(outcome.result.strategy).toBe('graph-walk');
   });
 
+  it('threads package end snapshots onto migration edge refs', () => {
+    const midHash = 'sha256:cipher-mid';
+    const headHash = 'sha256:cipher-head';
+    const baseline: OnDiskMigrationPackage = {
+      ...createAttestedPackage('20260101T0000_init', { from: null, to: midHash }),
+      endContractJson: { models: ['user'] },
+    };
+    const delta: OnDiskMigrationPackage = {
+      ...createAttestedPackage('20260102T0000_add_post', { from: midHash, to: headHash }),
+      endContractJson: { models: ['user', 'post'] },
+    };
+
+    const outcome = graphWalkStrategy({
+      aggregateTargetId: 'postgres',
+      member: makeMember([baseline, delta], headHash),
+      currentMarker: null,
+    });
+
+    expect(outcome.kind).toBe('ok');
+    if (outcome.kind !== 'ok') return;
+    expect(outcome.result.migrationEdges).toHaveLength(2);
+    expect(outcome.result.migrationEdges[0]?.contractJsonAfter).toEqual({ models: ['user'] });
+    expect(outcome.result.migrationEdges[1]?.contractJsonAfter).toEqual({
+      models: ['user', 'post'],
+    });
+  });
+
+  it('leaves edge snapshots absent when packages carry none', () => {
+    const headHash = 'sha256:cipher-head';
+    const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
+
+    const outcome = graphWalkStrategy({
+      aggregateTargetId: 'postgres',
+      member: makeMember([pkg], headHash),
+      currentMarker: null,
+    });
+
+    expect(outcome.kind).toBe('ok');
+    if (outcome.kind !== 'ok') return;
+    expect(outcome.result.migrationEdges[0]?.contractJsonAfter).toBeUndefined();
+  });
+
   it('returns unreachable when the live marker is not connected to the head', () => {
     const headHash = 'sha256:disconnected';
     // Single migration whose graph has only one node (EMPTY_CONTRACT_HASH → other-target).

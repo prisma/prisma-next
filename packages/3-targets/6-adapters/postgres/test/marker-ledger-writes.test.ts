@@ -113,7 +113,7 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
     expect(matched).toBe(false);
   });
 
-  it('writeLedgerEntry lowers to an INSERT with jsonb operations', async () => {
+  it('writeLedgerEntry lowers to a single INSERT … RETURNING id when no snapshot is given', async () => {
     const driver = createCapturingDriver();
     await adapter.writeLedgerEntry(driver, 'app', {
       edgeId: 'edge-1',
@@ -124,11 +124,12 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
       operations: [{ id: 'op-1' }],
     });
 
+    expect(driver.calls).toHaveLength(1);
     const { sql, params } = driver.calls[0]!;
     expect(sql).toBe(
       'INSERT INTO "prisma_contract"."ledger" ("space", "migration_name", "migration_hash", ' +
         '"origin_core_hash", "destination_core_hash", "operations") ' +
-        'VALUES ($1, $2, $3, $4, $5, $6::jsonb)',
+        'VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING "ledger"."id"',
     );
     expect(params.slice(0, 5)).toEqual([
       'app',
@@ -137,5 +138,43 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
       'sha256:from',
       'sha256:to',
     ]);
+  });
+
+  it('writeLedgerEntry inserts the 1:1 contract row keyed by the returned ledger id', async () => {
+    const driver = createCapturingDriver([{ id: '42' }]);
+    await adapter.writeLedgerEntry(driver, 'app', {
+      edgeId: 'edge-1',
+      from: 'sha256:from',
+      to: 'sha256:to',
+      migrationName: '002_add_post',
+      migrationHash: 'sha256:mig',
+      operations: [],
+      contractJsonAfter: { models: ['user', 'post'] },
+    });
+
+    expect(driver.calls).toHaveLength(2);
+    const contractInsert = driver.calls[1]!;
+    expect(contractInsert.sql).toBe(
+      'INSERT INTO "prisma_contract"."contract" ("ledger_id", "contract_json") ' +
+        'VALUES ($1, $2::jsonb)',
+    );
+    expect(contractInsert.params[0]).toBe('42');
+    expect(contractInsert.params[1]).toBe(JSON.stringify({ models: ['user', 'post'] }));
+  });
+
+  it('writeLedgerEntry fails loudly when a snapshot is given but no ledger id comes back', async () => {
+    const driver = createCapturingDriver([]);
+    await expect(
+      adapter.writeLedgerEntry(driver, 'app', {
+        edgeId: 'edge-1',
+        from: 'sha256:from',
+        to: 'sha256:to',
+        migrationName: '003_orphan',
+        migrationHash: 'sha256:mig',
+        operations: [],
+        contractJsonAfter: { models: [] },
+      }),
+    ).rejects.toThrow(/returned no id/);
+    expect(driver.calls).toHaveLength(1);
   });
 });

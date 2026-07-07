@@ -295,6 +295,7 @@ export interface SqlControlFamilyInstance
       readonly migrationName: string;
       readonly migrationHash: string;
       readonly operations: readonly unknown[];
+      readonly contractJsonAfter?: unknown;
     };
   }): Promise<void>;
 
@@ -878,6 +879,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         readonly migrationName: string;
         readonly migrationHash: string;
         readonly operations: readonly unknown[];
+        readonly contractJsonAfter?: unknown;
       };
     }): Promise<void> {
       return getControlAdapter().writeLedgerEntry(options.driver, options.space, options.entry);

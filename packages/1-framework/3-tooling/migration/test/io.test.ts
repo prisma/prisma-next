@@ -56,6 +56,50 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     expect(pkg.dirPath).toBe(absoluteDir);
   });
 
+  it('reads the end contract snapshot when end-contract.json is present', async () => {
+    const dir = join(tmpDir, '20260225T1430_snapshots');
+    await writeTestPackage(dir);
+    await writeFile(join(dir, 'end-contract.json'), JSON.stringify({ marker: 'end' }));
+
+    const pkg = await readMigrationPackage(dir);
+
+    expect(pkg.endContractJson).toEqual({ marker: 'end' });
+  });
+
+  it('ignores a sibling start-contract.json — only the end snapshot is loaded', async () => {
+    // The edge's before-state is the predecessor's end snapshot by chain
+    // construction, so the loader never surfaces start-contract.json.
+    const dir = join(tmpDir, '20260225T1430_start_ignored');
+    await writeTestPackage(dir);
+    await writeFile(join(dir, 'start-contract.json'), JSON.stringify({ marker: 'start' }));
+    await writeFile(join(dir, 'end-contract.json'), JSON.stringify({ marker: 'end' }));
+
+    const pkg = await readMigrationPackage(dir);
+
+    expect(pkg.endContractJson).toEqual({ marker: 'end' });
+    expect('startContractJson' in pkg).toBe(false);
+  });
+
+  it('omits endContractJson when no snapshot file exists', async () => {
+    const dir = join(tmpDir, '20260225T1430_bare');
+    await writeTestPackage(dir);
+
+    const pkg = await readMigrationPackage(dir);
+
+    expect(pkg.endContractJson).toBeUndefined();
+    expect('endContractJson' in pkg).toBe(false);
+  });
+
+  it('treats a malformed end snapshot as absent instead of failing the load', async () => {
+    const dir = join(tmpDir, '20260225T1430_bad_snapshot');
+    await writeTestPackage(dir);
+    await writeFile(join(dir, 'end-contract.json'), 'not json');
+
+    const pkg = await readMigrationPackage(dir);
+
+    expect(pkg.endContractJson).toBeUndefined();
+  });
+
   it('writes pretty-printed JSON', async () => {
     const dir = join(tmpDir, '20260225T1430_test');
     await writeTestPackage(dir);

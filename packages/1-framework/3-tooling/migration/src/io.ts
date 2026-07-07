@@ -23,6 +23,7 @@ import type { MigrationOps, OnDiskMigrationPackage } from './package';
 
 export const MANIFEST_FILE = 'migration.json';
 const OPS_FILE = 'ops.json';
+const END_CONTRACT_FILE = 'end-contract.json';
 const MAX_SLUG_LENGTH = 64;
 
 function hasErrnoCode(error: unknown, code: string): boolean {
@@ -176,6 +177,28 @@ export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise
   await writeFile(join(dir, OPS_FILE), `${JSON.stringify(ops, null, 2)}\n`);
 }
 
+/**
+ * Reads the optional `end-contract.json` snapshot next to a migration
+ * manifest — the contract IR of the migration's destination state.
+ * Snapshots are author-time conveniences (ADR 197), never structural
+ * runner inputs, so a missing or unparseable file is treated as absent
+ * (`undefined`) — a package holding only `migration.json` + `ops.json`
+ * must keep loading (pinned regression in this package).
+ */
+async function readEndContractJson(dir: string): Promise<unknown> {
+  let raw: string;
+  try {
+    raw = await readFile(join(dir, END_CONTRACT_FILE), 'utf-8');
+  } catch {
+    return undefined;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
 export async function readMigrationPackage(dir: string): Promise<OnDiskMigrationPackage> {
   const absoluteDir = resolve(dir);
   const manifestPath = join(absoluteDir, MANIFEST_FILE);
@@ -229,11 +252,13 @@ export async function readMigrationPackage(dir: string): Promise<OnDiskMigration
     );
   }
 
+  const endContractJson = await readEndContractJson(absoluteDir);
   const pkg: OnDiskMigrationPackage = {
     dirName: basename(absoluteDir),
     dirPath: absoluteDir,
     metadata,
     ops,
+    ...(endContractJson !== undefined ? { endContractJson } : {}),
   };
 
   const verification = verifyMigrationHash(pkg);
@@ -294,11 +319,13 @@ async function readMigrationPackageRaw(dir: string): Promise<OnDiskMigrationPack
   const opsResult = MigrationOpsSchema(ops);
   if (opsResult instanceof type.errors) return null;
 
+  const endContractJson = await readEndContractJson(absoluteDir);
   return {
     dirName: basename(absoluteDir),
     dirPath: absoluteDir,
     metadata,
     ops,
+    ...(endContractJson !== undefined ? { endContractJson } : {}),
   };
 }
 

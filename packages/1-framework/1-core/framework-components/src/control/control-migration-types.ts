@@ -477,6 +477,7 @@ export interface MigrationRunnerPerSpaceOptions<
     readonly from: string;
     readonly to: string;
     readonly operationCount: number;
+    readonly contractJsonAfter?: unknown;
   }>;
 }
 

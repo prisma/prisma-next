@@ -49,6 +49,20 @@ export const ledger = pgTable(
 );
 
 /**
+ * 1:1 companion of `prisma_contract.ledger`: the contract IR snapshot of a
+ * ledger row's destination state, keyed by the row's `id`. A row's *before*
+ * state is its predecessor's snapshot by chain construction, so only the
+ * after-state is ever stored.
+ */
+export const ledgerContract = pgTable(
+  { name: 'contract', schema: 'prisma_contract' },
+  {
+    ledger_id: int8(),
+    contract_json: jsonb(),
+  },
+);
+
+/**
  * Read-side handle covering every column of `prisma_contract.ledger`,
  * including the DB-generated `id` (for ORDER BY) and `created_at`.
  */
