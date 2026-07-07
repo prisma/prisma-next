@@ -100,10 +100,9 @@ export function createServer(connection: Connection): LanguageServer {
       documentConfigPaths.delete(uri);
       return;
     }
-    const computed = project.artifacts.update(
+    const computed = project.artifacts.materialize(
       uri,
       document.getText(),
-      document.version,
       project.inputs,
       project.controlStack,
     );
@@ -199,11 +198,11 @@ export function createServer(connection: Connection): LanguageServer {
 
   async function loadProject(configPath: string): Promise<ProjectState> {
     const resolution = await resolveConfigInputs(configPath);
-    // Preserve open-document ASTs across config reloads, but invalidate their
-    // parsed versions so the next update or read recomputes against the new
-    // stack instead of fast-pathing on an unchanged document version.
+    // A config reload can change what a parse produces (inputs, control stack),
+    // so every cached entry is evicted; the next read rematerializes against
+    // the new stack.
     const artifacts = projects.get(configPath)?.artifacts ?? createProjectArtifacts();
-    artifacts.invalidate();
+    artifacts.clear();
     const project: ProjectState =
       resolution.formatter === undefined
         ? {
@@ -376,23 +375,25 @@ export function createServer(connection: Connection): LanguageServer {
 
   /**
    * The single synchronous materialize-on-read seam: reads the live buffer
-   * from the `TextDocuments` mirror and reparses iff its version differs from
-   * the last-parsed version cached on the project's artifacts. Returns
-   * `undefined` for unmirrored documents and non-configured inputs.
+   * from the `TextDocuments` mirror and parses on a cache miss. A present
+   * entry is trusted as current: LSP messages are dispatched in order and the
+   * notification handlers evict synchronously against the already-updated
+   * text mirror, so every event that could change what a parse produces has
+   * evicted before any read can observe the cache. Returns `undefined` for
+   * unmirrored documents and non-configured inputs.
    */
   function ensureCurrent(project: ProjectState, uri: string): CachedDocument | undefined {
     const document = documents.get(uri);
     if (document === undefined) {
       return undefined;
     }
-    const updated = project.artifacts.update(
+    const materialized = project.artifacts.materialize(
       uri,
       document.getText(),
-      document.version,
       project.inputs,
       project.controlStack,
     );
-    return updated === null ? undefined : project.artifacts.getDocument(uri);
+    return materialized === null ? undefined : project.artifacts.getDocument(uri);
   }
 
   connection.onInitialize(async (params): Promise<InitializeResult> => {
@@ -519,16 +520,20 @@ export function createServer(connection: Connection): LanguageServer {
     return computeFoldingRanges(cached.document, cached.sourceFile);
   });
 
-  // For pull clients, open/change are invalidate-only: the `TextDocuments`
-  // version bump is the invalidation, and the next pull (or read) materializes
-  // through `ensureCurrent`. Eager publish remains for push clients.
+  // Marking dirty is eviction: open/change evict the document's cache entry
+  // before any transport work, so a later read parses the current buffer on
+  // its miss. For pull clients that is all that happens (the next pull or
+  // read materializes through `ensureCurrent`); for push clients the eager
+  // publish then refills the cache.
   documents.onDidOpen((event) => {
+    evictDocumentArtifacts(event.document.uri);
     if (clientSupportsPullDiagnostics) {
       return;
     }
     publishSafely(event.document.uri);
   });
   documents.onDidChangeContent((event) => {
+    evictDocumentArtifacts(event.document.uri);
     if (clientSupportsPullDiagnostics) {
       return;
     }
@@ -552,6 +557,10 @@ export function createServer(connection: Connection): LanguageServer {
   function artifactsForDocument(uri: string): ProjectArtifacts | undefined {
     const configPath = documentConfigPaths.get(uri);
     return configPath === undefined ? undefined : projects.get(configPath)?.artifacts;
+  }
+
+  function evictDocumentArtifacts(uri: string): void {
+    artifactsForDocument(uri)?.remove(uri);
   }
 
   return {

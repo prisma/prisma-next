@@ -637,7 +637,7 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     await republished;
   });
 
-  it('serves reads at an unchanged version without reparsing', async () => {
+  it('serves repeated reads without reparsing while no mutation intervenes', async () => {
     harness = startHarness(resolveToSchema);
     await harness.initialize();
     const { source, position } = sourceWithCursor(
@@ -1708,6 +1708,24 @@ describe('language server pull diagnostics', { timeout: timeouts.databaseOperati
     closeDocument(harness, schemaUri);
     await settle();
     expect(harness.publishCount(schemaUri)).toBe(0);
+  });
+
+  it('reparses on the next pull after a config reload', async () => {
+    harness = startHarness(resolveToSchema, pullDiagnosticsWithRefreshCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, duplicateModelSource);
+    expect(fullReportItems(await requestPullDiagnostics(harness, schemaUri))).not.toEqual([]);
+
+    pipelineMock.runPipeline.mockClear();
+    const refreshed = harness.waitForDiagnosticRefresh();
+    harness.notifyConfigChanged();
+    await refreshed;
+
+    const report = await requestPullDiagnostics(harness, schemaUri);
+    expect(fullReportItems(report).map((diagnostic) => diagnostic.code)).toContain(
+      'PSL_DUPLICATE_DECLARATION',
+    );
+    expect(pipelineMock.runPipeline).toHaveBeenCalledTimes(1);
   });
 
   it('requests a diagnostics refresh instead of republishing when a config changes', async () => {
