@@ -1,0 +1,9 @@
+{
+  "scopes": [
+    {
+      "path": "packages/1-framework",
+      "forbidden": ["nativeType", "native-type", "postgres", "sqlite", "mysql"],
+      "caseInsensitive": true
+    }
+  ]
+}
