@@ -129,48 +129,45 @@ export function resolveSemanticSatisfaction(
 }
 
 // ============================================================================
-// Issue classification — node kind + reason → target-neutral category
+// Issue classification — declared node role + reason → target-neutral category
 // ============================================================================
 
-function issueNodeKind(issue: SchemaDiffIssue): string | undefined {
+function issueNode(issue: SchemaDiffIssue): SqlSchemaIRNode | undefined {
   const node = issue.expected ?? issue.actual;
   if (node === undefined) return undefined;
   return blindCast<
     SqlSchemaIRNode,
-    'every node in a SQL schema diff tree is a SqlSchemaIRNode; nodeKind is its required discriminant'
-  >(node).nodeKind;
+    'every node in a SQL schema diff tree is a SqlSchemaIRNode; diffRole/nodeKind are its required discriminants'
+  >(node);
 }
 
 /**
  * Re-keys the legacy `classifySqlVerifierIssueKind` category mapping on the
- * diff node's kind + the issue reason. The relational vocabulary maps
- * one-to-one: an undeclared live table is `extraTopLevelObject`, an
- * undeclared live column `extraNestedElement`, undeclared constraints,
- * defaults, and policies `extraAuxiliary`; a value-set drift on a check
- * node is `valueDrift`; every other paired divergence is
- * `declaredIncompatible`; anything the database lacks is `declaredMissing`.
- * Target node kinds (policies, namespaces, tables of a namespaced tree)
- * classify by their kind-name suffix so the family stays free of target
- * imports.
+ * diff node's declared `diffRole` + the issue reason. The vocabulary maps
+ * one-to-one: an undeclared live table or namespace is
+ * `extraTopLevelObject`, an undeclared live column `extraNestedElement`,
+ * undeclared auxiliaries (constraints, indexes, defaults) and structural
+ * leaves (policies) `extraAuxiliary`; a value-set drift on a check node is
+ * `valueDrift`; every other paired divergence is `declaredIncompatible`;
+ * anything the database lacks is `declaredMissing`. `diffRole` is declared
+ * per node class, so target and extension node kinds classify without the
+ * family importing them.
  */
 export function classifySqlDiffIssue(issue: SchemaDiffIssue): VerifierIssueCategory {
-  const nodeKind = issueNodeKind(issue) ?? '';
   if (issue.reason === 'not-found') {
     return 'declaredMissing';
   }
   if (issue.reason === 'not-expected') {
-    if (nodeKind === RelationalSchemaNodeKind.table || nodeKind.endsWith('-table')) {
+    const role = issueNode(issue)?.diffRole;
+    if (role === 'table' || role === 'namespace') {
       return 'extraTopLevelObject';
     }
-    if (nodeKind === RelationalSchemaNodeKind.column || nodeKind.endsWith('-column')) {
+    if (role === 'column') {
       return 'extraNestedElement';
-    }
-    if (nodeKind.endsWith('-namespace')) {
-      return 'extraTopLevelObject';
     }
     return 'extraAuxiliary';
   }
-  if (nodeKind === RelationalSchemaNodeKind.check) {
+  if (issueNode(issue)?.nodeKind === RelationalSchemaNodeKind.check) {
     return 'valueDrift';
   }
   return 'declaredIncompatible';
@@ -178,18 +175,14 @@ export function classifySqlDiffIssue(issue: SchemaDiffIssue): VerifierIssueCateg
 
 /**
  * Whether a `not-expected` issue is a strict-mode-only finding. The legacy
- * walk detected every relational extra (tables, columns, constraints,
- * indexes, defaults, checks) only under `--strict`; the structural policy
- * diff (RLS policies) was never strict-gated — its extras fail in both
- * modes. Relational node kinds gate; target kinds (policies) do not.
+ * walk detected every relational extra (namespaces, tables, columns, and
+ * their auxiliaries) only under `--strict`; the structural diff (roots, RLS
+ * policies, roles) was never strict-gated — its extras fail in both modes.
+ * Keyed on the node's declared `diffRole`.
  */
 function isStrictOnlyExtra(issue: SchemaDiffIssue): boolean {
-  const nodeKind = issueNodeKind(issue) ?? '';
-  const relationalKinds: readonly string[] = Object.values(RelationalSchemaNodeKind);
-  if (relationalKinds.includes(nodeKind)) return true;
-  // Namespaced target trees reuse the same relational grammar for their
-  // table nodes; gate those identically.
-  return nodeKind.endsWith('-table') || nodeKind.endsWith('-namespace');
+  const role = issueNode(issue)?.diffRole;
+  return role === 'namespace' || role === 'table' || role === 'column' || role === 'auxiliary';
 }
 
 // ============================================================================

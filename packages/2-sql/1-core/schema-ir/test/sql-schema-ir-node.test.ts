@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { PrimaryKey } from '../src/ir/primary-key';
 import { SqlCheckConstraintIR } from '../src/ir/sql-check-constraint-ir';
+import { SqlColumnDefaultIR } from '../src/ir/sql-column-default-ir';
 import { SqlColumnIR } from '../src/ir/sql-column-ir';
 import { SqlForeignKeyIR } from '../src/ir/sql-foreign-key-ir';
 import { SqlIndexIR } from '../src/ir/sql-index-ir';
@@ -82,5 +83,46 @@ describe('SqlSchemaIRNode discriminants', () => {
       nullable: false,
       nodeKind: 'sql-column',
     });
+  });
+});
+
+/**
+ * `diffRole` is the declared verdict-classification discriminant the family's
+ * post-diff filters key on (issue category + strict gating) — never a naming
+ * convention over `nodeKind`. It lives on the prototype (a getter), so it is
+ * absent from spreads, `Object.keys`, and JSON, keeping serialization and
+ * `toEqual` against flat literals unchanged.
+ */
+describe('SqlSchemaIRNode diffRole', () => {
+  it.each([
+    ['SqlSchemaIR', new SqlSchemaIR({ tables: {} }), 'structural'],
+    [
+      'SqlTableIR',
+      new SqlTableIR({ name: 't', columns: {}, foreignKeys: [], uniques: [], indexes: [] }),
+      'table',
+    ],
+    ['SqlColumnIR', new SqlColumnIR({ name: 'id', nativeType: 'int4', nullable: false }), 'column'],
+    ['SqlColumnDefaultIR', new SqlColumnDefaultIR({ raw: '0' }), 'auxiliary'],
+    ['PrimaryKey', new PrimaryKey({ columns: ['id'] }), 'auxiliary'],
+    [
+      'SqlForeignKeyIR',
+      new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+      }),
+      'auxiliary',
+    ],
+    ['SqlUniqueIR', new SqlUniqueIR({ columns: ['email'] }), 'auxiliary'],
+    ['SqlIndexIR', new SqlIndexIR({ columns: ['email'], unique: false }), 'auxiliary'],
+    [
+      'SqlCheckConstraintIR',
+      new SqlCheckConstraintIR({ name: 'chk', column: 'status', permittedValues: ['a'] }),
+      'auxiliary',
+    ],
+  ] as const)('%s declares diffRole %s, non-enumerable', (_label, node, expectedRole) => {
+    expect(node.diffRole).toBe(expectedRole);
+    expect(Object.keys(node)).not.toContain('diffRole');
+    expect(JSON.parse(JSON.stringify(node))).not.toHaveProperty('diffRole');
   });
 });

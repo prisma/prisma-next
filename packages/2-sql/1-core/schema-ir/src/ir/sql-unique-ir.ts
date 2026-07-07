@@ -3,7 +3,7 @@ import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
-import { SqlSchemaIRNode } from './sql-schema-ir-node';
+import { type SqlSchemaDiffRole, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface SqlUniqueIRInput {
   readonly columns: readonly string[];
@@ -24,6 +24,10 @@ export interface SqlUniqueIRInput {
  */
 export class SqlUniqueIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.unique;
+
+  override get diffRole(): SqlSchemaDiffRole {
+    return 'auxiliary';
+  }
   readonly columns: readonly string[];
   declare readonly name?: string;
   declare readonly annotations?: SqlAnnotations;

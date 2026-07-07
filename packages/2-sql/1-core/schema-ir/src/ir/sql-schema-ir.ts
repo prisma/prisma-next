@@ -2,7 +2,7 @@ import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
-import { SqlSchemaIRNode } from './sql-schema-ir-node';
+import { type SqlSchemaDiffRole, SqlSchemaIRNode } from './sql-schema-ir-node';
 import { SqlTableIR, type SqlTableIRInput } from './sql-table-ir';
 
 export interface SqlSchemaIRInput {
@@ -27,6 +27,10 @@ export interface SqlSchemaIRInput {
  */
 export class SqlSchemaIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.schema;
+
+  override get diffRole(): SqlSchemaDiffRole {
+    return 'structural';
+  }
   readonly tables: Readonly<Record<string, SqlTableIR>>;
   declare readonly annotations?: SqlAnnotations;
 

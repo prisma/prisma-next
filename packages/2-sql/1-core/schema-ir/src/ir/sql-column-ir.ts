@@ -5,7 +5,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import { SqlColumnDefaultIR } from './sql-column-default-ir';
-import { SqlSchemaIRNode } from './sql-schema-ir-node';
+import { type SqlSchemaDiffRole, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 /**
  * Namespaced annotations for extensibility. Each namespace
@@ -61,6 +61,10 @@ export interface SqlColumnIRInput {
  */
 export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.column;
+
+  override get diffRole(): SqlSchemaDiffRole {
+    return 'column';
+  }
   readonly name: string;
   readonly nativeType: string;
   readonly nullable: boolean;

@@ -8,6 +8,7 @@ import {
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,
+  type SqlSchemaDiffRole,
   SqlSchemaIRNode,
   type SqlTableIRInput,
   SqlUniqueIR,
@@ -39,6 +40,10 @@ export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
  */
 export class PostgresTableSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.table;
+
+  override get diffRole(): SqlSchemaDiffRole {
+    return 'table';
+  }
   readonly name: string;
   readonly columns: Readonly<Record<string, SqlColumnIR>>;
   readonly foreignKeys: ReadonlyArray<SqlForeignKeyIR>;

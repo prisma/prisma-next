@@ -7,7 +7,7 @@ import { SqlCheckConstraintIR, type SqlCheckConstraintIRInput } from './sql-chec
 import { type SqlAnnotations, SqlColumnIR, type SqlColumnIRInput } from './sql-column-ir';
 import { SqlForeignKeyIR, type SqlForeignKeyIRInput } from './sql-foreign-key-ir';
 import { SqlIndexIR, type SqlIndexIRInput } from './sql-index-ir';
-import { SqlSchemaIRNode } from './sql-schema-ir-node';
+import { type SqlSchemaDiffRole, SqlSchemaIRNode } from './sql-schema-ir-node';
 import { SqlUniqueIR, type SqlUniqueIRInput } from './sql-unique-ir';
 
 export interface SqlTableIRInput {
@@ -53,6 +53,10 @@ export interface SqlTableIRInput {
  */
 export class SqlTableIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.table;
+
+  override get diffRole(): SqlSchemaDiffRole {
+    return 'table';
+  }
   readonly name: string;
   readonly columns: Readonly<Record<string, SqlColumnIR>>;
   readonly foreignKeys: ReadonlyArray<SqlForeignKeyIR>;

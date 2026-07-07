@@ -2,7 +2,7 @@ import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
-import { SqlSchemaIRNode } from './sql-schema-ir-node';
+import { type SqlSchemaDiffRole, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface SqlCheckConstraintIRInput {
   /** Constraint name as stored in the database catalog. */
@@ -27,6 +27,10 @@ export interface SqlCheckConstraintIRInput {
  */
 export class SqlCheckConstraintIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.check;
+
+  override get diffRole(): SqlSchemaDiffRole {
+    return 'auxiliary';
+  }
   readonly name: string;
   readonly column: string;
   readonly permittedValues: readonly string[];

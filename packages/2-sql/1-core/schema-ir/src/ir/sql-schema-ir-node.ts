@@ -1,6 +1,20 @@
 import { IRNodeBase } from '@prisma-next/framework-components/ir';
 
 /**
+ * Declared verdict-classification role of a schema-diff node — the
+ * discriminant the SQL family's post-diff filters key on (issue category
+ * and strict-mode gating), independent of the node's `nodeKind` spelling:
+ *
+ * - `namespace` / `table`: extras are `extraTopLevelObject`, strict-only.
+ * - `column`: extras are `extraNestedElement`, strict-only.
+ * - `auxiliary`: constraints, indexes, defaults — extras are
+ *   `extraAuxiliary`, strict-only.
+ * - `structural`: tree roots and structurally-diffed leaves (RLS policies,
+ *   roles) — extras fail in every mode; never strict-gated.
+ */
+export type SqlSchemaDiffRole = 'namespace' | 'table' | 'column' | 'auxiliary' | 'structural';
+
+/**
  * SQL Schema IR node base. Carries the family-level
  * `kind = 'sql-schema-ir'` discriminator and inherits the framework's
  * `freezeNode` affordance.
@@ -33,6 +47,14 @@ export abstract class SqlSchemaIRNode extends IRNodeBase {
    * object.
    */
   abstract readonly nodeKind: string;
+
+  /**
+   * Declared {@link SqlSchemaDiffRole}. Every concretion states its role
+   * explicitly — verdict logic dispatches on this, never on the `nodeKind`
+   * spelling. Implemented as a getter so it stays off the instance
+   * (invisible to spreads, `Object.keys`, and JSON), unlike `nodeKind`.
+   */
+  abstract readonly diffRole: SqlSchemaDiffRole;
 
   constructor() {
     super();
