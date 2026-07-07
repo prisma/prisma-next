@@ -8,7 +8,7 @@ import {
   StorageTable,
   StorageValueSet,
 } from '@prisma-next/sql-contract/types';
-import { SqlCheckConstraintIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlCheckConstraintIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
@@ -253,7 +253,7 @@ describe('verifySqlSchema — check constraints', () => {
       'published',
     ]);
     const schema = createTestSchemaIR({
-      post: {
+      post: new SqlTableIR({
         ...createSchemaTable('post', { status: { nativeType: 'text', nullable: false } }),
         checks: [
           new SqlCheckConstraintIR({
@@ -262,7 +262,7 @@ describe('verifySqlSchema — check constraints', () => {
             permittedValues: ['draft', 'published'],
           }),
         ],
-      },
+      }),
     });
 
     const result = verifySqlSchema({
@@ -334,7 +334,7 @@ describe('verifySqlSchema — check constraints', () => {
       extensionPacks: {},
     };
     const schema = createTestSchemaIR({
-      post: {
+      post: new SqlTableIR({
         ...createSchemaTable('post', { status: { nativeType: 'text', nullable: false } }),
         checks: [
           new SqlCheckConstraintIR({
@@ -343,7 +343,7 @@ describe('verifySqlSchema — check constraints', () => {
             permittedValues: ['draft', 'published'],
           }),
         ],
-      },
+      }),
     });
 
     const result = verifySqlSchema({

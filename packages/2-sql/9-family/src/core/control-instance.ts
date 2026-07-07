@@ -47,9 +47,11 @@ import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { extractCodecControlHooks } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
+import { computeSqlDiffVerdict, computeStorageTypeVerdict } from './diff/schema-diff-verify';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
-import type { DiffDatabaseSchemaInput } from './migrations/schema-differ';
+import type { DiffDatabaseSchemaInput, SqlDiffSchemaForVerdict } from './migrations/schema-differ';
 import type {
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
@@ -556,6 +558,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       `SQL target "${target.targetId}" is missing the required verifyDatabaseSchema descriptor operation`,
     );
   }
+  // The full-tree node diff the verify VERDICT derives from. Read lazily so
+  // construction-only stub descriptors (schema-view tests) keep working; the
+  // throw happens at verify time.
+  const diffSchemaForVerdict = blindCast<
+    { readonly diffSchemaForVerdict?: SqlDiffSchemaForVerdict },
+    'reading the target-descriptor diffSchemaForVerdict hook'
+  >(target).diffSchemaForVerdict;
   const deserializeWithTargetSerializer = (contractOrJson: unknown): Contract<SqlStorage> => {
     const serializer = targetSerializer ?? new SqlContractSerializer();
     const json =
@@ -713,11 +722,37 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
     }): VerifyDatabaseSchemaResult {
       const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
-      // Verify is a thin consumer of the target's black-box comparison: it
-      // introspects the actual schema (already in `options.schema`), calls the
-      // target's required `verifyDatabaseSchema`, and rejects when a surviving
-      // issue is a failure. It composes no diffing itself and is blind to how
-      // the comparison works.
+      if (!diffSchemaForVerdict) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required diffSchemaForVerdict descriptor operation`,
+        );
+      }
+      // THE VERDICT: the target's full-tree node diff, graded by the
+      // family's post-diff filters (strict gating + control-policy
+      // disposition), plus the codec verifyType hook findings. Verify
+      // rejects when a surviving issue is a failure.
+      const verdictDiff = diffSchemaForVerdict({
+        contract,
+        schema: options.schema,
+        frameworkComponents: options.frameworkComponents,
+      });
+      const diffVerdict = computeSqlDiffVerdict({
+        issues: verdictDiff.issues,
+        expectedRoot: verdictDiff.expectedRoot,
+        strict: options.strict,
+        defaultControlPolicy: contract.defaultControlPolicy,
+      });
+      const storageTypeVerdict = computeStorageTypeVerdict({
+        contract,
+        namespacePairs: verdictDiff.namespacePairs,
+        codecHooks: extractCodecControlHooks(options.frameworkComponents),
+      });
+      const ok = diffVerdict.failures.length === 0 && storageTypeVerdict.failures.length === 0;
+
+      // THE RENDERED OUTPUT (unchanged until the tree-view cut): the legacy
+      // walk's tree/counts/issues, plus the policy-scoped structural diff
+      // issues, composed exactly as before — only the `ok` flag now comes
+      // from the differ verdict above.
       const sqlResult = verifyDatabaseSchema({
         contract,
         schema: options.schema,
@@ -725,29 +760,41 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
       });
-      // Control-policy suppression of the structural (e.g. RLS policy) diff
-      // issues is a verify-side post-step — the combined diff returns them
-      // ownership-filtered, and a suppressed control policy drops them here.
       const schemaDiffIssues = filterSchemaDiffIssues(
         sqlResult.schema.schemaDiffIssues,
         contract.defaultControlPolicy,
       );
       const relationalFails = sqlResult.schema.counts.fail;
-      if (schemaDiffIssues.length === 0) {
-        if (schemaDiffIssues === sqlResult.schema.schemaDiffIssues) return sqlResult;
-        return { ...sqlResult, schema: { ...sqlResult.schema, schemaDiffIssues } };
-      }
-      const totalFails = relationalFails + schemaDiffIssues.length;
+      const composed: VerifyDatabaseSchemaResult = (() => {
+        if (schemaDiffIssues.length === 0) {
+          if (schemaDiffIssues === sqlResult.schema.schemaDiffIssues) return sqlResult;
+          return { ...sqlResult, schema: { ...sqlResult.schema, schemaDiffIssues } };
+        }
+        const totalFails = relationalFails + schemaDiffIssues.length;
+        return {
+          ...sqlResult,
+          ok: false,
+          code: sqlResult.code ?? 'PN-RUN-3010',
+          summary: `Database schema does not satisfy contract (${totalFails} failure${totalFails === 1 ? '' : 's'})`,
+          schema: {
+            ...sqlResult.schema,
+            schemaDiffIssues,
+            counts: { ...sqlResult.schema.counts, fail: totalFails },
+          },
+        };
+      })();
+      if (composed.ok === ok) return composed;
+      // Verdict divergence between the differ and the legacy walk — the
+      // parity suite pins these as always agreeing; the differ verdict wins.
       return {
-        ...sqlResult,
-        ok: false,
-        code: sqlResult.code ?? 'PN-RUN-3010',
-        summary: `Database schema does not satisfy contract (${totalFails} failure${totalFails === 1 ? '' : 's'})`,
-        schema: {
-          ...sqlResult.schema,
-          schemaDiffIssues,
-          counts: { ...sqlResult.schema.counts, fail: totalFails },
-        },
+        ...composed,
+        ok,
+        ...(ok
+          ? {}
+          : {
+              code: composed.code ?? 'PN-RUN-3010',
+              summary: 'Database schema does not satisfy contract',
+            }),
       };
     },
     async sign(options: {

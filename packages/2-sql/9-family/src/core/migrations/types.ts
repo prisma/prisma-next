@@ -36,7 +36,11 @@ import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/ty
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlAdapter } from '../control-adapter';
 import type { SqlControlFamilyInstance } from '../control-instance';
-import type { SqlDiffDatabaseSchema, SqlVerifyDatabaseSchema } from './schema-differ';
+import type {
+  SqlDiffDatabaseSchema,
+  SqlDiffSchemaForVerdict,
+  SqlVerifyDatabaseSchema,
+} from './schema-differ';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
 
@@ -526,6 +530,14 @@ export interface SqlControlTargetDescriptor<
    * once per verify, not once for the diff and again for the tree.
    */
   readonly verifyDatabaseSchema: SqlVerifyDatabaseSchema;
+  /**
+   * The full-tree node diff the family verify verdict derives from —
+   * expected-tree derivation, pre-diff normalization, the generic differ,
+   * and ownership scoping, all target-side. The family applies strict
+   * gating + control-policy disposition over the returned issues; verify
+   * rejects when a surviving issue is a failure.
+   */
+  readonly diffSchemaForVerdict: SqlDiffSchemaForVerdict;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

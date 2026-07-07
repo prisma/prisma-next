@@ -7,6 +7,21 @@
  */
 
 export type {
+  SemanticSatisfactionInput,
+  SemanticSatisfactionResult,
+  SqlDiffVerdict,
+  SqlDiffVerdictInput,
+  StorageTypeVerdictInput,
+} from '../core/diff/schema-diff-verify';
+export {
+  classifySqlDiffIssue,
+  computeSqlDiffVerdict,
+  computeStorageTypeVerdict,
+  neutralizeFlatExpectedFkSchemas,
+  normalizeFlatActualForDiff,
+  resolveSemanticSatisfaction,
+} from '../core/diff/schema-diff-verify';
+export type {
   NativeTypeNormalizer,
   VerifySqlSchemaOptions,
 } from '../core/diff/sql-schema-diff';
