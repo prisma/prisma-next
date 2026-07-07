@@ -10,6 +10,7 @@ import {
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresPolicySchemaNode } from '../../src/core/schema-ir/postgres-policy-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 
 /**
@@ -17,9 +18,13 @@ import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table
  * to the legacy relational walk — it skipped contract namespaces with zero
  * tables before pairing. The verdict diff must reproduce that: a table-less
  * namespace contributes nothing to the expected tree and does not claim its
- * DDL schema for ownership, so neither the schema's absence nor its live
- * contents can flip the verdict. Pinned here as legacy-vs-differ verdict
- * parity over Postgres TREES (the flat parity suite cannot see namespaces).
+ * DDL schema for RELATIONAL ownership, so neither the schema's absence nor
+ * its live relational contents can flip the verdict. RLS governance is the
+ * exception: the legacy policy diff owned every contract schema regardless
+ * of tables, so a live policy inside a table-less owned schema fails in
+ * both modes — structural extras check the full owned set. Pinned here as
+ * legacy-vs-differ verdict parity over Postgres TREES (the flat parity
+ * suite cannot see namespaces).
  */
 
 function makeContract(): Contract<SqlStorage> {
@@ -79,6 +84,32 @@ function publicNamespace(options?: { readonly idNullable?: boolean }): PostgresN
   return new PostgresNamespaceSchemaNode({
     schemaName: 'public',
     tables: { profiles: profilesTable(options) },
+    nativeEnumTypeNames: [],
+  });
+}
+
+function enumsNamespaceWithStrayTable(
+  policy?: PostgresPolicySchemaNode,
+): PostgresNamespaceSchemaNode {
+  return new PostgresNamespaceSchemaNode({
+    schemaName: 'enums',
+    tables: {
+      audit_log: new PostgresTableSchemaNode({
+        name: 'audit_log',
+        columns: {
+          id: {
+            name: 'id',
+            nativeType: 'int4',
+            nullable: false,
+            resolvedNativeType: 'int4',
+          },
+        },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+        policies: policy === undefined ? [] : [policy],
+      }),
+    },
     nativeEnumTypeNames: [],
   });
 }
@@ -151,29 +182,27 @@ describe('verdict parity: table-less contract namespaces (Postgres tree)', () =>
   it('DDL schema of an enums-only namespace holding live tables verifies clean', () => {
     const actual = rootOf({
       public: publicNamespace(),
-      enums: new PostgresNamespaceSchemaNode({
-        schemaName: 'enums',
-        tables: {
-          audit_log: new PostgresTableSchemaNode({
-            name: 'audit_log',
-            columns: {
-              id: {
-                name: 'id',
-                nativeType: 'int4',
-                nullable: false,
-                resolvedNativeType: 'int4',
-              },
-            },
-            foreignKeys: [],
-            uniques: [],
-            indexes: [],
-            policies: [],
-          }),
-        },
-        nativeEnumTypeNames: [],
-      }),
+      enums: enumsNamespaceWithStrayTable(),
     });
     assertParity(makeContract(), actual, true);
+  });
+
+  it('a live RLS policy on a stray table in the enums-only owned schema fails both pipelines', () => {
+    const strayPolicy = new PostgresPolicySchemaNode({
+      name: 'sneaky_read_a1b2c3d4',
+      prefix: 'sneaky_read',
+      tableName: 'audit_log',
+      namespaceId: 'enums',
+      operation: 'select',
+      roles: ['authenticated'],
+      using: 'true',
+      permissive: true,
+    });
+    const actual = rootOf({
+      public: publicNamespace(),
+      enums: enumsNamespaceWithStrayTable(strayPolicy),
+    });
+    assertParity(makeContract(), actual, false);
   });
 
   it('drift inside the table-bearing namespace still fails both pipelines', () => {

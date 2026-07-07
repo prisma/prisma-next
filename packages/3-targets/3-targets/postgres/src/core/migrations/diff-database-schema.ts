@@ -262,13 +262,15 @@ export function normalizePostgresActualForDiff(
 
 /**
  * Drops contract namespaces that declare no tables from the verdict-diff
- * expected tree and the owned-schema set. The legacy relational walk
- * skipped a table-less namespace (e.g. an enums-only schema) before
+ * expected tree and the relational owned-schema set. The legacy relational
+ * walk skipped a table-less namespace (e.g. an enums-only schema) before
  * pairing, so neither its DDL schema's absence nor that schema's live
- * contents ever reached the verdict — the pruned tree reproduces that.
- * Safe for the policy portion of this diff too: policies attach to tables,
- * so a table-less namespace carries none (the projection throws on a
- * policy referencing an absent table).
+ * relational contents ever reached the verdict — the pruned tree
+ * reproduces that. The prune loses no expected policies: policies attach
+ * to tables, so a table-less namespace carries none (the projection
+ * throws on a policy referencing an absent table). Live policies in a
+ * pruned schema remain governed via the full owned set (see
+ * {@link diffPostgresSchemaForVerdict}).
  */
 function pruneTableLessNamespaces(
   expected: PostgresDatabaseSchemaNode,
@@ -290,11 +292,16 @@ function pruneTableLessNamespaces(
  * resolved, table control policies stamped, table-less namespaces pruned),
  * normalize the actual tree for semantic satisfaction, run the generic
  * differ, and scope out `not-expected` findings under namespaces the
- * contract does not own — the legacy per-namespace walk never visited
- * unowned schemas, so their contents are invisible to verify. The codec
- * `verifyType` hooks run once per contract namespace with tables against
- * that namespace's paired actual node (the hooks read namespace-scoped
- * state such as `nativeEnumTypeNames`).
+ * contract does not own. Ownership is role-aware, mirroring the legacy
+ * decomposition: relational extras check the PRUNED owned set (the legacy
+ * per-namespace walk never visited a table-less namespace, so its live
+ * relational contents are invisible), while `structural` extras (RLS
+ * policies) check the FULL owned set (the legacy policy diff governed
+ * every contract schema regardless of tables — RLS governance does not
+ * shrink because a namespace declares no tables). The codec `verifyType`
+ * hooks run once per contract namespace with tables against that
+ * namespace's paired actual node (the hooks read namespace-scoped state
+ * such as `nativeEnumTypeNames`).
  */
 export function diffPostgresSchemaForVerdict(input: {
   readonly contract: Contract<SqlStorage>;
@@ -308,18 +315,24 @@ export function diffPostgresSchemaForVerdict(input: {
   PostgresDatabaseSchemaNode.assert(input.schema);
   const actual = input.schema;
   const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
-  const expected = pruneTableLessNamespaces(
-    contractToPostgresDatabaseSchemaNode(postgresContract, {
-      annotationNamespace: 'pg',
-      ...ifDefined('expandNativeType', expandNativeType),
-    }),
-  );
+  const fullExpected = contractToPostgresDatabaseSchemaNode(postgresContract, {
+    annotationNamespace: 'pg',
+    ...ifDefined('expandNativeType', expandNativeType),
+  });
+  const expected = pruneTableLessNamespaces(fullExpected);
   const normalizedActual = normalizePostgresActualForDiff(expected, actual);
-  const owned = ownedSchemaNames(expected);
+  const relationalOwned = ownedSchemaNames(expected);
+  const structuralOwned = ownedSchemaNames(fullExpected);
   const issues = diffSchemas(expected, normalizedActual).filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
     const namespaceSegment = issue.path[1];
-    return namespaceSegment === undefined || owned.has(namespaceSegment);
+    if (namespaceSegment === undefined) return true;
+    const node = blindCast<
+      SqlSchemaIRNode | undefined,
+      'every node in a Postgres schema diff tree is a SqlSchemaIRNode; diffRole is its required discriminant'
+    >(issue.actual ?? issue.expected);
+    const owned = node?.diffRole === 'structural' ? structuralOwned : relationalOwned;
+    return owned.has(namespaceSegment);
   });
   const namespacePairs = Object.values(expected.namespaces).map((ns) => ({
     actual: actual.namespaces[ns.schemaName],
