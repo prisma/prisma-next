@@ -26,7 +26,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import { resolveValueSetValues } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import type { SchemaDiffIssue, SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type SqlStorage,
@@ -154,6 +154,26 @@ export type CallMigrationStrategy = (
        * Defaults to `false`, which lets `planIssues` hoist individual calls
        * into their DDL sequencing bucket.
        */
+      recipe?: boolean;
+    }
+  | { kind: 'no_match' };
+
+/**
+ * The node-typed sibling of {@link CallMigrationStrategy}: consumes node diff
+ * issues (`SchemaDiffIssue`) instead of coordinate `SchemaIssue`s. Same
+ * `StrategyContext` (the retained subsystems — codec type-operations, the
+ * NOT-NULL temp-default backfill, control-policy — keep the contract per the
+ * slice's scope); the data-safety recipes read the issue's node pair for their
+ * decisions and the stamped `opRender` for DDL. Consumed by `planNodeIssues`.
+ */
+export type NodeCallMigrationStrategy = (
+  issues: readonly SchemaDiffIssue[],
+  context: StrategyContext,
+) =>
+  | {
+      kind: 'match';
+      issues: readonly SchemaDiffIssue[];
+      calls: readonly PostgresOpFactoryCall[];
       recipe?: boolean;
     }
   | { kind: 'no_match' };
@@ -682,3 +702,19 @@ export const postgresPlannerStrategies: readonly CallMigrationStrategy[] = [
   storageTypePlanCallStrategy,
   notNullAddColumnCallStrategy,
 ];
+
+/**
+ * Node-based planner strategies for the one-differ path ({@link planNodeIssues}).
+ *
+ * Empty for now: this commit lands the additive, inert node machinery
+ * (`buildPostgresPlanDiff` + `mapNodeIssueToCall` + `planNodeIssues`). The
+ * node-typed strategy variants — the data-safety recipes (NOT-NULL backfill,
+ * unsafe type change, nullable tightening), the check-constraint planner, the
+ * codec type-operations dispatch, and the shared temp-default backfill (reading
+ * `opRender.temporaryDefault`) — land with the cutover, where their byte-faithful
+ * design (a single `sql-column` `not-equal` merges the legacy `type_mismatch` +
+ * `nullability_mismatch`; `fromContract`-null reconciliation semantics) is
+ * validated against the planner / adapter / guard suites. Until then the node
+ * planner runs the default {@link mapNodeIssueToCall} path only.
+ */
+export const postgresNodePlannerStrategies: readonly NodeCallMigrationStrategy[] = [];

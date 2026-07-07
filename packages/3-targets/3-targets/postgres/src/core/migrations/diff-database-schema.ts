@@ -330,3 +330,102 @@ export function diffPostgresSchemaForVerdict(input: {
   }));
   return { issues, expectedRoot: expected, namespacePairs };
 }
+
+/**
+ * Adds an empty namespace node to the actual tree for every expected namespace
+ * absent from it. The relational plan diff pairs on namespace: a contract
+ * namespace whose live schema does not exist yet must surface each of its
+ * tables as `not-found` (→ `CREATE TABLE`), NOT as a single namespace
+ * `not-found` that subtree-coalescing would collapse (leaving `CREATE SCHEMA`
+ * with no tables). Padding makes the namespaces pair, so only table/column/
+ * policy drift surfaces; `CREATE SCHEMA` comes separately from the synthesized
+ * namespace-presence stitch (`verifyPostgresNamespacePresence`), never from the
+ * tree diff — matching the retired per-namespace-paired relational walk, which
+ * paired a missing schema against an empty namespace node.
+ */
+function padActualNamespaces(
+  expected: PostgresDatabaseSchemaNode,
+  actual: PostgresDatabaseSchemaNode,
+): PostgresDatabaseSchemaNode {
+  const namespaces: Record<string, PostgresNamespaceSchemaNode> = { ...actual.namespaces };
+  let padded = false;
+  for (const schemaName of Object.keys(expected.namespaces)) {
+    if (namespaces[schemaName] === undefined) {
+      namespaces[schemaName] = new PostgresNamespaceSchemaNode({
+        schemaName,
+        tables: {},
+        nativeEnumTypeNames: [],
+      });
+      padded = true;
+    }
+  }
+  if (!padded) return actual;
+  return new PostgresDatabaseSchemaNode({
+    namespaces,
+    roles: [...actual.roles],
+    existingSchemas: [...actual.existingSchemas],
+    pgVersion: actual.pgVersion,
+  });
+}
+
+export interface PostgresPlanDiff {
+  /** The desired ("end") tree — resolved leaf values, `opRender` stamped on every column, table-less namespaces pruned. */
+  readonly expected: PostgresDatabaseSchemaNode;
+  /** The live ("start") tree, padded with empty namespaces and normalized for semantic satisfaction against `expected`. */
+  readonly actual: PostgresDatabaseSchemaNode;
+  /** The one node diff over the two trees: relational + policy drift, role-aware ownership filtered. */
+  readonly issues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[];
+}
+
+/**
+ * The Postgres planner's diff input: the SAME tree-building
+ * `diffPostgresSchemaForVerdict` uses (expander threaded, FK schemas resolved,
+ * table-less namespaces pruned, actual normalized for semantic satisfaction,
+ * role-aware ownership filter) PLUS the op-render stamper (so expected column
+ * nodes carry the DDL payload the planner's op-builders read) and actual
+ * namespace padding (so a missing schema's tables surface as `not-found`
+ * instead of a swallowed namespace `not-found`). One differ drives both verify
+ * and plan; this is the plan-side derivation. The single issue list covers
+ * tables / columns / constraints / indexes / defaults AND policies — the caller
+ * splits it (relational → `mapNodeIssueToCall`; policy → RLS ops) and stitches
+ * in `CREATE SCHEMA` separately.
+ */
+export function buildPostgresPlanDiff(input: {
+  readonly contract: Contract<SqlStorage>;
+  readonly actualSchema: SqlSchemaIRNode;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+}): PostgresPlanDiff {
+  const postgresContract = blindCast<
+    PostgresContract,
+    'buildPostgresPlanDiff is only called with a postgres contract'
+  >(input.contract);
+  PostgresDatabaseSchemaNode.assert(input.actualSchema);
+  const actual = input.actualSchema;
+  const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
+  const codecHooks = extractCodecControlHooks(input.frameworkComponents);
+  const storageTypes = input.contract.storage.types ?? {};
+  const projectionOptions = {
+    annotationNamespace: 'pg',
+    ...ifDefined('expandNativeType', expandNativeType),
+    renderColumnOps: (name: string, column: StorageColumn) =>
+      buildPostgresColumnOpRender(name, column, codecHooks, storageTypes),
+  };
+  const fullExpected = contractToPostgresDatabaseSchemaNode(postgresContract, projectionOptions);
+  const expected = pruneTableLessNamespaces(fullExpected);
+  const paddedActual = padActualNamespaces(expected, actual);
+  const normalizedActual = normalizePostgresActualForDiff(expected, paddedActual);
+  const relationalOwned = ownedSchemaNames(expected);
+  const structuralOwned = ownedSchemaNames(fullExpected);
+  const issues = blindCast<
+    readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
+    'both trees are PostgresDatabaseSchemaNodes, so every diff-issue node is a SqlSchemaDiffNode'
+  >(diffSchemas(expected, normalizedActual)).filter((issue) => {
+    if (issue.reason !== 'not-expected') return true;
+    const namespaceSegment = issue.path[1];
+    if (namespaceSegment === undefined) return true;
+    const node = issue.actual ?? issue.expected;
+    const owned = node?.diffRole === 'structural' ? structuralOwned : relationalOwned;
+    return owned.has(namespaceSegment);
+  });
+  return { expected, actual: normalizedActual, issues };
+}
