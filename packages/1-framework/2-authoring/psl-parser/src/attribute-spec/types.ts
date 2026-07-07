@@ -1,4 +1,4 @@
-import type { PslDiagnostic, PslDiagnosticCode } from '@prisma-next/framework-components/psl-ast';
+import type { PslDiagnostic } from '@prisma-next/framework-components/psl-ast';
 import type { Result } from '@prisma-next/utils/result';
 import type { Simplify, UnionToIntersection } from '@prisma-next/utils/types';
 import type { SourceFile } from '../source-file';
@@ -12,13 +12,11 @@ export interface ArgType<T> {
   readonly label: string;
   // phantom carrier for `T`; never read at runtime.
   readonly _out?: T;
-  // returns diagnostics rather than pushing to a shared list, so `oneOf` can try and discard a failed branch.
   parse(arg: ExpressionAst, ctx: InterpretCtx): Result<T, readonly PslDiagnostic[]>;
 }
 
 export interface InterpretCtx {
   readonly level: AttributeLevel;
-  readonly diagnosticCode: PslDiagnosticCode;
   readonly sourceId: string;
   readonly sourceFile: SourceFile;
   readonly selfModel: ModelSymbol;
@@ -46,7 +44,6 @@ export interface AttributeSpec<Out> {
   readonly positional: readonly PositionalParam[];
   readonly named: Readonly<Record<string, Param<unknown>>>;
   readonly refine?: (parsed: Out, ctx: InterpretCtx) => readonly PslDiagnostic[];
-  readonly diagnosticCode?: PslDiagnosticCode;
 }
 
 export type OutOf<P> = P extends ArgType<infer T> ? T : never;

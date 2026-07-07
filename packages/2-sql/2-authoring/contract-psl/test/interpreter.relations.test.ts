@@ -312,7 +312,7 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
           sourceId: 'schema.prisma',
         }),
       ]),
@@ -346,7 +346,7 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
           message: expect.stringContaining('Field "missingUserId" does not exist on model "Post"'),
         }),
       ]),
@@ -380,7 +380,7 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
           message: expect.stringContaining('Field "missingId" does not exist on model "User"'),
         }),
       ]),
@@ -414,7 +414,7 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
           message: expect.stringContaining('Duplicate'),
         }),
       ]),
@@ -448,7 +448,7 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
           message: 'Relation field "Post.user" requires fields and references arguments',
         }),
       ]),

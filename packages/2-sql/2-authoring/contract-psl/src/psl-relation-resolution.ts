@@ -86,7 +86,7 @@ function relationInvariants(
   if (hasFields !== hasReferences) {
     return [
       {
-        code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
         message: `Relation field "${ctx.selfModel.name}.${ctx.field?.name ?? ''}" requires fields and references arguments`,
         sourceId: ctx.sourceId,
         span: relationAttributeSpan(ctx),
@@ -123,7 +123,6 @@ const sqlRelation = fieldAttribute('relation', {
     ),
   },
   refine: relationInvariants,
-  diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
 });
 
 export type SqlRelationOutput = InferAttr<typeof sqlRelation>;
@@ -172,7 +171,6 @@ function buildRelationInterpretCtx(input: {
 }): InterpretCtx {
   return {
     level: 'field',
-    diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
     sourceId: input.sourceId,
     sourceFile: input.sourceFile,
     selfModel: input.selfModel,

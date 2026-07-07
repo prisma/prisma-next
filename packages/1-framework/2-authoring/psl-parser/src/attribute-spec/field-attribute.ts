@@ -1,4 +1,4 @@
-import type { PslDiagnostic, PslDiagnosticCode } from '@prisma-next/framework-components/psl-ast';
+import type { PslDiagnostic } from '@prisma-next/framework-components/psl-ast';
 import type { AttributeOut, AttributeSpec, InterpretCtx, Param, PositionalParam } from './types';
 
 interface FieldAttributeConfig<
@@ -11,7 +11,6 @@ interface FieldAttributeConfig<
     parsed: AttributeOut<Pos, Named>,
     ctx: InterpretCtx,
   ) => readonly PslDiagnostic[];
-  readonly diagnosticCode?: PslDiagnosticCode;
 }
 
 export function fieldAttribute<
@@ -24,6 +23,5 @@ export function fieldAttribute<
     positional: config.positional ?? [],
     named: config.named ?? {},
     ...(config.refine !== undefined ? { refine: config.refine } : {}),
-    ...(config.diagnosticCode !== undefined ? { diagnosticCode: config.diagnosticCode } : {}),
   };
 }

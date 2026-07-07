@@ -1,16 +1,11 @@
-import type {
-  PslDiagnostic,
-  PslDiagnosticCode,
-  PslSpan,
-} from '@prisma-next/framework-components/psl-ast';
+import type { PslDiagnostic, PslSpan } from '@prisma-next/framework-components/psl-ast';
 import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { nodePslSpan } from '../resolve';
 import type { FieldAttributeAst, ModelAttributeAst } from '../syntax/ast/attributes';
 import type { AttributeArgAst } from '../syntax/ast/expressions';
+import { ATTRIBUTE_DIAGNOSTIC_CODE } from './combinators/diagnostic';
 import type { ArgType, AttributeSpec, InterpretCtx, OptionalArgType, Param } from './types';
-
-const DEFAULT_STRUCTURAL_CODE: PslDiagnosticCode = 'PSL_INVALID_ATTRIBUTE_SYNTAX';
 
 export function interpretAttribute<Out>(
   attrNode: FieldAttributeAst | ModelAttributeAst,
@@ -18,9 +13,6 @@ export function interpretAttribute<Out>(
   ctx: InterpretCtx,
 ): Result<Out, readonly PslDiagnostic[]> {
   const diagnostics: PslDiagnostic[] = [];
-  const code = spec.diagnosticCode ?? DEFAULT_STRUCTURAL_CODE;
-  // stamp the spec's code onto ctx so leaf diagnostics carry this attribute's code, not a generic one.
-  const leafCtx: InterpretCtx = { ...ctx, diagnosticCode: code };
   const attributeSpan = nodePslSpan(attrNode.syntax, ctx.sourceFile);
 
   const output: Record<string, unknown> = {};
@@ -39,7 +31,6 @@ export function interpretAttribute<Out>(
         if (!reportedExcess) {
           diagnostics.push(
             diagnostic(
-              code,
               `Attribute "${spec.name}" received too many positional arguments`,
               ctx,
               attributeSpan,
@@ -57,7 +48,6 @@ export function interpretAttribute<Out>(
       if (namedParam === undefined) {
         diagnostics.push(
           diagnostic(
-            code,
             `Attribute "${spec.name}" received unknown argument "${name}"`,
             ctx,
             nodePslSpan(arg.syntax, ctx.sourceFile),
@@ -72,7 +62,6 @@ export function interpretAttribute<Out>(
     if (seen.has(key)) {
       diagnostics.push(
         diagnostic(
-          code,
           `Attribute "${spec.name}" received duplicate argument "${key}"`,
           ctx,
           nodePslSpan(arg.syntax, ctx.sourceFile),
@@ -81,7 +70,7 @@ export function interpretAttribute<Out>(
       continue;
     }
     seen.add(key);
-    const result = parseArgValue(arg, param, leafCtx, diagnostics, code);
+    const result = parseArgValue(arg, param, ctx, diagnostics);
     if (result.ok) output[key] = result.value;
   }
 
@@ -101,7 +90,6 @@ export function interpretAttribute<Out>(
     }
     diagnostics.push(
       diagnostic(
-        code,
         `Attribute "${spec.name}" is missing required argument "${key}"`,
         ctx,
         attributeSpan,
@@ -126,7 +114,7 @@ export function interpretAttribute<Out>(
     'The engine builds the output object structurally from the spec; TypeScript cannot relate the dynamically-keyed record to the spec-inferred output type.'
   >(output);
   if (spec.refine !== undefined) {
-    const refineDiagnostics = spec.refine(value, leafCtx);
+    const refineDiagnostics = spec.refine(value, ctx);
     if (refineDiagnostics.length > 0) {
       return notOk<readonly PslDiagnostic[]>(refineDiagnostics);
     }
@@ -139,12 +127,10 @@ function parseArgValue(
   argType: ArgType<unknown>,
   ctx: InterpretCtx,
   diagnostics: PslDiagnostic[],
-  code: PslDiagnosticCode,
 ): Result<unknown, readonly PslDiagnostic[]> {
   const value = arg.value();
   if (value === undefined) {
     const missing = diagnostic(
-      code,
       'Attribute argument is missing a value',
       ctx,
       nodePslSpan(arg.syntax, ctx.sourceFile),
@@ -163,11 +149,6 @@ function isOptionalArgType(param: Param<unknown>): param is OptionalArgType<unkn
   return 'optional' in param && param.optional === true;
 }
 
-function diagnostic(
-  code: PslDiagnosticCode,
-  message: string,
-  ctx: InterpretCtx,
-  span: PslSpan,
-): PslDiagnostic {
-  return { code, message, sourceId: ctx.sourceId, span };
+function diagnostic(message: string, ctx: InterpretCtx, span: PslSpan): PslDiagnostic {
+  return { code: ATTRIBUTE_DIAGNOSTIC_CODE, message, sourceId: ctx.sourceId, span };
 }

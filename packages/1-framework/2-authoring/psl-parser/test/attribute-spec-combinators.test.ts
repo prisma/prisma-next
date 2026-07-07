@@ -1,4 +1,3 @@
-import type { PslDiagnostic } from '@prisma-next/framework-components/psl-ast';
 import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 import type { ArgType, InterpretCtx } from '../src/exports';
@@ -19,10 +18,7 @@ import { FieldAttributeAst } from '../src/syntax/ast/attributes';
 import type { ExpressionAst } from '../src/syntax/ast/expressions';
 import { createSyntaxTree } from '../src/syntax/red';
 
-function makeCtx(
-  sourceFile: SourceFile,
-  diagnosticCode: PslDiagnostic['code'] = 'PSL_INVALID_ATTRIBUTE_SYNTAX',
-): InterpretCtx {
+function makeCtx(sourceFile: SourceFile): InterpretCtx {
   const { document, sourceFile: modelSource } = parse('model M {\n  id Int @id\n}\n');
   const { table } = buildSymbolTable({
     document,
@@ -38,7 +34,6 @@ function makeCtx(
     sourceFile,
     selfModel,
     resolveReferencedModel: () => undefined,
-    diagnosticCode,
   };
 }
 
@@ -139,14 +134,13 @@ describe('oneOf', () => {
 
   it('emits a single aggregate diagnostic anchored to the arg node when every alternative fails', () => {
     const { expr, ctx } = argOf('WeirdAction');
-    const relationCtx: InterpretCtx = { ...ctx, diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE' };
 
-    const result = oneOf(identifier('Cascade'), identifier('SetNull')).parse(expr, relationCtx);
+    const result = oneOf(identifier('Cascade'), identifier('SetNull')).parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure).toHaveLength(1);
-      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
       expect(result.failure[0]?.span).toEqual(nodePslSpan(expr.syntax, ctx.sourceFile));
       expect(result.failure[0]?.message).toContain('Cascade');
       expect(result.failure[0]?.message).toContain('SetNull');
@@ -266,15 +260,14 @@ describe('list', () => {
   });
 });
 
-describe('combinator code parity through interpretAttribute', () => {
-  it('emits a leaf diagnostic carrying the spec diagnostic code', () => {
+describe('combinator code through interpretAttribute', () => {
+  it('emits a leaf diagnostic carrying the unified attribute code', () => {
     const cursor = new Cursor('@rel(1)');
     const node = FieldAttributeAst.cast(createSyntaxTree(parseAttribute(cursor)));
     if (!node) throw new Error('expected a field attribute');
     const ctx = makeCtx(cursor.sourceFile);
     const spec = fieldAttribute('rel', {
       positional: [{ key: 'name', type: str() }],
-      diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
     });
 
     const result = interpretAttribute(node, spec, ctx);
@@ -282,7 +275,7 @@ describe('combinator code parity through interpretAttribute', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure).toHaveLength(1);
-      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
     }
   });
 });

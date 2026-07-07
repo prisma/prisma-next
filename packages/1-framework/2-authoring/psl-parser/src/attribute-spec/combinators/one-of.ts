@@ -23,7 +23,6 @@ export function oneOf<Alts extends readonly [ArgType<unknown>, ...ArgType<unknow
           );
         }
       }
-      // Each alternative returns its own diagnostics instead of writing to a shared list, so a failed attempt leaves nothing behind; if none match, report one aggregate error.
       return notOk([leafDiagnostic(ctx, arg, `Expected one of: ${label}`)]);
     },
   };

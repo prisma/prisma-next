@@ -10,10 +10,7 @@ import { FieldAttributeAst } from '../src/syntax/ast/attributes';
 import { StringLiteralExprAst } from '../src/syntax/ast/expressions';
 import { createSyntaxTree } from '../src/syntax/red';
 
-function makeCtx(
-  sourceFile: SourceFile,
-  diagnosticCode: PslDiagnostic['code'] = 'PSL_INVALID_ATTRIBUTE_SYNTAX',
-): InterpretCtx {
+function makeCtx(sourceFile: SourceFile): InterpretCtx {
   const { document, sourceFile: modelSource } = parse('model M {\n  id Int @id\n}\n');
   const { table } = buildSymbolTable({
     document,
@@ -29,7 +26,6 @@ function makeCtx(
     sourceFile,
     selfModel,
     resolveReferencedModel: () => undefined,
-    diagnosticCode,
   };
 }
 
@@ -121,7 +117,6 @@ describe('interpretAttribute named binding', () => {
     const { node, ctx } = fieldAttr('@rel(foo: "x")');
     const spec = fieldAttribute('rel', {
       named: { name: optional(str()) },
-      diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
     });
 
     const result = interpretAttribute(node, spec, ctx);
@@ -129,7 +124,7 @@ describe('interpretAttribute named binding', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure).toHaveLength(1);
-      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
       expect(result.failure[0]?.message).toContain('foo');
       expect(result.failure[0]?.span).not.toEqual(nodePslSpan(node.syntax, ctx.sourceFile));
     }
@@ -142,7 +137,6 @@ describe('interpretAttribute positional-or-named duplicate', () => {
     const spec = fieldAttribute('rel', {
       positional: [{ key: 'name', type: optional(str()) }],
       named: { name: optional(str()) },
-      diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
     });
 
     const result = interpretAttribute(node, spec, ctx);
@@ -150,7 +144,7 @@ describe('interpretAttribute positional-or-named duplicate', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure).toHaveLength(1);
-      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
       expect(result.failure[0]?.span).not.toEqual(nodePslSpan(node.syntax, ctx.sourceFile));
     }
   });
@@ -160,7 +154,6 @@ describe('interpretAttribute positional-or-named duplicate', () => {
     const spec = fieldAttribute('rel', {
       positional: [{ key: 'name', type: optional(str()) }],
       named: { name: optional(str()) },
-      diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
     });
 
     const result = interpretAttribute(node, spec, ctx);
@@ -168,7 +161,7 @@ describe('interpretAttribute positional-or-named duplicate', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure).toHaveLength(1);
-      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
       expect(result.failure[0]?.span).not.toEqual(nodePslSpan(node.syntax, ctx.sourceFile));
     }
   });
@@ -179,7 +172,6 @@ describe('interpretAttribute duplicate named arguments', () => {
     const { node, ctx } = fieldAttr('@rel(name: "A", name: "B")');
     const spec = fieldAttribute('rel', {
       named: { name: optional(str()) },
-      diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
     });
 
     const result = interpretAttribute(node, spec, ctx);
@@ -187,7 +179,7 @@ describe('interpretAttribute duplicate named arguments', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure).toHaveLength(1);
-      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
       expect(result.failure[0]?.span).not.toEqual(nodePslSpan(node.syntax, ctx.sourceFile));
     }
   });
@@ -196,7 +188,6 @@ describe('interpretAttribute duplicate named arguments', () => {
     const { node, ctx } = fieldAttr('@rel(name: "A", name: "A")');
     const spec = fieldAttribute('rel', {
       named: { name: optional(str()) },
-      diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
     });
 
     const result = interpretAttribute(node, spec, ctx);
@@ -204,7 +195,7 @@ describe('interpretAttribute duplicate named arguments', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure).toHaveLength(1);
-      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
     }
   });
 });
@@ -325,43 +316,6 @@ describe('interpretAttribute leaf purity', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure).toEqual([FAILING_DIAGNOSTIC]);
-    }
-  });
-});
-
-function codeEcho(): ArgType<never> {
-  return {
-    kind: 'codeEcho',
-    label: 'codeEcho',
-    parse: (arg, ctx): Result<never, readonly PslDiagnostic[]> =>
-      notOk([
-        {
-          code: ctx.diagnosticCode,
-          message: 'leaf emitted with the threaded code',
-          sourceId: ctx.sourceId,
-          span: nodePslSpan(arg.syntax, ctx.sourceFile),
-        },
-      ]),
-  };
-}
-
-describe('interpretAttribute diagnostic-code threading', () => {
-  it('drives the leaf context code from the spec, overriding the caller baseline', () => {
-    const cursor = new Cursor('@rel(name: "x")');
-    const node = FieldAttributeAst.cast(createSyntaxTree(parseAttribute(cursor)));
-    if (!node) throw new Error('expected a field attribute');
-    const ctx = makeCtx(cursor.sourceFile, 'PSL_INVALID_ATTRIBUTE_SYNTAX');
-    const spec = fieldAttribute('rel', {
-      named: { name: codeEcho() },
-      diagnosticCode: 'PSL_INVALID_RELATION_ATTRIBUTE',
-    });
-
-    const result = interpretAttribute(node, spec, ctx);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.failure).toHaveLength(1);
-      expect(result.failure[0]?.code).toBe('PSL_INVALID_RELATION_ATTRIBUTE');
     }
   });
 });
