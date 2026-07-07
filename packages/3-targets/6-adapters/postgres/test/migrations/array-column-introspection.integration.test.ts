@@ -38,7 +38,7 @@ describe.sequential('array column introspection', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('text[] column → nativeType:text + many:true', { timeout: testTimeout }, async () => {
     await driver!.query('CREATE TABLE arr_test (id int4 PRIMARY KEY, tags text[] NOT NULL)');
