@@ -19,6 +19,7 @@ import {
   CodecDescriptorImpl,
   CodecImpl,
   type CodecInstanceContext,
+  type CodecMeta,
   type ColumnHelperFor,
   type ColumnHelperForStrict,
   column,
@@ -226,10 +227,12 @@ export class PgEnumDescriptor extends CodecDescriptorImpl<PgEnumParams> {
   override renderValueLiteral(value: JsonValue): string | undefined {
     return renderTsLiteral(value);
   }
-  nativeTypeFor(typeParams: JsonValue | undefined): string | undefined {
-    if (!isJsonObject(typeParams)) return undefined;
+  override metaFor(typeParams: JsonValue | undefined): CodecMeta | undefined {
+    if (!isJsonObject(typeParams)) return this.meta;
     const typeName = typeParams['typeName'];
-    return typeof typeName === 'string' ? typeName : undefined;
+    return typeof typeName === 'string'
+      ? { db: { sql: { postgres: { nativeType: typeName } } } }
+      : this.meta;
   }
   override factory(_params: PgEnumParams): (ctx: CodecInstanceContext) => PgEnumCodec {
     return () => new PgEnumCodec(this);

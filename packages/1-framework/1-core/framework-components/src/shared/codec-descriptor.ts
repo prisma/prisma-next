@@ -42,6 +42,8 @@ export interface CodecDescriptor<P = void> {
   readonly paramsSchema: StandardSchemaV1<P>;
   /** Whether this descriptor is parameterized — i.e. its `paramsSchema` is something other than the singleton `voidParamsSchema`. Consumers that need to gate column-aware dispatch read this directly rather than threading a free-floating `(codecId) => boolean` callback. */
   readonly isParameterized: boolean;
+  /** Optional params-aware metadata renderer. Computes this codec instance's `CodecMeta` from its `typeParams` (e.g. a per-instance identifier derived from an enum's declared member set). Optional; absent renderers cause `CodecLookup.metaFor` to fall back to the codec's static `meta`. Non-parameterized codecs typically omit it. */
+  readonly metaFor?: (params: P) => CodecMeta | undefined;
   /** Emit-path string renderer for `contract.d.ts`. Returns the TypeScript output type expression for given params (e.g. `Vector<1536>`). Optional; absent renderers cause the emitter to fall back to the codec's base output type. Non-parameterized codecs typically omit it. */
   readonly renderOutputType?: (params: P) => string | undefined;
   /** Emit-path string renderer for the `contract.d.ts` *input* position (create/update values). Returns the TypeScript input type expression for given params. Optional; absent renderers fall back to the codec's base input type. A codec supplies this when its write type is narrower than the generic codec input — e.g. an enum whose input should be the literal member union, not `string`. */
@@ -88,6 +90,9 @@ export abstract class CodecDescriptorImpl<TParams = void> implements CodecDescri
   get isParameterized(): boolean {
     return this.paramsSchema !== voidParamsSchema;
   }
+
+  /** Optional params-aware metadata renderer. Computes this codec instance's `CodecMeta` from its `typeParams` (e.g. a per-instance identifier derived from an enum's declared member set). Non-parameterized codecs typically omit it. */
+  metaFor?(params: TParams): CodecMeta | undefined;
 
   /** Optional emit-path string renderer for `contract.d.ts`. Returns the TypeScript output type expression for the given params (e.g. `Vector<1536>`). Non-parameterized codecs typically omit it. */
   renderOutputType?(params: TParams): string | undefined;

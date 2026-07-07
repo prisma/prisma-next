@@ -49,7 +49,6 @@
     "./factories": "./dist/factories.mjs",
     "./index-type-validation": "./dist/index-type-validation.mjs",
     "./index-types": "./dist/index-types.mjs",
-    "./native-type-hook": "./dist/native-type-hook.mjs",
     "./pack-types": "./dist/pack-types.mjs",
     "./referential-action-sql": "./dist/referential-action-sql.mjs",
     "./resolve-storage-table": "./dist/resolve-storage-table.mjs",

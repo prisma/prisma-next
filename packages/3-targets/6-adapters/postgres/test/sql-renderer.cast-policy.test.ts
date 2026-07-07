@@ -1,8 +1,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
+import type { Codec, CodecLookup, CodecMeta } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { RuntimeExtensionDescriptor } from '@prisma-next/framework-components/execution';
-import type { SqlCodecLookup } from '@prisma-next/sql-contract/native-type-hook';
 import {
   BinaryExpr,
   ColumnRef,
@@ -21,7 +20,7 @@ import type { PostgresContract } from '../src/core/types';
 import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 import { defineTestCodec } from './test-codec';
 
-const emptyLookup: SqlCodecLookup = {
+const emptyLookup: CodecLookup = {
   get: () => undefined,
   targetTypesFor: () => undefined,
   metaFor: () => undefined,
@@ -31,25 +30,26 @@ const emptyLookup: SqlCodecLookup = {
 // `Codec`-side static metadata (`targetTypes` / `meta` / `renderOutputType`) retired with the SQL `Codec` narrow (TML-2357); these tests supply the metadata side-by-side with the codec instance to build the `CodecLookup` directly.
 interface CodecMetadata {
   readonly targetTypes?: readonly string[];
-  readonly meta?: {
-    readonly db?: { readonly sql?: { readonly postgres?: { readonly nativeType?: string } } };
-  };
+  readonly meta?: CodecMeta;
   readonly renderOutputType?: (params: Record<string, unknown>) => string | undefined;
-  readonly nativeTypeFor?: (typeParams: unknown) => string | undefined;
+  readonly metaFor?: (typeParams: unknown) => CodecMeta | undefined;
 }
 
 function lookupOf(
   byId: Record<string, { codec: SqlCodec; metadata?: CodecMetadata }>,
-): SqlCodecLookup {
-  const base: CodecLookup = {
+): CodecLookup {
+  return {
     get: (id) => byId[id]?.codec as Codec | undefined,
     targetTypesFor: (id) => byId[id]?.metadata?.targetTypes,
-    metaFor: (id) => byId[id]?.metadata?.meta,
+    metaFor: (id, typeParams) => {
+      const metadata = byId[id]?.metadata;
+      if (typeParams !== undefined) {
+        const paramsAware = metadata?.metaFor?.(typeParams);
+        if (paramsAware !== undefined) return paramsAware;
+      }
+      return metadata?.meta;
+    },
     renderOutputTypeFor: (id, params) => byId[id]?.metadata?.renderOutputType?.(params),
-  };
-  return {
-    ...base,
-    nativeTypeFor: (id, typeParams) => byId[id]?.metadata?.nativeTypeFor?.(typeParams),
   };
 }
 
@@ -162,7 +162,7 @@ describe('renderLoweredSql cast policy', () => {
     expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."score" = $1');
   });
 
-  it('emits $N::<nativeType> for a native-enum column using the codec instance nativeTypeFor hook, not the codec static meta', () => {
+  it('emits $N::<nativeType> for a native-enum column using the codec instance params-aware metaFor, not the codec static meta', () => {
     const pgEnumCodec: Codec = defineTestCodec({
       typeId: 'pg/enum@1',
       encode: (value: string): string => value,
@@ -174,9 +174,9 @@ describe('renderLoweredSql cast policy', () => {
         metadata: {
           targetTypes: ['text'],
           meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
-          nativeTypeFor: (typeParams) =>
+          metaFor: (typeParams) =>
             typeParams !== null && typeof typeParams === 'object' && 'typeName' in typeParams
-              ? String((typeParams as { typeName: unknown }).typeName)
+              ? { db: { sql: { postgres: { nativeType: String(typeParams.typeName) } } } }
               : undefined,
         },
       },
@@ -202,9 +202,9 @@ describe('renderLoweredSql cast policy', () => {
         metadata: {
           targetTypes: ['text'],
           meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
-          nativeTypeFor: (typeParams) =>
+          metaFor: (typeParams) =>
             typeParams !== null && typeof typeParams === 'object' && 'typeName' in typeParams
-              ? String((typeParams as { typeName: unknown }).typeName)
+              ? { db: { sql: { postgres: { nativeType: String(typeParams.typeName) } } } }
               : undefined,
         },
       },
@@ -218,7 +218,7 @@ describe('renderLoweredSql cast policy', () => {
     );
   });
 
-  it('a column whose codec has no nativeTypeFor hook renders plain $N even when its udt-name spelling (int4) differs from static meta (integer)', () => {
+  it('a column whose codec has no params-aware metaFor renders plain $N even when its udt-name spelling (int4) differs from static meta (integer)', () => {
     // Built through the real codecRefForStorageColumn path (not a hand-built
     // ref), against the "score" column declared above with nativeType:
     // 'int4' in the contract. A CodecRef must not carry the column's own
@@ -373,7 +373,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
     );
   });
 
-  it('emits the per-instance enum cast through the assembled stack: the builtin pg/enum@1 descriptor exposes nativeTypeFor and the stack lookup wires it', () => {
+  it('emits the per-instance enum cast through the assembled stack: the builtin pg/enum@1 descriptor exposes a params-aware metaFor and the stack lookup wires it', () => {
     // No hand-built lookup — this goes through the production extractCodecLookup
     // path, proving the codec-instance cast works end-to-end from descriptor
     // registration to rendered SQL.

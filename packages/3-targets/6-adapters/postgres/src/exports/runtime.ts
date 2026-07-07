@@ -4,7 +4,6 @@ import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import type { RuntimeAdapterInstance } from '@prisma-next/framework-components/execution';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
-import { attachNativeTypeFor } from '@prisma-next/sql-contract/native-type-hook';
 import type { Adapter, AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlRuntimeAdapterDescriptor } from '@prisma-next/sql-runtime';
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
@@ -41,11 +40,7 @@ const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', 
       // The runtime `ExecutionStack` does not (yet) carry a pre-assembled `codecLookup` field the way the control `ControlStack` does, so we derive an equivalent lookup here from the stack's component metadata (target + adapter + extension packs) using the same assembly helper that `createControlStack` uses. This keeps the renderer fed with the same codec set on both planes — including extension-contributed codecs like
       // `pg/vector@1` from `@prisma-next/extension-pgvector`.
       const components = [stack.target, stack.adapter, ...stack.extensionPacks];
-      const registry = extractCodecLookup(components);
-      const codecDescriptors = components.flatMap(
-        (component) => component.types?.codecTypes?.codecDescriptors ?? [],
-      );
-      const codecLookup = { ...registry, ...attachNativeTypeFor(registry, codecDescriptors) };
+      const codecLookup = extractCodecLookup(components);
       return createPostgresAdapter({ codecLookup });
     },
   };

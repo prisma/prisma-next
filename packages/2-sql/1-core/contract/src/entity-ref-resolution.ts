@@ -5,7 +5,8 @@
  * family defines its own payload shape; this is the SQL family's — a resolved column binding, the
  * same three generic fields any parameterized-codec-plus-value-set column carries. The native type
  * is not part of this payload: it is derived from `typeParams.typeName`, the same way the codec's
- * own `nativeTypeFor` hook derives it (see `native-type-hook.ts`).
+ * own params-aware `metaFor` derives it (see `CodecDescriptor.metaFor` in
+ * `@prisma-next/framework-components/codec`).
  */
 export interface SqlColumnBinding {
   readonly codecId: string;

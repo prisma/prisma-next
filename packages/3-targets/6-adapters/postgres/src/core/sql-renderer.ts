@@ -1,6 +1,6 @@
 import type { JsonValue } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type { SqlCodecLookup } from '@prisma-next/sql-contract/native-type-hook';
 import {
   type AggregateExpr,
   type AnyExpression,
@@ -72,14 +72,14 @@ const POSTGRES_INFERRABLE_NATIVE_TYPES: ReadonlySet<string> = new Set([
 function renderTypedParam(
   index: number,
   codecId: string | undefined,
-  codecLookup: SqlCodecLookup,
+  codecLookup: CodecLookup,
   many?: boolean,
   typeParams?: JsonValue,
 ): string {
   if (codecId === undefined) {
     return `$${index}`;
   }
-  const meta = codecLookup.metaFor(codecId);
+  const meta = codecLookup.metaFor(codecId, typeParams);
   const isRegistered =
     codecLookup.get(codecId) !== undefined ||
     meta !== undefined ||
@@ -94,14 +94,11 @@ function renderTypedParam(
         "if it's a builtin.",
     );
   }
-  // The framework `CodecLookup.metaFor` returns the family-agnostic `CodecMeta` whose `db` is `Record<string, unknown>`. The SQL family populates a narrower shape with `db.sql.<dialect>.nativeType: string`; navigate that path defensively and string-check the leaf.
+  // The framework `CodecLookup.metaFor` returns the family-agnostic `CodecMeta` whose `db` is `Record<string, unknown>`. The SQL family populates a narrower shape with `db.sql.<dialect>.nativeType: string`; navigate that path defensively and string-check the leaf. Threading `typeParams` above already resolved a parameterized codec's per-instance meta (e.g. a native enum's type name) ahead of its static fallback.
   const dbRecord = meta?.db;
   const sqlBlock = isRecord(dbRecord) ? dbRecord['sql'] : undefined;
   const dialectBlock = isRecord(sqlBlock) ? sqlBlock['postgres'] : undefined;
-  const staticNativeType = isRecord(dialectBlock) ? dialectBlock['nativeType'] : undefined;
-  // A parameterized codec can carry a per-instance native type (e.g. a native enum's type name from its `typeParams`); it wins over the codec's static meta.
-  const instanceNativeType = codecLookup.nativeTypeFor?.(codecId, typeParams);
-  const nativeType = instanceNativeType ?? staticNativeType;
+  const nativeType = isRecord(dialectBlock) ? dialectBlock['nativeType'] : undefined;
   if (typeof nativeType === 'string') {
     const arraySuffix = many ? '[]' : '';
     if (!POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
@@ -123,7 +120,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 interface ParamIndexMap {
   readonly indexMap: Map<AnyParamRef, number>;
-  readonly codecLookup: SqlCodecLookup;
+  readonly codecLookup: CodecLookup;
 }
 
 /**
@@ -134,7 +131,7 @@ interface ParamIndexMap {
 export function renderLoweredSql(
   ast: AnyQueryAst,
   contract: PostgresContract,
-  codecLookup: SqlCodecLookup,
+  codecLookup: CodecLookup,
 ): { readonly sql: string; readonly params: readonly LoweredParam[] } {
   const orderedRefs = collectOrderedParamRefs(ast);
   const indexMap = new Map<AnyParamRef, number>();

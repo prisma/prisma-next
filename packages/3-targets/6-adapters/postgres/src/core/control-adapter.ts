@@ -10,7 +10,6 @@ import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-componen
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
-import type { SqlCodecLookup } from '@prisma-next/sql-contract/native-type-hook';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import type {
@@ -99,9 +98,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly familyId = 'sql' as const;
   readonly targetId = 'postgres' as const;
 
-  private readonly codecRegistry: CodecRegistry & SqlCodecLookup;
+  private readonly codecRegistry: CodecRegistry;
 
-  constructor(codecRegistry: CodecRegistry & SqlCodecLookup) {
+  constructor(codecRegistry: CodecRegistry) {
     this.codecRegistry = codecRegistry;
   }
 

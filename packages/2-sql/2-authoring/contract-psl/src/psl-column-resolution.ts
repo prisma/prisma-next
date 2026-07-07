@@ -479,9 +479,9 @@ function resolveEntityRefTypeConstructorCall(input: {
   const binding = resolved;
 
   // The native type is not part of the binding — it is derived from
-  // `typeParams.typeName`, the same field the codec's own `nativeTypeFor`
-  // hook reads (see `native-type-hook.ts`), so the column's declared native
-  // type and the render-time cast agree.
+  // `typeParams.typeName`, the same field the codec's own params-aware
+  // `metaFor` reads, so the column's declared native type and the
+  // render-time cast agree.
   const typeName =
     binding.typeParams !== undefined && typeof binding.typeParams['typeName'] === 'string'
       ? binding.typeParams['typeName']

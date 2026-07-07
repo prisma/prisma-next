@@ -29,7 +29,7 @@ export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespa
 /**
  * Resolves `pg.enum(<ref>)` against the namespace's already-lowered `native_enum`
  * entities: the `pg/enum@1` codec, the enum's type name as the codec-instance
- * `typeParams.typeName` (the codec's `nativeTypeFor` hook derives the column's
+ * `typeParams.typeName` (the codec's params-aware `metaFor` derives the column's
  * native type from this), and the block name as the `valueSetEntityName` (the
  * entity derives a same-named value-set). The type name is schema-qualified for
  * a named non-default schema (matching `format_type()`); `public` and the

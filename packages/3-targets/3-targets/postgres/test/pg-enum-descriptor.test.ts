@@ -14,19 +14,23 @@ describe('PgEnumDescriptor (pg/enum@1) as a parameterized codec', () => {
     expect(invalid).toHaveProperty('issues');
   });
 
-  describe('nativeTypeFor', () => {
-    it('returns the typeName from the codec-instance typeParams', () => {
-      expect(pgEnumDescriptor.nativeTypeFor({ typeName: 'aal_level' })).toBe('aal_level');
-      expect(pgEnumDescriptor.nativeTypeFor({ typeName: 'auth.aal_level' })).toBe('auth.aal_level');
+  describe('metaFor', () => {
+    it('returns meta carrying the typeName from the codec-instance typeParams', () => {
+      expect(pgEnumDescriptor.metaFor?.({ typeName: 'aal_level' })).toEqual({
+        db: { sql: { postgres: { nativeType: 'aal_level' } } },
+      });
+      expect(pgEnumDescriptor.metaFor?.({ typeName: 'auth.aal_level' })).toEqual({
+        db: { sql: { postgres: { nativeType: 'auth.aal_level' } } },
+      });
     });
 
-    it('returns undefined for absent or malformed typeParams', () => {
-      expect(pgEnumDescriptor.nativeTypeFor(undefined)).toBeUndefined();
-      expect(pgEnumDescriptor.nativeTypeFor(null)).toBeUndefined();
-      expect(pgEnumDescriptor.nativeTypeFor('aal_level')).toBeUndefined();
-      expect(pgEnumDescriptor.nativeTypeFor(['aal_level'])).toBeUndefined();
-      expect(pgEnumDescriptor.nativeTypeFor({ typeName: 42 })).toBeUndefined();
-      expect(pgEnumDescriptor.nativeTypeFor({})).toBeUndefined();
+    it('falls back to the codec static meta for absent or malformed typeParams', () => {
+      expect(pgEnumDescriptor.metaFor?.(undefined)).toBe(pgEnumDescriptor.meta);
+      expect(pgEnumDescriptor.metaFor?.(null)).toBe(pgEnumDescriptor.meta);
+      expect(pgEnumDescriptor.metaFor?.('aal_level')).toBe(pgEnumDescriptor.meta);
+      expect(pgEnumDescriptor.metaFor?.(['aal_level'])).toBe(pgEnumDescriptor.meta);
+      expect(pgEnumDescriptor.metaFor?.({ typeName: 42 })).toBe(pgEnumDescriptor.meta);
+      expect(pgEnumDescriptor.metaFor?.({})).toBe(pgEnumDescriptor.meta);
     });
   });
 });
