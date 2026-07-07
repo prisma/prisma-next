@@ -147,6 +147,12 @@ function omitDefaults(
 
       const isNullableField = key === 'nullable';
 
+      // A column default's literal payload is data, not schema shape —
+      // `{ kind: 'literal', value: false }` (or `value: []`) must survive
+      // canonicalization or the emitted contract fails validation on read.
+      const isDefaultLiteralValue =
+        key === 'value' && currentPath[currentPath.length - 2] === 'default';
+
       const isFamilyPreserved = shouldPreserveEmpty?.(currentPath) ?? false;
 
       if (
@@ -164,6 +170,7 @@ function omitDefaults(
         !isModelRelations &&
         !isModelStorage &&
         !isNullableField &&
+        !isDefaultLiteralValue &&
         !isFamilyPreserved
       ) {
         continue;

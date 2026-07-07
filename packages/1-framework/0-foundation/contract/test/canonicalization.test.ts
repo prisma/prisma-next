@@ -333,6 +333,48 @@ describe('default omission', () => {
     expect(idField).not.toHaveProperty('generated');
   });
 
+  it('preserves a literal false column default value', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          task: {
+            columns: {
+              done: {
+                codecId: 'pg/bool@1',
+                nativeType: 'bool',
+                nullable: false,
+                default: { kind: 'literal', value: false },
+              },
+            },
+          },
+        }),
+      }),
+    );
+    const done = drill(unboundTables(result), 'task', 'columns', 'done');
+    expect(done['default']).toEqual({ kind: 'literal', value: false });
+  });
+
+  it('preserves a literal empty-array column default value', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          task: {
+            columns: {
+              labels: {
+                codecId: 'pg/text_array@1',
+                nativeType: 'text[]',
+                nullable: false,
+                default: { kind: 'literal', value: [] },
+              },
+            },
+          },
+        }),
+      }),
+    );
+    const labels = drill(unboundTables(result), 'task', 'columns', 'labels');
+    expect(labels['default']).toEqual({ kind: 'literal', value: [] });
+  });
+
   it('strips onDelete: noAction and onUpdate: noAction', () => {
     const result = canonicalizeContractToObject(
       minimal({
