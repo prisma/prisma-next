@@ -27,6 +27,12 @@ export interface DbVerifyCommandSuccessResult {
   readonly schema?: {
     readonly summary: string;
     readonly strict: boolean;
+    /**
+     * Warn-graded finding messages (observed-policy drift). Informational —
+     * present on a passing verify; the full-mode result summarizes them as a
+     * flat message list.
+     */
+    readonly warnings?: readonly string[];
   };
   /**
    * Live element names no contract space declares. In full success this is
@@ -75,6 +81,14 @@ export function formatVerifyOutput(
   if (result.contract.profileHash) {
     lines.push(`${formatDimText(`  profileHash: ${result.contract.profileHash}`)}`);
   }
+  if (result.schema?.warnings && result.schema.warnings.length > 0) {
+    lines.push('');
+    lines.push(formatYellow('Schema warnings:'));
+    for (const message of result.schema.warnings) {
+      lines.push(`  ${formatYellow('⚠')} ${message}`);
+    }
+  }
+
   if (result.unclaimed && result.unclaimed.length > 0) {
     lines.push('');
     lines.push(formatYellow('Unclaimed elements (declared by no contract):'));
@@ -346,6 +360,18 @@ export function formatSchemaVerifyOutput(
     lines.push(formatRed('Schema issues:'));
     for (const message of issueMessages) {
       lines.push(`  ${formatRed('✖')} ${message}`);
+    }
+  }
+
+  const warningMessages = [
+    ...(result.schema.warnings?.issues ?? []).map((issue) => issue.message),
+    ...(result.schema.warnings?.schemaDiffIssues ?? []).map((issue) => issue.message),
+  ];
+  if (warningMessages.length > 0) {
+    if (lines.length > 0) lines.push('');
+    lines.push(formatYellow('Schema warnings:'));
+    for (const message of warningMessages) {
+      lines.push(`  ${formatYellow('⚠')} ${message}`);
     }
   }
 

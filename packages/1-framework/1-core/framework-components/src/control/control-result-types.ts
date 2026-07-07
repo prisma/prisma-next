@@ -132,12 +132,28 @@ export interface EnumValuesChangedIssue {
 export type SchemaIssue = BaseSchemaIssue | EnumValuesChangedIssue;
 
 /**
- * The issue-based schema-verify result. `ok` derives from the issue lists:
- * a verify passes exactly when both lists are empty — the lists carry only
- * verdict-bearing (failure) findings, post strict-gating and control-policy
- * disposition. `issues` holds the legacy coordinate-based findings (storage
- * types, Mongo — retires with the issue-type merge); `schemaDiffIssues`
- * holds the node-typed differ findings.
+ * A pair of issue lists split by type, not by severity: `issues` holds the
+ * legacy coordinate-based findings (storage types, Mongo — retires with the
+ * issue-type merge), `schemaDiffIssues` the node-typed differ findings. Used
+ * for both the failure channel and the warning channel of a verify result.
+ */
+export interface SchemaFindingLists {
+  readonly issues: readonly SchemaIssue[];
+  readonly schemaDiffIssues: readonly SchemaDiffIssue[];
+}
+
+/**
+ * The issue-based schema-verify result. `ok` derives from the FAILURE lists
+ * only: a verify passes exactly when `schema.issues` and
+ * `schema.schemaDiffIssues` are both empty, post strict-gating and
+ * control-policy disposition.
+ *
+ * `schema.warnings` carries warn-graded findings (an `observed`-policy
+ * subject's drift, and any other `warn` disposition) in the same
+ * coordinate/node split. Warnings are informational — they never affect
+ * `ok` — but they MUST be surfaced: an `observed` table that drifted yields
+ * `ok: true` with a non-empty warnings channel, which is what distinguishes
+ * "watch without failing" from full suppression.
  */
 export interface VerifyDatabaseSchemaResult {
   readonly ok: boolean;
@@ -151,9 +167,8 @@ export interface VerifyDatabaseSchemaResult {
     readonly expected: string;
     readonly actual?: string;
   };
-  readonly schema: {
-    readonly issues: readonly SchemaIssue[];
-    readonly schemaDiffIssues: readonly SchemaDiffIssue[];
+  readonly schema: SchemaFindingLists & {
+    readonly warnings?: SchemaFindingLists;
   };
   readonly meta?: {
     readonly configPath?: string;

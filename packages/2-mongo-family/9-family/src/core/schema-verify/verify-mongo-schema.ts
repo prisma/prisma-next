@@ -38,7 +38,7 @@ export function verifyMongoSchema(options: VerifyMongoSchemaOptions): VerifyData
     expectedIR,
   );
   const collectionControlPolicy = resolveMongoCollectionControlPolicy(contract);
-  const { failures } = diffMongoSchemas(
+  const { failures, warnings } = diffMongoSchemas(
     canonicalLive,
     canonicalExpected,
     strict,
@@ -59,7 +59,11 @@ export function verifyMongoSchema(options: VerifyMongoSchemaOptions): VerifyData
       ...(profileHash ? { profileHash } : {}),
     },
     target: { expected: contract.target },
-    schema: { issues: failures, schemaDiffIssues: [] },
+    schema: {
+      issues: failures,
+      schemaDiffIssues: [],
+      warnings: { issues: warnings, schemaDiffIssues: [] },
+    },
     meta: {
       strict,
       ...ifDefined('contractPath', context?.contractPath),

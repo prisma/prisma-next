@@ -161,10 +161,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // One combined database-schema diff drives the whole plan: the relational
     // findings (+ namespace presence) become structural DDL via `planIssues`,
     // the policy findings become RLS ops via `planPostgresSchemaDiff`. Verify
-    // runs the same underlying comparison (via `verifyDatabaseSchema`) and
-    // rejects on non-empty. The caller-supplied `keepDiffIssue` predicate is
-    // applied blindly — any scoping (e.g. multi-space ownership) is the
-    // orchestration's, never worked out here.
+    // runs its own full-tree node diff (`diffSchemaForVerdict`) over the same
+    // schema and rejects on a surviving failure. The caller-supplied
+    // `keepDiffIssue` predicate is applied blindly — any scoping (e.g.
+    // multi-space ownership) is the orchestration's, never worked out here.
     PostgresDatabaseSchemaNode.assert(options.schema);
     const rawDiff = diffPostgresDatabaseSchema({
       contract: options.contract,

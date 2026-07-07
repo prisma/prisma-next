@@ -65,12 +65,18 @@ export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDa
   const ok = issues.length === 0 && schemaDiffIssues.length === 0;
   const { code: staleCode, ...envelope } = result;
   void staleCode;
+  // Warnings are the space's own drift-watch (an observed-policy subject), never
+  // a sibling's unclaimed extra, so the strip carries them through untouched.
   return {
     ...envelope,
     ok,
     ...(ok ? {} : { code: result.code ?? 'PN-RUN-3010' }),
     summary: ok ? 'Database schema satisfies contract' : result.summary,
-    schema: { issues, schemaDiffIssues },
+    schema: {
+      issues,
+      schemaDiffIssues,
+      ...(result.schema.warnings !== undefined ? { warnings: result.schema.warnings } : {}),
+    },
   };
 }
 

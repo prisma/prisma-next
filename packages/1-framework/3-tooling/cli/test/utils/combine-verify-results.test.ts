@@ -49,7 +49,11 @@ describe('combineVerifyResults', () => {
       ok: true,
       summary: 'Database schema satisfies contract',
     });
-    expect(combined.result.schema).toEqual({ issues: [], schemaDiffIssues: [] });
+    expect(combined.result.schema).toEqual({
+      issues: [],
+      schemaDiffIssues: [],
+      warnings: { issues: [], schemaDiffIssues: [] },
+    });
     expect(combined.unclaimed).toEqual([]);
   });
 

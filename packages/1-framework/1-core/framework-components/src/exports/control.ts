@@ -60,6 +60,7 @@ export type {
   ExpectationFailureReason,
   IntrospectSchemaResult,
   OperationContext,
+  SchemaFindingLists,
   SchemaIssue,
   SignDatabaseResult,
   VerifyDatabaseResult,

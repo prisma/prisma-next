@@ -285,16 +285,18 @@ describe('control policy mongo CLI (e2e)', { timeout: timeouts.spinUpMongoMemory
       );
       expect(exitCode).toBe(0);
       expect(parsed['ok']).toBe(true);
-      // Under the `observed` control policy the dropped collection only warns; a
-      // warn-graded finding never reaches the result, so this asserts the
-      // observable effect (the command still passes with no reported issues)
-      // rather than the (unreported) warning itself.
+      // Under the `observed` control policy the dropped collection warns but
+      // does not fail: the failure lists stay empty (verify passes) AND the
+      // warning is surfaced in the warnings channel — watch-without-failing,
+      // not silent suppression.
       const schema = parsed['schema'] as {
         issues: readonly unknown[];
         schemaDiffIssues: readonly unknown[];
+        warnings: { issues: readonly { message: string }[]; schemaDiffIssues: readonly unknown[] };
       };
       expect(schema.issues).toEqual([]);
       expect(schema.schemaDiffIssues).toEqual([]);
+      expect(schema.warnings.issues.some((w) => w.message.includes('legacy_jobs'))).toBe(true);
     });
   });
 });

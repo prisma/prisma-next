@@ -380,6 +380,10 @@ export function verifySqlSchemaByDiff(
     schema: {
       issues: storageTypeVerdict.failures,
       schemaDiffIssues: diffVerdict.failures,
+      warnings: {
+        issues: storageTypeVerdict.warnings,
+        schemaDiffIssues: diffVerdict.warnings,
+      },
     },
     meta: { strict: input.strict },
     timings: { total: Date.now() - startTime },

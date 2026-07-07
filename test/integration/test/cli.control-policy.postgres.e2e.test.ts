@@ -352,12 +352,12 @@ withTempDir(({ createTempDir }) => {
           );
           expect(exitCode).toBe(0);
           expect(parsed['ok']).toBe(true);
-          // Under the `observed` control policy the dropped table only warns; a
-          // warn-graded finding never reaches the result, so this asserts the
-          // observable effect (the command still passes) rather than the
-          // (unreported) warning itself.
-          const schema = parsed['schema'] as { summary: string };
+          // Under the `observed` control policy the dropped table warns but does
+          // not fail: the verify passes AND the warning is surfaced in the
+          // output (watch-without-failing, not silent suppression).
+          const schema = parsed['schema'] as { summary: string; warnings: readonly string[] };
           expect(schema.summary).toBe('Database schema satisfies contract');
+          expect(schema.warnings.some((w) => w.includes('legacy_jobs'))).toBe(true);
         });
       },
       timeouts.spinUpPpgDev,

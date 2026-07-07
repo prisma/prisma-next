@@ -418,6 +418,38 @@ describe('formatSchemaVerifyOutput', () => {
     expect(stripped).toBe('✔ Database schema satisfies contract');
   });
 
+  it('renders a distinct "Schema warnings:" block on a passing verify with observed-policy drift', () => {
+    const { code: _code, ...rest } = createResult();
+    const result: VerifyDatabaseSchemaResult = {
+      ...rest,
+      ok: true,
+      summary: 'Database schema satisfies contract',
+      schema: {
+        issues: [],
+        schemaDiffIssues: [],
+        warnings: {
+          issues: [],
+          schemaDiffIssues: [
+            {
+              path: ['database', 'public', 'legacy_jobs'],
+              outcome: 'missing',
+              reason: 'not-found',
+              message: 'missing: database/public/legacy_jobs',
+            },
+          ],
+        },
+      },
+    };
+    const flags = parseGlobalFlags({ 'no-color': true });
+
+    const stripped = stripAnsi(formatSchemaVerifyOutput(result, flags));
+
+    expect(stripped).not.toContain('Schema issues:');
+    expect(stripped).toContain('Schema warnings:');
+    expect(stripped).toContain('⚠ missing: database/public/legacy_jobs');
+    expect(stripped).toContain('✔ Database schema satisfies contract');
+  });
+
   it('includes the code in the failure summary', () => {
     const result = createResult();
     const flags = parseGlobalFlags({ 'no-color': true });
