@@ -231,12 +231,7 @@ withTempDir(({ createTempDir }) => {
               },
               schema: {
                 summary: expect.any(String),
-                counts: {
-                  pass: expect.any(Number),
-                  warn: expect.any(Number),
-                  fail: expect.any(Number),
-                  totalNodes: expect.any(Number),
-                },
+                strict: expect.any(Boolean),
               },
             });
 

@@ -10,7 +10,6 @@ import sqliteAdapterDescriptor, {
 import type { Contract } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
 import sqlFamilyDescriptor, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import { verifySqlSchema } from '@prisma-next/family-sql/diff';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import {
   APP_SPACE_ID,
@@ -23,8 +22,6 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { field } from '@prisma-next/sqlite/contract-builder';
 import sqliteTargetDescriptor, { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
-import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
-import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import sqlitePack from '@prisma-next/target-sqlite/pack';
 
 const controlStack = createControlStack({
@@ -206,19 +203,18 @@ export async function applyMigration(
       throw new Error(`Destination runner failed: ${formatFailure(runResult.failure)}`);
 
     const freshSchema = await adapter.introspect(driver);
-    const vr = verifySqlSchema({
+    const vr = familyInstance.verifySchema({
       contract: options.destination,
       schema: freshSchema,
       strict: false,
-      typeMetadataRegistry: familyInstance.typeMetadataRegistry,
       frameworkComponents: fw,
-      normalizeDefault: parseSqliteDefault,
-      normalizeNativeType: normalizeSqliteNativeType,
     });
     if (!vr.ok) {
-      throw new Error(
-        `Schema verification failed:\n${vr.schema.issues.map((i) => `  - [${i.kind}] ${i.message}`).join('\n')}`,
-      );
+      const lines = [
+        ...vr.schema.issues.map((i) => `  - [${i.kind}] ${i.message}`),
+        ...vr.schema.schemaDiffIssues.map((i) => `  - ${i.message}`),
+      ];
+      throw new Error(`Schema verification failed:\n${lines.join('\n')}`);
     }
 
     const userTables: Record<string, SqlSchemaIR['tables'][string]> = {};

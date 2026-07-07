@@ -32,7 +32,7 @@ describe('family instance schemaVerify - modes', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false in strict mode with extra_column issue',
+      'returns ok=false in strict mode with a not-expected issue for the extra column',
       async () => {
         const contract = defineContract({
           models: {
@@ -47,20 +47,13 @@ describe('family instance schemaVerify - modes', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract, { strict: true });
 
-        expect(result).toMatchObject({
-          ok: false,
-          schema: {
-            counts: { fail: expect.any(Number) },
-            issues: expect.arrayContaining([
-              expect.objectContaining({
-                kind: 'extra_column',
-                table: 'user',
-                column: 'extraColumn',
-              }),
-            ]),
-          },
-        });
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
+        expect(result.ok).toBe(false);
+        expect(result.schema.schemaDiffIssues).toContainEqual(
+          expect.objectContaining({
+            reason: 'not-expected',
+            path: ['database', 'public', 'user', 'column:extraColumn'],
+          }),
+        );
       },
       timeouts.spinUpPpgDev,
     );
@@ -84,9 +77,7 @@ describe('family instance schemaVerify - modes', () => {
         // In permissive mode, extra columns don't cause failures
         expect(result).toMatchObject({
           ok: true,
-          schema: {
-            counts: { fail: 0 },
-          },
+          schema: { issues: [], schemaDiffIssues: [] },
         });
       },
       timeouts.spinUpPpgDev,

@@ -327,7 +327,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'observed: zero DDL; verifier warns without failing on declared drift',
+      'observed: zero DDL; verifier passes despite declared drift',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           const { testSetup, configPath } = await setupControlPolicyPostgresFixture(
@@ -352,9 +352,12 @@ withTempDir(({ createTempDir }) => {
           );
           expect(exitCode).toBe(0);
           expect(parsed['ok']).toBe(true);
-          const schema = parsed['schema'] as { counts: { warn: number; fail: number } };
-          expect(schema.counts.warn).toBeGreaterThan(0);
-          expect(schema.counts.fail).toBe(0);
+          // Under the `observed` control policy the dropped table only warns; a
+          // warn-graded finding never reaches the result, so this asserts the
+          // observable effect (the command still passes) rather than the
+          // (unreported) warning itself.
+          const schema = parsed['schema'] as { summary: string };
+          expect(schema.summary).toBe('Database schema satisfies contract');
         });
       },
       timeouts.spinUpPpgDev,

@@ -110,9 +110,8 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(true);
-          expect(result.schema.counts.fail).toBe(0);
-          expect(result.schema.counts.pass).toBeGreaterThan(0);
-          expect(result.schema.root.status).toBe('pass');
+          expect(result.schema.issues).toEqual([]);
+          expect(result.schema.schemaDiffIssues).toEqual([]);
         } finally {
           await driver.close();
         }
@@ -192,11 +191,9 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(false);
-          expect(result.schema.counts.fail).toBeGreaterThan(0);
-          expect(
-            result.schema.issues.some((i) => i.kind === 'missing_table' && i.table === 'post'),
-          ).toBe(true);
-          expect(result.schema.root.status).toBe('fail');
+          expect(result.schema.schemaDiffIssues).toContainEqual(
+            expect.objectContaining({ reason: 'not-found', path: ['database', 'public', 'post'] }),
+          );
         } finally {
           await driver.close();
         }
@@ -268,12 +265,12 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(false);
-          expect(result.schema.counts.fail).toBeGreaterThan(0);
-          expect(
-            result.schema.issues.some(
-              (i) => i.kind === 'missing_column' && i.table === 'user' && i.column === 'email',
-            ),
-          ).toBe(true);
+          expect(result.schema.schemaDiffIssues).toContainEqual(
+            expect.objectContaining({
+              reason: 'not-found',
+              path: ['database', 'public', 'user', 'column:email'],
+            }),
+          );
         } finally {
           await driver.close();
         }

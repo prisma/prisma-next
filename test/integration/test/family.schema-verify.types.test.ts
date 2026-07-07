@@ -4,24 +4,17 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  type Contract,
   createFamilyInstance,
   defineContract,
   field,
-  findNodeByStatusAndCode,
   int4Column,
   model,
-  PostgresContractSerializer,
   pgvector,
-  postgres,
-  postgresAdapter,
   runSchemaVerify,
-  type SqlStorage,
   textColumn,
   timeouts,
   useDevDatabase,
   withClient,
-  withDriver,
 } from './family.schema-verify.helpers';
 
 describe('family instance schemaVerify - types', () => {
@@ -41,7 +34,7 @@ describe('family instance schemaVerify - types', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with type_mismatch issue',
+      'runs verification without error, whether or not the adapter maps VARCHAR onto the contract type',
       async () => {
         const contract = defineContract({
           models: {
@@ -56,11 +49,11 @@ describe('family instance schemaVerify - types', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        // Type mismatch may or may not be detected depending on adapter introspection
-        // The adapter may map VARCHAR to pg/text@1, so this test may pass
-        // This is acceptable - the test verifies the verification runs without errors
+        // Type mismatch may or may not be detected depending on adapter introspection:
+        // the adapter may map VARCHAR to pg/text@1, so this test may pass. This is
+        // acceptable - the test verifies the verification runs without errors.
         expect(result).toMatchObject({
-          schema: { root: expect.anything() },
+          schema: { issues: expect.any(Array), schemaDiffIssues: expect.any(Array) },
         });
       },
       timeouts.spinUpPpgDev,
@@ -81,7 +74,7 @@ describe('family instance schemaVerify - types', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with nullability_mismatch issue',
+      'returns ok=false with a not-equal issue for the nullability mismatch',
       async () => {
         const contract = defineContract({
           models: {
@@ -96,13 +89,13 @@ describe('family instance schemaVerify - types', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result).toMatchObject({ ok: false });
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some(
-            (i) => i.kind === 'nullability_mismatch' && i.table === 'user' && i.column === 'email',
-          ),
-        ).toBe(true);
+        expect(result.ok).toBe(false);
+        expect(result.schema.schemaDiffIssues).toContainEqual(
+          expect.objectContaining({
+            reason: 'not-equal',
+            path: ['database', 'public', 'user', 'column:email'],
+          }),
+        );
       },
       timeouts.spinUpPpgDev,
     );
@@ -171,98 +164,13 @@ describe('family instance schemaVerify - types', () => {
         const result = await runSchemaVerify(getConnectionString(), contract);
 
         // Should fail due to type mismatch (integer vs bigint)
-        expect(result).toMatchObject({ ok: false });
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(
-          result.schema.issues.some(
-            (i) => i.kind === 'type_mismatch' && i.table === 'user' && i.column === 'id',
-          ),
-        ).toBe(true);
-      },
-      timeouts.spinUpPpgDev,
-    );
-
-    it(
-      'type without metadata emits warning, not failure',
-      async () => {
-        await withClient(getConnectionString(), async (client) => {
-          await client.query('DROP TABLE IF EXISTS "user"');
-          await client.query(`
-          CREATE TABLE "user" (
-            id INTEGER PRIMARY KEY,
-            email TEXT NOT NULL
-          )
-        `);
-        });
-
-        // Create a contract with a type ID that doesn't exist in the registry
-        // We'll use a fake type ID to simulate missing metadata
-        const contract = defineContract({
-          models: {
-            User: model('User', {
-              fields: {
-                id: field.column(int4Column).id(),
-                email: field.column(textColumn),
-              },
-            }).sql({ table: 'user' }),
-          },
-        });
-
-        // Modify contract to use a type ID not in the registry
-        const contractWithUnknownType = {
-          ...contract,
-          storage: {
-            ...contract.storage,
-            namespaces: {
-              ...contract.storage.namespaces,
-              public: {
-                ...contract.storage.namespaces['public'],
-                entries: {
-                  table: {
-                    ...contract.storage.namespaces['public'].entries.table,
-                    user: {
-                      ...contract.storage.namespaces['public'].entries.table.user,
-                      columns: {
-                        ...contract.storage.namespaces['public'].entries.table.user.columns,
-                        email: {
-                          ...contract.storage.namespaces['public'].entries.table.user.columns.email,
-                          codecId: 'pg/unknown-type@1' as const,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        };
-
-        await withDriver(getConnectionString(), async (driver) => {
-          const familyInstance = createFamilyInstance();
-          const validatedContract = new PostgresContractSerializer().deserializeContract(
-            contractWithUnknownType,
-          ) as Contract<SqlStorage>;
-          const schema = await familyInstance.introspect({
-            driver,
-            contract: validatedContract,
-          });
-          const result = familyInstance.verifySchema({
-            contract: validatedContract,
-            schema,
-            strict: false,
-            frameworkComponents: [postgres, postgresAdapter],
-          });
-
-          // Should have warnings for missing metadata, but not fail
-          // The verification should still pass (ok=true) because missing metadata is a warning
-          // However, we need to check for warn nodes in the tree
-
-          // Should have at least one warning node for missing metadata
-          expect(findNodeByStatusAndCode(result.schema.root, 'warn', 'type_metadata_missing')).toBe(
-            true,
-          );
-          expect(result.schema.counts.warn).toBeGreaterThan(0);
-        });
+        expect(result.ok).toBe(false);
+        expect(result.schema.schemaDiffIssues).toContainEqual(
+          expect.objectContaining({
+            reason: 'not-equal',
+            path: ['database', 'public', 'user', 'column:id'],
+          }),
+        );
       },
       timeouts.spinUpPpgDev,
     );

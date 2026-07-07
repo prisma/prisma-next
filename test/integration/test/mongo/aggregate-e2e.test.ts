@@ -327,7 +327,6 @@ describe('Mongo contract-space aggregate e2e', {
         frameworkComponents: [],
       });
       expect(extVerify.ok).toBe(false);
-      expect(extVerify.schema.counts.fail).toBeGreaterThan(0);
       const indexIssues = extVerify.schema.issues.filter(
         (i): i is typeof i & { readonly table: string } =>
           i.kind === 'index_mismatch' && 'table' in i,

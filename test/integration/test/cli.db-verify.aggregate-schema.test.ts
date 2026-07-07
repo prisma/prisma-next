@@ -185,11 +185,8 @@ withTempDir(({ createTempDir }) => {
             ok: true,
             mode: 'full',
           });
-          const schema = parsed['schema'] as
-            | { counts?: { fail?: number; warn?: number } }
-            | undefined;
-          expect(schema?.counts?.fail ?? -1).toBe(0);
-          expect(schema?.counts?.warn ?? -1).toBe(0);
+          const schema = parsed['schema'] as { summary?: string } | undefined;
+          expect(schema?.summary).toBe('Database schema satisfies contract');
         });
       },
       timeouts.spinUpPpgDev,

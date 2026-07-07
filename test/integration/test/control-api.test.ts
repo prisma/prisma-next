@@ -436,7 +436,8 @@ describe('control-api', () => {
               });
 
               expect(schemaResult.ok).toBe(true);
-              expect(schemaResult.schema.counts.fail).toBe(0);
+              expect(schemaResult.schema.issues).toEqual([]);
+              expect(schemaResult.schema.schemaDiffIssues).toEqual([]);
             } finally {
               await client.close();
             }
