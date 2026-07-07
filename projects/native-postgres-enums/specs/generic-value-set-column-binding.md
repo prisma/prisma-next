@@ -44,26 +44,25 @@ A text-backed enum (a value set enforced by a `CHECK`) and a native enum (enforc
 
 This also puts the fact where it belongs: with `pg/text` the codec has no idea whether storage enforces the set, so "enforced" was never the codec's fact to hold.
 
-### 3. Keep the enum codec and `nativeTypeFor` — researched, not collapsible
+### 3. Deliver the enum codec's per-instance native type through params-aware `metaFor` — no hook
 
-The parameterized `pg/enum` codec owns its per-instance native type (`auth.aal_level` from `typeParams`). That is the codec doing its job, and it is the only thing in scope when the renderer emits `$N::auth.aal_level`. Confirmed against the code:
+The parameterized `pg/enum` codec owns its per-instance native type (`auth.aal_level` from `typeParams`); that is the codec doing its job. The first draft kept a bespoke `nativeTypeFor` hook (+ `SqlCodecLookup` + `attachNativeTypeFor`) to smuggle it to the renderer, on the reasoning that the render chokepoint holds only a `SqlCodecLookup` and can't materialize a per-`typeParams` instance (`get(id)` is id-keyed; `forCodecRef` needs a `SqlCodecInstanceContext.usedAt` the render site lacks). That reasoning was right about materialization but wrong about the conclusion: native type is **codec metadata**, and the framework already exposes params-aware codec metadata through `extractCodecLookup` — `renderOutputTypeFor(id, params)`, `renderInputTypeFor(id, params)`, and `metaFor`. The only gap was that `metaFor(id)` was codec-id-keyed, not params-aware.
 
-- The renderer holds a `SqlCodecLookup`, whose `get(id)` is id-keyed (one instance per id, not per-`typeParams`); getting a per-`typeParams` instance needs `CodecRegistry.forCodecRef`, which the render path isn't given.
-- Materializing one needs a `SqlCodecInstanceContext.usedAt` the render site doesn't have; materializing a stateful codec there would mis-instantiate it.
-- `nativeType` is params-level and SQL-specific, so it belongs as a params-function on the SQL-side lookup — which is what `nativeTypeFor` is.
+So: make `metaFor` params-aware (`metaFor(id, typeParams)`). A parameterized codec computes its own metadata from its params via an optional descriptor `metaFor(params)` (declared next to `renderOutputType`); `extractCodecLookup` prefers it and falls back to the static `meta` (byte-identical when `typeParams` is absent or the codec has no hook). The renderer reads `metaFor(codecId, typeParams).db.sql.postgres.nativeType` in a single call. The framework stays family-blind — `nativeType` lives in the opaque `CodecMeta` the descriptor returns, never named in `packages/1-framework`.
 
-So the codec, `nativeTypeFor`, `SqlCodecLookup`, and `attachNativeTypeFor` all stay. Optional polish (not required): fold the static `meta.nativeType` and per-instance `nativeTypeFor` into one params-aware nativeType channel so the renderer stops doing `instance ?? static`.
+This deletes the whole bolt-on: `nativeTypeFor`, `NativeTypeForCodecDescriptor`, `providesNativeTypeFor`, `SqlCodecLookup`, `attachNativeTypeFor`, and `native-type-hook.ts` itself.
 
 ## Deletions enabled
 
 - `SqlEntityRefResolution`, `isSqlEntityRefResolution` (and their export).
 - `EnforcesValueSetCodecDescriptor`, `providesEnforcesValueSet`, `codecEnforcesValueSet`, `enforcesValueSet`.
-- The `blindCast` in `isAuthoringEntityRefTypeConstructorDescriptor`.
+- `nativeTypeFor`, `NativeTypeForCodecDescriptor`, `providesNativeTypeFor`, `SqlCodecLookup`, `attachNativeTypeFor`, and `native-type-hook.ts` itself.
+- The `blindCast` in `isAuthoringEntityRefTypeConstructorDescriptor` (and the four sibling authoring-descriptor predicates' casts, swept in the same pass).
 
 ## Kept
 
 - The `entityRefTypeConstructor` construct (real: a column type parameterized by an entity ref).
-- `pg/enum@1` codec + `nativeTypeFor` + `SqlCodecLookup` + `attachNativeTypeFor`.
+- The `pg/enum@1` codec, now delivering its per-instance native type through params-aware `metaFor`.
 - The value-set derivation from `native_enum`.
 
 ## Risks to validate first
