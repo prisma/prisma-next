@@ -1,6 +1,8 @@
 import type { MigrationOperationClass } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
-import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import type { SchemaDiffIssue, SchemaIssue } from '@prisma-next/framework-components/control';
+import { RelationalSchemaNodeKind, type SqlColumnIR } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { tableExistsAst } from '../../../contract-free/checks';
 import { stripOuterParens } from '../../default-normalizer';
 import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
@@ -367,6 +369,218 @@ export function buildRecreatePostchecks(
       // Build a `SUM(CASE WHEN ("from","to") IN ((…)) …)` so the check works
       // for both single- and multi-column FKs without depending on FK row
       // ordering inside `pragma_foreign_key_list`.
+      const tuples = fk.columns
+        .map((from, i) => {
+          const to = fk.references.columns[i] ?? from;
+          return `('${escapeLiteral(from)}', '${escapeLiteral(to)}')`;
+        })
+        .join(', ');
+      const description = `verify foreign key (${fk.columns.join(', ')}) → ${fk.references.table}(${fk.references.columns.join(', ')}) on "${tableName}"`;
+      checks.push({
+        description,
+        sql:
+          `SELECT EXISTS (SELECT 1 FROM pragma_foreign_key_list('${t}') f` +
+          ` WHERE f."table" = '${refTable}'` +
+          ' GROUP BY f.id' +
+          ` HAVING COUNT(*) = ${colCount}` +
+          ` AND SUM(CASE WHEN (f."from", f."to") IN (${tuples}) THEN 1 ELSE 0 END) = ${colCount})`,
+      });
+    }
+  }
+
+  return checks;
+}
+
+// ============================================================================
+// The node-based flip (W5) — additive, unwired
+// ============================================================================
+//
+// Node-typed siblings of `buildRecreateSummary`/`buildRecreatePostchecks`,
+// reading `SchemaDiffIssue`s instead of coordinate `SchemaIssue`s. Not
+// consumed by any strategy yet except the additive
+// `recreateTableStrategyOnDiff` in `planner-strategies.ts` — the cutover
+// commit deletes the two functions above and drops the `OnDiff` suffix from
+// these.
+
+/**
+ * Build a one-line summary of a recreate-table operation from the schema-diff
+ * issues that triggered it. Each `SchemaDiffIssue` already carries a
+ * differ-generated `message`, so this is a plain join rather than a per-kind
+ * message builder.
+ */
+export function buildRecreateSummaryOnDiff(
+  tableName: string,
+  issues: readonly SchemaDiffIssue[],
+): string {
+  const messages = issues.map((i) => i.message).join('; ');
+  return `Recreates table ${tableName} to apply schema changes: ${messages}`;
+}
+
+function nodeKindOf(issue: SchemaDiffIssue): string | undefined {
+  const node = issue.expected ?? issue.actual;
+  if (node === undefined) return undefined;
+  return blindCast<{ readonly nodeKind: string }, 'every diff-tree node declares nodeKind'>(node)
+    .nodeKind;
+}
+
+/** Mirrors `SqlColumnIR.isEqualTo`'s type comparison, isolated so a `not-equal` column issue's postcheck can target type drift and nullability drift independently. */
+function columnTypeChangedForPostcheck(expected: SqlColumnIR, actual: SqlColumnIR): boolean {
+  if (expected.resolvedNativeType !== undefined && actual.resolvedNativeType !== undefined) {
+    return expected.resolvedNativeType !== actual.resolvedNativeType;
+  }
+  return (
+    expected.nativeType !== actual.nativeType || Boolean(expected.many) !== Boolean(actual.many)
+  );
+}
+
+function columnNameFromNode(issue: SchemaDiffIssue): string | undefined {
+  const node = issue.expected ?? issue.actual;
+  if (node === undefined) return undefined;
+  return blindCast<{ readonly name: string }, 'a column issue node carries name'>(node).name;
+}
+
+/**
+ * A column-default issue's own node has no back-reference to its owning
+ * column — it's a transient child built by `SqlColumnIR.children()`. The
+ * column's id (`column:<name>`) is always the diff path's second-to-last
+ * segment for a default issue (`[..., tableId, columnId, 'default']`), so
+ * the name is recovered from the path rather than the node.
+ */
+function columnNameFromDefaultIssuePath(issue: SchemaDiffIssue): string | undefined {
+  const columnId = issue.path[issue.path.length - 2];
+  if (columnId === undefined) return undefined;
+  const prefix = 'column:';
+  return columnId.startsWith(prefix) ? columnId.slice(prefix.length) : columnId;
+}
+
+/**
+ * Node-based sibling of `buildRecreatePostchecks`. Column-level issues
+ * (`sql-column` `not-equal`, `sql-column-default` any reason) emit one
+ * targeted check each; constraint-level issues (`sql-primary-key`,
+ * `sql-unique`, `sql-foreign-key`, any reason) emit one `pragma_*`-driven
+ * check per declared constraint in the expected spec.
+ */
+export function buildRecreatePostchecksOnDiff(
+  tableName: string,
+  issues: readonly SchemaDiffIssue[],
+  spec: SqliteTableSpec,
+): Array<{ description: string; sql: string }> {
+  const checks: Array<{ description: string; sql: string }> = [];
+  const t = escapeLiteral(tableName);
+  const byName = new Map(spec.columns.map((c) => [c.name, c]));
+
+  let hasPkIssue = false;
+  let hasUniqueIssue = false;
+  let hasFkIssue = false;
+
+  for (const issue of issues) {
+    const nodeKind = nodeKindOf(issue);
+    if (nodeKind === RelationalSchemaNodeKind.column && issue.reason === 'not-equal') {
+      const columnName = columnNameFromNode(issue);
+      if (columnName === undefined) continue;
+      const c = escapeLiteral(columnName);
+      const expected = blindCast<SqlColumnIR, 'a not-equal column issue carries the expected node'>(
+        issue.expected,
+      );
+      const actual = blindCast<SqlColumnIR, 'a not-equal column issue carries the actual node'>(
+        issue.actual,
+      );
+      if (expected.nullable !== actual.nullable) {
+        checks.push({
+          description: `verify "${columnName}" nullability on "${tableName}"`,
+          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND "notnull" = ${expected.nullable ? 0 : 1}`,
+        });
+      }
+      if (columnTypeChangedForPostcheck(expected, actual)) {
+        const colSpec = byName.get(columnName);
+        if (colSpec) {
+          checks.push({
+            description: `verify "${columnName}" type on "${tableName}"`,
+            sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND LOWER(type) = '${escapeLiteral(colSpec.typeSql.toLowerCase())}'`,
+          });
+        }
+      }
+      continue;
+    }
+    if (nodeKind === RelationalSchemaNodeKind.columnDefault) {
+      const columnName = columnNameFromDefaultIssuePath(issue);
+      if (columnName === undefined) continue;
+      const c = escapeLiteral(columnName);
+      if (issue.reason === 'not-expected') {
+        checks.push({
+          description: `verify "${columnName}" has no default on "${tableName}"`,
+          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value IS NULL`,
+        });
+        continue;
+      }
+      // not-found (missing) or not-equal (drift) — both want the expected
+      // default SQL present on the live column.
+      const colSpec = byName.get(columnName);
+      const expectedRaw = colSpec?.defaultSql.startsWith('DEFAULT ')
+        ? // SQLite's pragma_table_info.dflt_value strips outer parens for
+          // expression defaults (per the SQLite docs), so `(datetime('now'))`
+          // is stored as `datetime('now')`. Strip them here so the postcheck
+          // matches.
+          stripOuterParens(colSpec.defaultSql.slice('DEFAULT '.length))
+        : null;
+      if (expectedRaw) {
+        checks.push({
+          description: `verify "${columnName}" default on "${tableName}"`,
+          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value = '${escapeLiteral(expectedRaw)}'`,
+        });
+      }
+      continue;
+    }
+    if (nodeKind === RelationalSchemaNodeKind.primaryKey) hasPkIssue = true;
+    if (nodeKind === RelationalSchemaNodeKind.unique) hasUniqueIssue = true;
+    if (nodeKind === RelationalSchemaNodeKind.foreignKey) hasFkIssue = true;
+  }
+
+  // Constraint-level issues — emit one postcheck per declared constraint in
+  // the expected spec when *any* issue of that kind fires, since recreate
+  // rebuilds the entire table at once.
+
+  if (hasPkIssue) {
+    const pkColumns = expectedPrimaryKeyColumns(spec);
+    // Verify pragma_table_info reports exactly these columns as PK members
+    // (count + named membership); zero columns expected ⇒ no PK at all.
+    const colCount = pkColumns.length;
+    if (colCount === 0) {
+      checks.push({
+        description: `verify "${tableName}" has no primary key`,
+        sql: `SELECT (SELECT COUNT(*) FROM pragma_table_info('${t}') WHERE pk > 0) = 0`,
+      });
+    } else {
+      checks.push({
+        description: `verify primary key on "${tableName}"`,
+        sql:
+          `SELECT (SELECT COUNT(*) FROM pragma_table_info('${t}') WHERE pk > 0) = ${colCount}` +
+          ` AND (SELECT COUNT(*) FROM pragma_table_info('${t}') WHERE pk > 0 AND name IN (${quoteSqlList(pkColumns)})) = ${colCount}`,
+      });
+    }
+  }
+
+  if (hasUniqueIssue) {
+    for (const u of spec.uniques ?? []) {
+      const colCount = u.columns.length;
+      const description = u.name
+        ? `verify unique constraint "${u.name}" on "${tableName}"`
+        : `verify unique constraint (${u.columns.join(', ')}) on "${tableName}"`;
+      checks.push({
+        description,
+        sql:
+          `SELECT EXISTS (SELECT 1 FROM pragma_index_list('${t}') l` +
+          ` WHERE l."unique" = 1` +
+          ` AND (SELECT COUNT(*) FROM pragma_index_info(l.name)) = ${colCount}` +
+          ` AND (SELECT COUNT(*) FROM pragma_index_info(l.name) WHERE name IN (${quoteSqlList(u.columns)})) = ${colCount})`,
+      });
+    }
+  }
+
+  if (hasFkIssue) {
+    for (const fk of spec.foreignKeys ?? []) {
+      const refTable = escapeLiteral(fk.references.table);
+      const colCount = fk.columns.length;
       const tuples = fk.columns
         .map((from, i) => {
           const to = fk.references.columns[i] ?? from;

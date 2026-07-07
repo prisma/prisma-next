@@ -12,7 +12,10 @@ import {
   verifySqlSchemaByDiff,
 } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
+import type {
+  SchemaDiffIssue,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/framework-components/control';
 import { diffSchemas, SchemaDiff } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
@@ -81,7 +84,10 @@ export function diffSqliteDatabaseSchema(input: SqliteDiffDatabaseSchemaInput): 
     contract: input.contract,
     actualSchema: input.actualSchema,
     buildExpectedSchema: (scoped) =>
-      sqliteContractToSchema(scoped, { expandNativeType, renderColumnOps }),
+      sqliteContractToSchema(scoped, {
+        ...ifDefined('expandNativeType', expandNativeType),
+        renderColumnOps,
+      }),
     strict: input.strict,
     frameworkComponents: input.frameworkComponents,
     normalizeDefault: parseSqliteDefault,
@@ -147,4 +153,47 @@ export function diffSqliteSchemaForVerdict(input: {
     expectedRoot: expected,
     namespacePairs: namespacesWithTables.map(() => ({ actual })),
   };
+}
+
+export interface SqlitePlanDiff {
+  /** The desired ("end") tree — resolved leaf values, `opRender` stamped on every column. */
+  readonly expected: SqlSchemaIR;
+  /** The live ("start") tree, normalized for semantic satisfaction against `expected`. */
+  readonly actual: SqlSchemaIR;
+  readonly issues: readonly SchemaDiffIssue[];
+}
+
+/**
+ * The SQLite planner's diff input: the same tree-building
+ * `diffSqliteSchemaForVerdict` uses (expander threaded, FK schema segment
+ * neutralized, actual tree normalized for semantic satisfaction), plus the
+ * op-render stamper so expected column nodes carry the DDL payload the
+ * planner's op-builders read. One differ drives both verify and plan; this
+ * is the plan-side derivation (verify never needs `renderColumnOps`).
+ */
+export function buildSqlitePlanDiff(input: {
+  readonly contract: Contract<SqlStorage>;
+  readonly actualSchema: SqlSchemaIRNode;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+}): SqlitePlanDiff {
+  const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
+  const storageTypes = input.contract.storage.types ?? {};
+  const renderColumnOps: ColumnOpRenderer = (name, column, table) =>
+    buildSqliteColumnOpRender(name, column, table, storageTypes);
+  const expected = neutralizeFlatExpectedFkSchemas(
+    sqliteContractToSchema(input.contract, {
+      ...ifDefined('expandNativeType', expandNativeType),
+      renderColumnOps,
+    }),
+  );
+  const actualRaw =
+    input.actualSchema instanceof SqlSchemaIR
+      ? input.actualSchema
+      : blindCast<
+          SqlSchemaIR,
+          'the SQLite introspection adapter always produces a flat SqlSchemaIR root'
+        >(input.actualSchema);
+  const actual = normalizeFlatActualForDiff(expected, actualRaw);
+  const issues = diffSchemas(expected, actual);
+  return { expected, actual, issues };
 }

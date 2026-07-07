@@ -20,7 +20,9 @@ import type {
   MigrationOperationPolicy,
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { SchemaIssue } from '@prisma-next/framework-components/control';
+// Node-based flip (W5) — additive, unused until the cutover renames these
+// into place and deletes the coordinate-based strategies above.
+import type { SchemaDiffIssue, SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   SqlStorage,
@@ -28,11 +30,21 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { toTableSpec } from './issue-planner';
+import {
+  RelationalSchemaNodeKind,
+  type SqlColumnIR,
+  type SqlSchemaIR,
+} from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
+import { columnTypeChanged, tableSpecFromNode, toTableSpec } from './issue-planner';
 import { DataTransformCall, RecreateTableCall, type SqliteOpFactoryCall } from './op-factory-call';
 import type { SqliteIndexSpec } from './operations/shared';
-import { buildRecreatePostchecks, buildRecreateSummary } from './operations/tables';
+import {
+  buildRecreatePostchecks,
+  buildRecreatePostchecksOnDiff,
+  buildRecreateSummary,
+  buildRecreateSummaryOnDiff,
+} from './operations/tables';
 
 export interface StrategyContext {
   readonly toContract: Contract<SqlStorage>;
@@ -273,4 +285,219 @@ export const nullabilityTighteningBackfillStrategy: CallMigrationStrategy = (iss
 export const sqlitePlannerStrategies: readonly CallMigrationStrategy[] = [
   nullabilityTighteningBackfillStrategy,
   recreateTableStrategy,
+];
+
+// ============================================================================
+// The node-based flip (W5) — additive, unwired
+// ============================================================================
+//
+// Node-typed siblings of the strategies above, reading `SchemaDiffIssue`s and
+// the start/end (`actual`/`expected`) schema-IR tree pair instead of
+// `toContract`/`fromContract`/`codecHooks`/`storageTypes`. Not consumed by
+// `planIssues` yet — the cutover commit deletes the coordinate-based
+// strategies above, drops the `OnDiff` suffix from these, and renames
+// `NodeStrategyContext` to `StrategyContext`.
+
+export interface NodeStrategyContext {
+  /** The desired ("end") tree — resolved leaf values, `opRender` stamped. */
+  readonly expected: SqlSchemaIR;
+  /** The live ("start") tree. */
+  readonly actual: SqlSchemaIR;
+  readonly policy: MigrationOperationPolicy;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+}
+
+export type NodeCallMigrationStrategy = (
+  issues: readonly SchemaDiffIssue[],
+  context: NodeStrategyContext,
+) =>
+  | {
+      kind: 'match';
+      issues: readonly SchemaDiffIssue[];
+      calls: readonly SqliteOpFactoryCall[];
+      recipe?: boolean;
+    }
+  | { kind: 'no_match' };
+
+/**
+ * Classifies a node issue into the operation class a recreate absorbing it
+ * would need, or `null` when the strategy doesn't handle this node/reason at
+ * all (table/column not-found-or-not-expected, and index issues — those are
+ * standalone ops, never folded into a recreate).
+ *
+ * Column drift is a single `not-equal` issue now (type AND nullability
+ * compared together by `SqlColumnIR.isEqualTo`), so this reads both fields
+ * off the node pair directly rather than trusting a separate issue kind per
+ * attribute: a type change is always destructive; a pure nullability change
+ * is destructive when tightening (NOT NULL required) and widening when
+ * relaxing.
+ */
+function classifyNodeIssue(issue: SchemaDiffIssue): 'widening' | 'destructive' | null {
+  const node = issue.expected ?? issue.actual;
+  if (node === undefined) return null;
+  const nodeKind = blindCast<
+    { readonly nodeKind: string },
+    'every diff-tree node declares nodeKind'
+  >(node).nodeKind;
+  switch (nodeKind) {
+    case RelationalSchemaNodeKind.column: {
+      if (issue.reason !== 'not-equal') return null;
+      const expected = blindCast<SqlColumnIR, 'a not-equal column issue carries the expected node'>(
+        issue.expected,
+      );
+      const actual = blindCast<SqlColumnIR, 'a not-equal column issue carries the actual node'>(
+        issue.actual,
+      );
+      if (columnTypeChanged(expected, actual)) return 'destructive';
+      // Type is unchanged, so `not-equal` here means only nullability
+      // differs: relaxing (NOT NULL → nullable) is safe; tightening is not.
+      return expected.nullable ? 'widening' : 'destructive';
+    }
+    case RelationalSchemaNodeKind.columnDefault:
+      return issue.reason === 'not-expected' ? 'destructive' : 'widening';
+    case RelationalSchemaNodeKind.primaryKey:
+    case RelationalSchemaNodeKind.foreignKey:
+    case RelationalSchemaNodeKind.unique:
+      return 'destructive';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Node-based sibling of `recreateTableStrategy`. Groups recreate-eligible
+ * issues by table, decides per-table operation class (destructive wins over
+ * widening), and emits one `RecreateTableCall` per table. The full desired/
+ * live table shapes come from `ctx.expected`/`ctx.actual` directly (keyed by
+ * table name — SQLite is a flat, single-namespace target) rather than from
+ * any individual issue, since a single drifted attribute's issue only
+ * carries that attribute's own node, never the whole table.
+ */
+export const recreateTableStrategyOnDiff: NodeCallMigrationStrategy = (issues, ctx) => {
+  const byTable = new Map<string, { issues: SchemaDiffIssue[]; hasDestructive: boolean }>();
+  const consumed = new Set<SchemaDiffIssue>();
+
+  for (const issue of issues) {
+    const cls = classifyNodeIssue(issue);
+    if (!cls) continue;
+    const tableName = issue.path[1];
+    if (tableName === undefined) continue;
+    const entry = byTable.get(tableName);
+    if (entry) {
+      entry.issues.push(issue);
+      if (cls === 'destructive') entry.hasDestructive = true;
+    } else {
+      byTable.set(tableName, { issues: [issue], hasDestructive: cls === 'destructive' });
+    }
+    consumed.add(issue);
+  }
+
+  if (byTable.size === 0) return { kind: 'no_match' };
+
+  const calls: SqliteOpFactoryCall[] = [];
+  for (const [tableName, entry] of byTable) {
+    const expectedTable = ctx.expected.tables[tableName];
+    const actualTable = ctx.actual.tables[tableName];
+    if (!expectedTable || !actualTable) continue;
+    const operationClass: MigrationOperationClass = entry.hasDestructive
+      ? 'destructive'
+      : 'widening';
+
+    // Flatten the expected table node to a self-contained spec — the Call
+    // holds pre-rendered SQL fragments only, no schema-IR node.
+    const tableSpec = tableSpecFromNode(expectedTable);
+
+    // Indexes (declared + FK-backing) are already merged and deduped by
+    // column-set at derivation (`contractToSchemaIR`'s `convertTable`).
+    const indexes: SqliteIndexSpec[] = expectedTable.indexes.map((idx) => ({
+      name: idx.name ?? defaultIndexName(tableName, idx.columns),
+      columns: idx.columns,
+    }));
+
+    calls.push(
+      new RecreateTableCall({
+        tableName,
+        contractTable: tableSpec,
+        schemaColumnNames: Object.keys(actualTable.columns),
+        indexes,
+        summary: buildRecreateSummaryOnDiff(tableName, entry.issues),
+        postchecks: buildRecreatePostchecksOnDiff(tableName, entry.issues, tableSpec),
+        operationClass,
+      }),
+    );
+  }
+
+  return {
+    kind: 'match',
+    issues: issues.filter((i) => !consumed.has(i)),
+    calls,
+    recipe: true,
+  };
+};
+
+/**
+ * Node-based sibling of `nullabilityTighteningBackfillStrategy`. Does NOT
+ * consume the tightening issue — `recreateTableStrategyOnDiff` still needs
+ * it to produce the actual recreate that enforces the NOT NULL at the
+ * schema level.
+ */
+export const nullabilityTighteningBackfillStrategyOnDiff: NodeCallMigrationStrategy = (
+  issues,
+  ctx,
+) => {
+  if (!ctx.policy.allowedOperationClasses.includes('data')) {
+    return { kind: 'no_match' };
+  }
+
+  const calls: SqliteOpFactoryCall[] = [];
+  for (const issue of issues) {
+    if (
+      issue.reason !== 'not-equal' ||
+      issue.expected === undefined ||
+      issue.actual === undefined
+    ) {
+      continue;
+    }
+    const nodeKind = blindCast<
+      { readonly nodeKind: string },
+      'every diff-tree node declares nodeKind'
+    >(issue.expected).nodeKind;
+    if (nodeKind !== RelationalSchemaNodeKind.column) continue;
+
+    const expectedColumn = blindCast<
+      SqlColumnIR,
+      'a not-equal column issue carries the expected node'
+    >(issue.expected);
+    const actualColumn = blindCast<SqlColumnIR, 'a not-equal column issue carries the actual node'>(
+      issue.actual,
+    );
+    if (expectedColumn.nullable === actualColumn.nullable) continue; // not a nullability change
+    if (expectedColumn.nullable) continue; // relaxing — no backfill needed
+
+    const tableName = issue.path[1];
+    if (tableName === undefined) continue;
+
+    calls.push(
+      new DataTransformCall(
+        `data_migration.backfill-${tableName}-${expectedColumn.name}`,
+        `Backfill NULLs in "${tableName}"."${expectedColumn.name}" before NOT NULL tightening`,
+        tableName,
+        expectedColumn.name,
+      ),
+    );
+  }
+
+  if (calls.length === 0) return { kind: 'no_match' };
+
+  return {
+    kind: 'match',
+    issues,
+    calls,
+    recipe: true,
+  };
+};
+
+export const sqlitePlannerStrategiesOnDiff: readonly NodeCallMigrationStrategy[] = [
+  nullabilityTighteningBackfillStrategyOnDiff,
+  recreateTableStrategyOnDiff,
 ];

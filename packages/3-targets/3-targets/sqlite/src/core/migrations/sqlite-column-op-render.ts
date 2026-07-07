@@ -4,6 +4,7 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { DdlColumn } from '@prisma-next/sql-relational-core/ast';
+import type { SqlColumnIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { tableToDdlParts, toColumnSpec } from './issue-planner';
 import type { SqliteColumnSpec } from './operations/shared';
@@ -44,4 +45,24 @@ export function buildSqliteColumnOpRender(
     throw new Error(`buildSqliteColumnOpRender: column "${name}" not found in table parts`);
   }
   return { columnSpec, ddlColumn };
+}
+
+/**
+ * Narrows an expected column node's opaque `opRender` payload back to
+ * {@link SqliteColumnOpRender}. Throws when absent — every expected column
+ * reaching the planner must come from a derivation that threaded
+ * `renderColumnOps`; a missing payload is a caller bug, not a reachable
+ * production state. Additive here — the node-typed planner (`plan(start,
+ * end)`) is the first consumer; see `issue-planner.ts`'s `mapNodeIssueToCall`.
+ */
+export function columnOpRenderOf(column: SqlColumnIR): SqliteColumnOpRender {
+  if (column.opRender === undefined) {
+    throw new Error(
+      `columnOpRenderOf: expected column "${column.name}" carries no opRender payload — the expected tree must be derived with renderColumnOps threaded for planning`,
+    );
+  }
+  return blindCast<
+    SqliteColumnOpRender,
+    'SqliteColumnOpRender is the only opRender shape sqlite-column-op-render.ts stamps; the planner only ever reads it off expected columns produced by buildSqliteColumnOpRender'
+  >(column.opRender);
 }
