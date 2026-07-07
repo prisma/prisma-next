@@ -1,7 +1,6 @@
 import type {
   ControlAdapterInstance,
   ControlFamilyInstance,
-  DiffIssue,
   MigrationOperationPolicy,
   MigrationPlanner,
   MigrationPlanWithAuthoringSurface,
@@ -10,7 +9,7 @@ import type {
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { synthStrategy } from '../../../src/aggregate/strategies/synth';
+import { planFromDiff } from '../../../src/aggregate/strategies/plan-from-diff';
 import type { AggregateContractSpace } from '../../../src/aggregate/types';
 import { makeAggregateContractSpace } from '../../fixtures';
 
@@ -45,14 +44,14 @@ function makeStubPlan(targetId: string): MigrationPlanWithAuthoringSurface {
   };
 }
 
-describe('synthStrategy', () => {
-  it('passes the full schema and a diff filter that drops only other spaces’ extras', async () => {
+describe('planFromDiff', () => {
+  it('passes the full schema and the sibling-owned entity names straight through to the planner', async () => {
     let observedSchema: unknown;
-    let observedKeep: ((issue: DiffIssue) => boolean) | undefined;
+    let observedSiblingOwnedEntityNames: ReadonlySet<string> | undefined;
     const stubPlanner: MigrationPlanner<'sql', 'postgres'> = {
-      plan: ({ schema, keepDiffIssue }) => {
+      plan: ({ schema, siblingOwnedEntityNames }) => {
         observedSchema = schema;
-        observedKeep = keepDiffIssue;
+        observedSiblingOwnedEntityNames = siblingOwnedEntityNames;
         return { kind: 'success', plan: makeStubPlan('placeholder') };
       },
       emptyMigration: () => {
@@ -81,11 +80,11 @@ describe('synthStrategy', () => {
       },
     };
 
-    const outcome = await synthStrategy({
+    const outcome = await planFromDiff({
       aggregateTargetId: 'postgres',
       currentMarker: null,
       space: appSpace,
-      declaredByAnotherSpace: (name) => name === 'cipher_state',
+      siblingOwnedEntityNames: new Set(['cipher_state']),
       schemaIntrospection: liveSchema,
       adapter: STUB_ADAPTER,
       migrations: stubMigrations,
@@ -95,9 +94,9 @@ describe('synthStrategy', () => {
 
     expect(outcome.kind).toBe('ok');
     if (outcome.kind !== 'ok') return;
-    // Synth strategy stamps the aggregate's targetId, not the planner's.
+    // The strategy stamps the aggregate's targetId, not the planner's.
     expect(outcome.result.plan.targetId).toBe('postgres');
-    expect(outcome.result.strategy).toBe('synth');
+    expect(outcome.result.strategy).toBe('plan-from-diff');
     expect(outcome.result.migrationEdges).toEqual([
       {
         dirName: '',
@@ -116,74 +115,10 @@ describe('synthStrategy', () => {
       'orphan_table',
     ]);
 
-    // … and a keep-predicate it applies to its diff. The planner holds no
-    // ownership logic: the predicate drops exactly the extras a sibling
-    // contract space declares, keeps every non-extra finding, and keeps
-    // extras no space declares (the planner may DROP those under policy).
-    const keep = observedKeep;
-    expect(keep).toBeDefined();
-    if (keep === undefined) return;
-    const missingIssue: DiffIssue = {
-      kind: 'missing_table',
-      table: 'cipher_state',
-      reason: 'not-found',
-      message: 'missing',
-    };
-    const siblingExtraIssue: DiffIssue = {
-      kind: 'extra_table',
-      table: 'cipher_state',
-      reason: 'not-expected',
-      message: 'extra',
-    };
-    const undeclaredExtraIssue: DiffIssue = {
-      kind: 'extra_table',
-      table: 'orphan_table',
-      reason: 'not-expected',
-      message: 'extra',
-    };
-    // An auxiliary/structural node (e.g. a Postgres RLS policy) references
-    // its owning table via `tableName` — the entity name a sibling space
-    // declares is the table, not the policy itself.
-    const siblingExtraDiffIssue: DiffIssue = {
-      path: ['public', 'cipher_state'],
-      outcome: 'extra',
-      reason: 'not-expected',
-      message: 'extra',
-      actual: { tableName: 'cipher_state' } as never,
-    };
-    // A relational table node's own identity is `name` (`SqlTableIR` /
-    // `PostgresTableSchemaNode`), gated on `diffRole: 'table'` so an
-    // unrelated node's own `name` (a column, index, or constraint) is never
-    // mistaken for an entity to scope by.
-    const siblingExtraTableNodeIssue: DiffIssue = {
-      path: ['public', 'cipher_state'],
-      outcome: 'extra',
-      reason: 'not-expected',
-      message: 'extra',
-      actual: { name: 'cipher_state', diffRole: 'table' } as never,
-    };
-    // A column node also carries `name`, but no `diffRole: 'table'` — its
-    // own name must never be read as an entity to scope by.
-    const undeclaredExtraColumnNodeIssue: DiffIssue = {
-      path: ['public', 'app_user', 'column:cipher_state'],
-      outcome: 'extra',
-      reason: 'not-expected',
-      message: 'extra',
-      actual: { name: 'cipher_state', diffRole: 'column' } as never,
-    };
-    const missingDiffIssue: DiffIssue = {
-      path: ['public', 'app_user', 'policy_x'],
-      outcome: 'missing',
-      reason: 'not-found',
-      message: 'missing',
-    };
-    expect(keep(missingIssue)).toBe(true);
-    expect(keep(siblingExtraIssue)).toBe(false);
-    expect(keep(undeclaredExtraIssue)).toBe(true);
-    expect(keep(siblingExtraDiffIssue)).toBe(false);
-    expect(keep(siblingExtraTableNodeIssue)).toBe(false);
-    expect(keep(undeclaredExtraColumnNodeIssue)).toBe(true);
-    expect(keep(missingDiffIssue)).toBe(true);
+    // … and the aggregate's ownership set verbatim. The planner itself
+    // decides how to scope its diff by it; this strategy holds no
+    // ownership logic.
+    expect(observedSiblingOwnedEntityNames).toEqual(new Set(['cipher_state']));
   });
 
   it('forwards planner failures verbatim', async () => {
@@ -208,11 +143,11 @@ describe('synthStrategy', () => {
       contractToSchema: () => ({ tables: {} }),
     };
 
-    const outcome = await synthStrategy({
+    const outcome = await planFromDiff({
       aggregateTargetId: 'postgres',
       currentMarker: null,
       space: makeSpace('app', {}),
-      declaredByAnotherSpace: () => false,
+      siblingOwnedEntityNames: new Set(),
       schemaIntrospection: { tables: {} },
       adapter: STUB_ADAPTER,
       migrations: stubMigrations,

@@ -309,6 +309,16 @@ export function createContractSpaceAggregate(args: {
     declaresEntity: (entityName) => ordered.some((space) => spaceDeclares(space, entityName)),
     declaringSpaces: (entityName) =>
       ordered.filter((space) => spaceDeclares(space, entityName)).map((s) => s.spaceId),
+    siblingOwnedEntityNames: (spaceId) => {
+      const names = new Set<string>();
+      for (const space of ordered) {
+        if (space.spaceId === spaceId) continue;
+        for (const coord of elementCoordinates(space.contract().storage)) {
+          names.add(coord.entityName);
+        }
+      }
+      return names;
+    },
     checkIntegrity,
   };
 }

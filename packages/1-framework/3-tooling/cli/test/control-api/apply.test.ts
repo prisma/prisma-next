@@ -63,7 +63,7 @@ function makePerSpacePlan(): PerSpacePlan {
     plan,
     displayOps: [],
     destinationContract: makeAppSpace().contract,
-    strategy: 'graph-walk',
+    strategy: 'resolve-recorded-path',
     migrationEdges: [
       buildSynthMigrationEdge({
         currentMarkerStorageHash: null,

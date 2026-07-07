@@ -15,19 +15,19 @@ const mocks = vi.hoisted(() => ({
   createControlClient: vi.fn(),
   readAllMarkers: vi.fn(),
   runMigration: vi.fn(),
-  graphWalkStrategy: vi.fn(),
+  resolveRecordedPath: vi.fn(),
 }));
 
 vi.mock('@prisma-next/config-loader', () => ({ loadConfig: mocks.loadConfig }));
 vi.mock('../../src/control-api/client', () => ({
   createControlClient: mocks.createControlClient,
 }));
-// Spy on graphWalkStrategy to assert it is the seam used for path computation.
+// Spy on resolveRecordedPath to assert it is the seam used for path computation.
 vi.mock('@prisma-next/migration-tools/aggregate', async (importOriginal) => {
   const original = await importOriginal<typeof import('@prisma-next/migration-tools/aggregate')>();
   return {
     ...original,
-    graphWalkStrategy: mocks.graphWalkStrategy.mockImplementation(original.graphWalkStrategy),
+    resolveRecordedPath: mocks.resolveRecordedPath.mockImplementation(original.resolveRecordedPath),
   };
 });
 // runMigration is the write boundary — if --show ever calls it, tests must fail.
@@ -112,7 +112,7 @@ async function buildFixture(): Promise<{ cwd: string; appDir: string }> {
 
 /**
  * Build a fixture where the --to ref carries invariants. Used to verify that
- * planSpacePath feeds graphWalkStrategy the ref's invariants as
+ * planSpacePath feeds resolveRecordedPath the ref's invariants as
  * space.headRef.invariants, not the contract-derived head ref's empty invariants.
  *
  * Graph: EMPTY → C1 → C2 (linear, both migrations provide no invariants).
@@ -120,7 +120,7 @@ async function buildFixture(): Promise<{ cwd: string; appDir: string }> {
  *
  * With the old bug: space.headRef.invariants was always [], so required = [].
  * With the fix: space.headRef.invariants is ['inv-a'], so required = ['inv-a'] \ markerInvariants.
- * The graphWalkStrategy call argument differs between the two — this test detects it.
+ * The resolveRecordedPath call argument differs between the two — this test detects it.
  */
 async function buildInvariantFixture(): Promise<{ cwd: string; appDir: string }> {
   const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-show-inv-'));
@@ -206,9 +206,9 @@ describe('migrate --show (read-only + faithfulness)', () => {
     expect(mocks.runMigration).not.toHaveBeenCalled();
   });
 
-  it('faithfulness: graphWalkStrategy is called with the correct inputs (same as migrate apply)', async () => {
+  it('faithfulness: resolveRecordedPath is called with the correct inputs (same as migrate apply)', async () => {
     // Basic fixture: linear chain, no ref invariants.
-    // Asserts graphWalkStrategy is called with a correctly-assembled currentMarker
+    // Asserts resolveRecordedPath is called with a correctly-assembled currentMarker
     // (null for EMPTY from-state) and the contract-derived target hash.
     const { cwd } = await buildFixture();
     process.chdir(cwd);
@@ -226,8 +226,8 @@ describe('migrate --show (read-only + faithfulness)', () => {
       // process.exit on success
     }
 
-    expect(mocks.graphWalkStrategy).toHaveBeenCalled();
-    const [firstCall] = mocks.graphWalkStrategy.mock.calls;
+    expect(mocks.resolveRecordedPath).toHaveBeenCalled();
+    const [firstCall] = mocks.resolveRecordedPath.mock.calls;
     expect(firstCall).toBeDefined();
     const callArg = firstCall![0] as { currentMarker: unknown; space: { headRef: unknown } };
     // From sha256:empty — marker should be null (planSpacePath treats EMPTY as no-marker).
@@ -236,7 +236,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     expect((callArg.space.headRef as { invariants: unknown }).invariants).toEqual([]);
   });
 
-  it('faithfulness: --to ref invariants are passed to graphWalkStrategy (not silently dropped)', async () => {
+  it('faithfulness: --to ref invariants are passed to resolveRecordedPath (not silently dropped)', async () => {
     // This test would have caught the original Bug #2: the show command was ignoring the
     // --to ref's invariants and always using headRef.invariants = [] instead.
     //
@@ -268,8 +268,8 @@ describe('migrate --show (read-only + faithfulness)', () => {
     }
 
     expect(getExitCode()).toBe(0);
-    expect(mocks.graphWalkStrategy).toHaveBeenCalled();
-    const [firstCall] = mocks.graphWalkStrategy.mock.calls;
+    expect(mocks.resolveRecordedPath).toHaveBeenCalled();
+    const [firstCall] = mocks.resolveRecordedPath.mock.calls;
     expect(firstCall).toBeDefined();
     const callArg = firstCall![0] as { space: { headRef: { hash: string; invariants: unknown } } };
     // The ref 'prod' has invariants: ['inv-a']. planSpacePath must propagate these

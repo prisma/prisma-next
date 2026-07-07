@@ -72,6 +72,85 @@ changes:
         - "deriveJsonSchema"
         - "derivePolymorphicJsonSchema"
       anyMatch: true
+  - id: sql-migration-planner-keep-diff-issue-to-sibling-owned-entity-names
+    summary: |
+      `MigrationPlanner.plan()` (and the SQL family's `SqlMigrationPlannerPlanOptions`) drops the
+      `keepDiffIssue` option — a caller-supplied `(issue: DiffIssue) => boolean` predicate the
+      planner applied to its schema diff for multi-space ownership scoping. It is replaced by
+      `siblingOwnedEntityNames?: ReadonlySet<string>` — the bare entity names a sibling contract
+      space declares. If your extension calls `planner.plan(...)` directly with `keepDiffIssue`
+      (rather than going through the aggregate's `db init` / `db update` / `migrate` orchestration,
+      which computes and passes this for you), replace the predicate with the equivalent name set:
+      collect the bare entity names every OTHER contract space in your aggregate declares and pass
+      them as `siblingOwnedEntityNames`. The planner now resolves ownership scoping itself from its
+      own diff nodes; it no longer accepts an externally-supplied filter function.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "keepDiffIssue"
+      anyMatch: true
+  - id: family-sql-collect-sql-schema-issues-removed
+    summary: |
+      `collectSqlSchemaIssues`, `collectSqlSchemaIssuesPerNamespace`, and their
+      `CollectSqlSchemaIssuesOptions` options type are removed from `@prisma-next/family-sql/diff`.
+      They implemented the coordinate-based relational schema diff the migration planner used before
+      it moved onto the generic node differ (`plan(start, end)`). There is no drop-in replacement —
+      if your extension called either function directly to compare a contract against a live/derived
+      schema, use the generic node differ instead: `diffSchemas` (from
+      `@prisma-next/framework-components/control`) over two schema-IR trees, or a target's own
+      `buildXPlanDiff` (e.g. `buildPostgresPlanDiff` from `@prisma-next/target-postgres/diff-database-schema`,
+      `buildSqlitePlanDiff` from the sqlite target) for the same op-render-stamped comparison the
+      planner itself runs.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "collectSqlSchemaIssues"
+        - "collectSqlSchemaIssuesPerNamespace"
+        - "CollectSqlSchemaIssuesOptions"
+      anyMatch: true
+  - id: sql-control-target-descriptor-diff-database-schema-removed
+    summary: |
+      `SqlControlTargetDescriptor` (from `@prisma-next/family-sql/control`) drops the
+      `diffDatabaseSchema` field — the per-target `SchemaDiffer` hook that used to back the
+      coordinate-based relational diff. If your extension implements a custom SQL target descriptor
+      and supplied this field, remove it; the migration planner reaches the one differ directly via
+      the target's own diff-tree builder now (see the `family-sql-collect-sql-schema-issues-removed`
+      entry above). `diffSchemaForVerdict` (the full-tree node diff the verify verdict derives from)
+      is unaffected and still required.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "diffDatabaseSchema"
+      anyMatch: true
+  - id: migration-tools-aggregate-strategy-rename
+    summary: |
+      `@prisma-next/migration-tools/aggregate` renames its exported graph-walk strategy to say what
+      it does, not how it's implemented: `graphWalkStrategy` -> `resolveRecordedPath`,
+      `GraphWalkOutcome` -> `ResolveRecordedPathOutcome`, `GraphWalkStrategyInputs` ->
+      `ResolveRecordedPathInputs`. The function's behaviour, inputs, and outcome shape are
+      unchanged — only the names. If your extension imports any of these symbols directly (rather
+      than going through `planMigration`, which handles this internally), update the import names.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "graphWalkStrategy"
+        - "GraphWalkOutcome"
+        - "GraphWalkStrategyInputs"
+      anyMatch: true
+  - id: target-postgres-diff-postgres-database-schema-removed
+    summary: |
+      `diffPostgresDatabaseSchema` is removed from `@prisma-next/target-postgres/planner` — the
+      Postgres-specific coordinate-based `SchemaDiffer` implementation, retired alongside
+      `SqlControlTargetDescriptor.diffDatabaseSchema` (see the entry above). If your extension
+      imported it directly, use `buildPostgresPlanDiff` from
+      `@prisma-next/target-postgres/diff-database-schema` instead — it runs the same one-differ
+      comparison the planner itself uses (relational + RLS-policy issues in one node-typed list,
+      filter to the subset you need) and additionally stamps the op-render payload the planner reads.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "diffPostgresDatabaseSchema"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
@@ -232,4 +311,22 @@ control stack always populates; extension authors do not construct them. The onl
 `capabilities` field). No extension-author API changed — re-emit absorbs the
 scalar-list contract shape. No extension-author action required. Incidental
 substrate diff only.
+-->
+
+<!--
+Postgres-RLS slice 2.5 (one-differ-two-ir-planner, the cutover to
+`plan(start, end)`): the migration planner now diffs two derived schema IRs
+via the generic node differ instead of the coordinate-based relational walk.
+The only `packages/3-extensions/` touch is a fixture fix in
+`pgvector/test/migrations/{planner.behavior,planner.contract-to-schema-ir}.test.ts`
+— the hand-built `PostgresTableSchemaNode` foreign-key fixtures now stamp
+`resolvedReferencedSchema` (the differ pairs FK nodes by id, which folds in
+that field; an unresolved FK on a hand-built actual node no longer paired with
+the derived expected side). Test-fixture-only; no extension-author API
+changed. See the `sql-migration-planner-keep-diff-issue-to-sibling-owned-entity-names`,
+`family-sql-collect-sql-schema-issues-removed`,
+`sql-control-target-descriptor-diff-database-schema-removed`,
+`migration-tools-aggregate-strategy-rename`, and
+`target-postgres-diff-postgres-database-schema-removed` entries above for the
+real breaking changes this slice makes to the framework SPI.
 -->

@@ -24,10 +24,10 @@ export {
   planMigration,
 } from '../aggregate/planner';
 export {
-  type GraphWalkOutcome,
-  type GraphWalkStrategyInputs,
-  graphWalkStrategy,
-} from '../aggregate/strategies/graph-walk';
+  type ResolveRecordedPathInputs,
+  type ResolveRecordedPathOutcome,
+  resolveRecordedPath,
+} from '../aggregate/strategies/resolve-recorded-path';
 export { buildSynthMigrationEdge } from '../aggregate/synth-migration-edge';
 export type {
   AggregateContractSpace,

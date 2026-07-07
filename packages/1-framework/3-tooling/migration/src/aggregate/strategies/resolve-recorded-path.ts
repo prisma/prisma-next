@@ -8,19 +8,20 @@ import type { PerSpacePlan } from '../planner-types';
 import type { AggregateContractSpace } from '../types';
 
 /**
- * Outcome variants for the graph-walk strategy. Mirrors
+ * Outcome variants for resolving a contract space's recorded migration
+ * path. Mirrors
  * {@link import('../../compute-extension-space-apply-path').ExtensionSpaceApplyPathOutcome}
  * but operates against the contract space's lazily-reconstructed `graph()`
  * instead of re-reading from disk. The aggregate planner converts
  * these into {@link import('../planner-types').PlannerError}
  * variants.
  */
-export type GraphWalkOutcome =
+export type ResolveRecordedPathOutcome =
   | { readonly kind: 'ok'; readonly result: PerSpacePlan }
   | { readonly kind: 'unreachable' }
   | { readonly kind: 'unsatisfiable'; readonly missing: readonly string[] };
 
-export interface GraphWalkStrategyInputs {
+export interface ResolveRecordedPathInputs {
   readonly aggregateTargetId: string;
   readonly space: AggregateContractSpace;
   readonly currentMarker: ContractMarkerRecordLike | null;
@@ -34,13 +35,13 @@ export interface GraphWalkStrategyInputs {
 }
 
 /**
- * Walk a contract space's hydrated migration graph from the live marker to
- * `space.headRef.hash`, covering every required invariant.
+ * Resolve a contract space's hydrated migration graph to the path from the
+ * live marker to `space.headRef.hash`, covering every required invariant.
  *
  * Pure synchronous function — no I/O. The aggregate's loader has
  * already integrity-checked every package and reconstructed the graph;
- * this strategy just looks up ops by `migrationHash` and assembles a
- * `MigrationPlan` with `targetId` set from the aggregate (no
+ * this resolves the path by looking up ops by `migrationHash` and
+ * assembles a `MigrationPlan` with `targetId` set from the aggregate (no
  * placeholder cast).
  *
  * Required invariants are computed as `headRef.invariants \ marker.invariants`
@@ -48,7 +49,7 @@ export interface GraphWalkStrategyInputs {
  * only needs to provide the remainder. Mirrors today's
  * `computeExtensionSpaceApplyPath` semantics.
  */
-export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutcome {
+export function resolveRecordedPath(input: ResolveRecordedPathInputs): ResolveRecordedPathOutcome {
   const { aggregateTargetId, space, currentMarker, refName } = input;
   const headRef = requireHeadRef(space);
   const graph = space.graph();
@@ -114,7 +115,7 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
       plan,
       displayOps: pathOps,
       destinationContract: space.contract(),
-      strategy: 'graph-walk',
+      strategy: 'resolve-recorded-path',
       migrationEdges: edgeRefs,
       pathDecision: outcome.decision,
     },
