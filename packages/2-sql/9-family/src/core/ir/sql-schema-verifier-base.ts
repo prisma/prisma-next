@@ -9,7 +9,7 @@ import type {
  * SQL family `SchemaVerifier` abstract base. Centralises the SQL-shared
  * walk (table-by-table + column-by-column matching keyed by
  * `(namespace.id, name)`, FK / unique / index comparisons via the
- * existing helpers in `verify-helpers.ts`) and exposes a protected hook
+ * shared satisfaction helpers in `sql-schema-diff.ts`) and exposes a protected hook
  * for target extensions (Postgres functions, RLS policies, future
  * target-only kinds).
  *

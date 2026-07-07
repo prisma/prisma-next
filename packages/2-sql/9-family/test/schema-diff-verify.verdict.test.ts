@@ -1,21 +1,20 @@
 /**
- * Differ-parity suite: for every scenario class the legacy relational walk
- * grades (basic drift, constraints, checks, defaults, referential actions,
- * semantic satisfaction, strict extras, control policies, storage types),
- * the generic-differ verify flow must produce the same VERDICT in both
- * strict and lenient modes, with the drift keyed on reason + node.
+ * Differ verdict suite: for every scenario class the retired relational
+ * walk used to grade (basic drift, constraints, checks, defaults,
+ * referential actions, semantic satisfaction, strict extras, control
+ * policies, storage types), the generic-differ verify flow must produce
+ * the pinned VERDICT in both strict and lenient modes, with the drift
+ * keyed on reason + node.
  *
- * Each scenario runs BOTH pipelines over identical fixtures:
- * - legacy: `verifySqlSchema` (the walk), exactly as the legacy suites do;
- * - differ: contract→flat expected tree (resolved leaf values stamped) vs
- *   the actual tree stamped the way introspection stamps it, normalized for
- *   semantic satisfaction, diffed by `diffSchemas`, graded by
- *   `computeSqlDiffVerdict` + `computeStorageTypeVerdict`.
+ * Each scenario builds: contract→flat expected tree (resolved leaf values
+ * stamped) vs the actual tree stamped the way introspection stamps it,
+ * normalized for semantic satisfaction, diffed by `diffSchemas`, graded by
+ * `computeSqlDiffVerdict` + `computeStorageTypeVerdict`.
  */
 
 import type { ColumnDefault, ControlPolicy } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import type { SchemaDiffIssue, SchemaIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas } from '@prisma-next/framework-components/control';
 import { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -27,14 +26,12 @@ import {
   normalizeFlatActualForDiff,
 } from '../src/core/diff/schema-diff-verify';
 import type { DefaultNormalizer, NativeTypeNormalizer } from '../src/core/diff/sql-schema-diff';
-import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
 import { contractToSchemaIR } from '../src/core/migrations/contract-to-schema-ir';
 import {
   createContractTable,
   createSchemaTable,
   createTestContract,
   createTestSchemaIR,
-  emptyTypeMetadataRegistry,
 } from './schema-verify.helpers';
 
 const testNormalizer: DefaultNormalizer = (rawDefault: string): ColumnDefault | undefined => {
@@ -88,29 +85,19 @@ function stampLikeIntrospection(schema: SqlSchemaIR): SqlSchemaIR {
   return new SqlSchemaIR({ tables });
 }
 
-interface ParityRun {
-  readonly legacyOk: boolean;
-  readonly newOk: boolean;
-  readonly failures: readonly SchemaDiffIssue[];
-  readonly warnings: readonly SchemaDiffIssue[];
+interface VerdictRun {
+  readonly ok: boolean;
+  readonly failures: readonly (SchemaDiffIssue | SchemaIssue)[];
+  readonly warnings: readonly (SchemaDiffIssue | SchemaIssue)[];
 }
 
-function runPipelines(options: {
+function runVerdict(options: {
   readonly contract: ReturnType<typeof createTestContract>;
   readonly schema: SqlSchemaIR;
   readonly strict: boolean;
   readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
-}): ParityRun {
+}): VerdictRun {
   const frameworkComponents = options.frameworkComponents ?? [];
-  const legacy = verifySqlSchema({
-    contract: options.contract,
-    schema: options.schema,
-    strict: options.strict,
-    typeMetadataRegistry: emptyTypeMetadataRegistry,
-    frameworkComponents,
-    normalizeDefault: testNormalizer,
-    normalizeNativeType: identityNativeNormalizer,
-  });
 
   const expected = neutralizeFlatExpectedFkSchemas(
     contractToSchemaIR(options.contract, { annotationNamespace: 'pg' }),
@@ -132,35 +119,32 @@ function runPipelines(options: {
     codecHooks: extractCodecControlHooks(frameworkComponents),
   });
   return {
-    legacyOk: legacy.ok,
-    newOk: diffVerdict.failures.length === 0 && typeVerdict.failures.length === 0,
+    ok: diffVerdict.failures.length === 0 && typeVerdict.failures.length === 0,
     failures: [...diffVerdict.failures, ...typeVerdict.failures],
     warnings: [...diffVerdict.warnings, ...typeVerdict.warnings],
   };
 }
 
-/** Runs both pipelines in both modes and asserts verdict equality. */
-function assertParity(options: {
+/** Runs the verdict in both strict and lenient modes. */
+function runBothModes(options: {
   readonly contract: ReturnType<typeof createTestContract>;
   readonly schema: SqlSchemaIR;
   readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
-}): { readonly strict: ParityRun; readonly lenient: ParityRun } {
-  const strict = runPipelines({ ...options, strict: true });
-  const lenient = runPipelines({ ...options, strict: false });
-  expect(strict.newOk, 'strict verdict parity').toBe(strict.legacyOk);
-  expect(lenient.newOk, 'lenient verdict parity').toBe(lenient.legacyOk);
+}): { readonly strict: VerdictRun; readonly lenient: VerdictRun } {
+  const strict = runVerdict({ ...options, strict: true });
+  const lenient = runVerdict({ ...options, strict: false });
   return { strict, lenient };
 }
 
-function failureReasonsByNodeKind(run: ParityRun): ReadonlyArray<readonly [string, string]> {
+function failureReasonsByNodeKind(run: VerdictRun): ReadonlyArray<readonly [string, string]> {
   return run.failures.map((issue) => {
-    const node = issue.expected ?? issue.actual;
+    const node = 'outcome' in issue ? (issue.expected ?? issue.actual) : undefined;
     const nodeKind = (node as { nodeKind?: string } | undefined)?.nodeKind ?? 'unknown';
-    return [nodeKind, issue.reason] as const;
+    return [nodeKind, issue.reason ?? 'unknown'] as const;
   });
 }
 
-describe('differ parity — basic drift', () => {
+describe('differ verdict — basic drift', () => {
   it('identical schema verifies in both modes', () => {
     const contract = createTestContract({
       user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
@@ -168,9 +152,9 @@ describe('differ parity — basic drift', () => {
     const schema = createTestSchemaIR({
       user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }),
     });
-    const { strict, lenient } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(true);
-    expect(lenient.newOk).toBe(true);
+    const { strict, lenient } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(true);
+    expect(lenient.ok).toBe(true);
   });
 
   it('missing table fails both modes as not-found', () => {
@@ -178,9 +162,9 @@ describe('differ parity — basic drift', () => {
       user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
     });
     const schema = createTestSchemaIR({});
-    const { strict, lenient } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(false);
-    expect(lenient.newOk).toBe(false);
+    const { strict, lenient } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(false);
+    expect(lenient.ok).toBe(false);
     expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-table', 'not-found']);
   });
 
@@ -192,9 +176,9 @@ describe('differ parity — basic drift', () => {
       user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }),
       stray: createSchemaTable('stray', { id: { nativeType: 'int4', nullable: false } }),
     });
-    const { strict, lenient } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(false);
-    expect(lenient.newOk).toBe(true);
+    const { strict, lenient } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(false);
+    expect(lenient.ok).toBe(true);
     expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-table', 'not-expected']);
   });
 
@@ -211,9 +195,9 @@ describe('differ parity — basic drift', () => {
         stray: { nativeType: 'text', nullable: true },
       }),
     });
-    const { strict, lenient } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(false);
-    expect(lenient.newOk).toBe(false);
+    const { strict, lenient } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(false);
+    expect(lenient.ok).toBe(false);
     expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-column', 'not-found']);
     expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-column', 'not-expected']);
     expect(failureReasonsByNodeKind(lenient)).not.toContainEqual(['sql-column', 'not-expected']);
@@ -232,8 +216,8 @@ describe('differ parity — basic drift', () => {
         email: { nativeType: 'text', nullable: true },
       }),
     });
-    const { lenient } = assertParity({ contract, schema });
-    expect(lenient.newOk).toBe(false);
+    const { lenient } = runBothModes({ contract, schema });
+    expect(lenient.ok).toBe(false);
     const reasons = failureReasonsByNodeKind(lenient);
     expect(reasons.filter(([kind]) => kind === 'sql-column')).toHaveLength(2);
   });
@@ -245,12 +229,12 @@ describe('differ parity — basic drift', () => {
     const schema = createTestSchemaIR({
       user: createSchemaTable('user', { name: { nativeType: 'varchar', nullable: false } }),
     });
-    const { strict } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(true);
+    const { strict } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(true);
   });
 });
 
-describe('differ parity — defaults (default is a child node of the column)', () => {
+describe('differ verdict — defaults (default is a child node of the column)', () => {
   it('matching literal default verifies', () => {
     const contract = createTestContract({
       user: createContractTable({
@@ -266,8 +250,8 @@ describe('differ parity — defaults (default is a child node of the column)', (
         status: { nativeType: 'text', nullable: false, default: "'draft'::text" },
       }),
     });
-    const { strict } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(true);
+    const { strict } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(true);
   });
 
   it('default missing fails BOTH modes as not-found on the default node', () => {
@@ -283,9 +267,9 @@ describe('differ parity — defaults (default is a child node of the column)', (
     const schema = createTestSchemaIR({
       user: createSchemaTable('user', { status: { nativeType: 'text', nullable: false } }),
     });
-    const { strict, lenient } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(false);
-    expect(lenient.newOk).toBe(false);
+    const { strict, lenient } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(false);
+    expect(lenient.ok).toBe(false);
     expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-column-default', 'not-found']);
   });
 
@@ -304,8 +288,8 @@ describe('differ parity — defaults (default is a child node of the column)', (
         status: { nativeType: 'text', nullable: false, default: "'published'::text" },
       }),
     });
-    const { lenient } = assertParity({ contract, schema });
-    expect(lenient.newOk).toBe(false);
+    const { lenient } = runBothModes({ contract, schema });
+    expect(lenient.ok).toBe(false);
     expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-column-default', 'not-equal']);
   });
 
@@ -318,9 +302,9 @@ describe('differ parity — defaults (default is a child node of the column)', (
         status: { nativeType: 'text', nullable: false, default: "'draft'::text" },
       }),
     });
-    const { strict, lenient } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(false);
-    expect(lenient.newOk).toBe(true);
+    const { strict, lenient } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(false);
+    expect(lenient.ok).toBe(true);
     expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-column-default', 'not-expected']);
   });
 
@@ -339,8 +323,8 @@ describe('differ parity — defaults (default is a child node of the column)', (
         created: { nativeType: 'timestamptz', nullable: false, default: 'CURRENT_TIMESTAMP' },
       }),
     });
-    const { strict } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(true);
+    const { strict } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(true);
   });
 
   it('an unparseable live default against a declared one fails', () => {
@@ -358,12 +342,12 @@ describe('differ parity — defaults (default is a child node of the column)', (
         status: { nativeType: 'text', nullable: false, default: 'unparseable()' },
       }),
     });
-    const { lenient } = assertParity({ contract, schema });
-    expect(lenient.newOk).toBe(false);
+    const { lenient } = runBothModes({ contract, schema });
+    expect(lenient.ok).toBe(false);
   });
 });
 
-describe('differ parity — primary keys', () => {
+describe('differ verdict — primary keys', () => {
   const contractWithPk = () =>
     createTestContract({
       user: createContractTable(
@@ -380,16 +364,16 @@ describe('differ parity — primary keys', () => {
         { primaryKey: { columns: ['id'], name: 'user_pkey' } },
       ),
     });
-    const { strict } = assertParity({ contract: contractWithPk(), schema });
-    expect(strict.newOk).toBe(true);
+    const { strict } = runBothModes({ contract: contractWithPk(), schema });
+    expect(strict.ok).toBe(true);
   });
 
   it('missing PK fails both modes; extra PK fails strict only', () => {
     const missing = createTestSchemaIR({
       user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }),
     });
-    const { lenient } = assertParity({ contract: contractWithPk(), schema: missing });
-    expect(lenient.newOk).toBe(false);
+    const { lenient } = runBothModes({ contract: contractWithPk(), schema: missing });
+    expect(lenient.ok).toBe(false);
     expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-primary-key', 'not-found']);
 
     const contractNoPk = createTestContract({
@@ -402,9 +386,9 @@ describe('differ parity — primary keys', () => {
         { primaryKey: { columns: ['id'] } },
       ),
     });
-    const runs = assertParity({ contract: contractNoPk, schema: extra });
-    expect(runs.strict.newOk).toBe(false);
-    expect(runs.lenient.newOk).toBe(true);
+    const runs = runBothModes({ contract: contractNoPk, schema: extra });
+    expect(runs.strict.ok).toBe(false);
+    expect(runs.lenient.ok).toBe(true);
   });
 
   it('PK column drift fails both modes', () => {
@@ -427,13 +411,13 @@ describe('differ parity — primary keys', () => {
         { primaryKey: { columns: ['id'] } },
       ),
     });
-    const { lenient } = assertParity({ contract, schema });
-    expect(lenient.newOk).toBe(false);
+    const { lenient } = runBothModes({ contract, schema });
+    expect(lenient.ok).toBe(false);
     expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-primary-key', 'not-equal']);
   });
 });
 
-describe('differ parity — foreign keys', () => {
+describe('differ verdict — foreign keys', () => {
   const NS = '__unbound__';
   const contractWithFk = (actions?: { onDelete?: 'cascade' | 'noAction' }) =>
     createTestContract({
@@ -496,61 +480,61 @@ describe('differ parity — foreign keys', () => {
     });
 
   it('matching FK (unbound contract vs schema-less live FK) verifies — id pairing', () => {
-    const { strict } = assertParity({ contract: contractWithFk(), schema: schemaWithFk() });
-    expect(strict.newOk).toBe(true);
+    const { strict } = runBothModes({ contract: contractWithFk(), schema: schemaWithFk() });
+    expect(strict.ok).toBe(true);
   });
 
   it('missing FK fails both modes', () => {
-    const { lenient } = assertParity({
+    const { lenient } = runBothModes({
       contract: contractWithFk(),
       schema: schemaWithFk({ omitFk: true }),
     });
-    expect(lenient.newOk).toBe(false);
+    expect(lenient.ok).toBe(false);
     expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-foreign-key', 'not-found']);
   });
 
   it('fk-backing index expectation: live DB missing the backing index fails both modes', () => {
-    const { lenient } = assertParity({
+    const { lenient } = runBothModes({
       contract: contractWithFk(),
       schema: schemaWithFk({ omitBackingIndex: true }),
     });
-    expect(lenient.newOk).toBe(false);
+    expect(lenient.ok).toBe(false);
     expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-index', 'not-found']);
   });
 
   it('referential-action directionality: undeclared expected never flags live actions', () => {
-    const { strict } = assertParity({
+    const { strict } = runBothModes({
       contract: contractWithFk(),
       schema: schemaWithFk({ onDelete: 'cascade' }),
     });
-    expect(strict.newOk).toBe(true);
+    expect(strict.ok).toBe(true);
   });
 
   it('referential-action directionality: declared expected flags divergent live action', () => {
-    const { lenient } = assertParity({
+    const { lenient } = runBothModes({
       contract: contractWithFk({ onDelete: 'cascade' }),
       schema: schemaWithFk({ onDelete: 'restrict' }),
     });
-    expect(lenient.newOk).toBe(false);
+    expect(lenient.ok).toBe(false);
     expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-foreign-key', 'not-equal']);
   });
 
   it('referential-action noAction is equivalent to undeclared on both sides', () => {
-    const noActionExpected = assertParity({
+    const noActionExpected = runBothModes({
       contract: contractWithFk({ onDelete: 'noAction' }),
       schema: schemaWithFk({ onDelete: 'cascade' }),
     });
-    expect(noActionExpected.strict.newOk).toBe(true);
+    expect(noActionExpected.strict.ok).toBe(true);
 
-    const noActionActual = assertParity({
+    const noActionActual = runBothModes({
       contract: contractWithFk({ onDelete: 'cascade' }),
       schema: schemaWithFk({ onDelete: 'noAction' }),
     });
-    expect(noActionActual.strict.newOk).toBe(false);
+    expect(noActionActual.strict.ok).toBe(false);
   });
 });
 
-describe('differ parity — uniques, indexes, semantic satisfaction', () => {
+describe('differ verdict — uniques, indexes, semantic satisfaction', () => {
   it('unique satisfied by a live unique INDEX passes both modes with no extras', () => {
     const contract = createTestContract({
       user: createContractTable(
@@ -565,8 +549,8 @@ describe('differ parity — uniques, indexes, semantic satisfaction', () => {
         { indexes: [{ columns: ['email'], unique: true, name: 'user_email_key' }] },
       ),
     });
-    const { strict } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(true);
+    const { strict } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(true);
   });
 
   it('contract index satisfied by a live unique CONSTRAINT: lenient passes, strict flags the undeclared unique', () => {
@@ -583,9 +567,9 @@ describe('differ parity — uniques, indexes, semantic satisfaction', () => {
         { uniques: [{ columns: ['email'], name: 'user_email_key' }] },
       ),
     });
-    const { strict, lenient } = assertParity({ contract, schema });
-    expect(lenient.newOk).toBe(true);
-    expect(strict.newOk).toBe(false);
+    const { strict, lenient } = runBothModes({ contract, schema });
+    expect(lenient.ok).toBe(true);
+    expect(strict.ok).toBe(false);
     expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-unique', 'not-expected']);
   });
 
@@ -603,8 +587,8 @@ describe('differ parity — uniques, indexes, semantic satisfaction', () => {
         { uniques: [{ columns: ['email'] }] },
       ),
     });
-    const { lenient } = assertParity({ contract, schema });
-    expect(lenient.newOk).toBe(false);
+    const { lenient } = runBothModes({ contract, schema });
+    expect(lenient.ok).toBe(false);
   });
 
   it('a stray live unique INDEX is never an extra (legacy invisibility)', () => {
@@ -618,9 +602,9 @@ describe('differ parity — uniques, indexes, semantic satisfaction', () => {
         { indexes: [{ columns: ['email'], unique: true }] },
       ),
     });
-    const { strict, lenient } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(true);
-    expect(lenient.newOk).toBe(true);
+    const { strict, lenient } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(true);
+    expect(lenient.ok).toBe(true);
   });
 
   it('a stray live non-unique index is an extra in strict only', () => {
@@ -634,9 +618,9 @@ describe('differ parity — uniques, indexes, semantic satisfaction', () => {
         { indexes: [{ columns: ['email'], unique: false }] },
       ),
     });
-    const runs = assertParity({ contract, schema });
-    expect(runs.strict.newOk).toBe(false);
-    expect(runs.lenient.newOk).toBe(true);
+    const runs = runBothModes({ contract, schema });
+    expect(runs.strict.ok).toBe(false);
+    expect(runs.lenient.ok).toBe(true);
   });
 
   it('missing unique fails both modes; stray live unique constraint is strict-only', () => {
@@ -649,8 +633,8 @@ describe('differ parity — uniques, indexes, semantic satisfaction', () => {
     const missing = createTestSchemaIR({
       user: createSchemaTable('user', { email: { nativeType: 'text', nullable: false } }),
     });
-    const missingRuns = assertParity({ contract, schema: missing });
-    expect(missingRuns.lenient.newOk).toBe(false);
+    const missingRuns = runBothModes({ contract, schema: missing });
+    expect(missingRuns.lenient.ok).toBe(false);
 
     const contractNone = createTestContract({
       user: createContractTable({ email: { nativeType: 'text', nullable: false } }),
@@ -662,9 +646,9 @@ describe('differ parity — uniques, indexes, semantic satisfaction', () => {
         { uniques: [{ columns: ['email'] }] },
       ),
     });
-    const strayRuns = assertParity({ contract: contractNone, schema: stray });
-    expect(strayRuns.strict.newOk).toBe(false);
-    expect(strayRuns.lenient.newOk).toBe(true);
+    const strayRuns = runBothModes({ contract: contractNone, schema: stray });
+    expect(strayRuns.strict.ok).toBe(false);
+    expect(strayRuns.lenient.ok).toBe(true);
   });
 
   it('index options compare loosely (typed contract vs stringly introspection)', () => {
@@ -681,12 +665,12 @@ describe('differ parity — uniques, indexes, semantic satisfaction', () => {
         { indexes: [{ columns: ['email'], unique: false, options: { fillfactor: '70' } }] },
       ),
     });
-    const { strict } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(true);
+    const { strict } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(true);
   });
 });
 
-describe('differ parity — check constraints', () => {
+describe('differ verdict — check constraints', () => {
   const contractWithCheck = (values: readonly string[]) => {
     const table = createContractTable({ status: { nativeType: 'text', nullable: false } });
     // createContractTable has no checks support; splice the check in via a
@@ -786,8 +770,8 @@ describe('differ parity — check constraints', () => {
   });
 });
 
-describe('differ parity — control policies', () => {
-  it('an observed table warns instead of failing (both pipelines pass)', () => {
+describe('differ verdict — control policies', () => {
+  it('an observed table warns instead of failing (both modes pass)', () => {
     const contract = createTestContract({
       user: createContractTable(
         { id: { nativeType: 'int4', nullable: false } },
@@ -797,9 +781,9 @@ describe('differ parity — control policies', () => {
     const schema = createTestSchemaIR({
       user: createSchemaTable('user', { id: { nativeType: 'int8', nullable: false } }),
     });
-    const { strict, lenient } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(true);
-    expect(lenient.newOk).toBe(true);
+    const { strict, lenient } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(true);
+    expect(lenient.ok).toBe(true);
     expect(lenient.warnings.length).toBeGreaterThan(0);
   });
 
@@ -818,14 +802,14 @@ describe('differ parity — control policies', () => {
         stray: { nativeType: 'text', nullable: true },
       }),
     });
-    const extraRuns = assertParity({ contract, schema: extras });
-    expect(extraRuns.strict.newOk).toBe(true);
+    const extraRuns = runBothModes({ contract, schema: extras });
+    expect(extraRuns.strict.ok).toBe(true);
 
     const drift = createTestSchemaIR({
       user: createSchemaTable('user', { id: { nativeType: 'int8', nullable: false } }),
     });
-    const driftRuns = assertParity({ contract, schema: drift });
-    expect(driftRuns.lenient.newOk).toBe(false);
+    const driftRuns = runBothModes({ contract, schema: drift });
+    expect(driftRuns.lenient.ok).toBe(false);
   });
 
   it('a tolerated table suppresses extra columns only', () => {
@@ -841,8 +825,8 @@ describe('differ parity — control policies', () => {
         stray: { nativeType: 'text', nullable: true },
       }),
     });
-    const columnRuns = assertParity({ contract, schema: extraColumn });
-    expect(columnRuns.strict.newOk).toBe(true);
+    const columnRuns = runBothModes({ contract, schema: extraColumn });
+    expect(columnRuns.strict.ok).toBe(true);
 
     const extraIndex = createTestSchemaIR({
       user: createSchemaTable(
@@ -851,8 +835,8 @@ describe('differ parity — control policies', () => {
         { indexes: [{ columns: ['id'], unique: false }] },
       ),
     });
-    const indexRuns = assertParity({ contract, schema: extraIndex });
-    expect(indexRuns.strict.newOk).toBe(false);
+    const indexRuns = runBothModes({ contract, schema: extraIndex });
+    expect(indexRuns.strict.ok).toBe(false);
   });
 
   it('a defaultControlPolicy of observed downgrades an extra table to a warning', () => {
@@ -868,13 +852,13 @@ describe('differ parity — control policies', () => {
       user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }),
       stray: createSchemaTable('stray', { id: { nativeType: 'int4', nullable: false } }),
     });
-    const { strict } = assertParity({ contract, schema });
-    expect(strict.newOk).toBe(true);
+    const { strict } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(true);
     expect(strict.warnings.length).toBeGreaterThan(0);
   });
 });
 
-describe('differ parity — storage types (verifyType hook)', () => {
+describe('differ verdict — storage types (verifyType hook)', () => {
   function typeComponent(
     issues: readonly { kind: string; message: string }[],
   ): TargetBoundComponentDescriptor<'sql', string> {
@@ -916,28 +900,28 @@ describe('differ parity — storage types (verifyType hook)', () => {
       user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }),
     });
 
-  it('a verifyType failure fails the verdict in both pipelines', () => {
+  it('a verifyType failure fails the verdict in both modes', () => {
     const components = [
       typeComponent([
         { kind: 'type_values_mismatch', message: 'enum drift', reason: 'not-equal' } as never,
       ]),
     ];
-    const { strict, lenient } = assertParity({
+    const { strict, lenient } = runBothModes({
       contract: contractWithType(),
       schema: matchingSchema(),
       frameworkComponents: components,
     });
-    expect(strict.newOk).toBe(false);
-    expect(lenient.newOk).toBe(false);
+    expect(strict.ok).toBe(false);
+    expect(lenient.ok).toBe(false);
   });
 
   it('a clean verifyType hook keeps the verdict green', () => {
     const components = [typeComponent([])];
-    const { strict } = assertParity({
+    const { strict } = runBothModes({
       contract: contractWithType(),
       schema: matchingSchema(),
       frameworkComponents: components,
     });
-    expect(strict.newOk).toBe(true);
+    expect(strict.ok).toBe(true);
   });
 });

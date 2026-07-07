@@ -1,14 +1,10 @@
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
+import { collectSqlSchemaIssues } from '../src/core/diff/sql-schema-diff';
 import type { CodecControlHooks } from '../src/exports/control';
-import {
-  createTestContract,
-  createTestSchemaIR,
-  emptyTypeMetadataRegistry,
-} from './schema-verify.helpers';
+import { createTestContract, createTestSchemaIR } from './schema-verify.helpers';
 
-describe('verifySqlSchema - storage types', () => {
+describe('collectSqlSchemaIssues - storage types', () => {
   it('surfaces storage type issues from control hooks', () => {
     const contract = createTestContract(
       {},
@@ -52,16 +48,14 @@ describe('verifySqlSchema - storage types', () => {
       } as TargetBoundComponentDescriptor<'sql', 'postgres'>,
     ];
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
+    expect(issues).toContainEqual(
       expect.objectContaining({
         kind: 'type_missing',
         typeName: 'Role',

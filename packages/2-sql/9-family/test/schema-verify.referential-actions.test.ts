@@ -1,15 +1,14 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
+import { collectSqlSchemaIssues } from '../src/core/diff/sql-schema-diff';
 import {
   createContractTable,
   createSchemaTable,
   createTestContract,
   createTestSchemaIR,
-  emptyTypeMetadataRegistry,
 } from './schema-verify.helpers';
 
-describe('verifySqlSchema - referential actions', () => {
+describe('collectSqlSchemaIssues - referential actions', () => {
   it('passes when contract and schema FK referential actions match', () => {
     const contract = createTestContract({
       user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
@@ -52,16 +51,14 @@ describe('verifySqlSchema - referential actions', () => {
       ),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('fails when contract FK has onDelete but schema FK has different onDelete', () => {
@@ -106,16 +103,14 @@ describe('verifySqlSchema - referential actions', () => {
       ),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
+    expect(issues).toContainEqual(
       expect.objectContaining({
         kind: 'foreign_key_mismatch',
         table: 'post',
@@ -165,16 +160,14 @@ describe('verifySqlSchema - referential actions', () => {
       ),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
+    expect(issues).toContainEqual(
       expect.objectContaining({
         kind: 'foreign_key_mismatch',
         table: 'post',
@@ -225,16 +218,14 @@ describe('verifySqlSchema - referential actions', () => {
       ),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('passes when contract FK omits referential actions (does not compare)', () => {
@@ -278,15 +269,13 @@ describe('verifySqlSchema - referential actions', () => {
       ),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 });

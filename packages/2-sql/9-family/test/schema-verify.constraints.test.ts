@@ -1,15 +1,14 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
+import { collectSqlSchemaIssues } from '../src/core/diff/sql-schema-diff';
 import {
   createContractTable,
   createSchemaTable,
   createTestContract,
   createTestSchemaIR,
-  emptyTypeMetadataRegistry,
 } from './schema-verify.helpers';
 
-describe('verifySqlSchema - constraints', () => {
+describe('collectSqlSchemaIssues - constraints', () => {
   describe('primary key mismatch', () => {
     it('returns primary_key_mismatch issue when PK is missing in schema', () => {
       const contract = createTestContract({
@@ -26,16 +25,14 @@ describe('verifySqlSchema - constraints', () => {
         // No primaryKey in schema
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'primary_key_mismatch',
           table: 'user',
@@ -77,16 +74,14 @@ describe('verifySqlSchema - constraints', () => {
         // No foreignKey in schema
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'foreign_key_mismatch',
           table: 'post',
@@ -139,16 +134,14 @@ describe('verifySqlSchema - constraints', () => {
           ),
         });
 
-        const result = verifySqlSchema({
+        const issues = collectSqlSchemaIssues({
           contract,
           schema,
           strict: false,
-          typeMetadataRegistry: emptyTypeMetadataRegistry,
           frameworkComponents: [],
         });
 
-        expect(result.ok).toBe(true);
-        expect(result.schema.issues).toHaveLength(0);
+        expect(issues).toEqual([]);
       });
 
       it('returns foreign_key_mismatch when introspected FK has wrong referencedColumns', () => {
@@ -196,16 +189,14 @@ describe('verifySqlSchema - constraints', () => {
           ),
         });
 
-        const result = verifySqlSchema({
+        const issues = collectSqlSchemaIssues({
           contract,
           schema,
           strict: false,
-          typeMetadataRegistry: emptyTypeMetadataRegistry,
           frameworkComponents: [],
         });
 
-        expect(result.ok).toBe(false);
-        expect(result.schema.issues).toContainEqual(
+        expect(issues).toContainEqual(
           expect.objectContaining({
             kind: 'foreign_key_mismatch',
             table: 'profile',
@@ -258,15 +249,14 @@ describe('verifySqlSchema - constraints', () => {
           ),
         });
 
-        const result = verifySqlSchema({
+        const issues = collectSqlSchemaIssues({
           contract,
           schema,
           strict: false,
-          typeMetadataRegistry: emptyTypeMetadataRegistry,
           frameworkComponents: [],
         });
 
-        const missingAuthUsers = result.schema.issues.filter(
+        const missingAuthUsers = issues.filter(
           (i) => i.kind === 'missing_table' && i.table === 'users' && i.namespaceId === 'auth',
         );
         expect(missingAuthUsers).toHaveLength(0);
@@ -294,16 +284,14 @@ describe('verifySqlSchema - constraints', () => {
         // No unique constraint in schema
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'unique_constraint_mismatch',
           table: 'user',
@@ -331,16 +319,14 @@ describe('verifySqlSchema - constraints', () => {
         }),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'unique_constraint_mismatch',
           table: 'user',
@@ -372,16 +358,14 @@ describe('verifySqlSchema - constraints', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
   });
 
@@ -420,16 +404,14 @@ describe('verifySqlSchema - constraints', () => {
         // No FK in schema — should pass because constraint=false
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues.filter((i) => i.kind === 'foreign_key_mismatch')).toHaveLength(0);
+      expect(issues.filter((i) => i.kind === 'foreign_key_mismatch')).toHaveLength(0);
     });
 
     it('still reports FK constraint mismatch when constraint=true', () => {
@@ -465,16 +447,14 @@ describe('verifySqlSchema - constraints', () => {
         }),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'foreign_key_mismatch',
           table: 'post',
@@ -517,16 +497,14 @@ describe('verifySqlSchema - constraints', () => {
         // No index in schema — should fail because user declared the index
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'index_mismatch',
           table: 'post',
@@ -555,16 +533,14 @@ describe('verifySqlSchema - constraints', () => {
         // No index in schema
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'index_mismatch',
           table: 'user',

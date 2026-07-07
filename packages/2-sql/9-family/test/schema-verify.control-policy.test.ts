@@ -1,18 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { filterSchemaDiffIssues } from '../src/core/control-instance';
-import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
+import { collectSqlSchemaIssues } from '../src/core/diff/sql-schema-diff';
 import {
   createContractTable,
   createMockPostgresComponent,
   createSchemaTable,
   createTestContract,
   createTestSchemaIR,
-  emptyTypeMetadataRegistry,
 } from './schema-verify.helpers';
 
 const verifyOpts = {
   strict: true,
-  typeMetadataRegistry: emptyTypeMetadataRegistry,
   frameworkComponents: [createMockPostgresComponent()],
 };
 
@@ -34,15 +31,14 @@ function userSchema(extra?: { extra_column?: { nativeType: string; nullable: boo
   });
 }
 
-describe('verifySqlSchema control policy', () => {
+describe('collectSqlSchemaIssues control policy', () => {
   it('fails on any drift under managed', () => {
     const contract = createTestContract({ user: userTable('managed') });
     const schema = createTestSchemaIR({
       user: userSchema({ extra_column: { nativeType: 'text', nullable: true } }),
     });
-    const result = verifySqlSchema({ contract, schema, ...verifyOpts });
-    expect(result.ok).toBe(false);
-    expect(result.schema.counts.fail).toBeGreaterThan(0);
+    const issues = collectSqlSchemaIssues({ contract, schema, ...verifyOpts });
+    expect(issues.length).toBeGreaterThan(0);
   });
 
   it('suppresses extra columns but fails missing declared under tolerated', () => {
@@ -50,19 +46,17 @@ describe('verifySqlSchema control policy', () => {
     const schema = createTestSchemaIR({
       user: userSchema({ extra_column: { nativeType: 'text', nullable: true } }),
     });
-    const withExtra = verifySqlSchema({ contract, schema, ...verifyOpts });
-    expect(withExtra.ok).toBe(true);
-    expect(withExtra.schema.issues.some((i) => i.kind === 'extra_column')).toBe(false);
+    const withExtra = collectSqlSchemaIssues({ contract, schema, ...verifyOpts });
+    expect(withExtra).toEqual([]);
 
-    const missingEmail = verifySqlSchema({
+    const missingEmail = collectSqlSchemaIssues({
       contract,
       schema: createTestSchemaIR({
         user: createSchemaTable('user', { id: { nativeType: 'int4', nullable: false } }),
       }),
       ...verifyOpts,
     });
-    expect(missingEmail.ok).toBe(false);
-    expect(missingEmail.schema.issues).toContainEqual(
+    expect(missingEmail).toContainEqual(
       expect.objectContaining({ kind: 'missing_column', column: 'email' }),
     );
   });
@@ -86,10 +80,9 @@ describe('verifySqlSchema control policy', () => {
         },
       ),
     });
-    const result = verifySqlSchema({ contract, schema, ...verifyOpts });
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues.some((i) => i.kind === 'extra_column')).toBe(false);
-    expect(result.schema.issues.some((i) => i.kind === 'extra_index')).toBe(false);
+    const issues = collectSqlSchemaIssues({ contract, schema, ...verifyOpts });
+    expect(issues.some((i) => i.kind === 'extra_column')).toBe(false);
+    expect(issues.some((i) => i.kind === 'extra_index')).toBe(false);
   });
 
   it('fails a native-type mismatch under external (exact equality)', () => {
@@ -104,9 +97,8 @@ describe('verifySqlSchema control policy', () => {
         email: { nativeType: 'text', nullable: true },
       }),
     });
-    const result = verifySqlSchema({ contract, schema, ...verifyOpts });
-    expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
+    const issues = collectSqlSchemaIssues({ contract, schema, ...verifyOpts });
+    expect(issues).toContainEqual(
       expect.objectContaining({ kind: 'type_mismatch', column: 'email' }),
     );
   });
@@ -121,9 +113,8 @@ describe('verifySqlSchema control policy', () => {
     const schema = createTestSchemaIR({
       user: createSchemaTable('user', { email: { nativeType: 'text', nullable: true } }),
     });
-    const result = verifySqlSchema({ contract, schema, ...verifyOpts });
-    expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
+    const issues = collectSqlSchemaIssues({ contract, schema, ...verifyOpts });
+    expect(issues).toContainEqual(
       expect.objectContaining({ kind: 'type_mismatch', column: 'email' }),
     );
   });
@@ -136,56 +127,16 @@ describe('verifySqlSchema control policy', () => {
       user: userSchema(),
       audit_log: createSchemaTable('audit_log', { id: { nativeType: 'int4', nullable: false } }),
     });
-    const result = verifySqlSchema({ contract, schema, ...verifyOpts });
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues.some((i) => i.kind === 'extra_table')).toBe(false);
+    const issues = collectSqlSchemaIssues({ contract, schema, ...verifyOpts });
+    expect(issues.some((i) => i.kind === 'extra_table')).toBe(false);
   });
 
-  it('downgrades every divergence to warn under observed', () => {
+  it('still emits the extra-column issue under observed (grading to warn happens at the verdict layer)', () => {
     const contract = createTestContract({ user: userTable('observed') });
     const schema = createTestSchemaIR({
       user: userSchema({ extra_column: { nativeType: 'text', nullable: true } }),
     });
-    const result = verifySqlSchema({ contract, schema, ...verifyOpts });
-    expect(result.ok).toBe(true);
-    expect(result.schema.counts.fail).toBe(0);
-    expect(result.schema.counts.warn).toBeGreaterThan(0);
-    expect(result.schema.issues.some((i) => i.kind === 'extra_column')).toBe(true);
-  });
-});
-
-describe('filterSchemaDiffIssues', () => {
-  const extraIssue = {
-    path: ['public', 'profiles', 'p_abc12345'],
-    outcome: 'extra' as const,
-    reason: 'not-expected' as const,
-    message: 'extra: public/profiles/p_abc12345',
-  };
-  const missingIssue = {
-    path: ['public', 'profiles', 'p_deadbeef'],
-    outcome: 'missing' as const,
-    reason: 'not-found' as const,
-    message: 'missing: public/profiles/p_deadbeef',
-  };
-
-  it('keeps all issues when defaultControlPolicy is managed', () => {
-    const result = filterSchemaDiffIssues([extraIssue, missingIssue], 'managed');
-    expect(result).toHaveLength(2);
-  });
-
-  it('keeps all issues when defaultControlPolicy is undefined (defaults to managed)', () => {
-    const result = filterSchemaDiffIssues([extraIssue, missingIssue], undefined);
-    expect(result).toHaveLength(2);
-  });
-
-  it('suppresses extra issues under external policy', () => {
-    const result = filterSchemaDiffIssues([extraIssue, missingIssue], 'external');
-    expect(result).toHaveLength(1);
-    expect(result[0]?.outcome).toBe('missing');
-  });
-
-  it('returns empty array unchanged', () => {
-    const result = filterSchemaDiffIssues([], 'external');
-    expect(result).toHaveLength(0);
+    const issues = collectSqlSchemaIssues({ contract, schema, ...verifyOpts });
+    expect(issues.some((i) => i.kind === 'extra_column')).toBe(true);
   });
 });

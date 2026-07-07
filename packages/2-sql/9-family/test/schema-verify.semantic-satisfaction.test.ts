@@ -9,16 +9,15 @@
 
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
+import { collectSqlSchemaIssues } from '../src/core/diff/sql-schema-diff';
 import {
   createContractTable,
   createSchemaTable,
   createTestContract,
   createTestSchemaIR,
-  emptyTypeMetadataRegistry,
 } from './schema-verify.helpers';
 
-describe('verifySqlSchema - semantic satisfaction', () => {
+describe('collectSqlSchemaIssues - semantic satisfaction', () => {
   describe('primary key', () => {
     it('passes when columns match but names differ', () => {
       const contract = createTestContract({
@@ -36,16 +35,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
 
     it('passes when schema has name but contract does not', () => {
@@ -64,16 +61,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
   });
 
@@ -100,16 +95,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
 
     it('passes when satisfied by unique index with same columns', () => {
@@ -138,16 +131,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
 
     it('fails when no matching unique constraint or unique index', () => {
@@ -175,16 +166,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'unique_constraint_mismatch',
           table: 'user',
@@ -216,16 +205,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
 
     it('passes when satisfied by unique index (stronger satisfies weaker)', () => {
@@ -251,16 +238,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
 
     it('passes when satisfied by unique constraint (stronger satisfies weaker)', () => {
@@ -289,16 +274,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
 
     it('fails when no matching index, unique index, or unique constraint', () => {
@@ -320,16 +303,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         // No indexes at all
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'index_mismatch',
           table: 'user',
@@ -359,21 +340,17 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: true,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({ kind: 'index_mismatch', table: 'doc' }),
       );
-      expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ kind: 'extra_index', table: 'doc' }),
-      );
+      expect(issues).toContainEqual(expect.objectContaining({ kind: 'extra_index', table: 'doc' }));
     });
 
     it('fails when contract index options differ from schema index options', () => {
@@ -410,21 +387,17 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: true,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({ kind: 'index_mismatch', table: 'doc' }),
       );
-      expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ kind: 'extra_index', table: 'doc' }),
-      );
+      expect(issues).toContainEqual(expect.objectContaining({ kind: 'extra_index', table: 'doc' }));
     });
 
     it('passes when contract type/options match schema type/options exactly', () => {
@@ -461,16 +434,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: true,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
   });
 
@@ -521,16 +492,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
 
     it('fails when foreign key is missing from schema', () => {
@@ -566,16 +535,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         }),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'foreign_key_mismatch',
           table: 'post',
@@ -647,16 +614,14 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
   });
 });

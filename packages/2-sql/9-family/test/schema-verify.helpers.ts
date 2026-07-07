@@ -11,7 +11,6 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
 import { SchemaDiff } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
@@ -27,11 +26,6 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import type { CodecControlHooks, ExpandNativeTypeInput } from '../src/core/migrations/types';
-
-/**
- * Empty type metadata registry for tests that don't need codec warnings.
- */
-export const emptyTypeMetadataRegistry = new Map<string, { nativeType?: string }>();
 
 /**
  * Creates a minimal valid contract for testing.
@@ -307,36 +301,4 @@ export function createMockPostgresComponent(): TargetBoundComponentDescriptor<'s
  */
 export function stubTargetDiffDatabaseSchema(): SchemaDiff {
   return new SchemaDiff([], []);
-}
-
-/**
- * A no-op `verifyDatabaseSchema` for target-descriptor stubs in tests that
- * construct a family instance but never call `verifySchema`. Every SQL target
- * descriptor must provide `verifyDatabaseSchema`; this satisfies that
- * requirement for construction-only tests.
- */
-export function stubTargetVerifyDatabaseSchema(): VerifyDatabaseSchemaResult {
-  return {
-    ok: true,
-    summary: 'stub',
-    contract: { storageHash: 'stub' },
-    target: { expected: 'postgres' },
-    schema: {
-      issues: [],
-      schemaDiffIssues: [],
-      root: {
-        status: 'pass',
-        kind: 'database',
-        name: 'root',
-        contractPath: '',
-        code: '',
-        message: '',
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      },
-      counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
-    },
-    timings: { total: 0 },
-  };
 }

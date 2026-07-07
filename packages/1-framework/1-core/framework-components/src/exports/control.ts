@@ -61,7 +61,6 @@ export type {
   IntrospectSchemaResult,
   OperationContext,
   SchemaIssue,
-  SchemaVerificationNode,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,

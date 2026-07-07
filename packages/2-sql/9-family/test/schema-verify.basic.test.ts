@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
+import { collectSqlSchemaIssues } from '../src/core/diff/sql-schema-diff';
 import {
   createContractTable,
   createMockPostgresComponent,
   createSchemaTable,
   createTestContract,
   createTestSchemaIR,
-  emptyTypeMetadataRegistry,
 } from './schema-verify.helpers';
 
-describe('verifySqlSchema - basic', () => {
+describe('collectSqlSchemaIssues - basic', () => {
   describe('matching schema', () => {
-    it('returns ok: true when schema matches contract', () => {
+    it('returns no issues when schema matches contract', () => {
       const contract = createTestContract({
         user: createContractTable({
           id: { nativeType: 'int4', nullable: false },
@@ -26,16 +25,14 @@ describe('verifySqlSchema - basic', () => {
         }),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
 
     it('treats parameterized native types as matching when expanded', () => {
@@ -66,16 +63,14 @@ describe('verifySqlSchema - basic', () => {
       });
 
       // Use mock postgres component to provide the expandNativeType hook
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [createMockPostgresComponent()],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
 
     it('treats parameterized named storage type refs as matching when expanded', () => {
@@ -119,16 +114,14 @@ describe('verifySqlSchema - basic', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [createMockPostgresComponent()],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.issues).toHaveLength(0);
+      expect(issues).toEqual([]);
     });
 
     it('fails fast when a column typeRef points at a missing storage type', () => {
@@ -162,11 +155,10 @@ describe('verifySqlSchema - basic', () => {
       });
 
       expect(() =>
-        verifySqlSchema({
+        collectSqlSchemaIssues({
           contract,
           schema,
           strict: false,
-          typeMetadataRegistry: emptyTypeMetadataRegistry,
           frameworkComponents: [],
         }),
       ).toThrow(
@@ -201,16 +193,14 @@ describe('verifySqlSchema - basic', () => {
         ),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [createMockPostgresComponent()],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'type_mismatch',
           table: 'user',
@@ -232,16 +222,14 @@ describe('verifySqlSchema - basic', () => {
 
       const schema = createTestSchemaIR({});
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'missing_table',
           table: 'user',
@@ -266,16 +254,14 @@ describe('verifySqlSchema - basic', () => {
         }),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'missing_column',
           table: 'user',
@@ -299,16 +285,14 @@ describe('verifySqlSchema - basic', () => {
         }),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'type_mismatch',
           table: 'user',
@@ -334,16 +318,14 @@ describe('verifySqlSchema - basic', () => {
         }),
       });
 
-      const result = verifySqlSchema({
+      const issues = collectSqlSchemaIssues({
         contract,
         schema,
         strict: false,
-        typeMetadataRegistry: emptyTypeMetadataRegistry,
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(false);
-      expect(result.schema.issues).toContainEqual(
+      expect(issues).toContainEqual(
         expect.objectContaining({
           kind: 'nullability_mismatch',
           table: 'user',

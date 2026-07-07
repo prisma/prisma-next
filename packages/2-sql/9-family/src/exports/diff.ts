@@ -11,7 +11,9 @@ export type {
   SemanticSatisfactionResult,
   SqlDiffVerdict,
   SqlDiffVerdictInput,
+  StorageTypeVerdict,
   StorageTypeVerdictInput,
+  VerifySqlSchemaByDiffInput,
 } from '../core/diff/schema-diff-verify';
 export {
   classifySqlDiffIssue,
@@ -20,14 +22,16 @@ export {
   neutralizeFlatExpectedFkSchemas,
   normalizeFlatActualForDiff,
   resolveSemanticSatisfaction,
+  verifySqlSchemaByDiff,
 } from '../core/diff/schema-diff-verify';
 export type {
+  CollectSqlSchemaIssuesOptions,
   NativeTypeNormalizer,
-  VerifySqlSchemaOptions,
 } from '../core/diff/sql-schema-diff';
-export { verifySqlSchema, verifySqlSchemaTree } from '../core/diff/sql-schema-diff';
 export {
   arraysEqual,
+  collectSqlSchemaIssues,
+  collectSqlSchemaIssuesPerNamespace,
   isIndexSatisfied,
   isUniqueConstraintSatisfied,
-} from '../core/diff/verify-helpers';
+} from '../core/diff/sql-schema-diff';

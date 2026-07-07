@@ -131,26 +131,14 @@ export interface EnumValuesChangedIssue {
 
 export type SchemaIssue = BaseSchemaIssue | EnumValuesChangedIssue;
 
-export interface SchemaVerificationNode {
-  readonly status: 'pass' | 'warn' | 'fail';
-  readonly kind: string;
-  readonly name: string;
-  readonly contractPath: string;
-  readonly code: string;
-  readonly message: string;
-  readonly expected: unknown;
-  readonly actual: unknown;
-  readonly children: readonly SchemaVerificationNode[];
-  /**
-   * Why the actual state fails the expectation, for nodes a family grafts to
-   * represent a failure that has no declared counterpart (a live entity no
-   * contract expects carries `'not-expected'`). Absent on declared-node
-   * verification results. The aggregate strip filters on this field — never on
-   * family node kinds or codes.
-   */
-  readonly reason?: ExpectationFailureReason;
-}
-
+/**
+ * The issue-based schema-verify result. `ok` derives from the issue lists:
+ * a verify passes exactly when both lists are empty — the lists carry only
+ * verdict-bearing (failure) findings, post strict-gating and control-policy
+ * disposition. `issues` holds the legacy coordinate-based findings (storage
+ * types, Mongo — retires with the issue-type merge); `schemaDiffIssues`
+ * holds the node-typed differ findings.
+ */
 export interface VerifyDatabaseSchemaResult {
   readonly ok: boolean;
   readonly code?: string;
@@ -166,13 +154,6 @@ export interface VerifyDatabaseSchemaResult {
   readonly schema: {
     readonly issues: readonly SchemaIssue[];
     readonly schemaDiffIssues: readonly SchemaDiffIssue[];
-    readonly root: SchemaVerificationNode;
-    readonly counts: {
-      readonly pass: number;
-      readonly warn: number;
-      readonly fail: number;
-      readonly totalNodes: number;
-    };
   };
   readonly meta?: {
     readonly configPath?: string;

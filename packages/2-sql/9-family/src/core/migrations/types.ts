@@ -36,11 +36,7 @@ import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/ty
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlAdapter } from '../control-adapter';
 import type { SqlControlFamilyInstance } from '../control-instance';
-import type {
-  SqlDiffDatabaseSchema,
-  SqlDiffSchemaForVerdict,
-  SqlVerifyDatabaseSchema,
-} from './schema-differ';
+import type { SqlDiffDatabaseSchema, SqlDiffSchemaForVerdict } from './schema-differ';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
 
@@ -519,17 +515,9 @@ export interface SqlControlTargetDescriptor<
    * returns relational + policy issues; SQLite returns relational only). It is
    * schema logic on the target, not database I/O, so it lives here rather than
    * on the control adapter. How it computes the two issue sets is private.
-   * See {@link SqlDiffDatabaseSchema} / {@link SqlVerifyDatabaseSchema}.
+   * See {@link SqlDiffDatabaseSchema}.
    */
   readonly diffDatabaseSchema: SqlDiffDatabaseSchema;
-  /**
-   * The same combined comparison as {@link diffDatabaseSchema}, wrapped in the
-   * verify envelope (`ok`/`summary`/`code`/`target`/`timings`) plus the
-   * pass/warn/fail tree the CLI renders. Verify calls this instead of
-   * `diffDatabaseSchema` so the relational walk that produces the tree runs
-   * once per verify, not once for the diff and again for the tree.
-   */
-  readonly verifyDatabaseSchema: SqlVerifyDatabaseSchema;
   /**
    * The full-tree node diff the family verify verdict derives from —
    * expected-tree derivation, pre-diff normalization, the generic differ,

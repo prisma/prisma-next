@@ -1,10 +1,8 @@
 import type {
   Contract,
   ContractMarkerRecord,
-  ControlPolicy,
   LedgerEntryRecord,
 } from '@prisma-next/contract/types';
-import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
@@ -17,7 +15,6 @@ import type {
   OperationPreview,
   OperationPreviewCapable,
   PslContractInferCapable,
-  SchemaDiffIssue,
   SchemaViewCapable,
   SignDatabaseResult,
   VerifyDatabaseResult,
@@ -25,7 +22,6 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   APP_SPACE_ID,
-  dispositionForCategory,
   SchemaTreeNode,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
@@ -47,11 +43,10 @@ import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { extractCodecControlHooks } from './assembly';
 import type { SqlControlAdapter } from './control-adapter';
-import { computeSqlDiffVerdict, computeStorageTypeVerdict } from './diff/schema-diff-verify';
+import { verifySqlSchemaByDiff } from './diff/schema-diff-verify';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
-import type { DiffDatabaseSchemaInput, SqlDiffSchemaForVerdict } from './migrations/schema-differ';
+import type { SqlDiffSchemaForVerdict } from './migrations/schema-differ';
 import type {
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
@@ -540,24 +535,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     { readonly inferPslContract?: (schema: SqlSchemaIRNode) => PslDocumentAst },
     'reading the optional target-descriptor inferPslContract hook'
   >(target).inferPslContract;
-  // The combined database-schema verify is a required target-descriptor
-  // operation: every SQL target provides it, wrapping the same comparison
-  // `diffDatabaseSchema` runs in the verify envelope plus the pass/warn/fail
-  // tree the CLI renders. Read it off the descriptor like the other
-  // target-owned hooks.
-  const verifyDatabaseSchema = blindCast<
-    {
-      readonly verifyDatabaseSchema?: (
-        input: DiffDatabaseSchemaInput,
-      ) => VerifyDatabaseSchemaResult;
-    },
-    'reading the required target-descriptor verifyDatabaseSchema hook'
-  >(target).verifyDatabaseSchema;
-  if (!verifyDatabaseSchema) {
-    throw new Error(
-      `SQL target "${target.targetId}" is missing the required verifyDatabaseSchema descriptor operation`,
-    );
-  }
   // The full-tree node diff the verify VERDICT derives from. Read lazily so
   // construction-only stub descriptors (schema-view tests) keep working; the
   // throw happens at verify time.
@@ -729,73 +706,15 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       }
       // THE VERDICT: the target's full-tree node diff, graded by the
       // family's post-diff filters (strict gating + control-policy
-      // disposition), plus the codec verifyType hook findings. Verify
-      // rejects when a surviving issue is a failure.
-      const verdictDiff = diffSchemaForVerdict({
-        contract,
-        schema: options.schema,
-        frameworkComponents: options.frameworkComponents,
-      });
-      const diffVerdict = computeSqlDiffVerdict({
-        issues: verdictDiff.issues,
-        expectedRoot: verdictDiff.expectedRoot,
-        strict: options.strict,
-        defaultControlPolicy: contract.defaultControlPolicy,
-      });
-      const storageTypeVerdict = computeStorageTypeVerdict({
-        contract,
-        namespacePairs: verdictDiff.namespacePairs,
-        codecHooks: extractCodecControlHooks(options.frameworkComponents),
-      });
-      const ok = diffVerdict.failures.length === 0 && storageTypeVerdict.failures.length === 0;
-
-      // THE RENDERED OUTPUT (unchanged until the tree-view cut): the legacy
-      // walk's tree/counts/issues, plus the policy-scoped structural diff
-      // issues, composed exactly as before — only the `ok` flag now comes
-      // from the differ verdict above.
-      const sqlResult = verifyDatabaseSchema({
+      // disposition), plus the codec verifyType hook findings. The result
+      // is issue-based — `ok` holds exactly when both issue lists are empty.
+      return verifySqlSchemaByDiff({
         contract,
         schema: options.schema,
         strict: options.strict,
-        typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
+        diffSchemaForVerdict,
       });
-      const schemaDiffIssues = filterSchemaDiffIssues(
-        sqlResult.schema.schemaDiffIssues,
-        contract.defaultControlPolicy,
-      );
-      const relationalFails = sqlResult.schema.counts.fail;
-      const composed: VerifyDatabaseSchemaResult = (() => {
-        if (schemaDiffIssues.length === 0) {
-          if (schemaDiffIssues === sqlResult.schema.schemaDiffIssues) return sqlResult;
-          return { ...sqlResult, schema: { ...sqlResult.schema, schemaDiffIssues } };
-        }
-        const totalFails = relationalFails + schemaDiffIssues.length;
-        return {
-          ...sqlResult,
-          ok: false,
-          code: sqlResult.code ?? 'PN-RUN-3010',
-          summary: `Database schema does not satisfy contract (${totalFails} failure${totalFails === 1 ? '' : 's'})`,
-          schema: {
-            ...sqlResult.schema,
-            schemaDiffIssues,
-            counts: { ...sqlResult.schema.counts, fail: totalFails },
-          },
-        };
-      })();
-      if (composed.ok === ok) return composed;
-      // Verdict divergence between the differ and the legacy walk — the
-      // parity suite pins these as always agreeing; the differ verdict wins.
-      return {
-        ...composed,
-        ok,
-        ...(ok
-          ? {}
-          : {
-              code: composed.code ?? 'PN-RUN-3010',
-              summary: 'Database schema does not satisfy contract',
-            }),
-      };
     },
     async sign(options: {
       readonly driver: SqlControlDriverInstance<string>;
@@ -1145,32 +1064,4 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       };
     },
   };
-}
-
-/**
- * Filters the structural schema-diff issues (from `diffDatabaseSchema`) through
- * the contract's `defaultControlPolicy`. Issues whose outcome maps to a suppressed
- * category under the effective policy are removed. This mirrors the control-policy
- * filtering applied by `verifySqlSchema` for table/column-level findings.
- *
- * Outcome → category mapping:
- * - `'extra'`    → `'extraAuxiliary'`    (an extra auxiliary entity, e.g. an RLS policy)
- * - `'missing'`  → `'declaredMissing'`
- * - `'mismatch'` → `'declaredIncompatible'`
- */
-export function filterSchemaDiffIssues(
-  issues: readonly SchemaDiffIssue[],
-  defaultControlPolicy: ControlPolicy | undefined,
-): readonly SchemaDiffIssue[] {
-  if (issues.length === 0) return issues;
-  const policy = effectiveControlPolicy(undefined, defaultControlPolicy);
-  return issues.filter((issue) => {
-    const category =
-      issue.outcome === 'extra'
-        ? ('extraAuxiliary' as const)
-        : issue.outcome === 'missing'
-          ? ('declaredMissing' as const)
-          : ('declaredIncompatible' as const);
-    return dispositionForCategory(policy, category) !== 'suppress';
-  });
 }

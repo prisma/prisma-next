@@ -2,13 +2,12 @@ import { type ColumnDefault, type Contract, executionHash } from '@prisma-next/c
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import type { DefaultNormalizer } from '../src/core/diff/sql-schema-diff';
-import { verifySqlSchema } from '../src/core/diff/sql-schema-diff';
+import { collectSqlSchemaIssues } from '../src/core/diff/sql-schema-diff';
 import {
   createContractTable,
   createSchemaTable,
   createTestContract,
   createTestSchemaIR,
-  emptyTypeMetadataRegistry,
 } from './schema-verify.helpers';
 
 /**
@@ -69,7 +68,7 @@ const testNormalizer: DefaultNormalizer = (rawDefault: string): ColumnDefault | 
   return { kind: 'function', expression: trimmed };
 };
 
-describe('verifySqlSchema - defaults', () => {
+describe('collectSqlSchemaIssues - defaults', () => {
   it('returns default_missing when contract default is absent in schema', () => {
     const contract = createTestContract({
       user: createContractTable({
@@ -87,17 +86,15 @@ describe('verifySqlSchema - defaults', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
+    expect(issues).toContainEqual(
       expect.objectContaining({
         kind: 'default_missing',
         table: 'user',
@@ -128,17 +125,15 @@ describe('verifySqlSchema - defaults', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
+    expect(issues).toContainEqual(
       expect.objectContaining({
         kind: 'default_mismatch',
         table: 'user',
@@ -180,17 +175,15 @@ describe('verifySqlSchema - defaults', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('treats JSON defaults as equal when schema normalizer returns string literals', () => {
@@ -214,17 +207,15 @@ describe('verifySqlSchema - defaults', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('matches JSONB default with different key order (stable key sort)', () => {
@@ -249,17 +240,15 @@ describe('verifySqlSchema - defaults', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('matches JSONB default with arbitrary JSON object', () => {
@@ -283,17 +272,15 @@ describe('verifySqlSchema - defaults', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('falls back to string comparison when no normalizer is provided', () => {
@@ -320,17 +307,15 @@ describe('verifySqlSchema - defaults', () => {
     });
 
     // Without normalizer, comparison is direct string match on the literal value
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       // No normalizer provided
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('ignores generated defaults during verification', () => {
@@ -363,21 +348,19 @@ describe('verifySqlSchema - defaults', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 });
 
-describe('verifySqlSchema - timestamp default normalization', () => {
+describe('collectSqlSchemaIssues - timestamp default normalization', () => {
   it('treats now() contract default as equal to CURRENT_TIMESTAMP in schema', () => {
     const contract = createTestContract({
       event: createContractTable({
@@ -399,17 +382,15 @@ describe('verifySqlSchema - timestamp default normalization', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('treats now() contract default as equal to cast-wrapped timestamp in schema', () => {
@@ -433,21 +414,19 @@ describe('verifySqlSchema - timestamp default normalization', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 });
 
-describe('verifySqlSchema - null default normalization', () => {
+describe('collectSqlSchemaIssues - null default normalization', () => {
   it('treats NULL schema default as matching null literal contract default', () => {
     const contract = createTestContract({
       config: createContractTable({
@@ -469,21 +448,19 @@ describe('verifySqlSchema - null default normalization', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 });
 
-describe('verifySqlSchema - string literal defaults with type casts', () => {
+describe('collectSqlSchemaIssues - string literal defaults with type casts', () => {
   it('matches contract literal without cast to DB literal with ::text cast', () => {
     const contract = createTestContract({
       Environment: createContractTable({
@@ -505,17 +482,15 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('matches contract literal without cast to DB literal with ::character varying cast', () => {
@@ -539,17 +514,15 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('matches contract literal without cast to DB literal with quoted enum cast', () => {
@@ -573,17 +546,15 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('matches contract literal without cast to DB literal with escaped quotes and cast', () => {
@@ -607,17 +578,15 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('matches boolean literal true despite DB returning raw true', () => {
@@ -641,17 +610,15 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('still detects actual value mismatch when both have casts', () => {
@@ -675,17 +642,15 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
+    expect(issues).toContainEqual(
       expect.objectContaining({
         kind: 'default_mismatch',
         table: 'Environment',
@@ -715,17 +680,15 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('matches when DB returns cast-free enum literal', () => {
@@ -749,17 +712,15 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(true);
-    expect(result.schema.issues).toHaveLength(0);
+    expect(issues).toEqual([]);
   });
 
   it('detects value mismatch even when both have enum casts', () => {
@@ -783,17 +744,15 @@ describe('verifySqlSchema - string literal defaults with type casts', () => {
       }),
     });
 
-    const result = verifySqlSchema({
+    const issues = collectSqlSchemaIssues({
       contract,
       schema,
       strict: false,
-      typeMetadataRegistry: emptyTypeMetadataRegistry,
       frameworkComponents: [],
       normalizeDefault: testNormalizer,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
+    expect(issues).toContainEqual(
       expect.objectContaining({
         kind: 'default_mismatch',
         table: 'Organization',

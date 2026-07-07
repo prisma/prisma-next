@@ -8,20 +8,21 @@
  * reason/kind-keyed filters applied AFTER the diff — never inside it — and
  * the verify verdict derives from the filtered issue list.
  *
- * The legacy relational walk (`verifySqlSchema`) remains alive alongside
- * for rendered output until the tree-view cut; this module must produce the
- * identical verdict for every scenario the walk grades (pinned by the
- * differ-parity suite).
+ * `verifySqlSchemaByDiff` wraps the verdict in the issue-based result
+ * envelope — this is THE SQL schema verify (the legacy relational walk and
+ * its verification tree are retired).
  */
 
 import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import { effectiveControlPolicy } from '@prisma-next/contract/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   DiffableNode,
   SchemaDiffIssue,
   SchemaIssue,
   VerifierIssueCategory,
   VerifierOutcome,
+  VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { dispositionForCategory } from '@prisma-next/framework-components/control';
 import { isStorageTypeInstance, type SqlStorage } from '@prisma-next/sql-contract/types';
@@ -35,6 +36,9 @@ import {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
+import { extractCodecControlHooks } from '../assembly';
+import type { SqlDiffSchemaForVerdict } from '../migrations/schema-differ';
 import type { CodecControlHooks } from '../migrations/types';
 import { verifierDisposition } from './verifier-disposition';
 
@@ -64,7 +68,7 @@ function sameColumns(a: readonly string[], b: readonly string[]): boolean {
  * pairs for the differ (the differ pairs strictly by id, so a `unique:`
  * node can never pair with an `index:` node). Three legacy rules, ported
  * from `isUniqueConstraintSatisfied` / `isIndexSatisfied` and the
- * strict-extras loops in the merge-base `verify-helpers.ts`:
+ * strict-extras loops of the retired relational walk:
  *
  * 1. A contract unique satisfied by a live unique INDEX: the actual index
  *    node is reclassified as a unique node (it pairs with the expected
@@ -283,7 +287,12 @@ export interface StorageTypeVerdictInput {
  * `nativeEnumTypeNames` off it). Issue dispositions grade against the
  * contract default policy, matching the legacy `pushTypeNode` semantics.
  */
-export function computeStorageTypeVerdict(input: StorageTypeVerdictInput): SqlDiffVerdict {
+export interface StorageTypeVerdict {
+  readonly failures: readonly SchemaIssue[];
+  readonly warnings: readonly SchemaIssue[];
+}
+
+export function computeStorageTypeVerdict(input: StorageTypeVerdictInput): StorageTypeVerdict {
   const failures: SchemaIssue[] = [];
   const warnings: SchemaIssue[] = [];
   const policy = effectiveControlPolicy(undefined, input.contract.defaultControlPolicy);
@@ -305,18 +314,75 @@ export function computeStorageTypeVerdict(input: StorageTypeVerdictInput): SqlDi
       }
     }
   }
-  // Storage-type issues keep the legacy coordinate shape until the
-  // one-issue-type merge; the verdict only needs their counts, so they ride
-  // in the diff-issue lists as opaque failures via a structural lift.
+  return { failures, warnings };
+}
+
+// ============================================================================
+// The issue-based verify envelope
+// ============================================================================
+
+export interface VerifySqlSchemaByDiffInput {
+  readonly contract: Contract<SqlStorage>;
+  readonly schema: SqlSchemaIRNode;
+  readonly strict: boolean;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  /** The target's full-tree node diff (`diffSchemaForVerdict` descriptor hook). */
+  readonly diffSchemaForVerdict: SqlDiffSchemaForVerdict;
+}
+
+/**
+ * THE SQL schema verify: runs the target's full-tree node diff, grades it
+ * through the family's post-diff filters (strict gating + control-policy
+ * disposition) plus the codec `verifyType` hook findings, and wraps the
+ * verdict in the issue-based result envelope. `ok` holds exactly when both
+ * issue lists are empty — the lists carry the verdict's failures.
+ */
+export function verifySqlSchemaByDiff(
+  input: VerifySqlSchemaByDiffInput,
+): VerifyDatabaseSchemaResult {
+  const startTime = Date.now();
+  const verdictDiff = input.diffSchemaForVerdict({
+    contract: input.contract,
+    schema: input.schema,
+    frameworkComponents: input.frameworkComponents,
+  });
+  const diffVerdict = computeSqlDiffVerdict({
+    issues: verdictDiff.issues,
+    expectedRoot: verdictDiff.expectedRoot,
+    strict: input.strict,
+    defaultControlPolicy: input.contract.defaultControlPolicy,
+  });
+  const storageTypeVerdict = computeStorageTypeVerdict({
+    contract: input.contract,
+    namespacePairs: verdictDiff.namespacePairs,
+    codecHooks: extractCodecControlHooks(input.frameworkComponents),
+  });
+  const failCount = diffVerdict.failures.length + storageTypeVerdict.failures.length;
+  const ok = failCount === 0;
+  const profileHash =
+    'profileHash' in input.contract && typeof input.contract.profileHash === 'string'
+      ? input.contract.profileHash
+      : undefined;
   return {
-    failures: blindCast<
-      readonly SchemaDiffIssue[],
-      'W3 interim: legacy-typed storage-type issues counted into the verdict; the one-issue-type merge is a later unit'
-    >(failures),
-    warnings: blindCast<
-      readonly SchemaDiffIssue[],
-      'W3 interim: legacy-typed storage-type issues counted into the verdict; the one-issue-type merge is a later unit'
-    >(warnings),
+    ok,
+    ...(ok ? {} : { code: 'PN-SCHEMA-0001' }),
+    summary: ok
+      ? 'Database schema satisfies contract'
+      : `Database schema does not satisfy contract (${failCount} failure${failCount === 1 ? '' : 's'})`,
+    contract: {
+      storageHash: input.contract.storage.storageHash,
+      ...ifDefined('profileHash', profileHash),
+    },
+    target: {
+      expected: input.contract.target,
+      actual: input.contract.target,
+    },
+    schema: {
+      issues: storageTypeVerdict.failures,
+      schemaDiffIssues: diffVerdict.failures,
+    },
+    meta: { strict: input.strict },
+    timings: { total: Date.now() - startTime },
   };
 }
 
