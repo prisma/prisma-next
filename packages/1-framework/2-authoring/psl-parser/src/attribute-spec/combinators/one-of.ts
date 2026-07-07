@@ -4,11 +4,6 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import type { ArgType, OutOf } from '../types';
 import { leafDiagnostic } from './diagnostic';
 
-/**
- * Because leaves are `Result`-pure — a failed branch returns its diagnostics
- * rather than pushing them into a sink — a discarded alternative leaves no stray
- * errors behind.
- */
 export function oneOf<Alts extends readonly [ArgType<unknown>, ...ArgType<unknown>[]]>(
   ...alts: Alts
 ): ArgType<OutOf<Alts[number]>> {
@@ -28,6 +23,7 @@ export function oneOf<Alts extends readonly [ArgType<unknown>, ...ArgType<unknow
           );
         }
       }
+      // Each alternative returns its own diagnostics instead of writing to a shared list, so a failed attempt leaves nothing behind; if none match, report one aggregate error.
       return notOk([leafDiagnostic(ctx, arg, `Expected one of: ${label}`)]);
     },
   };

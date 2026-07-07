@@ -71,25 +71,18 @@ export function fkRelationPairKey(declaringModelName: string, targetModelName: s
   return `${declaringModelName}::${targetModelName}`;
 }
 
-/**
- * The action set is validated upstream by the `@relation` spec's
- * `oneOf(identifier(...))`, so this is a pure lookup with no second validation
- * path.
- */
 export function normalizeReferentialAction(actionToken: string): ReferentialAction | undefined {
+  // the token is already validated by the `@relation` spec's `oneOf(identifier(...))`, so this is just a lookup — no second validation path here.
   return REFERENTIAL_ACTION_MAP[actionToken];
 }
 
-/**
- * Cross-argument rules the engine cannot express through per-argument leaves:
- * `fields` and `references` are both-or-neither.
- */
 function relationInvariants(
   parsed: { readonly fields?: readonly string[]; readonly references?: readonly string[] },
   ctx: InterpretCtx,
 ): readonly PslDiagnostic[] {
   const hasFields = parsed.fields !== undefined;
   const hasReferences = parsed.references !== undefined;
+  // `fields` and `references` must be both set or both absent — a cross-argument rule that per-argument parsing can't enforce.
   if (hasFields !== hasReferences) {
     return [
       {

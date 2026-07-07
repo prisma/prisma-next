@@ -4,18 +4,12 @@ import { IdentifierAst } from '../../syntax/ast/identifier';
 import type { ArgType } from '../types';
 import { leafDiagnostic } from './diagnostic';
 
-/** Carried for the language server; the value parsed at runtime is just the name. */
 export type FieldRefScope = 'self' | 'referenced';
 
 export interface FieldRefArgType extends ArgType<string> {
   readonly scope: FieldRefScope;
 }
 
-/**
- * When the referenced model is out of scope (e.g. a cross-space target the
- * parser cannot see), existence cannot be checked, so the name is carried
- * through unchecked and validated where the target is known.
- */
 export function fieldRef(scope: FieldRefScope): FieldRefArgType {
   return {
     kind: 'fieldRef',
@@ -30,6 +24,7 @@ export function fieldRef(scope: FieldRefScope): FieldRefArgType {
         return notOk([leafDiagnostic(ctx, arg, 'Expected a field name')]);
       }
       const model = scope === 'self' ? ctx.selfModel : ctx.resolveReferencedModel();
+      // A referenced model in another space can't be resolved here (resolveReferencedModel returns undefined); skip the existence check — it runs where that model is known.
       if (model !== undefined && !Object.hasOwn(model.fields, name)) {
         return notOk([
           leafDiagnostic(ctx, arg, `Field "${name}" does not exist on model "${model.name}"`),

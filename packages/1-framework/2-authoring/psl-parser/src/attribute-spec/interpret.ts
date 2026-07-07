@@ -19,6 +19,7 @@ export function interpretAttribute<Out>(
 ): Result<Out, readonly PslDiagnostic[]> {
   const diagnostics: PslDiagnostic[] = [];
   const code = spec.diagnosticCode ?? DEFAULT_STRUCTURAL_CODE;
+  // stamp the spec's code onto ctx so leaf diagnostics carry this attribute's code, not a generic one.
   const leafCtx: InterpretCtx = { ...ctx, diagnosticCode: code };
   const attributeSpan = nodePslSpan(attrNode.syntax, ctx.sourceFile);
 

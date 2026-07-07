@@ -7,32 +7,17 @@ import type { ExpressionAst } from '../syntax/ast/expressions';
 
 export type AttributeLevel = 'field' | 'model' | 'block';
 
-/**
- * Parsing is pure: a leaf returns its diagnostics in the `Result` rather than
- * pushing them into a shared sink, so an alternative can be tried and discarded
- * without leaving stray errors behind.
- */
 export interface ArgType<T> {
-  /** Discriminant for visitor dispatch. */
   readonly kind: string;
   readonly label: string;
-  /** Phantom carrier for `T`; never read at runtime. */
+  // phantom carrier for `T`; never read at runtime.
   readonly _out?: T;
+  // returns diagnostics rather than pushing to a shared list, so `oneOf` can try and discard a failed branch.
   parse(arg: ExpressionAst, ctx: InterpretCtx): Result<T, readonly PslDiagnostic[]>;
 }
 
-/**
- * Deliberately lean: codec-lookup / default-function-registry handles are added
- * only once a combinator needs them, so the kit does not pull those dependencies
- * into the parser layer before they are used.
- */
 export interface InterpretCtx {
   readonly level: AttributeLevel;
-  /**
-   * `interpretAttribute` populates this from the active spec's `diagnosticCode`
-   * so a combinator emits with the attribute's code rather than a hard-coded
-   * generic.
-   */
   readonly diagnosticCode: PslDiagnosticCode;
   readonly sourceId: string;
   readonly sourceFile: SourceFile;
@@ -41,11 +26,8 @@ export interface InterpretCtx {
   readonly field?: FieldSymbol;
 }
 
-/**
- * Because it extends `ArgType`, the engine parses an optional parameter directly
- * and detects optionality from the `optional` marker.
- */
 export interface OptionalArgType<T> extends ArgType<T> {
+  // the engine detects optionality by checking for this marker (`'optional' in param`).
   readonly optional: true;
   readonly hasDefault: boolean;
   readonly defaultValue?: T;
@@ -64,10 +46,6 @@ export interface AttributeSpec<Out> {
   readonly positional: readonly PositionalParam[];
   readonly named: Readonly<Record<string, Param<unknown>>>;
   readonly refine?: (parsed: Out, ctx: InterpretCtx) => readonly PslDiagnostic[];
-  /**
-   * Defaults to `PSL_INVALID_ATTRIBUTE_SYNTAX`; an attribute that must preserve a
-   * specific code overrides it here.
-   */
   readonly diagnosticCode?: PslDiagnosticCode;
 }
 
@@ -93,11 +71,5 @@ export type AttributeOut<
   Named extends Record<string, Param<unknown>>,
 > = Simplify<PosOut<Pos> & NamedOut<Named>>;
 
-/**
- * The parameter is intentionally unconstrained: `Out` sits contravariantly in
- * `AttributeSpec.refine`, so a `refine`-carrying `AttributeSpec<Out>` is not
- assignable to `AttributeSpec<unknown>` and a type bound would reject every
- * spec that uses a cross-argument `refine`. Inference still recovers `Out`
- * precisely.
- */
+// `S` is unconstrained on purpose: `refine` makes `Out` contravariant, so a bound like `S extends AttributeSpec<unknown>` would reject every spec that uses `refine`.
 export type InferAttr<S> = S extends AttributeSpec<infer Out> ? Out : never;

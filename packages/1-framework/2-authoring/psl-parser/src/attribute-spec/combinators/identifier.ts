@@ -4,10 +4,7 @@ import { IdentifierAst } from '../../syntax/ast/identifier';
 import type { ArgType } from '../types';
 import { leafDiagnostic } from './diagnostic';
 
-/**
- * Pinned-only: there is no open form, so several `identifier`s composed under
- * `oneOf` infer the precise union of names.
- */
+// `const N` keeps each name's literal type, so `oneOf(identifier('a'), identifier('b'))` infers `'a' | 'b'`.
 export function identifier<const N extends string>(name: N): ArgType<N> {
   return {
     kind: 'identifier',
