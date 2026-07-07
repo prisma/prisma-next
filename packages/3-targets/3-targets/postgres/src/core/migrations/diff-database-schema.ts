@@ -1,6 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlSchemaDiffForVerdict } from '@prisma-next/family-sql/control';
-import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
+import { buildNativeTypeExpander, extractCodecControlHooks } from '@prisma-next/family-sql/control';
 import {
   collectSqlSchemaIssuesPerNamespace,
   resolveSemanticSatisfaction,
@@ -8,7 +8,7 @@ import {
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue, SchemaIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas, SchemaDiff } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -21,6 +21,7 @@ import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-no
 import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
+import { buildPostgresColumnOpRender } from './postgres-column-op-render';
 
 interface PostgresDiffDatabaseSchemaInput {
   readonly contract: Contract<SqlStorage>;
@@ -60,9 +61,17 @@ function computePostgresSchemaComparison(input: PostgresDiffDatabaseSchemaInput)
   // side. The legacy relational walk below does not read them — it verifies
   // from the contract directly and self-normalizes.
   const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
+  // The expected column nodes carry the op-render payload the migration
+  // planner reads (create/add-column DDL, alter-type SQL, set-default SQL),
+  // computed here with the codec hooks / storage types in hand — the same
+  // builders the coordinate op-path uses, relocated to derivation.
+  const codecHooks = extractCodecControlHooks(input.frameworkComponents);
+  const storageTypes = input.contract.storage.types ?? {};
   const projectionOptions = {
     annotationNamespace: 'pg',
     ...ifDefined('expandNativeType', expandNativeType),
+    renderColumnOps: (name: string, column: StorageColumn) =>
+      buildPostgresColumnOpRender(name, column, codecHooks, storageTypes),
   };
 
   // Relational diff: per-namespace-paired so a multi-schema database checks each

@@ -41,6 +41,18 @@ export interface SqlColumnIRInput {
    * the introspected raw default could not be parsed.
    */
   readonly resolvedDefault?: ColumnDefault;
+  /**
+   * Target-computed DDL render payload for the migration planner, stamped
+   * on the EXPECTED (contract-derived) column at derivation time — where
+   * the caller holds the codec hooks and storage types. The planner's
+   * op-builders read it verbatim (create/add-column DDL, alter-type SQL),
+   * so emitted DDL is byte-identical to the pre-`plan(start, end)`
+   * contract-driven path: the exact computation is relocated to derivation,
+   * not re-run against node fields. Opaque to the shared IR — only the
+   * producing target interprets it. Absent on introspected/hand-built nodes
+   * and never compared by `isEqualTo`.
+   */
+  readonly opRender?: unknown;
 }
 
 /**
@@ -74,6 +86,8 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
   declare readonly many?: boolean;
   declare readonly resolvedNativeType?: string;
   declare readonly resolvedDefault?: ColumnDefault;
+  /** See {@link SqlColumnIRInput.opRender}. Non-enumerable so it stays out of JSON and structural equality. */
+  declare readonly opRender?: unknown;
 
   constructor(input: SqlColumnIRInput) {
     super();
@@ -85,6 +99,14 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
     if (input.many !== undefined) this.many = input.many;
     if (input.resolvedNativeType !== undefined) this.resolvedNativeType = input.resolvedNativeType;
     if (input.resolvedDefault !== undefined) this.resolvedDefault = input.resolvedDefault;
+    if (input.opRender !== undefined) {
+      Object.defineProperty(this, 'opRender', {
+        value: input.opRender,
+        enumerable: false,
+        writable: false,
+        configurable: false,
+      });
+    }
     freezeNode(this);
   }
 
@@ -107,6 +129,7 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
         ...ifDefined('resolved', this.resolvedDefault),
         ...ifDefined('raw', this.default),
         ...ifDefined('nativeTypeContext', this.resolvedNativeType),
+        ...ifDefined('opRender', this.opRender),
       }),
     ];
   }

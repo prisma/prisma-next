@@ -199,7 +199,7 @@ export interface IssuePlannerValue {
   readonly calls: readonly PostgresOpFactoryCall[];
 }
 
-function toDdlColumn(
+export function toDdlColumn(
   name: string,
   column: StorageColumn,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,

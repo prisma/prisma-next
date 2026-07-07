@@ -66,12 +66,27 @@ export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => str
  */
 export type EnumNamespaceSchemaResolver = (storage: SqlStorage, namespaceId: string) => string;
 
+/**
+ * Target-supplied callback that computes the opaque op-render payload the
+ * migration planner reads off the EXPECTED column node (create/add-column
+ * DDL, alter-type SQL, set-default SQL). It runs at derivation time — where
+ * the caller holds the codec hooks and storage types — using the same
+ * builders the pre-`plan(start, end)` op-path used, so the planner emits
+ * byte-identical DDL by reading the relocated result rather than recomputing.
+ * The family stays target-agnostic (same IoC pattern as
+ * {@link NativeTypeExpander}); the payload is opaque here and only the
+ * producing target interprets it. Absent ⇒ no payload is stamped (verify-only
+ * derivations that never plan).
+ */
+export type ColumnOpRenderer = (name: string, column: StorageColumn) => unknown;
+
 function convertColumn(
   name: string,
   column: StorageColumn,
   storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
+  renderColumnOps: ColumnOpRenderer | undefined,
 ): SqlColumnIRInput {
   // Resolve `typeRef` so columns that delegate their `nativeType`/`codecId`/
   // `typeParams` to a named `storage.types` entry expand the same way as
@@ -104,6 +119,7 @@ function convertColumn(
     // stamps its normalizer's parse of the raw expression).
     resolvedNativeType: nativeType,
     ...ifDefined('resolvedDefault', column.default ?? undefined),
+    ...ifDefined('opRender', renderColumnOps?.(name, column)),
   };
 }
 
@@ -236,6 +252,7 @@ function convertTable(
   storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
+  renderColumnOps: ColumnOpRenderer | undefined,
   storage: SqlStorage,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIRInput> = {};
@@ -246,6 +263,7 @@ function convertTable(
       storageTypes,
       expandNativeType,
       renderDefault,
+      renderColumnOps,
     );
   }
 
@@ -356,6 +374,13 @@ export interface ContractToSchemaIROptions {
    * schema-scoped enum storage (SQLite) omit it; enums are absent there.
    */
   readonly resolveEnumNamespaceSchema?: EnumNamespaceSchemaResolver;
+  /**
+   * Target-supplied op-render computation stamped onto each expected column
+   * node ({@link ColumnOpRenderer}). Provided by planning derivations (which
+   * hold the codec hooks); omitted by verify-only derivations, which never
+   * read the payload.
+   */
+  readonly renderColumnOps?: ColumnOpRenderer;
 }
 
 /**
@@ -408,6 +433,7 @@ export function contractNamespaceToSchemaIR(
       storageTypes,
       options.expandNativeType,
       options.renderDefault,
+      options.renderColumnOps,
       storage,
     );
   }
@@ -444,6 +470,7 @@ export function contractToSchemaIR(
         storageTypes,
         options.expandNativeType,
         options.renderDefault,
+        options.renderColumnOps,
         storage,
       );
     }

@@ -16,6 +16,12 @@ export interface SqlColumnDefaultIRInput {
    * column's resolved native type.
    */
   readonly nativeTypeContext?: string;
+  /**
+   * The owning column's opaque op-render payload, threaded through so the
+   * planner's set-default op-builder can read the derivation-computed
+   * default SQL verbatim. See {@link import('./sql-column-ir').SqlColumnIRInput.opRender}.
+   */
+  readonly opRender?: unknown;
 }
 
 /**
@@ -40,12 +46,22 @@ export class SqlColumnDefaultIR extends SqlSchemaIRNode implements DiffableNode 
   declare readonly resolved?: ColumnDefault;
   declare readonly raw?: string;
   declare readonly nativeTypeContext?: string;
+  /** See {@link SqlColumnDefaultIRInput.opRender}. Non-enumerable so it stays out of JSON and structural equality. */
+  declare readonly opRender?: unknown;
 
   constructor(input: SqlColumnDefaultIRInput) {
     super();
     if (input.resolved !== undefined) this.resolved = input.resolved;
     if (input.raw !== undefined) this.raw = input.raw;
     if (input.nativeTypeContext !== undefined) this.nativeTypeContext = input.nativeTypeContext;
+    if (input.opRender !== undefined) {
+      Object.defineProperty(this, 'opRender', {
+        value: input.opRender,
+        enumerable: false,
+        writable: false,
+        configurable: false,
+      });
+    }
     freezeNode(this);
   }
 
