@@ -32,7 +32,7 @@ import type { SqliteIndexSpec } from './operations/shared';
 import { buildRecreatePostchecks, buildRecreateSummary } from './operations/tables';
 
 export interface StrategyContext {
-  /** The desired ("end") tree — resolved leaf values, `opRender` stamped. */
+  /** The desired ("end") tree — resolved leaf values, incl. `codecRef`. */
   readonly expected: SqlSchemaIR;
   /** The live ("start") tree. */
   readonly actual: SqlSchemaIR;

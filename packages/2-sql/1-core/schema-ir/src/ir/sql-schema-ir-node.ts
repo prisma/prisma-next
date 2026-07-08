@@ -66,3 +66,26 @@ export abstract class SqlSchemaIRNode extends IRNodeBase {
     });
   }
 }
+
+/**
+ * Defines a non-enumerable own property, the same treatment `kind` gets
+ * above: a derivation-time render-support field stays out of
+ * `JSON.stringify`, `toEqual({...})` structural assertions, and spreads,
+ * while remaining directly readable (`node.field`) for the one consumer
+ * that resolves it at plan time. A no-op when `value` is `undefined` — the
+ * property is simply absent, matching every other optional field on these
+ * nodes.
+ */
+export function defineNonEnumerable<T extends object>(
+  target: T,
+  key: string,
+  value: unknown,
+): void {
+  if (value === undefined) return;
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  });
+}

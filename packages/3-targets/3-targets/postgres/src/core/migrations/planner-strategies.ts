@@ -17,12 +17,13 @@
  *   downstream strategies (codec-hook type ops and temp-default backfill)
  *   and `mapNodeIssueToCall` defaults emit direct DDL instead.
  *
- * Structural decisions (type/nullability drift, DDL fragments) read the
- * diff node pair + the derivation-stamped `opRender` payload. The retained
- * subsystems — codec type-operations (`storageTypePlanCallStrategy`) and the
- * NOT-NULL temp-default deferred DDL (`notNullAddColumnCallStrategy`) — keep
- * reading the contract + codec hooks via `StrategyContext`, per the slice's
- * scope (see `diff-database-schema.ts` / the slice spec).
+ * Structural decisions (type/nullability drift, DDL fragments) read the diff
+ * node pair and resolve column DDL from the node's `codecRef` (`column-ddl-
+ * rendering.ts`). The retained subsystems — codec type-operations
+ * (`storageTypePlanCallStrategy`) and the NOT-NULL temp-default deferred DDL
+ * (`notNullAddColumnCallStrategy`) — keep reading the contract + codec hooks
+ * via `StrategyContext`, per the slice's scope (see `diff-database-schema.ts`
+ * / the slice spec).
  */
 
 import type { Contract } from '@prisma-next/contract/types';
@@ -48,6 +49,11 @@ import {
 } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { isPostgresSchema } from '../postgres-schema';
+import {
+  renderColumnAlterType,
+  renderColumnDdl,
+  resolveColumnTemporaryDefault,
+} from './column-ddl-rendering';
 import { resolveNamespaceIdForDdlSchema } from './control-policy';
 import { emissionSchemaName, issueNode, issueSchemaName, issueTableName } from './issue-planner';
 import {
@@ -65,7 +71,6 @@ import {
 } from './op-factory-call';
 import { buildSchemaLookupMap, hasForeignKey, hasUniqueConstraint } from './planner-schema-lookup';
 import { buildTargetDetails, type PostgresPlanTargetDetails } from './planner-target-details';
-import { columnOpRenderOf } from './postgres-column-op-render';
 
 /**
  * Look up a storage table by its explicit namespace coordinate. Returns
@@ -147,9 +152,9 @@ export interface StrategyContext {
 /**
  * Consumes node-typed diff issues (`SchemaDiffIssue`, from the one differ —
  * `buildPostgresPlanDiff`), reading the issue's node pair for structural
- * decisions and the stamped `opRender` for DDL. The retained subsystems
- * (codec type-operations, the NOT-NULL temp-default backfill) keep reading
- * the contract via `StrategyContext`.
+ * decisions and resolving column DDL from the node's `codecRef`. The
+ * retained subsystems (codec type-operations, the NOT-NULL temp-default
+ * backfill) keep reading the contract via `StrategyContext`.
  */
 export type CallMigrationStrategy = (
   issues: readonly SchemaDiffIssue[],
@@ -208,7 +213,7 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
     const schemaName = emissionSchemaName(ctx, ddlSchemaName);
 
     matched.push(issue);
-    const ddl = columnOpRenderOf(expected).ddlColumn;
+    const ddl = renderColumnDdl(expected.name, expected, ctx.codecHooks);
     const nullableSpec = contractFree.col(ddl.name, ddl.type, {
       ...(ddl.codecRef !== undefined ? { codecRef: ddl.codecRef } : {}),
     });
@@ -275,7 +280,10 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
     const schemaName = emissionSchemaName(ctx, ddlSchemaName);
 
     matched.push(issue);
-    const { qualifiedTargetType, formatTypeExpected } = columnOpRenderOf(expected).alterType;
+    const { qualifiedTargetType, formatTypeExpected } = renderColumnAlterType(
+      expected,
+      ctx.codecHooks,
+    );
     const alterOpts = {
       qualifiedTargetType,
       formatTypeExpected,
@@ -563,9 +571,8 @@ export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) 
  * Two shapes:
  *  - Shared-temp-default safe: emit a single atomic composite op (add
  *    nullable → backfill identity value → `SET NOT NULL` → `DROP DEFAULT`).
- *    The temp-default value is the derivation-stamped
- *    `opRender.temporaryDefault` — resolved once at derivation
- *    (`resolveIdentityValue`), read here instead of recomputed.
+ *    The temp-default value is resolved from the column node's `codecRef`
+ *    (`resolveColumnTemporaryDefault`, wrapping `resolveIdentityValue`).
  *  - Empty-table guarded: emit a hand-built op with a `tableIsEmptyCheck`
  *    precheck so the failure message is "table is not empty" rather than the
  *    raw PG NOT NULL violation.
@@ -605,7 +612,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
     const schemaTable = ctx.schema.tables[tableName];
     if (!schemaTable) continue;
 
-    const temporaryDefault = columnOpRenderOf(expected).temporaryDefault;
+    const temporaryDefault = resolveColumnTemporaryDefault(expected, ctx.codecHooks);
     const schemaLookup = schemaLookups.get(tableName);
     const canUseSharedTempDefault =
       temporaryDefault !== null &&
@@ -638,7 +645,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
         schemaName,
         tableName,
         expected.name,
-        columnOpRenderOf(expected).ddlColumn,
+        renderColumnDdl(expected.name, expected, ctx.codecHooks),
       ),
     );
   }

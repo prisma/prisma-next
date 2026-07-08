@@ -10,9 +10,8 @@
  *
  * Every branch reads the diff node the issue carries (`issue.expected` /
  * `issue.actual`) — never the contract, never `storageTypes`, never codec
- * hooks. The expected tree's columns already carry the op-render payload
- * (`opRender`, stamped at derivation), so op construction is a direct read,
- * not a recomputation.
+ * hooks. Column DDL resolves from the column node's `codecRef`
+ * (`column-ddl-rendering.ts`), never a recomputation against the contract.
  */
 
 import type {
@@ -22,12 +21,6 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
-import {
-  type DdlTableConstraint,
-  ForeignKeyConstraint,
-  PrimaryKeyConstraint,
-  UniqueConstraint,
-} from '@prisma-next/sql-relational-core/ast';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import {
   RelationalSchemaNodeKind,
@@ -41,6 +34,12 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { CONTROL_TABLE_NAMES } from '../control-tables';
+import {
+  columnSpecFromNode,
+  ddlColumnFromNode,
+  isInlineAutoincrementPrimaryKeyNode,
+  tableConstraintsFromNode,
+} from './column-ddl-rendering';
 import {
   AddColumnCall,
   CreateIndexCall,
@@ -61,7 +60,6 @@ import {
   type StrategyContext,
   sqlitePlannerStrategies,
 } from './planner-strategies';
-import { columnOpRenderOf } from './sqlite-column-op-render';
 
 export type { CallMigrationStrategy, StrategyContext };
 
@@ -171,11 +169,11 @@ export function columnTypeChanged(expected: SqlColumnIR, actual: SqlColumnIR): b
  * Builds the flat `SqliteTableSpec` `RecreateTableCall` needs from the
  * expected table node — the node-sourced equivalent of the retired
  * `toTableSpec` (which read a raw contract `StorageTable`). Every column's
- * spec comes directly off its `opRender` payload.
+ * spec is resolved from its `codecRef` via `columnSpecFromNode`.
  */
 export function tableSpecFromNode(table: SqlTableIR): SqliteTableSpec {
-  const columns: SqliteColumnSpec[] = Object.values(table.columns).map(
-    (c) => columnOpRenderOf(c).columnSpec,
+  const columns: SqliteColumnSpec[] = Object.values(table.columns).map((c) =>
+    columnSpecFromNode(c, isInlineAutoincrementPrimaryKeyNode(table, c)),
   );
   const uniques: SqliteUniqueSpec[] = table.uniques.map((u) => ({
     columns: u.columns,
@@ -250,8 +248,13 @@ function absorbedConflictKind(nodeKind: string): SqlPlannerConflict['kind'] {
  * derivation (`contractToSchemaIR`'s `convertTable`).
  */
 function buildCreateTableCalls(table: SqlTableIR): SqliteOpFactoryCall[] {
-  const columns = Object.values(table.columns).map((c) => columnOpRenderOf(c).ddlColumn);
-  const constraints = buildTableConstraints(table);
+  const columns = Object.values(table.columns).map((c) =>
+    ddlColumnFromNode(c, isInlineAutoincrementPrimaryKeyNode(table, c)),
+  );
+  const hasInlinePk = Object.values(table.columns).some((c) =>
+    isInlineAutoincrementPrimaryKeyNode(table, c),
+  );
+  const constraints = tableConstraintsFromNode(table, hasInlinePk);
   const calls: SqliteOpFactoryCall[] = [
     new CreateTableCall(table.name, columns, constraints.length > 0 ? constraints : undefined),
   ];
@@ -260,37 +263,6 @@ function buildCreateTableCalls(table: SqlTableIR): SqliteOpFactoryCall[] {
     calls.push(new CreateIndexCall(table.name, indexName, index.columns));
   }
   return calls;
-}
-
-function buildTableConstraints(table: SqlTableIR): DdlTableConstraint[] {
-  const constraints: DdlTableConstraint[] = [];
-  const hasInlinePk = Object.values(table.columns).some(
-    (c) => columnOpRenderOf(c).columnSpec.inlineAutoincrementPrimaryKey === true,
-  );
-  if (table.primaryKey && !hasInlinePk) {
-    constraints.push(new PrimaryKeyConstraint({ columns: table.primaryKey.columns }));
-  }
-  for (const u of table.uniques) {
-    constraints.push(
-      new UniqueConstraint({
-        columns: u.columns,
-        ...(u.name !== undefined ? { name: u.name } : {}),
-      }),
-    );
-  }
-  for (const fk of table.foreignKeys) {
-    constraints.push(
-      new ForeignKeyConstraint({
-        columns: fk.columns,
-        refTable: fk.referencedTable,
-        refColumns: fk.referencedColumns,
-        ...(fk.name !== undefined ? { name: fk.name } : {}),
-        ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
-        ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
-      }),
-    );
-  }
-  return constraints;
 }
 
 // ============================================================================
@@ -323,6 +295,7 @@ function mapTableIssue(
 
 function mapColumnIssue(
   issue: SchemaDiffIssue,
+  ctx: StrategyContext,
 ): Result<readonly SqliteOpFactoryCall[], SqlPlannerConflict> {
   const tableName = issue.path[1];
   if (tableName === undefined) {
@@ -338,7 +311,13 @@ function mapColumnIssue(
       SqlColumnIR,
       'a not-found column issue always carries the expected column node'
     >(issue.expected);
-    return ok([new AddColumnCall(tableName, columnOpRenderOf(column).columnSpec)]);
+    // A sole-autoincrement-PK column is always part of the table's own
+    // CREATE (never a bare ADD COLUMN — PK changes go through
+    // `recreateTableStrategy`), but the check is cheap and keeps this path
+    // honest against the table node rather than assuming it.
+    const table = ctx.expected.tables[tableName];
+    const inline = table !== undefined && isInlineAutoincrementPrimaryKeyNode(table, column);
+    return ok([new AddColumnCall(tableName, columnSpecFromNode(column, inline))]);
   }
   if (issue.reason === 'not-expected') {
     const column = blindCast<
@@ -398,7 +377,7 @@ function mapIndexIssue(
 
 export function mapNodeIssueToCall(
   issue: SchemaDiffIssue,
-  _ctx: StrategyContext,
+  ctx: StrategyContext,
 ): Result<readonly SqliteOpFactoryCall[], SqlPlannerConflict> {
   const node = issueNode(issue);
   if (node === undefined) {
@@ -413,7 +392,7 @@ export function mapNodeIssueToCall(
     case RelationalSchemaNodeKind.table:
       return mapTableIssue(issue);
     case RelationalSchemaNodeKind.column:
-      return mapColumnIssue(issue);
+      return mapColumnIssue(issue, ctx);
     case RelationalSchemaNodeKind.index:
       return mapIndexIssue(issue);
     case RelationalSchemaNodeKind.columnDefault:
@@ -473,7 +452,7 @@ function classifyCall(call: SqliteOpFactoryCall): CallCategory | null {
 
 export interface IssuePlannerOptions {
   readonly issues: readonly SchemaDiffIssue[];
-  /** The desired ("end") tree — resolved leaf values, `opRender` stamped. */
+  /** The desired ("end") tree — resolved leaf values, incl. `codecRef`. */
   readonly expected?: SqlSchemaIR;
   /** The live ("start") tree. */
   readonly actual?: SqlSchemaIR;

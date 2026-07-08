@@ -4,7 +4,7 @@ import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { resolvedDefaultsEqual } from './resolved-default-equality';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
-import { type SqlSchemaDiffRole, SqlSchemaIRNode } from './sql-schema-ir-node';
+import { defineNonEnumerable, type SqlSchemaDiffRole, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface SqlColumnDefaultIRInput {
   /** Structured resolved default (contract-declared or normalizer-parsed). */
@@ -17,11 +17,12 @@ export interface SqlColumnDefaultIRInput {
    */
   readonly nativeTypeContext?: string;
   /**
-   * The owning column's opaque op-render payload, threaded through so the
-   * planner's set-default op-builder can read the derivation-computed
-   * default SQL verbatim. See {@link import('./sql-column-ir').SqlColumnIRInput.opRender}.
+   * The owning column's array-ness, threaded through so the planner's
+   * set-default op-builder can render an array-literal default (e.g.
+   * `ARRAY[...]`) the same way the pre-`plan(start, end)` op-path did. See
+   * {@link import('./sql-column-ir').SqlColumnIRInput.many}.
    */
-  readonly opRender?: unknown;
+  readonly many?: boolean;
 }
 
 /**
@@ -46,22 +47,15 @@ export class SqlColumnDefaultIR extends SqlSchemaIRNode implements DiffableNode 
   declare readonly resolved?: ColumnDefault;
   declare readonly raw?: string;
   declare readonly nativeTypeContext?: string;
-  /** See {@link SqlColumnDefaultIRInput.opRender}. Non-enumerable so it stays out of JSON and structural equality. */
-  declare readonly opRender?: unknown;
+  /** See {@link SqlColumnDefaultIRInput.many}. Non-enumerable so it stays out of JSON and structural equality. */
+  declare readonly many?: boolean;
 
   constructor(input: SqlColumnDefaultIRInput) {
     super();
     if (input.resolved !== undefined) this.resolved = input.resolved;
     if (input.raw !== undefined) this.raw = input.raw;
     if (input.nativeTypeContext !== undefined) this.nativeTypeContext = input.nativeTypeContext;
-    if (input.opRender !== undefined) {
-      Object.defineProperty(this, 'opRender', {
-        value: input.opRender,
-        enumerable: false,
-        writable: false,
-        configurable: false,
-      });
-    }
+    defineNonEnumerable(this, 'many', input.many);
     freezeNode(this);
   }
 

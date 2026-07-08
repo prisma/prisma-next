@@ -12,7 +12,6 @@ import type {
   ExpectationFailureReason,
   SchemaDiffIssue,
 } from '@prisma-next/framework-components/control';
-import { DdlColumn } from '@prisma-next/sql-relational-core/ast';
 import {
   PrimaryKey,
   SqlCheckConstraintIR,
@@ -23,33 +22,17 @@ import {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
-import type { SqliteColumnSpec } from '../../src/core/migrations/operations/shared';
-import type { SqliteColumnOpRender } from '../../src/core/migrations/sqlite-column-op-render';
 
-/** Builds the op-render payload a real derivation would stamp on an expected column — mirrors `buildSqliteColumnOpRender`'s output shape. */
-export function opRenderFor(input: {
-  readonly name: string;
-  readonly typeSql: string;
-  readonly nullable: boolean;
-  readonly defaultSql?: string;
-  readonly inlineAutoincrementPrimaryKey?: boolean;
-}): SqliteColumnOpRender {
-  const columnSpec: SqliteColumnSpec = {
-    name: input.name,
-    typeSql: input.typeSql,
-    defaultSql: input.defaultSql ?? '',
-    nullable: input.nullable,
-    ...(input.inlineAutoincrementPrimaryKey ? { inlineAutoincrementPrimaryKey: true } : {}),
-  };
-  const ddlColumn = new DdlColumn({
-    name: input.name,
-    type: input.typeSql,
-    ...(!input.nullable ? { notNull: true } : {}),
-  });
-  return { columnSpec, ddlColumn };
-}
+/** Placeholder codec id for hand-built test fixtures — SQLite's DDL builders only uppercase the base native type, never resolving codec hooks by id. */
+const TEST_CODEC_ID = 'test/native@1';
 
-/** An expected (desired-side) column, carrying `opRender` the way derivation stamps it. */
+/**
+ * An expected (desired-side) column, carrying the codec identity
+ * (`codecRef` / `codecBaseNativeType`) the way derivation stamps it —
+ * mirrors `contractToSchemaIR`'s output shape, so the node-based op-builders
+ * (`column-ddl-rendering.ts`) resolve DDL from it exactly like a
+ * derivation-produced tree.
+ */
 export function expectedColumn(input: {
   readonly name: string;
   readonly nativeType: string;
@@ -57,8 +40,6 @@ export function expectedColumn(input: {
   readonly resolvedNativeType?: string;
   readonly many?: boolean;
   readonly resolvedDefault?: ColumnDefault;
-  readonly defaultSql?: string;
-  readonly inlineAutoincrementPrimaryKey?: boolean;
 }): SqlColumnIR {
   return new SqlColumnIR({
     name: input.name,
@@ -67,17 +48,12 @@ export function expectedColumn(input: {
     resolvedNativeType: input.resolvedNativeType ?? input.nativeType,
     ...(input.many !== undefined ? { many: input.many } : {}),
     ...(input.resolvedDefault !== undefined ? { resolvedDefault: input.resolvedDefault } : {}),
-    opRender: opRenderFor({
-      name: input.name,
-      typeSql: input.nativeType,
-      nullable: input.nullable,
-      ...(input.defaultSql !== undefined ? { defaultSql: input.defaultSql } : {}),
-      ...(input.inlineAutoincrementPrimaryKey ? { inlineAutoincrementPrimaryKey: true } : {}),
-    }),
+    codecRef: { codecId: TEST_CODEC_ID, ...(input.many !== undefined ? { many: input.many } : {}) },
+    codecBaseNativeType: input.nativeType,
   });
 }
 
-/** A live (actual-side) column, as introspection would build it — no `opRender`. */
+/** A live (actual-side) column, as introspection would build it — no codec identity. */
 export function actualColumn(input: {
   readonly name: string;
   readonly nativeType: string;

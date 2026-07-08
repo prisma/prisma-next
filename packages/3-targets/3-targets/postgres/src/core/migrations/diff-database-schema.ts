@@ -1,11 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlSchemaDiffForVerdict } from '@prisma-next/family-sql/control';
-import { buildNativeTypeExpander, extractCodecControlHooks } from '@prisma-next/family-sql/control';
+import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
 import { resolveSemanticSatisfaction } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -15,7 +15,6 @@ import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-sch
 import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
-import { buildPostgresColumnOpRender } from './postgres-column-op-render';
 
 function ownedSchemaNames(expected: PostgresDatabaseSchemaNode): ReadonlySet<string> {
   const policyNamespaces = Object.values(expected.namespaces).flatMap((ns) =>
@@ -198,7 +197,7 @@ function padActualNamespaces(
 }
 
 export interface PostgresPlanDiff {
-  /** The desired ("end") tree — resolved leaf values, `opRender` stamped on every column, table-less namespaces pruned. */
+  /** The desired ("end") tree — resolved leaf values (incl. `codecRef`) on every column, table-less namespaces pruned. */
   readonly expected: PostgresDatabaseSchemaNode;
   /** The live ("start") tree, padded with empty namespaces and normalized for semantic satisfaction against `expected`. */
   readonly actual: PostgresDatabaseSchemaNode;
@@ -210,14 +209,13 @@ export interface PostgresPlanDiff {
  * The Postgres planner's diff input: the SAME tree-building
  * `diffPostgresSchemaForVerdict` uses (expander threaded, FK schemas resolved,
  * table-less namespaces pruned, actual normalized for semantic satisfaction,
- * role-aware ownership filter) PLUS the op-render stamper (so expected column
- * nodes carry the DDL payload the planner's op-builders read) and actual
- * namespace padding (so a missing schema's tables surface as `not-found`
- * instead of a swallowed namespace `not-found`). One differ drives both verify
- * and plan; this is the plan-side derivation. The single issue list covers
- * tables / columns / constraints / indexes / defaults AND policies — the caller
- * splits it (relational → `mapNodeIssueToCall`; policy → RLS ops) and stitches
- * in `CREATE SCHEMA` separately.
+ * role-aware ownership filter) plus actual namespace padding (so a missing
+ * schema's tables surface as `not-found` instead of a swallowed namespace
+ * `not-found`). One differ drives both verify and plan; this is the
+ * plan-side derivation. The single issue list covers tables / columns /
+ * constraints / indexes / defaults AND policies — the caller splits it
+ * (relational → `mapNodeIssueToCall`; policy → RLS ops) and stitches in
+ * `CREATE SCHEMA` separately.
  */
 export function buildPostgresPlanDiff(input: {
   readonly contract: Contract<SqlStorage>;
@@ -231,13 +229,9 @@ export function buildPostgresPlanDiff(input: {
   PostgresDatabaseSchemaNode.assert(input.actualSchema);
   const actual = input.actualSchema;
   const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
-  const codecHooks = extractCodecControlHooks(input.frameworkComponents);
-  const storageTypes = input.contract.storage.types ?? {};
   const projectionOptions = {
     annotationNamespace: 'pg',
     ...ifDefined('expandNativeType', expandNativeType),
-    renderColumnOps: (name: string, column: StorageColumn) =>
-      buildPostgresColumnOpRender(name, column, codecHooks, storageTypes),
   };
   const fullExpected = contractToPostgresDatabaseSchemaNode(postgresContract, projectionOptions);
   const expected = pruneTableLessNamespaces(fullExpected);

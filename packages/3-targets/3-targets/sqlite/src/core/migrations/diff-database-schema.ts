@@ -1,9 +1,5 @@
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
-import type {
-  ColumnOpRenderer,
-  NativeTypeExpander,
-  SqlSchemaDiffForVerdict,
-} from '@prisma-next/family-sql/control';
+import type { NativeTypeExpander, SqlSchemaDiffForVerdict } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander, contractToSchemaIR } from '@prisma-next/family-sql/control';
 import {
   neutralizeFlatExpectedFkSchemas,
@@ -27,7 +23,6 @@ import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { renderDefaultLiteral } from './planner-ddl-builders';
-import { buildSqliteColumnOpRender } from './sqlite-column-op-render';
 
 interface SqliteDiffDatabaseSchemaInput {
   readonly contract: Contract<SqlStorage>;
@@ -51,23 +46,22 @@ export function sqliteRenderDefault(def: ColumnDefault, _column: StorageColumn):
 /**
  * The SQLite expected-side projection: contract → flat relational schema IR.
  *
- * `extras` thread the plan-time derivation inputs: the native-type expander
- * (so the expected side carries resolved native types, like the verify side)
- * and the op-render stamper (so expected column nodes carry the SQLite DDL
- * payload the planner reads). Verify-only callers omit them.
+ * `extras` thread the plan-time derivation input: the native-type expander,
+ * so the expected side carries resolved native types (like the verify
+ * side). Every expected column also carries its `codecRef` unconditionally
+ * (Decision 5) — the planner's op-builders resolve DDL rendering from it at
+ * plan time, so no separate render stamper is threaded here.
  */
 export function sqliteContractToSchema(
   contract: Contract<SqlStorage> | null,
   extras?: {
     readonly expandNativeType?: NativeTypeExpander;
-    readonly renderColumnOps?: ColumnOpRenderer;
   },
 ): SqlSchemaIR {
   return contractToSchemaIR(contract, {
     annotationNamespace: 'sqlite',
     renderDefault: sqliteRenderDefault,
     ...ifDefined('expandNativeType', extras?.expandNativeType),
-    ...ifDefined('renderColumnOps', extras?.renderColumnOps),
   });
 }
 
@@ -131,7 +125,7 @@ export function diffSqliteSchemaForVerdict(input: {
 }
 
 export interface SqlitePlanDiff {
-  /** The desired ("end") tree — resolved leaf values, `opRender` stamped on every column. */
+  /** The desired ("end") tree — resolved leaf values, incl. `codecRef`, on every column. */
   readonly expected: SqlSchemaIR;
   /** The live ("start") tree, normalized for semantic satisfaction against `expected`. */
   readonly actual: SqlSchemaIR;
@@ -141,10 +135,10 @@ export interface SqlitePlanDiff {
 /**
  * The SQLite planner's diff input: the same tree-building
  * `diffSqliteSchemaForVerdict` uses (expander threaded, FK schema segment
- * neutralized, actual tree normalized for semantic satisfaction), plus the
- * op-render stamper so expected column nodes carry the DDL payload the
- * planner's op-builders read. One differ drives both verify and plan; this
- * is the plan-side derivation (verify never needs `renderColumnOps`).
+ * neutralized, actual tree normalized for semantic satisfaction). One differ
+ * drives both verify and plan; this is the plan-side derivation — column DDL
+ * resolves from each expected column's `codecRef` at plan time
+ * (`column-ddl-rendering.ts`), so no separate render stamping happens here.
  */
 export function buildSqlitePlanDiff(input: {
   readonly contract: Contract<SqlStorage>;
@@ -152,13 +146,9 @@ export function buildSqlitePlanDiff(input: {
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }): SqlitePlanDiff {
   const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
-  const storageTypes = input.contract.storage.types ?? {};
-  const renderColumnOps: ColumnOpRenderer = (name, column, table) =>
-    buildSqliteColumnOpRender(name, column, table, storageTypes);
   const expected = neutralizeFlatExpectedFkSchemas(
     sqliteContractToSchema(input.contract, {
       ...ifDefined('expandNativeType', expandNativeType),
-      renderColumnOps,
     }),
   );
   // The differ dispatches polymorphically (`.isEqualTo()` / `.children()`), so

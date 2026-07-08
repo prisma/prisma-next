@@ -1,11 +1,12 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { CodecRef } from '@prisma-next/framework-components/codec';
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import { SqlColumnDefaultIR } from './sql-column-default-ir';
-import { type SqlSchemaDiffRole, SqlSchemaIRNode } from './sql-schema-ir-node';
+import { defineNonEnumerable, type SqlSchemaDiffRole, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 /**
  * Namespaced annotations for extensibility. Each namespace
@@ -42,17 +43,36 @@ export interface SqlColumnIRInput {
    */
   readonly resolvedDefault?: ColumnDefault;
   /**
-   * Target-computed DDL render payload for the migration planner, stamped
-   * on the EXPECTED (contract-derived) column at derivation time — where
-   * the caller holds the codec hooks and storage types. The planner's
-   * op-builders read it verbatim (create/add-column DDL, alter-type SQL),
-   * so emitted DDL is byte-identical to the pre-`plan(start, end)`
-   * contract-driven path: the exact computation is relocated to derivation,
-   * not re-run against node fields. Opaque to the shared IR — only the
-   * producing target interprets it. Absent on introspected/hand-built nodes
+   * The column's resolved codec reference — the identity the migration
+   * planner's op-builders resolve DDL type rendering against at plan time
+   * (parameterized type expansion, e.g. `character` + `{ length: 36 }` →
+   * `character(36)`), calling the same codec hooks the pre-`plan(start,
+   * end)` op-path called. Carried the same way the query AST carries
+   * `CodecRef` (TML-2456) and the migration DDL renderer (TML-2918).
+   * Stamped on the EXPECTED (contract-derived) column at derivation,
+   * post-`typeRef` resolution (the referenced storage type's own
+   * codec/params, not the column's `typeRef` pointer). Absent on
+   * introspected/hand-built nodes — the actual side never renders DDL —
    * and never compared by `isEqualTo`.
    */
-  readonly opRender?: unknown;
+  readonly codecRef?: CodecRef;
+  /**
+   * The column's resolved BASE native type: pre-parameter-expansion,
+   * pre-array-suffix (e.g. `character`, not `character(36)` or
+   * `character[]`). Distinct from {@link resolvedNativeType} (the EXPANDED
+   * comparison value) — DDL rendering re-expands a parameterized type at
+   * plan time from this base, so it must not already carry the expansion.
+   * Stamped alongside {@link codecRef}.
+   */
+  readonly codecBaseNativeType?: string;
+  /**
+   * True when the contract column declared its type via a named
+   * `storage.types` reference (`typeRef`) rather than inline fields — the
+   * migration planner quotes the base native type as an identifier in this
+   * case (e.g. a native enum's type name), matching the pre-`plan(start,
+   * end)` rendering exactly.
+   */
+  readonly codecNamedType?: boolean;
 }
 
 /**
@@ -86,8 +106,12 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
   declare readonly many?: boolean;
   declare readonly resolvedNativeType?: string;
   declare readonly resolvedDefault?: ColumnDefault;
-  /** See {@link SqlColumnIRInput.opRender}. Non-enumerable so it stays out of JSON and structural equality. */
-  declare readonly opRender?: unknown;
+  /** See {@link SqlColumnIRInput.codecRef}. Non-enumerable so it stays out of JSON and structural equality. */
+  declare readonly codecRef?: CodecRef;
+  /** See {@link SqlColumnIRInput.codecBaseNativeType}. Non-enumerable, same reason as {@link codecRef}. */
+  declare readonly codecBaseNativeType?: string;
+  /** See {@link SqlColumnIRInput.codecNamedType}. Non-enumerable, same reason as {@link codecRef}. */
+  declare readonly codecNamedType?: boolean;
 
   constructor(input: SqlColumnIRInput) {
     super();
@@ -99,14 +123,9 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
     if (input.many !== undefined) this.many = input.many;
     if (input.resolvedNativeType !== undefined) this.resolvedNativeType = input.resolvedNativeType;
     if (input.resolvedDefault !== undefined) this.resolvedDefault = input.resolvedDefault;
-    if (input.opRender !== undefined) {
-      Object.defineProperty(this, 'opRender', {
-        value: input.opRender,
-        enumerable: false,
-        writable: false,
-        configurable: false,
-      });
-    }
+    defineNonEnumerable(this, 'codecRef', input.codecRef);
+    defineNonEnumerable(this, 'codecBaseNativeType', input.codecBaseNativeType);
+    defineNonEnumerable(this, 'codecNamedType', input.codecNamedType);
     freezeNode(this);
   }
 
@@ -129,7 +148,12 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
         ...ifDefined('resolved', this.resolvedDefault),
         ...ifDefined('raw', this.default),
         ...ifDefined('nativeTypeContext', this.resolvedNativeType),
-        ...ifDefined('opRender', this.opRender),
+        // `this.many` is unset on contract-derived columns (array-ness rides
+        // on the `nativeType` `[]` suffix there — `codecRef.many` carries
+        // it instead); introspected/hand-built columns set `this.many`
+        // directly. Either source works for the default node's array-
+        // literal rendering.
+        ...ifDefined('many', this.many ?? this.codecRef?.many),
       }),
     ];
   }

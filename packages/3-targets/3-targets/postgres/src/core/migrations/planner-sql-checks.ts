@@ -145,7 +145,7 @@ function formatUserDefinedTypeName(identifier: string): string {
 
 export function buildExpectedFormatType(
   column: StorageColumn,
-  codecHooks: Map<string, CodecControlHooks>,
+  codecHooks: ReadonlyMap<string, CodecControlHooks>,
   storageTypes: Record<string, StorageTypeInstance> = {},
 ): string {
   const resolved = resolveColumnTypeMetadata(column, storageTypes);

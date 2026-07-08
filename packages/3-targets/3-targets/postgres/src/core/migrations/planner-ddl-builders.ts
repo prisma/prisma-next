@@ -118,7 +118,7 @@ function expandParameterizedTypeSql(
 /** Autoincrement columns use SERIAL types, so this returns empty for them. */
 export function buildColumnDefaultSql(
   columnDefault: PostgresColumnDefault | undefined,
-  column?: StorageColumn,
+  column?: Pick<StorageColumn, 'many' | 'nativeType'>,
 ): string {
   if (!columnDefault) {
     return '';
@@ -139,7 +139,10 @@ export function buildColumnDefaultSql(
   }
 }
 
-export function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
+export function renderDefaultLiteral(
+  value: unknown,
+  column?: Pick<StorageColumn, 'many' | 'nativeType'>,
+): string {
   const isJsonColumn = column?.nativeType === 'json' || column?.nativeType === 'jsonb';
 
   if (column?.many && Array.isArray(value)) {

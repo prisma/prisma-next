@@ -19,7 +19,6 @@ export type {
   SqlDescribedContractSpace,
 } from '../core/control-target-descriptor';
 export type {
-  ColumnOpRenderer,
   ContractToSchemaIROptions,
   DefaultRenderer,
   EnumNamespaceSchemaResolver,

@@ -8,14 +8,15 @@
  * addColumn(nullable) + dataTransform + setNotNull); remaining issues flow
  * through `mapNodeIssueToCall` for the default case.
  *
- * Structural op-render (column type/default DDL) is a direct read of the
- * node's derivation-stamped `opRender` payload — never recomputed from the
- * contract. The retained subsystems (codec type-operations, the NOT-NULL
- * temp-default deferred DDL, control-policy disposition) still read the
- * contract via the strategy context, per the slice's scope.
+ * Structural op-render (column type/default DDL) resolves the column node's
+ * `codecRef` against the codec hooks the caller holds (`column-ddl-
+ * rendering.ts`) — never re-derived from the contract. The retained
+ * subsystems (codec type-operations, the NOT-NULL temp-default deferred DDL,
+ * control-policy disposition) still read the contract via the strategy
+ * context, per the slice's scope.
  */
 
-import type { Contract, JsonValue } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   MigrationOperationPolicy,
@@ -25,16 +26,13 @@ import type {
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type {
-  SqlStorage,
-  StorageColumn,
-  StorageTypeInstance,
-} from '@prisma-next/sql-contract/types';
-import type { CodecRef, DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
+import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import * as contractFree from '@prisma-next/sql-relational-core/contract-free';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import {
   RelationalSchemaNodeKind,
+  type SqlColumnDefaultIR,
   type SqlColumnIR,
   type SqlForeignKeyIR,
   type SqlIndexIR,
@@ -50,6 +48,11 @@ import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespac
 import type { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
 import { quoteIdentifier } from '../sql-utils';
+import {
+  renderColumnAlterType,
+  renderColumnDdl,
+  renderColumnDefaultSql,
+} from './column-ddl-rendering';
 import { resolveNamespaceIdForDdlSchema } from './control-policy';
 import {
   AddColumnCall,
@@ -68,19 +71,15 @@ import {
   DropNotNullCall,
   DropTableCall,
   type PostgresOpFactoryCall,
-  postgresDefaultToDdlColumnDefault,
   SetDefaultCall,
   SetNotNullCall,
 } from './op-factory-call';
 import type { ForeignKeySpec } from './operations/shared';
-import { buildColumnTypeSql } from './planner-ddl-builders';
 import {
   type CallMigrationStrategy,
   postgresPlannerStrategies,
   type StrategyContext,
 } from './planner-strategies';
-import { resolveColumnTypeMetadata } from './planner-type-resolution';
-import { columnOpRenderOf } from './postgres-column-op-render';
 
 export type { CallMigrationStrategy, StrategyContext };
 
@@ -123,38 +122,6 @@ function issueConflict(
 
 export interface IssuePlannerValue {
   readonly calls: readonly PostgresOpFactoryCall[];
-}
-
-export function toDdlColumn(
-  name: string,
-  column: StorageColumn,
-  codecHooks: ReadonlyMap<string, CodecControlHooks>,
-  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
-): DdlColumn {
-  const typeSql = buildColumnTypeSql(column, codecHooks, storageTypes);
-  const ddlDefault = postgresDefaultToDdlColumnDefault(column.default);
-  const resolved = resolveColumnTypeMetadata(
-    column,
-    storageTypes as Record<string, StorageTypeInstance>,
-  );
-  const codecRef: CodecRef | undefined = resolved.codecId
-    ? {
-        codecId: resolved.codecId,
-        ...(resolved.typeParams !== undefined
-          ? {
-              typeParams: blindCast<
-                JsonValue,
-                'resolved.typeParams is JsonValue-shaped storage metadata; the narrowed (non-undefined) value lands in CodecRef.typeParams which is JsonValue'
-              >(resolved.typeParams),
-            }
-          : {}),
-      }
-    : undefined;
-  return contractFree.col(name, typeSql, {
-    ...(!column.nullable ? { notNull: true } : {}),
-    ...ifDefined('default', ddlDefault),
-    ...ifDefined('codecRef', codecRef),
-  });
 }
 
 /**
@@ -309,17 +276,17 @@ function conflictForDisallowedCall(
 }
 
 // ============================================================================
-// Node-based issue planner (the one differ path — additive, wired in the flip)
+// Node-based issue planner
 // ============================================================================
 //
-// The node planner consumes node-typed `SchemaDiffIssue`s (from the one differ
-// — `buildPostgresPlanDiff`) and reads the diff node each issue carries
-// (`issue.expected` / `issue.actual`) plus the derivation-stamped `opRender`
-// payload for column DDL. It never reads the contract for STRUCTURAL op-render
-// (column type/default SQL is relocated to `opRender`). The retained subsystems
-// — codec type-operations, field-lifecycle hooks, the NOT-NULL temp-default
-// deferred DDL, control-policy disposition — keep the contract via the strategy
-// context, per the slice's scope.
+// Consumes node-typed `SchemaDiffIssue`s (from the one differ —
+// `buildPostgresPlanDiff`) and reads the diff node each issue carries
+// (`issue.expected` / `issue.actual`). Column DDL (type/default SQL) resolves
+// from the column node's `codecRef` against the codec hooks the caller holds
+// (`column-ddl-rendering.ts`), never the contract. The retained subsystems —
+// codec type-operations, field-lifecycle hooks, the NOT-NULL temp-default
+// deferred DDL, control-policy disposition — keep the contract via the
+// strategy context, per the slice's scope.
 
 /** The diff node an issue concerns — expected when present, else the actual (extra) node. */
 export function issueNode(issue: SchemaDiffIssue): SqlSchemaIRNode | undefined {
@@ -494,14 +461,15 @@ function fkSpecFromNode(fk: SqlForeignKeyIR, tableName: string): ForeignKeySpec 
  * PK and element-non-null CHECKs go inline as table constraints; indexes
  * (declared + FK-backing, already merged and ordered at derivation) and the
  * FK / unique constraints are separate calls (re-bucketed downstream). Every
- * column's DDL comes off its stamped `opRender.ddlColumn`.
+ * column's DDL is resolved from its `codecRef` via `renderColumnDdl`.
  */
 function buildCreateTableCallsFromNode(
   schemaName: string,
   table: PostgresTableSchemaNode,
+  codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): PostgresOpFactoryCall[] {
-  const ddlColumns: DdlColumn[] = Object.values(table.columns).map(
-    (c) => columnOpRenderOf(c).ddlColumn,
+  const ddlColumns = Object.values(table.columns).map((c) =>
+    renderColumnDdl(c.name, c, codecHooks),
   );
   const primaryKeyConstraints: DdlTableConstraint[] = table.primaryKey
     ? [
@@ -551,13 +519,14 @@ function nodeConflict(kind: SqlPlannerConflict['kind'], message: string): SqlPla
 function mapTableNodeIssue(
   issue: SchemaDiffIssue,
   schemaName: string,
+  codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
   if (issue.reason === 'not-found') {
     const table = blindCast<
       PostgresTableSchemaNode,
       'a not-found table issue always carries the expected PostgresTableSchemaNode'
     >(issue.expected);
-    return ok(buildCreateTableCallsFromNode(schemaName, table));
+    return ok(buildCreateTableCallsFromNode(schemaName, table, codecHooks));
   }
   if (issue.reason === 'not-expected') {
     const table = blindCast<
@@ -574,13 +543,16 @@ function mapColumnNodeIssue(
   issue: SchemaDiffIssue,
   schemaName: string,
   tableName: string,
+  codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
   if (issue.reason === 'not-found') {
     const column = blindCast<
       SqlColumnIR,
       'a not-found column issue always carries the expected column node'
     >(issue.expected);
-    return ok([new AddColumnCall(schemaName, tableName, columnOpRenderOf(column).ddlColumn)]);
+    return ok([
+      new AddColumnCall(schemaName, tableName, renderColumnDdl(column.name, column, codecHooks)),
+    ]);
   }
   if (issue.reason === 'not-expected') {
     const column = blindCast<
@@ -600,7 +572,7 @@ function mapColumnNodeIssue(
   >(issue.actual);
   const calls: PostgresOpFactoryCall[] = [];
   if (columnTypeChanged(expected, actual)) {
-    const { qualifiedTargetType, formatTypeExpected } = columnOpRenderOf(expected).alterType;
+    const { qualifiedTargetType, formatTypeExpected } = renderColumnAlterType(expected, codecHooks);
     calls.push(
       new AlterColumnTypeCall(schemaName, tableName, expected.name, {
         qualifiedTargetType,
@@ -629,7 +601,12 @@ function mapColumnDefaultNodeIssue(
     return ok([new DropDefaultCall(schemaName, tableName, columnName)]);
   }
   // not-found (SET DEFAULT, additive) or not-equal (SET DEFAULT, widening).
-  const defaultSql = readOpRenderDefaultSql(issue);
+  if (issue.expected === undefined) return ok([]);
+  const defaultNode = blindCast<
+    SqlColumnDefaultIR,
+    'a not-found/not-equal column-default issue always carries the expected default node'
+  >(issue.expected);
+  const defaultSql = renderColumnDefaultSql(defaultNode);
   if (!defaultSql) return ok([]);
   return ok([
     new SetDefaultCall(
@@ -640,22 +617,6 @@ function mapColumnDefaultNodeIssue(
       issue.reason === 'not-equal' ? 'widening' : 'additive',
     ),
   ]);
-}
-
-/** The column's set-default SQL, read off the default node's threaded `opRender`. */
-function readOpRenderDefaultSql(issue: SchemaDiffIssue): string {
-  if (issue.expected === undefined) return '';
-  const opRender = blindCast<
-    { readonly opRender?: unknown },
-    'a column-default diff node carries an optional opRender payload threaded from its owning column'
-  >(issue.expected).opRender;
-  if (opRender === undefined) return '';
-  return (
-    blindCast<
-      { readonly setDefaultSql?: string },
-      'the default node threads the owning column PostgresColumnOpRender, which carries setDefaultSql'
-    >(opRender).setDefaultSql ?? ''
-  );
 }
 
 function mapPrimaryKeyNodeIssue(
@@ -783,7 +744,8 @@ function mapCheckNodeIssue(
 
 /**
  * Maps one node-typed diff issue to its migration call(s), dispatching on the
- * node's `nodeKind` + `issue.reason`, reading nodes + the stamped `opRender`.
+ * node's `nodeKind` + `issue.reason`, reading nodes and resolving column DDL
+ * from `codecRef` via `column-ddl-rendering.ts`.
  */
 export function mapNodeIssueToCall(
   issue: SchemaDiffIssue,
@@ -825,9 +787,9 @@ export function mapNodeIssueToCall(
 
   switch (node.nodeKind) {
     case PostgresSchemaNodeKind.table:
-      return mapTableNodeIssue(issue, schemaName);
+      return mapTableNodeIssue(issue, schemaName, ctx.codecHooks);
     case RelationalSchemaNodeKind.column:
-      return mapColumnNodeIssue(issue, schemaName, tableName);
+      return mapColumnNodeIssue(issue, schemaName, tableName, ctx.codecHooks);
     case RelationalSchemaNodeKind.columnDefault: {
       const columnName = issueColumnName(issue);
       if (columnName === undefined) {

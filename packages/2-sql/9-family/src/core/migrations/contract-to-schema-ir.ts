@@ -1,4 +1,5 @@
 import type { ColumnDefault, Contract, JsonValue } from '@prisma-next/contract/types';
+import type { CodecRef } from '@prisma-next/framework-components/codec';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
 import {
   type CheckConstraint,
@@ -22,6 +23,7 @@ import {
   SqlTableIR,
   type SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 /**
@@ -66,34 +68,12 @@ export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => str
  */
 export type EnumNamespaceSchemaResolver = (storage: SqlStorage, namespaceId: string) => string;
 
-/**
- * Target-supplied callback that computes the opaque op-render payload the
- * migration planner reads off the EXPECTED column node (create/add-column
- * DDL, alter-type SQL, set-default SQL). It runs at derivation time — where
- * the caller holds the codec hooks and storage types — using the same
- * builders the pre-`plan(start, end)` op-path used, so the planner emits
- * byte-identical DDL by reading the relocated result rather than recomputing.
- * The family stays target-agnostic (same IoC pattern as
- * {@link NativeTypeExpander}); the payload is opaque here and only the
- * producing target interprets it. Absent ⇒ no payload is stamped (verify-only
- * derivations that never plan). The owning `table` is passed so targets whose
- * column DDL depends on table context (SQLite's sole-column AUTOINCREMENT
- * primary key) can compute the full payload at derivation.
- */
-export type ColumnOpRenderer = (
-  name: string,
-  column: StorageColumn,
-  table: StorageTable,
-) => unknown;
-
 function convertColumn(
   name: string,
   column: StorageColumn,
-  table: StorageTable,
   storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
-  renderColumnOps: ColumnOpRenderer | undefined,
 ): SqlColumnIRInput {
   // Resolve `typeRef` so columns that delegate their `nativeType`/`codecId`/
   // `typeParams` to a named `storage.types` entry expand the same way as
@@ -126,7 +106,37 @@ function convertColumn(
     // stamps its normalizer's parse of the raw expression).
     resolvedNativeType: nativeType,
     ...ifDefined('resolvedDefault', column.default ?? undefined),
-    ...ifDefined('opRender', renderColumnOps?.(name, column, table)),
+    // The column's codec identity, carried the same way the query AST
+    // carries `CodecRef` (TML-2456) — the migration planner's op-builders
+    // resolve DDL rendering from this at plan time (Decision 5), instead of
+    // reading a derivation-precomputed render payload.
+    codecRef: buildColumnCodecRef(resolved, column.many),
+    codecBaseNativeType: resolved.nativeType,
+    ...(column.typeRef !== undefined ? { codecNamedType: true } : {}),
+  };
+}
+
+/**
+ * Builds the column's `CodecRef` from its resolved (post-`typeRef`) codec
+ * identity — the same construction the query AST and the migration DDL
+ * renderer already use (TML-2456, TML-2918).
+ */
+function buildColumnCodecRef(
+  resolved: Pick<StorageColumn, 'codecId' | 'nativeType' | 'typeParams'>,
+  many: boolean | undefined,
+): CodecRef {
+  return {
+    codecId: resolved.codecId,
+    ...ifDefined(
+      'typeParams',
+      resolved.typeParams !== undefined
+        ? blindCast<
+            JsonValue,
+            'resolved.typeParams is JsonValue-shaped storage metadata; the narrowed (non-undefined) value lands in CodecRef.typeParams which is JsonValue'
+          >(resolved.typeParams)
+        : undefined,
+    ),
+    ...ifDefined('many', many),
   };
 }
 
@@ -259,7 +269,6 @@ function convertTable(
   storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
-  renderColumnOps: ColumnOpRenderer | undefined,
   storage: SqlStorage,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIRInput> = {};
@@ -267,11 +276,9 @@ function convertTable(
     columns[colName] = convertColumn(
       colName,
       colDef,
-      table,
       storageTypes,
       expandNativeType,
       renderDefault,
-      renderColumnOps,
     );
   }
 
@@ -382,13 +389,6 @@ export interface ContractToSchemaIROptions {
    * schema-scoped enum storage (SQLite) omit it; enums are absent there.
    */
   readonly resolveEnumNamespaceSchema?: EnumNamespaceSchemaResolver;
-  /**
-   * Target-supplied op-render computation stamped onto each expected column
-   * node ({@link ColumnOpRenderer}). Provided by planning derivations (which
-   * hold the codec hooks); omitted by verify-only derivations, which never
-   * read the payload.
-   */
-  readonly renderColumnOps?: ColumnOpRenderer;
 }
 
 /**
@@ -441,7 +441,6 @@ export function contractNamespaceToSchemaIR(
       storageTypes,
       options.expandNativeType,
       options.renderDefault,
-      options.renderColumnOps,
       storage,
     );
   }
@@ -478,7 +477,6 @@ export function contractToSchemaIR(
         storageTypes,
         options.expandNativeType,
         options.renderDefault,
-        options.renderColumnOps,
         storage,
       );
     }
