@@ -9,7 +9,10 @@
 
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
-import type { SchemaOwnership } from '@prisma-next/framework-components/control';
+import type {
+  SchemaOwnership,
+  SchemaOwnershipCoordinate,
+} from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -89,9 +92,13 @@ function buildLiveSchema(): SqlSchemaIR {
 
 // An ownership oracle in which every named entity is owned by some contract
 // space — as if the aggregate declared `cipher_state` (a sibling's table).
+// SQLite is a single-namespace target, so every declared entity is
+// implicitly qualified with `UNBOUND_NAMESPACE_ID`.
 const ownsOnly = (...names: string[]): SchemaOwnership => {
   const owned = new Set(names);
-  return { declaresEntity: (name) => owned.has(name) };
+  return {
+    declaresEntity: (coordinate: SchemaOwnershipCoordinate) => owned.has(coordinate.entityName),
+  };
 };
 
 describe('SQLite planner ownership consultation', () => {

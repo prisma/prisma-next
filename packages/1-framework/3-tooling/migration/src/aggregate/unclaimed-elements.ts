@@ -1,7 +1,9 @@
 import type {
   SchemaDiffIssue,
+  SchemaOwnershipCoordinate,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 
 /**
@@ -84,34 +86,48 @@ export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDa
 }
 
 /**
- * The bare entity name a `not-expected` `SchemaDiffIssue` addresses, when its
- * subject is a whole top-level entity. A nested leaf (a column, an index, an
- * RLS policy on an undeclared table) has no entity name of its own to report
- * here.
+ * The namespace-qualified coordinate a `not-expected` `SchemaDiffIssue`
+ * addresses, when its subject is a whole top-level entity. A nested leaf (a
+ * column, an index, an RLS policy on an undeclared table) has no entity of
+ * its own to report here.
  *
  * A `diffRole`-declaring family's whole-entity node names itself (its diff id
  * is the entity name); a family with no such discriminant (Mongo) has no node
  * to read at all for a bare coordinate finding, so the path itself — already
- * exactly the entity name at this depth — is the answer.
+ * exactly the entity name at this depth — is the answer. The namespace
+ * segment only exists for namespace-qualified (Postgres-shaped) paths
+ * (`['database', namespaceId, tableName]`); single-namespace families
+ * (SQLite's flat `['database', tableName]`, Mongo's bare `[collectionName]`)
+ * have no separate segment, so every entity they declare implicitly shares
+ * one namespace — the same sentinel the aggregate's own coordinate walk
+ * uses for those families.
  */
-function schemaDiffIssueEntityName(issue: SchemaDiffIssue): string | undefined {
+function schemaDiffIssueCoordinate(issue: SchemaDiffIssue): SchemaOwnershipCoordinate | undefined {
   if (!isWholeEntityIssue(issue)) return undefined;
-  if (issueNodeRole(issue) !== undefined) return issue.actual?.id;
-  return issue.path[issue.path.length - 1];
+  const entityName =
+    issueNodeRole(issue) !== undefined ? issue.actual?.id : issue.path[issue.path.length - 1];
+  if (entityName === undefined) return undefined;
+  const namespaceId =
+    issue.path.length === 3 ? (issue.path[1] ?? UNBOUND_NAMESPACE_ID) : UNBOUND_NAMESPACE_ID;
+  return { namespaceId, entityName };
 }
 
 /**
- * The bare names of every live element this contract space's diff reports as
- * `not-expected`. The verifier gathers these across all spaces, deduplicates,
- * and keeps only the names no contract space declares — the standalone
- * unclaimed-elements list, reported once for the whole database.
+ * The namespace-qualified coordinates of every live element this contract
+ * space's diff reports as `not-expected`, deduplicated. The verifier gathers
+ * these across all spaces and keeps only the coordinates no contract space
+ * declares — the standalone unclaimed-elements list, reported once for the
+ * whole database.
  */
-export function collectExtraElementNames(result: VerifyDatabaseSchemaResult): Set<string> {
-  const names = new Set<string>();
+export function collectExtraElementCoordinates(
+  result: VerifyDatabaseSchemaResult,
+): readonly SchemaOwnershipCoordinate[] {
+  const seen = new Map<string, SchemaOwnershipCoordinate>();
   for (const issue of result.schema.issues) {
     if (issue.reason !== 'not-expected') continue;
-    const name = schemaDiffIssueEntityName(issue);
-    if (name !== undefined) names.add(name);
+    const coordinate = schemaDiffIssueCoordinate(issue);
+    if (coordinate === undefined) continue;
+    seen.set(`${coordinate.namespaceId} ${coordinate.entityName}`, coordinate);
   }
-  return names;
+  return [...seen.values()];
 }

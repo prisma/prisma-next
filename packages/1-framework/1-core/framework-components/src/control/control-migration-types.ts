@@ -361,6 +361,17 @@ export interface MigrationRunnerExecutionChecks {
 // ============================================================================
 
 /**
+ * Namespace-qualified identity of a live storage entity, for an ownership
+ * query. A bare entity name is not a unique identity across namespaces (two
+ * namespaces can each declare a table of the same name), so ownership is
+ * always asked per `(namespaceId, entityName)` pair.
+ */
+export interface SchemaOwnershipCoordinate {
+  readonly namespaceId: string;
+  readonly entityName: string;
+}
+
+/**
  * Contract-space ownership query the planner consults while planning one
  * space against a live database.
  *
@@ -383,9 +394,9 @@ export interface MigrationRunnerExecutionChecks {
 export interface SchemaOwnership {
   /**
    * True when some contract space in the composition declares a storage
-   * entity with this bare name.
+   * entity at this namespace-qualified coordinate.
    */
-  declaresEntity(entityName: string): boolean;
+  declaresEntity(coordinate: SchemaOwnershipCoordinate): boolean;
 }
 
 /**

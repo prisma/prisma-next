@@ -1,5 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { SchemaOwnership } from '@prisma-next/framework-components/control';
+import type {
+  SchemaOwnership,
+  SchemaOwnershipCoordinate,
+} from '@prisma-next/framework-components/control';
 import type { MigrationGraph } from '../graph';
 import type { IntegrityQueryOptions, IntegrityViolation } from '../integrity-violation';
 import type { OnDiskMigrationPackage } from '../package';
@@ -92,13 +95,14 @@ export interface AggregateContractSpace {
  * - `listSpaces()` / `hasSpace()` / `space()` / `spaces()`: the query
  *   surface the read commands consume — `app` first, then extension ids
  *   lex-ascending.
- * - `declaresEntity(name)` / `declaringSpaces(name)`: ownership queries —
- *   does any contract space declare a storage entity with this bare name,
- *   and which spaces do? The verifier's unclaimed-elements pass asks these
- *   of the diff's extra findings; the migration planner asks `declaresEntity`
- *   per live extra node to decide whether some space owns it (the aggregate
- *   satisfies the framework {@link SchemaOwnership} oracle). The passive
- *   aggregate answers both; it runs no diff.
+ * - `declaresEntity(coordinate)` / `declaringSpaces(coordinate)`: ownership
+ *   queries — does any contract space declare a storage entity at this
+ *   namespace-qualified coordinate, and which spaces do? The verifier's
+ *   unclaimed-elements pass asks these of the diff's extra findings; the
+ *   migration planner asks `declaresEntity` per live extra node to decide
+ *   whether some space owns it (the aggregate satisfies the framework
+ *   {@link SchemaOwnership} oracle). The passive aggregate answers both; it
+ *   runs no diff.
  * - `checkIntegrity()`: judges the loaded model and returns every
  *   violation (never bailing at the first). Config/contract-dependent
  *   checks run only when the matching {@link IntegrityQueryOptions} opt
@@ -112,7 +116,7 @@ export interface ContractSpaceAggregate extends SchemaOwnership {
   hasSpace(id: string): boolean;
   space(id: string): AggregateContractSpace | undefined;
   spaces(): readonly AggregateContractSpace[];
-  declaresEntity(entityName: string): boolean;
-  declaringSpaces(entityName: string): readonly string[];
+  declaresEntity(coordinate: SchemaOwnershipCoordinate): boolean;
+  declaringSpaces(coordinate: SchemaOwnershipCoordinate): readonly string[];
   checkIntegrity(opts?: IntegrityQueryOptions): readonly IntegrityViolation[];
 }

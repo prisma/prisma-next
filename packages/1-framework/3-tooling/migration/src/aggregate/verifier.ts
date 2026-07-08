@@ -1,10 +1,13 @@
-import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
+import type {
+  SchemaOwnershipCoordinate,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/framework-components/control';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
 import type { ContractMarkerRecordLike } from './marker-types';
 import type { AggregateContractSpace, ContractSpaceAggregate } from './types';
-import { collectExtraElementNames, stripExtraFindings } from './unclaimed-elements';
+import { collectExtraElementCoordinates, stripExtraFindings } from './unclaimed-elements';
 
 /**
  * Caller policy for the verifier. Today's only knob is
@@ -166,18 +169,24 @@ function runVerifyMigration(input: VerifierInput): VerifierOutput {
 
   // Schema check: verify each space against the full schema, then split the
   // results in two: each space's contract-satisfaction view (extras
-  // stripped), and every extra name across all spaces, deduplicated and kept
-  // only when no contract space declares it.
+  // stripped), and every extra coordinate across all spaces, deduplicated
+  // and kept only when no contract space declares it at that coordinate.
   const schemaPerSpace = new Map<string, VerifyDatabaseSchemaResult>();
-  const extraNames = new Set<string>();
+  const extraCoordinates = new Map<string, SchemaOwnershipCoordinate>();
   for (const space of allSpaces) {
     const result = verifySchemaForSpace(schemaIntrospection, space, mode);
     schemaPerSpace.set(space.spaceId, stripExtraFindings(result));
-    for (const name of collectExtraElementNames(result)) extraNames.add(name);
+    for (const coordinate of collectExtraElementCoordinates(result)) {
+      extraCoordinates.set(`${coordinate.namespaceId} ${coordinate.entityName}`, coordinate);
+    }
   }
-  const unclaimed = [...extraNames]
-    .filter((name) => !aggregate.declaresEntity(name))
-    .sort((a, b) => a.localeCompare(b));
+  const unclaimed = [
+    ...new Set(
+      [...extraCoordinates.values()]
+        .filter((coordinate) => !aggregate.declaresEntity(coordinate))
+        .map((coordinate) => coordinate.entityName),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
 
   return ok({
     markerCheck: {

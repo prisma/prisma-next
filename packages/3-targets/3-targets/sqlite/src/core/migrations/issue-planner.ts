@@ -146,7 +146,7 @@ function isStrictDescendantPath(path: readonly string[], ancestor: readonly stri
 // Node helpers
 // ============================================================================
 
-function issueNode(issue: SchemaDiffIssue): SqlSchemaIRNode | undefined {
+export function issueNode(issue: SchemaDiffIssue): SqlSchemaIRNode | undefined {
   const node = issue.expected ?? issue.actual;
   if (node === undefined) return undefined;
   return blindCast<

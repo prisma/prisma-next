@@ -85,7 +85,9 @@ describe('planFromDiff', () => {
 
     // The aggregate satisfies `SchemaOwnership`; the strategy forwards it
     // verbatim. Here `cipher_state` is owned by some (sibling) space.
-    const ownership: SchemaOwnership = { declaresEntity: (name) => name === 'cipher_state' };
+    const ownership: SchemaOwnership = {
+      declaresEntity: (coordinate) => coordinate.entityName === 'cipher_state',
+    };
 
     const outcome = await planFromDiff({
       aggregateTargetId: 'postgres',

@@ -3,9 +3,10 @@ import type {
   SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import {
-  collectExtraElementNames,
+  collectExtraElementCoordinates,
   stripExtraFindings,
 } from '../../src/aggregate/unclaimed-elements';
 
@@ -188,8 +189,8 @@ describe('stripExtraFindings', () => {
   });
 });
 
-describe('collectExtraElementNames', () => {
-  it('gathers extra names from whole-table-role nodes and Mongo-shape whole-collection issues', () => {
+describe('collectExtraElementCoordinates', () => {
+  it('gathers extra coordinates from whole-table-role nodes and Mongo-shape whole-collection issues', () => {
     const result = makeResult({
       ok: false,
       issues: [
@@ -199,6 +200,35 @@ describe('collectExtraElementNames', () => {
       ],
     });
 
-    expect([...collectExtraElementNames(result)].sort()).toEqual(['legacy', 'stray']);
+    const coordinates = [...collectExtraElementCoordinates(result)].sort((a, b) =>
+      a.entityName.localeCompare(b.entityName),
+    );
+    expect(coordinates).toEqual([
+      { namespaceId: UNBOUND_NAMESPACE_ID, entityName: 'legacy' },
+      { namespaceId: 'public', entityName: 'stray' },
+    ]);
+  });
+
+  it('does not conflate the same bare name declared in two different namespaces', () => {
+    const result = makeResult({
+      ok: false,
+      issues: [
+        extraTableIssue('orphan_table'),
+        {
+          path: ['database', 'tenant_b', 'orphan_table'],
+          reason: 'not-expected',
+          message: 'extra: orphan_table',
+          actual: diffNode('orphan_table', 'table'),
+        },
+      ],
+    });
+
+    const coordinates = [...collectExtraElementCoordinates(result)].sort((a, b) =>
+      a.namespaceId.localeCompare(b.namespaceId),
+    );
+    expect(coordinates).toEqual([
+      { namespaceId: 'public', entityName: 'orphan_table' },
+      { namespaceId: 'tenant_b', entityName: 'orphan_table' },
+    ]);
   });
 });

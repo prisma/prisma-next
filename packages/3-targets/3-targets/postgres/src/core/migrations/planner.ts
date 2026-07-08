@@ -22,21 +22,29 @@ import type {
   SchemaOwnership,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
-import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
+import { PostgresSchemaNodeKind, type SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import {
   formatPostgresControlPolicySubjectLabel,
+  resolveNamespaceIdForDdlSchema,
   resolvePostgresCallControlPolicySubject,
   resolvePostgresNodeIssueControlPolicySubject,
   resolvePostgresNodeIssueCreationFactoryName,
 } from './control-policy';
 import { buildPostgresPlanDiff } from './diff-database-schema';
-import { coalesceSubtreeIssues, planIssues } from './issue-planner';
+import {
+  coalesceSubtreeIssues,
+  issueNode,
+  issueSchemaName,
+  issueTableName,
+  planIssues,
+} from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import {
   CreatePostgresRlsPolicyCall,
@@ -201,7 +209,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       options.policy.allowedOperationClasses.includes('widening') ||
       options.policy.allowedOperationClasses.includes('destructive');
     const coalesced = coalesceSubtreeIssues(relationalDiffIssues);
-    const owned = retainUnownedExtras(coalesced, options.ownership);
+    const owned = retainUnownedExtras(coalesced, options.ownership, options.contract);
     const gated = strict ? owned : owned.filter((issue) => issue.reason !== 'not-expected');
 
     // Namespace presence (`CREATE SCHEMA`) is a planner-only op-generation
@@ -402,21 +410,29 @@ function isPolicyDiffIssue(issue: SchemaDiffIssue<SqlSchemaDiffNode>): boolean {
   return node !== undefined && PostgresPolicySchemaNode.is(node);
 }
 
-// A Postgres diff path is `['database', ddlSchema, tableName, …child]`, so a
-// whole-table extra sits at exactly this depth; anything deeper is a child of
-// a table.
-const POSTGRES_TABLE_PATH_DEPTH = 3;
-
 /**
  * Drops a `not-expected` issue when it is a whole extra TABLE that some
  * contract space owns, asking the ownership oracle per node.
  *
  * The consultation applies ONLY to table-level extras — a live table this
- * space's contract lacks. `declaresEntity` answers over the whole composition
- * (self included), so a positive answer on such a table means another space
- * owns it (a table this space owned would be in its expected tree, never an
- * extra): leave it. A negative answer means no space owns it — a genuine
- * orphan to drop.
+ * space's contract lacks — identified by asking the issue's own node
+ * (`nodeKind === table`), never by counting path segments. `declaresEntity`
+ * answers over the whole composition (self included), keyed on the
+ * namespace-qualified coordinate so a genuine orphan in one namespace is
+ * never conflated with a same-named table a sibling space declares in
+ * another: a positive answer means another space owns THIS table in THIS
+ * namespace (a table this space owned would be in its expected tree, never
+ * an extra) — leave it. A negative answer means no space owns it — a
+ * genuine orphan to drop.
+ *
+ * The issue path carries the *resolved DDL schema* (e.g. `public`), but a
+ * contract space's own declared namespace id can be the unbound sentinel
+ * (`__unbound__`) that resolves to that schema — the two spellings would
+ * never string-match. `resolveNamespaceIdForDdlSchema` recovers the raw
+ * namespace id THIS space's own contract would use for that DDL schema, so
+ * a table this space's own unbound namespace declares (and any sibling
+ * whose own unbound namespace resolves the same way) is compared on the
+ * same coordinate the aggregate's `elementCoordinates` walk yields.
  *
  * A DEEPER extra (an extra column/constraint on a table this space DOES own —
  * only the child drifted, so the table is in the expected tree) is this
@@ -428,13 +444,18 @@ const POSTGRES_TABLE_PATH_DEPTH = 3;
 function retainUnownedExtras(
   issues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
   ownership: SchemaOwnership | undefined,
+  contract: Contract<SqlStorage>,
 ): readonly SchemaDiffIssue<SqlSchemaDiffNode>[] {
   if (ownership === undefined) return issues;
   return issues.filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
-    if (issue.path.length !== POSTGRES_TABLE_PATH_DEPTH) return true;
-    const tableName = issue.path[2];
-    return tableName === undefined || !ownership.declaresEntity(tableName);
+    const node = issueNode(issue);
+    if (node === undefined || node.nodeKind !== PostgresSchemaNodeKind.table) return true;
+    const ddlSchemaName = issueSchemaName(issue);
+    const tableName = issueTableName(issue);
+    if (ddlSchemaName === undefined || tableName === undefined) return true;
+    const namespaceId = resolveNamespaceIdForDdlSchema(contract, ddlSchemaName);
+    return !ownership.declaresEntity({ namespaceId, entityName: tableName });
   });
 }
 

@@ -18,9 +18,10 @@ import type {
   SchemaDiffIssue,
   SchemaOwnership,
 } from '@prisma-next/framework-components/control';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { RelationalSchemaNodeKind, type SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildSqlitePlanDiff } from './diff-database-schema';
-import { coalesceSubtreeIssues, planIssues } from './issue-planner';
+import { coalesceSubtreeIssues, issueNode, planIssues } from './issue-planner';
 import {
   type SqliteMigrationDestinationInfo,
   TypeScriptRenderableSqliteMigration,
@@ -233,21 +234,20 @@ export class SqliteMigrationPlanner
   }
 }
 
-// SQLite's tree is flat (`SqlSchemaIR` root → tables), so a diff path is
-// `['database', tableName, …child]`; a whole-table extra sits at exactly this
-// depth, anything deeper is a child of a table.
-const SQLITE_TABLE_PATH_DEPTH = 2;
-
 /**
  * Drops a `not-expected` issue when it is a whole extra TABLE that some
  * contract space owns, asking the ownership oracle per node.
  *
  * The consultation applies ONLY to table-level extras — a live table this
- * space's contract lacks. `declaresEntity` answers over the whole composition
- * (self included), so a positive answer on such a table means another space
- * owns it (a table this space owned would be in its expected tree, never an
- * extra): leave it. A negative answer means no space owns it — a genuine
- * orphan to drop.
+ * space's contract lacks — identified by asking the issue's own node
+ * (`nodeKind === table`), never by counting path segments. SQLite is a
+ * single-namespace target, so every coordinate is qualified with the shared
+ * `UNBOUND_NAMESPACE_ID` sentinel (the same one the aggregate's declared
+ * entities carry for this target). `declaresEntity` answers over the whole
+ * composition (self included), so a positive answer on such a table means
+ * another space owns it (a table this space owned would be in its expected
+ * tree, never an extra): leave it. A negative answer means no space owns
+ * it — a genuine orphan to drop.
  *
  * A DEEPER extra (an extra column/constraint on a table this space DOES own —
  * only the child drifted, so the table is in the expected tree) is this
@@ -262,8 +262,12 @@ function retainUnownedExtras(
   if (ownership === undefined) return issues;
   return issues.filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
-    if (issue.path.length !== SQLITE_TABLE_PATH_DEPTH) return true;
+    const node = issueNode(issue);
+    if (node === undefined || node.nodeKind !== RelationalSchemaNodeKind.table) return true;
     const tableName = issue.path[1];
-    return tableName === undefined || !ownership.declaresEntity(tableName);
+    return (
+      tableName === undefined ||
+      !ownership.declaresEntity({ namespaceId: UNBOUND_NAMESPACE_ID, entityName: tableName })
+    );
   });
 }

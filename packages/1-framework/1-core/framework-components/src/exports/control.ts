@@ -48,6 +48,7 @@ export type {
   MigrationScaffoldContext,
   OpFactoryCall,
   SchemaOwnership,
+  SchemaOwnershipCoordinate,
   TargetMigrationsCapability,
 } from '../control/control-migration-types';
 export type {
