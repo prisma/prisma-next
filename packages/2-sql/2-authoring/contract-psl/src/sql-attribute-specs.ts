@@ -64,13 +64,14 @@ function buildFieldInterpretCtx(input: {
   readonly field: FieldSymbol;
   readonly sourceFile: SourceFile;
   readonly sourceId: string;
+  readonly resolveReferencedModel?: (() => ModelSymbol | undefined) | undefined;
 }): InterpretCtx {
   return {
     level: 'field',
     sourceId: input.sourceId,
     sourceFile: input.sourceFile,
     selfModel: input.selfModel,
-    resolveReferencedModel: () => undefined,
+    resolveReferencedModel: input.resolveReferencedModel ?? (() => undefined),
     field: input.field,
   };
 }
@@ -113,6 +114,7 @@ export function interpretFieldAttribute<Out>(input: {
   readonly sourceFile: SourceFile;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
+  readonly resolveReferencedModel?: () => ModelSymbol | undefined;
 }): Out | undefined {
   const result = interpretAttribute(
     input.node,
@@ -122,6 +124,7 @@ export function interpretFieldAttribute<Out>(input: {
       field: input.field,
       sourceFile: input.sourceFile,
       sourceId: input.sourceId,
+      resolveReferencedModel: input.resolveReferencedModel,
     }),
   );
   if (!result.ok) {
