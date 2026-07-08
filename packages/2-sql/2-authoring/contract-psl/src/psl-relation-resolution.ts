@@ -21,11 +21,7 @@ import {
   optional,
   str,
 } from '@prisma-next/psl-parser';
-import type {
-  ExpressionAst,
-  FieldAttributeAst,
-  SourceFile,
-} from '@prisma-next/psl-parser/syntax';
+import type { ExpressionAst, FieldAttributeAst, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { ArrayLiteralAst, IdentifierAst, QualifiedNameAst } from '@prisma-next/psl-parser/syntax';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -412,7 +408,11 @@ function buildRelationInterpretCtx(input: {
 }
 
 function legacyRelationNameDiagnostic(
-  input: { readonly selfModel: ModelSymbol; readonly field: FieldSymbol; readonly sourceId: string },
+  input: {
+    readonly selfModel: ModelSymbol;
+    readonly field: FieldSymbol;
+    readonly sourceId: string;
+  },
   span: PslSpan,
 ): ContractSourceDiagnostic {
   return {
