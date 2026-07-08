@@ -1081,8 +1081,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: 'Model "Thing" @@index list contains duplicate field "email"',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: 'Duplicate list entry',
         }),
       ]),
     );

@@ -4,9 +4,11 @@ import {
   fieldAttribute,
   fieldRef,
   interpretAttribute,
+  leafDiagnostic,
   list,
   modelAttribute,
   optional,
+  record,
   str,
 } from '@prisma-next/psl-parser';
 import type {
@@ -163,6 +165,59 @@ export function interpretModelConstraint(input: {
     return undefined;
   }
   return { fields: result.value.fields, map: result.value.map };
+}
+
+const indexModelSpec = modelAttribute('index', {
+  positional: [{ key: 'fields', type: list(fieldRef('self'), { nonEmpty: true, unique: true }) }],
+  named: { map: optional(str()), type: optional(str()), options: optional(record(str())) },
+  refine: (value, ctx) =>
+    value.options !== undefined && value.type === undefined
+      ? [
+          leafDiagnostic(
+            ctx,
+            ctx.selfModel.node,
+            '`@@index` options argument requires a type argument',
+          ),
+        ]
+      : [],
+});
+
+// `@@index` carries a required field list plus optional `map`/`type`/`options`.
+// `options` is only meaningful alongside `type` (enforced by the spec's refine).
+// Column mapping and duplicate-attribute checks stay in the caller.
+export function interpretModelIndex(input: {
+  readonly node: ModelAttributeAst;
+  readonly model: ModelSymbol;
+  readonly sourceFile: SourceFile;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}):
+  | {
+      readonly fields: readonly string[];
+      readonly map: string | undefined;
+      readonly type: string | undefined;
+      readonly options: Record<string, string> | undefined;
+    }
+  | undefined {
+  const result = interpretAttribute(
+    input.node,
+    indexModelSpec,
+    buildModelInterpretCtx({
+      selfModel: input.model,
+      sourceFile: input.sourceFile,
+      sourceId: input.sourceId,
+    }),
+  );
+  if (!result.ok) {
+    for (const failure of result.failure) input.diagnostics.push(failure);
+    return undefined;
+  }
+  return {
+    fields: result.value.fields,
+    map: result.value.map,
+    type: result.value.type,
+    options: result.value.options,
+  };
 }
 
 export function interpretFieldMapName(input: {

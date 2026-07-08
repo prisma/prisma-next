@@ -12,6 +12,7 @@ import {
   modelAttribute,
   nodePslSpan,
   oneOf,
+  record,
   str,
 } from '../src/exports';
 import { Cursor, parse, parseAttribute } from '../src/parse';
@@ -363,6 +364,68 @@ describe('list', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('record', () => {
+  it('parses a single-key object into a record', () => {
+    const { expr, ctx } = argOf('{ where: "active = true" }');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ where: 'active = true' });
+  });
+
+  it('parses a multi-key object into a record', () => {
+    const { expr, ctx } = argOf('{ ops: "gin_trgm_ops", where: "deleted = false" }');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ ops: 'gin_trgm_ops', where: 'deleted = false' });
+  });
+
+  it('parses an empty object into an empty record', () => {
+    const { expr, ctx } = argOf('{}');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({});
+  });
+
+  it('rejects a duplicate key', () => {
+    const { expr, ctx } = argOf('{ ops: "a", ops: "b" }');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a non-object argument', () => {
+    const { expr, ctx } = argOf('"nope"');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('propagates a leaf parse error when a value does not match', () => {
+    const { expr, ctx } = argOf('{ ops: 1 }');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
   });
 });
 

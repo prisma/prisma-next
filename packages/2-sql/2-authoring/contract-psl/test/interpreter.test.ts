@@ -718,7 +718,7 @@ model OrderItem {
       expect(result.ok).toBe(false);
       if (result.ok) return;
       expect(
-        result.failure.diagnostics.some((d) => /must be a quoted string literal/.test(d.message)),
+        result.failure.diagnostics.some((d) => /Expected a string literal/.test(d.message)),
       ).toBe(true);
     });
 
@@ -739,7 +739,7 @@ model OrderItem {
       expect(result.ok).toBe(false);
       if (result.ok) return;
       expect(
-        result.failure.diagnostics.some((d) => /must be a quoted string literal/.test(d.message)),
+        result.failure.diagnostics.some((d) => /Expected a string literal/.test(d.message)),
       ).toBe(true);
     });
 
@@ -783,7 +783,7 @@ model OrderItem {
       expect(result.ok).toBe(false);
       if (result.ok) return;
       expect(
-        result.failure.diagnostics.some((d) => /missing a "key: value" colon/.test(d.message)),
+        result.failure.diagnostics.some((d) => d.code === 'PSL_INVALID_ATTRIBUTE_SYNTAX'),
       ).toBe(true);
     });
 
