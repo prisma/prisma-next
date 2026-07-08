@@ -94,7 +94,13 @@ function renderTypedParam(
         "if it's a builtin.",
     );
   }
-  // The framework `CodecLookup.metaFor` returns the family-agnostic `CodecMeta` whose `db` is `Record<string, unknown>`. The SQL family populates a narrower shape with `db.sql.<dialect>.nativeType: string`; navigate that path defensively and string-check the leaf. Threading `typeParams` above already resolved a parameterized codec's per-instance meta (e.g. a native enum's type name) ahead of its static fallback.
+  // `typeParams` above already resolved a parameterized codec's per-instance
+  // meta (e.g. a native enum's type name) ahead of its static fallback.
+  //
+  // The framework `CodecLookup.metaFor` returns the family-agnostic
+  // `CodecMeta`, whose `db` is `Record<string, unknown>`. The SQL family
+  // populates a narrower shape with `db.sql.<dialect>.nativeType: string`, so
+  // navigate that path defensively and string-check the leaf.
   const dbRecord = meta?.db;
   const sqlBlock = isRecord(dbRecord) ? dbRecord['sql'] : undefined;
   const dialectBlock = isRecord(sqlBlock) ? sqlBlock['postgres'] : undefined;

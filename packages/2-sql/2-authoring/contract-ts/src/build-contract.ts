@@ -434,17 +434,15 @@ export function buildSqlContractFromDefinition(
       // A domain enum (`storageValueSetRef`, from an `enumType()` handle) is
       // stored as a plain scalar column (`text`, `int4`, …) with no native
       // type of its own to enforce membership, so it needs an explicit
-      // CHECK. A value set resolved by an entity-ref type constructor
-      // (`field.descriptor.valueSet`, e.g. `pg.enum(Ref)`) binds the column
-      // to a codec/native-type pairing that IS the storage-level
+      // CHECK — scalar or array, since a `text[]` array has no element-level
+      // enforcement either. A value set resolved by an entity-ref type
+      // constructor (`field.descriptor.valueSet`, e.g. `pg.enum(Ref)`) binds
+      // the column to a codec/native-type pairing that IS the storage-level
       // enforcement (a Postgres native enum type, or another target's
-      // equivalent) — no CHECK for those, except a `many` (list) column:
-      // a native per-instance type only constrains a scalar column, not
-      // each element of an array.
-      if (
-        column.valueSet !== undefined &&
-        (field.many === true || storageValueSetRef !== undefined)
-      ) {
+      // equivalent) — including array columns, since the target enforces
+      // membership on every element of a native-typed array — so no CHECK
+      // for those.
+      if (column.valueSet !== undefined && storageValueSetRef !== undefined) {
         checksForTable.push({
           name: `${tableName}_${field.columnName}_check`,
           column: field.columnName,

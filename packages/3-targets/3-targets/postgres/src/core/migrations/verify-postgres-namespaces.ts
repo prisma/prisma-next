@@ -3,6 +3,7 @@ import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { DEFAULT_NAMESPACE_ID } from '../namespace-ids';
 import { isPostgresSchema } from '../postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 
@@ -43,7 +44,7 @@ function existingSchemasFromSchema(schema: SqlSchemaIRNode): readonly string[] {
   if (PostgresDatabaseSchemaNode.is(schema)) {
     return schema.existingSchemas;
   }
-  return ['public'];
+  return [DEFAULT_NAMESPACE_ID];
 }
 
 /**
