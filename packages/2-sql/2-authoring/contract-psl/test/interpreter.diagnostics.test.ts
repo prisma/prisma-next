@@ -154,18 +154,13 @@ model User {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
-    expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('Field "Team.id" @map requires'),
-        }),
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('Model "Team" @map requires'),
-        }),
-      ]),
+    const mapDiagnostics = result.failure.diagnostics.filter(
+      (diagnostic) => diagnostic.code === 'PSL_INVALID_ATTRIBUTE_SYNTAX',
     );
+    expect(mapDiagnostics).toHaveLength(2);
+    for (const diagnostic of mapDiagnostics) {
+      expect(diagnostic.message).toContain('Expected a string literal');
+    }
   });
 
   it('returns diagnostics for unsupported model attributes', () => {

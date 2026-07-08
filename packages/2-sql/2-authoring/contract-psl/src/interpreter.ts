@@ -1970,6 +1970,7 @@ export function interpretPslDocumentToSqlContract(
     defaultNamespaceId,
     diagnostics,
     sourceId,
+    sourceFile,
   );
   // Bare-name view for unqualified relation targets and polymorphism, where
   // resolution is by bare model name. When a bare name is shared across

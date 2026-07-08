@@ -12,15 +12,11 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { FieldSymbol, ModelSymbol, ResolvedAttribute } from '@prisma-next/psl-parser';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import {
-  getAttribute,
-  lowerFirst,
-  parseConstraintMapArgument,
-  parseMapName,
-} from './psl-attribute-parsing';
+import { getAttribute, lowerFirst, parseConstraintMapArgument } from './psl-attribute-parsing';
 import type { ColumnDescriptor, FieldPresetContributions } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
@@ -28,6 +24,7 @@ import {
   reportUncomposedNamespace,
   resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
+import { interpretFieldMapName, interpretModelMapName } from './sql-attribute-specs';
 
 type LoweredFieldDefault = {
   readonly defaultValue?: ColumnDefault;
@@ -578,28 +575,26 @@ export function buildModelMappings(
   defaultNamespaceId: string,
   diagnostics: ContractSourceDiagnostic[],
   sourceId: string,
+  sourceFile: SourceFile,
 ): Map<string, ModelNameMapping> {
   const result = new Map<string, ModelNameMapping>();
   for (const { model, namespaceId } of modelEntries) {
-    const mapAttribute = getAttribute(model.attributes, 'map');
-    const tableName = parseMapName({
-      attribute: mapAttribute,
+    const tableName = interpretModelMapName({
+      model,
       defaultValue: lowerFirst(model.name),
+      sourceFile,
       sourceId,
       diagnostics,
-      entityLabel: `Model "${model.name}"`,
-      span: model.span,
     });
     const fieldColumns = new Map<string, string>();
     for (const field of Object.values(model.fields)) {
-      const fieldMapAttribute = getAttribute(field.attributes, 'map');
-      const columnName = parseMapName({
-        attribute: fieldMapAttribute,
+      const columnName = interpretFieldMapName({
+        model,
+        field,
         defaultValue: field.name,
+        sourceFile,
         sourceId,
         diagnostics,
-        entityLabel: `Field "${model.name}.${field.name}"`,
-        span: field.span,
       });
       fieldColumns.set(field.name, columnName);
     }

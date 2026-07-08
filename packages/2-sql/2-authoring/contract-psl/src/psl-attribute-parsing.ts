@@ -68,41 +68,6 @@ export function parseFieldList(value: string): readonly string[] | undefined {
   return parts;
 }
 
-export function parseMapName(input: {
-  readonly attribute: ResolvedAttribute | undefined;
-  readonly defaultValue: string;
-  readonly sourceId: string;
-  readonly diagnostics: ContractSourceDiagnostic[];
-  readonly entityLabel: string;
-  readonly span: PslSpan;
-}): string {
-  if (!input.attribute) {
-    return input.defaultValue;
-  }
-
-  const value = getPositionalArgument(input.attribute);
-  if (!value) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-      message: `${input.entityLabel} @map requires a positional quoted string literal argument`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return input.defaultValue;
-  }
-  const parsed = parseQuotedStringLiteral(value);
-  if (parsed === undefined) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-      message: `${input.entityLabel} @map requires a positional quoted string literal argument`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return input.defaultValue;
-  }
-  return parsed;
-}
-
 export function parseConstraintMapArgument(input: {
   readonly attribute: ResolvedAttribute | undefined;
   readonly sourceId: string;
