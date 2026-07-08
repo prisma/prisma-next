@@ -12,7 +12,7 @@ import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
  * Strict gating, control-policy disposition, and the verdict itself are the
  * family's post-diff filters over this output.
  */
-export interface SqlSchemaDiffForVerdict {
+export interface SqlSchemaDiffResult {
   /** The full, ownership-scoped diff issue list. */
   readonly issues: readonly SchemaDiffIssue[];
   /**
@@ -32,10 +32,10 @@ export interface SqlSchemaDiffForVerdict {
   readonly namespacePairs: ReadonlyArray<{ readonly actual: SqlSchemaIRNode | undefined }>;
 }
 
-export interface DiffSchemaForVerdictInput {
+export interface SqlSchemaDiffInput {
   readonly contract: Contract<SqlStorage>;
   readonly schema: SqlSchemaIRNode;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
-export type SqlDiffSchemaForVerdict = (input: DiffSchemaForVerdictInput) => SqlSchemaDiffForVerdict;
+export type SqlSchemaDiffFn = (input: SqlSchemaDiffInput) => SqlSchemaDiffResult;

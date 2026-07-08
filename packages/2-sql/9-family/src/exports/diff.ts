@@ -10,21 +10,25 @@
 export type {
   SemanticSatisfactionInput,
   SemanticSatisfactionResult,
+} from '../core/diff/diff-tree-normalization';
+export {
+  neutralizeFlatExpectedFkSchemas,
+  normalizeFlatActualForDiff,
+  resolveSemanticSatisfaction,
+} from '../core/diff/diff-tree-normalization';
+export type {
   SqlDiffVerdict,
   SqlDiffVerdictInput,
   StorageTypeVerdict,
   StorageTypeVerdictInput,
   VerifySqlSchemaByDiffInput,
-} from '../core/diff/schema-diff-verify';
+} from '../core/diff/schema-verify';
 export {
   classifySqlDiffIssue,
   computeSqlDiffVerdict,
   computeStorageTypeVerdict,
-  neutralizeFlatExpectedFkSchemas,
-  normalizeFlatActualForDiff,
-  resolveSemanticSatisfaction,
   verifySqlSchemaByDiff,
-} from '../core/diff/schema-diff-verify';
+} from '../core/diff/schema-verify';
 export type { NativeTypeNormalizer } from '../core/diff/sql-schema-diff';
 export {
   arraysEqual,

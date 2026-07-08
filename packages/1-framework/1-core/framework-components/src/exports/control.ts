@@ -60,17 +60,16 @@ export type {
   ExpectationFailureReason,
   IntrospectSchemaResult,
   OperationContext,
-  SchemaFindingLists,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '../control/control-result-types';
+} from '../control/control-operation-results';
 export {
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
   VERIFY_CODE_SCHEMA_FAILURE,
   VERIFY_CODE_TARGET_MISMATCH,
-} from '../control/control-result-types';
+} from '../control/control-operation-results';
 export type {
   CoreSchemaView,
   SchemaTreeNodeOptions,

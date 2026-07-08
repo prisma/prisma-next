@@ -22,11 +22,10 @@ import { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir
 import { describe, expect, it } from 'vitest';
 import { extractCodecControlHooks } from '../src/core/assembly';
 import {
-  computeSqlDiffVerdict,
-  computeStorageTypeVerdict,
   neutralizeFlatExpectedFkSchemas,
   normalizeFlatActualForDiff,
-} from '../src/core/diff/schema-diff-verify';
+} from '../src/core/diff/diff-tree-normalization';
+import { computeSqlDiffVerdict, computeStorageTypeVerdict } from '../src/core/diff/schema-verify';
 import type { DefaultNormalizer, NativeTypeNormalizer } from '../src/core/diff/sql-schema-diff';
 import { contractToSchemaIR } from '../src/core/migrations/contract-to-schema-ir';
 import {
@@ -96,7 +95,7 @@ interface VerdictRun {
 /**
  * Resolves a verdict-diff issue's subject table's declared control policy
  * directly from the contract — mirrors the flat-tree resolution
- * `diffSqliteSchemaForVerdict` performs for the real SQLite target.
+ * `diffSqliteSchema` performs for the real SQLite target.
  */
 function resolveControlPolicy(
   issue: SchemaDiffIssue,

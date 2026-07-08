@@ -9,9 +9,9 @@ import type {
   SchemaOwnership,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
+import { buildFabricatedMigrationEdge } from '../fabricated-migration-edge';
 import type { ContractMarkerRecordLike } from '../marker-types';
 import type { PerSpacePlan } from '../planner-types';
-import { buildSynthMigrationEdge } from '../synth-migration-edge';
 import type { AggregateContractSpace } from '../types';
 
 export interface PlanFromDiffInputs<TFamilyId extends string, TTargetId extends string> {
@@ -131,7 +131,7 @@ export async function planFromDiff<TFamilyId extends string, TTargetId extends s
         ? { warnings: plannerResult.warnings }
         : {}),
       migrationEdges: [
-        buildSynthMigrationEdge({
+        buildFabricatedMigrationEdge({
           currentMarkerStorageHash: input.currentMarker?.storageHash,
           destinationStorageHash,
           operationCount: producedOps.length,

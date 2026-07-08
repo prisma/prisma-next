@@ -3,7 +3,7 @@ import { verifySqlSchemaByDiff } from '@prisma-next/family-sql/diff';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { diffPostgresSchemaForVerdict } from '../../src/core/migrations/diff-database-schema';
+import { diffPostgresSchema } from '../../src/core/migrations/diff-database-schema';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
@@ -132,7 +132,7 @@ function assertVerdict(
       schema: actual,
       strict,
       frameworkComponents: [],
-      diffSchemaForVerdict: diffPostgresSchemaForVerdict,
+      diffSchema: diffPostgresSchema,
     });
     expect({ strict, ok: result.ok }).toEqual({ strict, ok: expectedOk });
   }

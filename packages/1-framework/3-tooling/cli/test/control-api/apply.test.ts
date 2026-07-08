@@ -11,7 +11,7 @@ import type {
   PerSpacePlan,
 } from '@prisma-next/migration-tools/aggregate';
 import {
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
   createContractSpaceAggregate,
 } from '@prisma-next/migration-tools/aggregate';
 import { ok } from '@prisma-next/utils/result';
@@ -65,7 +65,7 @@ function makePerSpacePlan(): PerSpacePlan {
     destinationContract: makeAppSpace().contract,
     strategy: 'resolve-recorded-path',
     migrationEdges: [
-      buildSynthMigrationEdge({
+      buildFabricatedMigrationEdge({
         currentMarkerStorageHash: null,
         destinationStorageHash: APP_HASH,
         operationCount: 0,

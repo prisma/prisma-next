@@ -4,7 +4,7 @@
  * / `collectSqlSchemaIssuesPerNamespace`) retired once the migration planner
  * took `plan(start, end)` over the one differ (`buildPostgresPlanDiff` /
  * `buildSqlitePlanDiff`); what remains here is consumed by the surviving
- * verify verdict (`schema-diff-verify.ts`) and the control adapters.
+ * verify verdict (`schema-verify.ts`) and the control adapters.
  */
 
 import type { ColumnDefault } from '@prisma-next/contract/types';

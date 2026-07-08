@@ -293,7 +293,7 @@ describe('planMigration', () => {
     expect(failure.missingInvariants).toEqual(['cipher:create-v1']);
   });
 
-  it('forwards plan-from-diff planner failures as appSynthFailure', async () => {
+  it('forwards plan-from-diff planner failures as planFromDiffFailed', async () => {
     const aggregate = makeAggregate({
       app: makeSpace({ spaceId: 'app' }),
     });
@@ -317,8 +317,8 @@ describe('planMigration', () => {
 
     expect(result.ok).toBe(false);
     const failure = result.assertNotOk();
-    expect(failure.kind).toBe('appSynthFailure');
-    if (failure.kind !== 'appSynthFailure') return;
+    expect(failure.kind).toBe('planFromDiffFailed');
+    if (failure.kind !== 'planFromDiffFailed') return;
     expect(failure.spaceId).toBe('app');
     expect(failure.conflicts).toHaveLength(1);
   });

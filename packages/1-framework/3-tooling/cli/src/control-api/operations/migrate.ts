@@ -12,7 +12,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   type AggregateContractSpace,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
   type ContractMarkerRecordLike,
   type ContractSpaceAggregate,
   type PerSpacePlan,
@@ -460,7 +460,7 @@ function buildAtHeadResolution(args: {
     destinationContract: space.contract(),
     strategy: 'declared-state',
     migrationEdges: [
-      buildSynthMigrationEdge({
+      buildFabricatedMigrationEdge({
         currentMarkerStorageHash: liveMarker?.storageHash,
         destinationStorageHash: targetHash,
         operationCount: 0,

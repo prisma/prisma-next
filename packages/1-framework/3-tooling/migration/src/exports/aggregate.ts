@@ -10,6 +10,7 @@ export {
   type IntegritySpaceState,
   loadProblemToViolation,
 } from '../aggregate/check-integrity';
+export { buildFabricatedMigrationEdge } from '../aggregate/fabricated-migration-edge';
 export { type LoadAggregateInput, loadContractSpaceAggregate } from '../aggregate/loader';
 export type { ContractMarkerRecordLike } from '../aggregate/marker-types';
 export {
@@ -28,7 +29,6 @@ export {
   type ResolveRecordedPathOutcome,
   resolveRecordedPath,
 } from '../aggregate/strategies/resolve-recorded-path';
-export { buildSynthMigrationEdge } from '../aggregate/synth-migration-edge';
 export type {
   AggregateContractSpace,
   ContractAtOptions,

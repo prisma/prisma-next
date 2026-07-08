@@ -1,5 +1,5 @@
 import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
-import type { SqlSchemaDiffForVerdict } from '@prisma-next/family-sql/control';
+import type { SqlSchemaDiffResult } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
 import { resolveSemanticSatisfaction } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
@@ -90,7 +90,7 @@ export function normalizePostgresActualForDiff(
  * to tables, so a table-less namespace carries none (the projection
  * throws on a policy referencing an absent table). Live policies in a
  * pruned schema remain governed via the full owned set (see
- * {@link diffPostgresSchemaForVerdict}).
+ * {@link diffPostgresSchema}).
  */
 function pruneTableLessNamespaces(
   expected: PostgresDatabaseSchemaNode,
@@ -141,14 +141,14 @@ function resolveControlPolicy(
  * namespace's paired actual node (the hooks read namespace-scoped state
  * such as `nativeEnumTypeNames`).
  */
-export function diffPostgresSchemaForVerdict(input: {
+export function diffPostgresSchema(input: {
   readonly contract: Contract<SqlStorage>;
   readonly schema: SqlSchemaIRNode;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
-}): SqlSchemaDiffForVerdict {
+}): SqlSchemaDiffResult {
   const postgresContract = blindCast<
     PostgresContract,
-    'diffPostgresSchemaForVerdict is only called with a postgres contract'
+    'diffPostgresSchema is only called with a postgres contract'
   >(input.contract);
   PostgresDatabaseSchemaNode.assert(input.schema);
   const actual = input.schema;
@@ -230,7 +230,7 @@ export interface PostgresPlanDiff {
 
 /**
  * The Postgres planner's diff input: the SAME tree-building
- * `diffPostgresSchemaForVerdict` uses (expander threaded, FK schemas resolved,
+ * `diffPostgresSchema` uses (expander threaded, FK schemas resolved,
  * table-less namespaces pruned, actual normalized for semantic satisfaction,
  * role-aware ownership filter) plus actual namespace padding (so a missing
  * schema's tables surface as `not-found` instead of a swallowed namespace

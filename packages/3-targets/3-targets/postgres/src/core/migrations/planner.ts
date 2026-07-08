@@ -176,7 +176,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // The one combined tree diff drives the whole plan: relational findings
     // become structural DDL via `planIssues`, policy findings become RLS ops
     // via `planPostgresSchemaDiff`. Verify runs its own full-tree node diff
-    // (`diffSchemaForVerdict`) over the same schema and rejects on a
+    // (`diffSchema`) over the same schema and rejects on a
     // surviving failure.
     PostgresDatabaseSchemaNode.assert(options.schema);
     const { issues: rawIssues } = buildPostgresPlanDiff({

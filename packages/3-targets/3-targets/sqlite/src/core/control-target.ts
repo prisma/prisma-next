@@ -8,10 +8,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqliteTargetDescriptorMeta } from './descriptor-meta';
-import {
-  diffSqliteSchemaForVerdict,
-  sqliteContractToSchema,
-} from './migrations/diff-database-schema';
+import { diffSqliteSchema, sqliteContractToSchema } from './migrations/diff-database-schema';
 import { createSqliteMigrationPlanner } from './migrations/planner';
 import type { SqlitePlanTargetDetails } from './migrations/planner-target-details';
 import { createSqliteMigrationRunner } from './migrations/runner';
@@ -27,8 +24,8 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
     ...sqliteTargetDescriptorMeta,
     contractSerializer: new SqliteContractSerializer(),
     schemaVerifier: new SqliteSchemaVerifier(),
-    diffSchemaForVerdict(input) {
-      return diffSqliteSchemaForVerdict(input);
+    diffSchema(input) {
+      return diffSqliteSchema(input);
     },
     migrations: {
       createPlanner(adapter: SqlControlAdapter<'sqlite'>): MigrationPlanner<'sql', 'sqlite'> {

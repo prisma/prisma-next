@@ -49,9 +49,9 @@ export {
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
 export type {
-  DiffSchemaForVerdictInput,
-  SqlDiffSchemaForVerdict,
-  SqlSchemaDiffForVerdict,
+  SqlSchemaDiffFn,
+  SqlSchemaDiffInput,
+  SqlSchemaDiffResult,
 } from '../core/migrations/schema-differ';
 export type {
   CodecControlHooks,

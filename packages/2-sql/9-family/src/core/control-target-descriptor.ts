@@ -10,7 +10,7 @@ import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { SqlControlAdapter } from './control-adapter';
 import type { SqlControlFamilyInstance } from './control-instance';
-import type { SqlDiffSchemaForVerdict } from './migrations/schema-differ';
+import type { SqlSchemaDiffFn } from './migrations/schema-differ';
 import type { SqlMigrationPlanner, SqlMigrationRunner } from './migrations/types';
 
 /**
@@ -68,7 +68,7 @@ export interface SqlControlTargetDescriptor<
    * gating + control-policy disposition over the returned issues; verify
    * rejects when a surviving issue is a failure.
    */
-  readonly diffSchemaForVerdict: SqlDiffSchemaForVerdict;
+  readonly diffSchema: SqlSchemaDiffFn;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

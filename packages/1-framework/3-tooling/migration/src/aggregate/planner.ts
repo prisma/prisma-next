@@ -1,9 +1,9 @@
 import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
+import { buildFabricatedMigrationEdge } from './fabricated-migration-edge';
 import type { PerSpacePlan, PlannerError, PlannerInput, PlannerOutput } from './planner-types';
 import { planFromDiff } from './strategies/plan-from-diff';
 import { resolveRecordedPath } from './strategies/resolve-recorded-path';
-import { buildSynthMigrationEdge } from './synth-migration-edge';
 import type { AggregateContractSpace } from './types';
 
 export type {
@@ -71,7 +71,7 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
       const conflict: PlannerError = {
         kind: 'policyConflict',
         spaceId: space.spaceId,
-        detail: `\`callerPolicy.ignoreGraphFor\` requested for space "${space.spaceId}", but the contract space declares non-empty head-ref invariants (${headRef.invariants.join(', ')}). Synthesising a plan from the contract IR cannot satisfy authored invariants — the graph must be walked. Either remove "${space.spaceId}" from \`ignoreGraphFor\` or amend the on-disk head ref to declare zero invariants.`,
+        detail: `\`callerPolicy.ignoreGraphFor\` requested for space "${space.spaceId}", but the contract space declares non-empty head-ref invariants (${headRef.invariants.join(', ')}). A plan built directly from the contract IR cannot satisfy authored invariants — the graph must be walked. Either remove "${space.spaceId}" from \`ignoreGraphFor\` or amend the on-disk head ref to declare zero invariants.`,
       };
       return notOk(conflict);
     }
@@ -90,7 +90,7 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
       });
       if (diffOutcome.kind === 'failure') {
         return notOk({
-          kind: 'appSynthFailure',
+          kind: 'planFromDiffFailed',
           spaceId: space.spaceId,
           conflicts: diffOutcome.conflicts,
         });
@@ -158,7 +158,7 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
       destinationContract: space.contract(),
       strategy: 'declared-state',
       migrationEdges: [
-        buildSynthMigrationEdge({
+        buildFabricatedMigrationEdge({
           currentMarkerStorageHash: currentMarker?.storageHash,
           destinationStorageHash: headRef.hash,
           operationCount: 0,

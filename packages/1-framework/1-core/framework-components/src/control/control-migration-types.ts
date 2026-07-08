@@ -18,7 +18,7 @@ import type {
   ControlDriverInstance,
   ControlFamilyInstance,
 } from './control-instances';
-import type { OperationContext } from './control-result-types';
+import type { OperationContext } from './control-operation-results';
 
 // ============================================================================
 // Migration Package Metadata

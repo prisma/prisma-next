@@ -328,7 +328,7 @@ function detectOrphanMarkers(
 }
 
 function mapPlannerError(error: PlannerError): DbInitResult | DbUpdateResult {
-  if (error.kind === 'appSynthFailure') {
+  if (error.kind === 'planFromDiffFailed') {
     const failure: DbInitFailure | DbUpdateFailure = {
       code: 'PLANNING_FAILED',
       summary: 'Migration planning failed due to conflicts',

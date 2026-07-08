@@ -184,7 +184,7 @@ export class SqliteMigrationPlanner
 
   /**
    * Diffs the target contract against the live schema via the one differ
-   * (the same tree-building `diffSqliteSchemaForVerdict` uses, plus the
+   * (the same tree-building `diffSqliteSchema` uses, plus the
    * op-render stamper) and prepares the issue list `planIssues` consumes.
    *
    * Three passes, in order:

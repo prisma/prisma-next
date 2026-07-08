@@ -1,5 +1,5 @@
 import type { ColumnDefault, Contract, ControlPolicy } from '@prisma-next/contract/types';
-import type { NativeTypeExpander, SqlSchemaDiffForVerdict } from '@prisma-next/family-sql/control';
+import type { NativeTypeExpander, SqlSchemaDiffResult } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander, contractToSchemaIR } from '@prisma-next/family-sql/control';
 import {
   neutralizeFlatExpectedFkSchemas,
@@ -79,7 +79,7 @@ export function verifySqliteDatabaseSchema(
     schema: input.actualSchema,
     strict: input.strict,
     frameworkComponents: input.frameworkComponents,
-    diffSchemaForVerdict: diffSqliteSchemaForVerdict,
+    diffSchema: diffSqliteSchema,
   });
 }
 
@@ -118,11 +118,11 @@ function resolveControlPolicy(
  * contract namespace with tables, each against the sole flat actual root —
  * exactly the legacy per-namespace pairing.
  */
-export function diffSqliteSchemaForVerdict(input: {
+export function diffSqliteSchema(input: {
   readonly contract: Contract<SqlStorage>;
   readonly schema: SqlSchemaIRNode;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
-}): SqlSchemaDiffForVerdict {
+}): SqlSchemaDiffResult {
   const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
   const expected = neutralizeFlatExpectedFkSchemas(
     contractToSchemaIR(input.contract, {
@@ -160,7 +160,7 @@ export interface SqlitePlanDiff {
 
 /**
  * The SQLite planner's diff input: the same tree-building
- * `diffSqliteSchemaForVerdict` uses (expander threaded, FK schema segment
+ * `diffSqliteSchema` uses (expander threaded, FK schema segment
  * neutralized, actual tree normalized for semantic satisfaction). One differ
  * drives both verify and plan; this is the plan-side derivation — column DDL
  * resolves from each expected column's `codecRef` at plan time

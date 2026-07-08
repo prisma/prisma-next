@@ -6,7 +6,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   type AggregateMigrationEdgeRef,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
@@ -200,7 +200,7 @@ function makePlan(ops: readonly AnyMongoMigrationOperation[]): MigrationPlan {
 
 function synthEdges(plan: MigrationPlan): readonly AggregateMigrationEdgeRef[] {
   return [
-    buildSynthMigrationEdge({
+    buildFabricatedMigrationEdge({
       currentMarkerStorageHash: plan.origin?.storageHash,
       destinationStorageHash: plan.destination.storageHash,
       operationCount: plan.operations.length,

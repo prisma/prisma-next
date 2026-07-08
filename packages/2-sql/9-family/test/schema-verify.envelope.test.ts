@@ -7,18 +7,18 @@
  */
 
 import type { Contract } from '@prisma-next/contract/types';
-import type { SqlDiffSchemaForVerdict } from '@prisma-next/family-sql/control';
+import type { SqlSchemaDiffFn } from '@prisma-next/family-sql/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlColumnIR, SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { verifySqlSchemaByDiff } from '../src/core/diff/schema-diff-verify';
+import { verifySqlSchemaByDiff } from '../src/core/diff/schema-verify';
 import { createTestContract } from './schema-verify.helpers';
 
 /**
  * A stub target diff: the live DB is missing the `user.email` column, so the
  * differ emits one `not-found` issue whose subject table resolves to `control`.
  */
-function stubDiff(control: 'observed' | 'managed'): SqlDiffSchemaForVerdict {
+function stubDiff(control: 'observed' | 'managed'): SqlSchemaDiffFn {
   return () => ({
     issues: [
       {
@@ -42,7 +42,7 @@ describe('verifySqlSchemaByDiff surfaces warnings without failing', () => {
       schema: new SqlSchemaIR({ tables: {} }),
       strict: false,
       frameworkComponents: [],
-      diffSchemaForVerdict: stubDiff('observed'),
+      diffSchema: stubDiff('observed'),
     });
 
     expect(result.ok).toBe(true);
@@ -57,7 +57,7 @@ describe('verifySqlSchemaByDiff surfaces warnings without failing', () => {
       schema: new SqlSchemaIR({ tables: {} }),
       strict: false,
       frameworkComponents: [],
-      diffSchemaForVerdict: stubDiff('managed'),
+      diffSchema: stubDiff('managed'),
     });
 
     expect(result.ok).toBe(false);

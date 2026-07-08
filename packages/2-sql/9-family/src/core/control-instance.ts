@@ -48,9 +48,9 @@ import type {
   SqlControlTargetDescriptor,
   SqlDescribedContractSpace,
 } from './control-target-descriptor';
-import { verifySqlSchemaByDiff } from './diff/schema-diff-verify';
+import { verifySqlSchemaByDiff } from './diff/schema-verify';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
-import type { SqlDiffSchemaForVerdict } from './migrations/schema-differ';
+import type { SqlSchemaDiffFn } from './migrations/schema-differ';
 import type {
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
@@ -542,10 +542,10 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   // The full-tree node diff the verify VERDICT derives from. Read lazily so
   // construction-only stub descriptors (schema-view tests) keep working; the
   // throw happens at verify time.
-  const diffSchemaForVerdict = blindCast<
-    { readonly diffSchemaForVerdict?: SqlDiffSchemaForVerdict },
-    'reading the target-descriptor diffSchemaForVerdict hook'
-  >(target).diffSchemaForVerdict;
+  const diffSchema = blindCast<
+    { readonly diffSchema?: SqlSchemaDiffFn },
+    'reading the target-descriptor diffSchema hook'
+  >(target).diffSchema;
   // `contract infer` needs each extension pack's already-assembled contract,
   // carried as-is (no merging — that is the contract-spaces machinery's
   // concern), paired with the `spaceId` its descriptor was registered under
@@ -715,9 +715,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
     }): VerifyDatabaseSchemaResult {
       const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
-      if (!diffSchemaForVerdict) {
+      if (!diffSchema) {
         throw new Error(
-          `SQL target "${target.targetId}" is missing the required diffSchemaForVerdict descriptor operation`,
+          `SQL target "${target.targetId}" is missing the required diffSchema descriptor operation`,
         );
       }
       // THE VERDICT: the target's full-tree node diff, graded by the
@@ -729,7 +729,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         schema: options.schema,
         strict: options.strict,
         frameworkComponents: options.frameworkComponents,
-        diffSchemaForVerdict,
+        diffSchema,
       });
     },
     async sign(options: {

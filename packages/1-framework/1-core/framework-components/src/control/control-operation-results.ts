@@ -53,19 +53,11 @@ export interface VerifyDatabaseResult {
 export type ExpectationFailureReason = 'not-expected' | 'not-found' | 'not-equal';
 
 /**
- * A verify result's findings: one node-typed issue list. Used for both the
- * failure channel and the warning channel of a verify result.
- */
-export interface SchemaFindingLists {
-  readonly issues: readonly SchemaDiffIssue[];
-}
-
-/**
  * The issue-based schema-verify result. `ok` derives from the FAILURE list
  * only: a verify passes exactly when `schema.issues` is empty, post
  * strict-gating and control-policy disposition.
  *
- * `schema.warnings` carries warn-graded findings (an `observed`-policy
+ * `schema.warnings` carries warn-graded issues (an `observed`-policy
  * subject's drift, and any other `warn` disposition) in the same shape.
  * Warnings are informational — they never affect `ok` — but they MUST be
  * surfaced: an `observed` table that drifted yields `ok: true` with a
@@ -84,8 +76,11 @@ export interface VerifyDatabaseSchemaResult {
     readonly expected: string;
     readonly actual?: string;
   };
-  readonly schema: SchemaFindingLists & {
-    readonly warnings?: SchemaFindingLists;
+  readonly schema: {
+    readonly issues: readonly SchemaDiffIssue[];
+    readonly warnings?: {
+      readonly issues: readonly SchemaDiffIssue[];
+    };
   };
   readonly meta?: {
     readonly configPath?: string;

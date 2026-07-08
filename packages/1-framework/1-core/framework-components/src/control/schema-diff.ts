@@ -1,4 +1,4 @@
-import type { ExpectationFailureReason } from './control-result-types';
+import type { ExpectationFailureReason } from './control-operation-results';
 
 export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   /** Path from the root node down to the diffed node, as a sequence of local keys. */

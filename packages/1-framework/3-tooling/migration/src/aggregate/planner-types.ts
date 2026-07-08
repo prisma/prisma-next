@@ -111,8 +111,8 @@ export interface PlannerInput<TFamilyId extends string, TTargetId extends string
  * without re-walking the graph.
  *
  * `plan-from-diff`/`declared-state` plans leave this absent — they don't
- * have authored edges to surface (a single synthesised edge is used
- * instead, see {@link import('./synth-migration-edge').buildSynthMigrationEdge}).
+ * have authored edges to surface (a single fabricated edge is used
+ * instead, see {@link import('./fabricated-migration-edge').buildFabricatedMigrationEdge}).
  */
 export interface AggregateMigrationEdgeRef {
   readonly migrationHash: string;
@@ -131,7 +131,7 @@ export interface PerSpacePlan {
   /**
    * Per-edge breakdown of the chain. `resolve-recorded-path` plans carry
    * one entry per authored edge; `plan-from-diff` and `declared-state`
-   * plans carry a single synthesised edge.
+   * plans carry a single fabricated edge.
    */
   readonly migrationEdges: readonly AggregateMigrationEdgeRef[];
   /**
@@ -173,7 +173,7 @@ export type PlannerError =
       readonly missingInvariants: readonly string[];
     }
   | {
-      readonly kind: 'appSynthFailure';
+      readonly kind: 'planFromDiffFailed';
       readonly spaceId: string;
       readonly conflicts: readonly MigrationPlannerConflict[];
     }

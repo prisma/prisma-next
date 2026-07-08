@@ -9,7 +9,7 @@ import {
   SqlTableIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { classifySqlDiffIssue, computeSqlDiffVerdict } from '../src/core/diff/schema-diff-verify';
+import { classifySqlDiffIssue, computeSqlDiffVerdict } from '../src/core/diff/schema-verify';
 
 /**
  * Classification and strict gating key on the node's DECLARED `diffRole`,
