@@ -79,7 +79,7 @@ describe('createProjectArtifacts', () => {
 
     const second = store.document(schemaUri);
     expect(second?.document).not.toBe(first?.document);
-    expect(Object.keys(second?.symbolTable.topLevel.models ?? {})).toEqual(
+    expect(Object.keys(store.symbolTable().topLevel.models)).toEqual(
       expect.arrayContaining(['User', 'Post']),
     );
   });
@@ -99,23 +99,29 @@ describe('createProjectArtifacts', () => {
     expect(pipelineMock.runPipeline).not.toHaveBeenCalled();
   });
 
-  it('one parse yields the document artifacts and their symbol table together', () => {
+  it('reading the symbol table on a fresh store parses the open configured input once', () => {
     const { texts, store } = projectWithMirror();
     texts.set(schemaUri, cleanSource);
 
-    const artifacts = store.document(schemaUri);
-    expect(Object.keys(artifacts?.symbolTable.topLevel.models ?? {})).toContain('User');
+    expect(Object.keys(store.symbolTable().topLevel.models)).toContain('User');
     expect(pipelineMock.runPipeline).toHaveBeenCalledTimes(1);
   });
 
-  it('a second consumer of the same artifacts causes no reparse', () => {
+  it('a document read after a symbol-table read reuses the same parse', () => {
     const { texts, store } = projectWithMirror();
     texts.set(schemaUri, cleanSource);
 
-    const first = store.document(schemaUri);
-    const second = store.document(schemaUri);
-    expect(second?.symbolTable).toBe(first?.symbolTable);
+    store.symbolTable();
+    expect(store.document(schemaUri)?.document).toBeDefined();
     expect(pipelineMock.runPipeline).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the degenerate empty table when no configured input is open', () => {
+    const { store } = projectWithMirror();
+
+    const table = store.symbolTable();
+    expect(Object.keys(table.topLevel.models)).toEqual([]);
+    expect(pipelineMock.runPipeline).not.toHaveBeenCalled();
   });
 
   it('drops the artifacts on documentClosed', () => {

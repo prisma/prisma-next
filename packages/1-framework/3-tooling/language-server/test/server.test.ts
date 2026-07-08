@@ -1764,6 +1764,70 @@ describe('language server pull diagnostics', { timeout: timeouts.databaseOperati
   });
 });
 
+describe('language server project lifecycle', { timeout: timeouts.databaseOperation }, () => {
+  it('drops the project when its last open input closes and reopening re-evaluates the config', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    openDocument(harness, schemaUri, duplicateModelSource);
+    expect((await harness.waitForDiagnostics(schemaUri)).length).toBeGreaterThan(0);
+    expect(configResolutionMock.resolveConfigInputs).toHaveBeenCalledTimes(1);
+
+    const cleared = harness.waitForDiagnosticsMatching(
+      schemaUri,
+      (diagnostics) => diagnostics.length === 0,
+    );
+    closeDocument(harness, schemaUri);
+    await cleared;
+
+    const rediagnosed = harness.waitForDiagnosticsMatching(
+      schemaUri,
+      (diagnostics) => diagnostics.length > 0,
+    );
+    openDocument(harness, schemaUri, duplicateModelSource, 2);
+    await rediagnosed;
+    expect(configResolutionMock.resolveConfigInputs).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the project while another open input remains', async () => {
+    const schema2Path = join(root, 'schema2.psl');
+    const schema2Uri = pathToFileURL(schema2Path).toString();
+    harness = startHarness(async () => resolutionForInputs([schemaPath, schema2Path]));
+    await harness.initialize();
+    openDocument(harness, schemaUri, duplicateModelSource);
+    expect((await harness.waitForDiagnostics(schemaUri)).length).toBeGreaterThan(0);
+    openDocument(harness, schema2Uri, formattedPsl);
+    expect(await harness.waitForDiagnostics(schema2Uri)).toEqual([]);
+
+    const cleared = harness.waitForDiagnosticsMatching(
+      schema2Uri,
+      (diagnostics) => diagnostics.length === 0,
+    );
+    closeDocument(harness, schema2Uri);
+    await cleared;
+
+    await expect(requestSemanticTokens(harness, schemaUri)).resolves.not.toEqual({ data: [] });
+    expect(configResolutionMock.resolveConfigInputs).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reload a dropped project when its config changes', async () => {
+    harness = startHarness(resolveToSchema, watchedFilesCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, duplicateModelSource);
+    expect((await harness.waitForDiagnostics(schemaUri)).length).toBeGreaterThan(0);
+
+    const cleared = harness.waitForDiagnosticsMatching(
+      schemaUri,
+      (diagnostics) => diagnostics.length === 0,
+    );
+    closeDocument(harness, schemaUri);
+    await cleared;
+
+    harness.notifyConfigChanged();
+    await settle();
+    expect(configResolutionMock.resolveConfigInputs).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('language server preserved artifacts', { timeout: timeouts.databaseOperation }, () => {
   it('replaces the cached AST per URI on each edit while one symbol table tracks the project', async () => {
     harness = startHarness(resolveToSchema);

@@ -1,5 +1,5 @@
-import type { SymbolTable } from '@prisma-next/psl-parser';
-import type { DocumentAst, SourceFile } from '@prisma-next/psl-parser/syntax';
+import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
+import { type DocumentAst, parse, type SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { LspDiagnostic } from './diagnostic-mapping';
 import { computeDocumentDiagnostics } from './document-diagnostics';
 import type { PipelineInputs } from './pipeline';
@@ -9,11 +9,6 @@ export interface DocumentArtifacts {
   readonly document: DocumentAst;
   readonly sourceFile: SourceFile;
   readonly diagnostics: readonly LspDiagnostic[];
-  /**
-   * Built from this document alone — single-input by design; merging multiple
-   * inputs (and reading unopened ones from disk) is deferred cross-file work.
-   */
-  readonly symbolTable: SymbolTable;
 }
 
 export interface ProjectArtifactsOptions {
@@ -35,16 +30,30 @@ export interface ProjectArtifacts {
    * one of the project's configured inputs.
    */
   document(uri: string): DocumentArtifacts | undefined;
+  symbolTable(): SymbolTable;
   documentChanged(uri: string): void;
   documentClosed(uri: string): void;
 }
 
+// Doubles as the unset-slot sentinel and the type-totality safety net for
+// `symbolTable()`: unreachable as a returned value while the server drops a
+// project once its last open input closes (a live project always has an open
+// input for the walk to read). Kept total instead of throwing — this is not a
+// designed state.
+const emptySymbolTable: SymbolTable = (() => {
+  const { document, sourceFile } = parse('');
+  return buildSymbolTable({ document, sourceFile, scalarTypes: [], pslBlockDescriptors: {} }).table;
+})();
+
 export function createProjectArtifacts(options: ProjectArtifactsOptions): ProjectArtifacts {
   const { inputs, controlStack, getText } = options;
   const documents = new Map<string, DocumentArtifacts>();
+  let symbolTable = emptySymbolTable;
 
   function drop(uri: string): void {
-    documents.delete(uri);
+    if (documents.delete(uri)) {
+      symbolTable = emptySymbolTable;
+    }
   }
 
   function readDocument(uri: string): DocumentArtifacts | undefined {
@@ -64,14 +73,27 @@ export function createProjectArtifacts(options: ProjectArtifactsOptions): Projec
       document: computed.document,
       sourceFile: computed.sourceFile,
       diagnostics: computed.diagnostics,
-      symbolTable: computed.symbolTable,
     };
     documents.set(uri, artifacts);
+    // Single-input by design: the project table is rebuilt from the one open
+    // configured input; merging multiple inputs (and reading unopened ones
+    // from disk) is deferred cross-file work.
+    symbolTable = computed.symbolTable;
     return artifacts;
   }
 
   return {
     document: readDocument,
+    symbolTable: () => {
+      if (symbolTable === emptySymbolTable) {
+        for (const uri of inputs.uris()) {
+          if (readDocument(uri) !== undefined) {
+            break;
+          }
+        }
+      }
+      return symbolTable;
+    },
     documentChanged: drop,
     documentClosed: drop,
   };

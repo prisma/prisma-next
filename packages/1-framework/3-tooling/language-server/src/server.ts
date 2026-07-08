@@ -229,7 +229,15 @@ export function createServer(connection: Connection): LanguageServer {
             controlStack: resolution.controlStack,
             artifacts,
           };
-    projects.set(configPath, project);
+    // Register only while an open document is still associated with this
+    // config: a load that settles after the last association vanished (the
+    // document closed mid-load, or a reload left no managed inputs) must not
+    // keep a project entry alive.
+    if (hasManagedDocuments(configPath)) {
+      projects.set(configPath, project);
+    } else {
+      projects.delete(configPath);
+    }
     return project;
   }
 
@@ -333,7 +341,7 @@ export function createServer(connection: Connection): LanguageServer {
     const source = {
       document: artifacts.document,
       sourceFile: artifacts.sourceFile,
-      symbolTable: artifacts.symbolTable,
+      symbolTable: project.artifacts.symbolTable(),
       scalarTypes: project.controlStack.scalarTypes,
     };
     return buildSemanticTokens(source, range);
@@ -368,7 +376,7 @@ export function createServer(connection: Connection): LanguageServer {
           candidates: {
             scalarTypes: project.controlStack.scalarTypes,
             pslBlockDescriptors: project.controlStack.pslBlockDescriptors,
-            symbolTable: artifacts.symbolTable,
+            symbolTable: project.artifacts.symbolTable(),
           },
           clientSupportsSnippets: clientCapabilities.completionSnippets,
         }),
@@ -435,11 +443,17 @@ export function createServer(connection: Connection): LanguageServer {
       params.changes.map((change) => filePathFromUri(change.uri)),
     );
     for (const configPath of changedConfigPaths) {
-      try {
-        await refreshProject(configPath);
-      } catch {
-        stopManagingProject(configPath);
-        continue;
+      // Only live (or currently loading) projects are refreshed eagerly, so a
+      // config change cannot resurrect a project dropped when its last input
+      // closed; a config that newly gains an open input is still picked up
+      // lazily below through per-document rediscovery.
+      if (projects.has(configPath) || projectLoads.has(configPath)) {
+        try {
+          await refreshProject(configPath);
+        } catch {
+          stopManagingProject(configPath);
+          continue;
+        }
       }
       if (!clientCapabilities.pullDiagnostics) {
         await republishOpenDocumentsForConfig(configPath);
@@ -501,8 +515,15 @@ export function createServer(connection: Connection): LanguageServer {
   });
   documents.onDidClose((event) => {
     const uri = event.document.uri;
+    const configPath = documentConfigPaths.get(uri);
     artifactsForDocument(uri)?.documentClosed(uri);
     documentConfigPaths.delete(uri);
+    // A live project always has at least one open input; when the last one
+    // closes the project is dropped, and a reopen re-resolves and reloads the
+    // config from scratch.
+    if (configPath !== undefined && !hasManagedDocuments(configPath)) {
+      projects.delete(configPath);
+    }
     if (!clientCapabilities.pullDiagnostics) {
       sendDiagnostics({ uri, diagnostics: [] });
     }
@@ -516,13 +537,24 @@ export function createServer(connection: Connection): LanguageServer {
     return configPath === undefined ? undefined : projects.get(configPath)?.artifacts;
   }
 
+  function hasManagedDocuments(configPath: string): boolean {
+    for (const managedConfigPath of documentConfigPaths.values()) {
+      if (managedConfigPath === configPath) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   return {
     dispose: () => {
       disposed = true;
       connection.dispose();
     },
     getDocumentAst: (uri) => artifactsForDocument(uri)?.document(uri),
-    getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.document(uri)?.symbolTable,
+    // `| undefined` only because the uri may be unmanaged (closed, non-input,
+    // or projectless); a managed document's project always yields a table.
+    getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.symbolTable(),
   };
 }
 
