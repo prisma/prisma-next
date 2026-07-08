@@ -61,12 +61,28 @@ interface ProjectState {
   readonly artifacts: ProjectArtifacts;
 }
 
+/**
+ * One entry per managed config: either the load in flight or the loaded
+ * project — never both, never a settled load without an entry decision.
+ */
+type ManagedProject =
+  | {
+      readonly status: 'loading';
+      readonly load: Promise<ProjectState>;
+      /**
+       * Whether a loaded project existed when this load (chain) began — a
+       * failed reload must still clear the markers push clients were shown,
+       * while a failed first load must not publish anything.
+       */
+      readonly hadLoadedProject: boolean;
+    }
+  | { readonly status: 'loaded'; readonly project: ProjectState };
+
 const semanticTokenSourceLimit = 100_000;
 
 export function createServer(connection: Connection): LanguageServer {
   const documents = new TextDocuments(TextDocument);
-  const projects = new Map<string, ProjectState>();
-  const projectLoads = new Map<string, Promise<ProjectState>>();
+  const managedProjects = new Map<string, ManagedProject>();
   const documentConfigPaths = new Map<string, string>();
   let rootPath = process.cwd();
   let watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
@@ -177,33 +193,53 @@ export function createServer(connection: Connection): LanguageServer {
   }
 
   async function resolveProject(configPath: string): Promise<ProjectState> {
-    const existing = projects.get(configPath);
-    if (existing !== undefined) {
-      return existing;
+    const entry = managedProjects.get(configPath);
+    if (entry === undefined) {
+      return startProjectLoad(configPath);
     }
-    const existingLoad = projectLoads.get(configPath);
-    if (existingLoad !== undefined) {
-      return existingLoad;
-    }
-    return queueProjectLoad(configPath);
+    return entry.status === 'loaded' ? entry.project : entry.load;
   }
 
   function refreshProject(configPath: string): Promise<ProjectState> {
-    return queueProjectLoad(configPath);
+    return startProjectLoad(configPath);
   }
 
-  function queueProjectLoad(configPath: string): Promise<ProjectState> {
-    const previousLoad = projectLoads.get(configPath) ?? Promise.resolve();
-    const load = previousLoad
+  // A load replaces the entry with `loading` immediately, so reads during a
+  // config reload await the fresh resolution instead of the pre-reload
+  // project; a load requested while another is in flight chains behind it.
+  // A failed load leaves its entry in place — every awaiter funnels the
+  // failure into `stopManagingProject`, which needs the entry to decide
+  // whether push clears are owed.
+  function startProjectLoad(configPath: string): Promise<ProjectState> {
+    const existing = managedProjects.get(configPath);
+    const previousLoad = existing?.status === 'loading' ? existing.load : undefined;
+    const hadLoadedProject =
+      existing?.status === 'loaded' ||
+      (existing?.status === 'loading' && existing.hadLoadedProject);
+    const load: Promise<ProjectState> = (previousLoad ?? Promise.resolve(undefined))
       .catch(() => undefined)
       .then(() => loadProject(configPath))
-      .finally(() => {
-        if (projectLoads.get(configPath) === load) {
-          projectLoads.delete(configPath);
+      .then((project) => {
+        // Settle only if this load is still the current entry (a newer reload
+        // or a drop supersedes it), and only while an open document is still
+        // associated with the config — a load that outlives the last
+        // association must not keep a project entry alive.
+        if (isCurrentLoad(configPath, load)) {
+          if (hasManagedDocuments(configPath)) {
+            managedProjects.set(configPath, { status: 'loaded', project });
+          } else {
+            managedProjects.delete(configPath);
+          }
         }
+        return project;
       });
-    projectLoads.set(configPath, load);
+    managedProjects.set(configPath, { status: 'loading', load, hadLoadedProject });
     return load;
+  }
+
+  function isCurrentLoad(configPath: string, load: Promise<ProjectState>): boolean {
+    const entry = managedProjects.get(configPath);
+    return entry?.status === 'loading' && entry.load === load;
   }
 
   async function loadProject(configPath: string): Promise<ProjectState> {
@@ -231,20 +267,14 @@ export function createServer(connection: Connection): LanguageServer {
             controlStack: resolution.controlStack,
             artifacts,
           };
-    // Register only while an open document is still associated with this
-    // config: a load that settles after the last association vanished (the
-    // document closed mid-load, or a reload left no managed inputs) must not
-    // keep a project entry alive.
-    if (hasManagedDocuments(configPath)) {
-      projects.set(configPath, project);
-    } else {
-      projects.delete(configPath);
-    }
     return project;
   }
 
   function stopManagingProject(configPath: string): void {
-    const hadProject = projects.delete(configPath);
+    const entry = managedProjects.get(configPath);
+    const hadProject =
+      entry?.status === 'loaded' || (entry?.status === 'loading' && entry.hadLoadedProject);
+    managedProjects.delete(configPath);
     for (const document of documents.all()) {
       if (documentConfigPaths.get(document.uri) === configPath) {
         documentConfigPaths.delete(document.uri);
@@ -449,7 +479,7 @@ export function createServer(connection: Connection): LanguageServer {
       // config change cannot resurrect a project dropped when its last input
       // closed; a config that newly gains an open input is still picked up
       // lazily below through per-document rediscovery.
-      if (projects.has(configPath) || projectLoads.has(configPath)) {
+      if (managedProjects.has(configPath)) {
         try {
           await refreshProject(configPath);
         } catch {
@@ -536,7 +566,11 @@ export function createServer(connection: Connection): LanguageServer {
 
   function artifactsForDocument(uri: string): ProjectArtifacts | undefined {
     const configPath = documentConfigPaths.get(uri);
-    return configPath === undefined ? undefined : projects.get(configPath)?.artifacts;
+    if (configPath === undefined) {
+      return undefined;
+    }
+    const entry = managedProjects.get(configPath);
+    return entry?.status === 'loaded' ? entry.project.artifacts : undefined;
   }
 
   function hasManagedDocuments(configPath: string): boolean {
@@ -548,9 +582,14 @@ export function createServer(connection: Connection): LanguageServer {
     return false;
   }
 
+  // Deletes only loaded entries: an in-flight load settles through the
+  // association check in startProjectLoad and cleans up after itself.
   function dropProjectWithoutManagedDocuments(configPath: string): void {
-    if (!hasManagedDocuments(configPath)) {
-      projects.delete(configPath);
+    if (hasManagedDocuments(configPath)) {
+      return;
+    }
+    if (managedProjects.get(configPath)?.status === 'loaded') {
+      managedProjects.delete(configPath);
     }
   }
 

@@ -1446,6 +1446,33 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
     expect(resolvedConfigs).toEqual([childConfigPath]);
   });
 
+  it('serves reads during a config reload from the fresh resolution', async () => {
+    const { source, position } = sourceWithCursor(
+      ['model User {', '  id Int @id', '}', '', 'model Post {', '  author |', '}'].join('\n'),
+    );
+    const refreshLoad = controlledPromise();
+    let loadCount = 0;
+    const resolveInputs: ResolveInputs = async () => {
+      loadCount += 1;
+      if (loadCount === 1) {
+        return resolutionForInputs([schemaPath]);
+      }
+      await refreshLoad.promise;
+      return emptyResolution();
+    };
+    harness = startHarness(resolveInputs, watchedFilesCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, source);
+    await harness.waitForDiagnostics(schemaUri);
+
+    harness.notifyConfigChanged();
+    const completion = requestCompletion(harness, schemaUri, position);
+    await settle();
+    refreshLoad.resolve();
+
+    expect(completionItems(await completion)).toEqual([]);
+  });
+
   it('queues project refreshes behind in-flight project loads', async () => {
     const projectRoot = join(root, 'queued-load-project');
     const projectConfigPath = join(projectRoot, 'prisma-next.config.ts');
