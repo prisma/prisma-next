@@ -9,35 +9,16 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlDiffSchemaForVerdict } from '@prisma-next/family-sql/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlColumnIR, SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchemaByDiff } from '../src/core/diff/schema-diff-verify';
 import { createTestContract } from './schema-verify.helpers';
 
-/** An expected flat tree whose one table is stamped with a control policy. */
-function expectedRootWithPolicy(control: 'observed' | 'managed'): SqlSchemaIR {
-  return new SqlSchemaIR({
-    tables: {
-      user: new SqlTableIR({
-        name: 'user',
-        columns: {
-          email: new SqlColumnIR({ name: 'email', nativeType: 'text', nullable: false }),
-        },
-        foreignKeys: [],
-        uniques: [],
-        indexes: [],
-        controlPolicy: control,
-      }),
-    },
-  });
-}
-
 /**
  * A stub target diff: the live DB is missing the `user.email` column, so the
- * differ emits one `not-found` issue whose subject table carries `control`.
+ * differ emits one `not-found` issue whose subject table resolves to `control`.
  */
 function stubDiff(control: 'observed' | 'managed'): SqlDiffSchemaForVerdict {
-  const expectedRoot = expectedRootWithPolicy(control);
   return () => ({
     issues: [
       {
@@ -47,7 +28,7 @@ function stubDiff(control: 'observed' | 'managed'): SqlDiffSchemaForVerdict {
         expected: new SqlColumnIR({ name: 'email', nativeType: 'text', nullable: false }),
       },
     ],
-    expectedRoot,
+    resolveControlPolicy: () => control,
     namespacePairs: [],
   });
 }

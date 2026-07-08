@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { SqlSchemaDiffForVerdict } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
 import { resolveSemanticSatisfaction } from '@prisma-next/family-sql/diff';
@@ -15,6 +15,7 @@ import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-sch
 import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
+import { resolvePostgresNodeIssueControlPolicySubject } from './control-policy';
 
 function ownedSchemaNames(expected: PostgresDatabaseSchemaNode): ReadonlySet<string> {
   const policyNamespaces = Object.values(expected.namespaces).flatMap((ns) =>
@@ -106,10 +107,28 @@ function pruneTableLessNamespaces(
 }
 
 /**
+ * Resolves a verdict-diff issue's subject table's declared control policy
+ * directly from the contract, by delegating to the same node-typed resolver
+ * ({@link resolvePostgresNodeIssueControlPolicySubject}) the planner uses to
+ * gate DDL calls. `undefined` when the issue resolves to no contract table.
+ */
+function resolveControlPolicy(
+  issue: SchemaDiffIssue,
+  contract: Contract<SqlStorage>,
+): ControlPolicy | undefined {
+  const nodeIssue = blindCast<
+    SchemaDiffIssue<SqlSchemaDiffNode>,
+    'every node in a Postgres schema diff tree is a SqlSchemaDiffNode'
+  >(issue);
+  return resolvePostgresNodeIssueControlPolicySubject(nodeIssue, contract)
+    ?.explicitNodeControlPolicy;
+}
+
+/**
  * The Postgres full-tree node diff for the family verify verdict: derive
  * the expected tree (resolved leaf values, expander threaded, FK schemas
- * resolved, table control policies stamped, table-less namespaces pruned),
- * normalize the actual tree for semantic satisfaction, run the generic
+ * resolved, table-less namespaces pruned), normalize the actual tree for
+ * semantic satisfaction, run the generic
  * differ, and scope out `not-expected` findings under namespaces the
  * contract does not own. Ownership is role-aware, mirroring the legacy
  * decomposition: relational extras check the PRUNED owned set (the legacy
@@ -156,7 +175,11 @@ export function diffPostgresSchemaForVerdict(input: {
   const namespacePairs = Object.values(expected.namespaces).map((ns) => ({
     actual: actual.namespaces[ns.schemaName],
   }));
-  return { issues, expectedRoot: expected, namespacePairs };
+  return {
+    issues,
+    resolveControlPolicy: (issue) => resolveControlPolicy(issue, postgresContract),
+    namespacePairs,
+  };
 }
 
 /**

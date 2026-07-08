@@ -1,4 +1,3 @@
-import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import {
@@ -14,7 +13,7 @@ import {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import type { PostgresPolicySchemaNode } from './postgres-policy-schema-node';
-import { PostgresSchemaNodeKind } from './schema-node-kinds';
+import { PostgresSchemaNodeKind, postgresNodeRole } from './schema-node-kinds';
 
 export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
   readonly policies?: readonly PostgresPolicySchemaNode[];
@@ -42,7 +41,7 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
   override readonly nodeKind = PostgresSchemaNodeKind.table;
 
   override get diffRole(): SqlSchemaDiffRole {
-    return 'table';
+    return postgresNodeRole(this.nodeKind);
   }
   readonly name: string;
   readonly columns: Readonly<Record<string, SqlColumnIR>>;
@@ -52,7 +51,6 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
   declare readonly primaryKey?: PrimaryKey;
   declare readonly annotations?: SqlAnnotations;
   declare readonly checks?: ReadonlyArray<SqlCheckConstraintIR>;
-  declare readonly controlPolicy?: ControlPolicy;
   readonly policies: readonly PostgresPolicySchemaNode[];
 
   constructor(input: PostgresTableSchemaNodeInput) {
@@ -89,7 +87,6 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
         ),
       );
     }
-    if (input.controlPolicy !== undefined) this.controlPolicy = input.controlPolicy;
     this.policies = Object.freeze([...(input.policies ?? [])]);
     freezeNode(this);
   }

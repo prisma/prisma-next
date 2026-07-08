@@ -313,9 +313,6 @@ function convertTable(
     uniques: table.uniques.map(convertUnique),
     indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
     ...ifDefined('checks', checks),
-    // The raw declared policy (not the resolved effective one): verify's
-    // post-diff filter resolves it against the contract default per issue.
-    ...ifDefined('controlPolicy', table.control),
   });
 }
 

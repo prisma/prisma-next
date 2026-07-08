@@ -1,5 +1,5 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
-import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaDiffRole, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 
 /**
  * A Postgres schema-diff-tree node: a `SqlSchemaIRNode` that also implements
@@ -26,3 +26,22 @@ export const PostgresSchemaNodeKind = {
 
 export type PostgresSchemaNodeKind =
   (typeof PostgresSchemaNodeKind)[keyof typeof PostgresSchemaNodeKind];
+
+/**
+ * The one real map from a Postgres-specific `nodeKind` to its
+ * {@link SqlSchemaDiffRole} — each `Postgres*SchemaNode`'s `diffRole` getter
+ * dispatches on `nodeKind` equality against this map (never a
+ * `nodeKind`-suffix string match).
+ */
+const POSTGRES_NODE_ROLES: Readonly<Record<PostgresSchemaNodeKind, SqlSchemaDiffRole>> = {
+  [PostgresSchemaNodeKind.database]: 'structural',
+  [PostgresSchemaNodeKind.namespace]: 'namespace',
+  [PostgresSchemaNodeKind.table]: 'table',
+  [PostgresSchemaNodeKind.policy]: 'structural',
+  [PostgresSchemaNodeKind.role]: 'structural',
+};
+
+/** Looks up the declared role for a Postgres-specific `nodeKind`. */
+export function postgresNodeRole(nodeKind: PostgresSchemaNodeKind): SqlSchemaDiffRole {
+  return POSTGRES_NODE_ROLES[nodeKind];
+}

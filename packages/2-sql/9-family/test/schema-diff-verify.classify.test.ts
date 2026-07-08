@@ -5,7 +5,6 @@ import {
   SqlCheckConstraintIR,
   SqlColumnIR,
   SqlIndexIR,
-  SqlSchemaIR,
   SqlSchemaIRNode,
   SqlTableIR,
 } from '@prisma-next/sql-schema-ir/types';
@@ -88,12 +87,10 @@ describe('classifySqlDiffIssue keys on diffRole', () => {
 });
 
 describe('strict gating keys on diffRole', () => {
-  const expectedRoot = new SqlSchemaIR({ tables: {} });
-
   function verdictFor(node: DiffableNode, strict: boolean) {
     return computeSqlDiffVerdict({
       issues: [issueOf('not-expected', node)],
-      expectedRoot,
+      resolveControlPolicy: () => undefined,
       strict,
       defaultControlPolicy: undefined,
     });

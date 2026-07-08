@@ -363,7 +363,7 @@ export interface MigrationRunnerExecutionChecks {
 /**
  * Namespace-qualified identity of a live storage entity, for an ownership
  * query. A bare entity name is not a unique identity across namespaces (two
- * namespaces can each declare a table of the same name), so ownership is
+ * namespaces can each declare an entity of the same name), so ownership is
  * always asked per `(namespaceId, entityName)` pair.
  */
 export interface SchemaOwnershipCoordinate {

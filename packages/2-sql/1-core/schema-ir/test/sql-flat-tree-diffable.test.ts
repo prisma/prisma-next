@@ -54,17 +54,4 @@ describe('flat tree diffability (SqlSchemaIR / SqlTableIR)', () => {
     expect(table.isEqualTo(sameName)).toBe(true);
     expect(table.isEqualTo(otherName)).toBe(false);
   });
-
-  it('SqlTableIR carries the stamped controlPolicy', () => {
-    const withPolicy = new SqlTableIR({
-      name: 't',
-      columns: {},
-      foreignKeys: [],
-      uniques: [],
-      indexes: [],
-      controlPolicy: 'observed',
-    });
-    expect(withPolicy.controlPolicy).toBe('observed');
-    expect(table.controlPolicy).toBeUndefined();
-  });
 });

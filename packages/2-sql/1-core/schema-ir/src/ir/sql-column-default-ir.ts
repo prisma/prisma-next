@@ -4,7 +4,7 @@ import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { resolvedDefaultsEqual } from './resolved-default-equality';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
-import { defineNonEnumerable, type SqlSchemaDiffRole, SqlSchemaIRNode } from './sql-schema-ir-node';
+import { defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface SqlColumnDefaultIRInput {
   /** Structured resolved default (contract-declared or normalizer-parsed). */
@@ -41,9 +41,6 @@ export interface SqlColumnDefaultIRInput {
 export class SqlColumnDefaultIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.columnDefault;
 
-  override get diffRole(): SqlSchemaDiffRole {
-    return 'auxiliary';
-  }
   declare readonly resolved?: ColumnDefault;
   declare readonly raw?: string;
   declare readonly nativeTypeContext?: string;

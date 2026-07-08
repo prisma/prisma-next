@@ -28,12 +28,12 @@ function pathIsUnder(path: readonly string[], prefix: readonly string[]): boolea
 }
 
 /**
- * Whether an issue's subject is a WHOLE top-level entity (a table, a Mongo
- * collection) rather than something nested under one (a column, an index, an
- * RLS policy). Families that declare a `diffRole` discriminant (SQL) answer
- * via the node's own role; families without one (Mongo) answer via `path`
- * shape — a top-level Mongo path is exactly the collection's own name (one
- * segment), so anything deeper is nested.
+ * Whether an issue's subject is a WHOLE top-level entity — as opposed to
+ * something nested under one (e.g. a field, an index, or a policy).
+ * Families that declare a `diffRole` discriminant answer via the node's own
+ * role; families without one answer via `path` shape instead — their
+ * top-level entity's path is exactly its own name (one segment), so
+ * anything deeper is nested.
  */
 function isWholeEntityIssue(issue: SchemaDiffIssue): boolean {
   const role = issueNodeRole(issue);
@@ -43,13 +43,13 @@ function isWholeEntityIssue(issue: SchemaDiffIssue): boolean {
 
 /**
  * A contract space's contract-satisfaction view. Strips the top-level entity
- * extras — the `not-expected` findings on table-role nodes (plus the
- * findings the differ's total descent reported under those tables). Those
+ * extras — the `not-expected` findings on whole-entity nodes (plus the
+ * findings the differ's total descent reported under those entities). Those
  * belong to the standalone unclaimed-elements list
- * ({@link collectExtraElementNames}), never a space's own verdict.
+ * ({@link collectExtraElementCoordinates}), never a space's own verdict.
  *
- * Nested `not-expected` findings (an extra column on the space's own
- * declared table…) and structural findings (an undeclared RLS policy) are
+ * Nested `not-expected` findings (an extra field on the space's own
+ * declared entity…) and structural findings (an undeclared policy) are
  * the space's **own drift** and stay.
  *
  * The verdict recomputes from the surviving list: the per-space result is
@@ -87,20 +87,20 @@ export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDa
 
 /**
  * The namespace-qualified coordinate a `not-expected` `SchemaDiffIssue`
- * addresses, when its subject is a whole top-level entity. A nested leaf (a
- * column, an index, an RLS policy on an undeclared table) has no entity of
+ * addresses, when its subject is a whole top-level entity. A nested leaf
+ * (a field, an index, a policy on an undeclared entity) has no entity of
  * its own to report here.
  *
  * A `diffRole`-declaring family's whole-entity node names itself (its diff id
- * is the entity name); a family with no such discriminant (Mongo) has no node
- * to read at all for a bare coordinate finding, so the path itself — already
+ * is the entity name); a family with no such discriminant has no node to
+ * read at all for a bare coordinate finding, so the path itself — already
  * exactly the entity name at this depth — is the answer. The namespace
- * segment only exists for namespace-qualified (Postgres-shaped) paths
- * (`['database', namespaceId, tableName]`); single-namespace families
- * (SQLite's flat `['database', tableName]`, Mongo's bare `[collectionName]`)
- * have no separate segment, so every entity they declare implicitly shares
- * one namespace — the same sentinel the aggregate's own coordinate walk
- * uses for those families.
+ * segment only exists for namespace-qualified paths
+ * (`['database', namespaceId, entityName]`); single-namespace families
+ * (a flat `['database', entityName]`, or a bare `[entityName]`) have no
+ * separate segment, so every entity they declare implicitly shares one
+ * namespace — the same sentinel the aggregate's own coordinate walk uses
+ * for those families.
  */
 function schemaDiffIssueCoordinate(issue: SchemaDiffIssue): SchemaOwnershipCoordinate | undefined {
   if (!isWholeEntityIssue(issue)) return undefined;

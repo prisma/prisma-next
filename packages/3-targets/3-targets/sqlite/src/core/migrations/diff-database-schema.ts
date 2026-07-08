@@ -1,4 +1,4 @@
-import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
+import type { ColumnDefault, Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { NativeTypeExpander, SqlSchemaDiffForVerdict } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander, contractToSchemaIR } from '@prisma-next/family-sql/control';
 import {
@@ -12,7 +12,8 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { diffSchemas } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
+import { entityAt } from '@prisma-next/framework-components/ir';
+import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type {
   SqlColumnIRInput,
   SqlSchemaIRInput,
@@ -83,6 +84,31 @@ export function verifySqliteDatabaseSchema(
 }
 
 /**
+ * Resolves a verdict-diff issue's subject table's declared control policy
+ * directly from the contract. SQLite's expected tree is flat, so the issue
+ * path carries no namespace segment — `path[1]` is the table name (`path[0]`
+ * is the tree root's own id); every contract namespace is searched for that
+ * table name (table names are globally unique in the flat tree — duplicates
+ * across namespaces are rejected earlier, at `contractToSchemaIR`).
+ */
+function resolveControlPolicy(
+  issue: SchemaDiffIssue,
+  contract: Contract<SqlStorage>,
+): ControlPolicy | undefined {
+  const tableName = issue.path[1];
+  if (tableName === undefined) return undefined;
+  for (const namespaceId of Object.keys(contract.storage.namespaces)) {
+    const table = entityAt<StorageTable>(contract.storage, {
+      namespaceId,
+      entityKind: 'table',
+      entityName: tableName,
+    });
+    if (table !== undefined) return table.control;
+  }
+  return undefined;
+}
+
+/**
  * The SQLite full-tree node diff for the family verify verdict: derive the
  * expected flat tree with resolved leaf values (expander threaded so
  * parameterized types compare expanded), neutralize the FK schema segment
@@ -119,7 +145,7 @@ export function diffSqliteSchemaForVerdict(input: {
   );
   return {
     issues,
-    expectedRoot: expected,
+    resolveControlPolicy: (issue) => resolveControlPolicy(issue, input.contract),
     namespacePairs: namespacesWithTables.map(() => ({ actual })),
   };
 }

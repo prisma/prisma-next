@@ -17,7 +17,6 @@ import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
-  DiffableNode,
   SchemaDiffIssue,
   VerifierIssueCategory,
   VerifierOutcome,
@@ -189,39 +188,14 @@ function isStrictOnlyExtra(issue: SchemaDiffIssue): boolean {
 }
 
 // ============================================================================
-// Control-policy resolution — walk the expected tree along the issue path
-// ============================================================================
-
-function tableControlPolicyForPath(
-  expectedRoot: DiffableNode,
-  path: readonly string[],
-): ControlPolicy | undefined {
-  let current: DiffableNode | undefined = expectedRoot;
-  let policy: ControlPolicy | undefined;
-  // path[0] is the root's own id.
-  for (const segment of path.slice(1)) {
-    current = current?.children().find((child) => child.id === segment);
-    if (current === undefined) break;
-    const stamped = blindCast<
-      { readonly controlPolicy?: ControlPolicy },
-      'structural read of the optional controlPolicy field derivation stamps on expected table nodes'
-    >(current).controlPolicy;
-    if (stamped !== undefined) {
-      policy = stamped;
-    }
-  }
-  return policy;
-}
-
-// ============================================================================
 // The post-diff filter + verdict
 // ============================================================================
 
 export interface SqlDiffVerdictInput {
   /** The full, ownership-scoped diff issue list from the target's differ. */
   readonly issues: readonly SchemaDiffIssue[];
-  /** The expected tree the diff ran over (control-policy resolution). */
-  readonly expectedRoot: DiffableNode;
+  /** Resolves a diff issue's subject table's declared control policy directly from the contract. */
+  readonly resolveControlPolicy: (issue: SchemaDiffIssue) => ControlPolicy | undefined;
   readonly strict: boolean;
   readonly defaultControlPolicy: ControlPolicy | undefined;
 }
@@ -245,7 +219,7 @@ export function computeSqlDiffVerdict(input: SqlDiffVerdictInput): SqlDiffVerdic
     if (!input.strict && issue.reason === 'not-expected' && isStrictOnlyExtra(issue)) {
       continue;
     }
-    const tablePolicy = tableControlPolicyForPath(input.expectedRoot, issue.path);
+    const tablePolicy = input.resolveControlPolicy(issue);
     const policy = effectiveControlPolicy(tablePolicy, input.defaultControlPolicy);
     const disposition: VerifierOutcome = dispositionForCategory(
       policy,
@@ -347,7 +321,7 @@ export function verifySqlSchemaByDiff(
   });
   const diffVerdict = computeSqlDiffVerdict({
     issues: verdictDiff.issues,
-    expectedRoot: verdictDiff.expectedRoot,
+    resolveControlPolicy: verdictDiff.resolveControlPolicy,
     strict: input.strict,
     defaultControlPolicy: input.contract.defaultControlPolicy,
   });
@@ -468,7 +442,6 @@ export function neutralizeFlatExpectedFkSchemas(expected: SqlSchemaIR): SqlSchem
       ...(table.primaryKey !== undefined ? { primaryKey: table.primaryKey } : {}),
       ...(table.annotations !== undefined ? { annotations: table.annotations } : {}),
       ...(table.checks !== undefined ? { checks: table.checks } : {}),
-      ...(table.controlPolicy !== undefined ? { controlPolicy: table.controlPolicy } : {}),
     });
   }
   return new SqlSchemaIR({

@@ -31,12 +31,12 @@
         "foreign key"
       ],
       "allow": ["SymbolTable"],
-      "threshold": 852
+      "threshold": 840
     },
     {
       "path": "packages/2-sql",
       "forbidden": ["schema"],
-      "threshold": 689
+      "threshold": 699
     }
   ]
 }

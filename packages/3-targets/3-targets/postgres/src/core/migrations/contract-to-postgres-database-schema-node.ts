@@ -116,7 +116,6 @@ export function contractToPostgresDatabaseSchemaNode(
         ...ifDefined('primaryKey', sqlTable.primaryKey),
         ...ifDefined('annotations', sqlTable.annotations),
         ...ifDefined('checks', sqlTable.checks),
-        ...ifDefined('controlPolicy', sqlTable.controlPolicy),
         policies: policiesByTable.get(tableName) ?? [],
       });
     }

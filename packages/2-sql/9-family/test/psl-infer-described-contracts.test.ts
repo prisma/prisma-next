@@ -15,7 +15,7 @@ import {
 } from '@prisma-next/framework-components/psl-ast';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
-import { type SqlSchemaDiffRole, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
@@ -37,7 +37,6 @@ const SYNTHETIC_SPAN: PslSpan = {
  */
 class TestSchemaTree extends SqlSchemaIRNode {
   override readonly nodeKind = 'sql-schema';
-  override readonly diffRole: SqlSchemaDiffRole = 'structural';
 
   constructor(readonly appTables: readonly string[]) {
     super();

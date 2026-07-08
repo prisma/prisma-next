@@ -1,18 +1,7 @@
 import { IRNodeBase } from '@prisma-next/framework-components/ir';
+import { relationalNodeRole, type SqlSchemaDiffRole } from './schema-node-kinds';
 
-/**
- * Declared verdict-classification role of a schema-diff node — the
- * discriminant the SQL family's post-diff filters key on (issue category
- * and strict-mode gating), independent of the node's `nodeKind` spelling:
- *
- * - `namespace` / `table`: extras are `extraTopLevelObject`, strict-only.
- * - `column`: extras are `extraNestedElement`, strict-only.
- * - `auxiliary`: constraints, indexes, defaults — extras are
- *   `extraAuxiliary`, strict-only.
- * - `structural`: tree roots and structurally-diffed leaves (RLS policies,
- *   roles) — extras fail in every mode; never strict-gated.
- */
-export type SqlSchemaDiffRole = 'namespace' | 'table' | 'column' | 'auxiliary' | 'structural';
+export type { SqlSchemaDiffRole } from './schema-node-kinds';
 
 /**
  * SQL Schema IR node base. Carries the family-level
@@ -49,12 +38,18 @@ export abstract class SqlSchemaIRNode extends IRNodeBase {
   abstract readonly nodeKind: string;
 
   /**
-   * Declared {@link SqlSchemaDiffRole}. Every concretion states its role
-   * explicitly — verdict logic dispatches on this, never on the `nodeKind`
-   * spelling. Implemented as a getter so it stays off the instance
-   * (invisible to spreads, `Object.keys`, and JSON), unlike `nodeKind`.
+   * {@link SqlSchemaDiffRole}, resolved from `nodeKind` via the one real map
+   * in `relationalNodeRole` — verdict logic dispatches on this, never on the
+   * `nodeKind` spelling and never via a hand-written per-class return.
+   * Implemented as a getter so it stays off the instance (invisible to
+   * spreads, `Object.keys`, and JSON), unlike `nodeKind`. Target-specific
+   * concretions whose `nodeKind` is outside the relational vocabulary (e.g.
+   * Postgres's namespace/table/policy/role) override this with their own
+   * map lookup.
    */
-  abstract readonly diffRole: SqlSchemaDiffRole;
+  get diffRole(): SqlSchemaDiffRole {
+    return relationalNodeRole(this.nodeKind);
+  }
 
   constructor() {
     super();

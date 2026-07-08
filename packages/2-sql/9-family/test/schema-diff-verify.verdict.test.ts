@@ -12,10 +12,12 @@
  * `computeSqlDiffVerdict` + `computeStorageTypeVerdict`.
  */
 
-import type { ColumnDefault, ControlPolicy } from '@prisma-next/contract/types';
+import type { ColumnDefault, Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas } from '@prisma-next/framework-components/control';
+import { entityAt } from '@prisma-next/framework-components/ir';
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { extractCodecControlHooks } from '../src/core/assembly';
@@ -91,6 +93,28 @@ interface VerdictRun {
   readonly warnings: readonly SchemaDiffIssue[];
 }
 
+/**
+ * Resolves a verdict-diff issue's subject table's declared control policy
+ * directly from the contract — mirrors the flat-tree resolution
+ * `diffSqliteSchemaForVerdict` performs for the real SQLite target.
+ */
+function resolveControlPolicy(
+  issue: SchemaDiffIssue,
+  contract: Contract<SqlStorage>,
+): ControlPolicy | undefined {
+  const tableName = issue.path[1];
+  if (tableName === undefined) return undefined;
+  for (const namespaceId of Object.keys(contract.storage.namespaces)) {
+    const table = entityAt<StorageTable>(contract.storage, {
+      namespaceId,
+      entityKind: 'table',
+      entityName: tableName,
+    });
+    if (table !== undefined) return table.control;
+  }
+  return undefined;
+}
+
 function runVerdict(options: {
   readonly contract: ReturnType<typeof createTestContract>;
   readonly schema: SqlSchemaIR;
@@ -106,7 +130,7 @@ function runVerdict(options: {
   const issues = diffSchemas(expected, actual);
   const diffVerdict = computeSqlDiffVerdict({
     issues,
-    expectedRoot: expected,
+    resolveControlPolicy: (issue) => resolveControlPolicy(issue, options.contract),
     strict: options.strict,
     defaultControlPolicy: options.contract.defaultControlPolicy,
   });
@@ -755,13 +779,13 @@ describe('differ verdict — check constraints', () => {
     expect(liveOnlyCheckIssues[0]?.reason).toBe('not-expected');
     const strictVerdict = computeSqlDiffVerdict({
       issues: liveOnlyCheckIssues,
-      expectedRoot: expectedNoChecks,
+      resolveControlPolicy: () => undefined,
       strict: true,
       defaultControlPolicy: undefined,
     });
     const lenientVerdict = computeSqlDiffVerdict({
       issues: liveOnlyCheckIssues,
-      expectedRoot: expectedNoChecks,
+      resolveControlPolicy: () => undefined,
       strict: false,
       defaultControlPolicy: undefined,
     });

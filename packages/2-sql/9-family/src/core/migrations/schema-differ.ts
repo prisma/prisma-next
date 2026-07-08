@@ -1,6 +1,6 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 
@@ -15,8 +15,15 @@ import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 export interface SqlSchemaDiffForVerdict {
   /** The full, ownership-scoped diff issue list. */
   readonly issues: readonly SchemaDiffIssue[];
-  /** The expected tree the diff ran over (control-policy path resolution). */
-  readonly expectedRoot: DiffableNode;
+  /**
+   * Resolves a diff issue's subject table's declared control policy directly
+   * from the contract (Decision 5's own-layer-per-concern discipline extends
+   * here too: control policy is a contract concern, resolved by the target
+   * at disposition time — never stamped on the diff node). `undefined`
+   * when the issue's path resolves to no contract table (a genuine orphan,
+   * or a non-table subject).
+   */
+  readonly resolveControlPolicy: (issue: SchemaDiffIssue) => ControlPolicy | undefined;
   /**
    * The expected/actual namespace-node pairs the codec `verifyType` hooks
    * run over — one per contract namespace with tables, paired by DDL
