@@ -16,7 +16,15 @@ function greenText(element: GreenElement): string {
 
 function parseArg(source: string) {
   const cursor = new Cursor(source);
-  const node = parseAttributeArg(cursor);
+  cursor.startNode('AttributeArgList');
+  parseAttributeArg(cursor);
+  const list = cursor.finishNode();
+  const node = list.children.find(
+    (child): child is GreenNode => child.type === 'node' && child.kind === 'AttributeArg',
+  );
+  if (node === undefined) {
+    throw new Error(`no AttributeArg parsed from ${JSON.stringify(source)}`);
+  }
   return { node, diagnostics: cursor.diagnostics };
 }
 
