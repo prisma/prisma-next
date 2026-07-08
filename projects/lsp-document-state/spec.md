@@ -15,11 +15,11 @@ didOpen /
 didChange  ──▶  mark the document dirty (evict its cache entry)  (cheap; no parse)
 
 read req   ──▶  await project load (only while uncached)      (async: config eval, cached)
-            ──▶  ensureCurrent(project, uri)                  (SYNC: reparse iff marked dirty)
+            ──▶  project.artifacts.document(uri)              (SYNC: reparses internally iff invalidated)
             ──▶  derive (completion / diagnostics / …)        (SYNC: no await before deriving)
 ```
 
-`ensureCurrent` is the one synchronous seam that turns the current `TextDocuments` text into the project's `SymbolTable` + per-document `CachedDocument`, and only when the document was marked dirty (opened, edited, or its config reloaded) since we last parsed. Every read feature consumes that one cache. A burst of keystrokes with no intervening read costs zero parses; a read after N edits costs one. Because the parse is synchronous CPU with no `await` between “get current text” and “derive”, the result is internally consistent for the buffer it ran against — which is exactly the synchronization the spec assumes — without snapshots or cancellation (rust-analyzer needs those only because its reads run on background threads; ours don't).
+The artifact store's read path is the one synchronous seam that turns the current `TextDocuments` text into the project's `SymbolTable` + per-document artifacts, and only when the document was invalidated (opened, edited, or its config reloaded) since we last parsed. Caching is fully encapsulated in `ProjectArtifacts`: the server raises domain events (document changed/closed, config reloaded) and reads artifacts back; whether and when parsing happens is the store's private concern. Every read feature consumes that one cache. A burst of keystrokes with no intervening read costs zero parses; a read after N edits costs one. Because the parse is synchronous CPU with no `await` between “get current text” and “derive”, the result is internally consistent for the buffer it ran against — which is exactly the synchronization the spec assumes — without snapshots or cancellation (rust-analyzer needs those only because its reads run on background threads; ours don't).
 
 Diagnostics move to the same philosophy: pull (`textDocument/diagnostic`) instead of push, so they too are computed on demand from the current cache rather than eagerly on every change. This is the standardized form of tsserver's `geterr` model.
 
@@ -42,7 +42,7 @@ Diagnostics move to the same philosophy: pull (`textDocument/diagnostic`) instea
 ## Cross-cutting requirements
 
 - A change notification only **invalidates**; it never parses. The single per-project artifact cache is the one source every read feature consumes — no feature keeps its own parse/token cache, and no read re-derives independently.
-- `ensureCurrent(project, uri)` is the only place raw text becomes derived state, it is **synchronous**, and it recomputes only when the document was marked dirty by one of the enumerated mutation points (didOpen, didChange, config/watched-file reload). A read of a clean document does zero parsing.
+- The project's `ProjectArtifacts` store is the only place raw text becomes derived state. Caching is fully encapsulated inside it: the server raises domain events (document changed/closed; a config reload rebuilds the store) and reads artifacts back; reads recompute internally, synchronously, only when a mutation event invalidated the document. No caching vocabulary appears in `server.ts`, and nothing outside the store can trigger a reparse except a text edit or a config change. A read of an untouched document does zero parsing.
 - Reads are correct under interleaving without snapshots/cancellation: there is no `await` between reading the current buffer text and deriving from it, so a derived result is always internally consistent for one version.
 - Asynchrony is confined to project/config resolution (cached per config, de-duped). Notification handlers stay fire-and-forget; the not-yet-loaded window is handled by **read handlers awaiting readiness**, never by trying to make a notification handler a barrier.
 - The defensive per-request reparse (`currentDocumentArtifact`) and whole-document text compare are removed; freshness is keyed on explicit dirty marks at the mutation points — didOpen, didChange, and config reload — the only handlers that can change what a parse would produce.
@@ -59,8 +59,8 @@ Diagnostics move to the same philosophy: pull (`textDocument/diagnostic`) instea
 ## Project Definition of Done
 
 - [ ] Team-DoD floor items (inherited from `drive/calibration/dod.md`).
-- [ ] `currentDocumentArtifact`, the per-request reparse, and the whole-document text compare are gone; all read handlers (completion, diagnostics, semantic tokens, folding) materialize state through a single synchronous `ensureCurrent` against the per-project cache.
-- [ ] `ensureCurrent` recomputes only when the document was marked dirty; a read of a clean document performs no parse (covered by a test).
+- [ ] `currentDocumentArtifact`, the per-request reparse, and the whole-document text compare are gone; all read handlers (completion, diagnostics, semantic tokens, folding) read through the per-project `ProjectArtifacts` store's single synchronous read path.
+- [ ] The artifact store recomputes only when a mutation event invalidated the document; a read of an untouched document performs no parse (covered by a test).
 - [ ] A change notification performs no parse; an edit→read sequence does no async work on the hot path once the project is cached (covered by a test, including the edit-then-immediate-completion case that motivated the original stale-buffer fix).
 - [ ] Diagnostics are served via `textDocument/diagnostic`, capability-gated, with push retained as fallback for clients lacking `textDocument.diagnostic`, and `workspace/diagnostic/refresh` issued on config/watched-file change when the client supports it.
 - [ ] `TextDocuments` is still the text mirror / lifecycle / version source; it was not removed.
