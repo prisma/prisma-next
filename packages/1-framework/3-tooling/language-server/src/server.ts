@@ -1,8 +1,8 @@
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findNearestConfigPathForFile } from '@prisma-next/config-loader';
 import type { SymbolTable } from '@prisma-next/psl-parser';
 import { type FormatOptions, format } from '@prisma-next/psl-parser/format';
+import { join } from 'pathe';
 import {
   type CompletionItem,
   type Connection,
@@ -389,7 +389,7 @@ export function createServer(connection: Connection): LanguageServer {
   }
 
   connection.onInitialize(async (params): Promise<InitializeResult> => {
-    rootPath = resolveRootPath(params.rootUri, params.rootPath);
+    rootPath = resolveRootPath(params);
     watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
     clientCapabilities = resolveClientCapabilities(params);
 
@@ -618,15 +618,18 @@ function resolveClientCapabilities(params: InitializeParams): ResolvedClientCapa
   };
 }
 
-function resolveRootPath(
-  rootUri: string | null | undefined,
-  rootPath: string | null | undefined,
-): string {
-  if (rootUri) {
-    return fileURLToPath(rootUri);
+function resolveRootPath(params: InitializeParams): string {
+  // Single-root scope: the first workspace folder wins; multi-root workspaces
+  // are out of scope. `rootUri` / `rootPath` are the deprecated fallbacks.
+  const workspaceFolder = params.workspaceFolders?.[0];
+  if (workspaceFolder !== undefined) {
+    return fileURLToPath(workspaceFolder.uri);
   }
-  if (rootPath) {
-    return rootPath;
+  if (params.rootUri) {
+    return fileURLToPath(params.rootUri);
+  }
+  if (params.rootPath) {
+    return params.rootPath;
   }
   return process.cwd();
 }

@@ -1,5 +1,4 @@
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
@@ -7,6 +6,7 @@ import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
 import type { FormatOptions } from '@prisma-next/psl-parser/format';
 import { type ParseDiagnostic, parse } from '@prisma-next/psl-parser/syntax';
 import { timeouts } from '@prisma-next/test-utils';
+import { join } from 'pathe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   type ClientCapabilities,
@@ -1552,6 +1552,23 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
     const watchedFiles = watchedFilesRegistrations(harness);
     expect(watchedFiles.length).toBe(1);
     expect(JSON.stringify(watchedFiles[0]?.registerOptions)).toContain('prisma-next.config.ts');
+  });
+
+  it('resolves the workspace root from workspaceFolders when rootUri is absent', async () => {
+    harness = startHarness(resolveToSchema, watchedFilesCapabilities);
+    const workspaceRoot = join(root, 'ws-folder');
+    await harness.client.sendRequest(InitializeRequest.type, {
+      processId: process.pid,
+      rootUri: null,
+      capabilities: watchedFilesCapabilities,
+      workspaceFolders: [{ uri: pathToFileURL(workspaceRoot).toString(), name: 'ws-folder' }],
+    });
+    harness.client.sendNotification(InitializedNotification.type, {});
+    await harness.waitForWatchedFilesRegistration(timeouts.default);
+
+    const serialized = JSON.stringify(watchedFilesRegistrations(harness)[0]?.registerOptions);
+    expect(serialized).toContain('ws-folder');
+    expect(serialized).not.toContain('\\\\');
   });
 
   it('does not request registration when the client lacks dynamic registration', async () => {
