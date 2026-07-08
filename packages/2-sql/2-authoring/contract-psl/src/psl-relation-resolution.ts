@@ -347,7 +347,7 @@ function throughRef(): ArgType<ThroughArgument> {
     parse: (arg, ctx): Result<ThroughArgument, readonly PslDiagnostic[]> => {
       if (arg instanceof StringLiteralExprAst) {
         const value = arg.value();
-        if (value !== undefined && value.includes('->')) {
+        if (value?.includes('->')) {
           const arrowPath = parseArrowPath(value);
           if (arrowPath === undefined) {
             return notOk([
