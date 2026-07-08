@@ -319,26 +319,6 @@
     "namespaces": {
       "auth": {
         "entries": {
-          "native_enum": {
-            "AalLevel": {
-              "kind": "postgres-enum",
-              "members": [
-                {
-                  "name": "aal1",
-                  "value": "aal1"
-                },
-                {
-                  "name": "aal2",
-                  "value": "aal2"
-                },
-                {
-                  "name": "aal3",
-                  "value": "aal3"
-                }
-              ],
-              "typeName": "aal_level"
-            }
-          },
           "table": {
             "identities": {
               "columns": {
@@ -565,7 +545,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:a370d4a08b89ede10154241bee283741c4b33239ca9b7a4aeb3fac64b8cc9f8b",
+    "storageHash": "sha256:31cf0e2bc6efafc1d3c6c55148f6665700205dba671b16a5d6d5f6db693d97f6",
     "types": {
       "Timestamptz": {
         "codecId": "pg/timestamptz@1",

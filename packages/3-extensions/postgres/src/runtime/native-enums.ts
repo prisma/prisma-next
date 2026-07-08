@@ -6,17 +6,33 @@ import {
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { PG_ENUM_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
-import { isPostgresSchema } from '@prisma-next/target-postgres/types';
 
+/**
+ * Reads the namespace's `valueSet` entries directly off the plain contract
+ * shape (`storage.namespaces[id].entries.valueSet`), not through a hydrated
+ * `PostgresSchema` class instance — the same plain-data path `db.enums`
+ * reads `domain.namespaces[id].enum` through. Works on a `validateContract`'d
+ * JSON contract as well as one produced by `PostgresContractSerializer`.
+ *
+ * A native enum is never re-emitted as its own entity: once `native_enum` is
+ * lowered, its member values live on in the `valueSet` entry it derives (the
+ * SQL family's generic `deriveValueSet` mechanism) — the same slot
+ * `column.valueSet`-typed columns read. A member is a value, not a
+ * name→value pair (matching `CREATE TYPE … AS ENUM ('a', 'b')`), so each
+ * value doubles as its own accessor name.
+ */
 export function buildNativeEnumsMapForNamespace(
   storage: SqlStorage,
   namespaceId: string,
 ): Record<string, EnumAccessor> {
   const result: Record<string, EnumAccessor> = {};
-  const ns = storage.namespaces[namespaceId];
-  const nativeEnums = isPostgresSchema(ns) ? ns.nativeEnum : {};
-  for (const [name, nativeEnum] of Object.entries(nativeEnums)) {
-    result[name] = createEnumAccessor({ codecId: PG_ENUM_CODEC_ID, members: nativeEnum.members });
+  const valueSets = storage.namespaces[namespaceId]?.entries.valueSet;
+  if (!valueSets) return result;
+  for (const [name, valueSet] of Object.entries(valueSets)) {
+    result[name] = createEnumAccessor({
+      codecId: PG_ENUM_CODEC_ID,
+      members: valueSet.values.map((value) => ({ name: String(value), value })),
+    });
   }
   return result;
 }
@@ -33,22 +49,56 @@ export function buildNamespacedNativeEnums(
 
 type Present<T> = Exclude<T, undefined>;
 
-type NamespaceNativeEnumEntries<TNs> = TNs extends {
-  readonly entries: { readonly native_enum?: infer E };
+type NamespaceValueSetEntries<TNs> = TNs extends {
+  readonly entries: { readonly valueSet?: infer E };
 }
   ? unknown extends E
     ? Record<never, never>
     : Present<E>
   : Record<never, never>;
 
+type ValueSetEntry = { readonly values: readonly unknown[] };
+
+// Mapped over a bare type parameter (mirroring `MemberValues`/`MemberNames` in
+// `enum-accessor.ts`) so the mapped type is homomorphic — a readonly tuple of
+// values yields a readonly tuple of members, not a plain `{ 0: …; 1: … }`
+// object keyed by every `Array.prototype` member name. `name` narrows to
+// `string` via `Extract` — native-enum values are always strings (Postgres
+// enum labels), but `StorageValueSet['values']` is `readonly JsonValue[]`
+// generically, and `ContractEnumAccessor`'s member name must be `string`.
+type ValueSetMembers<Values extends readonly unknown[]> = {
+  readonly [I in keyof Values]: {
+    readonly name: Extract<Values[I], string>;
+    readonly value: Values[I];
+  };
+};
+
 /**
- * Accessor type for `db.nativeEnums`. Literal for emitted contracts — the emitter type-emits the
- * `native_enum` entries slot, so each accessor carries literal `values`/`names`/`members`. For a
- * no-emit (`typeof contract`) contract the storage type is non-literal and this degrades to the
- * structural shape — the same emit/no-emit boundary column typing has (TML-2960).
+ * Projects a value-only `StorageValueSet`-shaped literal type onto the
+ * `{name, value}[]`-member shape `ContractEnumAccessor` expects, treating
+ * each value as its own name (Option B: a native-enum member is a value, not
+ * a name→value pair).
+ */
+type ValueSetToEnumEntry<Entry extends ValueSetEntry> = {
+  readonly members: ValueSetMembers<Entry['values']>;
+};
+
+type ValueSetEntriesToEnumEntries<Entries> = {
+  readonly [K in keyof Entries]: Entries[K] extends ValueSetEntry
+    ? ValueSetToEnumEntry<Entries[K]>
+    : never;
+};
+
+/**
+ * Accessor type for `db.nativeEnums`. Types off the namespace's `valueSet`
+ * entries — the same generic surface that types `db.enums` and column value
+ * unions — not a raw `native_enum` entity slot; `contract.d.ts` no longer
+ * emits one. For a no-emit (`typeof contract`) contract the storage type is
+ * non-literal and this degrades to the structural shape — the same
+ * emit/no-emit boundary column typing has (TML-2960).
  */
 export type NamespacedNativeEnums<TContract extends Contract> = {
   readonly [Ns in keyof TContract['storage']['namespaces']]: EnumEntriesToAccessors<
-    NamespaceNativeEnumEntries<TContract['storage']['namespaces'][Ns]>
+    ValueSetEntriesToEnumEntries<NamespaceValueSetEntries<TContract['storage']['namespaces'][Ns]>>
   >;
 };

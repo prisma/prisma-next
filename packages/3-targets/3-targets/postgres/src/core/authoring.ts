@@ -101,8 +101,11 @@ function lowerRlsPolicyFromBlock(
  * Lowers a `native_enum { memberName = "value" … @@map("type_name") }` block
  * into a {@link PostgresNativeEnum}. Members must be authored as explicit
  * `key = "value"` pairs — a bare (value-less) member is a diagnostic, not
- * accepted (authoring-design.md §2.1). `typeName` comes from `@@map` or
- * defaults to the block name verbatim.
+ * accepted (authoring-design.md §2.1). The parsed `memberName` is only used
+ * to duplicate-check and report diagnostics; the lowered entity carries just
+ * the member values (a native enum is value-only — the member "name" isn't
+ * a separate authoring concept from the value). `typeName` comes from
+ * `@@map` or defaults to the block name verbatim.
  */
 function lowerNativeEnumFromBlock(
   block: PslExtensionBlock,
@@ -130,7 +133,7 @@ function lowerNativeEnumFromBlock(
 
   let memberError = false;
   const seenValues = new Set<string>();
-  const members: { name: string; value: string }[] = [];
+  const members: string[] = [];
   for (const [memberName, paramValue] of Object.entries(block.parameters)) {
     if (paramValue.kind === 'bare') {
       diagnostics?.push({
@@ -178,7 +181,7 @@ function lowerNativeEnumFromBlock(
       continue;
     }
     seenValues.add(jsonValue);
-    members.push({ name: memberName, value: jsonValue });
+    members.push(jsonValue);
   }
 
   if (memberError) return undefined;
@@ -210,7 +213,7 @@ const nativeEnumEntityTypeOutput = {
   factory: lowerNativeEnumFromBlock,
   deriveValueSet: (entity: PostgresNativeEnum) => ({
     kind: 'valueSet' as const,
-    values: entity.members.map((m) => m.value),
+    values: [...entity.members],
   }),
 } satisfies AuthoringEntityTypeFactoryOutput<PslExtensionBlock, PostgresNativeEnum | undefined> &
   SqlValueSetDerivingEntityTypeOutput;

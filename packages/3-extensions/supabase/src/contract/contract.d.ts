@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:a370d4a08b89ede10154241bee283741c4b33239ca9b7a4aeb3fac64b8cc9f8b'>;
+  StorageHashBase<'sha256:31cf0e2bc6efafc1d3c6c55148f6665700205dba671b16a5d6d5f6db693d97f6'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -312,17 +312,6 @@ type ContractBase = Omit<
               uniques: readonly [];
               indexes: readonly [];
               foreignKeys: readonly [];
-            };
-          };
-          readonly native_enum: {
-            readonly AalLevel: {
-              readonly kind: 'postgres-enum';
-              readonly typeName: 'aal_level';
-              readonly members: readonly [
-                { readonly name: 'aal1'; readonly value: 'aal1' },
-                { readonly name: 'aal2'; readonly value: 'aal2' },
-                { readonly name: 'aal3'; readonly value: 'aal3' },
-              ];
             };
           };
           readonly valueSet: {

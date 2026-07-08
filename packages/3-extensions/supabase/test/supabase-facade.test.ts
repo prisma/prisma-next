@@ -294,8 +294,9 @@ describe('service_role .supabase.nativeEnums (facade)', () => {
   // not a fixture — `nativeEnums` is derived from `extContract.storage`,
   // which the Supabase runtime always builds from the extension's own
   // emitted contract (see `buildExtensionContract` in ../src/runtime/supabase.ts).
-  // The `auth` namespace's `AalLevel` native_enum entry is production data:
-  // members `aal1`/`aal2`/`aal3`, backing the `auth.sessions.aal` column.
+  // The `auth` namespace's `AalLevel` valueSet entry (derived from the
+  // `native_enum` block) is production data: members `aal1`/`aal2`/`aal3`,
+  // backing the `auth.sessions.aal` column.
   it('exposes auth.AalLevel members, matching the emitted extension contract', async () => {
     const db = await supabase({
       contract,

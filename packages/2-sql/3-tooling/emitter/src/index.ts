@@ -537,13 +537,18 @@ function generateDocumentScopedStorageTypesType(types: SqlStorage['types']): str
 }
 
 /**
- * Literalizes a pack-contributed entries slot from its canonical serialized JSON — the same value
- * `contract.json` carries for the slot. The emitter has no family→target knowledge of what the
- * slot is (`valueSet`, `native_enum`, `role`, …); it reflects whatever the pack serialized.
+ * Literalizes the `valueSet` entries slot — a core SQL entity kind (alongside
+ * `table`), not a pack-contributed one, so naming it here isn't a
+ * family→target layering leak. This is the only non-`table` entries slot with
+ * a type-level consumer (`db.nativeEnums`, `packages/3-extensions/postgres`):
+ * pack-contributed slots (`role`, `policy`, `native_enum`, …) have none and
+ * are not emitted.
  */
-function literalizeSerializedEntriesSlot(slotEntries: unknown): string {
-  const json: unknown = JSON.parse(JSON.stringify(slotEntries));
-  return serializeValue(json);
+function generateValueSetBlockType(valueSets: Readonly<Record<string, StorageValueSet>>): string {
+  const entries = Object.entries(valueSets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, valueSet]) => `readonly ${serializeObjectKey(name)}: ${serializeValue(valueSet)}`);
+  return `{ ${entries.join('; ')} }`;
 }
 
 function namespaceSerializedKind(ns: Namespace): string {
@@ -660,21 +665,9 @@ function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): st
       (ns.entries.table ?? {}) as Readonly<Record<string, StorageTable>>,
     );
     const entriesParts = [`readonly table: ${tablesType}`];
-    // Every non-table entries slot is emitted generically from its canonical serialized JSON.
-    const otherSlots = Object.entries(ns.entries)
-      .filter(([slotKey]) => slotKey !== 'table')
-      .sort(([a], [b]) => a.localeCompare(b));
-    for (const [slotKey, slotEntries] of otherSlots) {
-      if (
-        slotEntries === undefined ||
-        slotEntries === null ||
-        Object.keys(slotEntries).length === 0
-      ) {
-        continue;
-      }
-      entriesParts.push(
-        `readonly ${serializeObjectKey(slotKey)}: ${literalizeSerializedEntriesSlot(slotEntries)}`,
-      );
+    const valueSetEntries = ns.entries.valueSet;
+    if (valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0) {
+      entriesParts.push(`readonly valueSet: ${generateValueSetBlockType(valueSetEntries)}`);
     }
     const entriesType = `{ ${entriesParts.join('; ')} }`;
     parts.push(

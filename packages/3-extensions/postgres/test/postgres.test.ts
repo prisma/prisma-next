@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { PostgresSchema } from '@prisma-next/target-postgres/types';
@@ -44,6 +45,7 @@ vi.mock('pg', () => {
 });
 
 import { Client, Pool } from 'pg';
+import { buildNativeEnumsMapForNamespace } from '../src/runtime/native-enums';
 import postgres, { type PostgresClient } from '../src/runtime/postgres';
 
 const contract = createContract<SqlStorage>();
@@ -482,23 +484,19 @@ describe('postgres', () => {
   });
 
   describe('db.nativeEnums (facade)', () => {
-    // Built from real `PostgresSchema`/`PostgresNativeEnum` IR instances (not
-    // plain literals): `PostgresContractSerializer.serializeContract` only
-    // walks `entries.native_enum` for namespaces it recognizes via
-    // `isPostgresSchema`, matching how a real Postgres contract always
-    // rehydrates through the serializer at the `postgres()` call site.
+    // Built from real `PostgresSchema` IR instances (not plain literals):
+    // `PostgresContractSerializer.serializeContract` carries `entries.valueSet`
+    // for any namespace it recognizes via `isPostgresSchema`, matching how a
+    // real Postgres contract always rehydrates through the serializer at the
+    // `postgres()` call site. `db.nativeEnums` reads that `valueSet` entry —
+    // the same generic entry a `native_enum`'s `deriveValueSet` hook produces
+    // — not the (never re-serialized) `native_enum` entity itself.
     const publicNs = new PostgresSchema({
       id: 'public',
       entries: {
         table: {},
-        native_enum: {
-          AalLevel: {
-            typeName: 'aal_level',
-            members: [
-              { name: 'aal1', value: 'aal1' },
-              { name: 'aal2', value: 'aal2' },
-            ],
-          },
+        valueSet: {
+          AalLevel: { kind: 'valueSet', values: ['aal1', 'aal2'] },
         },
       },
     });
@@ -506,14 +504,8 @@ describe('postgres', () => {
       id: 'audit',
       entries: {
         table: {},
-        native_enum: {
-          AalLevel: {
-            typeName: 'audit_aal_level',
-            members: [
-              { name: 'low', value: 'low' },
-              { name: 'high', value: 'high' },
-            ],
-          },
+        valueSet: {
+          AalLevel: { kind: 'valueSet', values: ['low', 'high'] },
         },
       },
     });
@@ -561,6 +553,33 @@ describe('postgres', () => {
 
       expect(db.nativeEnums.public['AalLevel']?.values).toEqual(['aal1', 'aal2']);
       expect(poolConnectSpy()).not.toHaveBeenCalled();
+    });
+
+    // F02: the accessor must read the same plain namespace shape a
+    // `validateContract`'d JSON contract carries, not a hydrated
+    // `PostgresSchema` class instance — symmetric with `db.enums`
+    // (`buildNamespacedEnums`), which already works on plain data.
+    it('resolves members from a plain (non-hydrated) contract, not just a hydrated PostgresSchema', () => {
+      const plainStorage: SqlStorage = {
+        storageHash: coreHash('test-storage-hash'),
+        namespaces: {
+          public: {
+            id: 'public',
+            kind: 'postgres-schema',
+            entries: {
+              table: {},
+              valueSet: {
+                AalLevel: { kind: 'valueSet', values: ['aal1', 'aal2', 'aal3'] },
+              },
+            },
+          },
+        },
+      };
+
+      const result = buildNativeEnumsMapForNamespace(plainStorage, 'public');
+
+      expect(result['AalLevel']?.values).toEqual(['aal1', 'aal2', 'aal3']);
+      expect(result['AalLevel']?.has('aal2')).toBe(true);
     });
   });
 });

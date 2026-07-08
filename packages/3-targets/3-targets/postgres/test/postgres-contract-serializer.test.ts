@@ -599,11 +599,7 @@ describe('native_enum + valueSet round-trip', () => {
                 AalLevel: {
                   kind: 'postgres-enum',
                   typeName: 'aal_level',
-                  members: [
-                    { name: 'aal1', value: 'aal1' },
-                    { name: 'aal2', value: 'aal2' },
-                    { name: 'aal3', value: 'aal3' },
-                  ],
+                  members: ['aal1', 'aal2', 'aal3'],
                   control: 'external',
                 },
               },
@@ -617,7 +613,25 @@ describe('native_enum + valueSet round-trip', () => {
     };
   }
 
-  it('preserves the native_enum entity and derived valueSet through serialize → deserialize', () => {
+  it('deserializes the native_enum entity (in-memory-only) and preserves the derived valueSet', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = makeContractWithNativeEnum();
+
+    const contract = serializer.deserializeContract(input);
+    const ns = contract.storage.namespaces['auth'] as PostgresSchema;
+    expect(ns).toBeInstanceOf(PostgresSchema);
+
+    const nativeEnum = ns.entries.native_enum?.['AalLevel'];
+    expect(nativeEnum).toBeInstanceOf(PostgresNativeEnum);
+    expect(nativeEnum?.typeName).toBe('aal_level');
+    expect(nativeEnum?.members).toEqual(['aal1', 'aal2', 'aal3']);
+    expect(nativeEnum?.control).toBe('external');
+
+    const valueSet = ns.valueSet?.['AalLevel'];
+    expect(valueSet?.values).toEqual(['aal1', 'aal2', 'aal3']);
+  });
+
+  it('does not re-serialize the native_enum entity — only its derived valueSet survives a round-trip', () => {
     const serializer = new PostgresContractSerializer();
     const input = makeContractWithNativeEnum();
 
@@ -628,36 +642,13 @@ describe('native_enum + valueSet round-trip', () => {
 
     const ns = roundTripped.storage.namespaces['auth'] as PostgresSchema;
     expect(ns).toBeInstanceOf(PostgresSchema);
-
-    expect(Object.keys(ns.nativeEnum)).toHaveLength(1);
-    const nativeEnum = ns.nativeEnum['AalLevel'];
-    expect(nativeEnum).toBeInstanceOf(PostgresNativeEnum);
-    expect(nativeEnum?.typeName).toBe('aal_level');
-    expect(nativeEnum?.members).toEqual([
-      { name: 'aal1', value: 'aal1' },
-      { name: 'aal2', value: 'aal2' },
-      { name: 'aal3', value: 'aal3' },
-    ]);
-    expect(nativeEnum?.control).toBe('external');
+    expect(ns.entries.native_enum).toBeUndefined();
 
     const valueSet = ns.valueSet?.['AalLevel'];
     expect(valueSet?.values).toEqual(['aal1', 'aal2', 'aal3']);
   });
 
-  it('produces a frozen PostgresNativeEnum after round-trip', () => {
-    const serializer = new PostgresContractSerializer();
-    const input = makeContractWithNativeEnum();
-
-    const contract = serializer.deserializeContract(input);
-    const json = serializer.serializeContract(contract);
-    const roundTripped = serializer.deserializeContract(JSON.parse(JSON.stringify(json)));
-
-    const ns = roundTripped.storage.namespaces['auth'] as PostgresSchema;
-    const nativeEnum = ns.nativeEnum['AalLevel']!;
-    expect(Object.isFrozen(nativeEnum)).toBe(true);
-  });
-
-  it('serialized native_enum matches expected shape', () => {
+  it('serialized namespace entries omit native_enum but keep valueSet', () => {
     const serializer = new PostgresContractSerializer();
     const input = makeContractWithNativeEnum();
 
@@ -666,23 +657,14 @@ describe('native_enum + valueSet round-trip', () => {
     const reparsed = JSON.parse(JSON.stringify(json));
 
     const ns = reparsed.storage.namespaces['auth'];
-    expect(ns.entries.native_enum.AalLevel).toEqual({
-      kind: 'postgres-enum',
-      typeName: 'aal_level',
-      members: [
-        { name: 'aal1', value: 'aal1' },
-        { name: 'aal2', value: 'aal2' },
-        { name: 'aal3', value: 'aal3' },
-      ],
-      control: 'external',
-    });
+    expect(ns.entries.native_enum).toBeUndefined();
     expect(ns.entries.valueSet.AalLevel).toEqual({
       kind: 'valueSet',
       values: ['aal1', 'aal2', 'aal3'],
     });
   });
 
-  it('rejects a malformed native_enum entry (members missing value)', () => {
+  it('rejects a malformed native_enum entry (a non-string member)', () => {
     const serializer = new PostgresContractSerializer();
     const input = createSqlContract({
       storage: {
@@ -720,7 +702,7 @@ describe('native_enum + valueSet round-trip', () => {
                 AalLevel: {
                   kind: 'enum',
                   typeName: 'aal_level',
-                  members: [{ name: 'aal1', value: 'aal1' }],
+                  members: ['aal1'],
                 },
               },
             },

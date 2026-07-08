@@ -5,31 +5,23 @@ import { PostgresSchema } from '../src/core/postgres-schema';
 
 const aalLevelInput = {
   typeName: 'aal_level',
-  members: [
-    { name: 'aal1', value: 'aal1' },
-    { name: 'aal2', value: 'aal2' },
-    { name: 'aal3', value: 'aal3' },
-  ],
+  members: ['aal1', 'aal2', 'aal3'],
   control: 'external' as const,
 };
 
 describe('PostgresNativeEnum', () => {
-  it('constructs with typeName, ordered members, and control', () => {
+  it('constructs with typeName, ordered value-only members, and control', () => {
     const node = new PostgresNativeEnum(aalLevelInput);
     expect(node.kind).toBe('postgres-enum');
     expect(node.typeName).toBe('aal_level');
-    expect(node.members).toEqual([
-      { name: 'aal1', value: 'aal1' },
-      { name: 'aal2', value: 'aal2' },
-      { name: 'aal3', value: 'aal3' },
-    ]);
+    expect(node.members).toEqual(['aal1', 'aal2', 'aal3']);
     expect(node.control).toBe('external');
   });
 
   it('omits control when not provided', () => {
     const node = new PostgresNativeEnum({
       typeName: 'aal_level',
-      members: [{ name: 'aal1', value: 'aal1' }],
+      members: ['aal1'],
     });
     expect(Object.hasOwn(node, 'control')).toBe(false);
     expect('control' in JSON.parse(JSON.stringify(node))).toBe(false);
@@ -58,7 +50,7 @@ describe('PostgresNativeEnum', () => {
   });
 
   it('does not share the members array reference with input', () => {
-    const members = [{ name: 'aal1', value: 'aal1' }];
+    const members = ['aal1'];
     const node = new PostgresNativeEnum({ typeName: 'aal_level', members });
     expect(node.members).not.toBe(members);
   });
@@ -99,8 +91,7 @@ describe('PostgresNativeEnum', () => {
 describe('PostgresSchema native_enum slot', () => {
   it('exposes an empty native_enum map when not provided', () => {
     const schema = new PostgresSchema({ id: 'public', entries: { table: {} } });
-    expect(schema.nativeEnum).toEqual({});
-    expect(Object.isFrozen(schema.nativeEnum)).toBe(true);
+    expect(schema.entries.native_enum).toBeUndefined();
   });
 
   it('normalises plain native_enum input into PostgresNativeEnum instances', () => {
@@ -111,7 +102,7 @@ describe('PostgresSchema native_enum slot', () => {
         native_enum: { AalLevel: aalLevelInput },
       },
     });
-    const node = schema.nativeEnum['AalLevel'];
+    const node = schema.entries.native_enum?.['AalLevel'];
     expect(node).toBeInstanceOf(PostgresNativeEnum);
     expect(node?.typeName).toBe('aal_level');
     expect(node?.members).toHaveLength(3);

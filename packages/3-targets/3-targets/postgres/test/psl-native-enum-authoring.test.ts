@@ -136,16 +136,12 @@ namespace auth {
 
     const ns = result.value.storage.namespaces['auth'] as PostgresSchema;
     expect(ns).toBeInstanceOf(PostgresSchema);
-    expect(Object.keys(ns.nativeEnum)).toHaveLength(1);
+    expect(Object.keys(ns.entries.native_enum ?? {})).toHaveLength(1);
 
-    const nativeEnum = ns.nativeEnum['AalLevel'];
+    const nativeEnum = ns.entries.native_enum?.['AalLevel'];
     expect(nativeEnum).toBeInstanceOf(PostgresNativeEnum);
     expect(nativeEnum?.typeName).toBe('aal_level');
-    expect(nativeEnum?.members).toEqual([
-      { name: 'aal1', value: 'aal1' },
-      { name: 'aal2', value: 'aal2' },
-      { name: 'aal3', value: 'aal3' },
-    ]);
+    expect(nativeEnum?.members).toEqual(['aal1', 'aal2', 'aal3']);
   });
 
   it('leaves control unset — the effective grade resolves from the contract-level defaultControlPolicy, not a per-node stamp', () => {
@@ -167,7 +163,7 @@ namespace auth {
     if (!result.ok) return;
 
     const ns = result.value.storage.namespaces['auth'] as PostgresSchema;
-    const nativeEnum = ns.nativeEnum['AalLevel'];
+    const nativeEnum = ns.entries.native_enum?.['AalLevel'];
     expect(Object.hasOwn(nativeEnum!, 'control')).toBe(false);
   });
 
@@ -216,7 +212,7 @@ namespace auth {
     if (!result.ok) return;
 
     const ns = result.value.storage.namespaces['auth'] as PostgresSchema;
-    const nativeEnum = ns.nativeEnum['FactorType'];
+    const nativeEnum = ns.entries.native_enum?.['FactorType'];
     expect(nativeEnum?.typeName).toBe('FactorType');
   });
 
@@ -449,7 +445,7 @@ namespace public {
     const ns = result.value.storage.namespaces['public'] as PostgresSchema;
     expect(ns.valueSet?.['Priority']).toMatchObject({ values: ['low', 'high'] });
     expect(ns.valueSet?.['AalLevel']).toMatchObject({ values: ['aal1', 'aal2'] });
-    expect(ns.nativeEnum['AalLevel']).toBeInstanceOf(PostgresNativeEnum);
+    expect(ns.entries.native_enum?.['AalLevel']).toBeInstanceOf(PostgresNativeEnum);
   });
 
   it('a native_enum and a domain enum sharing a name in one namespace is rejected, not silently merged', () => {

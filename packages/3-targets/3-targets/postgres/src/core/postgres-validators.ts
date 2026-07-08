@@ -19,14 +19,9 @@ export const PostgresRlsPolicySchema = type({
   permissive: 'boolean',
 });
 
-const PostgresNativeEnumMemberSchema = type({
-  name: 'string',
-  value: 'string',
-});
-
 export const PostgresNativeEnumSchema = type({
   kind: "'postgres-enum'",
   typeName: 'string',
-  members: PostgresNativeEnumMemberSchema.array().readonly(),
+  members: type.string.array().readonly(),
   'control?': "'managed' | 'tolerated' | 'external' | 'observed'",
 });

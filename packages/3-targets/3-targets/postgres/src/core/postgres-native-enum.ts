@@ -2,16 +2,11 @@ import type { ControlPolicy } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
-export interface PostgresNativeEnumMember {
-  readonly name: string;
-  readonly value: string;
-}
-
 export interface PostgresNativeEnumInput {
   /** The Postgres type name (`CREATE TYPE <typeName> AS ENUM (…)`). */
   readonly typeName: string;
-  /** Members in declaration order — this is the Postgres enum sort order. */
-  readonly members: readonly PostgresNativeEnumMember[];
+  /** Member values in declaration order — this is the Postgres enum sort order. */
+  readonly members: readonly string[];
   readonly control?: ControlPolicy;
 }
 
@@ -22,6 +17,9 @@ export interface PostgresNativeEnumInput {
  * kind, extends `SqlNode`, and is stored in `contract.json`. It is NOT a DiffableNode;
  * the schema-diff tree will use `PostgresNativeEnumSchemaNode` when the managed phase
  * builds it.
+ *
+ * A member is a value, not a name→value pair — matching `CREATE TYPE … AS ENUM
+ * ('a', 'b')`, which has no separate member name.
  *
  * Target-only concept — no SQL-family abstract. Extends `SqlNode` directly,
  * frozen at construction via `freezeNode(this)`. The `kind: 'postgres-enum'`
@@ -40,13 +38,13 @@ export class PostgresNativeEnum extends SqlNode {
 
   override readonly kind = 'postgres-enum' as const;
   readonly typeName: string;
-  readonly members: readonly PostgresNativeEnumMember[];
+  readonly members: readonly string[];
   declare readonly control?: ControlPolicy;
 
   constructor(input: PostgresNativeEnumInput) {
     super();
     this.typeName = input.typeName;
-    this.members = Object.freeze(input.members.map((m) => ({ name: m.name, value: m.value })));
+    this.members = Object.freeze([...input.members]);
     if (input.control !== undefined) this.control = input.control;
     freezeNode(this);
   }
