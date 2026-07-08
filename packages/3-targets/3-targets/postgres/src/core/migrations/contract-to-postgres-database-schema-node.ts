@@ -101,7 +101,7 @@ export function contractToPostgresDatabaseSchemaNode(
             ...ifDefined('onDelete', fk.onDelete),
             ...ifDefined('onUpdate', fk.onUpdate),
             ...ifDefined('annotations', fk.annotations),
-            resolvedReferencedSchema: resolveDdlSchemaForNamespaceStorage(
+            resolvedReferencedNamespace: resolveDdlSchemaForNamespaceStorage(
               contract.storage,
               fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
             ),

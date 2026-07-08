@@ -199,7 +199,7 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
   });
 });
 
-describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedSchema', () => {
+describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespace', () => {
   function contractWithFk(targetNamespaceId: string): PostgresContract {
     const schema = new PostgresSchema({
       id: SCHEMA_NAME,
@@ -263,7 +263,7 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedSchema',
     );
     const fk = root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME]?.foreignKeys[0];
     expect(fk?.referencedSchema).toBe(UNBOUND_NAMESPACE_ID);
-    expect(fk?.resolvedReferencedSchema).toBe('public');
+    expect(fk?.resolvedReferencedNamespace).toBe('public');
   });
 
   it('resolves a named FK target namespace through its DDL schema name', () => {
@@ -272,7 +272,7 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedSchema',
       projectionOptions,
     );
     const fk = root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME]?.foreignKeys[0];
-    expect(fk?.resolvedReferencedSchema).toBe('public');
+    expect(fk?.resolvedReferencedNamespace).toBe('public');
   });
 
   it('an unbound-namespace contract FK pairs by id with an introspected public FK', () => {

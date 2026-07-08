@@ -117,9 +117,9 @@ function contractToSchemaIR(
         columns: t.columns,
         // The flat family `contractToSchemaIR` stamps `referencedSchema`
         // verbatim (the raw contract namespace id) and never resolves
-        // `resolvedReferencedSchema` — that fixup is `contractToPostgresDatabaseSchemaNode`'s
+        // `resolvedReferencedNamespace` — that fixup is `contractToPostgresDatabaseSchemaNode`'s
         // own responsibility. The differ pairs FK nodes by id, which folds in
-        // `resolvedReferencedSchema`, so this test double must apply the same
+        // `resolvedReferencedNamespace`, so this test double must apply the same
         // resolution the real Postgres tree-builder does, or an unresolved FK
         // here never pairs with the differ's Postgres-tree-derived expected
         // side and shows up as a spurious drop+recreate.
@@ -138,7 +138,7 @@ function contractToSchemaIR(
                     ...(fk.name !== undefined ? { name: fk.name } : {}),
                     ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
                     ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
-                    resolvedReferencedSchema: resolveDdlSchemaForNamespaceStorage(
+                    resolvedReferencedNamespace: resolveDdlSchemaForNamespaceStorage(
                       contract.storage,
                       fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
                     ),

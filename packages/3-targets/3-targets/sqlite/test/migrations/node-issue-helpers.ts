@@ -112,7 +112,7 @@ export function foreignKey(input: {
     columns: input.columns,
     referencedTable: input.referencedTable,
     referencedColumns: input.referencedColumns,
-    resolvedReferencedSchema: '',
+    resolvedReferencedNamespace: '',
     ...(input.name !== undefined ? { name: input.name } : {}),
     ...(input.onDelete !== undefined ? { onDelete: input.onDelete } : {}),
     ...(input.onUpdate !== undefined ? { onUpdate: input.onUpdate } : {}),

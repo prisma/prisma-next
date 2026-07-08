@@ -60,7 +60,7 @@ describe('SqlForeignKeyIR', () => {
     expect(fk.children()).toEqual([]);
   });
 
-  describe('resolvedReferencedSchema', () => {
+  describe('resolvedReferencedNamespace', () => {
     it('defaults to the raw referencedSchema when not supplied', () => {
       const fk = new SqlForeignKeyIR({
         columns: ['user_id'],
@@ -68,7 +68,7 @@ describe('SqlForeignKeyIR', () => {
         referencedColumns: ['id'],
         referencedSchema: 'public',
       });
-      expect(fk.resolvedReferencedSchema).toBe('public');
+      expect(fk.resolvedReferencedNamespace).toBe('public');
     });
 
     it('stays undefined when neither raw nor resolved schema is supplied', () => {
@@ -77,7 +77,7 @@ describe('SqlForeignKeyIR', () => {
         referencedTable: 'users',
         referencedColumns: ['id'],
       });
-      expect(fk.resolvedReferencedSchema).toBeUndefined();
+      expect(fk.resolvedReferencedNamespace).toBeUndefined();
       expect(fk.id).toBe('foreign-key:user_id->.users(id)');
     });
 
@@ -87,7 +87,7 @@ describe('SqlForeignKeyIR', () => {
         referencedTable: 'users',
         referencedColumns: ['id'],
         referencedSchema: '__unbound__',
-        resolvedReferencedSchema: 'public',
+        resolvedReferencedNamespace: 'public',
       });
       expect(fk.referencedSchema).toBe('__unbound__');
       expect(fk.id).toBe('foreign-key:user_id->public.users(id)');
@@ -99,7 +99,7 @@ describe('SqlForeignKeyIR', () => {
         referencedTable: 'users',
         referencedColumns: ['id'],
         referencedSchema: '__unbound__',
-        resolvedReferencedSchema: 'public',
+        resolvedReferencedNamespace: 'public',
       });
       const actual = new SqlForeignKeyIR({
         columns: ['user_id'],

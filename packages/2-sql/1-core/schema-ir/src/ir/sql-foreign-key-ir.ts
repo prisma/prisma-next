@@ -18,14 +18,14 @@ export interface SqlForeignKeyIRInput {
   readonly onUpdate?: SqlReferentialAction;
   readonly annotations?: SqlAnnotations;
   /**
-   * The real live DDL schema of the referenced table, comparable across the
-   * two diff sides. Contract-derived trees stamp it explicitly (resolving
-   * namespace ids — including the unbound sentinel — to the DDL schema);
+   * The real live DDL namespace of the referenced table, comparable across
+   * the two diff sides. Contract-derived trees stamp it explicitly (resolving
+   * namespace ids — including the unbound sentinel — to the DDL namespace);
    * introspected FKs default it to `referencedSchema`, whose value already
-   * is the live schema. Folded into `id` in place of the raw value so an
+   * is the live namespace. Folded into `id` in place of the raw value so an
    * unbound-namespace contract FK pairs with its introspected counterpart.
    */
-  readonly resolvedReferencedSchema?: string;
+  readonly resolvedReferencedNamespace?: string;
 }
 
 /**
@@ -59,7 +59,7 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode implements DiffableNode {
   declare readonly onDelete?: SqlReferentialAction;
   declare readonly onUpdate?: SqlReferentialAction;
   declare readonly annotations?: SqlAnnotations;
-  declare readonly resolvedReferencedSchema?: string;
+  declare readonly resolvedReferencedNamespace?: string;
 
   constructor(input: SqlForeignKeyIRInput) {
     super();
@@ -71,16 +71,16 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode implements DiffableNode {
     if (input.onDelete !== undefined) this.onDelete = input.onDelete;
     if (input.onUpdate !== undefined) this.onUpdate = input.onUpdate;
     if (input.annotations !== undefined) this.annotations = input.annotations;
-    const resolvedReferencedSchema = input.resolvedReferencedSchema ?? input.referencedSchema;
-    if (resolvedReferencedSchema !== undefined) {
-      this.resolvedReferencedSchema = resolvedReferencedSchema;
+    const resolvedReferencedNamespace = input.resolvedReferencedNamespace ?? input.referencedSchema;
+    if (resolvedReferencedNamespace !== undefined) {
+      this.resolvedReferencedNamespace = resolvedReferencedNamespace;
     }
     freezeNode(this);
   }
 
   get id(): string {
-    const referencedSchema = this.resolvedReferencedSchema ?? '';
-    return `foreign-key:${this.columns.join(',')}->${referencedSchema}.${this.referencedTable}(${this.referencedColumns.join(',')})`;
+    const referencedNamespace = this.resolvedReferencedNamespace ?? '';
+    return `foreign-key:${this.columns.join(',')}->${referencedNamespace}.${this.referencedTable}(${this.referencedColumns.join(',')})`;
   }
 
   children(): readonly DiffableNode[] {

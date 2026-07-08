@@ -456,7 +456,7 @@ export function neutralizeFlatExpectedFkSchemas(expected: SqlSchemaIR): SqlSchem
           ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
           ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
           ...(fk.annotations !== undefined ? { annotations: fk.annotations } : {}),
-          resolvedReferencedSchema: '',
+          resolvedReferencedNamespace: '',
         }),
     );
     tables[name] = new SqlTableIR({
