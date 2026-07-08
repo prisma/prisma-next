@@ -34,12 +34,7 @@ export class SqliteContractSerializer extends SqlContractSerializerBase<Contract
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
       namespacesJson[nsId] = {
         id: ns.id,
-        entries: {
-          table: blindCast<
-            JsonObject,
-            'JSON.parse(JSON.stringify(...)) strips class methods; result is a plain JsonObject'
-          >(JSON.parse(JSON.stringify(ns.entries.table ?? {}))),
-        },
+        entries: this.serializeNamespaceEntries(ns.entries),
       };
     }
     return blindCast<
@@ -50,14 +45,7 @@ export class SqliteContractSerializer extends SqlContractSerializerBase<Contract
       storage: {
         storageHash: String(storage.storageHash),
         namespaces: namespacesJson,
-        ...(storage.types !== undefined
-          ? {
-              types: blindCast<
-                JsonObject,
-                'JSON.parse(JSON.stringify(...)) strips class methods; result is plain JsonObject'
-              >(JSON.parse(JSON.stringify(storage.types))),
-            }
-          : {}),
+        ...(storage.types !== undefined ? { types: this.serializeJsonObject(storage.types) } : {}),
       },
     });
   }
