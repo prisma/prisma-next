@@ -19,6 +19,7 @@ export interface MongoSchemaIndexOptions {
 
 export class MongoSchemaIndex extends MongoSchemaIRNode {
   readonly kind = 'index' as const;
+  readonly id: string;
   readonly keys: ReadonlyArray<MongoIndexKey>;
   readonly unique: boolean;
   readonly sparse?: boolean | undefined;
@@ -32,6 +33,7 @@ export class MongoSchemaIndex extends MongoSchemaIRNode {
 
   constructor(options: MongoSchemaIndexOptions) {
     super();
+    this.id = options.keys.map((k) => `${k.field}:${k.direction}`).join(',');
     this.keys = options.keys;
     this.unique = options.unique ?? false;
     this.sparse = options.sparse;

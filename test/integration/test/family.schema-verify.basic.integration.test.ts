@@ -111,7 +111,6 @@ describe('family instance schemaVerify', () => {
 
           expect(result.ok).toBe(true);
           expect(result.schema.issues).toEqual([]);
-          expect(result.schema.schemaDiffIssues).toEqual([]);
         } finally {
           await driver.close();
         }
@@ -191,7 +190,7 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(false);
-          expect(result.schema.schemaDiffIssues).toContainEqual(
+          expect(result.schema.issues).toContainEqual(
             expect.objectContaining({ reason: 'not-found', path: ['database', 'public', 'post'] }),
           );
         } finally {
@@ -265,7 +264,7 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(false);
-          expect(result.schema.schemaDiffIssues).toContainEqual(
+          expect(result.schema.issues).toContainEqual(
             expect.objectContaining({
               reason: 'not-found',
               path: ['database', 'public', 'user', 'column:email'],

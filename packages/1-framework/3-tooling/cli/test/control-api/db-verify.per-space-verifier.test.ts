@@ -39,7 +39,6 @@ describe('createPerSpaceVerifier', () => {
       target: { expected: 'postgres' },
       schema: {
         issues: [],
-        schemaDiffIssues: [],
       },
       timings: { total: 0 },
     });

@@ -1,6 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
-  SchemaIssue,
+  SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
@@ -17,7 +17,7 @@ function makeContract(collections: readonly string[]): Contract {
 
 function makeResult(args: {
   ok: boolean;
-  issues: readonly SchemaIssue[];
+  issues: readonly SchemaDiffIssue[];
 }): VerifyDatabaseSchemaResult {
   return {
     ok: args.ok,
@@ -25,7 +25,7 @@ function makeResult(args: {
     summary: args.ok ? 'Database schema satisfies contract' : 'does not satisfy',
     contract: { storageHash: 'sha256:x' },
     target: { expected: 'mongo' },
-    schema: { issues: args.issues, schemaDiffIssues: [] },
+    schema: { issues: args.issues },
     timings: { total: 0 },
   };
 }
@@ -55,8 +55,8 @@ describe('scopeVerifyResultToSpace', () => {
     const result = makeResult({
       ok: false,
       issues: [
-        { kind: 'extra_table', table: 'cipher_state', message: 'extra' },
-        { kind: 'extra_table', table: 'junk', message: 'extra' },
+        { path: ['cipher_state'], reason: 'not-expected', message: 'extra' },
+        { path: ['junk'], reason: 'not-expected', message: 'extra' },
       ],
     });
 
@@ -65,7 +65,7 @@ describe('scopeVerifyResultToSpace', () => {
     // The sibling's collection is dropped; the truly undeclared `junk` stays,
     // so the runner still fails on genuine drift.
     expect(scoped.schema.issues).toEqual([
-      expect.objectContaining({ kind: 'extra_table', table: 'junk' }),
+      expect.objectContaining({ path: ['junk'], reason: 'not-expected' }),
     ]);
     expect(scoped.ok).toBe(false);
     expect(scoped.code).toBe('PN-RUN-3010');
@@ -74,7 +74,7 @@ describe('scopeVerifyResultToSpace', () => {
   it('flips ok to true when the only failures were sibling collections', () => {
     const result = makeResult({
       ok: false,
-      issues: [{ kind: 'extra_table', table: 'cipher_state', message: 'extra' }],
+      issues: [{ path: ['cipher_state'], reason: 'not-expected', message: 'extra' }],
     });
 
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
@@ -85,15 +85,13 @@ describe('scopeVerifyResultToSpace', () => {
   });
 
   it('never drops a non-extra issue even when its table name matches a sibling', () => {
-    // Only `extra_*` kinds are droppable — a genuine drift finding (e.g. a
-    // missing column) on a table that happens to share a name with a
-    // sibling-owned collection must survive, so the space still fails on
-    // its own drift.
+    // Only whole-collection `not-expected` issues are droppable — a genuine
+    // drift finding (e.g. a missing column) on a table that happens to share
+    // a name with a sibling-owned collection must survive, so the space
+    // still fails on its own drift.
     const result = makeResult({
       ok: false,
-      issues: [
-        { kind: 'missing_column', table: 'cipher_state', column: 'ssn', message: 'missing' },
-      ],
+      issues: [{ path: ['cipher_state', 'column:ssn'], reason: 'not-found', message: 'missing' }],
     });
 
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
@@ -102,20 +100,24 @@ describe('scopeVerifyResultToSpace', () => {
     expect(scoped.ok).toBe(false);
   });
 
-  it('drops nested extra-column issues scoped to a sibling table', () => {
+  it('never drops a nested (auxiliary-depth) not-expected issue, even under a sibling-named collection', () => {
+    // A nested extra (e.g. an extra index) only ever appears on a collection
+    // THIS space's own contract declares — Mongo's diff only descends into
+    // index/validator/options comparisons when both sides declare the
+    // collection, so a whole-collection extra never carries children. The
+    // depth check is what protects a same-named nested finding from ever
+    // being mistaken for the sibling's whole-collection extra.
     const result = makeResult({
       ok: false,
       issues: [
-        { kind: 'extra_column', table: 'cipher_state', column: 'secret', message: 'extra' },
-        { kind: 'missing_column', table: 'user', column: 'email', message: 'missing' },
+        { path: ['cipher_state', 'index:secret:1'], reason: 'not-expected', message: 'extra' },
+        { path: ['user', 'column:email'], reason: 'not-found', message: 'missing' },
       ],
     });
 
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
 
-    expect(scoped.schema.issues).toEqual([
-      expect.objectContaining({ kind: 'missing_column', table: 'user' }),
-    ]);
+    expect(scoped).toBe(result);
     expect(scoped.ok).toBe(false);
   });
 });

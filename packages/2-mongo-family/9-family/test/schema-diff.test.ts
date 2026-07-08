@@ -78,7 +78,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.failures).toEqual([
-        expect.objectContaining({ kind: 'missing_table', table: 'users' }),
+        expect.objectContaining({ path: ['users'], reason: 'not-found' }),
       ]);
     });
 
@@ -89,7 +89,7 @@ describe('diffMongoSchemas', () => {
 
       expect(result.failures).toEqual([]);
       expect(result.warnings).toEqual([
-        expect.objectContaining({ kind: 'extra_table', table: 'users' }),
+        expect.objectContaining({ path: ['users'], reason: 'not-expected' }),
       ]);
     });
 
@@ -99,7 +99,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, true);
 
       expect(result.failures).toEqual([
-        expect.objectContaining({ kind: 'extra_table', table: 'users' }),
+        expect.objectContaining({ path: ['users'], reason: 'not-expected' }),
       ]);
       expect(result.warnings).toEqual([]);
     });
@@ -127,7 +127,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.failures).toEqual([
-        expect.objectContaining({ kind: 'index_mismatch', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-equal' }),
       ]);
     });
 
@@ -140,7 +140,7 @@ describe('diffMongoSchemas', () => {
 
       expect(result.failures).toEqual([]);
       expect(result.warnings).toEqual([
-        expect.objectContaining({ kind: 'extra_index', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-expected' }),
       ]);
     });
 
@@ -152,7 +152,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, true);
 
       expect(result.failures).toEqual([
-        expect.objectContaining({ kind: 'extra_index', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-expected' }),
       ]);
     });
   });
@@ -179,7 +179,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.failures).toEqual([
-        expect.objectContaining({ kind: 'type_missing', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-found' }),
       ]);
     });
 
@@ -190,7 +190,7 @@ describe('diffMongoSchemas', () => {
 
       expect(result.failures).toEqual([]);
       expect(result.warnings).toEqual([
-        expect.objectContaining({ kind: 'extra_validator', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-expected' }),
       ]);
     });
 
@@ -200,7 +200,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, true);
 
       expect(result.failures).toEqual([
-        expect.objectContaining({ kind: 'extra_validator', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-expected' }),
       ]);
     });
 
@@ -210,7 +210,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.failures).toEqual([
-        expect.objectContaining({ kind: 'type_mismatch', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-equal' }),
       ]);
     });
 
@@ -274,7 +274,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.failures).toEqual([
-        expect.objectContaining({ kind: 'type_mismatch', table: 'logs' }),
+        expect.objectContaining({ path: ['logs', 'options'], reason: 'not-equal' }),
       ]);
     });
   });
@@ -327,8 +327,11 @@ describe('diffMongoSchemas', () => {
       expect(result.failures.length).toBeGreaterThanOrEqual(1);
       expect(result.failures).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ kind: 'index_mismatch', table: 'events' }),
-          expect.objectContaining({ kind: 'extra_index', table: 'events' }),
+          expect.objectContaining({ path: ['events', 'index:createdAt:1'], reason: 'not-equal' }),
+          expect.objectContaining({
+            path: ['events', 'index:createdAt:1'],
+            reason: 'not-expected',
+          }),
         ]),
       );
     });

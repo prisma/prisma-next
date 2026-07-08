@@ -176,12 +176,6 @@ function checkIssue(options: {
       : undefined;
   return {
     path,
-    outcome:
-      options.reason === 'not-found'
-        ? 'missing'
-        : options.reason === 'not-expected'
-          ? 'extra'
-          : 'mismatch',
     reason: options.reason,
     message: `check drift on "${TABLE_NAME}"`,
     ...(expected !== undefined ? { expected } : {}),

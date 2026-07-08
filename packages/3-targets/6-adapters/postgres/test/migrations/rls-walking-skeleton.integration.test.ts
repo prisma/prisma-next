@@ -180,7 +180,7 @@ describe.sequential('RLS walking skeleton — author → plan → apply → filt
         frameworkComponents,
       });
 
-      expect(verifyResult.schema.schemaDiffIssues).toEqual([]);
+      expect(verifyResult.schema.issues).toEqual([]);
     },
     testTimeout,
   );

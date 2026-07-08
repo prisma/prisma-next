@@ -90,7 +90,7 @@ describe('family instance schemaVerify', () => {
           // The adapter may map VARCHAR to pg/text@1, so this test may pass
           // This is acceptable - the test verifies the verification runs without errors
           expect(result).toMatchObject({
-            schema: { issues: expect.any(Array), schemaDiffIssues: expect.any(Array) },
+            schema: { issues: expect.any(Array) },
           });
         } finally {
           await driver.close();
@@ -164,7 +164,7 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(false);
-          expect(result.schema.schemaDiffIssues).toContainEqual(
+          expect(result.schema.issues).toContainEqual(
             expect.objectContaining({
               reason: 'not-equal',
               path: ['database', 'public', 'user', 'column:email'],
@@ -243,7 +243,7 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(false);
-          expect(result.schema.schemaDiffIssues).toContainEqual(
+          expect(result.schema.issues).toContainEqual(
             expect.objectContaining({
               reason: 'not-equal',
               path: ['database', 'public', 'user', 'primary-key'],
@@ -347,7 +347,7 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(false);
-          expect(result.schema.schemaDiffIssues).toContainEqual(
+          expect(result.schema.issues).toContainEqual(
             expect.objectContaining({
               reason: 'not-found',
               path: ['database', 'public', 'post', 'foreign-key:userId->public.user(id)'],

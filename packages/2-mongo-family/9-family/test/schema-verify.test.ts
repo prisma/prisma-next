@@ -163,7 +163,7 @@ describe('verifyMongoSchema', () => {
       expect(result.code).toBe('PN-RUN-3010');
       expect(result.schema.issues.length).toBeGreaterThan(0);
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ kind: 'missing_table', table: 'users' }),
+        expect.objectContaining({ path: ['users'], reason: 'not-found' }),
       );
     });
 
@@ -183,7 +183,7 @@ describe('verifyMongoSchema', () => {
       expect(result.ok).toBe(false);
       expect(result.code).toBe('PN-RUN-3010');
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ kind: 'index_mismatch', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-equal' }),
       );
     });
 
@@ -203,7 +203,7 @@ describe('verifyMongoSchema', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues.length).toBeGreaterThan(0);
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ kind: 'extra_index', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-expected' }),
       );
     });
 
@@ -227,7 +227,7 @@ describe('verifyMongoSchema', () => {
 
       const diff = diffFromContractAndLive(contract, liveSchema, false);
       expect(diff.warnings).toContainEqual(
-        expect.objectContaining({ kind: 'extra_index', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-expected' }),
       );
     });
 
@@ -253,7 +253,7 @@ describe('verifyMongoSchema', () => {
 
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ kind: 'type_missing', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-found' }),
       );
     });
 
@@ -278,7 +278,7 @@ describe('verifyMongoSchema', () => {
 
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ kind: 'extra_validator', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-expected' }),
       );
     });
 
@@ -312,7 +312,7 @@ describe('verifyMongoSchema', () => {
 
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ kind: 'type_mismatch', table: 'users' }),
+        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-equal' }),
       );
     });
 
@@ -338,7 +338,7 @@ describe('verifyMongoSchema', () => {
 
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ kind: 'type_mismatch', table: 'events' }),
+        expect.objectContaining({ path: ['events', 'options'], reason: 'not-equal' }),
       );
     });
   });

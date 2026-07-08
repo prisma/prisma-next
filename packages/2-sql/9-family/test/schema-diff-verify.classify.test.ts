@@ -1,8 +1,4 @@
-import type {
-  DiffableNode,
-  SchemaDiffIssue,
-  SchemaDiffOutcome,
-} from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import type { SqlSchemaDiffRole } from '@prisma-next/sql-schema-ir/types';
 import {
@@ -58,13 +54,10 @@ function issueOf(
   reason: 'not-expected' | 'not-found' | 'not-equal',
   node: DiffableNode,
 ): SchemaDiffIssue {
-  const outcome: SchemaDiffOutcome =
-    reason === 'not-expected' ? 'extra' : reason === 'not-found' ? 'missing' : 'mismatch';
   return {
     path: ['database', node.id],
-    outcome,
     reason,
-    message: `${outcome}: ${node.id}`,
+    message: `${reason}: ${node.id}`,
     ...(reason === 'not-expected' ? { actual: node } : { expected: node, actual: node }),
   };
 }

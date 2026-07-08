@@ -276,7 +276,6 @@ function buildSkippedSchemaResult(space: AggregateContractSpace): VerifyDatabase
     target: { expected: contract.target },
     schema: {
       issues: [],
-      schemaDiffIssues: [],
     },
     timings: { total: 0 },
   };

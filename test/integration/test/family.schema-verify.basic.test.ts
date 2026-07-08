@@ -80,7 +80,7 @@ describe('family instance schemaVerify - basic', () => {
 
         expect(result).toMatchObject({
           ok: true,
-          schema: { issues: [], schemaDiffIssues: [] },
+          schema: { issues: [] },
         });
       },
       timeouts.spinUpPpgDev,
@@ -124,7 +124,7 @@ describe('family instance schemaVerify - basic', () => {
         const result = await runSchemaVerify(getConnectionString(), contract);
 
         expect(result.ok).toBe(false);
-        expect(result.schema.schemaDiffIssues).toContainEqual(
+        expect(result.schema.issues).toContainEqual(
           expect.objectContaining({ reason: 'not-found', path: ['database', 'public', 'post'] }),
         );
       },
@@ -161,7 +161,7 @@ describe('family instance schemaVerify - basic', () => {
         const result = await runSchemaVerify(getConnectionString(), contract);
 
         expect(result.ok).toBe(false);
-        expect(result.schema.schemaDiffIssues).toContainEqual(
+        expect(result.schema.issues).toContainEqual(
           expect.objectContaining({
             reason: 'not-found',
             path: ['database', 'public', 'user', 'column:email'],

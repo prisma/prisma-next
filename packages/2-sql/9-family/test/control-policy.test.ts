@@ -102,7 +102,7 @@ interface FakeIssue {
    * `'createTable'` for `missing_table`-style issues; `undefined` for the
    * non-creation kinds. The Postgres adapter encodes the same mapping in
    * `resolvePostgresIssueCreationFactoryName` based on the real
-   * `SchemaIssue.kind`; these fakes call it out directly so the helper test
+   * the real diff issue's node kind; these fakes call it out directly so the helper test
    * doesn't depend on adapter wiring.
    */
   readonly creationFactoryName: string | undefined;

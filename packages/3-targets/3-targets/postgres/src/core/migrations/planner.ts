@@ -340,10 +340,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const seenEnableTables = new Set<string>();
 
     for (const issue of filteredDiffIssues) {
-      // 'mismatch' is unreachable for content-addressed policies: the wire name
+      // 'not-equal' is unreachable for content-addressed policies: the wire name
       // encodes the body hash, so two policies sharing a local key (same name)
       // are always equal and isEqualTo never returns false.
-      if (issue.outcome === 'missing') {
+      if (issue.reason === 'not-found') {
         const expected = issue.expected;
         PostgresPolicySchemaNode.assert(expected);
         // expected.namespaceId is the DDL schema name (resolved during projection);
@@ -364,7 +364,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
             policyNodeToContractPolicy(expected),
           ),
         );
-      } else if (issue.outcome === 'extra' && allowsDestructive) {
+      } else if (issue.reason === 'not-expected' && allowsDestructive) {
         const actual = issue.actual;
         PostgresPolicySchemaNode.assert(actual);
         const schemaForTable = resolveDdlSchemaForNamespaceStorage(

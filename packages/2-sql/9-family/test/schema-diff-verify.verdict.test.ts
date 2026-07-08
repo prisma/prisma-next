@@ -14,7 +14,7 @@
 
 import type { ColumnDefault, ControlPolicy } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { SchemaDiffIssue, SchemaIssue } from '@prisma-next/framework-components/control';
+import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas } from '@prisma-next/framework-components/control';
 import { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -87,8 +87,8 @@ function stampLikeIntrospection(schema: SqlSchemaIR): SqlSchemaIR {
 
 interface VerdictRun {
   readonly ok: boolean;
-  readonly failures: readonly (SchemaDiffIssue | SchemaIssue)[];
-  readonly warnings: readonly (SchemaDiffIssue | SchemaIssue)[];
+  readonly failures: readonly SchemaDiffIssue[];
+  readonly warnings: readonly SchemaDiffIssue[];
 }
 
 function runVerdict(options: {
@@ -138,7 +138,7 @@ function runBothModes(options: {
 
 function failureReasonsByNodeKind(run: VerdictRun): ReadonlyArray<readonly [string, string]> {
   return run.failures.map((issue) => {
-    const node = 'outcome' in issue ? (issue.expected ?? issue.actual) : undefined;
+    const node = issue.expected ?? issue.actual;
     const nodeKind = (node as { nodeKind?: string } | undefined)?.nodeKind ?? 'unknown';
     return [nodeKind, issue.reason ?? 'unknown'] as const;
   });
@@ -860,7 +860,7 @@ describe('differ verdict — control policies', () => {
 
 describe('differ verdict — storage types (verifyType hook)', () => {
   function typeComponent(
-    issues: readonly { kind: string; message: string }[],
+    issues: readonly SchemaDiffIssue[],
   ): TargetBoundComponentDescriptor<'sql', string> {
     return {
       kind: 'adapter',
@@ -902,9 +902,7 @@ describe('differ verdict — storage types (verifyType hook)', () => {
 
   it('a verifyType failure fails the verdict in both modes', () => {
     const components = [
-      typeComponent([
-        { kind: 'type_values_mismatch', message: 'enum drift', reason: 'not-equal' } as never,
-      ]),
+      typeComponent([{ path: ['user_status'], reason: 'not-equal', message: 'enum drift' }]),
     ];
     const { strict, lenient } = runBothModes({
       contract: contractWithType(),

@@ -328,22 +328,21 @@ describe('Mongo contract-space aggregate e2e', {
       });
       expect(extVerify.ok).toBe(false);
       const indexIssues = extVerify.schema.issues.filter(
-        (i): i is typeof i & { readonly table: string } =>
-          i.kind === 'index_mismatch' && 'table' in i,
+        (i) => i.reason === 'not-equal' && i.path[1]?.startsWith('index:'),
       );
       expect(indexIssues.length).toBeGreaterThan(0);
       for (const issue of indexIssues) {
-        expect(issue.table).toBe(MONGO_TEST_COLLECTION);
+        expect(issue.path[0]).toBe(MONGO_TEST_COLLECTION);
       }
       // The remediation hint a CLI consumer would render therefore
       // points at the extension's collection, not at the app's.
       // Issues on app-owned collections without per-space projection
-      // (e.g. `extra_table` for the app's `users` from the ext
-      // contract's POV) are warnings in non-strict mode; only drift
-      // on a contract-declared element escalates to a failure, and
-      // every failure here scopes to the extension's collection.
+      // (e.g. a whole-collection extra for the app's `users` from the
+      // ext contract's POV) are warnings in non-strict mode; only
+      // drift on a contract-declared element escalates to a failure,
+      // and every failure here scopes to the extension's collection.
       for (const issue of indexIssues) {
-        expect(issue.table).not.toBe('users');
+        expect(issue.path[0]).not.toBe('users');
       }
     } finally {
       await driver.close();

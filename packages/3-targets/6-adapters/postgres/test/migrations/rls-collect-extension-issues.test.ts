@@ -150,7 +150,7 @@ describe('buildPostgresPlanDiff — RLS drift detection', () => {
     const issues = policyDiffIssues(buildContract([]), schemaWithPolicies([managedPolicy()]));
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.outcome).toBe('extra');
+    expect(issues[0]?.reason).toBe('not-expected');
     expect(issues[0]?.actual).toMatchObject({ name: WIRE_NAME });
   });
 
@@ -158,7 +158,7 @@ describe('buildPostgresPlanDiff — RLS drift detection', () => {
     const issues = policyDiffIssues(buildContract([]), schemaWithPolicies([externalPolicy()]));
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.outcome).toBe('extra');
+    expect(issues[0]?.reason).toBe('not-expected');
     expect(issues[0]?.actual).toMatchObject({ name: 'legacy_admin_policy' });
   });
 

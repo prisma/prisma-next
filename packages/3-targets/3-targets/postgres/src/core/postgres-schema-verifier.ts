@@ -1,6 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { SqlSchemaVerifierBase } from '@prisma-next/family-sql/ir';
-import type { SchemaIssue, SchemaVerifyOptions } from '@prisma-next/framework-components/control';
+import type {
+  SchemaDiffIssue,
+  SchemaVerifyOptions,
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
@@ -25,13 +28,13 @@ export class PostgresSchemaVerifier extends SqlSchemaVerifierBase<
 > {
   protected verifyCommonSqlSchema(
     _options: SchemaVerifyOptions<Contract<SqlStorage>, SqlSchemaIR>,
-  ): readonly SchemaIssue[] {
+  ): readonly SchemaDiffIssue[] {
     return [];
   }
 
   protected verifyTargetExtensions(
     _options: SchemaVerifyOptions<Contract<SqlStorage>, SqlSchemaIR>,
-  ): readonly SchemaIssue[] {
+  ): readonly SchemaDiffIssue[] {
     return [];
   }
 }

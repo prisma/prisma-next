@@ -1,6 +1,5 @@
 import type {
   SchemaDiffIssue,
-  SchemaIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
@@ -10,12 +9,11 @@ function makeResult(overrides: {
   spaceId: string;
   ok: boolean;
   summary: string;
-  issues?: readonly SchemaIssue[];
-  schemaDiffIssues?: readonly SchemaDiffIssue[];
+  issues?: readonly SchemaDiffIssue[];
 }): VerifyDatabaseSchemaResult {
-  const defaultIssues: readonly SchemaIssue[] = overrides.ok
+  const defaultIssues: readonly SchemaDiffIssue[] = overrides.ok
     ? []
-    : [{ kind: 'missing_table', table: overrides.spaceId, message: overrides.summary }];
+    : [{ path: [overrides.spaceId], reason: 'not-found', message: overrides.summary }];
   const result: VerifyDatabaseSchemaResult = {
     ok: overrides.ok,
     summary: overrides.summary,
@@ -23,7 +21,6 @@ function makeResult(overrides: {
     target: { expected: 'postgres' },
     schema: {
       issues: overrides.issues ?? defaultIssues,
-      schemaDiffIssues: overrides.schemaDiffIssues ?? [],
     },
     timings: { total: 0 },
   };
@@ -51,8 +48,7 @@ describe('combineVerifyResults', () => {
     });
     expect(combined.result.schema).toEqual({
       issues: [],
-      schemaDiffIssues: [],
-      warnings: { issues: [], schemaDiffIssues: [] },
+      warnings: { issues: [] },
     });
     expect(combined.unclaimed).toEqual([]);
   });
@@ -114,8 +110,8 @@ describe('combineVerifyResults', () => {
           ok: false,
           summary: 'Schema verification found 2 issue(s)',
           issues: [
-            { kind: 'missing_table', table: 'a', message: 'missing a' },
-            { kind: 'missing_table', table: 'b', message: 'missing b' },
+            { path: ['a'], reason: 'not-found', message: 'missing a' },
+            { path: ['b'], reason: 'not-found', message: 'missing b' },
           ],
         }),
       ],
@@ -216,21 +212,14 @@ describe('combineVerifyResults', () => {
     });
   });
 
-  it('concatenates issues and schemaDiffIssues from all spaces into the combined result', () => {
-    const appStructuralIssue: SchemaIssue = {
-      kind: 'missing_table',
-      table: 'profiles',
-      message: 'Table "profiles" is missing from the database',
-    };
+  it('concatenates issues from all spaces into the combined result', () => {
     const appDiffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_app_abc'],
-      outcome: 'missing',
       reason: 'not-found',
       message: "RLS policy 'policy_app_abc' is missing from the database",
     };
     const extDiffIssue: SchemaDiffIssue = {
       path: ['public', 'audit_log', 'policy_cipher_def'],
-      outcome: 'extra',
       reason: 'not-expected',
       message: "RLS policy 'policy_cipher_def' is present in the database but not in the contract",
     };
@@ -242,8 +231,7 @@ describe('combineVerifyResults', () => {
           spaceId: 'app',
           ok: true,
           summary: 'Database schema satisfies contract',
-          issues: [appStructuralIssue],
-          schemaDiffIssues: [appDiffIssue],
+          issues: [appDiffIssue],
         }),
       ],
       [
@@ -252,14 +240,13 @@ describe('combineVerifyResults', () => {
           spaceId: 'cipher',
           ok: true,
           summary: 'Schema matches contract',
-          schemaDiffIssues: [extDiffIssue],
+          issues: [extDiffIssue],
         }),
       ],
     ]);
 
     const combined = combineVerifyResults(perSpace, 'app', false, []);
 
-    expect(combined.result.schema.issues).toEqual([appStructuralIssue]);
-    expect(combined.result.schema.schemaDiffIssues).toEqual([appDiffIssue, extDiffIssue]);
+    expect(combined.result.schema.issues).toEqual([appDiffIssue, extDiffIssue]);
   });
 });

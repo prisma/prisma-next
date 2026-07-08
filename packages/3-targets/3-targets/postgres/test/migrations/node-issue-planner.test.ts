@@ -281,7 +281,6 @@ describe('mapNodeIssueToCall — synthesized namespace issue', () => {
     });
     const issue: SchemaDiffIssue = {
       path: ['database', 'auth'],
-      outcome: 'missing',
       reason: 'not-found',
       message: 'missing: database/auth',
       expected: namespace,

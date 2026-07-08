@@ -2,7 +2,6 @@ import type {
   CoreSchemaView,
   IntrospectSchemaResult,
   SchemaDiffIssue,
-  SchemaIssue,
   SignDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
@@ -333,9 +332,9 @@ describe('formatIntrospectJson', () => {
 });
 
 describe('formatSchemaVerifyOutput', () => {
-  const missingTableIssue: SchemaIssue = {
-    kind: 'missing_table',
-    table: 'post',
+  const missingTableIssue: SchemaDiffIssue = {
+    path: ['post'],
+    reason: 'not-found',
     message: 'Table "post" is missing from database',
   };
 
@@ -352,7 +351,6 @@ describe('formatSchemaVerifyOutput', () => {
     },
     schema: {
       issues: [missingTableIssue],
-      schemaDiffIssues: [],
     },
     meta: {
       contractPath: './contract.json',
@@ -375,18 +373,16 @@ describe('formatSchemaVerifyOutput', () => {
     expect(stripped).toContain('✖ Database schema does not satisfy contract (1 failure)');
   });
 
-  it('renders schemaDiffIssues after issues, each on its own line', () => {
+  it('renders every issue, each on its own line', () => {
     const diffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_abc'],
-      outcome: 'missing',
       reason: 'not-found',
       message: 'RLS policy "policy_abc" is missing from the database',
     };
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
       schema: {
-        issues: [missingTableIssue],
-        schemaDiffIssues: [diffIssue],
+        issues: [missingTableIssue, diffIssue],
       },
     };
     const flags = parseGlobalFlags({ 'no-color': true });
@@ -401,13 +397,13 @@ describe('formatSchemaVerifyOutput', () => {
     expect(diffLineIndex).toBeGreaterThan(issueLineIndex);
   });
 
-  it('omits the "Schema issues:" header and renders the success summary when both lists are empty', () => {
+  it('omits the "Schema issues:" header and renders the success summary when the list is empty', () => {
     const { code: _code, ...rest } = createResult();
     const result: VerifyDatabaseSchemaResult = {
       ...rest,
       ok: true,
       summary: 'Database schema satisfies contract',
-      schema: { issues: [], schemaDiffIssues: [] },
+      schema: { issues: [] },
     };
     const flags = parseGlobalFlags({ 'no-color': true });
 
@@ -426,13 +422,10 @@ describe('formatSchemaVerifyOutput', () => {
       summary: 'Database schema satisfies contract',
       schema: {
         issues: [],
-        schemaDiffIssues: [],
         warnings: {
-          issues: [],
-          schemaDiffIssues: [
+          issues: [
             {
               path: ['database', 'public', 'legacy_jobs'],
-              outcome: 'missing',
               reason: 'not-found',
               message: 'missing: database/public/legacy_jobs',
             },
@@ -515,7 +508,7 @@ describe('formatSchemaVerifyOutput', () => {
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
       ok: false,
-      schema: { issues: [], schemaDiffIssues: [] },
+      schema: { issues: [] },
       meta: { contractPath: './contract.json', strict: true },
     };
     const flags = parseGlobalFlags({ color: true });
@@ -533,7 +526,7 @@ describe('formatSchemaVerifyOutput', () => {
       ...rest,
       ok: true,
       summary: 'Database schema satisfies contract',
-      schema: { issues: [], schemaDiffIssues: [] },
+      schema: { issues: [] },
       meta: { contractPath: './contract.json', strict: false },
     };
     const flags = parseGlobalFlags({ color: true });
@@ -558,18 +551,16 @@ describe('formatSchemaVerifyOutput', () => {
     expect(lines[blankIndex + 1]).toBe('Unclaimed elements (declared by no contract):');
   });
 
-  it('renders RLS policy drift issues via schemaDiffIssues, naming each drifted policy', () => {
+  it('renders RLS policy drift issues, naming each drifted policy', () => {
     const policyWireName = 'read_own_profiles_abc12345';
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
       ok: false,
       summary: 'Database schema does not satisfy contract (1 failure)',
       schema: {
-        issues: [],
-        schemaDiffIssues: [
+        issues: [
           {
             path: ['public', 'profiles', policyWireName],
-            outcome: 'missing',
             reason: 'not-found',
             message: `RLS policy "${policyWireName}" on table "profiles" is missing from the database`,
           },
@@ -602,7 +593,6 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
-        schemaDiffIssues: [],
       },
       meta: {
         contractPath: './contract.json',
@@ -623,7 +613,6 @@ describe('formatSchemaVerifyJson', () => {
     expect(parsed.contract.profileHash).toBe('sha256:profile');
     expect(parsed.target.expected).toBe('postgres');
     expect(parsed.schema.issues).toEqual([]);
-    expect(parsed.schema.schemaDiffIssues).toEqual([]);
     expect(parsed.meta?.contractPath).toBe('./contract.json');
     expect(parsed.meta?.strict).toBe(false);
     expect(parsed.timings.total).toBe(123);
@@ -642,7 +631,6 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
-        schemaDiffIssues: [],
       },
       meta: {
         contractPath: './contract.json',
@@ -673,7 +661,6 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
-        schemaDiffIssues: [],
       },
       meta: {
         contractPath: './contract.json',
@@ -691,7 +678,7 @@ describe('formatSchemaVerifyJson', () => {
     expect(parsed.code).toBeUndefined();
   });
 
-  it('includes issues and schemaDiffIssues', () => {
+  it('includes every issue', () => {
     const result: VerifyDatabaseSchemaResult = {
       ok: false,
       code: 'PN-SCHEMA-0001',
@@ -706,15 +693,12 @@ describe('formatSchemaVerifyJson', () => {
       schema: {
         issues: [
           {
-            kind: 'missing_table',
-            table: 'post',
+            path: ['post'],
+            reason: 'not-found',
             message: 'Table "post" is missing',
           },
-        ],
-        schemaDiffIssues: [
           {
             path: ['public', 'profiles', 'policy_abc'],
-            outcome: 'missing',
             reason: 'not-found',
             message: 'RLS policy "policy_abc" is missing from the database',
           },
@@ -735,8 +719,7 @@ describe('formatSchemaVerifyJson', () => {
 
     expect(parsed.ok).toBe(false);
     expect(parsed.code).toBe('PN-SCHEMA-0001');
-    expect(parsed.schema.issues).toHaveLength(1);
-    expect(parsed.schema.schemaDiffIssues).toHaveLength(1);
+    expect(parsed.schema.issues).toHaveLength(2);
     expect(parsed.meta?.strict).toBe(true);
   });
 
@@ -754,7 +737,6 @@ describe('formatSchemaVerifyJson', () => {
       },
       schema: {
         issues: [],
-        schemaDiffIssues: [],
       },
       meta: {
         contractPath: './contract.json',

@@ -48,7 +48,7 @@ describe('family instance schemaVerify - modes', () => {
         const result = await runSchemaVerify(getConnectionString(), contract, { strict: true });
 
         expect(result.ok).toBe(false);
-        expect(result.schema.schemaDiffIssues).toContainEqual(
+        expect(result.schema.issues).toContainEqual(
           expect.objectContaining({
             reason: 'not-expected',
             path: ['database', 'public', 'user', 'column:extraColumn'],
@@ -77,7 +77,7 @@ describe('family instance schemaVerify - modes', () => {
         // In permissive mode, extra columns don't cause failures
         expect(result).toMatchObject({
           ok: true,
-          schema: { issues: [], schemaDiffIssues: [] },
+          schema: { issues: [] },
         });
       },
       timeouts.spinUpPpgDev,

@@ -85,7 +85,11 @@ describe('verifyMongoSchema control policy', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.schema.issues.length).toBeGreaterThan(0);
-    expect(result.schema.issues.some((i) => i.kind === 'extra_index')).toBe(true);
+    expect(
+      result.schema.issues.some(
+        (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+      ),
+    ).toBe(true);
   });
 
   it('fails a missing declared collection under external (existence required)', () => {
@@ -98,7 +102,7 @@ describe('verifyMongoSchema control policy', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.schema.issues).toContainEqual(
-      expect.objectContaining({ kind: 'missing_table', table: 'items' }),
+      expect.objectContaining({ path: ['items'], reason: 'not-found' }),
     );
   });
 
@@ -114,7 +118,9 @@ describe('verifyMongoSchema control policy', () => {
       frameworkComponents: [],
     });
     expect(result.ok).toBe(true);
-    expect(result.schema.issues.some((i) => i.kind === 'extra_table')).toBe(false);
+    expect(
+      result.schema.issues.some((i) => i.reason === 'not-expected' && i.path.length === 1),
+    ).toBe(false);
   });
 
   it('softens a non-strict extra index to warn for tolerated and observed alike', () => {
@@ -151,7 +157,7 @@ describe('verifyMongoSchema control policy', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.schema.issues).toContainEqual(
-      expect.objectContaining({ kind: 'missing_table', table: 'items' }),
+      expect.objectContaining({ path: ['items'], reason: 'not-found' }),
     );
   });
 
@@ -169,7 +175,11 @@ describe('verifyMongoSchema control policy', () => {
       frameworkComponents: [],
     });
     expect(result.ok).toBe(true);
-    expect(result.schema.issues.some((i) => i.kind === 'extra_index')).toBe(false);
+    expect(
+      result.schema.issues.some(
+        (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+      ),
+    ).toBe(false);
   });
 
   it('downgrades drift to warn under observed', () => {

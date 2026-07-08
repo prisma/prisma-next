@@ -291,11 +291,9 @@ describe('control policy mongo CLI (e2e)', { timeout: timeouts.spinUpMongoMemory
       // not silent suppression.
       const schema = parsed['schema'] as {
         issues: readonly unknown[];
-        schemaDiffIssues: readonly unknown[];
-        warnings: { issues: readonly { message: string }[]; schemaDiffIssues: readonly unknown[] };
+        warnings: { issues: readonly { message: string }[] };
       };
       expect(schema.issues).toEqual([]);
-      expect(schema.schemaDiffIssues).toEqual([]);
       expect(schema.warnings.issues.some((w) => w.message.includes('legacy_jobs'))).toBe(true);
     });
   });

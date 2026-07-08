@@ -19,7 +19,6 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import type {
   DiffableNode,
   SchemaDiffIssue,
-  SchemaIssue,
   VerifierIssueCategory,
   VerifierOutcome,
   VerifyDatabaseSchemaResult,
@@ -288,13 +287,13 @@ export interface StorageTypeVerdictInput {
  * contract default policy, matching the legacy `pushTypeNode` semantics.
  */
 export interface StorageTypeVerdict {
-  readonly failures: readonly SchemaIssue[];
-  readonly warnings: readonly SchemaIssue[];
+  readonly failures: readonly SchemaDiffIssue[];
+  readonly warnings: readonly SchemaDiffIssue[];
 }
 
 export function computeStorageTypeVerdict(input: StorageTypeVerdictInput): StorageTypeVerdict {
-  const failures: SchemaIssue[] = [];
-  const warnings: SchemaIssue[] = [];
+  const failures: SchemaDiffIssue[] = [];
+  const warnings: SchemaDiffIssue[] = [];
   const policy = effectiveControlPolicy(undefined, input.contract.defaultControlPolicy);
   for (const pair of input.namespacePairs) {
     if (pair.actual === undefined) continue;
@@ -304,7 +303,7 @@ export function computeStorageTypeVerdict(input: StorageTypeVerdictInput): Stora
       if (!hook?.verifyType) continue;
       const typeIssues = hook.verifyType({ typeName, typeInstance, schema: pair.actual });
       for (const issue of typeIssues) {
-        const disposition = verifierDisposition(policy, issue.kind);
+        const disposition = verifierDisposition(policy, issue);
         if (disposition === 'suppress') continue;
         if (disposition === 'warn') {
           warnings.push(issue);
@@ -378,11 +377,9 @@ export function verifySqlSchemaByDiff(
       actual: input.contract.target,
     },
     schema: {
-      issues: storageTypeVerdict.failures,
-      schemaDiffIssues: diffVerdict.failures,
+      issues: [...diffVerdict.failures, ...storageTypeVerdict.failures],
       warnings: {
-        issues: storageTypeVerdict.warnings,
-        schemaDiffIssues: diffVerdict.warnings,
+        issues: [...diffVerdict.warnings, ...storageTypeVerdict.warnings],
       },
     },
     meta: { strict: input.strict },

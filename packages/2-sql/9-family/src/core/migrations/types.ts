@@ -18,7 +18,7 @@ import type {
   MigrationRunnerResult,
   OperationContext,
   OpFactoryCall,
-  SchemaIssue,
+  SchemaDiffIssue,
   SchemaOwnership,
   SchemaVerifier,
 } from '@prisma-next/framework-components/control';
@@ -127,7 +127,7 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
     readonly typeInstance: StorageTypeInstance;
     readonly schema: SqlSchemaIRNode;
     readonly schemaName?: string;
-  }) => readonly SchemaIssue[];
+  }) => readonly SchemaDiffIssue[];
   introspectTypes?: (options: {
     readonly driver: SqlControlDriverInstance<string>;
     readonly schemaName?: string;

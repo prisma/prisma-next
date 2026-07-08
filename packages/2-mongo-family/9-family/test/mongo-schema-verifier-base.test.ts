@@ -1,5 +1,8 @@
 import { coreHash } from '@prisma-next/contract/types';
-import type { SchemaIssue, SchemaVerifyOptions } from '@prisma-next/framework-components/control';
+import type {
+  SchemaDiffIssue,
+  SchemaVerifyOptions,
+} from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import { MongoStorage } from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
@@ -36,8 +39,8 @@ class RecordingVerifier extends MongoSchemaVerifierBase<FakeContract, FakeSchema
   readonly targetExtensionCalls: Array<SchemaVerifyOptions<FakeContract, FakeSchema>> = [];
 
   constructor(
-    private readonly issuesByNamespace: Readonly<Record<string, readonly SchemaIssue[]>> = {},
-    private readonly targetExtensionIssues: readonly SchemaIssue[] = [],
+    private readonly issuesByNamespace: Readonly<Record<string, readonly SchemaDiffIssue[]>> = {},
+    private readonly targetExtensionIssues: readonly SchemaDiffIssue[] = [],
   ) {
     super();
   }
@@ -47,7 +50,7 @@ class RecordingVerifier extends MongoSchemaVerifierBase<FakeContract, FakeSchema
     readonly schema: FakeSchema;
     readonly namespaceId: string;
     readonly namespace: Namespace;
-  }): readonly SchemaIssue[] {
+  }): readonly SchemaDiffIssue[] {
     this.dispatches.push({
       namespaceId: options.namespaceId,
       schemaTag: options.schema.tag,
@@ -57,7 +60,7 @@ class RecordingVerifier extends MongoSchemaVerifierBase<FakeContract, FakeSchema
 
   protected verifyTargetExtensions(
     options: SchemaVerifyOptions<FakeContract, FakeSchema>,
-  ): readonly SchemaIssue[] {
+  ): readonly SchemaDiffIssue[] {
     this.targetExtensionCalls.push(options);
     return this.targetExtensionIssues;
   }
@@ -111,14 +114,14 @@ describe('MongoSchemaVerifierBase', () => {
     });
 
     it('accumulates per-namespace issues + target-extension issues', () => {
-      const nsIssue: SchemaIssue = {
-        kind: 'missing_table',
-        table: 'users',
+      const nsIssue: SchemaDiffIssue = {
+        path: ['users'],
+        reason: 'not-found',
         message: 'collection users missing',
       };
-      const targetIssue: SchemaIssue = {
-        kind: 'extra_table',
-        table: 'audit_log',
+      const targetIssue: SchemaDiffIssue = {
+        path: ['audit_log'],
+        reason: 'not-expected',
         message: 'unexpected target-only collection',
       };
 

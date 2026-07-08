@@ -1,7 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
-  BaseSchemaIssue,
-  SchemaIssue,
+  SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { elementCoordinates } from '@prisma-next/framework-components/ir';
@@ -21,18 +20,14 @@ export function entityNamesDeclaredBy(contracts: ReadonlyArray<Contract>): Set<s
   return owned;
 }
 
-/** True when an issue reports an element present in the database but declared by no contract (an extra). */
-function isExtraIssue(issue: SchemaIssue): issue is BaseSchemaIssue {
-  return (
-    issue.kind === 'extra_table' ||
-    issue.kind === 'extra_column' ||
-    issue.kind === 'extra_primary_key' ||
-    issue.kind === 'extra_foreign_key' ||
-    issue.kind === 'extra_unique_constraint' ||
-    issue.kind === 'extra_index' ||
-    issue.kind === 'extra_validator' ||
-    issue.kind === 'extra_default'
-  );
+/**
+ * True when an issue reports a whole collection present in the database but
+ * declared by no contract (an extra) — its path is exactly the collection
+ * name, never a deeper index/validator/options auxiliary.
+ */
+function extraCollectionName(issue: SchemaDiffIssue): string | undefined {
+  if (issue.reason !== 'not-expected' || issue.path.length !== 1) return undefined;
+  return issue.path[0];
 }
 
 /**
@@ -44,8 +39,7 @@ function isExtraIssue(issue: SchemaIssue): issue is BaseSchemaIssue {
  * survive, so genuine drift still fails the runner's verdict.
  *
  * The result is issue-based, so the verdict recomputes directly from the
- * surviving lists: `ok` holds exactly when both lists are empty. Mongo
- * results carry no `schemaDiffIssues`.
+ * surviving list: `ok` holds exactly when it is empty.
  */
 export function scopeVerifyResultToSpace(
   result: VerifyDatabaseSchemaResult,
@@ -53,13 +47,13 @@ export function scopeVerifyResultToSpace(
 ): VerifyDatabaseSchemaResult {
   if (ownedByOtherSpaces.size === 0) return result;
 
-  const issues = result.schema.issues.filter(
-    (issue) =>
-      !(isExtraIssue(issue) && issue.table !== undefined && ownedByOtherSpaces.has(issue.table)),
-  );
+  const issues = result.schema.issues.filter((issue) => {
+    const name = extraCollectionName(issue);
+    return name === undefined || !ownedByOtherSpaces.has(name);
+  });
   if (issues.length === result.schema.issues.length) return result;
 
-  const ok = issues.length === 0 && result.schema.schemaDiffIssues.length === 0;
+  const ok = issues.length === 0;
   const { code: staleCode, ...envelope } = result;
   void staleCode;
   return {

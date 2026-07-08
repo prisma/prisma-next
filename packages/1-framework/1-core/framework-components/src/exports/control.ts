@@ -55,14 +55,11 @@ export type {
   OperationPreviewStatement,
 } from '../control/control-operation-preview';
 export type {
-  BaseSchemaIssue,
   EmitContractResult,
-  EnumValuesChangedIssue,
   ExpectationFailureReason,
   IntrospectSchemaResult,
   OperationContext,
   SchemaFindingLists,
-  SchemaIssue,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
@@ -103,13 +100,7 @@ export {
   extractComponentIds,
   extractQueryOperationTypeImports,
 } from '../control/control-stack';
-export type {
-  DiffableNode,
-  DiffIssue,
-  SchemaDiffer,
-  SchemaDiffIssue,
-  SchemaDiffOutcome,
-} from '../control/schema-diff';
+export type { DiffableNode, SchemaDiffIssue } from '../control/schema-diff';
 export { diffSchemas, SchemaDiff } from '../control/schema-diff';
 export type {
   SchemaVerifier,

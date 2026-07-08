@@ -53,7 +53,7 @@ describe('family instance schemaVerify - types', () => {
         // the adapter may map VARCHAR to pg/text@1, so this test may pass. This is
         // acceptable - the test verifies the verification runs without errors.
         expect(result).toMatchObject({
-          schema: { issues: expect.any(Array), schemaDiffIssues: expect.any(Array) },
+          schema: { issues: expect.any(Array) },
         });
       },
       timeouts.spinUpPpgDev,
@@ -90,7 +90,7 @@ describe('family instance schemaVerify - types', () => {
         const result = await runSchemaVerify(getConnectionString(), contract);
 
         expect(result.ok).toBe(false);
-        expect(result.schema.schemaDiffIssues).toContainEqual(
+        expect(result.schema.issues).toContainEqual(
           expect.objectContaining({
             reason: 'not-equal',
             path: ['database', 'public', 'user', 'column:email'],
@@ -165,7 +165,7 @@ describe('family instance schemaVerify - types', () => {
 
         // Should fail due to type mismatch (integer vs bigint)
         expect(result.ok).toBe(false);
-        expect(result.schema.schemaDiffIssues).toContainEqual(
+        expect(result.schema.issues).toContainEqual(
           expect.objectContaining({
             reason: 'not-equal',
             path: ['database', 'public', 'user', 'column:id'],

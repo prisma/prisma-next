@@ -61,8 +61,7 @@ export function verifyMongoSchema(options: VerifyMongoSchemaOptions): VerifyData
     target: { expected: contract.target },
     schema: {
       issues: failures,
-      schemaDiffIssues: [],
-      warnings: { issues: warnings, schemaDiffIssues: [] },
+      warnings: { issues: warnings },
     },
     meta: {
       strict,

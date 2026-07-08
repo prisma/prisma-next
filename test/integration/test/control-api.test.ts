@@ -437,7 +437,6 @@ describe('control-api', () => {
 
               expect(schemaResult.ok).toBe(true);
               expect(schemaResult.schema.issues).toEqual([]);
-              expect(schemaResult.schema.schemaDiffIssues).toEqual([]);
             } finally {
               await client.close();
             }

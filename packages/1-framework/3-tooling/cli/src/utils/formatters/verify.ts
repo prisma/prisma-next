@@ -352,10 +352,7 @@ export function formatSchemaVerifyOutput(
   const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  const issueMessages = [
-    ...result.schema.issues.map((issue) => issue.message),
-    ...result.schema.schemaDiffIssues.map((issue) => issue.message),
-  ];
+  const issueMessages = result.schema.issues.map((issue) => issue.message);
   if (issueMessages.length > 0) {
     lines.push(formatRed('Schema issues:'));
     for (const message of issueMessages) {
@@ -363,10 +360,7 @@ export function formatSchemaVerifyOutput(
     }
   }
 
-  const warningMessages = [
-    ...(result.schema.warnings?.issues ?? []).map((issue) => issue.message),
-    ...(result.schema.warnings?.schemaDiffIssues ?? []).map((issue) => issue.message),
-  ];
+  const warningMessages = (result.schema.warnings?.issues ?? []).map((issue) => issue.message);
   if (warningMessages.length > 0) {
     if (lines.length > 0) lines.push('');
     lines.push(formatYellow('Schema warnings:'));

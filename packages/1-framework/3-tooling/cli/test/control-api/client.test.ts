@@ -84,7 +84,6 @@ function createMockComponents() {
       target: { expected: 'postgres' },
       schema: {
         issues: [],
-        schemaDiffIssues: [],
       },
       timings: { total: 10 },
     }),
@@ -284,12 +283,11 @@ describe('ControlClient progress emission', () => {
         schema: {
           issues: [
             {
-              kind: 'missing_table',
-              table: 'root',
+              path: ['root'],
+              reason: 'not-found',
               message: 'Schema mismatch',
             },
           ],
-          schemaDiffIssues: [],
         },
         timings: { total: 10 },
       });

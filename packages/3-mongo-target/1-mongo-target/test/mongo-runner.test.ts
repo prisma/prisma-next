@@ -475,7 +475,9 @@ describe('MongoMigrationRunner schema verification', () => {
     expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
     expect(failure.why).toMatch(/destination contract/);
     expect(failure.meta?.['issues']).toEqual(
-      expect.arrayContaining([expect.objectContaining({ kind: 'extra_table', table: 'rogue' })]),
+      expect.arrayContaining([
+        expect.objectContaining({ path: ['rogue'], reason: 'not-expected' }),
+      ]),
     );
     expect(calls).toEqual({ initMarker: 0, updateMarker: 0, writeLedgerEntry: 0 });
   });

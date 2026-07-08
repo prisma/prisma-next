@@ -190,7 +190,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
 
       expect(result).toMatchObject({
         ok: true,
-        schema: { issues: [], schemaDiffIssues: [] },
+        schema: { issues: [] },
       });
     });
 
@@ -211,7 +211,11 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.schema.issues.some((i) => i.kind === 'index_mismatch')).toBe(true);
+      expect(
+        result.schema.issues.some(
+          (i) => i.reason === 'not-equal' && i.path[1]?.startsWith('index:'),
+        ),
+      ).toBe(true);
     });
 
     it('passes on extra index in non-strict mode, with no extra-index finding in the result', async () => {
@@ -233,7 +237,11 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(true);
-      expect(result.schema.issues.some((i) => i.kind === 'extra_index')).toBe(false);
+      expect(
+        result.schema.issues.some(
+          (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+        ),
+      ).toBe(false);
     });
 
     it('fails on extra index in strict mode', async () => {
@@ -255,7 +263,11 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.schema.issues.some((i) => i.kind === 'extra_index')).toBe(true);
+      expect(
+        result.schema.issues.some(
+          (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+        ),
+      ).toBe(true);
     });
 
     it('fails when expected collection is missing', async () => {
@@ -273,7 +285,9 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.schema.issues.some((i) => i.kind === 'missing_table')).toBe(true);
+      expect(
+        result.schema.issues.some((i) => i.reason === 'not-found' && i.path.length === 1),
+      ).toBe(true);
     });
   });
 

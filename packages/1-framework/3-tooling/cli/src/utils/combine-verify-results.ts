@@ -50,21 +50,14 @@ export function combineVerifyResults(
   let okAll = true;
   let firstFailure: VerifyDatabaseSchemaResult | undefined;
   let issues: VerifyDatabaseSchemaResult['schema']['issues'] = [];
-  let schemaDiffIssues: VerifyDatabaseSchemaResult['schema']['schemaDiffIssues'] = [];
   let warningIssues: VerifyDatabaseSchemaResult['schema']['issues'] = [];
-  let warningSchemaDiffIssues: VerifyDatabaseSchemaResult['schema']['schemaDiffIssues'] = [];
   for (const [, result] of perSpace) {
     if (!result.ok) {
       okAll = false;
       if (firstFailure === undefined) firstFailure = result;
     }
     issues = [...issues, ...result.schema.issues];
-    schemaDiffIssues = [...schemaDiffIssues, ...result.schema.schemaDiffIssues];
     warningIssues = [...warningIssues, ...(result.schema.warnings?.issues ?? [])];
-    warningSchemaDiffIssues = [
-      ...warningSchemaDiffIssues,
-      ...(result.schema.warnings?.schemaDiffIssues ?? []),
-    ];
   }
 
   const unclaimedFails = strict && unclaimed.length > 0;
@@ -91,8 +84,7 @@ export function combineVerifyResults(
       target: appResult.target,
       schema: {
         issues,
-        schemaDiffIssues,
-        warnings: { issues: warningIssues, schemaDiffIssues: warningSchemaDiffIssues },
+        warnings: { issues: warningIssues },
       },
       meta: { strict },
       timings: { total: 0 },

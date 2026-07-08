@@ -1,5 +1,5 @@
 import type {
-  SchemaIssue,
+  SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -200,7 +200,7 @@ export function errorMarkerRequired(options?: {
 export function errorSchemaVerificationFailed(options: {
   readonly summary: string;
   readonly verificationResult: VerifyDatabaseSchemaResult;
-  readonly issues?: readonly SchemaIssue[];
+  readonly issues?: readonly SchemaDiffIssue[];
 }): CliStructuredError {
   return new CliStructuredError('3004', options.summary, {
     domain: 'RUN',

@@ -140,10 +140,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
           why: 'The resulting database schema does not satisfy the destination contract.',
           meta: {
-            issues: [
-              ...schemaVerifyResult.schema.issues,
-              ...schemaVerifyResult.schema.schemaDiffIssues,
-            ],
+            issues: schemaVerifyResult.schema.issues,
           },
         });
       }

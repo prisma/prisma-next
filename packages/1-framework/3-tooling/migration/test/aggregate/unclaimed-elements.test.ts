@@ -25,7 +25,6 @@ function diffNode(id: string, diffRole: string): DiffableNode {
 function extraTableIssue(name: string): SchemaDiffIssue {
   return {
     path: ['database', 'public', name],
-    outcome: 'extra',
     reason: 'not-expected',
     message: `extra: ${name}`,
     actual: diffNode(name, 'table'),
@@ -35,7 +34,6 @@ function extraTableIssue(name: string): SchemaDiffIssue {
 function extraColumnIssueUnder(tableName: string, columnName: string): SchemaDiffIssue {
   return {
     path: ['database', 'public', tableName, `column:${columnName}`],
-    outcome: 'extra',
     reason: 'not-expected',
     message: `extra column: ${columnName}`,
     actual: diffNode(`column:${columnName}`, 'column'),
@@ -45,7 +43,6 @@ function extraColumnIssueUnder(tableName: string, columnName: string): SchemaDif
 function extraPolicyIssue(tableName: string, policyName: string): SchemaDiffIssue {
   return {
     path: ['database', 'public', tableName, policyName],
-    outcome: 'extra',
     reason: 'not-expected',
     message: `RLS policy '${policyName}' is present in the database but not in the contract`,
     actual: {
@@ -55,10 +52,19 @@ function extraPolicyIssue(tableName: string, policyName: string): SchemaDiffIssu
   };
 }
 
+/** A Mongo-shape extra collection issue: no `diffRole`, path is the bare collection name. */
+function extraCollectionIssue(name: string): SchemaDiffIssue {
+  return {
+    path: [name],
+    reason: 'not-expected',
+    message: `Extra collection "${name}" exists in the database but not in the contract`,
+    actual: { id: name, isEqualTo: () => true, children: () => [] },
+  };
+}
+
 function makeResult(args: {
   ok: boolean;
   issues?: VerifyDatabaseSchemaResult['schema']['issues'];
-  schemaDiffIssues?: VerifyDatabaseSchemaResult['schema']['schemaDiffIssues'];
 }): VerifyDatabaseSchemaResult {
   return {
     ok: args.ok,
@@ -68,7 +74,6 @@ function makeResult(args: {
     target: { expected: 'postgres' },
     schema: {
       issues: args.issues ?? [],
-      schemaDiffIssues: args.schemaDiffIssues ?? [],
     },
     timings: { total: 0 },
   };
@@ -83,23 +88,20 @@ describe('stripExtraFindings', () => {
   it('strict extras-only failure passes after the strip (table + its descendants dropped)', () => {
     const result = makeResult({
       ok: false,
-      schemaDiffIssues: [extraTableIssue('legacy'), extraColumnIssueUnder('legacy', 'id')],
+      issues: [extraTableIssue('legacy'), extraColumnIssueUnder('legacy', 'id')],
     });
 
     const stripped = stripExtraFindings(result);
 
-    expect(stripped.schema.schemaDiffIssues).toEqual([]);
+    expect(stripped.schema.issues).toEqual([]);
     expect(stripped.ok).toBe(true);
     expect(stripped.summary).toBe('Database schema satisfies contract');
   });
 
-  it('coordinate extra_table issues are stripped the same way (Mongo shape)', () => {
+  it('a Mongo-shape extra collection issue is stripped the same way', () => {
     const result = makeResult({
       ok: false,
-      issues: [
-        { kind: 'extra_table', table: 'a', reason: 'not-expected', message: 'x' },
-        { kind: 'extra_table', table: 'b', reason: 'not-expected', message: 'x' },
-      ],
+      issues: [extraCollectionIssue('a'), extraCollectionIssue('b')],
     });
 
     const stripped = stripExtraFindings(result);
@@ -109,24 +111,21 @@ describe('stripExtraFindings', () => {
   });
 
   it('a real missing/mismatch failure survives the strip', () => {
+    const missingColumn: SchemaDiffIssue = {
+      path: ['database', 'public', 'user', 'column:email'],
+      reason: 'not-found',
+      message: 'm',
+      expected: diffNode('column:email', 'column'),
+    };
     const result = makeResult({
       ok: false,
-      issues: [
-        {
-          kind: 'missing_column',
-          table: 'user',
-          column: 'email',
-          reason: 'not-found',
-          message: 'm',
-        },
-        { kind: 'extra_table', table: 'legacy', reason: 'not-expected', message: 'x' },
-      ],
+      issues: [missingColumn, extraTableIssue('legacy')],
     });
 
     const stripped = stripExtraFindings(result);
 
     expect(stripped.ok).toBe(false);
-    expect(stripped.schema.issues.map((i) => i.kind)).toEqual(['missing_column']);
+    expect(stripped.schema.issues).toEqual([missingColumn]);
   });
 
   it('keeps an extra column on a declared table as the space’s own drift', () => {
@@ -134,7 +133,7 @@ describe('stripExtraFindings', () => {
     // the verdict stays consistent with the surviving evidence.
     const result = makeResult({
       ok: false,
-      schemaDiffIssues: [extraColumnIssueUnder('user', 'stale')],
+      issues: [extraColumnIssueUnder('user', 'stale')],
     });
 
     const stripped = stripExtraFindings(result);
@@ -149,12 +148,12 @@ describe('stripExtraFindings', () => {
     const policyIssue = extraPolicyIssue('user', 'policy_rogue');
     const result = makeResult({
       ok: false,
-      schemaDiffIssues: [extraTableIssue('cipher_state'), policyIssue],
+      issues: [extraTableIssue('cipher_state'), policyIssue],
     });
 
     const stripped = stripExtraFindings(result);
 
-    expect(stripped.schema.schemaDiffIssues).toEqual([policyIssue]);
+    expect(stripped.schema.issues).toEqual([policyIssue]);
     expect(stripped.ok).toBe(false);
   });
 
@@ -162,7 +161,7 @@ describe('stripExtraFindings', () => {
     const policyIssue = extraPolicyIssue('cipher_state', 'policy_rogue');
     const result = makeResult({
       ok: false,
-      schemaDiffIssues: [
+      issues: [
         extraTableIssue('cipher_state'),
         extraColumnIssueUnder('cipher_state', 'id'),
         policyIssue,
@@ -171,44 +170,35 @@ describe('stripExtraFindings', () => {
 
     const stripped = stripExtraFindings(result);
 
-    expect(stripped.schema.schemaDiffIssues).toEqual([policyIssue]);
+    expect(stripped.schema.issues).toEqual([policyIssue]);
     expect(stripped.ok).toBe(false);
   });
 
-  it('keeps an extra-policy schemaDiffIssue as the space’s own drift (nothing else stripped)', () => {
+  it('keeps an extra-policy issue as the space’s own drift (nothing else stripped)', () => {
     const result = makeResult({
       ok: false,
-      schemaDiffIssues: [extraPolicyIssue('user', 'policy_rogue')],
+      issues: [extraPolicyIssue('user', 'policy_rogue')],
     });
 
     const stripped = stripExtraFindings(result);
 
     expect(stripped).toBe(result);
-    expect(stripped.schema.schemaDiffIssues).toHaveLength(1);
+    expect(stripped.schema.issues).toHaveLength(1);
     expect(stripped.ok).toBe(false);
   });
 });
 
 describe('collectExtraElementNames', () => {
-  it('gathers extra names from coordinate issues, table-role nodes, and policy subjects', () => {
+  it('gathers extra names from whole-table-role nodes and Mongo-shape whole-collection issues', () => {
     const result = makeResult({
       ok: false,
       issues: [
-        { kind: 'extra_table', table: 'legacy', reason: 'not-expected', message: 'x' },
-        { kind: 'missing_table', table: 'wanted', reason: 'not-found', message: 'm' },
-      ],
-      schemaDiffIssues: [
         extraTableIssue('stray'),
+        extraCollectionIssue('legacy'),
         extraPolicyIssue('audit', 'p'),
-        {
-          path: ['database', 'public', 'x', 'p'],
-          outcome: 'missing',
-          reason: 'not-found',
-          message: 'm',
-        },
       ],
     });
 
-    expect([...collectExtraElementNames(result)].sort()).toEqual(['audit', 'legacy', 'stray']);
+    expect([...collectExtraElementNames(result)].sort()).toEqual(['legacy', 'stray']);
   });
 });

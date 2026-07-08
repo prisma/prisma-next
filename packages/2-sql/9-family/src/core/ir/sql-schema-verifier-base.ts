@@ -1,5 +1,5 @@
 import type {
-  SchemaIssue,
+  SchemaDiffIssue,
   SchemaVerifier,
   SchemaVerifyOptions,
   SchemaVerifyResult,
@@ -29,7 +29,7 @@ export abstract class SqlSchemaVerifierBase<TContract, TSchema>
   implements SchemaVerifier<TContract, TSchema>
 {
   verifySchema(options: SchemaVerifyOptions<TContract, TSchema>): SchemaVerifyResult {
-    const issues: SchemaIssue[] = [];
+    const issues: SchemaDiffIssue[] = [];
     issues.push(...this.verifyCommonSqlSchema(options));
     issues.push(...this.verifyTargetExtensions(options));
     return { ok: issues.length === 0, issues };
@@ -43,7 +43,7 @@ export abstract class SqlSchemaVerifierBase<TContract, TSchema>
    */
   protected abstract verifyCommonSqlSchema(
     options: SchemaVerifyOptions<TContract, TSchema>,
-  ): readonly SchemaIssue[];
+  ): readonly SchemaDiffIssue[];
 
   /**
    * Target-specific extensions — e.g. Postgres functions, future RLS
@@ -52,5 +52,5 @@ export abstract class SqlSchemaVerifierBase<TContract, TSchema>
    */
   protected abstract verifyTargetExtensions(
     options: SchemaVerifyOptions<TContract, TSchema>,
-  ): readonly SchemaIssue[];
+  ): readonly SchemaDiffIssue[];
 }

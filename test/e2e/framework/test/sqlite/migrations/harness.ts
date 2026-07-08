@@ -210,10 +210,7 @@ export async function applyMigration(
       frameworkComponents: fw,
     });
     if (!vr.ok) {
-      const lines = [
-        ...vr.schema.issues.map((i) => `  - [${i.kind}] ${i.message}`),
-        ...vr.schema.schemaDiffIssues.map((i) => `  - ${i.message}`),
-      ];
+      const lines = vr.schema.issues.map((i) => `  - ${i.message}`);
       throw new Error(`Schema verification failed:\n${lines.join('\n')}`);
     }
 

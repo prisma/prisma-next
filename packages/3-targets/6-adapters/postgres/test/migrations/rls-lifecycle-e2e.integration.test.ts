@@ -345,7 +345,7 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
       });
 
       expect(verifyResult.ok).toBe(false);
-      const extraIssues = verifyResult.schema.schemaDiffIssues.filter((i) => i.outcome === 'extra');
+      const extraIssues = verifyResult.schema.issues.filter((i) => i.reason === 'not-expected');
       expect(extraIssues.length).toBeGreaterThan(0);
 
       const issueMessages = extraIssues.map((i) => i.message);

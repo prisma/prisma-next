@@ -52,108 +52,25 @@ export interface VerifyDatabaseResult {
  */
 export type ExpectationFailureReason = 'not-expected' | 'not-found' | 'not-equal';
 
-export interface BaseSchemaIssue {
-  readonly kind:
-    | 'missing_schema'
-    | 'missing_table'
-    | 'missing_column'
-    | 'extra_table'
-    | 'extra_column'
-    | 'extra_primary_key'
-    | 'extra_foreign_key'
-    | 'extra_unique_constraint'
-    | 'extra_index'
-    | 'extra_validator'
-    | 'type_mismatch'
-    | 'type_missing'
-    | 'type_values_mismatch'
-    | 'nullability_mismatch'
-    | 'primary_key_mismatch'
-    | 'foreign_key_mismatch'
-    | 'unique_constraint_mismatch'
-    | 'index_mismatch'
-    | 'default_missing'
-    | 'default_mismatch'
-    | 'extra_default'
-    | 'check_missing'
-    | 'check_removed'
-    | 'check_mismatch';
-  readonly table?: string;
-  /**
-   * Namespace coordinate of the issue's subject (e.g. the schema a SQL
-   * table lives in). Populated by family verifiers that have the
-   * coordinate in scope when constructing the issue; absent for issues
-   * whose family has no namespace concept (e.g. Mongo collections) or
-   * whose subject isn't in any contract namespace (e.g. an extra-table
-   * issue raised for a table that exists in the live DB but not in the
-   * contract).
-   *
-   * Downstream planners trust this field as the authoritative subject
-   * coordinate and do not re-derive it by name lookup. A finer-grained
-   * structural split between framework-shared and family-specific issue
-   * fields is tracked under a follow-up ticket.
-   */
-  readonly namespaceId?: string;
-  readonly column?: string;
-  readonly indexOrConstraint?: string;
-  readonly typeName?: string;
-  readonly expected?: string;
-  readonly actual?: string;
-  readonly message: string;
-  /**
-   * Why the actual state fails the expectation. Stamped by every family
-   * verifier at issue construction; optional only because this legacy
-   * coordinate-based issue type predates the field and retires into the
-   * node-typed issue with the issue-type merge.
-   */
-  readonly reason?: ExpectationFailureReason;
-}
-
-export interface EnumValuesChangedIssue {
-  readonly kind: 'enum_values_changed';
-  /**
-   * Namespace coordinate of the enum type that changed values. Populated by
-   * family verifiers that have the coordinate in scope when constructing the
-   * issue. Downstream planners trust this field as the authoritative subject
-   * coordinate and do not re-derive it by name lookup.
-   */
-  readonly namespaceId: string;
-  readonly typeName: string;
-  readonly addedValues: readonly string[];
-  readonly removedValues: readonly string[];
-  readonly message: string;
-  /**
-   * Why the actual state fails the expectation (always `'not-equal'` for a
-   * value-set change). Stamped by the family verifiers at issue construction.
-   */
-  readonly reason?: ExpectationFailureReason;
-}
-
-export type SchemaIssue = BaseSchemaIssue | EnumValuesChangedIssue;
-
 /**
- * A pair of issue lists split by type, not by severity: `issues` holds the
- * legacy coordinate-based findings (storage types, Mongo — retires with the
- * issue-type merge), `schemaDiffIssues` the node-typed differ findings. Used
- * for both the failure channel and the warning channel of a verify result.
+ * A verify result's findings: one node-typed issue list. Used for both the
+ * failure channel and the warning channel of a verify result.
  */
 export interface SchemaFindingLists {
-  readonly issues: readonly SchemaIssue[];
-  readonly schemaDiffIssues: readonly SchemaDiffIssue[];
+  readonly issues: readonly SchemaDiffIssue[];
 }
 
 /**
- * The issue-based schema-verify result. `ok` derives from the FAILURE lists
- * only: a verify passes exactly when `schema.issues` and
- * `schema.schemaDiffIssues` are both empty, post strict-gating and
- * control-policy disposition.
+ * The issue-based schema-verify result. `ok` derives from the FAILURE list
+ * only: a verify passes exactly when `schema.issues` is empty, post
+ * strict-gating and control-policy disposition.
  *
  * `schema.warnings` carries warn-graded findings (an `observed`-policy
- * subject's drift, and any other `warn` disposition) in the same
- * coordinate/node split. Warnings are informational — they never affect
- * `ok` — but they MUST be surfaced: an `observed` table that drifted yields
- * `ok: true` with a non-empty warnings channel, which is what distinguishes
- * "watch without failing" from full suppression.
+ * subject's drift, and any other `warn` disposition) in the same shape.
+ * Warnings are informational — they never affect `ok` — but they MUST be
+ * surfaced: an `observed` table that drifted yields `ok: true` with a
+ * non-empty warnings channel, which is what distinguishes "watch without
+ * failing" from full suppression.
  */
 export interface VerifyDatabaseSchemaResult {
   readonly ok: boolean;

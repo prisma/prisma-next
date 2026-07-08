@@ -66,12 +66,10 @@ const FULL_SCHEMA_VERIFY = (
     target: { expected: 'postgres' },
     schema: {
       issues: extras.map((name) => ({
-        kind: 'extra_table' as const,
-        table: name,
+        path: [name],
         reason: 'not-expected' as const,
         message: `Extra table "${name}"`,
       })),
-      schemaDiffIssues: [],
     },
     timings: { total: 0 },
   };
@@ -79,7 +77,10 @@ const FULL_SCHEMA_VERIFY = (
 
 function extraTables(result: VerifyDatabaseSchemaResult | undefined): string[] {
   return (result?.schema.issues ?? [])
-    .flatMap((issue) => (issue.kind === 'extra_table' && issue.table ? [issue.table] : []))
+    .flatMap((issue) =>
+      issue.reason === 'not-expected' && issue.path.length === 1 ? [issue.path[0]] : [],
+    )
+    .filter((name): name is string => name !== undefined)
     .sort();
 }
 

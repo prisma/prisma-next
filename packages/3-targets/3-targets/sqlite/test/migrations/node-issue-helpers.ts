@@ -178,17 +178,10 @@ export function issue(input: {
   readonly actual?: unknown;
   readonly message?: string;
 }): SchemaDiffIssue {
-  const outcome =
-    input.reason === 'not-found'
-      ? 'missing'
-      : input.reason === 'not-expected'
-        ? 'extra'
-        : 'mismatch';
   return {
     path: input.path,
-    outcome,
     reason: input.reason,
-    message: input.message ?? `${outcome}: ${input.path.join('/')}`,
+    message: input.message ?? `${input.reason}: ${input.path.join('/')}`,
     ...(input.expected !== undefined ? { expected: input.expected } : {}),
     ...(input.actual !== undefined ? { actual: input.actual } : {}),
   } as SchemaDiffIssue;

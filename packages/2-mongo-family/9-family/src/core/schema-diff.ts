@@ -1,21 +1,27 @@
 import type { ControlPolicy } from '@prisma-next/contract/types';
-import type { SchemaIssue, VerifierOutcome } from '@prisma-next/framework-components/control';
+import type { SchemaDiffIssue, VerifierOutcome } from '@prisma-next/framework-components/control';
 import type {
   MongoSchemaCollection,
   MongoSchemaIndex,
   MongoSchemaIR,
 } from '@prisma-next/mongo-schema-ir';
 import { canonicalize, deepEqual } from '@prisma-next/mongo-schema-ir';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { verifierDisposition } from './schema-verify/verifier-disposition';
 
 /**
  * The Mongo schema diff, issue-only: `failures` carry the verdict (a verify
  * passes exactly when it is empty), `warnings` the surviving warn-graded
  * findings (live-only extras in non-strict mode, `observed` subjects).
+ *
+ * Each issue's `path` carries the coordinate — `[collectionName]` for a
+ * whole-collection finding, `[collectionName, 'index:…' | 'validator' |
+ * 'options']` for an auxiliary — and `expected`/`actual` carry the real
+ * Mongo schema-IR node the finding concerns.
  */
 export interface MongoSchemaDiff {
-  readonly failures: readonly SchemaIssue[];
-  readonly warnings: readonly SchemaIssue[];
+  readonly failures: readonly SchemaDiffIssue[];
+  readonly warnings: readonly SchemaDiffIssue[];
 }
 
 /**
@@ -41,12 +47,12 @@ export interface MongoSchemaDiff {
  */
 function emitMongoIssueUnderControlPolicy(
   controlPolicy: ControlPolicy,
-  issue: SchemaIssue,
+  issue: SchemaDiffIssue,
   baseOutcome: 'fail' | 'warn',
-  failures: SchemaIssue[],
-  warnings: SchemaIssue[],
+  failures: SchemaDiffIssue[],
+  warnings: SchemaDiffIssue[],
 ): VerifierOutcome {
-  const disposition = verifierDisposition(controlPolicy, issue.kind);
+  const disposition = verifierDisposition(controlPolicy, issue);
   const outcome = disposition === 'fail' ? baseOutcome : disposition;
   if (outcome === 'suppress') {
     return 'suppress';
@@ -65,8 +71,8 @@ export function diffMongoSchemas(
   strict: boolean,
   collectionControlPolicy: (collectionName: string) => ControlPolicy,
 ): MongoSchemaDiff {
-  const failures: SchemaIssue[] = [];
-  const warnings: SchemaIssue[] = [];
+  const failures: SchemaDiffIssue[] = [];
+  const warnings: SchemaDiffIssue[] = [];
 
   const allNames = new Set([...live.collectionNames, ...expected.collectionNames]);
 
@@ -78,10 +84,10 @@ export function diffMongoSchemas(
       emitMongoIssueUnderControlPolicy(
         collectionControlPolicy(name),
         {
-          kind: 'missing_table',
+          path: [name],
           reason: 'not-found',
-          table: name,
           message: `Collection "${name}" is missing from the database`,
+          expected: expectedColl,
         },
         'fail',
         failures,
@@ -94,10 +100,10 @@ export function diffMongoSchemas(
       emitMongoIssueUnderControlPolicy(
         collectionControlPolicy(name),
         {
-          kind: 'extra_table',
+          path: [name],
           reason: 'not-expected',
-          table: name,
           message: `Extra collection "${name}" exists in the database but not in the contract`,
+          actual: liveColl,
         },
         strict ? 'fail' : 'warn',
         failures,
@@ -145,8 +151,8 @@ function diffIndexes(
   expected: MongoSchemaCollection,
   strict: boolean,
   collectionControlPolicy: ControlPolicy,
-  failures: SchemaIssue[],
-  warnings: SchemaIssue[],
+  failures: SchemaDiffIssue[],
+  warnings: SchemaDiffIssue[],
 ): void {
   const liveLookup = new Map<string, MongoSchemaIndex>();
   for (const idx of live.indexes) liveLookup.set(buildIndexLookupKey(idx), idx);
@@ -159,11 +165,10 @@ function diffIndexes(
       emitMongoIssueUnderControlPolicy(
         collectionControlPolicy,
         {
-          kind: 'index_mismatch',
+          path: [collName, `index:${formatIndexName(idx)}`],
           reason: 'not-equal',
-          table: collName,
-          indexOrConstraint: formatIndexName(idx),
           message: `Index ${formatIndexName(idx)} missing on collection "${collName}"`,
+          expected: idx,
         },
         'fail',
         failures,
@@ -177,11 +182,10 @@ function diffIndexes(
       emitMongoIssueUnderControlPolicy(
         collectionControlPolicy,
         {
-          kind: 'extra_index',
+          path: [collName, `index:${formatIndexName(idx)}`],
           reason: 'not-expected',
-          table: collName,
-          indexOrConstraint: formatIndexName(idx),
           message: `Extra index ${formatIndexName(idx)} on collection "${collName}"`,
+          actual: idx,
         },
         strict ? 'fail' : 'warn',
         failures,
@@ -197,8 +201,8 @@ function diffValidator(
   expected: MongoSchemaCollection,
   strict: boolean,
   collectionControlPolicy: ControlPolicy,
-  failures: SchemaIssue[],
-  warnings: SchemaIssue[],
+  failures: SchemaDiffIssue[],
+  warnings: SchemaDiffIssue[],
 ): void {
   if (!live.validator && !expected.validator) return;
 
@@ -206,10 +210,10 @@ function diffValidator(
     emitMongoIssueUnderControlPolicy(
       collectionControlPolicy,
       {
-        kind: 'type_missing',
+        path: [collName, 'validator'],
         reason: 'not-found',
-        table: collName,
         message: `Validator missing on collection "${collName}"`,
+        expected: expected.validator,
       },
       'fail',
       failures,
@@ -222,10 +226,10 @@ function diffValidator(
     emitMongoIssueUnderControlPolicy(
       collectionControlPolicy,
       {
-        kind: 'extra_validator',
+        path: [collName, 'validator'],
         reason: 'not-expected',
-        table: collName,
         message: `Extra validator on collection "${collName}"`,
+        actual: live.validator,
       },
       strict ? 'fail' : 'warn',
       failures,
@@ -247,12 +251,11 @@ function diffValidator(
     emitMongoIssueUnderControlPolicy(
       collectionControlPolicy,
       {
-        kind: 'type_mismatch',
+        path: [collName, 'validator'],
         reason: 'not-equal',
-        table: collName,
-        expected: expectedSchema,
-        actual: liveSchema,
         message: `Validator mismatch on collection "${collName}"`,
+        expected: expectedVal,
+        actual: liveVal,
       },
       'fail',
       failures,
@@ -267,8 +270,8 @@ function diffOptions(
   expected: MongoSchemaCollection,
   strict: boolean,
   collectionControlPolicy: ControlPolicy,
-  failures: SchemaIssue[],
-  warnings: SchemaIssue[],
+  failures: SchemaDiffIssue[],
+  warnings: SchemaDiffIssue[],
 ): void {
   if (!live.options && !expected.options) return;
 
@@ -276,11 +279,10 @@ function diffOptions(
     emitMongoIssueUnderControlPolicy(
       collectionControlPolicy,
       {
-        kind: 'type_mismatch',
+        path: [collName, 'options'],
         reason: 'not-equal',
-        table: collName,
-        actual: canonicalize(live.options),
         message: `Extra collection options on "${collName}"`,
+        actual: live.options,
       },
       strict ? 'fail' : 'warn',
       failures,
@@ -296,12 +298,11 @@ function diffOptions(
   emitMongoIssueUnderControlPolicy(
     collectionControlPolicy,
     {
-      kind: 'type_mismatch',
+      path: [collName, 'options'],
       reason: 'not-equal',
-      table: collName,
-      expected: canonicalize(expected.options),
-      actual: canonicalize(live.options),
       message: `Collection options mismatch on "${collName}"`,
+      ...ifDefined('expected', expected.options),
+      ...ifDefined('actual', live.options),
     },
     'fail',
     failures,
