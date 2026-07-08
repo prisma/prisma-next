@@ -435,12 +435,12 @@ describe('interpretPslDocumentToMongoContract', () => {
       expect(model(ir, 'User').fields).not.toHaveProperty('posts');
     });
 
-    it('disambiguates multiple FK relations to the same target using relation name', () => {
+    it('disambiguates multiple FK relations to the same target using inverse:', () => {
       const ir = interpretOk(`
         model User {
           id             ObjectId @id @map("_id")
-          createdTasks   Task[] @relation("created")
-          assignedTasks  Task[] @relation("assigned")
+          createdTasks   Task[] @relation(inverse: creator)
+          assignedTasks  Task[] @relation(inverse: assignee)
         }
 
         model Task {
@@ -448,8 +448,8 @@ describe('interpretPslDocumentToMongoContract', () => {
           title        String
           creatorId    ObjectId
           assigneeId   ObjectId
-          creator      User @relation("created", from: [creatorId], to: [id])
-          assignee     User @relation("assigned", from: [assigneeId], to: [id])
+          creator      User @relation(from: [creatorId], to: [id])
+          assignee     User @relation(from: [assigneeId], to: [id])
         }
       `);
 
@@ -467,7 +467,7 @@ describe('interpretPslDocumentToMongoContract', () => {
       });
     });
 
-    it('emits diagnostic for ambiguous backrelation with multiple FKs and no relation name', () => {
+    it('emits diagnostic for ambiguous backrelation with multiple FKs and no inverse: pin', () => {
       const result = interpret(`
         model User {
           id    ObjectId @id @map("_id")
@@ -478,8 +478,8 @@ describe('interpretPslDocumentToMongoContract', () => {
           id          ObjectId @id @map("_id")
           creatorId   ObjectId
           assigneeId  ObjectId
-          creator     User @relation("created", from: [creatorId], to: [id])
-          assignee    User @relation("assigned", from: [assigneeId], to: [id])
+          creator     User @relation(from: [creatorId], to: [id])
+          assignee    User @relation(from: [assigneeId], to: [id])
         }
       `);
 
@@ -492,6 +492,78 @@ describe('interpretPslDocumentToMongoContract', () => {
           }),
         ]),
       );
+    });
+
+    it('rejects @relation(name:) and the positional name form', () => {
+      const named = interpret(`
+        model User {
+          id            ObjectId @id @map("_id")
+          createdTasks  Task[] @relation(name: "created")
+        }
+
+        model Task {
+          id        ObjectId @id @map("_id")
+          creatorId ObjectId
+          creator   User @relation(name: "created", from: [creatorId], to: [id])
+        }
+      `);
+
+      expect(named.ok).toBe(false);
+      if (named.ok) return;
+      expect(named.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_LEGACY_RELATION_NAME',
+            message: expect.stringContaining('inverse:'),
+          }),
+        ]),
+      );
+
+      const positional = interpret(`
+        model User {
+          id    ObjectId @id @map("_id")
+          posts Post[] @relation("UserPosts")
+        }
+
+        model Post {
+          id     ObjectId @id @map("_id")
+          userId ObjectId
+          user   User @relation("UserPosts", from: [userId], to: [id])
+        }
+      `);
+
+      expect(positional.ok).toBe(false);
+      if (positional.ok) return;
+      expect(positional.failure.diagnostics).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'PSL_LEGACY_RELATION_NAME' })]),
+      );
+    });
+
+    it('emits a diagnostic when inverse: names a field that is not an FK-side relation', () => {
+      const result = interpret(`
+        model User {
+          id            ObjectId @id @map("_id")
+          createdTasks  Task[] @relation(inverse: notAField)
+          assignedTasks Task[] @relation(inverse: assignee)
+        }
+
+        model Task {
+          id          ObjectId @id @map("_id")
+          creatorId   ObjectId
+          assigneeId  ObjectId
+          creator     User @relation(from: [creatorId], to: [id])
+          assignee    User @relation(from: [assigneeId], to: [id])
+        }
+      `);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const diagnostic = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_INVERSE_FIELD_NOT_FK',
+      );
+      expect(diagnostic).toBeDefined();
+      expect(diagnostic?.message).toContain('User.createdTasks');
+      expect(diagnostic?.message).toContain('notAField');
     });
 
     it('creates 1:1 inverse relation for singular non-FK relation field', () => {

@@ -188,8 +188,24 @@ export function parseExpression(cursor: Cursor): GreenNode | undefined {
     parseObjectLiteralExpr(cursor) ??
     parseFunctionCall(cursor) ??
     parseBooleanLiteralExpr(cursor) ??
-    parseIdentifierExpr(cursor)
+    parseMemberAccessExpr(cursor)
   );
+}
+
+/**
+ * Parses an identifier-leading value: a member-access `Foo.bar` (the dotted form
+ * `through: Junction.relationField` uses to pin a relation field) as a
+ * {@link parseQualifiedName} chain that preserves every segment, or a bare
+ * `Foo` as a single `Identifier`. Returns `undefined` when no identifier leads,
+ * leaving the `parseExpression` chain to fall through.
+ */
+export function parseMemberAccessExpr(cursor: Cursor): GreenNode | undefined {
+  if (cursor.peekKind() !== 'Ident') return undefined;
+  if (cursor.peekKind(1) !== 'Dot') return parseIdentifierExpr(cursor);
+  cursor.startNode('QualifiedName');
+  parseIdentifier(cursor);
+  parseQualifiedSegments(cursor, 'Dot');
+  return cursor.finishNode();
 }
 
 export function parseStringLiteralExpr(cursor: Cursor): GreenNode | undefined {

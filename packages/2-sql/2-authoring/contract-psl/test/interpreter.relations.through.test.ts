@@ -246,8 +246,8 @@ model PostTag {
 model Follow {
   followerId Int
   followeeId Int
-  follower User @relation("follower", from: [followerId], to: [id])
-  followee User @relation("followee", from: [followeeId], to: [id])
+  follower User @relation(from: [followerId], to: [id])
+  followee User @relation(from: [followeeId], to: [id])
 
   @@id([followerId, followeeId])
 }
@@ -264,5 +264,104 @@ model Follow {
         }),
       ]),
     );
+  });
+});
+
+const selfRelationFollowJunction = `model Follow {
+  followerId Int
+  followeeId Int
+  follower User @relation(from: followerId)
+  followee User @relation(from: followeeId)
+
+  @@id([followerId, followeeId])
+}
+`;
+
+describe('interpretPslDocumentToSqlContract qualified through: disambiguation', () => {
+  it('pins each self-referential M:N leg to the junction relation field it names', () => {
+    const result = interpret(`model User {
+  id Int @id
+  following User[] @relation(through: Follow.follower)
+  followers User[] @relation(through: Follow.followee)
+}
+
+${selfRelationFollowJunction}`);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const models = relationsOf(result.value);
+    expect(models['User']?.relations).toEqual({
+      following: {
+        to: crossRef('User', 'public'),
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['followerId'] },
+        through: {
+          table: 'follow',
+          namespaceId: 'public',
+          parentColumns: ['followerId'],
+          childColumns: ['followeeId'],
+          targetColumns: ['id'],
+        },
+      },
+      followers: {
+        to: crossRef('User', 'public'),
+        cardinality: 'N:M',
+        on: { localFields: ['id'], targetFields: ['followeeId'] },
+        through: {
+          table: 'follow',
+          namespaceId: 'public',
+          parentColumns: ['followeeId'],
+          childColumns: ['followerId'],
+          targetColumns: ['id'],
+        },
+      },
+    });
+
+    const envelope = JSON.parse(JSON.stringify(result.value)) as unknown;
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(envelope)).not.toThrow();
+  });
+
+  it('defers the same self-relation to the ambiguity diagnostic when through: is unqualified (control)', () => {
+    const result = interpret(`model User {
+  id Int @id
+  following User[] @relation(through: Follow)
+  followers User[] @relation(through: Follow)
+}
+
+${selfRelationFollowJunction}`);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+          message: expect.stringContaining('User.following'),
+        }),
+      ]),
+    );
+  });
+
+  it('emits an actionable diagnostic when through: names a field that is not a junction FK back to the candidate', () => {
+    const result = interpret(`model User {
+  id Int @id
+  following User[] @relation(through: Follow.notAField)
+  followers User[] @relation(through: Follow.followee)
+}
+
+${selfRelationFollowJunction}`);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    const diagnostic = result.failure.diagnostics.find(
+      (d) => d.code === 'PSL_JUNCTION_THROUGH_FIELD_NOT_FK',
+    );
+    expect(diagnostic).toBeDefined();
+    expect(diagnostic?.message).toContain('User.following');
+    expect(diagnostic?.message).toContain('Follow');
+    expect(diagnostic?.message).toContain('notAField');
   });
 });

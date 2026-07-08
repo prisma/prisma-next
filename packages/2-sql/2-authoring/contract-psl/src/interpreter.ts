@@ -106,6 +106,7 @@ import {
   interpretRelationAttribute,
   type ModelBackrelationCandidate,
   normalizeReferentialAction,
+  type ParsedThrough,
   resolveTargetIdFieldNames,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
@@ -563,8 +564,8 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       targetId: input.targetId,
     });
     const relationAttribute = getAttribute(field.attributes, 'relation');
-    let relationName: string | undefined;
-    let through: string | undefined;
+    let through: ParsedThrough | undefined;
+    let inverse: string | undefined;
     if (relationAttribute) {
       const parsedRelation = interpretRelationAttribute({
         selfModel: model,
@@ -595,8 +596,8 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         });
         continue;
       }
-      relationName = parsedRelation.name;
       through = parsedRelation.through;
+      inverse = parsedRelation.inverse;
     }
     if (!attributesValid) {
       continue;
@@ -607,8 +608,8 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       tableName,
       field,
       targetModelName: field.typeName,
-      ...ifDefined('relationName', relationName),
       ...ifDefined('through', through),
+      ...ifDefined('inverse', inverse),
     });
   }
 
@@ -1172,7 +1173,6 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       targetModelName: targetMapping.model.name,
       targetTableName: targetMapping.tableName,
       ...ifDefined('targetNamespaceId', targetNamespaceId),
-      ...ifDefined('relationName', parsedRelation.name),
       localColumns,
       referencedColumns,
     });

@@ -21,7 +21,7 @@ import {
   NamespaceDeclarationAst,
   NumberLiteralExprAst,
   ObjectLiteralExprAst,
-  type QualifiedNameAst,
+  QualifiedNameAst,
   type SourceFile,
   StringLiteralExprAst,
   type SyntaxToken,
@@ -443,6 +443,13 @@ function collectExpression(
     for (const field of expression.fields()) {
       addIdentifier(field.key(), 'property', tokens);
       collectExpression(field.value(), source, tokens, namespace);
+    }
+    return;
+  }
+
+  if (expression instanceof QualifiedNameAst) {
+    for (const segment of filterChildren(expression.syntax, IdentifierAst.cast)) {
+      collectIdentifierExpression(segment, source, tokens, namespace, context);
     }
     return;
   }
