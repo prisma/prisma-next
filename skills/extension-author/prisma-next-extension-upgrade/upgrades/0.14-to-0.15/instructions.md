@@ -414,3 +414,17 @@ model mapped to it now makes `contract infer` throw (malformed pack); packs norm
 ship storage + domain together, so no action for well-formed packs. No extension-author
 action required. Incidental substrate diff only.
 -->
+
+<!--
+TML-2828 (variant relations on the narrowed accessor, PR #933): the
+`packages/3-extensions/` diff is confined to `@prisma-next/sql-orm-client` (itself an
+extension). The `.variant('X')`-narrowed predicate accessor now surfaces relations the
+variant model declares in the contract, alongside the base model's relations —
+`createModelAccessor` resolves a variant-owned relation against the variant's
+coordinates (variant table for MTI, base table for STI), and
+`VariantAwareModelAccessor` intersects in the variant's relation accessors so
+`t.variant('Feature').where(x => x.assignee.some(…))` type-checks and plans a correct
+EXISTS. Purely additive to the ORM client's query surface; no extension-author SPI
+(`@prisma-next/contract`, `@prisma-next/framework-components`, …) changed. No
+extension-author action required. Incidental substrate diff only.
+-->
