@@ -17,6 +17,23 @@ changes:
       contains:
         - "@relation"
       anyMatch: true
+  - id: relation-name-pointer-disambiguation
+    summary: |
+      `@relation(name:)` and the positional relation name (`@relation("...")`) are
+      rejected at contract emission with PSL_LEGACY_RELATION_NAME. Replace name-based
+      relation pairing with pointer disambiguation: on a 1:N back-relation list field,
+      name the owning FK-side relation field with `inverse:` (e.g. `posts Post[]
+      @relation(inverse: author)`); on a many-to-many list field, name the junction
+      with `through:` (e.g. `tags Tag[] @relation(through: PostTag)`) and, for
+      self-relations or multiple many-to-many between the same pair of models, pin the
+      parent-side junction relation field with the qualified form
+      (`through: Follow.follower`). Relations that are unambiguous without a name
+      simply drop the argument.
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "@relation("
+      anyMatch: true
 ---
 
 <!--
