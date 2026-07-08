@@ -71,12 +71,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 
-import {
-  getAttribute,
-  getPositionalArgument,
-  mapFieldNamesToColumns,
-  parseQuotedStringLiteral,
-} from './psl-attribute-parsing';
+import { getAttribute, mapFieldNamesToColumns } from './psl-attribute-parsing';
 import type { ColumnDescriptor } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
@@ -103,8 +98,11 @@ import {
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
 import {
+  findModelAttributeNode,
+  interpretModelBase,
   interpretModelConstraint,
   interpretModelControl,
+  interpretModelDiscriminator,
   interpretModelIndex,
 } from './sql-attribute-specs';
 
@@ -1287,6 +1285,7 @@ type BaseDeclaration = {
 
 function collectPolymorphismDeclarations(
   models: readonly ModelSymbol[],
+  sourceFile: SourceFile,
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): {
@@ -1297,54 +1296,46 @@ function collectPolymorphismDeclarations(
   const baseDeclarations = new Map<string, BaseDeclaration>();
 
   for (const model of models) {
-    for (const attr of model.attributes) {
-      if (attr.name === 'discriminator') {
-        const fieldName = getPositionalArgument(attr);
-        if (!fieldName) {
-          diagnostics.push({
-            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Model "${model.name}" @@discriminator requires a field name argument`,
-            sourceId,
-            span: attr.span,
-          });
-          continue;
-        }
-        const discField = model.fields[fieldName];
+    const discriminatorNode = findModelAttributeNode(model, 'discriminator');
+    if (discriminatorNode !== undefined) {
+      const parsed = interpretModelDiscriminator({
+        node: discriminatorNode,
+        model,
+        sourceFile,
+        sourceId,
+        diagnostics,
+      });
+      if (parsed !== undefined) {
+        const span = nodePslSpan(discriminatorNode.syntax, sourceFile);
+        const discField = model.fields[parsed.field];
         if (discField && discField.typeName !== 'String') {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Discriminator field "${fieldName}" on model "${model.name}" must be of type String, but is "${discField.typeName}"`,
+            message: `Discriminator field "${parsed.field}" on model "${model.name}" must be of type String, but is "${discField.typeName}"`,
             sourceId,
-            span: attr.span,
+            span,
           });
-          continue;
+        } else {
+          discriminatorDeclarations.set(model.name, { fieldName: parsed.field, span });
         }
-        discriminatorDeclarations.set(model.name, { fieldName, span: attr.span });
       }
+    }
 
-      if (attr.name === 'base') {
-        const baseName = getPositionalArgument(attr, 0);
-        const rawValue = getPositionalArgument(attr, 1);
-        if (!baseName || !rawValue) {
-          diagnostics.push({
-            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Model "${model.name}" @@base requires two arguments: base model name and discriminator value`,
-            sourceId,
-            span: attr.span,
-          });
-          continue;
-        }
-        const value = parseQuotedStringLiteral(rawValue);
-        if (value === undefined) {
-          diagnostics.push({
-            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Model "${model.name}" @@base discriminator value must be a quoted string literal`,
-            sourceId,
-            span: attr.span,
-          });
-          continue;
-        }
-        baseDeclarations.set(model.name, { baseName, value, span: attr.span });
+    const baseNode = findModelAttributeNode(model, 'base');
+    if (baseNode !== undefined) {
+      const parsed = interpretModelBase({
+        node: baseNode,
+        model,
+        sourceFile,
+        sourceId,
+        diagnostics,
+      });
+      if (parsed !== undefined) {
+        baseDeclarations.set(model.name, {
+          baseName: parsed.base,
+          value: parsed.value,
+          span: nodePslSpan(baseNode.syntax, sourceFile),
+        });
       }
     }
   }
@@ -1397,16 +1388,6 @@ function resolvePolymorphism(
 
     const model = patched[coordinateFor(modelName)];
     if (!model) continue;
-
-    if (!Object.hasOwn(model.fields, decl.fieldName)) {
-      diagnostics.push({
-        code: 'PSL_DISCRIMINATOR_FIELD_NOT_FOUND',
-        message: `Discriminator field "${decl.fieldName}" is not a field on model "${modelName}"`,
-        sourceId,
-        span: decl.span,
-      });
-      continue;
-    }
 
     const variants: Record<string, { readonly value: string }> = {};
     const seenValues = new Map<string, string>();
@@ -2033,6 +2014,7 @@ export function interpretPslDocumentToSqlContract(
 
   const { discriminatorDeclarations, baseDeclarations } = collectPolymorphismDeclarations(
     models,
+    sourceFile,
     sourceId,
     diagnostics,
   );

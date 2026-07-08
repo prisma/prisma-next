@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ArgType, InterpretCtx } from '../src/exports';
 import {
   bool,
+  entityRef,
   fieldAttribute,
   fieldRef,
   identifier,
@@ -308,6 +309,47 @@ describe('fieldRef', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+  });
+});
+
+describe('entityRef', () => {
+  it('parses a bare identifier into its model name', () => {
+    const { expr, ctx } = argOf('Task');
+
+    const result = entityRef().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe('Task');
+  });
+
+  it('rejects a quoted string literal', () => {
+    const { expr, ctx } = argOf('"Task"');
+
+    const result = entityRef().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a number token', () => {
+    const { expr, ctx } = argOf('42');
+
+    const result = entityRef().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('rejects an array literal', () => {
+    const { expr, ctx } = argOf('[Task]');
+
+    const result = entityRef().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
   });
 });
 

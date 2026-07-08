@@ -5,10 +5,6 @@ import type { ExpressionAst } from '@prisma-next/psl-parser/syntax';
 
 export { parseQuotedStringLiteral };
 
-export function getPositionalArgument(attribute: ResolvedAttribute, index = 0): string | undefined {
-  return attribute.args.filter((arg) => arg.kind === 'positional')[index]?.value;
-}
-
 export function lowerFirst(value: string): string {
   if (value.length === 0) return value;
   return value[0]?.toLowerCase() + value.slice(1);

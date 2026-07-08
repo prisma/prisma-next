@@ -2,6 +2,7 @@ import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types'
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { FieldSymbol, InterpretCtx, ModelSymbol } from '@prisma-next/psl-parser';
 import {
+  entityRef,
   fieldAttribute,
   fieldRef,
   identifier,
@@ -260,6 +261,67 @@ export function interpretModelControl(input: {
     return undefined;
   }
   return result.value.policy;
+}
+
+const discriminatorModelSpec = modelAttribute('discriminator', {
+  positional: [{ key: 'field', type: fieldRef('self') }],
+});
+const baseModelSpec = modelAttribute('base', {
+  positional: [
+    { key: 'base', type: entityRef() },
+    { key: 'value', type: str() },
+  ],
+});
+
+// `@@discriminator` names a field on the declaring model; `fieldRef('self')`
+// already rejects an unknown field. The String-type semantic check and all
+// cross-model resolution stay in the caller.
+export function interpretModelDiscriminator(input: {
+  readonly node: ModelAttributeAst;
+  readonly model: ModelSymbol;
+  readonly sourceFile: SourceFile;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): { readonly field: string } | undefined {
+  const result = interpretAttribute(
+    input.node,
+    discriminatorModelSpec,
+    buildModelInterpretCtx({
+      selfModel: input.model,
+      sourceFile: input.sourceFile,
+      sourceId: input.sourceId,
+    }),
+  );
+  if (!result.ok) {
+    for (const failure of result.failure) input.diagnostics.push(failure);
+    return undefined;
+  }
+  return { field: result.value.field };
+}
+
+// `@@base` names a base model (bare identifier, resolved downstream) plus a
+// quoted discriminator value. Base-model existence stays in the caller.
+export function interpretModelBase(input: {
+  readonly node: ModelAttributeAst;
+  readonly model: ModelSymbol;
+  readonly sourceFile: SourceFile;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): { readonly base: string; readonly value: string } | undefined {
+  const result = interpretAttribute(
+    input.node,
+    baseModelSpec,
+    buildModelInterpretCtx({
+      selfModel: input.model,
+      sourceFile: input.sourceFile,
+      sourceId: input.sourceId,
+    }),
+  );
+  if (!result.ok) {
+    for (const failure of result.failure) input.diagnostics.push(failure);
+    return undefined;
+  }
+  return { base: result.value.base, value: result.value.value };
 }
 
 export function interpretFieldMapName(input: {

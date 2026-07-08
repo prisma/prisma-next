@@ -38,6 +38,7 @@ export {
 export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
 export { bool } from '../attribute-spec/combinators/bool';
 export { leafDiagnostic } from '../attribute-spec/combinators/diagnostic';
+export { entityRef } from '../attribute-spec/combinators/entity-ref';
 export type { FieldRefArgType, FieldRefScope } from '../attribute-spec/combinators/field-ref';
 export { fieldRef } from '../attribute-spec/combinators/field-ref';
 export { identifier } from '../attribute-spec/combinators/identifier';
