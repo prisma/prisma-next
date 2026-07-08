@@ -1809,6 +1809,37 @@ describe('language server project lifecycle', { timeout: timeouts.databaseOperat
     expect(configResolutionMock.resolveConfigInputs).toHaveBeenCalledTimes(1);
   });
 
+  it('leaves no project behind when only a stray document was opened', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    const otherUri = pathToFileURL(join(root, 'not-a-schema.psl')).toString();
+    openDocument(harness, otherUri, formattedPsl);
+    await settle();
+    expect(configResolutionMock.resolveConfigInputs).toHaveBeenCalledTimes(1);
+
+    const diagnosed = harness.waitForDiagnosticsMatching(
+      schemaUri,
+      (diagnostics) => diagnostics.length > 0,
+    );
+    openDocument(harness, schemaUri, duplicateModelSource);
+    await diagnosed;
+    expect(configResolutionMock.resolveConfigInputs).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the project when a stray document opens beside an open input', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    openDocument(harness, schemaUri, duplicateModelSource);
+    expect((await harness.waitForDiagnostics(schemaUri)).length).toBeGreaterThan(0);
+
+    const otherUri = pathToFileURL(join(root, 'not-a-schema.psl')).toString();
+    openDocument(harness, otherUri, formattedPsl);
+    await settle();
+
+    await expect(requestSemanticTokens(harness, schemaUri)).resolves.not.toEqual({ data: [] });
+    expect(configResolutionMock.resolveConfigInputs).toHaveBeenCalledTimes(1);
+  });
+
   it('does not reload a dropped project when its config changes', async () => {
     harness = startHarness(resolveToSchema, watchedFilesCapabilities);
     await harness.initialize();

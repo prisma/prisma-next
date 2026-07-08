@@ -126,8 +126,10 @@ export function createServer(connection: Connection): LanguageServer {
       return project;
     }
     // Only the config's declared inputs are managed: a stray document beside
-    // a config keeps no association, so reads and events never reach it.
+    // a config keeps no association, so reads and events never reach it — and
+    // a project it alone caused to load is dropped again.
     documentConfigPaths.delete(uri);
+    dropProjectWithoutManagedDocuments(project.configPath);
     return undefined;
   }
 
@@ -521,8 +523,8 @@ export function createServer(connection: Connection): LanguageServer {
     // A live project always has at least one open input; when the last one
     // closes the project is dropped, and a reopen re-resolves and reloads the
     // config from scratch.
-    if (configPath !== undefined && !hasManagedDocuments(configPath)) {
-      projects.delete(configPath);
+    if (configPath !== undefined) {
+      dropProjectWithoutManagedDocuments(configPath);
     }
     if (!clientCapabilities.pullDiagnostics) {
       sendDiagnostics({ uri, diagnostics: [] });
@@ -544,6 +546,12 @@ export function createServer(connection: Connection): LanguageServer {
       }
     }
     return false;
+  }
+
+  function dropProjectWithoutManagedDocuments(configPath: string): void {
+    if (!hasManagedDocuments(configPath)) {
+      projects.delete(configPath);
+    }
   }
 
   return {
