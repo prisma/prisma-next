@@ -1,11 +1,26 @@
 import { pathToFileURL } from 'node:url';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mapParseDiagnostics } from '../src/diagnostic-mapping';
 import type { PipelineInputs } from '../src/pipeline';
 import { createProjectArtifacts, type ProjectArtifacts } from '../src/project-artifacts';
 import { resolveSchemaInputs } from '../src/schema-inputs';
+
+const pipelineMock = vi.hoisted(() => ({
+  runPipeline: vi.fn<typeof import('../src/pipeline')['runPipeline']>(),
+}));
+
+// Pass-through spy on the parse seam so tests can count parses.
+vi.mock('../src/pipeline', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/pipeline')>();
+  pipelineMock.runPipeline.mockImplementation(actual.runPipeline);
+  return { ...actual, runPipeline: pipelineMock.runPipeline };
+});
+
+afterEach(() => {
+  pipelineMock.runPipeline.mockClear();
+});
 
 const schemaUri = pathToFileURL('/abs/schema.psl').toString();
 const inputs = resolveSchemaInputs({
@@ -73,6 +88,7 @@ describe('createProjectArtifacts', () => {
     const { store } = projectWithMirror();
     expect(store.document(schemaUri)).toBeUndefined();
     expect(store.symbolTable()).toBeUndefined();
+    expect(pipelineMock.runPipeline).not.toHaveBeenCalled();
   });
 
   it('returns undefined for documents that are not configured inputs', () => {
@@ -92,11 +108,43 @@ describe('createProjectArtifacts', () => {
     expect(Object.keys(store.symbolTable()?.topLevel.models ?? {})).toContain('User');
   });
 
-  it('reading the symbol table alone does not parse', () => {
+  it('reading the symbol table on a fresh store parses the open configured input once', () => {
     const { texts, store } = projectWithMirror();
     texts.set(schemaUri, cleanSource);
 
+    expect(Object.keys(store.symbolTable()?.topLevel.models ?? {})).toContain('User');
+    expect(pipelineMock.runPipeline).toHaveBeenCalledTimes(1);
+  });
+
+  it('a document read after a symbol-table read reuses the same parse', () => {
+    const { texts, store } = projectWithMirror();
+    texts.set(schemaUri, cleanSource);
+
+    store.symbolTable();
+    expect(store.document(schemaUri)?.document).toBeDefined();
+    expect(pipelineMock.runPipeline).toHaveBeenCalledTimes(1);
+  });
+
+  it('reading the symbol table with no open configured input returns undefined without parsing', () => {
+    const { texts, store } = projectWithMirror();
+    const otherUri = pathToFileURL('/abs/not-a-schema.psl').toString();
+    texts.set(otherUri, cleanSource);
+
     expect(store.symbolTable()).toBeUndefined();
+    expect(pipelineMock.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it('reading the symbol table after documentChanged reflects the latest mirrored text', () => {
+    const { texts, store } = projectWithMirror();
+    texts.set(schemaUri, cleanSource);
+    store.document(schemaUri);
+
+    texts.set(schemaUri, twoModelSource);
+    store.documentChanged(schemaUri);
+
+    expect(Object.keys(store.symbolTable()?.topLevel.models ?? {})).toEqual(
+      expect.arrayContaining(['User', 'Post']),
+    );
   });
 
   it('drops the artifacts and symbol table on documentClosed', () => {

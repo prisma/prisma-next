@@ -30,11 +30,7 @@ export interface ProjectArtifacts {
    * one of the project's configured inputs.
    */
   document(uri: string): DocumentArtifacts | undefined;
-  /**
-   * Built as a byproduct of reading a configured input via `document`;
-   * `undefined` before the first such read or after the contributing document
-   * was changed or closed.
-   */
+  /** `undefined` only when no configured input is open in the text mirror. */
   symbolTable(): SymbolTable | undefined;
   documentChanged(uri: string): void;
   documentClosed(uri: string): void;
@@ -51,33 +47,45 @@ export function createProjectArtifacts(options: ProjectArtifactsOptions): Projec
     }
   }
 
+  function readDocument(uri: string): DocumentArtifacts | undefined {
+    const existing = documents.get(uri);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const text = getText(uri);
+    if (text === undefined) {
+      return undefined;
+    }
+    const computed = computeDocumentDiagnostics(uri, text, inputs, controlStack);
+    if (computed === null) {
+      return undefined;
+    }
+    const artifacts: DocumentArtifacts = {
+      document: computed.document,
+      sourceFile: computed.sourceFile,
+      diagnostics: computed.diagnostics,
+    };
+    documents.set(uri, artifacts);
+    // Single-input by design: the project table is rebuilt from the one open
+    // configured input; merging multiple inputs (and reading unopened ones
+    // from disk) is deferred cross-file work.
+    symbolTable = computed.symbolTable;
+    return artifacts;
+  }
+
   return {
-    document: (uri) => {
-      const existing = documents.get(uri);
-      if (existing !== undefined) {
-        return existing;
+    document: readDocument,
+    symbolTable: () => {
+      if (symbolTable !== undefined) {
+        return symbolTable;
       }
-      const text = getText(uri);
-      if (text === undefined) {
-        return undefined;
+      for (const uri of inputs.uris()) {
+        if (readDocument(uri) !== undefined) {
+          break;
+        }
       }
-      const computed = computeDocumentDiagnostics(uri, text, inputs, controlStack);
-      if (computed === null) {
-        return undefined;
-      }
-      const artifacts: DocumentArtifacts = {
-        document: computed.document,
-        sourceFile: computed.sourceFile,
-        diagnostics: computed.diagnostics,
-      };
-      documents.set(uri, artifacts);
-      // Single-input by design: the project table is rebuilt from the one open
-      // configured input; merging multiple inputs (and reading unopened ones
-      // from disk) is deferred cross-file work.
-      symbolTable = computed.symbolTable;
-      return artifacts;
+      return symbolTable;
     },
-    symbolTable: () => symbolTable,
     documentChanged: drop,
     documentClosed: drop,
   };
