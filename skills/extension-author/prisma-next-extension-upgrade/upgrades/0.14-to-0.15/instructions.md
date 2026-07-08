@@ -235,6 +235,18 @@ substrate diff only.
 -->
 
 <!--
+TML-2976 (native Postgres enums, external Supabase types — this PR): the
+`packages/3-extensions/` diff is additive. `@prisma-next/extension-postgres` gains a
+`db.nativeEnums` accessor (new `src/runtime/native-enums.ts`; `runtime/postgres.ts`,
+`exports/runtime.ts`, and `static/postgres-static.ts` expose it) — a Postgres-only
+sibling of `db.enums` for reading external native enum columns.
+`@prisma-next/extension-supabase` gains the same accessor and regenerates its bundled
+contract (`src/contract/contract.{prisma,json,d.ts}`) to carry the `auth.aal_level`
+native enum. A new `sql-orm-client` type test
+(`test/native-enum.field-output.test-d.ts`) pins native-enum field-output typing.
+All additive — the existing extension-author SPI is unchanged, and re-emit absorbs the
+contract shape. No extension-author action required. Incidental substrate diff only.
+
 TML-2962 (extension-aware contract infer, PR #919): `contract infer` now omits DB
 elements a stack extension pack's contract space already describes, and resolves an
 app table's foreign key into pack-owned space to the qualified cross-space relation

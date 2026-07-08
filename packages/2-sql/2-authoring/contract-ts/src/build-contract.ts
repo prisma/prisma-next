@@ -253,6 +253,13 @@ function buildStorageColumn(
       ? encodeColumnDefault(field.default, codecId, codecLookup, field.many === true)
       : undefined;
 
+  // `storageValueSetRef` (derived from an `enumTypeHandle`) takes precedence
+  // when present — the established domain-enum path. `field.descriptor.valueSet`
+  // is the fallback: set by an entity-ref type constructor (e.g. `pg.enum(Ref)`)
+  // that resolved the field's type against a value-set-deriving entity with no
+  // domain enum involved. A field carries at most one of the two in practice.
+  const valueSet = storageValueSetRef ?? field.descriptor.valueSet;
+
   return {
     nativeType: field.descriptor.nativeType,
     codecId,
@@ -261,7 +268,7 @@ function buildStorageColumn(
     ...ifDefined('typeParams', field.descriptor.typeParams),
     ...ifDefined('default', encodedDefault),
     ...ifDefined('typeRef', field.descriptor.typeRef),
-    ...ifDefined('valueSet', storageValueSetRef),
+    ...ifDefined('valueSet', valueSet),
   };
 }
 
@@ -377,6 +384,7 @@ export function buildSqlContractFromDefinition(
     const fieldToColumn: Record<string, string> = {};
     const domainFields: Record<string, ContractField> = {};
     const domainFieldRefs: Record<string, DomainFieldRef> = {};
+    const checksForTable: CheckConstraintInput[] = [];
 
     for (const field of semanticModel.fields) {
       const executionDefaultPhases =
@@ -422,6 +430,25 @@ export function buildSqlContractFromDefinition(
       const column = buildStorageColumn(field, storageValueSetRef, codecLookup);
       columns[field.columnName] = column;
       fieldToColumn[field.fieldName] = field.columnName;
+
+      // A domain enum (`storageValueSetRef`, from an `enumType()` handle) is
+      // stored as a plain scalar column (`text`, `int4`, …) with no native
+      // type of its own to enforce membership, so it needs an explicit
+      // CHECK — scalar or array, since a `text[]` array has no element-level
+      // enforcement either. A value set resolved by an entity-ref type
+      // constructor (`field.descriptor.valueSet`, e.g. `pg.enum(Ref)`) binds
+      // the column to a codec/native-type pairing that IS the storage-level
+      // enforcement (a Postgres native enum type, or another target's
+      // equivalent) — including array columns, since the target enforces
+      // membership on every element of a native-typed array — so no CHECK
+      // for those.
+      if (column.valueSet !== undefined && storageValueSetRef !== undefined) {
+        checksForTable.push({
+          name: `${tableName}_${field.columnName}_check`,
+          column: field.columnName,
+          valueSet: column.valueSet,
+        });
+      }
 
       domainFields[field.fieldName] = buildDomainField(field, column, domainValueSetRef);
 
@@ -513,15 +540,6 @@ export function buildSqlContractFromDefinition(
     // materialised onto the base `ModelNode`, so the variant builds a domain
     // model (below) but no storage table of its own.
     if (!semanticModel.sharesBaseTable) {
-      const checksForTable: CheckConstraintInput[] = Object.entries(columns).flatMap(
-        ([columnName, col]) => {
-          const valueSet = col.valueSet;
-          return valueSet === undefined
-            ? []
-            : [{ name: `${tableName}_${columnName}_check`, column: columnName, valueSet }];
-        },
-      );
-
       const tableInput: StorageTableInput = {
         columns,
         ...ifDefined('control', semanticModel.control),

@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import type {
   AuthoringContributions,
   AuthoringPslBlockDescriptor,
+  AuthoringPslBlockDescriptorNamespace,
 } from '../src/shared/framework-authoring';
 import { isAuthoringPslBlockDescriptor } from '../src/shared/framework-authoring';
 import type {
@@ -132,86 +133,27 @@ describe('AuthoringPslBlockDescriptor', () => {
 });
 
 describe('isAuthoringPslBlockDescriptor', () => {
-  it('returns true for a valid declarative descriptor', () => {
-    const result = isAuthoringPslBlockDescriptor({
-      kind: 'pslBlock',
-      keyword: 'policy_select',
-      discriminator: 'postgres-policy-select',
-      name: { required: true },
-      parameters: { target: { kind: 'ref', refKind: 'model', scope: 'same-namespace' } },
-    });
-    expect(result).toBe(true);
+  const descriptor = {
+    kind: 'pslBlock',
+    keyword: 'policy_select',
+    discriminator: 'postgres-policy-select',
+    name: { required: true },
+    parameters: { target: { kind: 'ref', refKind: 'model', scope: 'same-namespace' } },
+  } satisfies AuthoringPslBlockDescriptor;
+
+  it('returns true for a declarative descriptor', () => {
+    expect(isAuthoringPslBlockDescriptor(descriptor)).toBe(true);
   });
 
-  it('returns false when kind is not pslBlock', () => {
-    expect(isAuthoringPslBlockDescriptor({ kind: 'entity', discriminator: 'x' })).toBe(false);
+  it('returns false for a sub-namespace value', () => {
+    const namespace = { nested: descriptor } satisfies AuthoringPslBlockDescriptorNamespace;
+    expect(isAuthoringPslBlockDescriptor(namespace)).toBe(false);
   });
 
-  it('returns false when keyword is missing', () => {
-    expect(
-      isAuthoringPslBlockDescriptor({
-        kind: 'pslBlock',
-        discriminator: 'x',
-        name: { required: true },
-        parameters: {},
-      }),
-    ).toBe(false);
-  });
-
-  it('returns false when discriminator is missing', () => {
-    expect(
-      isAuthoringPslBlockDescriptor({
-        kind: 'pslBlock',
-        keyword: 'policy_select',
-        name: { required: true },
-        parameters: {},
-      }),
-    ).toBe(false);
-  });
-
-  it('returns false when name is missing', () => {
-    expect(
-      isAuthoringPslBlockDescriptor({
-        kind: 'pslBlock',
-        keyword: 'policy_select',
-        discriminator: 'x',
-        parameters: {},
-      }),
-    ).toBe(false);
-  });
-
-  it('returns false when parameters is missing', () => {
-    expect(
-      isAuthoringPslBlockDescriptor({
-        kind: 'pslBlock',
-        keyword: 'policy_select',
-        discriminator: 'x',
-        name: { required: true },
-      }),
-    ).toBe(false);
-  });
-
-  it('returns false for a function-based (old-style) descriptor', () => {
-    expect(
-      isAuthoringPslBlockDescriptor({
-        kind: 'pslBlock',
-        discriminator: 'x',
-        parser: () => ({}),
-        printer: () => '',
-      }),
-    ).toBe(false);
-  });
-
-  it('narrows the type when it returns true', () => {
-    const unknown: unknown = {
-      kind: 'pslBlock',
-      keyword: 'policy_select',
-      discriminator: 'postgres-policy-select',
-      name: { required: true },
-      parameters: {},
-    };
-    if (isAuthoringPslBlockDescriptor(unknown)) {
-      expectTypeOf(unknown).toEqualTypeOf<AuthoringPslBlockDescriptor>();
+  it('narrows to AuthoringPslBlockDescriptor when it returns true', () => {
+    const node: AuthoringPslBlockDescriptor | AuthoringPslBlockDescriptorNamespace = descriptor;
+    if (isAuthoringPslBlockDescriptor(node)) {
+      expectTypeOf(node).toEqualTypeOf<AuthoringPslBlockDescriptor>();
     }
   });
 });

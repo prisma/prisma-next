@@ -1,18 +1,44 @@
 import { temporalAuthoringPresets } from '@prisma-next/family-sql/control';
 import type {
   AuthoringEntityContext,
+  AuthoringEntityTypeFactoryOutput,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
   AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
+import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
+import { PG_ENUM_CODEC_ID } from './codec-ids';
+import { PostgresNativeEnum } from './postgres-native-enum';
 import { PostgresRlsPolicy } from './postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './postgres-role';
-import { PostgresRlsPolicySchema, PostgresRoleSchema } from './postgres-validators';
+import {
+  PostgresNativeEnumSchema,
+  PostgresRlsPolicySchema,
+  PostgresRoleSchema,
+} from './postgres-validators';
 import { computeContentHash, normalizePredicate } from './rls/canonicalize';
 
-export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
+/**
+ * `pg.enum(<ref>)` registers as an ordinary type constructor whose sole
+ * positional argument names a `native_enum` entity instead of carrying a
+ * literal value. The interpreter resolves the ref to the `native_enum`
+ * entity generically (driven by `entityRefArg`); the `pg/enum@1` codec
+ * descriptor's `columnFromEntity` hook (see `codecs.ts`) converts that
+ * entity into the column's `typeParams` and native type.
+ */
+export const postgresAuthoringTypes = {
+  pg: {
+    enum: {
+      kind: 'typeConstructor',
+      entityRefArg: { index: 0, entityKind: 'native_enum' },
+      output: {
+        codecId: PG_ENUM_CODEC_ID,
+      },
+    },
+  },
+} as const satisfies AuthoringTypeNamespace;
 
 export interface RlsPolicyExtensionBlock extends PslExtensionBlock {
   readonly namespaceId: string;
@@ -71,6 +97,127 @@ function lowerRlsPolicyFromBlock(
   });
 }
 
+/**
+ * Lowers a `native_enum { memberName = "value" … @@map("type_name") }` block
+ * into a {@link PostgresNativeEnum}. Members must be authored as explicit
+ * `key = "value"` pairs — a bare (value-less) member is a diagnostic, not
+ * accepted (authoring-design.md §2.1). The parsed `memberName` is only used
+ * to duplicate-check and report diagnostics; the lowered entity carries just
+ * the member values (a native enum is value-only — the member "name" isn't
+ * a separate authoring concept from the value). `typeName` comes from
+ * `@@map` or defaults to the block name verbatim.
+ */
+function lowerNativeEnumFromBlock(
+  block: PslExtensionBlock,
+  ctx: AuthoringEntityContext,
+): PostgresNativeEnum | undefined {
+  const sourceId = ctx.sourceId ?? 'unknown';
+  const diagnostics = ctx.diagnostics;
+
+  const mapAttr = block.blockAttributes.find((a) => a.name === 'map');
+  let typeName = block.name;
+  if (mapAttr) {
+    const rawArg = mapAttr.args[0]?.value;
+    const mapped = rawArg !== undefined ? unwrapQuotedString(rawArg) : undefined;
+    if (mapped === undefined) {
+      diagnostics?.push({
+        code: 'PSL_NATIVE_ENUM_INVALID_MAP',
+        message: `native_enum "${block.name}" @@map attribute must have a quoted type-name argument`,
+        sourceId,
+        span: mapAttr.span,
+      });
+      return undefined;
+    }
+    typeName = mapped;
+  }
+
+  let memberError = false;
+  const seenValues = new Set<string>();
+  const members: string[] = [];
+  for (const [memberName, paramValue] of Object.entries(block.parameters)) {
+    if (paramValue.kind === 'bare') {
+      diagnostics?.push({
+        code: 'PSL_NATIVE_ENUM_BARE_MEMBER',
+        message: `native_enum "${block.name}" member "${memberName}" has no value; members must be authored as "${memberName} = \\"value\\""`,
+        sourceId,
+        span: paramValue.span,
+      });
+      memberError = true;
+      continue;
+    }
+    if (paramValue.kind !== 'value') continue;
+
+    let jsonValue: unknown;
+    try {
+      jsonValue = JSON.parse(paramValue.raw);
+    } catch {
+      diagnostics?.push({
+        code: 'PSL_EXTENSION_INVALID_VALUE',
+        message: `native_enum "${block.name}" member "${memberName}" value "${paramValue.raw}" is not valid JSON`,
+        sourceId,
+        span: paramValue.span,
+      });
+      memberError = true;
+      continue;
+    }
+    if (typeof jsonValue !== 'string') {
+      diagnostics?.push({
+        code: 'PSL_EXTENSION_INVALID_VALUE',
+        message: `native_enum "${block.name}" member "${memberName}" value must be a string`,
+        sourceId,
+        span: paramValue.span,
+      });
+      memberError = true;
+      continue;
+    }
+    if (seenValues.has(jsonValue)) {
+      diagnostics?.push({
+        code: 'PSL_NATIVE_ENUM_DUPLICATE_MEMBER_VALUE',
+        message: `native_enum "${block.name}": duplicate member value "${jsonValue}"`,
+        sourceId,
+        span: paramValue.span,
+      });
+      memberError = true;
+      continue;
+    }
+    seenValues.add(jsonValue);
+    members.push(jsonValue);
+  }
+
+  if (memberError) return undefined;
+
+  if (members.length === 0) {
+    diagnostics?.push({
+      code: 'PSL_NATIVE_ENUM_MISSING_MEMBERS',
+      message: `native_enum "${block.name}" must have at least one member`,
+      sourceId,
+      span: block.span,
+    });
+    return undefined;
+  }
+
+  // `control` stays unset — the effective grade is resolved at read time via `effectiveControlPolicy`, like `StorageTable`/`StorageColumn`.
+  return new PostgresNativeEnum({ typeName, members });
+}
+
+/**
+ * `native_enum`'s entity-type factory output, checked separately from the assembled
+ * `postgresAuthoringEntityTypes` map below: `deriveValueSet` is SQL-family surface
+ * ({@link SqlValueSetDerivingEntityTypeOutput}), not part of the framework
+ * `AuthoringEntityTypeFactoryOutput` shape, so folding it directly into the map's single
+ * `satisfies AuthoringEntityTypeNamespace` check would trip an excess-property error. Checking it
+ * here against the intersection of both shapes keeps it structurally valid against each without
+ * widening the map's own check.
+ */
+const nativeEnumEntityTypeOutput = {
+  factory: lowerNativeEnumFromBlock,
+  deriveValueSet: (entity: PostgresNativeEnum) => ({
+    kind: 'valueSet' as const,
+    values: [...entity.members],
+  }),
+} satisfies AuthoringEntityTypeFactoryOutput<PslExtensionBlock, PostgresNativeEnum | undefined> &
+  SqlValueSetDerivingEntityTypeOutput;
+
 export const postgresAuthoringEntityTypes = {
   role: {
     kind: 'entity',
@@ -87,6 +234,12 @@ export const postgresAuthoringEntityTypes = {
     output: {
       factory: lowerRlsPolicyFromBlock,
     },
+  },
+  native_enum: {
+    kind: 'entity',
+    discriminator: 'native_enum',
+    validatorSchema: PostgresNativeEnumSchema,
+    output: nativeEnumEntityTypeOutput,
   },
 } as const satisfies AuthoringEntityTypeNamespace;
 
@@ -133,6 +286,24 @@ export const postgresAuthoringPslBlockDescriptors = {
       },
       using: { kind: 'value', codecId: 'pg/text@1', required: true },
     },
+  },
+  /**
+   * PSL block descriptor for `native_enum`.
+   *
+   * Reuses the existing variadic-block mechanism (the same shape the SQL
+   * family's `enum` block ships): the body is an open `memberName = "value"`
+   * list. `variadicParameters: true` opens the block to arbitrary keys
+   * beyond the declared (empty) `parameters` set — the lowering factory
+   * (`lowerNativeEnumFromBlock`) turns the variadic entries into ordered
+   * members and rejects a bare (value-less) member.
+   */
+  native_enum: {
+    kind: 'pslBlock',
+    keyword: 'native_enum',
+    discriminator: 'native_enum',
+    name: { required: true },
+    parameters: {},
+    variadicParameters: true,
   },
 } as const satisfies AuthoringPslBlockDescriptorNamespace;
 

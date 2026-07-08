@@ -19,7 +19,8 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresTableSource } from './ast/table-source';
 import { PG_TEXT_CODEC_ID } from './codec-ids';
-import { policyEntityKind, roleEntityKind } from './entity-kinds';
+import { nativeEnumEntityKind, policyEntityKind, roleEntityKind } from './entity-kinds';
+import type { PostgresNativeEnum } from './postgres-native-enum';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
 import { escapeLiteral } from './sql-utils';
@@ -29,6 +30,7 @@ export type PostgresContract = Contract<SqlStorage> & { readonly target: 'postgr
 export type PostgresNamespaceEntries = SqlNamespaceEntries & {
   readonly policy?: Readonly<Record<string, PostgresRlsPolicy>>;
   readonly role?: Readonly<Record<string, PostgresRole>>;
+  readonly native_enum?: Readonly<Record<string, PostgresNativeEnum>>;
 };
 
 export interface PostgresSchemaInput {
@@ -70,7 +72,7 @@ export class PostgresSchema extends SqlNamespaceBase {
 
     const dispatched = hydrateNamespaceEntities(
       input.entries,
-      composeSqlEntityKinds([policyEntityKind, roleEntityKind]),
+      composeSqlEntityKinds([policyEntityKind, roleEntityKind, nativeEnumEntityKind]),
       'carry',
     );
 
@@ -81,11 +83,33 @@ export class PostgresSchema extends SqlNamespaceBase {
         ? { ...dispatched, valueSet: undefined }
         : dispatched;
 
+    // `native_enum` is authoring-time-only (`PostgresContractSerializer`
+    // never re-emits it; its member values live on via the `valueSet`
+    // entry it derives). Carried as a non-enumerable property — like
+    // `kind` below — so `JSON.stringify` (the hashing pipeline's
+    // canonicalization step, `computeStorageHash` via `hashContract`)
+    // walks past it and the storage hash matches what actually gets
+    // serialized. Direct property access (`ns.entries.native_enum`)
+    // still resolves normally; only enumeration is affected.
+    const nativeEnumRaw = dispatched['native_enum'];
+    const entriesInput: Record<string, Readonly<Record<string, unknown>> | undefined> = {
+      ...withPresence,
+    };
+    delete entriesInput['native_enum'];
+    if (nativeEnumRaw !== undefined) {
+      Object.defineProperty(entriesInput, 'native_enum', {
+        value: nativeEnumRaw,
+        enumerable: false,
+        writable: false,
+        configurable: true,
+      });
+    }
+
     this.entries = Object.freeze(
       blindCast<
         PostgresNamespaceEntries,
-        'composeSqlEntityKinds([policyEntityKind, roleEntityKind]) supplies table→StorageTable, valueSet→StorageValueSet, policy→PostgresRlsPolicy, role→PostgresRole descriptors'
-      >(withPresence),
+        'composeSqlEntityKinds([policyEntityKind, roleEntityKind, nativeEnumEntityKind]) supplies table→StorageTable, valueSet→StorageValueSet, policy→PostgresRlsPolicy, role→PostgresRole, native_enum→PostgresNativeEnum descriptors'
+      >(entriesInput),
     );
     Object.defineProperty(this, 'kind', {
       value: 'schema',

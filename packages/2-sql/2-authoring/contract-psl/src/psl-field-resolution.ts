@@ -5,6 +5,7 @@ import type {
   ExecutionMutationDefaultPhases,
 } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { CapabilityMatrix } from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaultRegistry,
@@ -149,6 +150,12 @@ export interface CollectResolvedFieldsInput {
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
   readonly capabilities: CapabilityMatrix;
+  /** The model's resolved namespace id — forwarded to `resolveFieldTypeDescriptor` for entity-ref value-set scoping. */
+  readonly namespaceId?: string;
+  /** Extension entities already lowered for this namespace — forwarded to `resolveFieldTypeDescriptor` for entity-ref type-constructor resolution (e.g. `pg.enum(Ref)`). */
+  readonly namespaceExtensionEntities?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  /** Codec-id-keyed descriptor lookup — forwarded to `resolveFieldTypeDescriptor` for entity-ref type-constructor resolution (e.g. `pg.enum(Ref)`). */
+  readonly codecLookup?: CodecLookup;
 }
 
 const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
@@ -300,6 +307,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     scalarTypeDescriptors,
     enumHandles,
     capabilities,
+    namespaceId,
+    namespaceExtensionEntities,
+    codecLookup,
   } = input;
   const resolvedFields: ResolvedField[] = [];
 
@@ -350,6 +360,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       diagnostics,
       sourceId,
       entityLabel: `Field "${model.name}.${field.name}"`,
+      ...ifDefined('namespaceId', namespaceId),
+      ...ifDefined('namespaceExtensionEntities', namespaceExtensionEntities),
+      ...ifDefined('codecLookup', codecLookup),
     };
 
     if (isValueObjectField) {

@@ -17,6 +17,7 @@ export type {
   AuthoringStorageTypeTemplate,
   AuthoringTemplateValue,
   AuthoringTypeConstructorDescriptor,
+  AuthoringTypeConstructorEntityRef,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
 export {

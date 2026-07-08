@@ -53,6 +53,7 @@
     "./resolve-storage-table": "./dist/resolve-storage-table.mjs",
     "./types": "./dist/types.mjs",
     "./validators": "./dist/validators.mjs",
+    "./value-set-derivation-hook": "./dist/value-set-derivation-hook.mjs",
     "./package.json": "./package.json"
   },
   "engines": {
