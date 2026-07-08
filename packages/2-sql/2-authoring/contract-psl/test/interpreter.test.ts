@@ -783,7 +783,11 @@ model OrderItem {
       expect(result.ok).toBe(false);
       if (result.ok) return;
       expect(
-        result.failure.diagnostics.some((d) => d.code === 'PSL_INVALID_ATTRIBUTE_SYNTAX'),
+        result.failure.diagnostics.some(
+          (d) =>
+            d.code === 'PSL_INVALID_ATTRIBUTE_SYNTAX' &&
+            d.message.includes('Expected a string literal'),
+        ),
       ).toBe(true);
     });
 

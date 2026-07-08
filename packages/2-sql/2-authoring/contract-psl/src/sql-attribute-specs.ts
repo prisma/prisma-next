@@ -30,7 +30,7 @@ export function findModelAttributeNode(
   name: string,
 ): ModelAttributeAst | undefined {
   for (const attribute of model.node.attributes()) {
-    if (attribute.name()?.path().join('.') === name) return attribute;
+    if (attribute.name()?.isSimpleName(name) === true) return attribute;
   }
   return undefined;
 }
@@ -40,7 +40,7 @@ export function findFieldAttributeNode(
   name: string,
 ): FieldAttributeAst | undefined {
   for (const attribute of field.node.attributes()) {
-    if (attribute.name()?.path().join('.') === name) return attribute;
+    if (attribute.name()?.isSimpleName(name) === true) return attribute;
   }
   return undefined;
 }
