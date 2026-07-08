@@ -66,7 +66,7 @@ import {
   type RelationNode,
   type UniqueConstraintNode,
 } from '@prisma-next/sql-contract-ts/contract-builder';
-import { invariant } from '@prisma-next/utils/assertions';
+import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -108,6 +108,9 @@ import {
   normalizeReferentialAction,
   type ParsedThrough,
   resolveTargetIdFieldNames,
+  SYNTHESIZED_JUNCTION_COLUMN_A,
+  SYNTHESIZED_JUNCTION_COLUMN_B,
+  type SynthesizedJunction,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
 
@@ -1210,6 +1213,104 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   };
 }
 
+type JunctionTerminal = {
+  readonly tableName: string;
+  readonly idColumn: string;
+  readonly idDescriptor: FieldNode['descriptor'];
+  readonly namespaceId: string | undefined;
+};
+
+/**
+ * Resolves the table name, single `@id` column, and that column's type
+ * descriptor for one terminal of a synthesised junction, so the junction can
+ * copy the descriptor onto its referencing foreign-key column. The resolver
+ * guarantees a single-column `@id` before requesting synthesis, so the terminal
+ * model and its id column must both resolve.
+ */
+function junctionTerminal(
+  modelNodes: readonly ModelNode[],
+  modelName: string,
+  modelNamespaceIds: ReadonlyMap<string, string>,
+): JunctionTerminal {
+  const modelNode = modelNodes.find((node) => node.modelName === modelName);
+  assertDefined(modelNode, `synthesised junction terminal model "${modelName}"`);
+  const idColumns = modelNode.id?.columns;
+  invariant(
+    idColumns?.length === 1,
+    `synthesised junction terminal "${modelName}" must have a single-column @id`,
+  );
+  const idColumn = idColumns[0];
+  const idField = modelNode.fields.find(
+    (field): field is FieldNode => 'descriptor' in field && field.columnName === idColumn,
+  );
+  assertDefined(idField, `synthesised junction terminal "${modelName}" @id column field`);
+  return {
+    tableName: modelNode.tableName,
+    idColumn: idField.columnName,
+    idDescriptor: idField.descriptor,
+    namespaceId: modelNamespaceIds.get(modelName),
+  };
+}
+
+/**
+ * Builds the model-less junction `ModelNode` for a synthesised implicit
+ * many-to-many: two foreign-key columns `A`/`B` whose types match the two
+ * terminal models' ids, a composite primary key over them, and the two foreign
+ * keys back to the terminals. The contract assembler turns this into a storage
+ * table and a (non-root) domain model; the through descriptors already emitted
+ * on the navigable ends reference it by name.
+ */
+function buildSynthesizedJunctionModelNode(
+  junction: SynthesizedJunction,
+  modelNodes: readonly ModelNode[],
+  modelNamespaceIds: ReadonlyMap<string, string>,
+): ModelNode {
+  const terminalA = junctionTerminal(modelNodes, junction.modelA, modelNamespaceIds);
+  const terminalB = junctionTerminal(modelNodes, junction.modelB, modelNamespaceIds);
+  const fields: FieldNode[] = [
+    {
+      fieldName: SYNTHESIZED_JUNCTION_COLUMN_A,
+      columnName: SYNTHESIZED_JUNCTION_COLUMN_A,
+      descriptor: terminalA.idDescriptor,
+      nullable: false,
+    },
+    {
+      fieldName: SYNTHESIZED_JUNCTION_COLUMN_B,
+      columnName: SYNTHESIZED_JUNCTION_COLUMN_B,
+      descriptor: terminalB.idDescriptor,
+      nullable: false,
+    },
+  ];
+  const foreignKeys: ForeignKeyNode[] = [
+    {
+      columns: [SYNTHESIZED_JUNCTION_COLUMN_A],
+      references: {
+        model: junction.modelA,
+        table: terminalA.tableName,
+        columns: [terminalA.idColumn],
+        ...ifDefined('namespaceId', terminalA.namespaceId),
+      },
+    },
+    {
+      columns: [SYNTHESIZED_JUNCTION_COLUMN_B],
+      references: {
+        model: junction.modelB,
+        table: terminalB.tableName,
+        columns: [terminalB.idColumn],
+        ...ifDefined('namespaceId', terminalB.namespaceId),
+      },
+    },
+  ];
+  return {
+    modelName: junction.junctionModelName,
+    tableName: junction.junctionModelName,
+    ...ifDefined('namespaceId', terminalA.namespaceId),
+    fields,
+    id: { columns: [SYNTHESIZED_JUNCTION_COLUMN_A, SYNTHESIZED_JUNCTION_COLUMN_B] },
+    foreignKeys,
+  };
+}
+
 interface BuildValueObjectsInput {
   readonly compositeTypes: readonly CompositeTypeSymbol[];
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
@@ -2055,20 +2156,36 @@ export function interpretPslDocumentToSqlContract(
     fkRelationMetadata,
   });
   const modelIdColumns = new Map<string, readonly string[]>();
+  const modelTableNames = new Map<string, string>();
+  const declaredTableNames = new Set<string>();
   for (const modelNode of modelNodes) {
     if (modelNode.id) {
       modelIdColumns.set(modelNode.modelName, modelNode.id.columns);
     }
+    modelTableNames.set(modelNode.modelName, modelNode.tableName);
+    declaredTableNames.add(modelNode.modelName);
+    declaredTableNames.add(modelNode.tableName);
   }
-  applyBackrelationCandidates({
+  const { synthesizedJunctions } = applyBackrelationCandidates({
     backrelationCandidates,
     fkRelationsByPair,
     fkRelationsByDeclaringModel,
     modelIdColumns,
+    modelTableNames,
+    modelNamespaceIds,
+    declaredTableNames,
     modelRelations,
     diagnostics,
     sourceId,
   });
+
+  // Inject a model-less junction table for each implicit many-to-many: a
+  // physical table the user never authored (Prisma's `_<A>To<B>` convention).
+  // The contract assembler turns it into a storage table and a domain model,
+  // and fills the through descriptors' `targetColumns` from the terminal ids.
+  for (const junction of synthesizedJunctions) {
+    modelNodes.push(buildSynthesizedJunctionModelNode(junction, modelNodes, modelNamespaceIds));
+  }
 
   // Merge cross-space relations into modelRelations after local back-relation matching.
   // Cross-space targets have no local back-relation candidates, so they bypass that step.
@@ -2215,10 +2332,15 @@ export function interpretPslDocumentToSqlContract(
     });
   }
 
-  const variantModelNames = new Set(baseDeclarations.keys());
+  // STI variants share the base table and synthesised junctions are physical
+  // tables only — neither is a queryable root.
+  const nonRootModelNames = new Set(baseDeclarations.keys());
+  for (const junction of synthesizedJunctions) {
+    nonRootModelNames.add(junction.junctionModelName);
+  }
   const filteredRoots = Object.fromEntries(
     Object.entries(contract.roots).filter(
-      ([, crossReference]) => !variantModelNames.has(crossReference.model),
+      ([, crossReference]) => !nonRootModelNames.has(crossReference.model),
     ),
   );
 
