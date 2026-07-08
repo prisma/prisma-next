@@ -2,11 +2,14 @@ import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 import type { ArgType, InterpretCtx } from '../src/exports';
 import {
+  bool,
   fieldAttribute,
   fieldRef,
   identifier,
+  int,
   interpretAttribute,
   list,
+  modelAttribute,
   nodePslSpan,
   oneOf,
   str,
@@ -14,7 +17,7 @@ import {
 import { Cursor, parse, parseAttribute } from '../src/parse';
 import type { SourceFile } from '../src/source-file';
 import { buildSymbolTable } from '../src/symbol-table';
-import { FieldAttributeAst } from '../src/syntax/ast/attributes';
+import { FieldAttributeAst, ModelAttributeAst } from '../src/syntax/ast/attributes';
 import type { ExpressionAst } from '../src/syntax/ast/expressions';
 import { createSyntaxTree } from '../src/syntax/red';
 
@@ -45,6 +48,13 @@ function argOf(exprSource: string): { expr: ExpressionAst; ctx: InterpretCtx } {
   const expr = first?.value();
   if (!expr) throw new Error('expected an argument expression');
   return { expr, ctx: makeCtx(cursor.sourceFile) };
+}
+
+function modelAttrOf(source: string): { node: ModelAttributeAst; ctx: InterpretCtx } {
+  const cursor = new Cursor(source);
+  const node = ModelAttributeAst.cast(createSyntaxTree(parseAttribute(cursor)));
+  if (!node) throw new Error('expected a model attribute');
+  return { node, ctx: { ...makeCtx(cursor.sourceFile), level: 'model' } };
 }
 
 describe('str', () => {
@@ -108,6 +118,102 @@ describe('identifier', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('int', () => {
+  it('parses an integer literal into its number value', () => {
+    const { expr, ctx } = argOf('42');
+
+    const result = int().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(42);
+  });
+
+  it('rejects a non-integer number with the threaded code', () => {
+    const { expr, ctx } = argOf('1.5');
+
+    const result = int().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a non-number token', () => {
+    const { expr, ctx } = argOf('"42"');
+
+    const result = int().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('bool', () => {
+  it('parses true into its boolean value', () => {
+    const { expr, ctx } = argOf('true');
+
+    const result = bool().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(true);
+  });
+
+  it('parses false into its boolean value', () => {
+    const { expr, ctx } = argOf('false');
+
+    const result = bool().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(false);
+  });
+
+  it('rejects a non-boolean token with the threaded code', () => {
+    const { expr, ctx } = argOf('"true"');
+
+    const result = bool().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+});
+
+describe('modelAttribute', () => {
+  it('fixes the spec level to model', () => {
+    const spec = modelAttribute('demo', { positional: [{ key: 'k', type: int() }] });
+
+    expect(spec.level).toBe('model');
+    expect(spec.name).toBe('demo');
+  });
+
+  it('binds a model-attribute node through interpretAttribute', () => {
+    const { node, ctx } = modelAttrOf('@@demo(7)');
+    const spec = modelAttribute('demo', { positional: [{ key: 'k', type: int() }] });
+
+    const result = interpretAttribute(node, spec, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ k: 7 });
+  });
+
+  it('surfaces a leaf diagnostic when a model-attribute argument fails to parse', () => {
+    const { node, ctx } = modelAttrOf('@@demo("nope")');
+    const spec = modelAttribute('demo', { positional: [{ key: 'k', type: int() }] });
+
+    const result = interpretAttribute(node, spec, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
   });
 });
 

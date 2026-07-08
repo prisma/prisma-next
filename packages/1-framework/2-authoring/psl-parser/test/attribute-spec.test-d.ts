@@ -2,7 +2,7 @@ import type { PslDiagnostic } from '@prisma-next/framework-components/psl-ast';
 import { ok, type Result } from '@prisma-next/utils/result';
 import { expectTypeOf, test } from 'vitest';
 import type { ArgType, InferAttr } from '../src/exports';
-import { fieldAttribute, optional } from '../src/exports';
+import { fieldAttribute, modelAttribute, optional } from '../src/exports';
 
 function leaf<T>(kind: string, value: T): ArgType<T> {
   return {
@@ -63,4 +63,24 @@ test('a spec carrying a refine still infers its output', () => {
     },
   });
   expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ name?: string }>();
+});
+
+test('modelAttribute infers the same shape fieldAttribute would for equivalent params', () => {
+  const fieldSpec = fieldAttribute('demo', {
+    positional: [{ key: 'name', type: str() }],
+    named: { count: optional(int()) },
+  });
+  const modelSpec = modelAttribute('demo', {
+    positional: [{ key: 'name', type: str() }],
+    named: { count: optional(int()) },
+  });
+  expectTypeOf<InferAttr<typeof modelSpec>>().toEqualTypeOf<InferAttr<typeof fieldSpec>>();
+  expectTypeOf<InferAttr<typeof modelSpec>>().toEqualTypeOf<{ name: string; count?: number }>();
+});
+
+test('a model positional slot contributes its key into the keyspace', () => {
+  const spec = modelAttribute('demo', {
+    positional: [{ key: 'k', type: int() }],
+  });
+  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ k: number }>();
 });
