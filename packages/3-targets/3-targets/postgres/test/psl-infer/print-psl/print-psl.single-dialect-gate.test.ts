@@ -1,7 +1,6 @@
-import { printPsl } from '@prisma-next/psl-printer';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { sqlSchemaIrToPslAst } from '../../../src/core/psl-contract-infer/sql-schema-ir-to-psl-ast';
+import { printPslFromFlat } from '../fixtures';
 
 // A schema exercising both a single-column FK and a composite FK, so the gate
 // covers every shape the relation printer emits. The host of each `@relation`
@@ -53,7 +52,7 @@ const schemaIR: SqlSchemaIR = {
 };
 
 describe('contract infer emits single-dialect relation vocabulary', () => {
-  const printed = printPsl(sqlSchemaIrToPslAst(schemaIR));
+  const printed = printPslFromFlat(schemaIR);
 
   it('emits no legacy @relation fields:/references: keys', () => {
     expect(printed).not.toMatch(/@relation\([^)]*\bfields:/);
