@@ -153,6 +153,62 @@ changes:
       contains:
         - "diffPostgresDatabaseSchema"
       anyMatch: true
+  - id: schema-issue-vocabulary-retired
+    summary: |
+      The coordinate-based issue vocabulary is gone: `BaseSchemaIssue`, `SchemaIssue`,
+      `EnumValuesChangedIssue`, and the `DiffIssue` union are removed from
+      `@prisma-next/framework-components/control`. `SchemaDiffIssue` (`{ path, reason, message,
+      expected?, actual? }`) is the only issue shape everywhere now — verify results, the codec
+      `verifyType` hook, and `SchemaVerifier.issues` all report it. Its `outcome` field is also
+      gone; use `reason` (`'not-found'` | `'not-expected'` | `'not-equal'`) instead — `outcome`'s
+      `'missing'` / `'extra'` / `'mismatch'` map onto those three respectively. If your extension
+      imports any of the removed types, constructs a `{ kind, table, message }`-shaped issue by
+      hand, or reads `.outcome` off a `SchemaDiffIssue`, switch to the node-typed shape and
+      `reason`.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "BaseSchemaIssue"
+        - "EnumValuesChangedIssue"
+        - "SchemaDiffOutcome"
+        - ".outcome === 'missing'"
+        - ".outcome === 'extra'"
+        - ".outcome === 'mismatch'"
+      anyMatch: true
+  - id: schema-finding-lists-single-list
+    summary: |
+      `SchemaFindingLists` (and therefore `VerifyDatabaseSchemaResult.schema` /
+      `.schema.warnings`) collapses from two lists (`issues: SchemaIssue[]`, `schemaDiffIssues:
+      SchemaDiffIssue[]`) to one: `{ issues: SchemaDiffIssue[] }`. The framework `SchemaDiff`
+      class follows the same collapse — its constructor now takes one issue array instead of
+      two (`new SchemaDiff(issues)`, not `new SchemaDiff(issues, schemaDiffIssues)`), and
+      `.filter()` narrows the single list. If your extension reads
+      `result.schema.schemaDiffIssues` (or `.schema.warnings.schemaDiffIssues`) directly, or
+      constructs a `SchemaDiff` by hand, update both call sites to the single-list shape —
+      concatenate the old two lists into one, in the same order, if you need to reproduce prior
+      combined output.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "schemaDiffIssues"
+        - "new SchemaDiff("
+      anyMatch: true
+  - id: codec-verify-type-hook-returns-schema-diff-issue
+    summary: |
+      `CodecControlHooks.verifyType` (the storage-type verification hook,
+      `@prisma-next/family-sql/control`) now returns `readonly SchemaDiffIssue[]` instead of
+      `readonly SchemaIssue[]` — no more `kind` string; classify by `reason` instead. A storage
+      type (e.g. a native enum) only ever diverges in its value set, so every paired
+      `not-equal` finding grades as value drift (suppressed under an `external` control policy,
+      same as before); `not-found` is a missing type, `not-expected` an extra one. If your
+      extension implements a custom codec's `verifyType` hook, return `{ path, reason, message,
+      expected?, actual? }` issues instead of the old `{ kind, table, message }` shape.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "verifyType:"
+        - "verifyType("
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
@@ -325,10 +381,12 @@ The only `packages/3-extensions/` touch is a fixture fix in
 `resolvedReferencedSchema` (the differ pairs FK nodes by id, which folds in
 that field; an unresolved FK on a hand-built actual node no longer paired with
 the derived expected side). Test-fixture-only; no extension-author API
-changed. See the `sql-migration-planner-keep-diff-issue-to-sibling-owned-entity-names`,
+changed. See the `sql-migration-planner-keep-diff-issue-to-ownership-oracle`,
 `family-sql-collect-sql-schema-issues-removed`,
 `sql-control-target-descriptor-diff-database-schema-removed`,
-`migration-tools-aggregate-strategy-rename`, and
-`target-postgres-diff-postgres-database-schema-removed` entries above for the
-real breaking changes this slice makes to the framework SPI.
+`migration-tools-aggregate-strategy-rename`,
+`target-postgres-diff-postgres-database-schema-removed`,
+`schema-issue-vocabulary-retired`, `schema-finding-lists-single-list`, and
+`codec-verify-type-hook-returns-schema-diff-issue` entries above for the real
+breaking changes this slice makes to the framework SPI.
 -->

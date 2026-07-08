@@ -1,8 +1,42 @@
 ---
 from: "0.14"
 to: "0.15"
-changes: []
+changes:
+  - id: db-verify-json-single-issue-list
+    summary: |
+      `prisma-next db verify --json` (and `db verify --schema-only --json`) now report a single
+      `schema.issues` array instead of the split `schema.issues` / `schema.schemaDiffIssues`
+      pair — the one-differ-two-ir-planner slice unified the CLI's schema-issue vocabulary onto
+      one shape: `{ path, reason, message, expected?, actual? }`. `reason` replaces the retired
+      `outcome` field (`'missing'` -> `'not-found'`, `'extra'` -> `'not-expected'`, `'mismatch'`
+      -> `'not-equal'`). The same collapse applies to `schema.warnings`. If a script or CI step
+      parses `db verify --json` output and reads `schema.schemaDiffIssues` /
+      `schema.warnings.schemaDiffIssues`, or compares an issue's `.outcome` field, update it:
+      read `schema.issues` (it already carries everything the two lists used to, concatenated)
+      and switch any `.outcome` comparison to the matching `.reason` value.
+    detection:
+      glob: "**/*.{ts,mts,cts,js,mjs,sh}"
+      contains:
+        - "schemaDiffIssues"
+        - ".outcome === 'missing'"
+        - ".outcome === 'extra'"
+        - ".outcome === 'mismatch'"
+      anyMatch: true
 ---
+
+<!--
+Postgres-RLS slice 2.5 (one-differ-two-ir-planner), final unit: retires the
+coordinate-based issue vocabulary (`BaseSchemaIssue` / `SchemaIssue` /
+`EnumValuesChangedIssue` / the legacy `outcome` field) now that the migration
+planner and `db verify` both run on the one node-typed differ. The only
+`examples/` touch is `examples/supabase/test/skeleton.integration.test.ts`,
+which read a verify result's `schema.schemaDiffIssues` list and an issue's
+`.outcome` field directly — updated to `schema.issues` and `.reason` per the
+`db-verify-json-single-issue-list` entry above. Superseds the "internal
+refactor... not a stable shipped API" framing of the TML-2931 entry below: the
+JSON shape is now settled and consumer-facing action is required for the
+collapse.
+-->
 
 <!--
 TML-2891 (eliminate the SQL family placeholder namespace): app authors who build
