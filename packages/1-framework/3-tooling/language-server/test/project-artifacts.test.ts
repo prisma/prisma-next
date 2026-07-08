@@ -4,7 +4,7 @@ import { parse } from '@prisma-next/psl-parser/syntax';
 import { describe, expect, it } from 'vitest';
 import { mapParseDiagnostics } from '../src/diagnostic-mapping';
 import type { PipelineInputs } from '../src/pipeline';
-import { createProjectArtifacts } from '../src/project-artifacts';
+import { createProjectArtifacts, type ProjectArtifacts } from '../src/project-artifacts';
 import { resolveSchemaInputs } from '../src/schema-inputs';
 
 const schemaUri = pathToFileURL('/abs/schema.psl').toString();
@@ -20,105 +20,101 @@ const controlStack: PipelineInputs = {
 const cleanSource = 'model User {\n  id Int @id\n}\n';
 const twoModelSource = 'model User {\n  id Int @id\n}\n\nmodel Post {\n  id Int @id\n}\n';
 
+function projectWithMirror(): {
+  readonly texts: Map<string, string>;
+  readonly store: ProjectArtifacts;
+} {
+  const texts = new Map<string, string>();
+  const store = createProjectArtifacts({
+    inputs,
+    controlStack,
+    getText: (uri) => texts.get(uri),
+  });
+  return { texts, store };
+}
+
 describe('createProjectArtifacts', () => {
-  it('caches the parsed AST per URI', () => {
-    const store = createProjectArtifacts();
-    store.materialize(schemaUri, cleanSource, inputs, controlStack);
+  it('parses the mirrored text on first read', () => {
+    const { texts, store } = projectWithMirror();
+    texts.set(schemaUri, cleanSource);
 
-    const cached = store.getDocument(schemaUri);
-    expect(cached?.document).toBeDefined();
-    expect(cached?.sourceFile).toBeDefined();
+    const artifacts = store.document(schemaUri);
+    expect(artifacts?.document).toBeDefined();
+    expect(artifacts?.sourceFile).toBeDefined();
+    expect(artifacts?.diagnostics).toEqual([]);
   });
 
-  it('returns the cached entry untouched while it remains present', () => {
-    const store = createProjectArtifacts();
-    const firstDiagnostics = store.materialize(schemaUri, cleanSource, inputs, controlStack);
-    const first = store.getDocument(schemaUri);
+  it('returns the same artifacts for repeated reads without an intervening event', () => {
+    const { texts, store } = projectWithMirror();
+    texts.set(schemaUri, cleanSource);
+    const first = store.document(schemaUri);
 
-    const secondDiagnostics = store.materialize(schemaUri, twoModelSource, inputs, controlStack);
+    texts.set(schemaUri, twoModelSource);
 
-    expect(store.getDocument(schemaUri)).toBe(first);
-    expect(secondDiagnostics).toBe(firstDiagnostics);
+    expect(store.document(schemaUri)).toBe(first);
   });
 
-  it('reparses and replaces the entry after it is evicted', () => {
-    const store = createProjectArtifacts();
-    store.materialize(schemaUri, cleanSource, inputs, controlStack);
-    const first = store.getDocument(schemaUri);
+  it('reflects the latest mirrored text on the read after documentChanged', () => {
+    const { texts, store } = projectWithMirror();
+    texts.set(schemaUri, cleanSource);
+    const first = store.document(schemaUri);
 
-    store.remove(schemaUri);
-    store.materialize(schemaUri, twoModelSource, inputs, controlStack);
+    texts.set(schemaUri, twoModelSource);
+    store.documentChanged(schemaUri);
 
-    const second = store.getDocument(schemaUri);
+    const second = store.document(schemaUri);
     expect(second?.document).not.toBe(first?.document);
-  });
-
-  it('recomputes after clear', () => {
-    const store = createProjectArtifacts();
-    store.materialize(schemaUri, cleanSource, inputs, controlStack);
-    const first = store.getDocument(schemaUri);
-
-    store.clear();
-    expect(store.getDocument(schemaUri)).toBeUndefined();
-    store.materialize(schemaUri, twoModelSource, inputs, controlStack);
-
-    const second = store.getDocument(schemaUri);
-    expect(second?.document).not.toBe(first?.document);
-    expect(Object.keys(store.getSymbolTable()?.topLevel.models ?? {})).toEqual(
+    expect(Object.keys(store.symbolTable()?.topLevel.models ?? {})).toEqual(
       expect.arrayContaining(['User', 'Post']),
     );
+  });
+
+  it('returns undefined for documents without mirrored text', () => {
+    const { store } = projectWithMirror();
+    expect(store.document(schemaUri)).toBeUndefined();
+    expect(store.symbolTable()).toBeUndefined();
+  });
+
+  it('returns undefined for documents that are not configured inputs', () => {
+    const { texts, store } = projectWithMirror();
+    const otherUri = pathToFileURL('/abs/not-a-schema.psl').toString();
+    texts.set(otherUri, cleanSource);
+
+    expect(store.document(otherUri)).toBeUndefined();
+    expect(store.symbolTable()).toBeUndefined();
   });
 
   it('builds one project symbol table from the open configured input', () => {
-    const store = createProjectArtifacts();
-    store.materialize(schemaUri, cleanSource, inputs, controlStack);
+    const { texts, store } = projectWithMirror();
+    texts.set(schemaUri, cleanSource);
+    store.document(schemaUri);
 
-    expect(Object.keys(store.getSymbolTable()?.topLevel.models ?? {})).toContain('User');
+    expect(Object.keys(store.symbolTable()?.topLevel.models ?? {})).toContain('User');
   });
 
-  it('rebuilds the project symbol table after eviction reflects the latest edit', () => {
-    const store = createProjectArtifacts();
-    store.materialize(schemaUri, cleanSource, inputs, controlStack);
-    store.remove(schemaUri);
-    store.materialize(schemaUri, twoModelSource, inputs, controlStack);
+  it('reading the symbol table alone does not parse', () => {
+    const { texts, store } = projectWithMirror();
+    texts.set(schemaUri, cleanSource);
 
-    expect(Object.keys(store.getSymbolTable()?.topLevel.models ?? {})).toEqual(
-      expect.arrayContaining(['User', 'Post']),
-    );
+    expect(store.symbolTable()).toBeUndefined();
   });
 
-  it('drops the AST and clears the symbol table when the document is removed', () => {
-    const store = createProjectArtifacts();
-    store.materialize(schemaUri, cleanSource, inputs, controlStack);
+  it('drops the artifacts and symbol table on documentClosed', () => {
+    const { texts, store } = projectWithMirror();
+    texts.set(schemaUri, cleanSource);
+    store.document(schemaUri);
 
-    store.remove(schemaUri);
+    texts.delete(schemaUri);
+    store.documentClosed(schemaUri);
 
-    expect(store.getDocument(schemaUri)).toBeUndefined();
-    expect(store.getSymbolTable()).toBeUndefined();
-  });
-
-  it('returns null and caches nothing for a document that is not a configured input', () => {
-    const store = createProjectArtifacts();
-    const otherUri = pathToFileURL('/abs/not-a-schema.psl').toString();
-
-    expect(store.materialize(otherUri, cleanSource, inputs, controlStack)).toBeNull();
-    expect(store.getDocument(otherUri)).toBeUndefined();
-  });
-
-  it('drops a cached input when a config reload removes it as an input', () => {
-    const store = createProjectArtifacts();
-    store.materialize(schemaUri, cleanSource, inputs, controlStack);
-
-    store.clear();
-    const emptyInputs = resolveSchemaInputs({});
-    expect(store.materialize(schemaUri, cleanSource, emptyInputs, controlStack)).toBeNull();
-    expect(store.getDocument(schemaUri)).toBeUndefined();
-    expect(store.getSymbolTable()).toBeUndefined();
+    expect(store.document(schemaUri)).toBeUndefined();
+    expect(store.symbolTable()).toBeUndefined();
   });
 
   it('returns diagnostics with parity to parse + buildSymbolTable for the same inputs', () => {
-    const store = createProjectArtifacts();
+    const { texts, store } = projectWithMirror();
     const source = ['model Profile {', '  user a.b.c', '}'].join('\n');
+    texts.set(schemaUri, source);
     const { document, sourceFile, diagnostics: parseDiagnostics } = parse(source);
     const { diagnostics: symbolTableDiagnostics } = buildSymbolTable({
       document,
@@ -127,17 +123,14 @@ describe('createProjectArtifacts', () => {
       pslBlockDescriptors: controlStack.pslBlockDescriptors,
     });
 
-    const diagnostics = store.materialize(schemaUri, source, inputs, controlStack);
-
-    expect(diagnostics).toEqual(
+    expect(store.document(schemaUri)?.diagnostics).toEqual(
       mapParseDiagnostics([...parseDiagnostics, ...symbolTableDiagnostics]),
     );
   });
 
   it('does not throw on a malformed, half-typed buffer', () => {
-    const store = createProjectArtifacts();
-    expect(() =>
-      store.materialize(schemaUri, 'model User {\n  id ', inputs, controlStack),
-    ).not.toThrow();
+    const { texts, store } = projectWithMirror();
+    texts.set(schemaUri, 'model User {\n  id ');
+    expect(() => store.document(schemaUri)).not.toThrow();
   });
 });

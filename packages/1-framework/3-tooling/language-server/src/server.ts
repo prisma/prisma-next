@@ -32,8 +32,8 @@ import { type LspDiagnostic, ParseDiagnosticSeverity } from './diagnostic-mappin
 import { computeFoldingRanges } from './folding-ranges';
 import type { PipelineInputs } from './pipeline';
 import {
-  type CachedDocument,
   createProjectArtifacts,
+  type DocumentArtifacts,
   type ProjectArtifacts,
 } from './project-artifacts';
 import type { SchemaInputSet } from './schema-inputs';
@@ -45,7 +45,7 @@ export interface LanguageServer {
    * Exposed for future features (completion, semantic tokens); nothing consumes
    * them yet.
    */
-  getDocumentAst(uri: string): CachedDocument | undefined;
+  getDocumentAst(uri: string): DocumentArtifacts | undefined;
   getProjectSymbolTable(uri: string): SymbolTable | undefined;
 }
 
@@ -100,17 +100,12 @@ export function createServer(connection: Connection): LanguageServer {
       documentConfigPaths.delete(uri);
       return;
     }
-    const computed = project.artifacts.materialize(
-      uri,
-      document.getText(),
-      project.inputs,
-      project.controlStack,
-    );
-    if (computed === null) {
+    const artifacts = project.artifacts.document(uri);
+    if (artifacts === undefined) {
       sendDiagnostics({ uri, diagnostics: [] });
       return;
     }
-    sendDiagnostics({ uri, diagnostics: toDiagnostics(computed) });
+    sendDiagnostics({ uri, diagnostics: toDiagnostics(artifacts.diagnostics) });
   }
 
   /**
@@ -122,10 +117,10 @@ export function createServer(connection: Connection): LanguageServer {
     project: ProjectState,
     uri: string,
   ): FullDocumentDiagnosticReport {
-    const cached = ensureCurrent(project, uri);
+    const artifacts = project.artifacts.document(uri);
     return {
       kind: DocumentDiagnosticReportKind.Full,
-      items: cached === undefined ? [] : toDiagnostics(cached.diagnostics),
+      items: artifacts === undefined ? [] : toDiagnostics(artifacts.diagnostics),
     };
   }
 
@@ -198,11 +193,14 @@ export function createServer(connection: Connection): LanguageServer {
 
   async function loadProject(configPath: string): Promise<ProjectState> {
     const resolution = await resolveConfigInputs(configPath);
-    // A config reload can change what a parse produces (inputs, control stack),
-    // so every cached entry is evicted; the next read rematerializes against
-    // the new stack.
-    const artifacts = projects.get(configPath)?.artifacts ?? createProjectArtifacts();
-    artifacts.clear();
+    // A fresh store per load: a config reload can change what a parse
+    // produces (inputs, control stack), so later reads must derive from the
+    // new resolution rather than anything computed under the old one.
+    const artifacts = createProjectArtifacts({
+      inputs: resolution.inputs,
+      controlStack: resolution.controlStack,
+      getText: (uri) => documents.get(uri)?.getText(),
+    });
     const project: ProjectState =
       resolution.formatter === undefined
         ? {
@@ -314,15 +312,15 @@ export function createServer(connection: Connection): LanguageServer {
       return emptySemanticTokens();
     }
 
-    const cached = ensureCurrent(project, uri);
-    if (cached === undefined) {
+    const artifacts = project.artifacts.document(uri);
+    if (artifacts === undefined) {
       return emptySemanticTokens();
     }
 
     const source = {
-      document: cached.document,
-      sourceFile: cached.sourceFile,
-      symbolTable: project.artifacts.getSymbolTable(),
+      document: artifacts.document,
+      sourceFile: artifacts.sourceFile,
+      symbolTable: project.artifacts.symbolTable(),
       scalarTypes: project.controlStack.scalarTypes,
     };
     return buildSemanticTokens(source, range);
@@ -344,22 +342,22 @@ export function createServer(connection: Connection): LanguageServer {
       return [];
     }
 
-    const cached = ensureCurrent(project, uri);
-    const symbolTable = project.artifacts.getSymbolTable();
-    if (cached === undefined || symbolTable === undefined) {
+    const artifacts = project.artifacts.document(uri);
+    const symbolTable = project.artifacts.symbolTable();
+    if (artifacts === undefined || symbolTable === undefined) {
       return [];
     }
 
     try {
       const context = classifyPslCompletionContext({
-        document: cached.document,
-        sourceFile: cached.sourceFile,
+        document: artifacts.document,
+        sourceFile: artifacts.sourceFile,
         position,
       });
       return [
         ...providePslCompletionItems({
           context,
-          sourceFile: cached.sourceFile,
+          sourceFile: artifacts.sourceFile,
           candidates: {
             scalarTypes: project.controlStack.scalarTypes,
             pslBlockDescriptors: project.controlStack.pslBlockDescriptors,
@@ -371,29 +369,6 @@ export function createServer(connection: Connection): LanguageServer {
     } catch {
       return [];
     }
-  }
-
-  /**
-   * The single synchronous materialize-on-read seam: reads the live buffer
-   * from the `TextDocuments` mirror and parses on a cache miss. A present
-   * entry is trusted as current: LSP messages are dispatched in order and the
-   * notification handlers evict synchronously against the already-updated
-   * text mirror, so every event that could change what a parse produces has
-   * evicted before any read can observe the cache. Returns `undefined` for
-   * unmirrored documents and non-configured inputs.
-   */
-  function ensureCurrent(project: ProjectState, uri: string): CachedDocument | undefined {
-    const document = documents.get(uri);
-    if (document === undefined) {
-      return undefined;
-    }
-    const materialized = project.artifacts.materialize(
-      uri,
-      document.getText(),
-      project.inputs,
-      project.controlStack,
-    );
-    return materialized === null ? undefined : project.artifacts.getDocument(uri);
   }
 
   connection.onInitialize(async (params): Promise<InitializeResult> => {
@@ -513,27 +488,25 @@ export function createServer(connection: Connection): LanguageServer {
     if (project === undefined) {
       return [];
     }
-    const cached = ensureCurrent(project, params.textDocument.uri);
-    if (cached === undefined) {
+    const artifacts = project.artifacts.document(params.textDocument.uri);
+    if (artifacts === undefined) {
       return [];
     }
-    return computeFoldingRanges(cached.document, cached.sourceFile);
+    return computeFoldingRanges(artifacts.document, artifacts.sourceFile);
   });
 
-  // Marking dirty is eviction: open/change evict the document's cache entry
-  // before any transport work, so a later read parses the current buffer on
-  // its miss. For pull clients that is all that happens (the next pull or
-  // read materializes through `ensureCurrent`); for push clients the eager
-  // publish then refills the cache.
+  // The artifact store learns about edits only through these events; for
+  // pull clients nothing else happens (the next read derives from the
+  // current buffer), while push clients publish eagerly as before.
   documents.onDidOpen((event) => {
-    evictDocumentArtifacts(event.document.uri);
+    artifactsForDocument(event.document.uri)?.documentChanged(event.document.uri);
     if (clientSupportsPullDiagnostics) {
       return;
     }
     publishSafely(event.document.uri);
   });
   documents.onDidChangeContent((event) => {
-    evictDocumentArtifacts(event.document.uri);
+    artifactsForDocument(event.document.uri)?.documentChanged(event.document.uri);
     if (clientSupportsPullDiagnostics) {
       return;
     }
@@ -541,10 +514,7 @@ export function createServer(connection: Connection): LanguageServer {
   });
   documents.onDidClose((event) => {
     const uri = event.document.uri;
-    const configPath = documentConfigPaths.get(uri);
-    if (configPath !== undefined) {
-      projects.get(configPath)?.artifacts.remove(uri);
-    }
+    artifactsForDocument(uri)?.documentClosed(uri);
     documentConfigPaths.delete(uri);
     if (!clientSupportsPullDiagnostics) {
       sendDiagnostics({ uri, diagnostics: [] });
@@ -559,17 +529,13 @@ export function createServer(connection: Connection): LanguageServer {
     return configPath === undefined ? undefined : projects.get(configPath)?.artifacts;
   }
 
-  function evictDocumentArtifacts(uri: string): void {
-    artifactsForDocument(uri)?.remove(uri);
-  }
-
   return {
     dispose: () => {
       disposed = true;
       connection.dispose();
     },
-    getDocumentAst: (uri) => artifactsForDocument(uri)?.getDocument(uri),
-    getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.getSymbolTable(),
+    getDocumentAst: (uri) => artifactsForDocument(uri)?.document(uri),
+    getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.symbolTable(),
   };
 }
 

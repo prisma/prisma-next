@@ -45,7 +45,7 @@ import {
   type TextEdit,
 } from 'vscode-languageserver/node';
 import type { ConfigResolution } from '../src/config-resolution';
-import type { CachedDocument } from '../src/project-artifacts';
+import type { DocumentArtifacts } from '../src/project-artifacts';
 import { resolveSchemaInputs } from '../src/schema-inputs';
 import { semanticTokensLegend } from '../src/semantic-tokens';
 import { createServer } from '../src/server';
@@ -201,7 +201,7 @@ interface Harness {
   readonly diagnosticRefreshCount: () => number;
   readonly waitForDiagnosticRefresh: () => Promise<void>;
   readonly notifyConfigChanged: (uri?: string) => void;
-  readonly getDocumentAst: (uri: string) => CachedDocument | undefined;
+  readonly getDocumentAst: (uri: string) => DocumentArtifacts | undefined;
   readonly getProjectSymbolTable: (uri: string) => SymbolTable | undefined;
   dispose: () => void;
 }
