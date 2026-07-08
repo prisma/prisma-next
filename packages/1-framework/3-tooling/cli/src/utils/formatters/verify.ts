@@ -1,6 +1,8 @@
 import type {
   CoreSchemaView,
+  ExpectationFailureReason,
   IntrospectSchemaResult,
+  SchemaDiffIssue,
   SchemaTreeNode,
   SignDatabaseResult,
   VerifyDatabaseResult,
@@ -10,6 +12,23 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
 import type { GlobalFlags } from '../global-flags';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
+
+/** Human-readable label for each failure reason, prefixed onto an issue's message for display. */
+const REASON_LABEL: Record<ExpectationFailureReason, string> = {
+  'not-found': 'missing',
+  'not-expected': 'extra',
+  'not-equal': 'mismatch',
+};
+
+/**
+ * The issue's display text: its own message (the differ's `path`), prefixed
+ * with a human label for why it's flagged. Turning `reason` into a label is
+ * this formatter's job, not the differ's — the differ's issue is data
+ * (`path` + `reason` + nodes), not prose.
+ */
+function formatIssueMessage(issue: SchemaDiffIssue): string {
+  return `${REASON_LABEL[issue.reason]}: ${issue.message}`;
+}
 
 // ============================================================================
 // Verify Output Formatters
@@ -352,7 +371,7 @@ export function formatSchemaVerifyOutput(
   const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  const issueMessages = result.schema.issues.map((issue) => issue.message);
+  const issueMessages = result.schema.issues.map(formatIssueMessage);
   if (issueMessages.length > 0) {
     lines.push(formatRed('Schema issues:'));
     for (const message of issueMessages) {
@@ -360,7 +379,7 @@ export function formatSchemaVerifyOutput(
     }
   }
 
-  const warningMessages = (result.schema.warnings?.issues ?? []).map((issue) => issue.message);
+  const warningMessages = (result.schema.warnings?.issues ?? []).map(formatIssueMessage);
   if (warningMessages.length > 0) {
     if (lines.length > 0) lines.push('');
     lines.push(formatYellow('Schema warnings:'));

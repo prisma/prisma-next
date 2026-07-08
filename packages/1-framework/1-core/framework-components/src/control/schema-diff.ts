@@ -34,15 +34,15 @@ function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
   map.set(key, node);
 }
 
-/** Human-readable label for each failure reason, used to build a diff issue's default message. */
-const REASON_LABEL: Record<ExpectationFailureReason, string> = {
-  'not-found': 'missing',
-  'not-expected': 'extra',
-  'not-equal': 'mismatch',
-};
-
-function reasonMessage(reason: ExpectationFailureReason, path: readonly string[]): string {
-  return `${REASON_LABEL[reason]}: ${path.join('/')}`;
+/**
+ * The issue's own default message: the path, nothing else. `reason` already
+ * carries why the node is flagged as structured data; turning that into a
+ * human label ("missing: …" / "extra: …" / "mismatch: …") is a presentation
+ * concern for whoever renders the issue (the CLI verify formatter), not the
+ * differ's.
+ */
+function pathMessage(path: readonly string[]): string {
+  return path.join('/');
 }
 
 function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
@@ -51,7 +51,7 @@ function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): 
     {
       path,
       reason: 'not-found',
-      message: reasonMessage('not-found', path),
+      message: pathMessage(path),
       expected: node,
     },
     ...node.children().flatMap((c) => emitMissingSubtree(c, path)),
@@ -64,7 +64,7 @@ function emitExtraSubtree(node: DiffableNode, parentPath: readonly string[]): Sc
     {
       path,
       reason: 'not-expected',
-      message: reasonMessage('not-expected', path),
+      message: pathMessage(path),
       actual: node,
     },
     ...node.children().flatMap((c) => emitExtraSubtree(c, path)),
@@ -98,7 +98,7 @@ function diffPair(
     issues.push({
       path,
       reason: 'not-equal',
-      message: reasonMessage('not-equal', path),
+      message: pathMessage(path),
       expected,
       actual,
     });

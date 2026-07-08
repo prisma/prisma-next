@@ -335,7 +335,7 @@ describe('formatSchemaVerifyOutput', () => {
   const missingTableIssue: SchemaDiffIssue = {
     path: ['post'],
     reason: 'not-found',
-    message: 'Table "post" is missing from database',
+    message: 'post',
   };
 
   const createResult = (): VerifyDatabaseSchemaResult => ({
@@ -369,7 +369,7 @@ describe('formatSchemaVerifyOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('Schema issues:');
-    expect(stripped).toContain('✖ Table "post" is missing from database');
+    expect(stripped).toContain('✖ missing: post');
     expect(stripped).toContain('✖ Database schema does not satisfy contract (1 failure)');
   });
 
@@ -377,7 +377,7 @@ describe('formatSchemaVerifyOutput', () => {
     const diffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_abc'],
       reason: 'not-found',
-      message: 'RLS policy "policy_abc" is missing from the database',
+      message: 'public/profiles/policy_abc',
     };
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
@@ -427,7 +427,7 @@ describe('formatSchemaVerifyOutput', () => {
             {
               path: ['database', 'public', 'legacy_jobs'],
               reason: 'not-found',
-              message: 'missing: database/public/legacy_jobs',
+              message: 'database/public/legacy_jobs',
             },
           ],
         },
@@ -547,7 +547,7 @@ describe('formatSchemaVerifyOutput', () => {
 
     const blankIndex = lines.findIndex((line) => line === '');
     expect(blankIndex).toBeGreaterThan(0);
-    expect(lines[blankIndex - 1]).toContain('Table "post" is missing from database');
+    expect(lines[blankIndex - 1]).toContain('missing: post');
     expect(lines[blankIndex + 1]).toBe('Unclaimed elements (declared by no contract):');
   });
 
