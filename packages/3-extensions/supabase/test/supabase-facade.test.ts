@@ -289,6 +289,47 @@ describe('supabase() factory — SupabaseDb surface', () => {
   });
 });
 
+describe('service_role .supabase.nativeEnums (facade)', () => {
+  // Built from the real extension contract (`../contract/contract.json`),
+  // not a fixture — `nativeEnums` is derived from `extContract.storage`,
+  // which the Supabase runtime always builds from the extension's own
+  // emitted contract (see `buildExtensionContract` in ../src/runtime/supabase.ts).
+  // The `auth` namespace's `AalLevel` valueSet entry (derived from the
+  // `native_enum` block) is production data: members `aal1`/`aal2`/`aal3`,
+  // backing the `auth.sessions.aal` column.
+  it('exposes auth.AalLevel members, matching the emitted extension contract', async () => {
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwt,
+    });
+
+    const AalLevel = db.asServiceRole().supabase.nativeEnums.auth['AalLevel'];
+
+    expect(AalLevel?.values).toEqual(['aal1', 'aal2', 'aal3']);
+    expect(AalLevel?.members['aal2']).toBe('aal2');
+
+    await db.close();
+  });
+
+  it('builds the nativeEnums surface eagerly, without a runtime', async () => {
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwt,
+    });
+
+    expect(db.asServiceRole().supabase.nativeEnums.auth['AalLevel']?.values).toEqual([
+      'aal1',
+      'aal2',
+      'aal3',
+    ]);
+    expect(poolConnectSpy()).not.toHaveBeenCalled();
+
+    await db.close();
+  });
+});
+
 describe('RoleBoundDb — facade invariant: no unbound connection surface', () => {
   // The security guarantee is facade-encapsulation: SupabaseRuntimeImpl inherits a public
   // connection() from the base, but the role-bound Db surface must never expose it.

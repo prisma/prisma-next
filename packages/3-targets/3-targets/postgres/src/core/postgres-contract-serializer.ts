@@ -19,7 +19,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject, JsonValue } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
 import { PG_INT_CODEC_ID, PG_TEXT_CODEC_ID } from './codec-ids';
-import { policyEntityKind, roleEntityKind } from './entity-kinds';
+import { nativeEnumEntityKind, policyEntityKind, roleEntityKind } from './entity-kinds';
 import { isPostgresSchema, PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
@@ -70,7 +70,12 @@ function collectStorageTypesHydrators(
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor(extraPackEntityKinds: readonly AnyEntityKindDescriptor[] = []) {
     const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
-    super(storageTypesHydrators, [policyEntityKind, roleEntityKind, ...extraPackEntityKinds]);
+    super(storageTypesHydrators, [
+      policyEntityKind,
+      roleEntityKind,
+      nativeEnumEntityKind,
+      ...extraPackEntityKinds,
+    ]);
   }
 
   protected override hydrateSqlNamespaceEntry(
@@ -143,26 +148,19 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     });
   }
 
+  /**
+   * Native enums are deliberately not serialized here — `native_enum` is
+   * authoring-time-only. Once lowered, its member values live on in the
+   * `valueSet` slot it derives (via the SQL family's generic
+   * `deriveValueSet` mechanism); nothing downstream reads the
+   * `PostgresNativeEnum` entity itself, so re-emitting it into
+   * `contract.json` would be dead weight.
+   */
   private serializePostgresNamespace(ns: PostgresSchema, isUnboundSlot: boolean): JsonObject {
-    const tablesOut: Record<string, JsonObject> = {};
-    for (const [tableName, table] of Object.entries(ns.table)) {
-      tablesOut[tableName] = this.serializeJsonObject(table);
-    }
-    const valueSetEntries = ns.valueSet;
-    const valueSetOut: Record<string, JsonObject> = {};
-    if (valueSetEntries !== undefined) {
-      for (const [valueSetName, valueSet] of Object.entries(valueSetEntries)) {
-        valueSetOut[valueSetName] = this.serializeJsonObject(valueSet);
-      }
-    }
-    const roleOut: Record<string, JsonObject> = {};
-    for (const [roleName, role] of Object.entries(ns.role)) {
-      roleOut[roleName] = this.serializeJsonObject(role);
-    }
-    const policyOut: Record<string, JsonObject> = {};
-    for (const [policyName, policy] of Object.entries(ns.policy)) {
-      policyOut[policyName] = this.serializeJsonObject(policy);
-    }
+    const tablesOut = this.serializeEntries(ns.table);
+    const valueSetOut = this.serializeEntries(ns.valueSet ?? {});
+    const roleOut = this.serializeEntries(ns.role);
+    const policyOut = this.serializeEntries(ns.policy);
     return {
       id: ns.id,
       kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
@@ -173,6 +171,14 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
         ...(Object.keys(policyOut).length > 0 ? { policy: policyOut } : {}),
       },
     };
+  }
+
+  private serializeEntries(entries: Readonly<Record<string, unknown>>): Record<string, JsonObject> {
+    const out: Record<string, JsonObject> = {};
+    for (const [name, entry] of Object.entries(entries)) {
+      out[name] = this.serializeJsonObject(entry);
+    }
+    return out;
   }
 
   private serializeJsonObject(value: unknown): JsonObject {

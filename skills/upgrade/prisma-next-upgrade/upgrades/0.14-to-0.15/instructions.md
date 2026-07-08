@@ -196,6 +196,16 @@ required. Incidental substrate diff only.
 -->
 
 <!--
+Slow-query warning middleware example (PR #912): the `prisma-next-demo` example
+gains a `slowQueryWarning` custom middleware (`src/prisma/slow-query-warning.ts`,
+wired into the runtime `middleware: [...]` chain in `src/prisma/db.ts`, with
+offline unit tests). Documentation-driven example code only — it exercises the
+existing public `SqlMiddleware` `afterExecute` hook and changes no framework
+surface, contract shape, or emitted artefact. No user action required.
+Incidental substrate diff only.
+-->
+
+<!--
 TML-2953 (this PR): Mongo enum fields now type through a storage value set, the same
 way SQL does. Authoring a Mongo enum writes a value set into
 `contract.storage.namespaces[<ns>].entries.valueSet[<Enum>]` (the codec-encoded
@@ -207,4 +217,23 @@ validator are byte-identical. `db.enums` runtime behaviour is unchanged. A re-em
 picks up the new `contract.json` shape; existing migrations are unaffected (the value
 set is non-physical — no new migration op). No user action required. Incidental
 substrate diff only.
+-->
+
+<!--
+TML-2976 (native Postgres enums, external Supabase types — this PR): adds external
+native Postgres enum support — Postgres `CREATE TYPE ... AS ENUM` types the database
+already owns (e.g. Supabase's `auth.aal_level`), represented via a `native_enum` PSL
+entity, typed as a value union, and read at runtime through a Postgres-only
+`db.nativeEnums` accessor. The `examples/` diff is additive:
+- `examples/supabase` gains `src/session-queries.ts` and
+  `test/native-enum-session.integration.test.ts` (reading `auth.aal_level`), plus a
+  regenerated `src/contract.d.ts`.
+- `examples/prisma-next-demo` and `examples/retail-store` switch their enum
+  value-union annotations from `EnumValues<Db['enums'][X]>` to the equivalent `.Value`
+  phantom (`Db['enums'][X]['Value']`). `EnumValues` is unchanged and still exported;
+  `.Value` is the new preferred form, so this is an optional style adoption, not a
+  forced migration.
+Native enums are opt-in — existing schemas without a `native_enum` emit and run
+unchanged, and a re-emit picks up any contract shape. No user action required.
+Incidental substrate diff only.
 -->

@@ -3925,6 +3925,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:0.14.0
         version: link:../../1-framework/1-core/operations
+      '@prisma-next/psl-printer':
+        specifier: workspace:0.14.0
+        version: link:../../1-framework/2-authoring/psl-printer
       '@prisma-next/sql-contract-psl':
         specifier: workspace:0.14.0
         version: link:../../2-sql/2-authoring/contract-psl

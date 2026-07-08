@@ -1,6 +1,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Codec } from './codec';
+import type { AnyCodecDescriptor } from './codec-descriptor';
 
 export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
 
@@ -41,13 +42,13 @@ export interface CodecCallContext {
  *
  * - `get(id)` returns a representative {@link Codec} instance for the codec id (used by `family.deserializeContract` for `decodeJson` of literal column defaults). For parameterized codecs whose factory requires concrete params, this may return `undefined` — use `CodecRegistry.forCodecRef` instead.
  * - `targetTypesFor(id)` exposes the codec-id-keyed `targetTypes` metadata the runtime instance no longer carries (TML-2357). Returns the same array `CodecDescriptor.targetTypes` would; for Mongo (whose registration doesn't yet resolve through the unified descriptor map — TML-2324) the family-side assembly populates this directly from the contributor's codec metadata.
- * - `metaFor(id)` exposes the codec-id-keyed `meta` (e.g. SQL-side `db.sql.postgres.nativeType`) the runtime instance no longer carries.
+ * - `metaFor(id, typeParams)` exposes the codec-id-keyed `meta` (e.g. SQL-side `db.sql.postgres.nativeType`) the runtime instance no longer carries. `typeParams` is optional: when given and the codec descriptor implements a params-aware `metaFor`, the descriptor computes its meta from those params (e.g. a native enum's per-instance Postgres type name); otherwise (or when `typeParams` is omitted) the codec's static `meta` is returned.
  * - `renderOutputTypeFor(id, params)` exposes the codec-id-keyed `renderOutputType` renderer the runtime instance no longer carries. Returns `undefined` when the codec doesn't render a custom type or when the codec id is unknown.
  */
 export interface CodecLookup {
   get(id: string): Codec | undefined;
   targetTypesFor(id: string): readonly string[] | undefined;
-  metaFor(id: string): CodecMeta | undefined;
+  metaFor(id: string, typeParams?: Record<string, unknown> | JsonValue): CodecMeta | undefined;
   renderOutputTypeFor(id: string, params: Record<string, unknown>): string | undefined;
   /** Codec-id-keyed `renderInputType` renderer for the `contract.d.ts` input position. Optional so existing lookups need not provide it; returns `undefined` when the codec renders no custom input type or the id is unknown. */
   renderInputTypeFor?(id: string, params: Record<string, unknown>): string | undefined;
@@ -57,6 +58,16 @@ export interface CodecLookup {
     value: JsonValue,
     side: 'output' | 'input',
   ): string | undefined;
+  /**
+   * Codec-id-keyed descriptor accessor. Returns the full registered
+   * {@link AnyCodecDescriptor} for `id`, or `undefined` if no descriptor is
+   * registered. Optional so existing lookups need not provide it; a consumer
+   * that needs more than the derived per-id readers above — e.g. an
+   * authoring-time hook a target-specific descriptor exposes but this
+   * framework interface does not model generically — fetches the descriptor
+   * itself and narrows it with its own structural predicate.
+   */
+  descriptorFor?(id: string): AnyCodecDescriptor | undefined;
 }
 
 /**

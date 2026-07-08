@@ -15,6 +15,10 @@ export { assembleAuthoringContributions } from '@prisma-next/framework-component
 export { extractCodecControlHooks } from '../core/assembly';
 export type { SqlControlFamilyInstance } from '../core/control-instance';
 export type {
+  SqlControlTargetDescriptor,
+  SqlDescribedContractSpace,
+} from '../core/control-target-descriptor';
+export type {
   ColumnOpRenderer,
   ContractToSchemaIROptions,
   DefaultRenderer,
@@ -59,7 +63,6 @@ export type {
   ResolveIdentityValueInput,
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
-  SqlControlTargetDescriptor,
   SqlMigrationPlan,
   SqlMigrationPlanContractInfo,
   SqlMigrationPlanner,

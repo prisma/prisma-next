@@ -37,6 +37,7 @@ import {
   resolveOptionalPostgresBinding,
   resolvePostgresBinding,
 } from './binding';
+import type { NamespacedNativeEnums } from './native-enums';
 import { PostgresRuntimeImpl } from './postgres-runtime';
 
 export type PostgresTargetId = 'postgres';
@@ -47,12 +48,14 @@ export interface PostgresTransactionContext<TContract extends Contract<SqlStorag
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
   readonly enums: NamespacedEnums<TContract>;
+  readonly nativeEnums: NamespacedNativeEnums<TContract>;
 }
 
 export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
   readonly enums: NamespacedEnums<TContract>;
+  readonly nativeEnums: NamespacedNativeEnums<TContract>;
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
   readonly contract: TContract;
@@ -177,6 +180,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     sql,
     raw: rawSqlTag,
     enums,
+    nativeEnums,
   } = buildPostgresStaticContext<TContract>(context, stack.adapter.rawCodecInferer);
 
   let runtimeInstance: Runtime | undefined;
@@ -269,6 +273,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     sql,
     orm,
     enums,
+    nativeEnums,
     raw: rawSqlTag,
     context,
     contract,
@@ -340,7 +345,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
         // Spreading would evaluate the getter once and freeze its value.
         const tx: PostgresTransactionContext<TContract> = Object.assign(
           Object.create(txCtx) as TransactionContext,
-          { sql: txSql, orm: txOrm, enums },
+          { sql: txSql, orm: txOrm, enums, nativeEnums },
         );
 
         return fn(tx);

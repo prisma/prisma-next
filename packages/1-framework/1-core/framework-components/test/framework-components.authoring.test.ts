@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { AuthoringTypeConstructorDescriptor } from '../src/shared/framework-authoring';
+import type {
+  AuthoringFieldNamespace,
+  AuthoringFieldPresetDescriptor,
+  AuthoringTypeConstructorDescriptor,
+  AuthoringTypeNamespace,
+} from '../src/shared/framework-authoring';
 import {
   classifyEnumMemberType,
   hasRegisteredFieldNamespace,
@@ -17,27 +22,25 @@ import type {
 } from '../src/shared/psl-extension-block';
 
 describe('authoring template resolution', () => {
-  it('detects authoring descriptor kinds', () => {
-    expect(
-      isAuthoringTypeConstructorDescriptor({
-        kind: 'typeConstructor',
-        output: { codecId: 'test/text@1', nativeType: 'text' },
-      }),
-    ).toBe(true);
-    expect(isAuthoringTypeConstructorDescriptor({ kind: 'fieldPreset' })).toBe(false);
+  const typeConstructor = {
+    kind: 'typeConstructor',
+    output: { codecId: 'test/text@1', nativeType: 'text' },
+  } satisfies AuthoringTypeConstructorDescriptor;
+  const fieldPreset = {
+    kind: 'fieldPreset',
+    output: { codecId: 'test/text@1', nativeType: 'text' },
+  } satisfies AuthoringFieldPresetDescriptor;
 
-    expect(
-      isAuthoringFieldPresetDescriptor({
-        kind: 'fieldPreset',
-        output: { codecId: 'test/text@1', nativeType: 'text' },
-      }),
-    ).toBe(true);
-    expect(isAuthoringFieldPresetDescriptor({ kind: 'typeConstructor' })).toBe(false);
+  it('narrows a descriptor by kind', () => {
+    expect(isAuthoringTypeConstructorDescriptor(typeConstructor)).toBe(true);
+    expect(isAuthoringFieldPresetDescriptor(fieldPreset)).toBe(true);
   });
 
-  it('rejects descriptors without output property', () => {
-    expect(isAuthoringTypeConstructorDescriptor({ kind: 'typeConstructor' })).toBe(false);
-    expect(isAuthoringFieldPresetDescriptor({ kind: 'fieldPreset' })).toBe(false);
+  it('classifies a sub-namespace as not a descriptor', () => {
+    const typeNamespace = { nested: typeConstructor } satisfies AuthoringTypeNamespace;
+    const fieldNamespace = { nested: fieldPreset } satisfies AuthoringFieldNamespace;
+    expect(isAuthoringTypeConstructorDescriptor(typeNamespace)).toBe(false);
+    expect(isAuthoringFieldPresetDescriptor(fieldNamespace)).toBe(false);
   });
 
   describe('hasRegisteredFieldNamespace', () => {

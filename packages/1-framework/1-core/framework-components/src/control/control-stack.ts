@@ -14,10 +14,6 @@ import type {
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
-  isAuthoringEntityTypeDescriptor,
-  isAuthoringFieldPresetDescriptor,
-  isAuthoringPslBlockDescriptor,
-  isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
@@ -169,29 +165,17 @@ export function assembleAuthoringContributions(
 
   for (const descriptor of descriptors) {
     if (descriptor.authoring?.field) {
-      mergeAuthoringNamespaces(
-        field,
-        descriptor.authoring.field,
-        [],
-        isAuthoringFieldPresetDescriptor,
-        'field',
-      );
+      mergeAuthoringNamespaces(field, descriptor.authoring.field, [], 'fieldPreset', 'field');
     }
     if (descriptor.authoring?.type) {
-      mergeAuthoringNamespaces(
-        type,
-        descriptor.authoring.type,
-        [],
-        isAuthoringTypeConstructorDescriptor,
-        'type',
-      );
+      mergeAuthoringNamespaces(type, descriptor.authoring.type, [], 'typeConstructor', 'type');
     }
     if (descriptor.authoring?.entityTypes) {
       mergeAuthoringNamespaces(
         entityTypes,
         descriptor.authoring.entityTypes,
         [],
-        isAuthoringEntityTypeDescriptor,
+        'entity',
         'entity',
       );
     }
@@ -200,7 +184,7 @@ export function assembleAuthoringContributions(
         pslBlockDescriptors,
         descriptor.authoring.pslBlockDescriptors,
         [],
-        isAuthoringPslBlockDescriptor,
+        'pslBlock',
         'pslBlock',
       );
     }
@@ -309,6 +293,10 @@ export function extractCodecLookup(
   const descriptorsById = new Map<string, AnyCodecDescriptor>();
   const targetTypesById = new Map<string, readonly string[]>();
   const metaById = new Map<string, CodecMeta>();
+  const metaRenderersById = new Map<
+    string,
+    (params: Record<string, unknown> | JsonValue) => CodecMeta | undefined
+  >();
   const renderersById = new Map<string, (params: Record<string, unknown>) => string | undefined>();
   const inputRenderersById = new Map<
     string,
@@ -338,6 +326,9 @@ export function extractCodecLookup(
       }
       if (codecDescriptor.meta !== undefined) {
         metaById.set(codecDescriptor.codecId, codecDescriptor.meta);
+      }
+      if (typeof codecDescriptor.metaFor === 'function') {
+        metaRenderersById.set(codecDescriptor.codecId, codecDescriptor.metaFor);
       }
       if (typeof codecDescriptor.renderOutputType === 'function') {
         renderersById.set(codecDescriptor.codecId, codecDescriptor.renderOutputType);
@@ -384,10 +375,17 @@ export function extractCodecLookup(
     },
     forColumn: () => undefined,
     targetTypesFor: (id) => targetTypesById.get(id),
-    metaFor: (id) => metaById.get(id),
+    metaFor: (id, typeParams) => {
+      if (typeParams !== undefined) {
+        const paramsAware = metaRenderersById.get(id)?.(typeParams);
+        if (paramsAware !== undefined) return paramsAware;
+      }
+      return metaById.get(id);
+    },
     renderOutputTypeFor: (id, params) => renderersById.get(id)?.(params),
     renderInputTypeFor: (id, params) => inputRenderersById.get(id)?.(params),
     renderValueLiteralFor: (id, value, side) => valueLiteralRenderersById.get(id)?.(value, side),
+    descriptorFor: (id) => descriptorsById.get(id),
   };
 }
 

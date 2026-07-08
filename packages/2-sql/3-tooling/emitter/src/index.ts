@@ -536,19 +536,18 @@ function generateDocumentScopedStorageTypesType(types: SqlStorage['types']): str
   return `{ ${typeEntries.join('; ')} }`;
 }
 
-function generateNamespaceValueSetType(
-  valueSet: Readonly<Record<string, StorageValueSet>>,
-): string {
-  if (Object.keys(valueSet).length === 0) {
-    return 'Record<string, never>';
-  }
-  const entries: string[] = [];
-  for (const [name, vs] of Object.entries(valueSet)) {
-    const valuesLiteral = vs.values.map((v) => serializeValue(v)).join(', ');
-    entries.push(
-      `readonly ${serializeObjectKey(name)}: { readonly kind: 'valueSet'; readonly values: readonly [${valuesLiteral}] }`,
-    );
-  }
+/**
+ * Literalizes the `valueSet` entries slot — a core SQL entity kind (alongside
+ * `table`), not a pack-contributed one, so naming it here isn't a
+ * family→target layering leak. This is the only non-`table` entries slot with
+ * a type-level consumer (`db.nativeEnums`, `packages/3-extensions/postgres`):
+ * pack-contributed slots (`role`, `policy`, `native_enum`, …) have none and
+ * are not emitted.
+ */
+function generateValueSetBlockType(valueSets: Readonly<Record<string, StorageValueSet>>): string {
+  const entries = Object.entries(valueSets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, valueSet]) => `readonly ${serializeObjectKey(name)}: ${serializeValue(valueSet)}`);
   return `{ ${entries.join('; ')} }`;
 }
 
@@ -665,10 +664,10 @@ function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): st
     const tablesType = generateTablesMapType(
       (ns.entries.table ?? {}) as Readonly<Record<string, StorageTable>>,
     );
-    const valueSetSlot = ns.entries.valueSet;
     const entriesParts = [`readonly table: ${tablesType}`];
-    if (valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0) {
-      entriesParts.push(`readonly valueSet: ${generateNamespaceValueSetType(valueSetSlot)}`);
+    const valueSetEntries = ns.entries.valueSet;
+    if (valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0) {
+      entriesParts.push(`readonly valueSet: ${generateValueSetBlockType(valueSetEntries)}`);
     }
     const entriesType = `{ ${entriesParts.join('; ')} }`;
     parts.push(

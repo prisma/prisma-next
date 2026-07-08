@@ -63,7 +63,7 @@ export function createTypeHelpersFromNamespace(
       continue;
     }
 
-    helpers[key] = createTypeHelpersFromNamespace(value as AuthoringTypeNamespace, currentPath);
+    helpers[key] = createTypeHelpersFromNamespace(value, currentPath);
   }
 
   return helpers;
@@ -133,11 +133,7 @@ export function createFieldHelpersFromNamespace(
       continue;
     }
 
-    helpers[key] = createFieldHelpersFromNamespace(
-      value as AuthoringFieldNamespace,
-      createLeafHelper,
-      currentPath,
-    );
+    helpers[key] = createFieldHelpersFromNamespace(value, createLeafHelper, currentPath);
   }
 
   return helpers;

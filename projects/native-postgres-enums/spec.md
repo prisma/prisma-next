@@ -1,272 +1,141 @@
 # Native Postgres enums — project spec
 
+**Status.** Phase 1 (external enums) is **shipped** — [PR #906](https://github.com/prisma/prisma-next/pull/906). Phase 2 (managed enums) is the **forward design** in this doc; it is **not built** and is not started without a fresh go-ahead.
+
+**Authoring design of record →** [`specs/authoring-design.md`](specs/authoring-design.md) (the `native_enum` block, the `pg.enum` codec, the lowering). **Querying →** [`specs/querying-design.md`](specs/querying-design.md). **Migration (phase 2) →** [`specs/migration-design.md`](specs/migration-design.md).
+
 ## Decision
 
-A domain enum can be **realized in storage as a native Postgres enum type**
-(`CREATE TYPE … AS ENUM`) instead of a text column + value-set + `CHECK` constraint.
-Native realization is a second **persistence strategy** for the *same* domain enum — the
-domain plane is unchanged. The domain enum stays the single source of truth for the
-application concept (members, values, `db.enums`, typed reads); only the storage
-projection differs.
+A native Postgres enum is a database **type** (`CREATE TYPE … AS ENUM`) — a **storage-plane object**, not a domain enum. Prisma Next represents that type in the contract and surfaces it to the app as a **typed value union**. It is authored as **one construct**, bound to a column by **one codec**, and exposed at runtime by **one accessor**:
 
-This exists primarily to **represent native enums that Postgres databases already have**
-— above all Supabase, whose schemas ship a large set of built-in native enums. Those are
-owned by an external system, never created or altered by Prisma Next, and must still be
-**surfaced to the application** as typed value unions. A user porting an existing Supabase
-(or any Postgres) project has user-authored native enums in the same position: they must
-be representable in the contract rather than rejected.
+- a **`native_enum` entity** in storage (`entries.native_enum[Name]`, kind `postgres-enum`): `typeName`, ordered `members[{name,value}]`, optional `control` grade;
+- a **derived value-set** (`entries.valueSet[Name]`): the entity's member values — exactly as a check enum derives one. **This drives typing.**
+- a **column** bound via `pg.enum(Ref)`: `codecId: pg/enum@1` (a **parameterized** text codec), a **`valueSet` ref** → the derived value-set (typing), **`typeParams: { typeName }`** = the schema-qualified type name as the codec instance's parameter (the cast), and the same name as the column's **`nativeType`** (`db verify` / DDL). **No `CHECK`** — the type enforces membership.
+- **`db.nativeEnums`** — a Postgres-only accessor root (a sibling of `db.enums`), built from the entity's members. `db.enums` is untouched and never contains native enums.
 
-Native realization is deliberately **Postgres-only**. SQLite and MongoDB have no native
-enum; they keep the check/validator realization the domain enum already lowers to. This
-is a SQL/Postgres-target storage feature, not a framework concept — consistent with the
-domain enum being target-agnostic and its realization being per-target.
+Typing is the **existing value-set → codec path** (post-TML-2952, unchanged): a native column carries a `valueSet` ref exactly like a check-enum column, so it reads/writes as the member-value union in the query builder, the ORM, and the emitted contract — **with no native-specific typing code**. Native realization is **Postgres-only**; SQLite and MongoDB have no native enum and keep the check realization.
 
-## Why native enums are awkward — and why this is staged
+So there are **two enum realizations sharing one typing path**, differing only in construct, enforcement, and accessor:
 
-Native enums are painful to *change*, and that pain is the reason the project is phased
-and the reason we never auto-migrate the expensive cases. The two operations Postgres
-special-cased are cheap and in-place; everything else forces a full-table rewrite:
+| | construct | enforcement | accessor | targets |
+| --- | --- | --- | --- | --- |
+| **check-realized** (the domain enum) | `enumType` | table `CHECK` | `db.enums` | all (family-agnostic) |
+| **native** | `native_enum` block + `pg.enum` codec | the Postgres type | `db.nativeEnums` | Postgres only |
 
-| Operation | Cost | In-place? |
-| --- | --- | --- |
-| Add a value (`ALTER TYPE … ADD VALUE`) | 1 txn, no rewrite, no data change | yes (but the new value is unusable until the adding txn commits) |
-| Rename a value (`ALTER TYPE … RENAME VALUE`) | 1 txn, no rewrite, no data change | yes |
-| Remove a value | rebuild type + repoint column + drop old | **no** — full-table rewrite + data migration |
-| Reorder values | rebuild type + repoint column + drop old | **no** — full-table rewrite |
+### At a glance
 
-A column stores a reference bound to a specific type, so repointing it to a rebuilt type
-re-encodes every row into a new table file under a lock that blocks all reads and writes.
-`ADD VALUE` also can't be used in the same transaction that adds it — which breaks the
-atomic-migration guarantee Prisma Next relies on. The user-facing rationale lives in
-[`docs/`-bound `why-native-postgres-enums.md`](specs/why-native-postgres-enums.md) (the
-shareable explainer; migrate to `docs/` at close-out).
+```prisma
+namespace public {
+  native_enum UserRole {          // pack-contributed entity, variadic members
+    admin  = "admin"
+    member = "member"
+    guest  = "guest"
+    @@map("user_role")            // the Postgres type name
+  }
+  model Profile {
+    id   Uuid @id
+    role pg.enum(UserRole)        // bound to the pg.enum codec; typed via the derived value-set
+    @@map("profiles")
+  }
+}
+```
 
-The consequence for scope: Prisma Next will support **add** and **rename**, and **never**
-auto-migrate **remove** or **reorder** — those stay user-managed (drop the type, create
-the replacement, `ALTER` the column by hand). This is what keeps the project clear of
-dependency-aware planner ordering and transaction-grouping.
-
-## Two-phase roadmap
-
-**Phase 1 — externally-managed native enums, surfaced to the app.**
-Represent a native enum type in the contract and type columns that use it as the value
-union. Native enums here are graded `external` (the Supabase extension's default
-`control` posture), so Prisma Next emits **no DDL** for them — no create, no alter, no
-drop. This cuts the entire migration half: no SchemaIR diff, no Contract→SchemaIR
-projection, no migration ops. Phase 1 is representation + typing only.
-
-**Phase 2 — Prisma Next creates and deletes native enums, plus the cheap ops.**
-A user can author a domain enum with the native strategy and Prisma Next will
-`CREATE TYPE` / `DROP TYPE` it, and migrate it in place for **add value** and
-**rename value** only. Remove and reorder are diagnosed and refused with a pointer to the
-manual procedure — never planned. This adds the SchemaIR node, the projection, the diff
-integration, and the four migration ops, all in cheap-ops-only form.
-
-## At a glance
-
-Phase 1 — a Supabase-defined native enum, represented and surfaced:
+Emitted `storage.namespaces.public.entries`:
 
 ```jsonc
-// storage plane — a native enum type as a top-level storage entity (external-graded)
-"storage": { "namespaces": { "public": { "entries": {
-  "type": {
-    "user_role": {
-      "kind": "postgres-enum",
-      "values": ["admin", "member", "guest"],
-      "control": "external"
-    }
-  },
-  "table": {
-    "profiles": {
-      "columns": {
-        "role": {
-          "nativeType": "user_role",
-          "codecId": "pg/text@1",
-          "nullable": false,
-          "type": { "plane": "storage", "entityKind": "type",
-                    "namespaceId": "public", "entityName": "user_role" }
-        }
-      }
-    }
-  }
-} } } }
+"native_enum": {
+  "UserRole": { "kind": "postgres-enum", "typeName": "user_role", "control": "external",
+    "members": [{"name":"admin","value":"admin"},{"name":"member","value":"member"},{"name":"guest","value":"guest"}] }
+},
+"valueSet": {                                    // DERIVED from native_enum.members[].value
+  "UserRole": { "kind": "valueSet", "values": ["admin","member","guest"] }
+},
+"table": { "profiles": { "columns": {
+  "role": { "codecId": "pg/enum@1", "nativeType": "user_role", "nullable": false,
+    "typeParams": { "typeName": "user_role" },   // the codec instance's parameter → the $N::user_role cast
+    "valueSet": { "plane":"storage", "entityKind":"valueSet", "namespaceId":"public", "entityName":"UserRole" } }
+} } }
 ```
 
 ```ts
-const p = await db.profiles.findOne({ where: { id } })
-p.role                        // 'admin' | 'member' | 'guest'   (not string)
-db.enums.public.UserRole.values   // readonly ['admin','member','guest']
+p.role                                  // 'admin' | 'member' | 'guest'   (not string)
+db.nativeEnums.public.UserRole.values  // readonly ['admin','member','guest']
 ```
 
-The domain plane carries the enum exactly as today (`domain…enum[UserRole]`, members +
-codec). The storage plane gains a native `type` entity and the column references it — in
-place of the value-set + check a domain-authored enum lowers to.
+## The design, part by part (Phase 1 — shipped)
 
-## Components
+Each element below states what is built and the requirement it satisfies (see the [Requirements](#requirements) table). Phase 1 is representation + typing only; it emits **no DDL**.
 
-The six pieces, mapped to phases. The persistence-strategy abstraction (#5) is the spine;
-the rest hang off it.
+**Representation — satisfies R1.** The `native_enum` is a Postgres-target top-level entity kind, contributed through the same generic mechanism as RLS `policy`/`role`: `composeSqlEntityKinds([…, nativeEnumEntityKind])` + an arktype validator + serializer, round-tripping through `entries.native_enum[Name]`. It is a `DiffableNode` (its Phase-2 job; inert in Phase 1). The interpreter derives a `StorageValueSet` (`entries.valueSet[Name]`) from the entity's ordered member values through a generic `deriveValueSet` hook — the value-set, not the enum, is the typing input.
 
-### #5 — Alternative persistence strategy (the spine; both phases)
+**Authoring — satisfies R2.** A `native_enum <Name> { member = "value" … @@map("pg_type") }` PSL block (a generic extension block with a variadic member list; members are always `key = "value"`, bare rejected) lowers to the entity. A field `pg.enum(Ref)` resolves the ref against the `native_enum` entity and produces the column: `codecId: pg/enum@1`, a `valueSet` ref → the derived value-set, and `nativeType` = the resolved type name. No `CHECK`; no separate domain enum. (TS authoring is deferred — [TML-2965]; the MVP path is PSL, which Supabase uses.)
 
-A domain enum is application-domain; **how it persists is a storage strategy**:
+**Typing — satisfies R3.** The column reads/writes as the value union via `computeColumnType`'s `column.valueSet` branch → `renderValueSetType` → the codec's `renderValueLiteral` → the literal union. This is the **same path a check enum uses** (post-TML-2952, which made column typing value-set-driven and enum-agnostic — *"the domain enum is no longer a typing input"*); there is no native-specific typing code. The `pg.enum` codec is a text codec that also renders value literals. Typed input rejects out-of-set literals; generated SQL casts a bound parameter to the enum's type. (No-emit `typeof contract` column typing is the one gap — [TML-2960]: that path is codec-id-keyed and doesn't read the value-set yet. Emit typing works today.)
 
-- **check** (today): storage `valueSet` entity + column `valueSet` ref + table `checks`
-  `CheckConstraint`. Family-agnostic; SQLite/Mongo use it.
-- **native** (new, Postgres-only): storage `type` (`postgres-enum`) entity carrying the
-  ordered values + the column referencing that type via `nativeType` + a `type` ref; **no**
-  value-set, **no** check.
+**The cast — satisfies R3.** The codec instance drives the `$N::<type>` cast: each enum column carries `typeParams: { typeName }`, and the SQL renderer asks the codec for its per-instance native type through a codec-owned `nativeTypeFor` hook (the `renderValueLiteralFor` delegate shape), falling back to the codec's static metadata — only `pg/enum@1` implements the hook, so every other column renders as before. A type in a **non-`public` schema is referenced schema-qualified** (`$N::auth.aal_level`), which is also what makes `db verify`'s column-type comparison (reading the column's `nativeType`) agree with Postgres `format_type()`; `public`/default and the unbound namespace stay bare — the same qualify-vs-don't split `PostgresSchema.qualifyTable` uses for tables.
 
-The strategy is **structural**, per the parent project's principle (enums spec §10 — the
-shape declares the strategy, no marker field). A column realized natively *has* a
-`type`-entity reference and *no* value-set/check; a check-realized column has the reverse.
-A consumer asks "what's the permitted value set for this column?" and resolves it from
-whichever is present.
+**Runtime access — satisfies R4.** `db.nativeEnums.<ns>.<Name>` exposes each native enum's members (name→value, same accessor shape as `db.enums`), built by walking the `native_enum` storage entities and reusing the framework `createEnumAccessor`. It is attached to the Postgres client, and — because a namespace like Supabase `auth` lives in an extension's own contract — to the Supabase client's `.supabase` root. `db.enums` is unchanged.
 
-How the strategy is *chosen* differs by phase:
-- Phase 1 (external): the source dictates it — the Supabase extension contributes a native
-  `type` entity, or adoption introspects one. The enum is native because the database made
-  it native.
-- Phase 2 (PN-managed): the author opts in (PSL/TS authoring attribute selecting native
-  realization on a domain enum). Default stays check.
+**External grade — satisfies R5.** `external`/`observed` native enums produce no DDL and no drift reports; the Supabase extension's `external` default applies to its contributed enums. External enums are never diffed, so `db verify` reports nothing for them for free.
 
-### #1 — ContractIR representation (both phases)
+**Why the entity lives in storage (the invariant).** The migration planner must derive the expected schema from the **storage segment alone**, never reaching into `domain` — `storageHash` is storage-only (ADR 004), a migration's identity reflects what it does to storage (ADR 199), and a storage entity may not reference a domain entity (ADR 221 §115). So the `native_enum` entity and its derived value-set are physical storage-plane objects (`entries.native_enum`, `entries.valueSet`), captured by `storageHash` and read by the planner with no domain reference. The cross-level value redundancy (entity members ↔ derived value-set) is the self-contained redundancy the emitter guarantees and ADR 172 sanctions.
 
-- A storage `type` entity, kind `postgres-enum`, carrying ordered `values` and an optional
-  `control` grade. A Postgres-target top-level entity kind — the RLS template (policy /
-  role) exactly.
-- The column→type join: a storage column expresses "my type is native enum X." The clean
-  shape is a coordinate reference parallel to `valueSet` (`{ plane: 'storage', entityKind:
-  'type', namespaceId, entityName }`), with `nativeType` set to the enum type's name.
-  *(Open: reuse the legacy `StorageColumn.typeRef` bare-string seam, or replace it with the
-  coordinate ref — see Open decisions.)*
-- Validator + serializer for the `type` slot, composed into the Postgres pack's
-  `composeSqlEntityKinds([… , typeEntityKind])` alongside `policy`/`role`.
+## Phase 2 — managed native enums (forward design, not built)
 
-### #6 — Query / typing (both phases)
+A user declares a **`managed`** `native_enum` (the *same* authoring surface as the external case — only the `control` grade differs). Prisma Next then owns the type's lifecycle: it creates and drops it, and migrates **add-value in place**. This is deferred and its own project.
 
-A column whose strategy is native reads and writes as the **value union**, via the
-TML-2886 `StorageColumnTypes` baked-lookup path — the same mechanism the check strategy
-uses, sourcing the union from the `type` entity's `values` instead of a value-set's. No
-type-level ref-following; the emitter bakes the literal. `db.enums.<ns>.<Name>` is
-unchanged (it reads the domain enum). The no-emit (`typeof contract`) path resolves the
-union the same structural way.
+**Why the ops are limited — the constraint that shapes the design.** Postgres makes two enum edits cheap and in-place and forces a full-table rewrite for the rest:
 
-### #2 — SchemaIR representation (phase 2)
+| Operation | Cost | In-place? |
+| --- | --- | --- |
+| Add a value (`ALTER TYPE … ADD VALUE`) | no rewrite, no data change | yes — but the value is unusable until the adding txn commits |
+| Rename a value (`ALTER TYPE … RENAME VALUE`) | no rewrite | yes |
+| Remove / reorder | rebuild type + repoint column + drop old | **no** — full-table rewrite under a blocking lock |
 
-A `PostgresEnumType` `DiffableNode` — `identity()` keyed on the type name (entityKind
-`'type'`), `isEqualTo()` over the ordered values. Introspection enriched from the current
-names-only `pg_type typtype='e'` query to capture **ordered values** (`pg_enum.enumsortorder`).
-Follows `PostgresRole` precisely.
+So Phase 2 **auto-migrates only add value** (a pure suffix-append). Rename is cheap but skipped too — telling rename from add+remove needs a rename-detection an order-aware diff can't do cleanly; remove and reorder rewrite the table. All three stay user-managed. This keeps the project clear of dependency-aware planner ordering and transaction grouping. User-facing rationale: [`specs/why-native-postgres-enums.md`](specs/why-native-postgres-enums.md).
 
-### #3 — Migration diff + Contract→SchemaIR projection (phase 2)
+The Phase-2 design, concretely (detail in [`specs/migration-design.md`](specs/migration-design.md)):
 
-Project the contract's native `type` entities into `PostgresSchemaIR` (a new
-`enumTypes` typed field, mirroring `rlsPolicies`/`roles`), and let the generic differ
-align expected vs. introspected enum types and report missing / extra / mismatch. The
-`external`/`observed` grade suppresses drift the same way it does for RLS — so even in
-phase 2 the externally-managed enums from phase 1 stay untouched.
+**SchemaIR node — satisfies R7, R10.** A `PostgresNativeEnum` `DiffableNode`: `identity()` on the type name, `isEqualTo()` over the ordered members. Introspection is enriched from the names-only `pg_type typtype='e'` query to also read the **ordered** values (`pg_enum.enumsortorder`).
 
-### #4 — Migration ops / factories / call objects (phase 2, cheap-ops-only)
+**Projection + drift suppression — satisfies R5, R10.** Contract→SchemaIR projects the `native_enum` entities into `PostgresSchemaIR` under a new `enumTypes` field (mirroring `rlsPolicies`/`roles`); the generic differ reports missing / extra / value-mismatch. The `external`/`observed` grade suppresses drift, so Phase-1 external enums stay untouched even after Phase 2 lands.
 
-`OpFactoryCall` classes for **create** (`CREATE TYPE … AS ENUM`), **delete**
-(`DROP TYPE`), **add value** (`ALTER TYPE … ADD VALUE`), and **rename value**
-(`ALTER TYPE … RENAME VALUE`). A value-removal or reorder diff is **refused with a
-diagnostic** pointing to the manual procedure — never lowered to an op. Ordering need is
-only "type before the column that uses it," which the planner's existing `'type'` →
-dependency bucket already models coarsely; add/rename touch no columns. `ADD VALUE`'s
-non-transactional caveat is surfaced to the runner, not worked around.
+**Order-aware diff — satisfies R8, R9.** The **only** accepted value change is a pure suffix-append → `ADD VALUE`. A rename, removal, or reorder diff is **refused with a diagnostic**, never lowered to an op.
+
+**Migration ops — satisfies R7, R8.** Three `OpFactoryCall`s: create (`CREATE TYPE … AS ENUM`), delete (`DROP TYPE`), add value (`ALTER TYPE … ADD VALUE`). Ordering need is only "type before the column that uses it," which the planner's existing `'type'` dependency bucket already models. `ADD VALUE`'s non-transactional caveat is surfaced to the runner.
+
+**Adoption — satisfies R6.** Contract-infer emits a **`managed`** `native_enum` for an introspected native type (all inference is managed) instead of throwing.
 
 ## Requirements
 
-- **R1 — Represent.** A native Postgres enum type is a first-class storage entity
-  (`storage…entries.type[Name]`, kind `postgres-enum`, ordered values, optional `control`),
-  round-tripping through serializer + validator.
-- **R2 — Reference.** A storage column expresses native realization by referencing the
-  `type` entity; the domain field/enum is unchanged. The strategy is structural (native ⇒
-  type-ref, no value-set/check).
-- **R3 — Surface (typed read).** A native-enum column reads as the value union (not
-  `string`) in the query builder and the ORM, through the emitted contract and the no-emit
-  path. Typed input rejects out-of-set literals.
-- **R4 — `db.enums` parity.** `db.enums.<ns>.<Name>` works identically regardless of
-  realization (it reads the domain enum).
-- **R5 — External grade.** Native enums graded `external`/`observed` produce no DDL and no
-  drift reports; the Supabase extension's `external` default applies to its contributed
-  enums.
-- **R6 — Adopt (porting).** Contract-infer emits the native `type` representation for an
-  introspected native enum instead of throwing. *(Grade of adopted enums: Open decision.)*
-- **R7 — Create / delete (phase 2).** An author-selected native enum is created
-  (`CREATE TYPE … AS ENUM`, declared order) and dropped (`DROP TYPE`), ordered after/before
-  the columns that depend on it, proven against a live database.
-- **R8 — Cheap in-place ops (phase 2).** Adding a value and renaming a value migrate in
-  place (`ADD VALUE` / `RENAME VALUE`) with no table rewrite, verified against a database.
-- **R9 — Refuse the expensive ops (phase 2).** A diff that would remove or reorder values
-  is refused with a diagnostic naming the manual procedure — never planned. (Verified by a
-  negative test.)
-- **R10 — Verify (phase 2).** For managed native enums, the generic differ reports
-  missing / extra / value-set mismatch against the live database.
+Phase 1 requirements are met by the shipped design above; Phase 2 requirements are met by the forward design.
+
+| # | Requirement | Phase | Met by | Proven by |
+| --- | --- | --- | --- | --- |
+| **R1** | A `native_enum` entity (type name, ordered members, control) round-trips and derives a value-set | 1 ✓ | Representation | `psl-native-enum-authoring.test.ts`, serializer round-trip |
+| **R2** | A field references it via `pg.enum(ref)` → column `{codecId, valueSet, nativeType}`, no `CHECK`, no domain enum | 1 ✓ | Authoring | `psl-pg-enum-column.test.ts` |
+| **R3** | The column reads as the value union (not `string`); input rejects out-of-set literals; SQL carries the `::type` cast | 1 ✓ | Typing + the cast | `native-enum.field-output.test-d.ts`, `sql-renderer.cast-policy.test.ts` |
+| **R4** | `db.nativeEnums.<ns>.<Name>` exposes members; `db.enums` unchanged | 1 ✓ | Runtime access | `postgres.test.ts`, `supabase-facade.test.ts` |
+| **R5** | `external` enums produce no DDL and no drift | 1 ✓ | External grade (+ Phase-2 suppression) | Supabase `db verify` integration tests |
+| **R6** | Contract-infer emits a `managed` `native_enum` for an introspected type instead of throwing | 2 | Adoption | (phase 2) |
+| **R7** | An author-selected native enum is created and dropped, ordered before its columns | 2 | SchemaIR node + ops | (phase 2, live DB) |
+| **R8** | A pure suffix-append migrates in place (`ADD VALUE`), no rewrite | 2 | Order-aware diff + ops | (phase 2, live DB) |
+| **R9** | Rename / remove / reorder is refused with a diagnostic, never planned | 2 | Order-aware diff | (phase 2, negative test) |
+| **R10** | The differ reports missing / extra / value-mismatch against a live DB | 2 | SchemaIR node + projection | (phase 2, live DB) |
 
 ## Non-goals
 
-- **Auto-migrating value removal or reorder.** Permanently out — they force a full-table
-  rewrite; users manage them by hand. The project refuses, it does not plan them.
-- **Native enums on SQLite / MySQL / MongoDB.** No native enum exists there; the check /
-  validator realization stays.
-- **Dependency-aware planner ordering + transaction-grouping (RLS follow-on B).** Excluded
-  by the cheap-ops-only scope. If a future feature wants the expensive ops, it pulls this
-  in then.
-- **Making native the default realization.** The default stays check (cross-target,
-  cheap-to-change). Native is opt-in (phase 2) or external-sourced (phase 1).
-- **Migrating existing check-realized enums to native (or back).** A realization swap is a
-  separate future want, not this project.
-
-## What this builds on (and the cruft to evaluate, not trust)
-
-- **RLS machinery (the template).** `PostgresRlsPolicy` / `PostgresRole` are target-owned
-  top-level `DiffableNode`s composed via `composeSqlEntityKinds`, diffed by the generic
-  differ, graded by `control` policy. `PostgresEnumType` follows this exactly. Requires the
-  RLS differ + extension-contribution seam landed (slice 1.5 / PR #868 and the
-  contribution-seam work) — **not** the full RLS feature set.
-- **TML-2886 `StorageColumnTypes`.** The baked storage-column-type lookup that types a
-  column as its value union; native-enum columns ride it.
-- **Leftover pre-migration plumbing — evaluate, do not assume well-designed.** A
-  `postgres-enum` arktype validator exists but is uncomposed/unwired; `StorageColumn.typeRef`
-  + a `storage.types` map are still resolved by the Postgres/SQLite planners
-  (`planner-type-resolution.ts`). These are the old hacky-enum seams. Parts may be reusable;
-  the design target is the clean shape above, and any reuse must be justified against it,
-  not adopted by default.
-
-## Open decisions (surface before/at slice shaping)
-
-1. **Column→type join shape.** Reuse the legacy `StorageColumn.typeRef` bare-string +
-   `storage.types` map, or introduce a coordinate `type` ref parallel to `valueSet`?
-   Leaning coordinate ref (consistent with every other reference site; the bare string
-   drops the namespace coordinate). Cost: it diverges from the planner code that currently
-   reads `typeRef`.
-2. **Entity-kind slot name.** `type` (generic — could later host domains/composites) vs.
-   `enum`-native-specific. The domain plane already owns `enum`; the storage slot needs a
-   distinct name. Leaning `type` with `kind: 'postgres-enum'` (slot generic, kind specific).
-3. **Adopted-enum grade (R6).** Do enums from contract-infer come in `external`
-   (observe-only, matches phase 1, nearly free) or `managed` (PN owns the diff/migrate,
-   pulls in the phase-2 verify path)? Leaning `external` for the first cut, with a manual
-   promote-to-managed path later.
-4. **Phase-1 source: extension-declared vs. introspected.** Does Supabase contribute the
-   native `type` entities through authoring, or are they introspected/adopted? Affects
-   whether phase 1 needs any introspection at all.
+- **Auto-migrating value removal or reorder** — permanently out; user-managed (full-table rewrites on operations users can do by hand).
+- **Native enums on SQLite / MySQL / MongoDB** — no native enum exists there; they keep the check realization.
+- **Making native the default Postgres realization** — check is the safe default; native is opt-in (Phase 2) or external-sourced (Phase 1).
+- **Migrating an existing check-realized enum to native, or back** — a realization swap; a separate future want.
+- **A framework-level "native enum" concept** — native is a Postgres storage realization; the framework holds only the target-agnostic domain enum.
 
 ## Alternatives considered
 
-- **A `codec | nativeEnum` union on the column type.** Rejected for the same reason the
-  parent project rejected it for the domain field: every column has a codec, always; native
-  realization is an additive structural fact (a `type` reference), not a replacement of the
-  codec slot.
-- **Native as the default Postgres realization.** Rejected: native can't cheaply remove or
-  reorder values and forces table rewrites; check is the safe default. Native is opt-in.
-- **Reusing the legacy `typeRef` + `storage.types` map as-is.** Held open (decision 1) but
-  not assumed: it predates the domain/storage split and drops the namespace coordinate.
-- **Supporting remove/reorder via an automatic temporary-superset rebuild.** Rejected: two
-  full-table rewrites and a throwaway type, on an operation users can do by hand with full
-  control over the data migration. We refuse and document instead.
-- **A framework-level "native enum" concept.** Rejected: native enums are a Postgres
-  storage realization; the framework holds only the target-agnostic domain enum. Keeping
-  native in the Postgres target preserves the layering the parent project established.
+- **Type native columns via a parameterized codec** (`renderOutputType`, the *values* baked into `typeParams`, no value-set). Rejected for **typing**: post-TML-2952 the value-set → codec path is the general, enum-agnostic column-typing mechanism, so a native column just carries a `valueSet` ref (like a check enum) and reuses it with zero new typing code. A bespoke parameterized-codec typing path would duplicate that; it only seemed right pre-2952, when value-set typing was still enum-tangled. (The codec *is* parameterized — but by the type **name** for the cast, not by the values for typing.)
+- **Reuse `StorageColumn.typeRef` + `storage.types` for the column→type join.** Rejected: that slot is the codec-alias mechanism (`vector`/`geometry`/`uuid`) — values rendered inline into a column type, never a managed `CREATE TYPE` object. A native enum is a managed schema object (the RLS template) — a different concept.
+- **A `codec | nativeEnum` union on the column type.** Rejected: every column always has a codec; native realization is an additive structural fact, not a replacement of the codec.
+- **Native as the default Postgres realization.** Rejected: native can't cheaply remove/reorder and forces table rewrites; check is the safe default.
+- **Supporting remove/reorder via an automatic temporary-superset rebuild.** Rejected: two full-table rewrites plus a throwaway type, for an operation users can do by hand. We refuse and document.
+- **A framework-level native-enum concept.** Rejected: native enums are a Postgres storage realization; the framework holds only the target-agnostic domain enum.

@@ -6,11 +6,12 @@ import {
   postgresAuthoringTypes,
 } from './authoring';
 import { postgresTargetDescriptorMetaRuntime } from './descriptor-meta-runtime';
+import { DEFAULT_NAMESPACE_ID } from './namespace-ids';
 import { postgresCreateNamespace } from './postgres-schema';
 
 const postgresTargetDescriptorMetaBase = {
   ...postgresTargetDescriptorMetaRuntime,
-  defaultNamespaceId: 'public',
+  defaultNamespaceId: DEFAULT_NAMESPACE_ID,
   authoring: {
     type: postgresAuthoringTypes,
     field: postgresAuthoringFieldPresets,

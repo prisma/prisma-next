@@ -1,6 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Runtime } from '@prisma-next/sql-runtime';
+import { PostgresSchema } from '@prisma-next/target-postgres/types';
 import { createContract } from '@prisma-next/test-utils';
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
@@ -43,6 +45,7 @@ vi.mock('pg', () => {
 });
 
 import { Client, Pool } from 'pg';
+import { buildNativeEnumsMapForNamespace } from '../src/runtime/native-enums';
 import postgres, { type PostgresClient } from '../src/runtime/postgres';
 
 const contract = createContract<SqlStorage>();
@@ -477,6 +480,106 @@ describe('postgres', () => {
 
       expect(db.enums.public.Role.values).toEqual(['user', 'admin']);
       expect(poolConnectSpy()).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('db.nativeEnums (facade)', () => {
+    // Built from real `PostgresSchema` IR instances (not plain literals):
+    // `PostgresContractSerializer.serializeContract` carries `entries.valueSet`
+    // for any namespace it recognizes via `isPostgresSchema`, matching how a
+    // real Postgres contract always rehydrates through the serializer at the
+    // `postgres()` call site. `db.nativeEnums` reads that `valueSet` entry —
+    // the same generic entry a `native_enum`'s `deriveValueSet` hook produces
+    // — not the (never re-serialized) `native_enum` entity itself.
+    const publicNs = new PostgresSchema({
+      id: 'public',
+      entries: {
+        table: {},
+        valueSet: {
+          AalLevel: { kind: 'valueSet', values: ['aal1', 'aal2'] },
+        },
+      },
+    });
+    const auditNs = new PostgresSchema({
+      id: 'audit',
+      entries: {
+        table: {},
+        valueSet: {
+          AalLevel: { kind: 'valueSet', values: ['low', 'high'] },
+        },
+      },
+    });
+
+    const twoNamespaceStorage = {
+      ...contract,
+      storage: {
+        ...contract.storage,
+        namespaces: { public: publicNs, audit: auditNs },
+      },
+    };
+
+    // A literal-keyed contract so `db.nativeEnums.public` and `.audit` resolve
+    // to distinct namespace maps, proving per-namespace resolution rather than
+    // falling back to a single shared `Record<string, ...>`. Each namespace's
+    // enum accessors are still looked up by bracket access (`['AalLevel']`):
+    // `NamespacedNativeEnums` intentionally keeps entity names as an open
+    // index signature (see native-enums.ts), not a per-name literal facade.
+    type TwoNsStorageContract = Contract<SqlStorage> & {
+      readonly storage: (typeof twoNamespaceStorage)['storage'];
+    };
+
+    it('exposes native enum members per namespace and resolves same-named native enums independently', () => {
+      const db = postgres<TwoNsStorageContract>({
+        contract: twoNamespaceStorage,
+        url: 'postgres://localhost:5432/db',
+      });
+
+      const publicAalLevel = db.nativeEnums.public['AalLevel'];
+      const auditAalLevel = db.nativeEnums.audit['AalLevel'];
+
+      expect(publicAalLevel?.values).toEqual(['aal1', 'aal2']);
+      expect(auditAalLevel?.values).toEqual(['low', 'high']);
+      expect(publicAalLevel?.names).toEqual(['aal1', 'aal2']);
+      expect(publicAalLevel?.has('aal1')).toBe(true);
+      expect(publicAalLevel?.nameOf('aal2')).toBe('aal2');
+      expect(auditAalLevel?.nameOf('high')).toBe('high');
+    });
+
+    it('builds the nativeEnums surface eagerly, without a runtime', () => {
+      const db = postgres<TwoNsStorageContract>({
+        contract: twoNamespaceStorage,
+        url: 'postgres://localhost:5432/db',
+      });
+
+      expect(db.nativeEnums.public['AalLevel']?.values).toEqual(['aal1', 'aal2']);
+      expect(poolConnectSpy()).not.toHaveBeenCalled();
+    });
+
+    // F02: the accessor must read the same plain namespace shape a
+    // `validateContract`'d JSON contract carries, not a hydrated
+    // `PostgresSchema` class instance — symmetric with `db.enums`
+    // (`buildNamespacedEnums`), which already works on plain data.
+    it('resolves members from a plain (non-hydrated) contract, not just a hydrated PostgresSchema', () => {
+      const plainStorage: SqlStorage = {
+        storageHash: coreHash('test-storage-hash'),
+        namespaces: {
+          public: {
+            id: 'public',
+            kind: 'postgres-schema',
+            entries: {
+              table: {},
+              valueSet: {
+                AalLevel: { kind: 'valueSet', values: ['aal1', 'aal2', 'aal3'] },
+              },
+            },
+          },
+        },
+      };
+
+      const result = buildNativeEnumsMapForNamespace(plainStorage, 'public');
+
+      expect(result['AalLevel']?.values).toEqual(['aal1', 'aal2', 'aal3']);
+      expect(result['AalLevel']?.has('aal2')).toBe(true);
     });
   });
 });
