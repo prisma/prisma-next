@@ -108,6 +108,7 @@ import {
   normalizeReferentialAction,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
+import { interpretModelConstraint } from './sql-attribute-specs';
 
 type NamedTypeSymbol = ScalarSymbol | TypeAliasSymbol;
 
@@ -517,6 +518,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     generatorDescriptorById: input.generatorDescriptorById,
     diagnostics,
     sourceId,
+    sourceFile: input.sourceFile,
     scalarTypeDescriptors: input.scalarTypeDescriptors,
     ...ifDefined('enumHandles', input.enumHandles),
     capabilities: input.capabilities,
@@ -625,7 +627,8 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   const indexNodes: IndexNode[] = [];
   const foreignKeyNodes: ForeignKeyNode[] = [];
 
-  for (const modelAttribute of model.attributes) {
+  const modelAttributeNodes = Array.from(model.node.attributes());
+  for (const [attributeIndex, modelAttribute] of model.attributes.entries()) {
     if (modelAttribute.name === 'map') {
       continue;
     }
@@ -674,26 +677,22 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         blockPrimaryKeyDeclared = true;
         continue;
       }
-      const fieldNames = parseAttributeFieldList({
-        attribute: modelAttribute,
+      const node = modelAttributeNodes[attributeIndex];
+      if (node === undefined) {
+        continue;
+      }
+      const parsed = interpretModelConstraint({
+        node,
+        attributeName: 'id',
+        model,
+        sourceFile: input.sourceFile,
         sourceId,
         diagnostics,
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        entityLabel: attributeLabel,
       });
-      if (!fieldNames) {
+      if (parsed === undefined) {
         continue;
       }
-      const duplicateFieldName = findDuplicateFieldName(fieldNames);
-      if (duplicateFieldName !== undefined) {
-        diagnostics.push({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: `${attributeLabel} list contains duplicate field "${duplicateFieldName}"`,
-          sourceId,
-          span: modelAttribute.span,
-        });
-        continue;
-      }
+      const fieldNames = parsed.fields;
       const nullableFieldName = fieldNames.find((name) => model.fields[name]?.optional === true);
       if (nullableFieldName !== undefined) {
         diagnostics.push({
@@ -716,22 +715,48 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (!columnNames) {
         continue;
       }
-      const constraintName = parseConstraintMapArgument({
-        attribute: modelAttribute,
-        sourceId,
-        diagnostics,
-        entityLabel: attributeLabel,
-        span: modelAttribute.span,
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-      });
       primaryKey = {
         columns: columnNames,
-        ...ifDefined('name', constraintName),
+        ...ifDefined('name', parsed.map),
       };
       blockPrimaryKeyDeclared = true;
       continue;
     }
-    if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
+    if (modelAttribute.name === 'unique') {
+      const node = modelAttributeNodes[attributeIndex];
+      if (node === undefined) {
+        continue;
+      }
+      const parsed = interpretModelConstraint({
+        node,
+        attributeName: 'unique',
+        model,
+        sourceFile: input.sourceFile,
+        sourceId,
+        diagnostics,
+      });
+      if (parsed === undefined) {
+        continue;
+      }
+      const columnNames = mapFieldNamesToColumns({
+        modelName: model.name,
+        fieldNames: parsed.fields,
+        mapping,
+        sourceId,
+        diagnostics,
+        span: modelAttribute.span,
+        entityLabel: attributeLabel,
+      });
+      if (!columnNames) {
+        continue;
+      }
+      uniqueConstraints.push({
+        columns: columnNames,
+        ...ifDefined('name', parsed.map),
+      });
+      continue;
+    }
+    if (modelAttribute.name === 'index') {
       const fieldNames = parseAttributeFieldList({
         attribute: modelAttribute,
         sourceId,
@@ -772,59 +797,52 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         span: modelAttribute.span,
         code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       });
-      if (modelAttribute.name === 'unique') {
-        uniqueConstraints.push({
-          columns: columnNames,
-          ...ifDefined('name', constraintName),
-        });
-      } else {
-        const indexEntityLabel = `Model "${model.name}" @@index`;
-        const rawTypeArg = getNamedArgument(modelAttribute, 'type');
-        let indexType: string | undefined;
-        if (rawTypeArg !== undefined) {
-          const parsed = parseQuotedStringLiteral(rawTypeArg);
-          if (parsed === undefined) {
-            diagnostics.push({
-              code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-              message: `${indexEntityLabel} type argument must be a quoted string literal`,
-              sourceId,
-              span: modelAttribute.span,
-            });
-            continue;
-          }
-          indexType = parsed;
-        }
-        const rawOptionsArg = getNamedArgument(modelAttribute, 'options');
-        let indexOptions: Record<string, string> | undefined;
-        if (rawOptionsArg !== undefined) {
-          if (indexType === undefined) {
-            diagnostics.push({
-              code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-              message: `${indexEntityLabel} options argument requires a type argument`,
-              sourceId,
-              span: modelAttribute.span,
-            });
-            continue;
-          }
-          const parsed = parseObjectLiteralStringMap({
-            raw: rawOptionsArg,
-            diagnostics,
+      const indexEntityLabel = `Model "${model.name}" @@index`;
+      const rawTypeArg = getNamedArgument(modelAttribute, 'type');
+      let indexType: string | undefined;
+      if (rawTypeArg !== undefined) {
+        const parsed = parseQuotedStringLiteral(rawTypeArg);
+        if (parsed === undefined) {
+          diagnostics.push({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: `${indexEntityLabel} type argument must be a quoted string literal`,
             sourceId,
             span: modelAttribute.span,
-            entityLabel: indexEntityLabel,
           });
-          if (parsed === undefined) {
-            continue;
-          }
-          indexOptions = parsed;
+          continue;
         }
-        indexNodes.push({
-          columns: columnNames,
-          ...ifDefined('name', constraintName),
-          ...ifDefined('type', indexType),
-          ...ifDefined('options', indexOptions),
-        });
+        indexType = parsed;
       }
+      const rawOptionsArg = getNamedArgument(modelAttribute, 'options');
+      let indexOptions: Record<string, string> | undefined;
+      if (rawOptionsArg !== undefined) {
+        if (indexType === undefined) {
+          diagnostics.push({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            message: `${indexEntityLabel} options argument requires a type argument`,
+            sourceId,
+            span: modelAttribute.span,
+          });
+          continue;
+        }
+        const parsed = parseObjectLiteralStringMap({
+          raw: rawOptionsArg,
+          diagnostics,
+          sourceId,
+          span: modelAttribute.span,
+          entityLabel: indexEntityLabel,
+        });
+        if (parsed === undefined) {
+          continue;
+        }
+        indexOptions = parsed;
+      }
+      indexNodes.push({
+        columns: columnNames,
+        ...ifDefined('name', constraintName),
+        ...ifDefined('type', indexType),
+        ...ifDefined('options', indexOptions),
+      });
       continue;
     }
     const uncomposedNamespace = checkUncomposedNamespace(

@@ -236,8 +236,8 @@ model User {
 }
 `,
       {
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        message: 'Model "Membership" @@id references unknown field "Membership.missingId"',
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+        message: 'Field "missingId" does not exist on model "Membership"',
       },
     );
   });
@@ -763,8 +763,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('Model "Thing" @@id requires fields list argument'),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('is missing required argument "fields"'),
         }),
       ]),
     );
@@ -789,8 +789,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('@@id requires bracketed field list argument'),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Expected a non-empty list'),
         }),
       ]),
     );
@@ -815,10 +815,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining(
-            'Model "Thing" @@id references unknown field "Thing.nope"',
-          ),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Field "nope" does not exist on model "Thing"'),
         }),
       ]),
     );
@@ -869,8 +867,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('@@id map argument must be a quoted string literal'),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Expected a string literal'),
         }),
       ]),
     );
@@ -923,8 +921,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: 'Model "Thing" @@id list contains duplicate field "email"',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: 'Duplicate list entry',
         }),
       ]),
     );
@@ -1010,6 +1008,32 @@ model User {
     );
   });
 
+  it('rejects field @unique with a non-quoted map argument', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Thing {
+  id    Int @id
+  email String @unique(map: not_a_string)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Expected a string literal'),
+        }),
+      ]),
+    );
+  });
+
   it('rejects @@unique with duplicate fields in the list', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model Thing {
@@ -1030,8 +1054,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: 'Model "Thing" @@unique list contains duplicate field "email"',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: 'Duplicate list entry',
         }),
       ]),
     );

@@ -1,6 +1,14 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { FieldSymbol, InterpretCtx, ModelSymbol } from '@prisma-next/psl-parser';
-import { fieldAttribute, interpretAttribute, modelAttribute, str } from '@prisma-next/psl-parser';
+import {
+  fieldAttribute,
+  fieldRef,
+  interpretAttribute,
+  list,
+  modelAttribute,
+  optional,
+  str,
+} from '@prisma-next/psl-parser';
 import type {
   FieldAttributeAst,
   ModelAttributeAst,
@@ -85,6 +93,76 @@ export function interpretModelMapName(input: {
     return input.defaultValue;
   }
   return result.value.name;
+}
+
+const idFieldSpec = fieldAttribute('id', { named: { map: optional(str()) } });
+const uniqueFieldSpec = fieldAttribute('unique', { named: { map: optional(str()) } });
+
+const idModelSpec = modelAttribute('id', {
+  positional: [{ key: 'fields', type: list(fieldRef('self'), { nonEmpty: true, unique: true }) }],
+  named: { map: optional(str()) },
+});
+const uniqueModelSpec = modelAttribute('unique', {
+  positional: [{ key: 'fields', type: list(fieldRef('self'), { nonEmpty: true, unique: true }) }],
+  named: { map: optional(str()) },
+});
+
+// `@id` / `@unique` carry an optional constraint `map:` name; the caller detects
+// presence separately, so an absent attribute simply yields no name.
+export function interpretFieldConstraintMapName(input: {
+  readonly model: ModelSymbol;
+  readonly field: FieldSymbol;
+  readonly attributeName: 'id' | 'unique';
+  readonly sourceFile: SourceFile;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): string | undefined {
+  const node = findFieldAttributeNode(input.field, input.attributeName);
+  if (node === undefined) return undefined;
+  const spec = input.attributeName === 'id' ? idFieldSpec : uniqueFieldSpec;
+  const result = interpretAttribute(
+    node,
+    spec,
+    buildFieldInterpretCtx({
+      selfModel: input.model,
+      field: input.field,
+      sourceFile: input.sourceFile,
+      sourceId: input.sourceId,
+    }),
+  );
+  if (!result.ok) {
+    for (const failure of result.failure) input.diagnostics.push(failure);
+    return undefined;
+  }
+  return result.value.map;
+}
+
+// `@@id` / `@@unique` share an argument shape: a required field list plus an
+// optional constraint `map:` name. Semantic checks (nullable-in-PK, column
+// mapping, both-inline-and-block PK, duplicate declaration) stay in the caller.
+export function interpretModelConstraint(input: {
+  readonly node: ModelAttributeAst;
+  readonly attributeName: 'id' | 'unique';
+  readonly model: ModelSymbol;
+  readonly sourceFile: SourceFile;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): { readonly fields: readonly string[]; readonly map: string | undefined } | undefined {
+  const spec = input.attributeName === 'id' ? idModelSpec : uniqueModelSpec;
+  const result = interpretAttribute(
+    input.node,
+    spec,
+    buildModelInterpretCtx({
+      selfModel: input.model,
+      sourceFile: input.sourceFile,
+      sourceId: input.sourceId,
+    }),
+  );
+  if (!result.ok) {
+    for (const failure of result.failure) input.diagnostics.push(failure);
+    return undefined;
+  }
+  return { fields: result.value.fields, map: result.value.map };
 }
 
 export function interpretFieldMapName(input: {

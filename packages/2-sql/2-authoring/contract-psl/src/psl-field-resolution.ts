@@ -16,7 +16,7 @@ import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { getAttribute, lowerFirst, parseConstraintMapArgument } from './psl-attribute-parsing';
+import { getAttribute, lowerFirst } from './psl-attribute-parsing';
 import type { ColumnDescriptor, FieldPresetContributions } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
@@ -24,7 +24,11 @@ import {
   reportUncomposedNamespace,
   resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
-import { interpretFieldMapName, interpretModelMapName } from './sql-attribute-specs';
+import {
+  interpretFieldConstraintMapName,
+  interpretFieldMapName,
+  interpretModelMapName,
+} from './sql-attribute-specs';
 
 type LoweredFieldDefault = {
   readonly defaultValue?: ColumnDefault;
@@ -144,6 +148,7 @@ export interface CollectResolvedFieldsInput {
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
+  readonly sourceFile: SourceFile;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
   readonly capabilities: CapabilityMatrix;
@@ -256,6 +261,7 @@ function validateFieldAttributes(input: {
 function extractFieldConstraintNames(input: {
   readonly model: ModelSymbol;
   readonly field: FieldSymbol;
+  readonly sourceFile: SourceFile;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): {
@@ -266,21 +272,21 @@ function extractFieldConstraintNames(input: {
 } {
   const idAttribute = getAttribute(input.field.attributes, 'id');
   const uniqueAttribute = getAttribute(input.field.attributes, 'unique');
-  const idName = parseConstraintMapArgument({
-    attribute: idAttribute,
+  const idName = interpretFieldConstraintMapName({
+    model: input.model,
+    field: input.field,
+    attributeName: 'id',
+    sourceFile: input.sourceFile,
     sourceId: input.sourceId,
     diagnostics: input.diagnostics,
-    entityLabel: `Field "${input.model.name}.${input.field.name}" @id`,
-    span: input.field.span,
-    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
   });
-  const uniqueName = parseConstraintMapArgument({
-    attribute: uniqueAttribute,
+  const uniqueName = interpretFieldConstraintMapName({
+    model: input.model,
+    field: input.field,
+    attributeName: 'unique',
+    sourceFile: input.sourceFile,
     sourceId: input.sourceId,
     diagnostics: input.diagnostics,
-    entityLabel: `Field "${input.model.name}.${input.field.name}" @unique`,
-    span: input.field.span,
-    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
   });
   return { idAttribute, uniqueAttribute, idName, uniqueName };
 }
@@ -506,6 +512,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     const { idAttribute, uniqueAttribute, idName, uniqueName } = extractFieldConstraintNames({
       model,
       field,
+      sourceFile: input.sourceFile,
       sourceId,
       diagnostics,
     });
