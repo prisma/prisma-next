@@ -16,7 +16,7 @@ import {
 } from '@prisma-next/framework-components/ir';
 import type { SqlNamespaceInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
-import type { JsonObject, JsonValue } from '@prisma-next/utils/json';
+import type { JsonObject } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
 import { PG_INT_CODEC_ID, PG_TEXT_CODEC_ID } from './codec-ids';
 import { nativeEnumEntityKind, policyEntityKind, roleEntityKind } from './entity-kinds';
@@ -117,14 +117,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
         namespacesJson[nsId] = {
           id: nsId,
           kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
-          entries: {
-            table: Object.fromEntries(
-              Object.entries(ns.entries.table ?? {}).map(([tableName, table]) => [
-                tableName,
-                this.serializeJsonObject(table),
-              ]),
-            ),
-          },
+          entries: this.serializeNamespaceEntries(ns.entries),
         };
       }
     }
@@ -157,40 +150,10 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
    * `contract.json` would be dead weight.
    */
   private serializePostgresNamespace(ns: PostgresSchema, isUnboundSlot: boolean): JsonObject {
-    const tablesOut = this.serializeEntries(ns.table);
-    const valueSetOut = this.serializeEntries(ns.valueSet ?? {});
-    const roleOut = this.serializeEntries(ns.role);
-    const policyOut = this.serializeEntries(ns.policy);
     return {
       id: ns.id,
       kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
-      entries: {
-        table: tablesOut,
-        ...(Object.keys(valueSetOut).length > 0 ? { valueSet: valueSetOut } : {}),
-        ...(Object.keys(roleOut).length > 0 ? { role: roleOut } : {}),
-        ...(Object.keys(policyOut).length > 0 ? { policy: policyOut } : {}),
-      },
+      entries: this.serializeNamespaceEntries(ns.entries),
     };
-  }
-
-  private serializeEntries(entries: Readonly<Record<string, unknown>>): Record<string, JsonObject> {
-    const out: Record<string, JsonObject> = {};
-    for (const [name, entry] of Object.entries(entries)) {
-      out[name] = this.serializeJsonObject(entry);
-    }
-    return out;
-  }
-
-  private serializeJsonObject(value: unknown): JsonObject {
-    return blindCast<
-      JsonObject,
-      'serializeJsonValue round-trips an IR node through JSON, yielding a JsonObject'
-    >(this.serializeJsonValue(value));
-  }
-
-  private serializeJsonValue(value: unknown): JsonValue {
-    return blindCast<JsonValue, 'JSON.parse(JSON.stringify(x)) yields a JsonValue'>(
-      JSON.parse(JSON.stringify(value)),
-    );
   }
 }
