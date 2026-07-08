@@ -25,7 +25,16 @@ export interface ProjectArtifactsOptions {
  * config reload replaces the store wholesale.
  */
 export interface ProjectArtifacts {
+  /**
+   * `undefined` when the document is not open in the text mirror or is not
+   * one of the project's configured inputs.
+   */
   document(uri: string): DocumentArtifacts | undefined;
+  /**
+   * Built as a byproduct of reading a configured input via `document`;
+   * `undefined` before the first such read or after the contributing document
+   * was changed or closed.
+   */
   symbolTable(): SymbolTable | undefined;
   documentChanged(uri: string): void;
   documentClosed(uri: string): void;

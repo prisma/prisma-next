@@ -1005,6 +1005,16 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     expect(semanticTokenChunks(tokens).every((chunk) => chunk.length === 5)).toBe(true);
   });
 
+  it('returns empty semantic tokens when config discovery fails', async () => {
+    harness = startHarness(resolveToSchema, {}, async () => {
+      throw new Error('config discovery failed');
+    });
+    await harness.initialize();
+    openDocument(harness, schemaUri, formattedPsl);
+
+    await expect(requestSemanticTokens(harness, schemaUri)).resolves.toEqual({ data: [] });
+  });
+
   it('returns empty semantic tokens when config resolution fails', async () => {
     harness = startHarness(resolveFails);
     await harness.initialize();
@@ -1644,17 +1654,10 @@ describe('language server pull diagnostics', { timeout: timeouts.databaseOperati
     });
   });
 
-  it('does not advertise the diagnostic provider to push clients and serves them empty pull reports', async () => {
+  it('does not advertise the diagnostic provider to push clients', async () => {
     harness = startHarness(resolveToSchema);
     const result = await harness.initialize();
     expect(result.capabilities.diagnosticProvider).toBeUndefined();
-
-    openDocument(harness, schemaUri, duplicateModelSource);
-    await harness.waitForDiagnostics(schemaUri);
-    expect(await requestPullDiagnostics(harness, schemaUri)).toEqual({
-      kind: DocumentDiagnosticReportKind.Full,
-      items: [],
-    });
   });
 
   it('serves a full report through pull without pushing publishDiagnostics', async () => {

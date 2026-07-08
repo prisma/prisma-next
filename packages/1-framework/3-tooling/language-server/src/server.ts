@@ -70,10 +70,7 @@ export function createServer(connection: Connection): LanguageServer {
   const documentConfigPaths = new Map<string, string>();
   let rootPath = process.cwd();
   let watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
-  let supportsWatchedFilesRegistration = false;
-  let clientSupportsSnippets = false;
-  let clientSupportsPullDiagnostics = false;
-  let clientSupportsDiagnosticsRefresh = false;
+  let clientCapabilities = noClientCapabilities;
   let disposed = false;
 
   function sendDiagnostics(params: PublishDiagnosticsParams): void {
@@ -138,7 +135,13 @@ export function createServer(connection: Connection): LanguageServer {
       return undefined;
     }
 
-    const configPath = await findNearestConfigPathForFile(filePath);
+    let configPath: string | undefined;
+    try {
+      configPath = await findNearestConfigPathForFile(filePath);
+    } catch {
+      // Config discovery walks the filesystem; a failure means "no project".
+      return undefined;
+    }
     if (configPath === undefined) {
       return undefined;
     }
@@ -224,7 +227,7 @@ export function createServer(connection: Connection): LanguageServer {
     for (const document of documents.all()) {
       if (documentConfigPaths.get(document.uri) === configPath) {
         documentConfigPaths.delete(document.uri);
-        if (hadProject && !clientSupportsPullDiagnostics) {
+        if (hadProject && !clientCapabilities.pullDiagnostics) {
           sendDiagnostics({ uri: document.uri, diagnostics: [] });
         }
       }
@@ -266,12 +269,7 @@ export function createServer(connection: Connection): LanguageServer {
       return [];
     }
 
-    let project: ProjectState | undefined;
-    try {
-      project = await resolveProjectForDocument(uri);
-    } catch {
-      return [];
-    }
+    const project = await resolveProjectForDocument(uri);
     if (project === undefined || !project.inputs.includes(uri)) {
       return [];
     }
@@ -331,12 +329,7 @@ export function createServer(connection: Connection): LanguageServer {
       return [];
     }
 
-    let project: ProjectState | undefined;
-    try {
-      project = await resolveProjectForDocument(uri);
-    } catch {
-      return [];
-    }
+    const project = await resolveProjectForDocument(uri);
     if (project === undefined) {
       return [];
     }
@@ -362,7 +355,7 @@ export function createServer(connection: Connection): LanguageServer {
             pslBlockDescriptors: project.controlStack.pslBlockDescriptors,
             symbolTable,
           },
-          clientSupportsSnippets,
+          clientSupportsSnippets: clientCapabilities.completionSnippets,
         }),
       ];
     } catch {
@@ -373,11 +366,7 @@ export function createServer(connection: Connection): LanguageServer {
   connection.onInitialize(async (params): Promise<InitializeResult> => {
     rootPath = resolveRootPath(params.rootUri, params.rootPath);
     watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
-    supportsWatchedFilesRegistration = clientSupportsWatchedFilesRegistration(params);
-    clientSupportsSnippets = clientSupportsCompletionSnippets(params);
-    clientSupportsPullDiagnostics = params.capabilities.textDocument?.diagnostic !== undefined;
-    clientSupportsDiagnosticsRefresh =
-      params.capabilities.workspace?.diagnostics?.refreshSupport === true;
+    clientCapabilities = resolveClientCapabilities(params);
 
     return {
       capabilities: {
@@ -394,7 +383,7 @@ export function createServer(connection: Connection): LanguageServer {
         // not a property of PSL. Once the project symbol table merges multiple
         // inputs, an edit in one file can change diagnostics in another and
         // these must flip alongside that work.
-        ...(clientSupportsPullDiagnostics
+        ...(clientCapabilities.pullDiagnostics
           ? {
               diagnosticProvider: {
                 interFileDependencies: false,
@@ -407,7 +396,7 @@ export function createServer(connection: Connection): LanguageServer {
   });
 
   connection.onInitialized(() => {
-    if (supportsWatchedFilesRegistration) {
+    if (clientCapabilities.watchedFilesRegistration) {
       void connection
         .sendRequest(RegistrationRequest.type, {
           registrations: [
@@ -437,13 +426,13 @@ export function createServer(connection: Connection): LanguageServer {
         stopManagingProject(configPath);
         continue;
       }
-      if (!clientSupportsPullDiagnostics) {
+      if (!clientCapabilities.pullDiagnostics) {
         await republishOpenDocumentsForConfig(configPath);
       }
     }
     if (
-      clientSupportsPullDiagnostics &&
-      clientSupportsDiagnosticsRefresh &&
+      clientCapabilities.pullDiagnostics &&
+      clientCapabilities.diagnosticsRefresh &&
       changedConfigPaths.size > 0 &&
       !disposed
     ) {
@@ -462,15 +451,7 @@ export function createServer(connection: Connection): LanguageServer {
   );
 
   connection.languages.diagnostics.on(async (params): Promise<DocumentDiagnosticReport> => {
-    if (!clientSupportsPullDiagnostics) {
-      return { kind: DocumentDiagnosticReportKind.Full, items: [] };
-    }
-    let project: ProjectState | undefined;
-    try {
-      project = await resolveProjectForDocument(params.textDocument.uri);
-    } catch {
-      project = undefined;
-    }
+    const project = await resolveProjectForDocument(params.textDocument.uri);
     if (project === undefined) {
       return { kind: DocumentDiagnosticReportKind.Full, items: [] };
     }
@@ -478,12 +459,7 @@ export function createServer(connection: Connection): LanguageServer {
   });
 
   connection.onFoldingRanges(async (params): Promise<FoldingRange[]> => {
-    let project: ProjectState | undefined;
-    try {
-      project = await resolveProjectForDocument(params.textDocument.uri);
-    } catch {
-      return [];
-    }
+    const project = await resolveProjectForDocument(params.textDocument.uri);
     if (project === undefined) {
       return [];
     }
@@ -496,14 +472,14 @@ export function createServer(connection: Connection): LanguageServer {
 
   documents.onDidOpen((event) => {
     artifactsForDocument(event.document.uri)?.documentChanged(event.document.uri);
-    if (clientSupportsPullDiagnostics) {
+    if (clientCapabilities.pullDiagnostics) {
       return;
     }
     publishSafely(event.document.uri);
   });
   documents.onDidChangeContent((event) => {
     artifactsForDocument(event.document.uri)?.documentChanged(event.document.uri);
-    if (clientSupportsPullDiagnostics) {
+    if (clientCapabilities.pullDiagnostics) {
       return;
     }
     publishSafely(event.document.uri);
@@ -512,7 +488,7 @@ export function createServer(connection: Connection): LanguageServer {
     const uri = event.document.uri;
     artifactsForDocument(uri)?.documentClosed(uri);
     documentConfigPaths.delete(uri);
-    if (!clientSupportsPullDiagnostics) {
+    if (!clientCapabilities.pullDiagnostics) {
       sendDiagnostics({ uri, diagnostics: [] });
     }
   });
@@ -562,12 +538,29 @@ function toLspSeverity(severity: number): DiagnosticSeverity {
   }
 }
 
-function clientSupportsWatchedFilesRegistration(params: InitializeParams): boolean {
-  return params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true;
+interface ResolvedClientCapabilities {
+  readonly watchedFilesRegistration: boolean;
+  readonly completionSnippets: boolean;
+  readonly pullDiagnostics: boolean;
+  readonly diagnosticsRefresh: boolean;
 }
 
-function clientSupportsCompletionSnippets(params: InitializeParams): boolean {
-  return params.capabilities.textDocument?.completion?.completionItem?.snippetSupport === true;
+const noClientCapabilities: ResolvedClientCapabilities = {
+  watchedFilesRegistration: false,
+  completionSnippets: false,
+  pullDiagnostics: false,
+  diagnosticsRefresh: false,
+};
+
+function resolveClientCapabilities(params: InitializeParams): ResolvedClientCapabilities {
+  return {
+    watchedFilesRegistration:
+      params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true,
+    completionSnippets:
+      params.capabilities.textDocument?.completion?.completionItem?.snippetSupport === true,
+    pullDiagnostics: params.capabilities.textDocument?.diagnostic !== undefined,
+    diagnosticsRefresh: params.capabilities.workspace?.diagnostics?.refreshSupport === true,
+  };
 }
 
 function resolveRootPath(
