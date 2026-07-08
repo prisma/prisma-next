@@ -1,6 +1,11 @@
 import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
 import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
-import { type DocumentAst, parse, type SourceFile } from '@prisma-next/psl-parser/syntax';
+import {
+  type DocumentAst,
+  type ParseDiagnostic,
+  parse,
+  type SourceFile,
+} from '@prisma-next/psl-parser/syntax';
 import { type LspDiagnostic, mapParseDiagnostics } from './diagnostic-mapping';
 
 /**
@@ -28,12 +33,7 @@ export interface PipelineResult {
  */
 export function runPipeline(text: string, inputs: PipelineInputs): PipelineResult {
   const { document, sourceFile, diagnostics: parseDiagnostics } = parse(text);
-  const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
-    document,
-    sourceFile,
-    scalarTypes: inputs.scalarTypes,
-    pslBlockDescriptors: inputs.pslBlockDescriptors,
-  });
+  const { symbolTable, symbolTableDiagnostics } = runSymbolTableStage(document, sourceFile, inputs);
 
   return {
     document,
@@ -41,4 +41,19 @@ export function runPipeline(text: string, inputs: PipelineInputs): PipelineResul
     symbolTable,
     diagnostics: mapParseDiagnostics([...parseDiagnostics, ...symbolTableDiagnostics]),
   };
+}
+
+/** The pipeline's second stage, reusable against already-parsed artifacts. */
+export function runSymbolTableStage(
+  document: DocumentAst,
+  sourceFile: SourceFile,
+  inputs: PipelineInputs,
+): { symbolTable: SymbolTable; symbolTableDiagnostics: readonly ParseDiagnostic[] } {
+  const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: inputs.scalarTypes,
+    pslBlockDescriptors: inputs.pslBlockDescriptors,
+  });
+  return { symbolTable, symbolTableDiagnostics };
 }

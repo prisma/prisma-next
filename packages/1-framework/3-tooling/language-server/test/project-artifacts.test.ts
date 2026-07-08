@@ -116,11 +116,34 @@ describe('createProjectArtifacts', () => {
     expect(pipelineMock.runPipeline).toHaveBeenCalledTimes(1);
   });
 
-  it('returns the degenerate empty table when no configured input is open', () => {
+  it('rebuilds the symbol table from a sibling input after the contributing document closes', () => {
+    const schema2Uri = pathToFileURL('/abs/schema2.psl').toString();
+    const twoInputs = resolveSchemaInputs({
+      contract: {
+        source: { sourceFormat: 'psl', inputs: ['/abs/schema.psl', '/abs/schema2.psl'] },
+      },
+    });
+    const texts = new Map<string, string>();
+    const store = createProjectArtifacts({
+      inputs: twoInputs,
+      controlStack,
+      getText: (uri) => texts.get(uri),
+    });
+    texts.set(schemaUri, cleanSource);
+    texts.set(schema2Uri, twoModelSource);
+    store.document(schemaUri);
+    store.document(schema2Uri);
+
+    texts.delete(schema2Uri);
+    store.documentClosed(schema2Uri);
+
+    expect(Object.keys(store.symbolTable().topLevel.models)).toContain('User');
+  });
+
+  it('throws when no configured input is open instead of fabricating a table', () => {
     const { store } = projectWithMirror();
 
-    const table = store.symbolTable();
-    expect(Object.keys(table.topLevel.models)).toEqual([]);
+    expect(() => store.symbolTable()).toThrowError(/invariant violated.*no open configured input/i);
     expect(pipelineMock.runPipeline).not.toHaveBeenCalled();
   });
 
