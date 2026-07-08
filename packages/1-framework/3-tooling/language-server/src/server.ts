@@ -109,9 +109,8 @@ export function createServer(connection: Connection): LanguageServer {
   }
 
   /**
-   * Project-scoped so that a future multi-input symbol table can attach
-   * `relatedDocuments` for cross-file effects; today a report carries only the
-   * requested document's items.
+   * Project-scoped so a future multi-input symbol table can attach
+   * `relatedDocuments` for cross-file effects.
    */
   function buildDocumentDiagnosticReport(
     project: ProjectState,
@@ -495,9 +494,6 @@ export function createServer(connection: Connection): LanguageServer {
     return computeFoldingRanges(artifacts.document, artifacts.sourceFile);
   });
 
-  // The artifact store learns about edits only through these events; for
-  // pull clients nothing else happens (the next read derives from the
-  // current buffer), while push clients publish eagerly as before.
   documents.onDidOpen((event) => {
     artifactsForDocument(event.document.uri)?.documentChanged(event.document.uri);
     if (clientSupportsPullDiagnostics) {

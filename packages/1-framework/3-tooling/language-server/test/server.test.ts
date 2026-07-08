@@ -80,7 +80,7 @@ vi.mock('../src/config-resolution', async (importOriginal) => {
   return { ...actual, resolveConfigInputs: configResolutionMock.resolveConfigInputs };
 });
 
-// Pass-through spy on the parse seam so tests can count materializations.
+// Pass-through spy on the parse seam so tests can count parses.
 vi.mock('../src/pipeline', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/pipeline')>();
   pipelineMock.runPipeline.mockImplementation(actual.runPipeline);

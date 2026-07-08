@@ -14,21 +14,15 @@ export interface DocumentArtifacts {
 export interface ProjectArtifactsOptions {
   readonly inputs: SchemaInputSet;
   readonly controlStack: PipelineInputs;
-  /** Reads the live buffer from the server's text mirror. */
   readonly getText: (uri: string) => string | undefined;
 }
 
 /**
- * Owns all derived parse state for one project load. Reads (`document`,
- * `symbolTable`) are synchronous and parse internally when needed; the only
- * things that can change what a read returns are the domain events
- * (`documentChanged`, `documentClosed`) and replacing the whole store on a
- * config reload — nothing else can trigger a reparse.
- *
- * Correctness of caching internally: LSP messages are dispatched in order and
- * the server raises the events synchronously against the already-updated text
- * mirror, so by the time any read runs, every event that could change its
- * result has already been applied — cached artifacts are always current.
+ * Reads can never observe stale artifacts: the vscode-languageserver runtime
+ * dispatches messages in order and the server raises `documentChanged` /
+ * `documentClosed` synchronously against the already-updated text mirror, so
+ * every mutation that could affect a read lands before that read runs. A
+ * config reload replaces the store wholesale.
  */
 export interface ProjectArtifacts {
   document(uri: string): DocumentArtifacts | undefined;
@@ -68,11 +62,9 @@ export function createProjectArtifacts(options: ProjectArtifactsOptions): Projec
         diagnostics: computed.diagnostics,
       };
       documents.set(uri, artifacts);
-      // One symbol table per project. Single-input reality: it is (re)built
-      // from the one open configured input whenever that input reparses.
-      // Merging several open inputs into one project table — and reading
-      // unopened `inputs` from disk — is the deferred cross-file work;
-      // `buildSymbolTable`'s single-document signature is left untouched for it.
+      // Single-input by design: the project table is rebuilt from the one open
+      // configured input; merging multiple inputs (and reading unopened ones
+      // from disk) is deferred cross-file work.
       symbolTable = computed.symbolTable;
       return artifacts;
     },
