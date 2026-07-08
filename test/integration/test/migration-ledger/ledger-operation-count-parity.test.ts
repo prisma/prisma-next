@@ -13,7 +13,7 @@ import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import {
   type AggregateMigrationEdgeRef,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
@@ -484,7 +484,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
   }, async () => {
     const pgDest = pgContract.storage.storageHash;
     const pgSynthEdges = [
-      buildSynthMigrationEdge({
+      buildFabricatedMigrationEdge({
         currentMarkerStorageHash: null,
         destinationStorageHash: pgDest,
         operationCount: 1,
@@ -531,7 +531,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
 
     const sqliteDest = sqliteContract.storage.storageHash;
     const sqliteSynthEdges = [
-      buildSynthMigrationEdge({
+      buildFabricatedMigrationEdge({
         currentMarkerStorageHash: null,
         destinationStorageHash: sqliteDest,
         operationCount: 1,
@@ -586,7 +586,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       operations: JSON.parse(serializeMongoOps([createCollection('parity_synth')])),
     };
     const mongoSynthEdges = [
-      buildSynthMigrationEdge({
+      buildFabricatedMigrationEdge({
         currentMarkerStorageHash: null,
         destinationStorageHash: mongoDest,
         operationCount: mongoPlan.operations.length,

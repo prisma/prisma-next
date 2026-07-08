@@ -12,7 +12,7 @@ import type { Contract as FrameworkContract } from '@prisma-next/contract/types'
 import postgresControlDriver from '@prisma-next/driver-postgres/control';
 import sql, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
-import { buildSynthMigrationEdge } from '@prisma-next/migration-tools/aggregate';
+import { buildFabricatedMigrationEdge } from '@prisma-next/migration-tools/aggregate';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { orm } from '@prisma-next/sql-orm-client';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
@@ -65,7 +65,7 @@ async function migrateContract(connectionString: string): Promise<void> {
           space: APP_SPACE_ID,
           plan: planResult.plan,
           migrationEdges: [
-            buildSynthMigrationEdge({
+            buildFabricatedMigrationEdge({
               currentMarkerStorageHash: planResult.plan.origin?.storageHash,
               destinationStorageHash: planResult.plan.destination.storageHash,
               operationCount: planResult.plan.operations.length,

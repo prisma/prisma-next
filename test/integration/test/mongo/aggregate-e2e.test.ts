@@ -31,7 +31,7 @@ import {
   MONGO_TEST_SPACE_ID,
 } from '../contract-space-fixture-mongo/constants';
 import mongoTestContractSpaceExtensionDescriptor from '../contract-space-fixture-mongo/control';
-import { synthMigrationEdges } from './synth-migration-edges';
+import { buildFabricatedMigrationEdges } from './fabricated-migration-edges';
 
 const controlAdapter = new MongoControlAdapterImpl();
 
@@ -63,7 +63,7 @@ const ALL_POLICY = {
 type PerSpaceOptions = MigrationRunnerPerSpaceOptions<'mongo', 'mongo'>;
 
 function withSynthEdges(entry: Omit<PerSpaceOptions, 'migrationEdges'>): PerSpaceOptions {
-  return { ...entry, migrationEdges: synthMigrationEdges(entry.plan) };
+  return { ...entry, migrationEdges: buildFabricatedMigrationEdges(entry.plan) };
 }
 
 const extContract: MongoContract =

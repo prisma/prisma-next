@@ -21,7 +21,7 @@ import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { synthMigrationEdges } from './synth-migration-edges';
+import { buildFabricatedMigrationEdges } from './fabricated-migration-edges';
 
 const controlAdapter = new MongoControlAdapterImpl();
 
@@ -198,7 +198,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         };
         const runResult = await runner.execute({
           plan,
-          migrationEdges: synthMigrationEdges(plan),
+          migrationEdges: buildFabricatedMigrationEdges(plan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -249,7 +249,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         };
         await runner.execute({
           plan,
-          migrationEdges: synthMigrationEdges(plan),
+          migrationEdges: buildFabricatedMigrationEdges(plan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -294,7 +294,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         };
         await runner.execute({
           plan,
-          migrationEdges: synthMigrationEdges(plan),
+          migrationEdges: buildFabricatedMigrationEdges(plan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -345,7 +345,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         };
         await runner.execute({
           plan: createPlan,
-          migrationEdges: synthMigrationEdges(createPlan),
+          migrationEdges: buildFabricatedMigrationEdges(createPlan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -382,7 +382,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         };
         const dropRunResult = await runner.execute({
           plan: dropPlan,
-          migrationEdges: synthMigrationEdges(dropPlan),
+          migrationEdges: buildFabricatedMigrationEdges(dropPlan),
           destinationContract: emptyContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -448,7 +448,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
 
         await runner.execute({
           plan: bootstrapPlan,
-          migrationEdges: synthMigrationEdges(bootstrapPlan),
+          migrationEdges: buildFabricatedMigrationEdges(bootstrapPlan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -461,7 +461,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         };
         const reapplyResult = await runner.execute({
           plan: reapplyPlan,
-          migrationEdges: synthMigrationEdges(reapplyPlan),
+          migrationEdges: buildFabricatedMigrationEdges(reapplyPlan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -513,7 +513,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         };
         const runResult = await runner.execute({
           plan,
-          migrationEdges: synthMigrationEdges(plan),
+          migrationEdges: buildFabricatedMigrationEdges(plan),
           destinationContract: indexedContract,
           policy: ALL_POLICY,
           frameworkComponents: [],

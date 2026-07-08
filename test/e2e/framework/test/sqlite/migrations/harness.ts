@@ -17,7 +17,7 @@ import {
   type MigrationOperationPolicy,
   type MigrationRunnerFailure,
 } from '@prisma-next/framework-components/control';
-import { buildSynthMigrationEdge } from '@prisma-next/migration-tools/aggregate';
+import { buildFabricatedMigrationEdge } from '@prisma-next/migration-tools/aggregate';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { field } from '@prisma-next/sqlite/contract-builder';
@@ -93,7 +93,7 @@ function synthEdges(plan: {
   readonly operations: readonly unknown[];
 }) {
   return [
-    buildSynthMigrationEdge({
+    buildFabricatedMigrationEdge({
       currentMarkerStorageHash: plan.origin?.storageHash,
       destinationStorageHash: plan.destination.storageHash,
       operationCount: plan.operations.length,
