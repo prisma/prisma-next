@@ -317,7 +317,7 @@ export function createServer(connection: Connection): LanguageServer {
     const source = {
       document: artifacts.document,
       sourceFile: artifacts.sourceFile,
-      symbolTable: project.artifacts.symbolTable(),
+      symbolTable: artifacts.symbolTable,
       scalarTypes: project.controlStack.scalarTypes,
     };
     return buildSemanticTokens(source, range);
@@ -335,8 +335,7 @@ export function createServer(connection: Connection): LanguageServer {
     }
 
     const artifacts = project.artifacts.document(uri);
-    const symbolTable = project.artifacts.symbolTable();
-    if (artifacts === undefined || symbolTable === undefined) {
+    if (artifacts === undefined) {
       return [];
     }
 
@@ -353,7 +352,7 @@ export function createServer(connection: Connection): LanguageServer {
           candidates: {
             scalarTypes: project.controlStack.scalarTypes,
             pslBlockDescriptors: project.controlStack.pslBlockDescriptors,
-            symbolTable,
+            symbolTable: artifacts.symbolTable,
           },
           clientSupportsSnippets: clientCapabilities.completionSnippets,
         }),
@@ -507,7 +506,7 @@ export function createServer(connection: Connection): LanguageServer {
       connection.dispose();
     },
     getDocumentAst: (uri) => artifactsForDocument(uri)?.document(uri),
-    getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.symbolTable(),
+    getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.document(uri)?.symbolTable,
   };
 }
 

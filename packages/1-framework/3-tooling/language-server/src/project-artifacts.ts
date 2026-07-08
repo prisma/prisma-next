@@ -9,6 +9,11 @@ export interface DocumentArtifacts {
   readonly document: DocumentAst;
   readonly sourceFile: SourceFile;
   readonly diagnostics: readonly LspDiagnostic[];
+  /**
+   * Built from this document alone — single-input by design; merging multiple
+   * inputs (and reading unopened ones from disk) is deferred cross-file work.
+   */
+  readonly symbolTable: SymbolTable;
 }
 
 export interface ProjectArtifactsOptions {
@@ -30,8 +35,6 @@ export interface ProjectArtifacts {
    * one of the project's configured inputs.
    */
   document(uri: string): DocumentArtifacts | undefined;
-  /** `undefined` only when no configured input is open in the text mirror. */
-  symbolTable(): SymbolTable | undefined;
   documentChanged(uri: string): void;
   documentClosed(uri: string): void;
 }
@@ -39,12 +42,9 @@ export interface ProjectArtifacts {
 export function createProjectArtifacts(options: ProjectArtifactsOptions): ProjectArtifacts {
   const { inputs, controlStack, getText } = options;
   const documents = new Map<string, DocumentArtifacts>();
-  let symbolTable: SymbolTable | undefined;
 
   function drop(uri: string): void {
-    if (documents.delete(uri)) {
-      symbolTable = undefined;
-    }
+    documents.delete(uri);
   }
 
   function readDocument(uri: string): DocumentArtifacts | undefined {
@@ -64,28 +64,14 @@ export function createProjectArtifacts(options: ProjectArtifactsOptions): Projec
       document: computed.document,
       sourceFile: computed.sourceFile,
       diagnostics: computed.diagnostics,
+      symbolTable: computed.symbolTable,
     };
     documents.set(uri, artifacts);
-    // Single-input by design: the project table is rebuilt from the one open
-    // configured input; merging multiple inputs (and reading unopened ones
-    // from disk) is deferred cross-file work.
-    symbolTable = computed.symbolTable;
     return artifacts;
   }
 
   return {
     document: readDocument,
-    symbolTable: () => {
-      if (symbolTable !== undefined) {
-        return symbolTable;
-      }
-      for (const uri of inputs.uris()) {
-        if (readDocument(uri) !== undefined) {
-          break;
-        }
-      }
-      return symbolTable;
-    },
     documentChanged: drop,
     documentClosed: drop,
   };

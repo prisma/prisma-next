@@ -11,7 +11,6 @@ export interface SchemaInputConfig {
 
 export interface SchemaInputSet {
   includes(uri: string): boolean;
-  uris(): Iterable<string>;
 }
 
 export function hasPslInputs(config: SchemaInputConfig): boolean {
@@ -25,11 +24,9 @@ export function resolveSchemaInputs(config: SchemaInputConfig): SchemaInputSet {
 
   return {
     includes: (uri) => uris.has(uri),
-    uris: () => uris,
   };
 }
 
 export const emptySchemaInputSet: SchemaInputSet = {
   includes: () => false,
-  uris: () => [],
 };
