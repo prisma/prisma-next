@@ -216,8 +216,8 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
    * universal base kind (every namespace carries it), so it is always
    * emitted, even when empty; every other kind — target- or
    * pack-contributed — is emitted only when it holds at least one entry.
-   * `native_enum` is carried non-enumerable on `entries` (see
-   * `PostgresSchema`), so `Object.entries` excludes it here for free.
+   * A kind carried non-enumerable on `entries` is excluded here for free,
+   * since `Object.entries` honors enumerability.
    */
   protected serializeNamespaceEntries(
     entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
@@ -226,7 +226,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
       table: this.serializeEntries(entries['table'] ?? {}),
     };
     for (const [kind, record] of Object.entries(entries)) {
-      if (kind === 'table' || Object.keys(record).length === 0) {
+      if (kind === 'table' || record == null || Object.keys(record).length === 0) {
         continue;
       }
       out[kind] = this.serializeEntries(record);
@@ -234,9 +234,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     return out;
   }
 
-  protected serializeEntries(
-    entries: Readonly<Record<string, unknown>>,
-  ): Record<string, JsonObject> {
+  private serializeEntries(entries: Readonly<Record<string, unknown>>): Record<string, JsonObject> {
     const out: Record<string, JsonObject> = {};
     for (const [name, entry] of Object.entries(entries)) {
       out[name] = this.serializeJsonObject(entry);

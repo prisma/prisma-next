@@ -51,4 +51,18 @@ describe('SqlContractSerializerBase — serializeNamespaceEntries', () => {
     const result = harness.callSerializeNamespaceEntries({ table: {} });
     expect(result).toEqual({ table: {} });
   });
+
+  it('skips an enumerable undefined kind slot without throwing', () => {
+    // PostgresSchema can carry an enumerable `valueSet: undefined` own-key
+    // (its empty-valueSet normalization); the walk must not call
+    // Object.keys(undefined).
+    const entries: Record<string, Readonly<Record<string, unknown>>> = { table: {} };
+    Object.assign(entries, { valueSet: undefined });
+
+    const harness = new SerializeNamespaceEntriesHarness();
+    const result = harness.callSerializeNamespaceEntries(entries);
+
+    expect(result).toEqual({ table: {} });
+    expect(Object.hasOwn(result, 'valueSet')).toBe(false);
+  });
 });

@@ -20,7 +20,7 @@ import type { JsonObject } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
 import { PG_INT_CODEC_ID, PG_TEXT_CODEC_ID } from './codec-ids';
 import { nativeEnumEntityKind, policyEntityKind, roleEntityKind } from './entity-kinds';
-import { isPostgresSchema, PostgresSchema } from './postgres-schema';
+import { PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
   family: 'sql',
@@ -109,17 +109,17 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
   override serializeContract(contract: Contract<SqlStorage>): JsonObject {
     const { storage, ...rest } = contract;
     const namespacesJson: Record<string, JsonObject> = {};
+    // Each namespace serializes to its id, its schema-kind tag, and the
+    // base's generic entries walk. Native enums are excluded upstream —
+    // carried non-enumerable on `PostgresSchema.entries`, so the walk
+    // never sees them.
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
-      if (isPostgresSchema(ns)) {
-        namespacesJson[nsId] = this.serializePostgresNamespace(ns, ns.id === UNBOUND_NAMESPACE_ID);
-      } else {
-        const isUnboundSlot = nsId === UNBOUND_NAMESPACE_ID;
-        namespacesJson[nsId] = {
-          id: nsId,
-          kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
-          entries: this.serializeNamespaceEntries(ns.entries),
-        };
-      }
+      const isUnboundSlot = ns.id === UNBOUND_NAMESPACE_ID;
+      namespacesJson[nsId] = {
+        id: ns.id,
+        kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
+        entries: this.serializeNamespaceEntries(ns.entries),
+      };
     }
     const storageOut: Record<string, unknown> = {
       storageHash: String(storage.storageHash),
@@ -139,21 +139,5 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       ...rest,
       storage: storageOut,
     });
-  }
-
-  /**
-   * Native enums are deliberately not serialized here — `native_enum` is
-   * authoring-time-only. Once lowered, its member values live on in the
-   * `valueSet` slot it derives (via the SQL family's generic
-   * `deriveValueSet` mechanism); nothing downstream reads the
-   * `PostgresNativeEnum` entity itself, so re-emitting it into
-   * `contract.json` would be dead weight.
-   */
-  private serializePostgresNamespace(ns: PostgresSchema, isUnboundSlot: boolean): JsonObject {
-    return {
-      id: ns.id,
-      kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
-      entries: this.serializeNamespaceEntries(ns.entries),
-    };
   }
 }
