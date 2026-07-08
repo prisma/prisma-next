@@ -47,6 +47,7 @@ export type {
   MigrationRunnerSuccessValue,
   MigrationScaffoldContext,
   OpFactoryCall,
+  SchemaOwnership,
   TargetMigrationsCapability,
 } from '../control/control-migration-types';
 export type {

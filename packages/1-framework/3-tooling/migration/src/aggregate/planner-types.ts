@@ -44,10 +44,10 @@ export interface CallerPolicy {
  *   `storageHash` as the recorded-path resolution's `from` node, falling
  *   back to {@link import('../constants').EMPTY_CONTRACT_HASH} when absent.
  * - `schemaIntrospection`: the family's full live schema IR. Fed into
- *   `planFromDiff` in full; the aggregate hands the planner its own
- *   ownership query (`siblingOwnedEntityNames`) so the planner scopes its
- *   diff to each contract space's own findings — no schema is pruned up
- *   front, and the planner does the scoping itself from that data.
+ *   `planFromDiff` in full; the aggregate itself is handed to the planner as
+ *   an ownership oracle, which the planner asks per live extra node whether
+ *   any space owns it — no schema is pruned up front, and the planner never
+ *   drops a node a sibling space owns.
  *
  * Callers (CLI commands) gather this via the family's
  * `readAllMarkers` + `introspect` calls before invoking the planner.

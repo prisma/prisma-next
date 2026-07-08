@@ -6,6 +6,7 @@ import type {
   MigrationPlan,
   MigrationPlannerConflict,
   MigrationPlannerResult,
+  SchemaOwnership,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import type { ContractMarkerRecordLike } from '../marker-types';
@@ -18,15 +19,14 @@ export interface PlanFromDiffInputs<TFamilyId extends string, TTargetId extends 
   readonly currentMarker: ContractMarkerRecordLike | null;
   readonly space: AggregateContractSpace;
   /**
-   * Bare entity names declared by some OTHER contract space in the
-   * aggregate (never this space's own) — the aggregate's passive
-   * ownership query, precomputed once per space. Handed straight through
-   * to the family planner's `siblingOwnedEntityNames`, which drops
-   * `not-expected` diff findings for these entities so it never emits a
-   * destructive op against a sibling space's table. This strategy runs no
-   * diff of its own and holds no ownership logic.
+   * Ownership oracle over the whole composition — the passive aggregate
+   * itself. Handed straight through to the family planner, which asks it,
+   * per live extra node, whether any space owns that entity; a sibling-owned
+   * node is left untouched, an unowned node is a genuine extra. This strategy
+   * runs no diff of its own and holds no ownership logic — it forwards the
+   * aggregate as the oracle.
    */
-  readonly siblingOwnedEntityNames: ReadonlySet<string>;
+  readonly ownership: SchemaOwnership;
   readonly schemaIntrospection: unknown;
   readonly adapter: ControlAdapterInstance<TFamilyId, TTargetId>;
   readonly migrations: TargetMigrationsCapability<
@@ -56,10 +56,10 @@ type MaybeAsyncPlannerResult = MigrationPlannerResult | Promise<MigrationPlanner
  * live schema, delegating to the family's `createPlanner(...).plan(...)`.
  *
  * The planner diffs the whole introspected schema, so it sees other contract
- * spaces' tables as "extras"; the orchestration scopes the diff by handing the
- * planner the aggregate's ownership query (`siblingOwnedEntityNames`) so it
- * drops exactly those extras itself — the planner never emits a destructive
- * drop for a sibling space's table, and this strategy holds no ownership
+ * spaces' tables as "extras"; the orchestration hands the planner the
+ * aggregate as an ownership oracle so it can ask, per extra, whether any
+ * space owns it — a sibling-owned table is left untouched, so the planner
+ * never emits a destructive drop for it, and this strategy holds no ownership
  * logic of its own. The schema is never pruned before planning: cross-space
  * foreign keys need every sibling table visible to the diff.
  *
@@ -87,7 +87,7 @@ export async function planFromDiff<TFamilyId extends string, TTargetId extends s
     fromContract: null,
     frameworkComponents: input.frameworkComponents,
     spaceId: input.space.spaceId,
-    siblingOwnedEntityNames: input.siblingOwnedEntityNames,
+    ownership: input.ownership,
   }) as MaybeAsyncPlannerResult);
 
   if (plannerResult.kind === 'failure') {

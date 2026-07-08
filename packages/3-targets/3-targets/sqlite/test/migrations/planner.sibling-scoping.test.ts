@@ -1,14 +1,15 @@
 /**
- * Unit tests for the SQLite planner's sibling-space scoping: the aggregate
- * orchestration hands `plan()` the bare entity names another contract space
- * declares (`siblingOwnedEntityNames`), and the planner must never emit a
- * destructive op against one of those tables — while still dropping a truly
- * unclaimed table under a destructive policy. Replaces the retired
- * `keepDiffIssue` predicate mechanism.
+ * Unit tests for the SQLite planner's ownership consultation: the aggregate
+ * orchestration hands `plan()` an ownership oracle (the passive aggregate,
+ * satisfying `SchemaOwnership`). For each live extra node the planner asks the
+ * oracle whether any contract space owns it — a sibling-owned table is left
+ * untouched, a truly-unclaimed table is dropped under a destructive policy.
+ * No sibling-name list, no keep-predicate: ownership lives in the aggregate.
  */
 
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
+import type { SchemaOwnership } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -86,8 +87,15 @@ function buildLiveSchema(): SqlSchemaIR {
   });
 }
 
-describe('SQLite planner sibling-space scoping', () => {
-  it('drops every unclaimed table under a destructive policy when no ownership is supplied', async () => {
+// An ownership oracle in which every named entity is owned by some contract
+// space — as if the aggregate declared `cipher_state` (a sibling's table).
+const ownsOnly = (...names: string[]): SchemaOwnership => {
+  const owned = new Set(names);
+  return { declaresEntity: (name) => owned.has(name) };
+};
+
+describe('SQLite planner ownership consultation', () => {
+  it('drops every unclaimed table under a destructive policy when no ownership oracle is supplied', async () => {
     const planner = createSqliteMigrationPlanner(stubLowerer);
 
     const result = planner.plan({
@@ -106,9 +114,11 @@ describe('SQLite planner sibling-space scoping', () => {
     expect(dropIds.sort()).toEqual(['dropTable.cipher_state', 'dropTable.orphan_table']);
   });
 
-  it('never drops a table declared by a sibling contract space, but still drops a truly unclaimed one', async () => {
+  it('never drops a table another space owns, but still drops a truly unclaimed one', async () => {
     const planner = createSqliteMigrationPlanner(stubLowerer);
 
+    // The aggregate declares `app_user` (this space) and `cipher_state` (a
+    // sibling); `orphan_table` is owned by nobody.
     const result = planner.plan({
       contract: buildContract(),
       schema: buildLiveSchema(),
@@ -116,7 +126,7 @@ describe('SQLite planner sibling-space scoping', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
-      siblingOwnedEntityNames: new Set(['cipher_state']),
+      ownership: ownsOnly('app_user', 'cipher_state'),
     });
 
     expect(result.kind).toBe('success');
@@ -126,7 +136,7 @@ describe('SQLite planner sibling-space scoping', () => {
     expect(dropIds).toEqual(['dropTable.orphan_table']);
   });
 
-  it('never drops anything additive-only, regardless of sibling ownership', async () => {
+  it('never drops anything additive-only, regardless of ownership', async () => {
     const planner = createSqliteMigrationPlanner(stubLowerer);
 
     const result = planner.plan({
@@ -141,6 +151,46 @@ describe('SQLite planner sibling-space scoping', () => {
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
     const ops = await Promise.all(result.plan.operations);
+    expect(ops.some((op) => op.id.startsWith('dropTable.'))).toBe(false);
+  });
+
+  it('drops an extra column on a table this space owns even when the oracle declares that table', async () => {
+    // Ownership is consulted only for whole extra TABLES. A drifted column on
+    // `app_user` (a table this space owns and the oracle declares) is this
+    // space's own drift and must still be dropped — the oracle's positive
+    // answer on the owning table must not suppress it, and the table itself is
+    // never dropped.
+    const liveWithDriftColumn = new SqlSchemaIR({
+      tables: {
+        app_user: {
+          name: 'app_user',
+          columns: {
+            id: { name: 'id', nativeType: 'integer', nullable: false },
+            legacy_col: { name: 'legacy_col', nativeType: 'text', nullable: true },
+          },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+    });
+
+    const planner = createSqliteMigrationPlanner(stubLowerer);
+    const result = planner.plan({
+      contract: buildContract(),
+      schema: liveWithDriftColumn,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+      ownership: ownsOnly('app_user'),
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+    const ops = await Promise.all(result.plan.operations);
+    const dropColumnIds = ops.filter((op) => op.id.startsWith('dropColumn.')).map((op) => op.id);
+    expect(dropColumnIds).toEqual(['dropColumn.app_user.legacy_col']);
     expect(ops.some((op) => op.id.startsWith('dropTable.'))).toBe(false);
   });
 });

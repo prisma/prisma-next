@@ -16,10 +16,11 @@ import type {
   MigrationPlanner,
   MigrationScaffoldContext,
   SchemaDiffIssue,
+  SchemaOwnership,
 } from '@prisma-next/framework-components/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildSqlitePlanDiff } from './diff-database-schema';
-import { coalesceSubtreeIssues, filterSiblingOwnedIssues, planIssues } from './issue-planner';
+import { coalesceSubtreeIssues, planIssues } from './issue-planner';
 import {
   type SqliteMigrationDestinationInfo,
   TypeScriptRenderableSqliteMigration,
@@ -85,11 +86,10 @@ export class SqliteMigrationPlanner
      */
     readonly spaceId: string;
     /**
-     * Bare entity names declared by some OTHER contract space in the
-     * aggregate (never this plan's own contract) — see
-     * {@link SqlMigrationPlannerPlanOptions.siblingOwnedEntityNames}.
+     * Ownership oracle over the contract-space composition — see
+     * {@link SqlMigrationPlannerPlanOptions.ownership}.
      */
-    readonly siblingOwnedEntityNames?: ReadonlySet<string>;
+    readonly ownership?: SchemaOwnership;
   }): SqlitePlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
@@ -192,15 +192,18 @@ export class SqliteMigrationPlanner
    *    issues are redundant once the table-level `CreateTable`/`DropTable`
    *    call already accounts for the whole subtree. Runs FIRST, over the
    *    complete diff: a sibling-owned extra table's column issues must
-   *    collapse into its one table-level issue before ownership scoping
-   *    runs, because a bare column node carries no table reference to
-   *    resolve ownership by — if coalescing ran after scoping filtered the
-   *    table-level issue away, the orphaned column issues would survive
-   *    and the planner would emit drops against a sibling space's table.
-   * 2. `filterSiblingOwnedIssues` — drops `not-expected` findings whose
-   *    owning table is declared by a sibling contract space
-   *    (`options.siblingOwnedEntityNames`, the orchestration's ownership
-   *    query for multi-space plans).
+   *    collapse into its one table-level issue before the ownership pass,
+   *    because a bare column node carries no table reference — if coalescing
+   *    ran after ownership dropped the table-level issue, the orphaned column
+   *    issues would survive and the planner would emit drops against a
+   *    sibling space's table.
+   * 2. Ownership — a live extra is only this plan's to drop when no contract
+   *    space owns it. The differ ran against THIS space's contract, so a
+   *    table a sibling owns surfaces here as `not-expected`; the planner asks
+   *    the ownership oracle (the passive aggregate) whether any space declares
+   *    it and, if so, leaves it alone. A table no space owns stays a genuine
+   *    extra. Ownership lives in the aggregate; the planner only asks. No
+   *    oracle (single-space) keeps every extra.
    * 3. Strict-mode extras gating — `not-expected` (extra table/column/
    *    constraint) issues are dropped entirely outside strict mode, mirroring
    *    the retired coordinate walk's `if (strict) { ...extra_* } }` guards:
@@ -224,8 +227,43 @@ export class SqliteMigrationPlanner
       frameworkComponents: options.frameworkComponents,
     });
     const coalesced = coalesceSubtreeIssues(rawIssues);
-    const scoped = filterSiblingOwnedIssues(coalesced, options.siblingOwnedEntityNames);
-    const issues = strict ? scoped : scoped.filter((issue) => issue.reason !== 'not-expected');
+    const owned = retainUnownedExtras(coalesced, options.ownership);
+    const issues = strict ? owned : owned.filter((issue) => issue.reason !== 'not-expected');
     return { expected, actual, issues };
   }
+}
+
+// SQLite's tree is flat (`SqlSchemaIR` root → tables), so a diff path is
+// `['database', tableName, …child]`; a whole-table extra sits at exactly this
+// depth, anything deeper is a child of a table.
+const SQLITE_TABLE_PATH_DEPTH = 2;
+
+/**
+ * Drops a `not-expected` issue when it is a whole extra TABLE that some
+ * contract space owns, asking the ownership oracle per node.
+ *
+ * The consultation applies ONLY to table-level extras — a live table this
+ * space's contract lacks. `declaresEntity` answers over the whole composition
+ * (self included), so a positive answer on such a table means another space
+ * owns it (a table this space owned would be in its expected tree, never an
+ * extra): leave it. A negative answer means no space owns it — a genuine
+ * orphan to drop.
+ *
+ * A DEEPER extra (an extra column/constraint on a table this space DOES own —
+ * only the child drifted, so the table is in the expected tree) is this
+ * space's own drift and is always kept for dropping; asking the oracle there
+ * would wrongly suppress it, because the owned table answers `true`. No oracle
+ * ⇒ every extra is kept (single-space plan).
+ */
+function retainUnownedExtras(
+  issues: readonly SchemaDiffIssue[],
+  ownership: SchemaOwnership | undefined,
+): readonly SchemaDiffIssue[] {
+  if (ownership === undefined) return issues;
+  return issues.filter((issue) => {
+    if (issue.reason !== 'not-expected') return true;
+    if (issue.path.length !== SQLITE_TABLE_PATH_DEPTH) return true;
+    const tableName = issue.path[1];
+    return tableName === undefined || !ownership.declaresEntity(tableName);
+  });
 }

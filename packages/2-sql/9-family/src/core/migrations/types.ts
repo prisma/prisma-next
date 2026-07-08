@@ -19,6 +19,7 @@ import type {
   OperationContext,
   OpFactoryCall,
   SchemaIssue,
+  SchemaOwnership,
   SchemaVerifier,
 } from '@prisma-next/framework-components/control';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
@@ -360,16 +361,15 @@ export interface SqlMigrationPlannerPlanOptions {
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   /**
-   * Bare entity names declared by some OTHER contract space in the
-   * aggregate (never this plan's own contract) — the orchestration's
-   * passive ownership query, precomputed once per space. The planner
-   * drops `not-expected` diff findings whose owning entity is in this
-   * set, so it never emits a destructive op against a sibling space's
-   * table; scoping logic lives entirely in the planner, which reads its
-   * own diff issues' node structure to resolve each finding's owning
-   * entity. Absent for single-space plans.
+   * Ownership oracle over the whole contract-space composition (the passive
+   * aggregate). The planner asks it, per live extra node, whether any space
+   * declares that entity: a sibling-owned node is left untouched, an unowned
+   * node is a genuine extra it may drop under a destructive policy. The
+   * planner holds no list of other spaces' names — ownership lives in the
+   * aggregate; it only asks. Absent for a single-space plan handed no
+   * aggregate. See {@link SchemaOwnership}.
    */
-  readonly siblingOwnedEntityNames?: ReadonlySet<string>;
+  readonly ownership?: SchemaOwnership;
 }
 
 export interface SqlMigrationPlanner<TTargetDetails> {

@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { SchemaOwnership } from '@prisma-next/framework-components/control';
 import type { MigrationGraph } from '../graph';
 import type { IntegrityQueryOptions, IntegrityViolation } from '../integrity-violation';
 import type { OnDiskMigrationPackage } from '../package';
@@ -94,20 +95,16 @@ export interface AggregateContractSpace {
  * - `declaresEntity(name)` / `declaringSpaces(name)`: ownership queries —
  *   does any contract space declare a storage entity with this bare name,
  *   and which spaces do? The verifier's unclaimed-elements pass asks these
- *   of the diff's extra findings; the passive aggregate answers, it runs
- *   no diff.
- * - `siblingOwnedEntityNames(spaceId)`: every bare entity name declared by
- *   some OTHER contract space (never `spaceId`'s own). The plan
- *   orchestration computes this once per space and hands it to the
- *   family planner so it can drop `not-expected` diff findings for
- *   entities a sibling space owns, without the planner running any
- *   ownership logic of its own.
+ *   of the diff's extra findings; the migration planner asks `declaresEntity`
+ *   per live extra node to decide whether some space owns it (the aggregate
+ *   satisfies the framework {@link SchemaOwnership} oracle). The passive
+ *   aggregate answers both; it runs no diff.
  * - `checkIntegrity()`: judges the loaded model and returns every
  *   violation (never bailing at the first). Config/contract-dependent
  *   checks run only when the matching {@link IntegrityQueryOptions} opt
  *   is set.
  */
-export interface ContractSpaceAggregate {
+export interface ContractSpaceAggregate extends SchemaOwnership {
   readonly targetId: string;
   readonly app: AggregateContractSpace;
   readonly extensions: readonly AggregateContractSpace[];
@@ -117,6 +114,5 @@ export interface ContractSpaceAggregate {
   spaces(): readonly AggregateContractSpace[];
   declaresEntity(entityName: string): boolean;
   declaringSpaces(entityName: string): readonly string[];
-  siblingOwnedEntityNames(spaceId: string): ReadonlySet<string>;
   checkIntegrity(opts?: IntegrityQueryOptions): readonly IntegrityViolation[];
 }

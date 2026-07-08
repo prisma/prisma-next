@@ -72,18 +72,20 @@ changes:
         - "deriveJsonSchema"
         - "derivePolymorphicJsonSchema"
       anyMatch: true
-  - id: sql-migration-planner-keep-diff-issue-to-sibling-owned-entity-names
+  - id: sql-migration-planner-keep-diff-issue-to-ownership-oracle
     summary: |
       `MigrationPlanner.plan()` (and the SQL family's `SqlMigrationPlannerPlanOptions`) drops the
       `keepDiffIssue` option — a caller-supplied `(issue: DiffIssue) => boolean` predicate the
       planner applied to its schema diff for multi-space ownership scoping. It is replaced by
-      `siblingOwnedEntityNames?: ReadonlySet<string>` — the bare entity names a sibling contract
-      space declares. If your extension calls `planner.plan(...)` directly with `keepDiffIssue`
-      (rather than going through the aggregate's `db init` / `db update` / `migrate` orchestration,
-      which computes and passes this for you), replace the predicate with the equivalent name set:
-      collect the bare entity names every OTHER contract space in your aggregate declares and pass
-      them as `siblingOwnedEntityNames`. The planner now resolves ownership scoping itself from its
-      own diff nodes; it no longer accepts an externally-supplied filter function.
+      `ownership?: SchemaOwnership` — an ownership oracle (`{ declaresEntity(entityName): boolean }`,
+      exported from `@prisma-next/framework-components/control`) that the `ContractSpaceAggregate`
+      satisfies. The planner asks it, per live extra node, whether any contract space declares that
+      entity: a node another space owns is left untouched, a node no space owns is a genuine extra it
+      may drop under a destructive policy. If your extension calls `planner.plan(...)` directly with
+      `keepDiffIssue` (rather than through the aggregate's `db init` / `db update` / `migrate`
+      orchestration, which passes the aggregate as the oracle for you), drop the predicate and pass
+      the aggregate (or any object implementing `SchemaOwnership`) as `ownership`. There is no
+      names-set and no filter function — ownership lives in the aggregate; the planner only asks.
     detection:
       glob: "**/*.{ts,mts,cts}"
       contains:

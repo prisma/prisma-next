@@ -361,6 +361,34 @@ export interface MigrationRunnerExecutionChecks {
 // ============================================================================
 
 /**
+ * Contract-space ownership query the planner consults while planning one
+ * space against a live database.
+ *
+ * A live schema node the planned space does not own surfaces from the diff
+ * as `not-expected` (an extra). Before treating such a node as this plan's
+ * to drop, the planner asks the ownership oracle whether *any* contract
+ * space in the composition declares it: a node another (sibling) space owns
+ * is not an orphan, so it is left untouched; a node no space owns is a
+ * genuine extra the planner may drop under a destructive policy. (A node the
+ * planned space itself owns is in its expected tree and never surfaces as an
+ * extra, so a positive answer always means a sibling.)
+ *
+ * The oracle is a real domain object — the passive
+ * {@link import('@prisma-next/migration-tools/aggregate').ContractSpaceAggregate},
+ * which answers this from its loaded contract spaces. The planner holds no
+ * list of other spaces' names and no ownership rules of its own; it only
+ * asks. Single-space plans (offline `migration plan`) pass an aggregate of
+ * one — the same path, no special-casing.
+ */
+export interface SchemaOwnership {
+  /**
+   * True when some contract space in the composition declares a storage
+   * entity with this bare name.
+   */
+  declaresEntity(entityName: string): boolean;
+}
+
+/**
  * Migration planner interface for planning schema changes.
  * This is the minimal interface that CLI commands use.
  *
@@ -408,16 +436,15 @@ export interface MigrationPlanner<
      */
     readonly spaceId: string;
     /**
-     * Bare entity names declared by some OTHER contract space in the
-     * aggregate (never this plan's own contract) — the orchestration's
-     * passive ownership query, precomputed once per space. The planner
-     * drops `not-expected` diff findings whose owning entity is in this
-     * set, so it never emits a destructive op against a sibling space's
-     * table; scoping logic lives entirely in the planner, which reads its
-     * own diff issues' node structure to resolve each finding's owning
-     * entity. Absent for single-space plans.
+     * Ownership oracle over the whole contract-space composition (the
+     * passive aggregate). The planner asks it, per live extra node, whether
+     * any space declares that entity: a sibling-owned node is left
+     * untouched, an unowned node is a genuine extra. The planner holds no
+     * list of other spaces' names — ownership lives in the aggregate; it
+     * only asks. Absent for a single-space plan handed no aggregate.
+     * See {@link SchemaOwnership}.
      */
-    readonly siblingOwnedEntityNames?: ReadonlySet<string>;
+    readonly ownership?: SchemaOwnership;
   }): MigrationPlannerResult;
 
   /**

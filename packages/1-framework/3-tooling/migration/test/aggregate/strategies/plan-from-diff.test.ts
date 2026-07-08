@@ -4,6 +4,7 @@ import type {
   MigrationOperationPolicy,
   MigrationPlanner,
   MigrationPlanWithAuthoringSurface,
+  SchemaOwnership,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -19,6 +20,8 @@ const POLICY: MigrationOperationPolicy = {
 
 const STUB_ADAPTER: ControlAdapterInstance<'sql', 'postgres'> =
   {} as unknown as ControlAdapterInstance<'sql', 'postgres'>;
+
+const STUB_OWNERSHIP: SchemaOwnership = { declaresEntity: () => false };
 
 function makeSpace(spaceId: string, tables: Record<string, unknown>): AggregateContractSpace {
   return makeAggregateContractSpace({
@@ -45,13 +48,13 @@ function makeStubPlan(targetId: string): MigrationPlanWithAuthoringSurface {
 }
 
 describe('planFromDiff', () => {
-  it('passes the full schema and the sibling-owned entity names straight through to the planner', async () => {
+  it('passes the full schema and the ownership oracle straight through to the planner', async () => {
     let observedSchema: unknown;
-    let observedSiblingOwnedEntityNames: ReadonlySet<string> | undefined;
+    let observedOwnership: SchemaOwnership | undefined;
     const stubPlanner: MigrationPlanner<'sql', 'postgres'> = {
-      plan: ({ schema, siblingOwnedEntityNames }) => {
+      plan: ({ schema, ownership }) => {
         observedSchema = schema;
-        observedSiblingOwnedEntityNames = siblingOwnedEntityNames;
+        observedOwnership = ownership;
         return { kind: 'success', plan: makeStubPlan('placeholder') };
       },
       emptyMigration: () => {
@@ -80,11 +83,15 @@ describe('planFromDiff', () => {
       },
     };
 
+    // The aggregate satisfies `SchemaOwnership`; the strategy forwards it
+    // verbatim. Here `cipher_state` is owned by some (sibling) space.
+    const ownership: SchemaOwnership = { declaresEntity: (name) => name === 'cipher_state' };
+
     const outcome = await planFromDiff({
       aggregateTargetId: 'postgres',
       currentMarker: null,
       space: appSpace,
-      siblingOwnedEntityNames: new Set(['cipher_state']),
+      ownership,
       schemaIntrospection: liveSchema,
       adapter: STUB_ADAPTER,
       migrations: stubMigrations,
@@ -115,10 +122,9 @@ describe('planFromDiff', () => {
       'orphan_table',
     ]);
 
-    // … and the aggregate's ownership set verbatim. The planner itself
-    // decides how to scope its diff by it; this strategy holds no
-    // ownership logic.
-    expect(observedSiblingOwnedEntityNames).toEqual(new Set(['cipher_state']));
+    // … and the same ownership oracle object. The planner asks it who owns
+    // each extra; this strategy holds no ownership logic of its own.
+    expect(observedOwnership).toBe(ownership);
   });
 
   it('forwards planner failures verbatim', async () => {
@@ -147,7 +153,7 @@ describe('planFromDiff', () => {
       aggregateTargetId: 'postgres',
       currentMarker: null,
       space: makeSpace('app', {}),
-      siblingOwnedEntityNames: new Set(),
+      ownership: STUB_OWNERSHIP,
       schemaIntrospection: { tables: {} },
       adapter: STUB_ADAPTER,
       migrations: stubMigrations,

@@ -145,47 +145,6 @@ function isStrictDescendantPath(path: readonly string[], ancestor: readonly stri
 }
 
 // ============================================================================
-// Sibling-space scoping (the aggregate orchestration's ownership, resolved here)
-// ============================================================================
-
-/**
- * Drops `not-expected` (extra) issues whose owning table is declared by a
- * sibling contract space, so the planner never emits a destructive op
- * against another space's table. `siblingOwnedEntityNames` is the
- * aggregate's ownership query, precomputed once per space and handed
- * straight through `plan()`; the planner holds no ownership logic beyond
- * resolving which table an issue belongs to.
- *
- * SQLite's tree is flat (`SqlSchemaIR` root → tables directly), so a
- * table-level issue's own id sits at `path[1]`; every issue for a node
- * under a table (column, constraint, default, …) carries the same table
- * id at the same path position, so one path read covers both cases.
- * Root-level issues have no `path[1]` and are never sibling-scoped.
- */
-function keepIssueOutsideSiblingSpaces(
-  issue: SchemaDiffIssue,
-  siblingOwnedEntityNames: ReadonlySet<string>,
-): boolean {
-  if (issue.reason !== 'not-expected') return true;
-  const tableName = issue.path[1];
-  return tableName === undefined || !siblingOwnedEntityNames.has(tableName);
-}
-
-/**
- * Filters `not-expected` issues to those NOT owned by a sibling contract
- * space. A no-op (returns `issues` unchanged) when
- * `siblingOwnedEntityNames` is absent or empty — single-space plans never
- * pay for the filter.
- */
-export function filterSiblingOwnedIssues(
-  issues: readonly SchemaDiffIssue[],
-  siblingOwnedEntityNames: ReadonlySet<string> | undefined,
-): readonly SchemaDiffIssue[] {
-  if (siblingOwnedEntityNames === undefined || siblingOwnedEntityNames.size === 0) return issues;
-  return issues.filter((issue) => keepIssueOutsideSiblingSpaces(issue, siblingOwnedEntityNames));
-}
-
-// ============================================================================
 // Node helpers
 // ============================================================================
 

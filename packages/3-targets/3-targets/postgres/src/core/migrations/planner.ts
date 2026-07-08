@@ -19,6 +19,7 @@ import type {
   MigrationPlanWithAuthoringSurface,
   MigrationScaffoldContext,
   SchemaDiffIssue,
+  SchemaOwnership,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -35,7 +36,7 @@ import {
   resolvePostgresNodeIssueCreationFactoryName,
 } from './control-policy';
 import { buildPostgresPlanDiff } from './diff-database-schema';
-import { coalesceSubtreeIssues, filterSiblingOwnedIssues, planIssues } from './issue-planner';
+import { coalesceSubtreeIssues, planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import {
   CreatePostgresRlsPolicyCall,
@@ -131,11 +132,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
      */
     readonly spaceId: string;
     /**
-     * Bare entity names declared by some OTHER contract space in the
-     * aggregate (never this plan's own contract) — see
-     * {@link SqlMigrationPlannerPlanOptions.siblingOwnedEntityNames}.
+     * Ownership oracle over the contract-space composition — see
+     * {@link SqlMigrationPlannerPlanOptions.ownership}.
      */
-    readonly siblingOwnedEntityNames?: ReadonlySet<string>;
+    readonly ownership?: SchemaOwnership;
   }): PostgresPlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
@@ -169,10 +169,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // become structural DDL via `planIssues`, policy findings become RLS ops
     // via `planPostgresSchemaDiff`. Verify runs its own full-tree node diff
     // (`diffSchemaForVerdict`) over the same schema and rejects on a
-    // surviving failure. `siblingOwnedEntityNames` (the orchestration's
-    // multi-space ownership query) is resolved to a filter here — the
-    // planner reads its own diff issues' node structure, no scoping logic
-    // lives outside it.
+    // surviving failure.
     PostgresDatabaseSchemaNode.assert(options.schema);
     const { issues: rawIssues } = buildPostgresPlanDiff({
       contract: options.contract,
@@ -184,19 +181,28 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
     // The generic differ is total and un-gated: strict-mode extras filtering
     // (dropping `not-expected` findings outside strict mode, mirroring the
-    // retired coordinate walk's `if (strict) { ...extra_* } }` guards) and
+    // retired coordinate walk's `if (strict) { ...extra_* } }` guards),
     // subtree coalescing (a missing/extra table also emits an issue for
     // every child under it — redundant once the table-level Create/Drop call
-    // already accounts for the whole subtree) are both post-diff planner
-    // steps. Coalescing MUST run before the sibling-space filter: a bare
-    // column node carries no table reference for ownership scoping to
-    // resolve by.
+    // already accounts for the whole subtree), and ownership are all post-diff
+    // planner steps.
+    //
+    // Ownership: a live extra is only this plan's to drop when no contract
+    // space owns it. The differ ran against THIS space's contract, so a table
+    // a sibling space owns surfaces here as `not-expected`; the planner asks
+    // the ownership oracle (the passive aggregate) whether any space declares
+    // it and, if so, leaves it alone — it is a sibling's table, not an orphan.
+    // A table no space owns stays a genuine extra to drop under a destructive
+    // policy. Ownership lives in the aggregate; the planner only asks. Absent
+    // oracle (single-space, none handed) keeps every extra. Coalescing MUST
+    // run before this so a sibling-owned table's child issues have already
+    // collapsed into the one table-level issue that carries the table name.
     const strict =
       options.policy.allowedOperationClasses.includes('widening') ||
       options.policy.allowedOperationClasses.includes('destructive');
     const coalesced = coalesceSubtreeIssues(relationalDiffIssues);
-    const scoped = filterSiblingOwnedIssues(coalesced, options.siblingOwnedEntityNames);
-    const gated = strict ? scoped : scoped.filter((issue) => issue.reason !== 'not-expected');
+    const owned = retainUnownedExtras(coalesced, options.ownership);
+    const gated = strict ? owned : owned.filter((issue) => issue.reason !== 'not-expected');
 
     // Namespace presence (`CREATE SCHEMA`) is a planner-only op-generation
     // concern stitched in here rather than inside the shared diff — verify
@@ -394,6 +400,42 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 function isPolicyDiffIssue(issue: SchemaDiffIssue<SqlSchemaDiffNode>): boolean {
   const node = issue.expected ?? issue.actual;
   return node !== undefined && PostgresPolicySchemaNode.is(node);
+}
+
+// A Postgres diff path is `['database', ddlSchema, tableName, …child]`, so a
+// whole-table extra sits at exactly this depth; anything deeper is a child of
+// a table.
+const POSTGRES_TABLE_PATH_DEPTH = 3;
+
+/**
+ * Drops a `not-expected` issue when it is a whole extra TABLE that some
+ * contract space owns, asking the ownership oracle per node.
+ *
+ * The consultation applies ONLY to table-level extras — a live table this
+ * space's contract lacks. `declaresEntity` answers over the whole composition
+ * (self included), so a positive answer on such a table means another space
+ * owns it (a table this space owned would be in its expected tree, never an
+ * extra): leave it. A negative answer means no space owns it — a genuine
+ * orphan to drop.
+ *
+ * A DEEPER extra (an extra column/constraint on a table this space DOES own —
+ * only the child drifted, so the table is in the expected tree) is this
+ * space's own drift and is always kept for dropping; asking the oracle there
+ * would wrongly suppress it, because the owned table answers `true`. Shallower
+ * issues (namespace/root) are never ownership-scoped here. No oracle ⇒ every
+ * extra is kept (single-space plan).
+ */
+function retainUnownedExtras(
+  issues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
+  ownership: SchemaOwnership | undefined,
+): readonly SchemaDiffIssue<SqlSchemaDiffNode>[] {
+  if (ownership === undefined) return issues;
+  return issues.filter((issue) => {
+    if (issue.reason !== 'not-expected') return true;
+    if (issue.path.length !== POSTGRES_TABLE_PATH_DEPTH) return true;
+    const tableName = issue.path[2];
+    return tableName === undefined || !ownership.declaresEntity(tableName);
+  });
 }
 
 /**

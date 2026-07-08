@@ -61,7 +61,6 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
   ];
 
   for (const space of orderedSpaces) {
-    const siblingOwnedEntityNames = aggregate.siblingOwnedEntityNames(space.spaceId);
     const currentMarker = currentDBState.markersBySpaceId.get(space.spaceId) ?? null;
     const headRef = requireHeadRef(space);
 
@@ -82,7 +81,7 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
         aggregateTargetId: aggregate.targetId,
         currentMarker,
         space,
-        siblingOwnedEntityNames,
+        ownership: aggregate,
         schemaIntrospection: currentDBState.schemaIntrospection,
         adapter: input.adapter,
         migrations: input.migrations,
