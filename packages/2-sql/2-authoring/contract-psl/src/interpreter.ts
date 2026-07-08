@@ -15,6 +15,7 @@ import type {
   AuthoringContributions,
   AuthoringEntityContext,
   AuthoringEntityTypeDescriptor,
+  AuthoringEntityTypeNamespace,
   AuthoringPslBlockDescriptorNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
@@ -296,7 +297,7 @@ function buildEntityTypesByDiscriminator(
   const namespace = contributions?.entityTypes;
   if (namespace === undefined) return result;
 
-  const walk = (node: object): void => {
+  const walk = (node: AuthoringEntityTypeNamespace): void => {
     for (const value of Object.values(node)) {
       if (isAuthoringEntityTypeDescriptor(value)) {
         result.set(value.discriminator, value);
@@ -1941,13 +1942,9 @@ export function interpretPslDocumentToSqlContract(
     }
   }
 
-  // No early diagnostics checkpoint here (unlike after the field-resolution
-  // loop below): this pass runs early specifically so its output
-  // (`namespaceExtensionEntities`) is available to field resolution, and an
-  // immediate return would also discard any diagnostics already present from
-  // symbol-table seeding (`input.seedDiagnostics`) without ever reaching
-  // field resolution to accumulate its own. The first real checkpoint after
-  // model/field resolution below catches failures from this pass too.
+  // No checkpoint here: this pass runs early so `namespaceExtensionEntities` is
+  // ready for field resolution. The checkpoint after field resolution catches
+  // this pass's failures too.
 
   const namedTypeSymbols: readonly NamedTypeSymbol[] = [
     ...Object.values(topLevel.scalars),
@@ -2112,19 +2109,10 @@ export function interpretPslDocumentToSqlContract(
     });
   }
 
-  // Wrap createNamespace to merge lowered extension-block entities into each
-  // namespace's entries before handing off to the factory. The entities map
-  // keys are discriminator strings — equal to the entries key by the one-string
-  // rule — so they merge directly into entries without translation.
-  //
-  // `valueSet` is merged specifically (rather than let `entities` overwrite
-  // it wholesale): `nsInput.entries.valueSet` may already carry PSL `enum`
-  // block-derived value-sets (built in `buildSqlContractFromDefinition` from
-  // `definition.enums`, independently of this pass), and `entities.valueSet`
-  // may carry `deriveValueSet`-hook-derived ones — a namespace authoring both
-  // an `enum` and a value-set-deriving extension entity needs both to survive.
-  // Name collisions between the two are already rejected above, so this merge
-  // only ever unions distinct names.
+  // Merge lowered extension-block entities into each namespace's entries.
+  // `valueSet` is unioned rather than overwritten: a namespace may derive
+  // value-sets from both a PSL `enum` block and an extension entity, and both
+  // must survive (name collisions are already rejected above).
   const { createNamespace } = input;
   const createNamespaceWithExtensions = (nsInput: SqlNamespaceInput) => {
     const entities = namespaceExtensionEntities.get(nsInput.id);

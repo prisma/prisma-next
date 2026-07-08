@@ -7,8 +7,11 @@ import type {
 import type {
   AuthoringContributions,
   AuthoringEntityTypeDescriptor,
+  AuthoringEntityTypeNamespace,
+  AuthoringFieldNamespace,
   AuthoringFieldPresetDescriptor,
   AuthoringTypeConstructorDescriptor,
+  AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
 import {
   hasRegisteredFieldNamespace,
@@ -37,7 +40,6 @@ import {
   NumberLiteralExprAst,
   StringLiteralExprAst,
 } from '@prisma-next/psl-parser/syntax';
-import { blindCast } from '@prisma-next/utils/casts';
 
 import {
   lowerDefaultFunctionWithRegistry,
@@ -84,18 +86,19 @@ export function getAuthoringTypeConstructor(
   contributions: AuthoringContributions | undefined,
   path: readonly string[],
 ): AuthoringTypeConstructorDescriptor | undefined {
-  let current: unknown = contributions?.type;
+  let current: AuthoringTypeConstructorDescriptor | AuthoringTypeNamespace | undefined =
+    contributions?.type;
 
   for (const segment of path) {
-    if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+    if (typeof current !== 'object' || current === null || 'kind' in current) {
       return undefined;
     }
-    current = blindCast<Record<string, unknown>, 'narrowed by preceding typeof/null/array guards'>(
-      current,
-    )[segment];
+    current = current[segment];
   }
 
-  return isAuthoringTypeConstructorDescriptor(current) ? current : undefined;
+  return current !== undefined && isAuthoringTypeConstructorDescriptor(current)
+    ? current
+    : undefined;
 }
 
 /**
@@ -113,18 +116,17 @@ export function getAuthoringEntity(
   contributions: AuthoringContributions | undefined,
   path: readonly string[],
 ): AuthoringEntityTypeDescriptor | undefined {
-  let current: unknown = contributions?.entityTypes;
+  let current: AuthoringEntityTypeDescriptor | AuthoringEntityTypeNamespace | undefined =
+    contributions?.entityTypes;
 
   for (const segment of path) {
-    if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+    if (typeof current !== 'object' || current === null || 'kind' in current) {
       return undefined;
     }
-    current = blindCast<Record<string, unknown>, 'narrowed by preceding typeof/null/array guards'>(
-      current,
-    )[segment];
+    current = current[segment];
   }
 
-  return isAuthoringEntityTypeDescriptor(current) ? current : undefined;
+  return current !== undefined && isAuthoringEntityTypeDescriptor(current) ? current : undefined;
 }
 
 /**
@@ -136,18 +138,17 @@ export function getAuthoringFieldPreset(
   contributions: AuthoringContributions | undefined,
   path: readonly string[],
 ): AuthoringFieldPresetDescriptor | undefined {
-  let current: unknown = contributions?.field;
+  let current: AuthoringFieldPresetDescriptor | AuthoringFieldNamespace | undefined =
+    contributions?.field;
 
   for (const segment of path) {
-    if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+    if (typeof current !== 'object' || current === null || 'kind' in current) {
       return undefined;
     }
-    current = blindCast<Record<string, unknown>, 'narrowed by preceding typeof/null/array guards'>(
-      current,
-    )[segment];
+    current = current[segment];
   }
 
-  return isAuthoringFieldPresetDescriptor(current) ? current : undefined;
+  return current !== undefined && isAuthoringFieldPresetDescriptor(current) ? current : undefined;
 }
 
 /**

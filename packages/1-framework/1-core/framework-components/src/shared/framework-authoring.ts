@@ -395,62 +395,27 @@ function isAuthoringTemplateRecord(value: unknown): value is Record<string, unkn
 }
 
 export function isAuthoringTypeConstructorDescriptor(
-  value: unknown,
+  value: AuthoringTypeConstructorDescriptor | AuthoringTypeNamespace,
 ): value is AuthoringTypeConstructorDescriptor {
-  if (typeof value !== 'object' || value === null) return false;
-  if (!('kind' in value) || value.kind !== 'typeConstructor') return false;
-  if (!('output' in value)) return false;
-  const output = value.output;
-  return typeof output === 'object' && output !== null;
+  return 'kind' in value && value.kind === 'typeConstructor';
 }
 
 export function isAuthoringFieldPresetDescriptor(
-  value: unknown,
+  value: AuthoringFieldPresetDescriptor | AuthoringFieldNamespace,
 ): value is AuthoringFieldPresetDescriptor {
-  if (typeof value !== 'object' || value === null) return false;
-  if (!('kind' in value) || value.kind !== 'fieldPreset') return false;
-  if (!('output' in value)) return false;
-  const output = value.output;
-  return typeof output === 'object' && output !== null;
+  return 'kind' in value && value.kind === 'fieldPreset';
 }
 
 export function isAuthoringEntityTypeDescriptor(
-  value: unknown,
+  value: AuthoringEntityTypeDescriptor | AuthoringEntityTypeNamespace,
 ): value is AuthoringEntityTypeDescriptor {
-  if (typeof value !== 'object' || value === null) return false;
-  if (!('kind' in value) || value.kind !== 'entity') return false;
-  if (!('discriminator' in value) || typeof value.discriminator !== 'string') return false;
-  if (value.discriminator.length === 0) return false;
-  if (!('output' in value)) return false;
-  const output = value.output;
-  if (typeof output !== 'object' || output === null) return false;
-  const factory = 'factory' in output ? output.factory : undefined;
-  const template = 'template' in output ? output.template : undefined;
-  return typeof factory === 'function' || template !== undefined;
+  return 'kind' in value && value.kind === 'entity';
 }
 
 export function isAuthoringPslBlockDescriptor(
-  value: unknown,
+  value: AuthoringPslBlockDescriptor | AuthoringPslBlockDescriptorNamespace,
 ): value is AuthoringPslBlockDescriptor {
-  if (typeof value !== 'object' || value === null) return false;
-  if (!('kind' in value) || value.kind !== 'pslBlock') return false;
-  if (!('keyword' in value) || typeof value.keyword !== 'string' || value.keyword.length === 0) {
-    return false;
-  }
-  if (
-    !('discriminator' in value) ||
-    typeof value.discriminator !== 'string' ||
-    value.discriminator.length === 0
-  ) {
-    return false;
-  }
-  if (!('name' in value)) return false;
-  const name = value.name;
-  if (typeof name !== 'object' || name === null) return false;
-  if (!('required' in name) || typeof name.required !== 'boolean') return false;
-  if (!('parameters' in value)) return false;
-  const parameters = value.parameters;
-  return typeof parameters === 'object' && parameters !== null && !Array.isArray(parameters);
+  return 'kind' in value && value.kind === 'pslBlock';
 }
 
 /**
@@ -468,7 +433,8 @@ export function hasRegisteredFieldNamespace(
   if (contributions?.field === undefined || !Object.hasOwn(contributions.field, namespace)) {
     return false;
   }
-  return !isAuthoringFieldPresetDescriptor(contributions.field[namespace]);
+  const value = contributions.field[namespace];
+  return value !== undefined && !isAuthoringFieldPresetDescriptor(value);
 }
 
 function isCopyableNamespaceObject(value: unknown): value is Record<string, unknown> {
@@ -477,15 +443,76 @@ function isCopyableNamespaceObject(value: unknown): value is Record<string, unkn
   return proto === Object.prototype || proto === null;
 }
 
+/**
+ * Deep structural check run only at the composition boundary (the merge and
+ * collect walkers) to classify a raw namespace-tree node as a leaf descriptor.
+ * A node counts as a leaf iff its `kind` matches `descriptorKind` AND it
+ * carries that kind's required fields.
+ *
+ * This is boundary validation over `unknown`, NOT a type-predicate: the four
+ * exported `isAuthoring*Descriptor` predicates deliberately narrow on `kind`
+ * alone and trust the static types. The walkers, by contrast, also receive
+ * type-bypassing packs (`as unknown as never` in tests, untyped JS at runtime)
+ * whose descriptor-shaped-but-incomplete nodes must be rejected rather than
+ * silently treated as sub-namespaces — so the well-formedness check lives here.
+ */
+function isWellFormedDescriptor(value: unknown, descriptorKind: string): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('kind' in value) || value.kind !== descriptorKind) return false;
+  switch (descriptorKind) {
+    case 'typeConstructor':
+    case 'fieldPreset': {
+      if (!('output' in value)) return false;
+      const output = value.output;
+      return typeof output === 'object' && output !== null;
+    }
+    case 'entity': {
+      if (!('discriminator' in value) || typeof value.discriminator !== 'string') return false;
+      if (value.discriminator.length === 0) return false;
+      if (!('output' in value)) return false;
+      const output = value.output;
+      if (typeof output !== 'object' || output === null) return false;
+      const factory = 'factory' in output ? output.factory : undefined;
+      const template = 'template' in output ? output.template : undefined;
+      return typeof factory === 'function' || template !== undefined;
+    }
+    case 'pslBlock': {
+      if (
+        !('keyword' in value) ||
+        typeof value.keyword !== 'string' ||
+        value.keyword.length === 0
+      ) {
+        return false;
+      }
+      if (
+        !('discriminator' in value) ||
+        typeof value.discriminator !== 'string' ||
+        value.discriminator.length === 0
+      ) {
+        return false;
+      }
+      if (!('name' in value)) return false;
+      const name = value.name;
+      if (typeof name !== 'object' || name === null) return false;
+      if (!('required' in name) || typeof name.required !== 'boolean') return false;
+      if (!('parameters' in value)) return false;
+      const parameters = value.parameters;
+      return typeof parameters === 'object' && parameters !== null && !Array.isArray(parameters);
+    }
+    default:
+      return false;
+  }
+}
+
 function deepCopyNamespace(
   source: Record<string, unknown>,
-  isLeafDescriptor: (value: unknown) => boolean,
+  descriptorKind: string,
 ): Record<string, unknown> {
   const copy: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(source)) {
     copy[key] =
-      isCopyableNamespaceObject(value) && !isLeafDescriptor(value)
-        ? deepCopyNamespace(value, isLeafDescriptor)
+      isCopyableNamespaceObject(value) && !isWellFormedDescriptor(value, descriptorKind)
+        ? deepCopyNamespace(value, descriptorKind)
         : value;
   }
   return copy;
@@ -493,9 +520,10 @@ function deepCopyNamespace(
 
 /**
  * Merges `source` into `target` recursively at the descriptor-namespace
- * level. `isLeafDescriptor` decides which values are descriptors (terminal
- * merge points; same-path registrations across components are reported
- * as duplicates) versus sub-namespaces (recursion targets).
+ * level. `descriptorKind` is the `kind` value ('typeConstructor',
+ * 'fieldPreset', 'entity', or 'pslBlock') that identifies a descriptor
+ * (terminal merge point; same-path registrations across components are
+ * reported as duplicates) as opposed to a sub-namespace (recursion target).
  *
  * Path segments are validated against prototype-pollution names
  * (`__proto__`, `constructor`, `prototype`). A value that is neither a
@@ -513,7 +541,7 @@ export function mergeAuthoringNamespaces(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
   path: readonly string[],
-  isLeafDescriptor: (value: unknown) => boolean,
+  descriptorKind: string,
   label: string,
 ): void {
   const assertSafePath = (currentPath: readonly string[]) => {
@@ -539,14 +567,15 @@ export function mergeAuthoringNamespaces(
       // passed by reference — leaves are identity values; class instances carry
       // prototype getters that spread would destroy.
       target[key] =
-        isCopyableNamespaceObject(sourceValue) && !isLeafDescriptor(sourceValue)
-          ? deepCopyNamespace(sourceValue, isLeafDescriptor)
+        isCopyableNamespaceObject(sourceValue) &&
+        !isWellFormedDescriptor(sourceValue, descriptorKind)
+          ? deepCopyNamespace(sourceValue, descriptorKind)
           : sourceValue;
       continue;
     }
 
-    const existingIsLeaf = isLeafDescriptor(existingValue);
-    const sourceIsLeaf = isLeafDescriptor(sourceValue);
+    const existingIsLeaf = isWellFormedDescriptor(existingValue, descriptorKind);
+    const sourceIsLeaf = isWellFormedDescriptor(sourceValue, descriptorKind);
 
     if (existingIsLeaf || sourceIsLeaf) {
       throw new Error(
@@ -560,13 +589,22 @@ export function mergeAuthoringNamespaces(
       );
     }
 
-    mergeAuthoringNamespaces(existingValue, sourceValue, currentPath, isLeafDescriptor, label);
+    mergeAuthoringNamespaces(existingValue, sourceValue, currentPath, descriptorKind, label);
   }
 }
 
-function collectDescriptorPaths(
-  namespace: Readonly<Record<string, unknown>>,
-  isLeaf: (value: unknown) => boolean,
+/**
+ * Shape shared by every `Authoring*Namespace` type: a tree whose leaves are
+ * descriptors of type `D` and whose internal nodes are sub-namespaces of the
+ * same shape. `collectDescriptorPaths` and `collectDescriptorEntries` are
+ * generic over `D` so they can walk any of the four descriptor families with
+ * a properly narrowed `isLeaf` predicate instead of an `unknown`-typed one.
+ */
+type AuthoringNamespaceTree<D> = { readonly [name: string]: D | AuthoringNamespaceTree<D> };
+
+function collectDescriptorPaths<D>(
+  namespace: AuthoringNamespaceTree<D>,
+  isLeaf: (value: D | AuthoringNamespaceTree<D>) => value is D,
   path: readonly string[] = [],
 ): string[] {
   const paths: string[] = [];
@@ -577,9 +615,7 @@ function collectDescriptorPaths(
       continue;
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      paths.push(
-        ...collectDescriptorPaths(value as Readonly<Record<string, unknown>>, isLeaf, currentPath),
-      );
+      paths.push(...collectDescriptorPaths(value, isLeaf, currentPath));
     }
   }
   return paths;
@@ -590,9 +626,10 @@ interface DescriptorEntry {
   readonly discriminator: string;
 }
 
-function collectDescriptorEntries(
-  namespace: Readonly<Record<string, unknown>>,
-  isLeaf: (value: unknown) => boolean,
+function collectDescriptorEntries<D extends { readonly discriminator: string }>(
+  namespace: AuthoringNamespaceTree<D>,
+  isLeaf: (value: D | AuthoringNamespaceTree<D>) => value is D,
+  descriptorKind: string,
   label: string,
   path: readonly string[] = [],
 ): DescriptorEntry[] {
@@ -600,13 +637,16 @@ function collectDescriptorEntries(
   for (const [key, value] of Object.entries(namespace)) {
     const currentPath = [...path, key];
     if (isLeaf(value)) {
-      const record = blindCast<
-        Record<string, unknown>,
-        'discriminator extraction from a leaf already validated by isLeaf'
-      >(value);
-      const discriminator = record['discriminator'];
-      if (typeof discriminator === 'string' && discriminator.length > 0) {
-        entries.push({ path: currentPath.join('.'), discriminator });
+      // `isLeaf` narrows on `kind` alone; a type-bypassing pack can carry the
+      // right `kind` while missing the rest of the descriptor shape. Reject
+      // that here so a half-built contribution can't pass validation.
+      if (!isWellFormedDescriptor(value, descriptorKind)) {
+        throw new Error(
+          `Malformed authoring ${label} contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/keyword/discriminator) but does not satisfy the ${label} descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+        );
+      }
+      if (value.discriminator.length > 0) {
+        entries.push({ path: currentPath.join('.'), discriminator: value.discriminator });
       }
       continue;
     }
@@ -616,9 +656,9 @@ function collectDescriptorEntries(
         'walker inspects a non-leaf value for descriptor-shaped keys before recursing'
       >(value);
       // A value carrying descriptor-shaped keys (`kind`/`keyword`/`discriminator`)
-      // but failing `isAuthoringPslBlockDescriptor` (e.g. missing `parameters`) is
-      // a malformed declarative descriptor. Descending into it as a sub-namespace
-      // would silently skip it, so a half-built contribution would pass validation.
+      // but lacking a matching `kind` (so `isLeaf` rejected it) is a malformed
+      // declarative descriptor. Descending into it as a sub-namespace would
+      // silently skip it, so a half-built contribution would pass validation.
       // Reject it at load time instead, naming the path and what's wrong.
       //
       // A valid sub-namespace whose key happens to be named `kind`, `keyword`, or
@@ -640,7 +680,7 @@ function collectDescriptorEntries(
           );
         }
       }
-      entries.push(...collectDescriptorEntries(record, isLeaf, label, currentPath));
+      entries.push(...collectDescriptorEntries(value, isLeaf, descriptorKind, label, currentPath));
     }
   }
   return entries;
@@ -666,13 +706,20 @@ function assertUniqueDiscriminators(entries: readonly DescriptorEntry[], label: 
 }
 
 function collectPslBlockDescriptorEntries(
-  namespace: Readonly<Record<string, unknown>>,
+  namespace: AuthoringPslBlockDescriptorNamespace,
   path: readonly string[] = [],
 ): DescriptorEntry[] {
   const entries: DescriptorEntry[] = [];
   for (const [key, value] of Object.entries(namespace)) {
     const currentPath = [...path, key];
     if (isAuthoringPslBlockDescriptor(value)) {
+      // `isAuthoringPslBlockDescriptor` narrows on `kind` alone; reject a
+      // `kind: 'pslBlock'` value that is missing the rest of the shape.
+      if (!isWellFormedDescriptor(value, 'pslBlock')) {
+        throw new Error(
+          `Malformed authoring pslBlock contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/keyword/discriminator) but does not satisfy the pslBlock descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+        );
+      }
       entries.push({
         path: currentPath.join('.'),
         discriminator: value.discriminator,
@@ -692,7 +739,7 @@ function collectPslBlockDescriptorEntries(
           `Malformed authoring pslBlock contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/keyword/discriminator) but does not satisfy the pslBlock descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
         );
       }
-      entries.push(...collectPslBlockDescriptorEntries(record, currentPath));
+      entries.push(...collectPslBlockDescriptorEntries(value, currentPath));
     }
   }
   return entries;
@@ -711,6 +758,7 @@ function assertPslBlocksHaveFactories(
   const entityEntries = collectDescriptorEntries(
     entityTypeNamespace,
     isAuthoringEntityTypeDescriptor,
+    'entity',
     'entityType',
   );
 
@@ -743,20 +791,11 @@ export function assertNoCrossRegistryCollisions(
   const entityPaths = new Set(
     collectDescriptorPaths(entityTypeNamespace, isAuthoringEntityTypeDescriptor),
   );
-  // Within-registry duplicate detection is handled upstream by the merge
-  // walker (`mergeAuthoringNamespaces` in control-stack.ts and
-  // `mergeHelperNamespaces` in composed-authoring-helpers.ts), which throws
-  // on same-path registrations within any single registry before this check
-  // runs. This function only handles the cross-registry case.
-  //
-  // Cross-registry collisions are checked among `type` / `field` /
-  // `entityTypes` only — these are user-facing helper paths that PSL must
-  // resolve unambiguously. `pslBlockDescriptors` is an internal framework
-  // index consumed by parser and printer dispatch, not a user-facing helper
-  // path; the natural authoring pattern is the same path key in
-  // `entityTypes` and `pslBlockDescriptors` for a single contribution. The
-  // block→factory link is enforced by `assertPslBlocksHaveFactories` via the
-  // discriminator string, not by path.
+  // Within-registry duplicates are caught upstream by the merge walkers; this
+  // checks only cross-registry collisions, and only among the user-facing
+  // `type`/`field`/`entityTypes` paths. `pslBlockDescriptors` is an internal
+  // index — its block→factory link is checked by discriminator in
+  // `assertPslBlocksHaveFactories`, not by path.
   const ambiguityHint =
     'Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.';
   for (const fieldPath of fieldPaths) {

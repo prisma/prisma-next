@@ -42,13 +42,7 @@ function collectBlockDescriptors(
       continue;
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      collectBlockDescriptors(
-        blindCast<
-          AuthoringPslBlockDescriptorNamespace,
-          'recursive descent into a sub-namespace whose leaves are still walked by isAuthoringPslBlockDescriptor'
-        >(value),
-        out,
-      );
+      collectBlockDescriptors(value, out);
     }
   }
 }

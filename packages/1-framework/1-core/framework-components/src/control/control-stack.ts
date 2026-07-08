@@ -14,10 +14,6 @@ import type {
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
-  isAuthoringEntityTypeDescriptor,
-  isAuthoringFieldPresetDescriptor,
-  isAuthoringPslBlockDescriptor,
-  isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
@@ -169,29 +165,17 @@ export function assembleAuthoringContributions(
 
   for (const descriptor of descriptors) {
     if (descriptor.authoring?.field) {
-      mergeAuthoringNamespaces(
-        field,
-        descriptor.authoring.field,
-        [],
-        isAuthoringFieldPresetDescriptor,
-        'field',
-      );
+      mergeAuthoringNamespaces(field, descriptor.authoring.field, [], 'fieldPreset', 'field');
     }
     if (descriptor.authoring?.type) {
-      mergeAuthoringNamespaces(
-        type,
-        descriptor.authoring.type,
-        [],
-        isAuthoringTypeConstructorDescriptor,
-        'type',
-      );
+      mergeAuthoringNamespaces(type, descriptor.authoring.type, [], 'typeConstructor', 'type');
     }
     if (descriptor.authoring?.entityTypes) {
       mergeAuthoringNamespaces(
         entityTypes,
         descriptor.authoring.entityTypes,
         [],
-        isAuthoringEntityTypeDescriptor,
+        'entity',
         'entity',
       );
     }
@@ -200,7 +184,7 @@ export function assembleAuthoringContributions(
         pslBlockDescriptors,
         descriptor.authoring.pslBlockDescriptors,
         [],
-        isAuthoringPslBlockDescriptor,
+        'pslBlock',
         'pslBlock',
       );
     }
