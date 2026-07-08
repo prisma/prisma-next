@@ -3,7 +3,7 @@ import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
-import { SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export type SqlReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
 
@@ -84,6 +84,10 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode implements DiffableNode {
     return [];
   }
 
+  static is(node: SqlSchemaIRNode): node is SqlForeignKeyIR {
+    return node.nodeKind === RelationalSchemaNodeKind.foreignKey;
+  }
+
   /**
    * Referential-action comparison with `this` as the expected side, matching
    * the relational walk's `getReferentialActionMismatches`: `noAction` is the
@@ -92,9 +96,10 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode implements DiffableNode {
    */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
-      SqlForeignKeyIR,
-      'every diff-tree node the differ pairs at this position is a SqlForeignKeyIR; the id scheme keeps foreign keys from pairing with other node kinds'
+      SqlSchemaIRNode,
+      'every diff-tree node the differ pairs is a SqlSchemaIRNode'
     >(other);
+    assertNode(node, 'SqlForeignKeyIR', SqlForeignKeyIR.is);
     return (
       referentialActionMatches(this.onDelete, node.onDelete) &&
       referentialActionMatches(this.onUpdate, node.onUpdate)

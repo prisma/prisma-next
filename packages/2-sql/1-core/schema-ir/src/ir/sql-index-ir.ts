@@ -3,7 +3,7 @@ import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
-import { SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface SqlIndexIRInput {
   readonly columns: readonly string[];
@@ -56,6 +56,10 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
     return [];
   }
 
+  static is(node: SqlSchemaIRNode): node is SqlIndexIR {
+    return node.nodeKind === RelationalSchemaNodeKind.index;
+  }
+
   /**
    * Comparison with `this` as the expected side, matching the relational
    * walk's index satisfaction: a unique actual index satisfies a non-unique
@@ -64,9 +68,10 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
    */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
-      SqlIndexIR,
-      'every diff-tree node the differ pairs at this position is a SqlIndexIR; the id scheme keeps indexes from pairing with other node kinds'
+      SqlSchemaIRNode,
+      'every diff-tree node the differ pairs is a SqlSchemaIRNode'
     >(other);
+    assertNode(node, 'SqlIndexIR', SqlIndexIR.is);
     return (
       (!this.unique || node.unique) &&
       this.type === node.type &&

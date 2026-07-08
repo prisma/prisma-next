@@ -16,6 +16,7 @@ export type {
 } from '../types';
 
 export {
+  assertNode,
   PrimaryKey,
   RelationalSchemaNodeKind,
   SqlCheckConstraintIR,

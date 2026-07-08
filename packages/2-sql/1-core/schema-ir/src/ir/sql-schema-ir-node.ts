@@ -63,6 +63,22 @@ export abstract class SqlSchemaIRNode extends IRNodeBase {
 }
 
 /**
+ * Asserts `node` matches `predicate`, narrowing its type to `T`. The one
+ * shared implementation every node class's `static assert` and `isEqualTo`
+ * reach for, instead of each hand-writing its own throw: the message names
+ * the class the caller expected.
+ */
+export function assertNode<T extends SqlSchemaIRNode>(
+  node: SqlSchemaIRNode | undefined,
+  className: string,
+  predicate: (node: SqlSchemaIRNode) => node is T,
+): asserts node is T {
+  if (node === undefined || !predicate(node)) {
+    throw new Error(`Expected a ${className} but got nodeKind=${node?.nodeKind ?? 'undefined'}`);
+  }
+}
+
+/**
  * Defines a non-enumerable own property, the same treatment `kind` gets
  * above: a derivation-time render-support field stays out of
  * `JSON.stringify`, `toEqual({...})` structural assertions, and spreads,

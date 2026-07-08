@@ -4,7 +4,7 @@ import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { resolvedDefaultsEqual } from './resolved-default-equality';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
-import { defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface SqlColumnDefaultIRInput {
   /** Structured resolved default (contract-declared or normalizer-parsed). */
@@ -64,6 +64,10 @@ export class SqlColumnDefaultIR extends SqlSchemaIRNode implements DiffableNode 
     return [];
   }
 
+  static is(node: SqlSchemaIRNode): node is SqlColumnDefaultIR {
+    return node.nodeKind === RelationalSchemaNodeKind.columnDefault;
+  }
+
   /**
    * Structured comparison with `this` as the expected side: both sides
    * resolved compare per the relational walk's `columnDefaultsEqual`
@@ -73,9 +77,10 @@ export class SqlColumnDefaultIR extends SqlSchemaIRNode implements DiffableNode 
    */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
-      SqlColumnDefaultIR,
-      'the fixed sentinel id under a column pairs a default node only with the other side column default node'
+      SqlSchemaIRNode,
+      'every diff-tree node the differ pairs is a SqlSchemaIRNode'
     >(other);
+    assertNode(node, 'SqlColumnDefaultIR', SqlColumnDefaultIR.is);
     if (this.resolved !== undefined && node.resolved !== undefined) {
       return resolvedDefaultsEqual(
         this.resolved,

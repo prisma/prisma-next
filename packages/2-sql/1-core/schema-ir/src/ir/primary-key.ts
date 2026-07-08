@@ -2,7 +2,7 @@ import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
-import { SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface PrimaryKeyInput {
   readonly columns: readonly string[];
@@ -43,11 +43,16 @@ export class PrimaryKey extends SqlSchemaIRNode implements DiffableNode {
     return [];
   }
 
+  static is(node: SqlSchemaIRNode): node is PrimaryKey {
+    return node.nodeKind === RelationalSchemaNodeKind.primaryKey;
+  }
+
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
-      PrimaryKey,
-      'every diff-tree node the differ pairs at this position is a PrimaryKey; the fixed sentinel id keeps it from pairing with other node kinds'
+      SqlSchemaIRNode,
+      'every diff-tree node the differ pairs is a SqlSchemaIRNode'
     >(other);
+    assertNode(node, 'PrimaryKey', PrimaryKey.is);
     return (
       this.columns.length === node.columns.length &&
       this.columns.every((c, i) => c === node.columns[i])

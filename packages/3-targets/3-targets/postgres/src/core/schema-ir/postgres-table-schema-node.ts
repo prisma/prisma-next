@@ -1,6 +1,7 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import {
+  assertNode,
   PrimaryKey,
   type SqlAnnotations,
   SqlCheckConstraintIR,
@@ -116,10 +117,6 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
   }
 
   static assert(node: SqlSchemaIRNode): asserts node is PostgresTableSchemaNode {
-    if (!PostgresTableSchemaNode.is(node)) {
-      throw new Error(
-        `Expected a PostgresTableSchemaNode but got nodeKind=${node.nodeKind ?? 'undefined'}`,
-      );
-    }
+    assertNode(node, 'PostgresTableSchemaNode', PostgresTableSchemaNode.is);
   }
 }

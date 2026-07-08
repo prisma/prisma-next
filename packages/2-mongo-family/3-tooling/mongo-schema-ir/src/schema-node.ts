@@ -9,6 +9,12 @@ import type { MongoSchemaVisitor } from './visitor';
  * still hand-rolls its comparisons and never calls `isEqualTo`/`children` —
  * this conformance exists so an issue can carry the real collection/index/
  * validator/options node it concerns, not a coordinate string.
+ *
+ * Follow-up: `isEqualTo`/`children` are dead weight on every Mongo node
+ * (nothing calls them). The honest fix is splitting `DiffableNode` into a
+ * narrower "issue payload" bound (just `id`) that this class implements,
+ * separate from the full walkable `DiffableNode` (`id` + `isEqualTo` +
+ * `children`) the generic differ actually pairs and recurses over.
  */
 export abstract class MongoSchemaIRNode extends IRNodeBase implements DiffableNode {
   abstract readonly id: string;

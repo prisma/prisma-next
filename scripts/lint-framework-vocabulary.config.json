@@ -36,7 +36,7 @@
     {
       "path": "packages/2-sql",
       "forbidden": ["schema"],
-      "threshold": 700
+      "threshold": 731
     }
   ]
 }

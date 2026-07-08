@@ -195,7 +195,7 @@ export function errorMarkerRequired(options?: {
 
 /**
  * Schema verification found mismatches between the database and the contract.
- * The full verification tree is preserved in `meta.verificationResult`.
+ * The full verification result is preserved in `meta.verificationResult`.
  */
 export function errorSchemaVerificationFailed(options: {
   readonly summary: string;

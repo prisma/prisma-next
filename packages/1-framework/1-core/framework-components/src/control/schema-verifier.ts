@@ -8,8 +8,7 @@ import type { SchemaDiffIssue } from './schema-diff';
  * The framework verifier (per FR6) walks the contract-space aggregate,
  * dispatches to the right target's verifier (`descriptor.schemaVerifier`)
  * per space, and wraps the per-target results into a unified
- * `VerifyDatabaseSchemaResult` with timings, summary, and per-node
- * verification tree.
+ * `VerifyDatabaseSchemaResult` with timings, summary, and the issue list.
  *
  * Family-level abstract bases (e.g. `SqlSchemaVerifierBase`) carry the
  * shared SQL/Mongo walk logic and expose protected hooks for target
@@ -34,9 +33,8 @@ export interface SchemaVerifyOptions<TContract, TSchema> {
 /**
  * Per-target verifier result. The framework verifier wraps these into the
  * existing `VerifyDatabaseSchemaResult` envelope (with timings, summary,
- * per-node verification tree); the SPI itself returns just the
- * core ok/issues pair so the seam between target-walk and
- * framework-aggregation is explicit.
+ * issue list); the SPI itself returns just the core ok/issues pair so the
+ * seam between target-walk and framework-aggregation is explicit.
  */
 export interface SchemaVerifyResult {
   readonly ok: boolean;

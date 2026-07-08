@@ -28,7 +28,7 @@
  *      output; a planner change is invisible here. Prove planner-op parity via
  *      the planner suites + `migration plan` e2e + a golden diff of real
  *      `plan()` output vs these committed ops. See
- *      `docs/reference/fixtures-emit-and-check.md`.
+ *      `docs/onboarding/fixtures-emit-and-check.md`.
  *   6. Biome-formats all touched JSON files via stdin (bypassing biome's
  *      `files.includes` exclusion globs — same technique as
  *      `regen-extension-migrations.mjs`; see that file's JSDoc for rationale).

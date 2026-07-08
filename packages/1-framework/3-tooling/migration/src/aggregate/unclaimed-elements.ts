@@ -1,24 +1,30 @@
 import type {
+  DiffableNode,
   SchemaDiffIssue,
   SchemaOwnershipCoordinate,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { blindCast } from '@prisma-next/utils/casts';
+import { castAs } from '@prisma-next/utils/casts';
+
+/** A diff node that may declare a `diffRole` discriminant — not every family's nodes do. */
+interface RoleDiscriminatedNode extends Pick<DiffableNode, 'id'> {
+  readonly diffRole?: unknown;
+}
 
 /**
  * The declared verdict-classification role of a diff issue's subject node,
  * read structurally (`diffRole` is declared by every SQL schema-diff node;
  * the aggregate never imports family node classes). Absent for issues whose
- * nodes carry no role (non-SQL families).
+ * nodes carry no role (non-SQL families). Every `DiffableNode` already
+ * satisfies `RoleDiscriminatedNode` (its own `diffRole` is optional) —
+ * `castAs` names the read without asserting anything the type system can't
+ * already verify.
  */
 function issueNodeRole(issue: SchemaDiffIssue): string | undefined {
   const node = issue.actual ?? issue.expected;
   if (node === undefined) return undefined;
-  const role = blindCast<
-    { readonly diffRole?: unknown },
-    'structural read of the declared diffRole discriminant on a schema-diff node'
-  >(node).diffRole;
+  const role = castAs<RoleDiscriminatedNode>(node).diffRole;
   return typeof role === 'string' ? role : undefined;
 }
 

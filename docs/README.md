@@ -26,7 +26,6 @@ This directory contains the primary documentation for the repository.
 - [Codec authoring guide](./reference/codec-authoring-guide.md) — class-based codecs (`CodecImpl`, `CodecDescriptorImpl`) and column helpers
 - [Mongo Pipeline Builder](./reference/Mongo%20Pipeline%20Builder.md) — typed builder for MongoDB aggregation pipelines, reads, writes, and find-and-modify
 - [`migration graph --tree` rendering](./reference/migration-graph-rendering.md) — condensed annotated-tree rendering for offline migration topology
-- [`fixtures:emit` / `fixtures:check`](./reference/fixtures-emit-and-check.md) — what they gate (contract emission) vs don't (planner ops), and how to actually prove planner-op parity
 - [CLI Style Guide](./CLI%20Style%20Guide.md) — CLI UX conventions
 
 ## Working with AI agents

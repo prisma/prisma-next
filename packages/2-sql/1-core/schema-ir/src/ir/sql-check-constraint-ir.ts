@@ -2,7 +2,7 @@ import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
-import { SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface SqlCheckConstraintIRInput {
   /** Constraint name as stored in the database catalog. */
@@ -48,6 +48,10 @@ export class SqlCheckConstraintIR extends SqlSchemaIRNode implements DiffableNod
     return [];
   }
 
+  static is(node: SqlSchemaIRNode): node is SqlCheckConstraintIR {
+    return node.nodeKind === RelationalSchemaNodeKind.check;
+  }
+
   /**
    * Compares the permitted-value sets only (unordered), matching the
    * relational walk's `verifyCheckConstraints`: two checks pairing by name
@@ -57,9 +61,10 @@ export class SqlCheckConstraintIR extends SqlSchemaIRNode implements DiffableNod
    */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
-      SqlCheckConstraintIR,
-      'every diff-tree node the differ pairs at this position is a SqlCheckConstraintIR; the id scheme keeps checks from pairing with other node kinds'
+      SqlSchemaIRNode,
+      'every diff-tree node the differ pairs is a SqlSchemaIRNode'
     >(other);
+    assertNode(node, 'SqlCheckConstraintIR', SqlCheckConstraintIR.is);
     const thisValues = new Set(this.permittedValues);
     const otherValues = new Set(node.permittedValues);
     if (thisValues.size !== otherValues.size) return false;

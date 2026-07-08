@@ -6,7 +6,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import { SqlColumnDefaultIR } from './sql-column-default-ir';
-import { defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 /**
  * Namespaced annotations for extensibility. Each namespace
@@ -155,6 +155,10 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
     ];
   }
 
+  static is(node: SqlSchemaIRNode): node is SqlColumnIR {
+    return node.nodeKind === RelationalSchemaNodeKind.column;
+  }
+
   /**
    * Compares the column's own attributes only — the default lives on the
    * child node. When both sides carry `resolvedNativeType`, the resolved
@@ -163,9 +167,10 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
    */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
-      SqlColumnIR,
-      'every diff-tree node the differ pairs at this position is a SqlColumnIR; the id scheme keeps columns from pairing with other node kinds'
+      SqlSchemaIRNode,
+      'every diff-tree node the differ pairs is a SqlSchemaIRNode'
     >(other);
+    assertNode(node, 'SqlColumnIR', SqlColumnIR.is);
     if (this.resolvedNativeType !== undefined && node.resolvedNativeType !== undefined) {
       return this.resolvedNativeType === node.resolvedNativeType && this.nullable === node.nullable;
     }

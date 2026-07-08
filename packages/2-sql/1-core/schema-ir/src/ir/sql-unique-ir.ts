@@ -3,7 +3,7 @@ import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
-import { SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface SqlUniqueIRInput {
   readonly columns: readonly string[];
@@ -45,11 +45,16 @@ export class SqlUniqueIR extends SqlSchemaIRNode implements DiffableNode {
     return [];
   }
 
+  static is(node: SqlSchemaIRNode): node is SqlUniqueIR {
+    return node.nodeKind === RelationalSchemaNodeKind.unique;
+  }
+
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
-      SqlUniqueIR,
-      'every diff-tree node the differ pairs at this position is a SqlUniqueIR; the id scheme keeps uniques from pairing with other node kinds'
+      SqlSchemaIRNode,
+      'every diff-tree node the differ pairs is a SqlSchemaIRNode'
     >(other);
+    assertNode(node, 'SqlUniqueIR', SqlUniqueIR.is);
     return this.id === node.id;
   }
 }
