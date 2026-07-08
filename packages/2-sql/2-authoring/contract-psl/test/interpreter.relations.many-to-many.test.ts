@@ -46,8 +46,8 @@ model Tag {
 model PostTag {
   postId Int
   tagId Int
-  post Post @relation(fields: [postId], references: [id])
-  tag Tag @relation(fields: [tagId], references: [id])
+  post Post @relation(from: [postId], to: [id])
+  tag Tag @relation(from: [tagId], to: [id])
 
   @@id([postId, tagId])
 }
@@ -117,8 +117,8 @@ model PostTag {
   model UserTag {
     userId Int
     tagId Int
-    user User @relation(fields: [userId], references: [id])
-    tag Tag @relation(fields: [tagId], references: [id])
+    user User @relation(from: [userId], to: [id])
+    tag Tag @relation(from: [tagId], to: [id])
 
     @@id([userId, tagId])
   }
@@ -164,8 +164,8 @@ model UserTag {
   tagId Int
   createdAt DateTime
   note String
-  user User @relation(fields: [userId], references: [id])
-  tag Tag @relation(fields: [tagId], references: [id])
+  user User @relation(from: [userId], to: [id])
+  tag Tag @relation(from: [tagId], to: [id])
 
   @@id([userId, tagId])
 }
@@ -209,8 +209,8 @@ model ProjectLabel {
   projectTenantId Int
   projectId Int
   labelId Int
-  project Project @relation(fields: [projectTenantId, projectId], references: [tenantId, id])
-  label Label @relation(fields: [labelId], references: [id])
+  project Project @relation(from: [projectTenantId, projectId], to: [tenantId, id])
+  label Label @relation(from: [labelId], to: [id])
 
   @@id([projectTenantId, projectId, labelId])
 }
@@ -271,8 +271,8 @@ model ProjectLabel {
   projectId Int
   projectTenantId Int
   labelId Int
-  project Project @relation(fields: [projectId, projectTenantId], references: [id, tenantId])
-  label Label @relation(fields: [labelId], references: [id])
+  project Project @relation(from: [projectId, projectTenantId], to: [id, tenantId])
+  label Label @relation(from: [labelId], to: [id])
 
   @@id([projectTenantId, projectId, labelId])
 }
@@ -332,8 +332,8 @@ model Tag {
 model PostTag {
   postId Int
   tagSlug String
-  post Post @relation(fields: [postId], references: [id])
-  tag Tag @relation(fields: [tagSlug], references: [slug])
+  post Post @relation(from: [postId], to: [id])
+  tag Tag @relation(from: [tagSlug], to: [slug])
 
   @@id([postId, tagSlug])
 }
@@ -367,8 +367,8 @@ model PostTag {
 model Follow {
   followerId Int
   followeeId Int
-  follower User @relation("follower", fields: [followerId], references: [id])
-  followee User @relation("followee", fields: [followeeId], references: [id])
+  follower User @relation("follower", from: [followerId], to: [id])
+  followee User @relation("followee", from: [followeeId], to: [id])
 
   @@id([followerId, followeeId])
 }
@@ -415,8 +415,8 @@ model Follow {
 model Follow {
   followerId Int
   followeeId Int
-  follower User @relation("follower", fields: [followerId], references: [id])
-  followee User @relation("followee", fields: [followeeId], references: [id])
+  follower User @relation("follower", from: [followerId], to: [id])
+  followee User @relation("followee", from: [followeeId], to: [id])
 
   @@id([followerId, followeeId])
 }
@@ -451,8 +451,8 @@ model Tag {
 model TagOwnership {
   userId Int
   tagId Int
-  user User @relation("owned", fields: [userId], references: [id])
-  tag Tag @relation("owned", fields: [tagId], references: [id])
+  user User @relation("owned", from: [userId], to: [id])
+  tag Tag @relation("owned", from: [tagId], to: [id])
 
   @@id([userId, tagId])
 }
@@ -460,8 +460,8 @@ model TagOwnership {
 model TagWatch {
   userId Int
   tagId Int
-  user User @relation("watched", fields: [userId], references: [id])
-  tag Tag @relation("watched", fields: [tagId], references: [id])
+  user User @relation("watched", from: [userId], to: [id])
+  tag Tag @relation("watched", from: [tagId], to: [id])
 
   @@id([userId, tagId])
 }
@@ -544,8 +544,8 @@ model Tag {
 model TagOwnership {
   userId Int
   tagId Int
-  user User @relation(fields: [userId], references: [id])
-  tag Tag @relation(fields: [tagId], references: [id])
+  user User @relation(from: [userId], to: [id])
+  tag Tag @relation(from: [tagId], to: [id])
 
   @@id([userId, tagId])
 }
@@ -553,8 +553,8 @@ model TagOwnership {
 model TagWatch {
   userId Int
   tagId Int
-  user User @relation(fields: [userId], references: [id])
-  tag Tag @relation(fields: [tagId], references: [id])
+  user User @relation(from: [userId], to: [id])
+  tag Tag @relation(from: [tagId], to: [id])
 
   @@id([userId, tagId])
 }
@@ -611,8 +611,8 @@ model PostTag {
   id Int @id
   postId Int
   tagId Int
-  post Post @relation(fields: [postId], references: [id])
-  tag Tag @relation(fields: [tagId], references: [id])
+  post Post @relation(from: [postId], to: [id])
+  tag Tag @relation(from: [tagId], to: [id])
 }
 `);
 
@@ -648,8 +648,8 @@ model Tag {
 model PostTag {
   postId Int
   tagId Int
-  post Post @relation(fields: [postId], references: [id])
-  tag Tag @relation(fields: [tagId], references: [id])
+  post Post @relation(from: [postId], to: [id])
+  tag Tag @relation(from: [tagId], to: [id])
 
   @@id([postId, tagId])
 }
@@ -696,14 +696,14 @@ model PostTag {
 model Tag {
   id Int @id
   postId Int
-  post Post @relation(fields: [postId], references: [id])
+  post Post @relation(from: [postId], to: [id])
 }
 
 model PostTag {
   postId Int
   tagId Int
-  post Post @relation(fields: [postId], references: [id])
-  tag Tag @relation(fields: [tagId], references: [id])
+  post Post @relation(from: [postId], to: [id])
+  tag Tag @relation(from: [tagId], to: [id])
 
   @@id([postId, tagId])
 }

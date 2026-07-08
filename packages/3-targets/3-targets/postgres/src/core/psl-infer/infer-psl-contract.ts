@@ -653,7 +653,7 @@ function buildRelationField(
     }
     args.push(
       namedArg(
-        'fields',
+        'from',
         `[${rel.fields
           .map((columnName) => resolveColumnFieldName(fieldNamesByTable, hostTableName, columnName))
           .join(', ')}]`,
@@ -661,7 +661,7 @@ function buildRelationField(
     );
     args.push(
       namedArg(
-        'references',
+        'to',
         `[${rel.references
           .map((columnName) =>
             resolveColumnFieldName(fieldNamesByTable, rel.referencedTableName ?? '', columnName),

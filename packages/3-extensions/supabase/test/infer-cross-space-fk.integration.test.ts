@@ -16,7 +16,7 @@
  *   - keep the app's own `public.users` as a `Users` model,
  *   - omit `auth.users` (the pack already describes it),
  *   - emit the FK as the qualified cross-space relation
- *     `supabase:auth.AuthUser @relation(fields: [userId], references: [id],
+ *     `supabase:auth.AuthUser @relation(from: [userId], to: [id],
  *     onDelete: Cascade)` — matching how `examples/supabase/src/contract.prisma`
  *     hand-authors the same relationship — rather than wiring it to the local
  *     `Users` model or stripping it.
@@ -105,9 +105,7 @@ describe('contract infer — cross-space FK into the Supabase pack', () => {
 
         const printed = printPsl(ast);
         expect(printed).toMatch(/\buser\s+supabase:auth\.AuthUser\b/);
-        expect(printed).toContain(
-          '@relation(fields: [userId], references: [id], onDelete: Cascade',
-        );
+        expect(printed).toContain('@relation(from: [userId], to: [id], onDelete: Cascade');
       } finally {
         await client.close();
       }

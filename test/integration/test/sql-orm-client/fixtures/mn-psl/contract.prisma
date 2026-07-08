@@ -36,8 +36,8 @@ model UserTag {
   userId Int    @map("user_id")
   tagId  String @map("tag_id")
 
-  user User @relation(fields: [userId], references: [id])
-  tag  Tag  @relation(fields: [tagId], references: [id])
+  user User @relation(from: [userId], to: [id])
+  tag  Tag  @relation(from: [tagId], to: [id])
 
   @@id([userId, tagId])
   @@map("user_tags")

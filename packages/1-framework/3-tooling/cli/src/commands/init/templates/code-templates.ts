@@ -126,7 +126,7 @@ model Post {
   id        Int      @id @default(autoincrement())
   title     String
   content   String?
-  author    User     @relation(fields: [authorId], references: [id])
+  author    User     @relation(from: [authorId], to: [id])
   authorId  Int
   createdAt DateTime @default(now())
   updatedAt temporal.updatedAt()
@@ -150,7 +150,7 @@ model Post {
   id       ObjectId @id @map("_id")
   title    String
   content  String?
-  author   User     @relation(fields: [authorId], references: [id])
+  author   User     @relation(from: [authorId], to: [id])
   authorId ObjectId
   @@map("posts")
 }

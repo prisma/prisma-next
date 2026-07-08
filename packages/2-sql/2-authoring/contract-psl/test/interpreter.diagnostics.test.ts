@@ -110,7 +110,7 @@ model Team {
 model User {
   id Int @id
   tags String[]
-  ghost Ghost @relation(fields: [ghostId], references: [id])
+  ghost Ghost @relation(from: [ghostId], to: [id])
   ghostId Int
 }
 `,
@@ -392,7 +392,7 @@ model Post {
   id Int @id
   authorId Int
   reviewerId Int
-  user User @relation(fields: [authorId, reviewerId], references: [id])
+  user User @relation(from: [authorId, reviewerId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -424,7 +424,7 @@ model Post {
 model Post {
   id Int @id
   userId Int
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -450,13 +450,13 @@ model Post {
     const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
-  posts Post[] @relation(fields: [id], references: [userId])
+  posts Post[] @relation(from: [id], to: [userId])
 }
 
 model Post {
   id Int @id
   userId Int
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(from: [userId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',
@@ -519,8 +519,8 @@ model Post {
   id Int @id
   primaryUserId Int
   secondaryUserId Int
-  primaryUser User @relation(fields: [primaryUserId], references: [id])
-  secondaryUser User @relation(fields: [secondaryUserId], references: [id])
+  primaryUser User @relation(from: [primaryUserId], to: [id])
+  secondaryUser User @relation(from: [secondaryUserId], to: [id])
 }
 `,
       sourceId: 'schema.prisma',

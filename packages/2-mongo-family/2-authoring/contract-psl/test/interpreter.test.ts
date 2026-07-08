@@ -364,11 +364,11 @@ describe('interpretPslDocumentToMongoContract', () => {
         id       ObjectId @id @map("_id")
         title    String
         authorId ObjectId
-        author   User @relation(fields: [authorId], references: [id])
+        author   User @relation(from: [authorId], to: [id])
       }
     `;
 
-    it('creates N:1 reference relation from @relation with fields/references', () => {
+    it('creates N:1 reference relation from @relation with from/to', () => {
       const ir = interpretOk(blogSchema);
 
       expect(model(ir, 'Post').relations).toMatchObject({
@@ -408,7 +408,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         model Child {
           id       ObjectId @id @map("_id")
           parentId ObjectId @map("parent_id")
-          parent   Parent @relation(fields: [parentId], references: [id])
+          parent   Parent @relation(from: [parentId], to: [id])
         }
       `);
 
@@ -448,8 +448,8 @@ describe('interpretPslDocumentToMongoContract', () => {
           title        String
           creatorId    ObjectId
           assigneeId   ObjectId
-          creator      User @relation("created", fields: [creatorId], references: [id])
-          assignee     User @relation("assigned", fields: [assigneeId], references: [id])
+          creator      User @relation("created", from: [creatorId], to: [id])
+          assignee     User @relation("assigned", from: [assigneeId], to: [id])
         }
       `);
 
@@ -478,8 +478,8 @@ describe('interpretPslDocumentToMongoContract', () => {
           id          ObjectId @id @map("_id")
           creatorId   ObjectId
           assigneeId  ObjectId
-          creator     User @relation("created", fields: [creatorId], references: [id])
-          assignee    User @relation("assigned", fields: [assigneeId], references: [id])
+          creator     User @relation("created", from: [creatorId], to: [id])
+          assignee    User @relation("assigned", from: [assigneeId], to: [id])
         }
       `);
 
@@ -504,7 +504,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         model Profile {
           id     ObjectId @id @map("_id")
           userId ObjectId
-          user   User @relation(fields: [userId], references: [id])
+          user   User @relation(from: [userId], to: [id])
         }
       `);
 
@@ -551,6 +551,198 @@ describe('interpretPslDocumentToMongoContract', () => {
           }),
         ]),
       );
+    });
+  });
+
+  describe('from/to relation vocabulary', () => {
+    describe('legacy fields/references rejection', () => {
+      it('rejects @relation(fields:, references:) with a guiding diagnostic', () => {
+        const result = interpret(`
+          model User {
+            id    ObjectId @id @map("_id")
+            posts Post[]
+          }
+
+          model Post {
+            id       ObjectId @id @map("_id")
+            authorId ObjectId
+            author   User @relation(fields: [authorId], references: [id])
+          }
+        `);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) return;
+        expect(result.failure.diagnostics).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              code: 'PSL_LEGACY_FIELDS_REFERENCES',
+              message: expect.stringContaining('use from:/to:'),
+            }),
+          ]),
+        );
+      });
+
+      it('rejects a lone legacy fields: argument', () => {
+        const result = interpret(`
+          model User {
+            id    ObjectId @id @map("_id")
+            posts Post[]
+          }
+
+          model Post {
+            id       ObjectId @id @map("_id")
+            authorId ObjectId
+            author   User @relation(fields: [authorId])
+          }
+        `);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) return;
+        expect(result.failure.diagnostics).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ code: 'PSL_LEGACY_FIELDS_REFERENCES' }),
+          ]),
+        );
+      });
+
+      it('rejects a lone legacy references: argument', () => {
+        const result = interpret(`
+          model User {
+            id    ObjectId @id @map("_id")
+            posts Post[]
+          }
+
+          model Post {
+            id       ObjectId @id @map("_id")
+            authorId ObjectId
+            author   User @relation(references: [id])
+          }
+        `);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) return;
+        expect(result.failure.diagnostics).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ code: 'PSL_LEGACY_FIELDS_REFERENCES' }),
+          ]),
+        );
+      });
+    });
+
+    describe('to inference (omit to: ⇒ target @id)', () => {
+      it('infers the single-column target @id when to: is omitted', () => {
+        const inferred = interpretOk(`
+          model User {
+            id    ObjectId @id @map("_id")
+            posts Post[]
+          }
+
+          model Post {
+            id       ObjectId @id @map("_id")
+            authorId ObjectId
+            author   User @relation(from: authorId)
+          }
+        `);
+        const explicit = interpretOk(`
+          model User {
+            id    ObjectId @id @map("_id")
+            posts Post[]
+          }
+
+          model Post {
+            id       ObjectId @id @map("_id")
+            authorId ObjectId
+            author   User @relation(from: [authorId], to: [id])
+          }
+        `);
+
+        expect(inferred).toEqual(explicit);
+        expect(model(inferred, 'Post').relations).toMatchObject({
+          author: {
+            to: crossRef('User'),
+            cardinality: 'N:1',
+            on: { localFields: ['authorId'], targetFields: ['_id'] },
+          },
+        });
+      });
+
+      it('rejects an omitted to: when the target model has no @id', () => {
+        const result = interpret(`
+          model Tag {
+            label String
+          }
+
+          model Post {
+            id       ObjectId @id @map("_id")
+            tagLabel String
+            tag      Tag @relation(from: tagLabel)
+          }
+        `);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) return;
+        expect(result.failure.diagnostics).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ code: 'PSL_INVALID_RELATION_ATTRIBUTE' }),
+          ]),
+        );
+      });
+    });
+
+    describe('value forms', () => {
+      it('accepts a bare single from:/to: field equivalently to a bracketed one', () => {
+        const bare = interpretOk(`
+          model User {
+            id    ObjectId @id @map("_id")
+            posts Post[]
+          }
+
+          model Post {
+            id       ObjectId @id @map("_id")
+            authorId ObjectId
+            author   User @relation(from: authorId, to: id)
+          }
+        `);
+        const bracketed = interpretOk(`
+          model User {
+            id    ObjectId @id @map("_id")
+            posts Post[]
+          }
+
+          model Post {
+            id       ObjectId @id @map("_id")
+            authorId ObjectId
+            author   User @relation(from: [authorId], to: [id])
+          }
+        `);
+
+        expect(bare).toEqual(bracketed);
+      });
+    });
+
+    describe('both-or-neither diagnostic', () => {
+      it('rejects a to: without a from:', () => {
+        const result = interpret(`
+          model User {
+            id    ObjectId @id @map("_id")
+            posts Post[]
+          }
+
+          model Post {
+            id       ObjectId @id @map("_id")
+            authorId ObjectId
+            author   User @relation(to: [id])
+          }
+        `);
+
+        expect(result.ok).toBe(false);
+        if (result.ok) return;
+        expect(result.failure.diagnostics).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ code: 'PSL_INVALID_RELATION_ATTRIBUTE' }),
+          ]),
+        );
+      });
     });
   });
 
@@ -902,7 +1094,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           content   String
           authorId  ObjectId
           createdAt DateTime
-          author    User @relation(fields: [authorId], references: [id])
+          author    User @relation(from: [authorId], to: [id])
           @@map("posts")
         }
       `);
@@ -1628,7 +1820,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         model Post {
           id       ObjectId @id @map("_id")
           authorId ObjectId
-          author   User @relation(fields: [authorId], references: [id])
+          author   User @relation(from: [authorId], to: [id])
 
           @@index([author])
         }
@@ -1651,7 +1843,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         model Post {
           id       ObjectId @id @map("_id")
           authorId ObjectId
-          author   User @relation(fields: [authorId], references: [id])
+          author   User @relation(from: [authorId], to: [id])
 
           @@unique([author])
         }
@@ -1673,7 +1865,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         model Post {
           id       ObjectId @id @map("_id")
           authorId ObjectId
-          author   User @relation(fields: [authorId], references: [id])
+          author   User @relation(from: [authorId], to: [id])
 
           @@textIndex([author])
         }

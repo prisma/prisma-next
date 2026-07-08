@@ -93,7 +93,7 @@ model Cart {
   id     ObjectId   @id @map("_id")
   userId ObjectId
   items  CartItem[]
-  user   User       @relation(fields: [userId], references: [id])
+  user   User       @relation(from: [userId], to: [id])
   @@map("carts")
   @@unique([userId])
 }
@@ -105,7 +105,7 @@ model Order {
   shippingAddress String
   type            OrderType
   statusHistory   StatusEntry[]
-  user            User             @relation(fields: [userId], references: [id])
+  user            User             @relation(from: [userId], to: [id])
   invoices        Invoice[]
   @@map("orders")
   @@index([userId])
@@ -130,7 +130,7 @@ model Invoice {
   tax      Float
   total    Float
   issuedAt DateTime
-  order    Order             @relation(fields: [orderId], references: [id])
+  order    Order             @relation(from: [orderId], to: [id])
   @@map("invoices")
   @@index([orderId])
   @@index([issuedAt(sort: Desc)], sparse: true)

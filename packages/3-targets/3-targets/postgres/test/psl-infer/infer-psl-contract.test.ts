@@ -260,7 +260,7 @@ describe('inferPostgresPslContract', () => {
         id     Int    @id
         title  String
         userId Int    @map("user_id")
-        user   User   @relation(fields: [userId], references: [id])
+        user   User   @relation(from: [userId], to: [id])
 
         @@index([userId])
         @@map("post")

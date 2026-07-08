@@ -7,7 +7,7 @@ namespace public {
     id       Uuid   @id @default(uuid())
     username String
     userId   Uuid   @unique
-    user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user     supabase:auth.AuthUser @relation(from: [userId], to: [id], onDelete: Cascade)
     @@map("profile")
   }
 

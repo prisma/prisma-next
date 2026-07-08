@@ -643,6 +643,85 @@ describe('printPslFromAst', () => {
     expect(printed).toContain('@relation(fields: [authorId], references: [id])');
   });
 
+  it('topologically orders models from a canonical @relation(from:, to:)', () => {
+    // The FK-owning model is declared first; the referenced model must still
+    // print before it, which only happens when the printer recognises the
+    // canonical `from:`/`to:` relation keys as a dependency edge.
+    const models: PslModel[] = [
+      {
+        kind: 'model',
+        name: 'Post',
+        fields: [
+          {
+            kind: 'field',
+            name: 'id',
+            typeName: 'Int',
+            optional: false,
+            list: false,
+            attributes: [attr('field', 'id', [], 0)],
+            span: span(0),
+          },
+          {
+            kind: 'field',
+            name: 'authorId',
+            typeName: 'Int',
+            optional: false,
+            list: false,
+            attributes: [],
+            span: span(0),
+          },
+          {
+            kind: 'field',
+            name: 'author',
+            typeName: 'User',
+            optional: false,
+            list: false,
+            attributes: [
+              attr(
+                'field',
+                'relation',
+                [
+                  { kind: 'named', name: 'from', value: '[authorId]', span: span(1) },
+                  { kind: 'named', name: 'to', value: '[id]', span: span(2) },
+                ],
+                3,
+              ),
+            ],
+            span: span(0),
+          },
+        ],
+        attributes: [],
+        span: span(0),
+      },
+      {
+        kind: 'model',
+        name: 'User',
+        fields: [
+          {
+            kind: 'field',
+            name: 'id',
+            typeName: 'Int',
+            optional: false,
+            list: false,
+            attributes: [attr('field', 'id', [], 0)],
+            span: span(0),
+          },
+        ],
+        attributes: [],
+        span: span(0),
+      },
+    ];
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      namespaces: [makeNs(UNSPECIFIED_PSL_NAMESPACE_ID, models, [], 0)],
+      span: span(0),
+    };
+    const printed = printPslFromAst(ast);
+    expect(printed).toContain('@relation(from: [authorId], to: [id])');
+    expect(printed.indexOf('model User {')).toBeLessThan(printed.indexOf('model Post {'));
+  });
+
   describe('namespace blocks', () => {
     function idModel(name: string): PslModel {
       return {

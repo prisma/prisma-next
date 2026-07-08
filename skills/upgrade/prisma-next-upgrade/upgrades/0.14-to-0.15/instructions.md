@@ -1,7 +1,22 @@
 ---
 from: "0.14"
 to: "0.15"
-changes: []
+changes:
+  - id: relation-from-to-arguments
+    summary: |
+      The PSL `@relation` foreign-key arguments are renamed: `fields:` becomes `from:`
+      and `references:` becomes `to:`. The legacy spellings are rejected at contract
+      emission with PSL_LEGACY_FIELDS_REFERENCES. Rename the keys in place inside every
+      `@relation(...)` attribute — argument order and values are unchanged. `@@id(fields:)`
+      / `@@unique(fields:)` / `@@index(fields:)` are NOT affected; only `@relation` renames.
+      Two new conveniences are available but not required: a single field may be written
+      bare (`from: userId` instead of `from: [userId]`), and `to:` may be omitted entirely
+      when the relation references the target model's `@id` (`@relation(from: userId)`).
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "@relation"
+      anyMatch: true
 ---
 
 <!--

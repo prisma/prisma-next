@@ -30,7 +30,7 @@ model Post {
   userId    String
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(from: [userId], to: [id])
 
   @@map("post")
 }
@@ -44,7 +44,7 @@ model Task {
   userId      String
   createdAt   DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(from: [userId], to: [id])
 
   @@discriminator(type)
   @@map("task")
