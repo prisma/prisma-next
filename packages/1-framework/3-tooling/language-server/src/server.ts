@@ -206,9 +206,8 @@ export function createServer(connection: Connection): LanguageServer {
 
   // A load replaces the entry with `loading` immediately, so reads during a
   // config reload await the fresh resolution instead of the pre-reload
-  // project; a load requested while another is in flight chains behind it.
-  // A failed load leaves its entry in place — every awaiter funnels the
-  // failure into `stopManagingProject`, which needs the entry to decide
+  // project. A failed load leaves its entry in place — every awaiter funnels
+  // the failure into `stopManagingProject`, which needs the entry to decide
   // whether push clears are owed.
   function startProjectLoad(configPath: string): Promise<ProjectState> {
     const existing = managedProjects.get(configPath);
@@ -220,10 +219,8 @@ export function createServer(connection: Connection): LanguageServer {
       .catch(() => undefined)
       .then(() => loadProject(configPath))
       .then((project) => {
-        // Settle only if this load is still the current entry (a newer reload
-        // or a drop supersedes it), and only while an open document is still
-        // associated with the config — a load that outlives the last
-        // association must not keep a project entry alive.
+        // A load that outlives the last association must not keep a project
+        // entry alive.
         if (isCurrentLoad(configPath, load)) {
           if (hasManagedDocuments(configPath)) {
             managedProjects.set(configPath, { status: 'loaded', project });
