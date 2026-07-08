@@ -41,6 +41,16 @@ interface PolyStorage {
           readonly codecId: 'pg/int4@1';
           readonly nullable: true;
         };
+        readonly parent_id: {
+          readonly nativeType: 'int4';
+          readonly codecId: 'pg/int4@1';
+          readonly nullable: true;
+        };
+        readonly assignee_id: {
+          readonly nativeType: 'int4';
+          readonly codecId: 'pg/int4@1';
+          readonly nullable: true;
+        };
       };
       primaryKey: { columns: readonly ['id'] };
       uniques: readonly [];
@@ -57,6 +67,29 @@ interface PolyStorage {
         readonly priority: {
           readonly nativeType: 'int4';
           readonly codecId: 'pg/int4@1';
+          readonly nullable: false;
+        };
+        readonly assignee_id: {
+          readonly nativeType: 'int4';
+          readonly codecId: 'pg/int4@1';
+          readonly nullable: true;
+        };
+      };
+      primaryKey: { columns: readonly ['id'] };
+      uniques: readonly [];
+      indexes: readonly [];
+      foreignKeys: readonly [];
+    };
+    readonly assignees: {
+      columns: {
+        readonly id: {
+          readonly nativeType: 'int4';
+          readonly codecId: 'pg/int4@1';
+          readonly nullable: false;
+        };
+        readonly name: {
+          readonly nativeType: 'text';
+          readonly codecId: 'pg/text@1';
           readonly nullable: false;
         };
       };
@@ -126,8 +159,21 @@ type PolyModels = {
         readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
         readonly nullable: true;
       };
+      readonly parentId: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: true;
+      };
     };
-    readonly relations: R;
+    readonly relations: {
+      readonly subtasks: {
+        readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+        readonly cardinality: '1:N';
+        readonly on: {
+          readonly localFields: readonly ['id'];
+          readonly targetFields: readonly ['parentId'];
+        };
+      };
+    };
     readonly storage: {
       readonly table: 'tasks';
       readonly fields: {
@@ -135,6 +181,7 @@ type PolyModels = {
         readonly title: { readonly column: 'title' };
         readonly type: { readonly column: 'type' };
         readonly projectId: { readonly column: 'project_id' };
+        readonly parentId: { readonly column: 'parent_id' };
       };
     };
     readonly discriminator: { readonly field: 'type' };
@@ -149,12 +196,29 @@ type PolyModels = {
         readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
         readonly nullable: true;
       };
+      readonly assigneeId: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: true;
+      };
     };
-    readonly relations: R;
+    readonly relations: {
+      readonly assignee: {
+        readonly to: {
+          readonly namespace: '__unbound__' & NamespaceId;
+          readonly model: 'Assignee';
+        };
+        readonly cardinality: 'N:1';
+        readonly on: {
+          readonly localFields: readonly ['assigneeId'];
+          readonly targetFields: readonly ['id'];
+        };
+      };
+    };
     readonly storage: {
       readonly table: 'tasks';
       readonly fields: {
         readonly severity: { readonly column: 'severity' };
+        readonly assigneeId: { readonly column: 'assignee_id' };
       };
     };
     readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
@@ -165,15 +229,52 @@ type PolyModels = {
         readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
         readonly nullable: false;
       };
+      readonly assigneeId: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: true;
+      };
     };
-    readonly relations: R;
+    readonly relations: {
+      readonly assignee: {
+        readonly to: {
+          readonly namespace: '__unbound__' & NamespaceId;
+          readonly model: 'Assignee';
+        };
+        readonly cardinality: 'N:1';
+        readonly on: {
+          readonly localFields: readonly ['assigneeId'];
+          readonly targetFields: readonly ['id'];
+        };
+      };
+    };
     readonly storage: {
       readonly table: 'features';
       readonly fields: {
         readonly priority: { readonly column: 'priority' };
+        readonly assigneeId: { readonly column: 'assignee_id' };
       };
     };
     readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+  };
+  readonly Assignee: {
+    readonly fields: {
+      readonly id: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: false;
+      };
+      readonly name: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+    };
+    readonly relations: R;
+    readonly storage: {
+      readonly table: 'assignees';
+      readonly fields: {
+        readonly id: { readonly column: 'id' };
+        readonly name: { readonly column: 'name' };
+      };
+    };
   };
   readonly PlainModel: {
     readonly fields: {
@@ -423,6 +524,40 @@ test('where without a variant exposes only base fields on the predicate model', 
       expectTypeOf(task).toHaveProperty('title');
       // @ts-expect-error priority is an MTI variant field, absent on the base predicate model
       task.priority;
+      return task.title.isNotNull();
+    }),
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Variant-declared relations: `t.variant('X').where(...)` exposes a relation
+// declared on variant X, alongside relations declared on the base model.
+// ---------------------------------------------------------------------------
+
+test('where after variant("Feature") exposes the MTI variant relation and keeps a base relation', () => {
+  projects.include('tasks', (tasks) =>
+    tasks.variant('Feature').where((task) => {
+      expectTypeOf(task).toHaveProperty('assignee');
+      expectTypeOf(task).toHaveProperty('subtasks');
+      return task.assignee.some();
+    }),
+  );
+});
+
+test('where after variant("Bug") exposes the STI variant relation', () => {
+  projects.include('tasks', (tasks) =>
+    tasks.variant('Bug').where((task) => {
+      expectTypeOf(task).toHaveProperty('assignee');
+      return task.assignee.some();
+    }),
+  );
+});
+
+test('where without a variant does not expose the variant-declared relation', () => {
+  projects.include('tasks', (tasks) =>
+    tasks.where((task) => {
+      // @ts-expect-error assignee is a variant-declared relation, absent on the base predicate model
+      task.assignee;
       return task.title.isNotNull();
     }),
   );
