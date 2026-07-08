@@ -1,12 +1,15 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { FieldSymbol, InterpretCtx, ModelSymbol } from '@prisma-next/psl-parser';
 import {
   fieldAttribute,
   fieldRef,
+  identifier,
   interpretAttribute,
   leafDiagnostic,
   list,
   modelAttribute,
+  oneOf,
   optional,
   record,
   str,
@@ -218,6 +221,45 @@ export function interpretModelIndex(input: {
     type: result.value.type,
     options: result.value.options,
   };
+}
+
+const controlModelSpec = modelAttribute('control', {
+  positional: [
+    {
+      key: 'policy',
+      type: oneOf(
+        identifier('managed'),
+        identifier('tolerated'),
+        identifier('external'),
+        identifier('observed'),
+      ),
+    },
+  ],
+});
+
+// `@@control` carries a single bare-identifier policy word. The duplicate-`@@control`
+// guard stays in the caller; this helper only resolves the policy value.
+export function interpretModelControl(input: {
+  readonly node: ModelAttributeAst;
+  readonly model: ModelSymbol;
+  readonly sourceFile: SourceFile;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): ControlPolicy | undefined {
+  const result = interpretAttribute(
+    input.node,
+    controlModelSpec,
+    buildModelInterpretCtx({
+      selfModel: input.model,
+      sourceFile: input.sourceFile,
+      sourceId: input.sourceId,
+    }),
+  );
+  if (!result.ok) {
+    for (const failure of result.failure) input.diagnostics.push(failure);
+    return undefined;
+  }
+  return result.value.policy;
 }
 
 export function interpretFieldMapName(input: {

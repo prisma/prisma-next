@@ -75,7 +75,6 @@ import {
   getAttribute,
   getPositionalArgument,
   mapFieldNamesToColumns,
-  parseControlPolicyAttribute,
   parseQuotedStringLiteral,
 } from './psl-attribute-parsing';
 import type { ColumnDescriptor } from './psl-column-resolution';
@@ -103,7 +102,11 @@ import {
   normalizeReferentialAction,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
-import { interpretModelConstraint, interpretModelIndex } from './sql-attribute-specs';
+import {
+  interpretModelConstraint,
+  interpretModelControl,
+  interpretModelIndex,
+} from './sql-attribute-specs';
 
 type NamedTypeSymbol = ScalarSymbol | TypeAliasSymbol;
 
@@ -641,8 +644,14 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         continue;
       }
       controlPolicyDeclared = true;
-      const parsed = parseControlPolicyAttribute({
-        attribute: modelAttribute,
+      const node = modelAttributeNodes[attributeIndex];
+      if (node === undefined) {
+        continue;
+      }
+      const parsed = interpretModelControl({
+        node,
+        model,
+        sourceFile: input.sourceFile,
         sourceId,
         diagnostics,
       });
