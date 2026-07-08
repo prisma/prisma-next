@@ -121,6 +121,17 @@ export function createServer(connection: Connection): LanguageServer {
   }
 
   async function resolveProjectForDocument(uri: string): Promise<ProjectState | undefined> {
+    const project = await projectForNearestConfig(uri);
+    if (project === undefined || project.inputs.includes(uri)) {
+      return project;
+    }
+    // Only the config's declared inputs are managed: a stray document beside
+    // a config keeps no association, so reads and events never reach it.
+    documentConfigPaths.delete(uri);
+    return undefined;
+  }
+
+  async function projectForNearestConfig(uri: string): Promise<ProjectState | undefined> {
     const knownConfigPath = documentConfigPaths.get(uri);
     if (knownConfigPath !== undefined) {
       const project = await resolveProjectIfLoadable(knownConfigPath);
@@ -238,6 +249,11 @@ export function createServer(connection: Connection): LanguageServer {
     for (const document of documents.all()) {
       const knownConfigPath = documentConfigPaths.get(document.uri);
       if (knownConfigPath === configPath) {
+        if ((await resolveProjectForDocument(document.uri)) === undefined) {
+          // The reload dropped a previously managed document; clear its markers.
+          sendDiagnostics({ uri: document.uri, diagnostics: [] });
+          continue;
+        }
         await publish(document.uri);
         continue;
       }
@@ -270,7 +286,7 @@ export function createServer(connection: Connection): LanguageServer {
     }
 
     const project = await resolveProjectForDocument(uri);
-    if (project === undefined || !project.inputs.includes(uri)) {
+    if (project === undefined) {
       return [];
     }
 

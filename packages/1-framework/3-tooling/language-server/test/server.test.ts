@@ -755,7 +755,6 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
       ['model User {', '  id Int @id', '}', '', 'model Post {', '  author |', '}'].join('\n'),
     );
     openDocument(harness, otherUri, source);
-    expect(await harness.waitForDiagnostics(otherUri)).toEqual([]);
 
     const items = completionItems(await requestCompletion(harness, otherUri, position));
     expect(items).toEqual([]);
@@ -814,7 +813,7 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     expect(diagnostics).toEqual([]);
   });
 
-  it('publishes an empty set for a document that is not a configured input', async () => {
+  it('never manages a document that is not a configured input', async () => {
     harness = startHarness(resolveToSchema);
     await harness.initialize();
 
@@ -823,8 +822,9 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
       textDocument: { uri: otherUri, languageId: 'prisma', version: 1, text: 'model {' },
     });
 
-    const diagnostics = await harness.waitForDiagnostics(otherUri);
-    expect(diagnostics).toEqual([]);
+    await settle();
+    expect(harness.publishCount(otherUri)).toBe(0);
+    expect(harness.getDocumentAst(otherUri)).toBeUndefined();
   });
 
   it('clears diagnostics when an edit fixes the document', async () => {
@@ -892,7 +892,6 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     await harness.initialize();
     const otherUri = pathToFileURL(join(root, 'not-a-schema.psl')).toString();
     openDocument(harness, otherUri, unformattedPsl);
-    expect(await harness.waitForDiagnostics(otherUri)).toEqual([]);
 
     await expect(requestFormatting(harness, otherUri)).resolves.toEqual([]);
   });
@@ -972,7 +971,6 @@ describe('language server', { timeout: timeouts.databaseOperation }, () => {
     await harness.initialize();
     const otherUri = pathToFileURL(join(root, 'not-a-schema.psl')).toString();
     openDocument(harness, otherUri, 'model User {\n  id Int @id\n}\n');
-    expect(await harness.waitForDiagnostics(otherUri)).toEqual([]);
 
     await expect(requestSemanticTokens(harness, otherUri)).resolves.toEqual({ data: [] });
   });
@@ -1247,7 +1245,7 @@ describe('language server symbol-table diagnostics', {
     expect(Array.isArray(diagnostics)).toBe(true);
   });
 
-  it('publishes an empty set for a document that is not a configured input', async () => {
+  it('publishes nothing for a document that is not a configured input', async () => {
     harness = startHarness(resolveToSchema);
     await harness.initialize();
 
@@ -1256,8 +1254,8 @@ describe('language server symbol-table diagnostics', {
       textDocument: { uri: otherUri, languageId: 'prisma', version: 1, text: duplicateModelSource },
     });
 
-    const diagnostics = await harness.waitForDiagnostics(otherUri);
-    expect(diagnostics).toEqual([]);
+    await settle();
+    expect(harness.publishCount(otherUri)).toBe(0);
   });
 });
 
@@ -1412,7 +1410,8 @@ describe('language server project registry', { timeout: timeouts.databaseOperati
       textDocument: { uri: otherUri, languageId: 'prisma', version: 1, text: 'model {' },
     });
 
-    expect(await harness.waitForDiagnostics(otherUri)).toEqual([]);
+    await settle();
+    expect(harness.publishCount(otherUri)).toBe(0);
   });
 
   it('does not fall back to a parent config when the nearest config fails to load', async () => {
@@ -1573,7 +1572,8 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
     harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
       textDocument: { uri: schemaUri, languageId: 'prisma', version: 1, text: 'model {' },
     });
-    expect(await harness.waitForDiagnostics(schemaUri)).toEqual([]);
+    await settle();
+    expect(harness.publishCount(schemaUri)).toBe(0);
 
     const diagnosed = harness.waitForDiagnosticsMatching(
       schemaUri,
@@ -1843,14 +1843,12 @@ describe('language server preserved artifacts', { timeout: timeouts.databaseOper
     await closed;
 
     nearestConfigPath = alternateConfigPath;
-    const reopened = harness.waitForDiagnosticsMatching(
-      schemaUri,
-      (diagnostics) => diagnostics.length === 0,
-    );
     openDocument(harness, schemaUri, duplicateModelSource, 2);
-    await reopened;
-
-    expect(configResolutionMock.resolveConfigInputs).toHaveBeenCalledWith(alternateConfigPath);
+    await waitUntil(() =>
+      configResolutionMock.resolveConfigInputs.mock.calls.some(
+        ([path]) => path === alternateConfigPath,
+      ),
+    );
   });
 
   it('drops the cached AST and clears the symbol table when the document closes', async () => {
