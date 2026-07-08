@@ -72,6 +72,23 @@ changes:
         - "deriveJsonSchema"
         - "derivePolymorphicJsonSchema"
       anyMatch: true
+  - id: relation-from-to-arguments
+    summary: |
+      The PSL `@relation` foreign-key arguments are renamed: `fields:` becomes `from:`
+      and `references:` becomes `to:`. The legacy spellings are rejected at contract
+      emission with PSL_LEGACY_FIELDS_REFERENCES, and `contract infer` prints the
+      canonical `from:`/`to:` keys. Rename the keys in place inside every
+      `@relation(...)` attribute in extension fixture schemas and example PSL — argument
+      order and values are unchanged; `@@id(fields:)` and friends are NOT affected. Tests
+      asserting printed/inferred PSL that contains `@relation(fields: ..., references:
+      ...)` must expect `@relation(from: ..., to: ...)` instead. A single field may be
+      written bare (`from: userId`), and `to:` may be omitted when the relation
+      references the target model's `@id`.
+    detection:
+      glob: "**/*.{prisma,ts}"
+      contains:
+        - "@relation"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
