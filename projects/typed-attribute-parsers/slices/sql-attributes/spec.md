@@ -53,6 +53,7 @@ One outcome — "the SQL family validates every attribute's arguments through th
 | `fieldRef('self')` at model level | Works unchanged | Keys off `ctx.selfModel`; no separate "model field list" combinator needed. |
 | `@default` function registry | Preserve; `funcCall` defers to it | Entries are pack-contributed via `ControlMutationDefaultRegistry`; `funcCall` must be registry-parameterised, not hardcode names. Preserve `PSL_UNKNOWN_DEFAULT_FUNCTION` etc. |
 | Diagnostic codes | Syntax→`PSL_INVALID_ATTRIBUTE_SYNTAX`; semantic checks keep their codes | Expect fixture/test churn where an old `PSL_INVALID_ATTRIBUTE_ARGUMENT` *shape* error becomes `PSL_INVALID_ATTRIBUTE_SYNTAX` — intentional (consistent with slice 1). |
+| Field-list spelling for `@@id`/`@@unique`/`@@index` | Positional-only (`@@index([a, b])`); named `fields:` spelling intentionally dropped | The legacy `parseAttributeFieldList` accepted `fields: [...]` as a named arg too; the specs model `fields` as a positional param only. Positional is Prisma's canonical form, and no in-repo schema/fixture/test/example uses the named spelling, so this narrowing is invisible in practice. Accepted deliberately (operator decision) to keep the specs clean rather than declaring `fields` in both positional and named. |
 
 ## Slice-specific done conditions
 
