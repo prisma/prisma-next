@@ -600,7 +600,7 @@ export function createServer(connection: Connection): LanguageServer {
     },
     getDocumentAst: (uri) => artifactsForDocument(uri)?.document(uri),
     // `| undefined` only because the uri may be unmanaged (closed, non-input,
-    // or projectless); a managed document's project always yields a table.
+    // or projectless); a managed document's project always yields a symbolTable.
     getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.symbolTable(),
   };
 }

@@ -1,8 +1,8 @@
-import type { SymbolTable } from '@prisma-next/psl-parser';
+import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
 import type { DocumentAst, SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { LspDiagnostic } from './diagnostic-mapping';
 import { computeDocumentDiagnostics } from './document-diagnostics';
-import { type PipelineInputs, runSymbolTableStage } from './pipeline';
+import type { PipelineInputs } from './pipeline';
 import type { SchemaInputSet } from './schema-inputs';
 
 export interface DocumentArtifacts {
@@ -75,31 +75,31 @@ export function createProjectArtifacts(options: ProjectArtifactsOptions): Projec
   return {
     document: readDocument,
     symbolTable: () => {
-      if (symbolTable === undefined) {
-        for (const uri of inputs.uris()) {
-          const artifacts = readDocument(uri);
-          if (artifacts !== undefined) {
-            // A read that hits existing artifacts leaves the slot unset (the
-            // contributing input may have closed since); rebuild from the
-            // artifacts without reparsing.
-            symbolTable ??= runSymbolTableStage(
-              artifacts.document,
-              artifacts.sourceFile,
-              controlStack,
-            ).symbolTable;
-            break;
-          }
+      if (symbolTable !== undefined) {
+        return symbolTable;
+      }
+      for (const uri of inputs.uris()) {
+        const artifacts = readDocument(uri);
+        if (artifacts === undefined) {
+          continue;
         }
+        // A read that hits existing artifacts leaves the slot unset (the
+        // contributing input may have closed since); rebuild from the
+        // artifacts without reparsing.
+        symbolTable ??= buildSymbolTable({
+          document: artifacts.document,
+          sourceFile: artifacts.sourceFile,
+          scalarTypes: controlStack.scalarTypes,
+          pslBlockDescriptors: controlStack.pslBlockDescriptors,
+        }).table;
+        return symbolTable;
       }
-      if (symbolTable === undefined) {
-        // The server's lifecycle makes this unreachable: it drops a project
-        // once its last open input closes. Throwing loudly beats serving a
-        // fabricated empty symbolTable that would mask the broken invariant.
-        throw new Error(
-          'invariant violated: project has no open configured input — the server must drop such projects',
-        );
-      }
-      return symbolTable;
+      // The server's lifecycle makes this unreachable: it drops a project
+      // once its last open input closes. Throwing loudly beats serving a
+      // fabricated empty symbolTable that would mask the broken invariant.
+      throw new Error(
+        'invariant violated: project has no open configured input — the server must drop such projects',
+      );
     },
     documentChanged: drop,
     documentClosed: drop,
