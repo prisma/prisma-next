@@ -25,9 +25,14 @@ import {
   resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
 import {
-  interpretFieldConstraintMapName,
-  interpretFieldMapName,
-  interpretModelMapName,
+  findFieldAttributeNode,
+  findModelAttributeNode,
+  idFieldSpec,
+  interpretFieldAttribute,
+  interpretModelAttribute,
+  mapFieldSpec,
+  mapModelSpec,
+  uniqueFieldSpec,
 } from './sql-attribute-specs';
 
 type LoweredFieldDefault = {
@@ -272,22 +277,32 @@ function extractFieldConstraintNames(input: {
 } {
   const idAttribute = getAttribute(input.field.attributes, 'id');
   const uniqueAttribute = getAttribute(input.field.attributes, 'unique');
-  const idName = interpretFieldConstraintMapName({
-    model: input.model,
-    field: input.field,
-    attributeName: 'id',
-    sourceFile: input.sourceFile,
-    sourceId: input.sourceId,
-    diagnostics: input.diagnostics,
-  });
-  const uniqueName = interpretFieldConstraintMapName({
-    model: input.model,
-    field: input.field,
-    attributeName: 'unique',
-    sourceFile: input.sourceFile,
-    sourceId: input.sourceId,
-    diagnostics: input.diagnostics,
-  });
+  const idNode = findFieldAttributeNode(input.field, 'id');
+  const idName =
+    idNode === undefined
+      ? undefined
+      : interpretFieldAttribute({
+          node: idNode,
+          spec: idFieldSpec,
+          model: input.model,
+          field: input.field,
+          sourceFile: input.sourceFile,
+          sourceId: input.sourceId,
+          diagnostics: input.diagnostics,
+        })?.map;
+  const uniqueNode = findFieldAttributeNode(input.field, 'unique');
+  const uniqueName =
+    uniqueNode === undefined
+      ? undefined
+      : interpretFieldAttribute({
+          node: uniqueNode,
+          spec: uniqueFieldSpec,
+          model: input.model,
+          field: input.field,
+          sourceFile: input.sourceFile,
+          sourceId: input.sourceId,
+          diagnostics: input.diagnostics,
+        })?.map;
   return { idAttribute, uniqueAttribute, idName, uniqueName };
 }
 
@@ -586,23 +601,33 @@ export function buildModelMappings(
 ): Map<string, ModelNameMapping> {
   const result = new Map<string, ModelNameMapping>();
   for (const { model, namespaceId } of modelEntries) {
-    const tableName = interpretModelMapName({
-      model,
-      defaultValue: lowerFirst(model.name),
-      sourceFile,
-      sourceId,
-      diagnostics,
-    });
+    const mapNode = findModelAttributeNode(model, 'map');
+    const tableName =
+      mapNode === undefined
+        ? lowerFirst(model.name)
+        : (interpretModelAttribute({
+            node: mapNode,
+            spec: mapModelSpec,
+            model,
+            sourceFile,
+            sourceId,
+            diagnostics,
+          })?.name ?? lowerFirst(model.name));
     const fieldColumns = new Map<string, string>();
     for (const field of Object.values(model.fields)) {
-      const columnName = interpretFieldMapName({
-        model,
-        field,
-        defaultValue: field.name,
-        sourceFile,
-        sourceId,
-        diagnostics,
-      });
+      const fieldMapNode = findFieldAttributeNode(field, 'map');
+      const columnName =
+        fieldMapNode === undefined
+          ? field.name
+          : (interpretFieldAttribute({
+              node: fieldMapNode,
+              spec: mapFieldSpec,
+              model,
+              field,
+              sourceFile,
+              sourceId,
+              diagnostics,
+            })?.name ?? field.name);
       fieldColumns.set(field.name, columnName);
     }
     result.set(modelCoordinateKey(namespaceId ?? defaultNamespaceId, model.name), {

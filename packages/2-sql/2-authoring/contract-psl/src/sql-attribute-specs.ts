@@ -1,6 +1,10 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { ControlPolicy } from '@prisma-next/contract/types';
-import type { FieldSymbol, InterpretCtx, ModelSymbol } from '@prisma-next/psl-parser';
+import type {
+  AttributeSpec,
+  FieldSymbol,
+  InterpretCtx,
+  ModelSymbol,
+} from '@prisma-next/psl-parser';
 import {
   entityRef,
   fieldAttribute,
@@ -41,7 +45,7 @@ export function findFieldAttributeNode(
   return undefined;
 }
 
-export function buildModelInterpretCtx(input: {
+function buildModelInterpretCtx(input: {
   readonly selfModel: ModelSymbol;
   readonly sourceFile: SourceFile;
   readonly sourceId: string;
@@ -55,7 +59,7 @@ export function buildModelInterpretCtx(input: {
   };
 }
 
-export function buildFieldInterpretCtx(input: {
+function buildFieldInterpretCtx(input: {
   readonly selfModel: ModelSymbol;
   readonly field: FieldSymbol;
   readonly sourceFile: SourceFile;
@@ -71,23 +75,20 @@ export function buildFieldInterpretCtx(input: {
   };
 }
 
-const mapModelSpec = modelAttribute('map', { positional: [{ key: 'name', type: str() }] });
-const mapFieldSpec = fieldAttribute('map', { positional: [{ key: 'name', type: str() }] });
-
-// `@@map` / `@map` are optional: an absent attribute falls back to the caller's
-// default (lowered model name / field name).
-export function interpretModelMapName(input: {
+// Interpret a model-level attribute node against its spec, draining any parse
+// failures into `diagnostics`. Returns the typed value, or `undefined` on
+// failure so the caller can apply its own default/absence handling.
+export function interpretModelAttribute<Out>(input: {
+  readonly node: ModelAttributeAst;
+  readonly spec: AttributeSpec<Out>;
   readonly model: ModelSymbol;
-  readonly defaultValue: string;
   readonly sourceFile: SourceFile;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
-}): string {
-  const node = findModelAttributeNode(input.model, 'map');
-  if (node === undefined) return input.defaultValue;
+}): Out | undefined {
   const result = interpretAttribute(
-    node,
-    mapModelSpec,
+    input.node,
+    input.spec,
     buildModelInterpretCtx({
       selfModel: input.model,
       sourceFile: input.sourceFile,
@@ -96,39 +97,26 @@ export function interpretModelMapName(input: {
   );
   if (!result.ok) {
     for (const failure of result.failure) input.diagnostics.push(failure);
-    return input.defaultValue;
+    return undefined;
   }
-  return result.value.name;
+  return result.value;
 }
 
-const idFieldSpec = fieldAttribute('id', { named: { map: optional(str()) } });
-const uniqueFieldSpec = fieldAttribute('unique', { named: { map: optional(str()) } });
-
-const idModelSpec = modelAttribute('id', {
-  positional: [{ key: 'fields', type: list(fieldRef('self'), { nonEmpty: true, unique: true }) }],
-  named: { map: optional(str()) },
-});
-const uniqueModelSpec = modelAttribute('unique', {
-  positional: [{ key: 'fields', type: list(fieldRef('self'), { nonEmpty: true, unique: true }) }],
-  named: { map: optional(str()) },
-});
-
-// `@id` / `@unique` carry an optional constraint `map:` name; the caller detects
-// presence separately, so an absent attribute simply yields no name.
-export function interpretFieldConstraintMapName(input: {
+// Interpret a field-level attribute node against its spec, draining any parse
+// failures into `diagnostics`. Returns the typed value, or `undefined` on
+// failure so the caller can apply its own default/absence handling.
+export function interpretFieldAttribute<Out>(input: {
+  readonly node: FieldAttributeAst;
+  readonly spec: AttributeSpec<Out>;
   readonly model: ModelSymbol;
   readonly field: FieldSymbol;
-  readonly attributeName: 'id' | 'unique';
   readonly sourceFile: SourceFile;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
-}): string | undefined {
-  const node = findFieldAttributeNode(input.field, input.attributeName);
-  if (node === undefined) return undefined;
-  const spec = input.attributeName === 'id' ? idFieldSpec : uniqueFieldSpec;
+}): Out | undefined {
   const result = interpretAttribute(
-    node,
-    spec,
+    input.node,
+    input.spec,
     buildFieldInterpretCtx({
       selfModel: input.model,
       field: input.field,
@@ -140,38 +128,25 @@ export function interpretFieldConstraintMapName(input: {
     for (const failure of result.failure) input.diagnostics.push(failure);
     return undefined;
   }
-  return result.value.map;
+  return result.value;
 }
 
-// `@@id` / `@@unique` share an argument shape: a required field list plus an
-// optional constraint `map:` name. Semantic checks (nullable-in-PK, column
-// mapping, both-inline-and-block PK, duplicate declaration) stay in the caller.
-export function interpretModelConstraint(input: {
-  readonly node: ModelAttributeAst;
-  readonly attributeName: 'id' | 'unique';
-  readonly model: ModelSymbol;
-  readonly sourceFile: SourceFile;
-  readonly sourceId: string;
-  readonly diagnostics: ContractSourceDiagnostic[];
-}): { readonly fields: readonly string[]; readonly map: string | undefined } | undefined {
-  const spec = input.attributeName === 'id' ? idModelSpec : uniqueModelSpec;
-  const result = interpretAttribute(
-    input.node,
-    spec,
-    buildModelInterpretCtx({
-      selfModel: input.model,
-      sourceFile: input.sourceFile,
-      sourceId: input.sourceId,
-    }),
-  );
-  if (!result.ok) {
-    for (const failure of result.failure) input.diagnostics.push(failure);
-    return undefined;
-  }
-  return { fields: result.value.fields, map: result.value.map };
-}
+export const mapModelSpec = modelAttribute('map', { positional: [{ key: 'name', type: str() }] });
+export const mapFieldSpec = fieldAttribute('map', { positional: [{ key: 'name', type: str() }] });
 
-const indexModelSpec = modelAttribute('index', {
+export const idFieldSpec = fieldAttribute('id', { named: { map: optional(str()) } });
+export const uniqueFieldSpec = fieldAttribute('unique', { named: { map: optional(str()) } });
+
+export const idModelSpec = modelAttribute('id', {
+  positional: [{ key: 'fields', type: list(fieldRef('self'), { nonEmpty: true, unique: true }) }],
+  named: { map: optional(str()) },
+});
+export const uniqueModelSpec = modelAttribute('unique', {
+  positional: [{ key: 'fields', type: list(fieldRef('self'), { nonEmpty: true, unique: true }) }],
+  named: { map: optional(str()) },
+});
+
+export const indexModelSpec = modelAttribute('index', {
   positional: [{ key: 'fields', type: list(fieldRef('self'), { nonEmpty: true, unique: true }) }],
   named: { map: optional(str()), type: optional(str()), options: optional(record(str())) },
   refine: (value, ctx) =>
@@ -186,45 +161,7 @@ const indexModelSpec = modelAttribute('index', {
       : [],
 });
 
-// `@@index` carries a required field list plus optional `map`/`type`/`options`.
-// `options` is only meaningful alongside `type` (enforced by the spec's refine).
-// Column mapping and duplicate-attribute checks stay in the caller.
-export function interpretModelIndex(input: {
-  readonly node: ModelAttributeAst;
-  readonly model: ModelSymbol;
-  readonly sourceFile: SourceFile;
-  readonly sourceId: string;
-  readonly diagnostics: ContractSourceDiagnostic[];
-}):
-  | {
-      readonly fields: readonly string[];
-      readonly map: string | undefined;
-      readonly type: string | undefined;
-      readonly options: Record<string, string> | undefined;
-    }
-  | undefined {
-  const result = interpretAttribute(
-    input.node,
-    indexModelSpec,
-    buildModelInterpretCtx({
-      selfModel: input.model,
-      sourceFile: input.sourceFile,
-      sourceId: input.sourceId,
-    }),
-  );
-  if (!result.ok) {
-    for (const failure of result.failure) input.diagnostics.push(failure);
-    return undefined;
-  }
-  return {
-    fields: result.value.fields,
-    map: result.value.map,
-    type: result.value.type,
-    options: result.value.options,
-  };
-}
-
-const controlModelSpec = modelAttribute('control', {
+export const controlModelSpec = modelAttribute('control', {
   positional: [
     {
       key: 'policy',
@@ -238,115 +175,12 @@ const controlModelSpec = modelAttribute('control', {
   ],
 });
 
-// `@@control` carries a single bare-identifier policy word. The duplicate-`@@control`
-// guard stays in the caller; this helper only resolves the policy value.
-export function interpretModelControl(input: {
-  readonly node: ModelAttributeAst;
-  readonly model: ModelSymbol;
-  readonly sourceFile: SourceFile;
-  readonly sourceId: string;
-  readonly diagnostics: ContractSourceDiagnostic[];
-}): ControlPolicy | undefined {
-  const result = interpretAttribute(
-    input.node,
-    controlModelSpec,
-    buildModelInterpretCtx({
-      selfModel: input.model,
-      sourceFile: input.sourceFile,
-      sourceId: input.sourceId,
-    }),
-  );
-  if (!result.ok) {
-    for (const failure of result.failure) input.diagnostics.push(failure);
-    return undefined;
-  }
-  return result.value.policy;
-}
-
-const discriminatorModelSpec = modelAttribute('discriminator', {
+export const discriminatorModelSpec = modelAttribute('discriminator', {
   positional: [{ key: 'field', type: fieldRef('self') }],
 });
-const baseModelSpec = modelAttribute('base', {
+export const baseModelSpec = modelAttribute('base', {
   positional: [
     { key: 'base', type: entityRef() },
     { key: 'value', type: str() },
   ],
 });
-
-// `@@discriminator` names a field on the declaring model; `fieldRef('self')`
-// already rejects an unknown field. The String-type semantic check and all
-// cross-model resolution stay in the caller.
-export function interpretModelDiscriminator(input: {
-  readonly node: ModelAttributeAst;
-  readonly model: ModelSymbol;
-  readonly sourceFile: SourceFile;
-  readonly sourceId: string;
-  readonly diagnostics: ContractSourceDiagnostic[];
-}): { readonly field: string } | undefined {
-  const result = interpretAttribute(
-    input.node,
-    discriminatorModelSpec,
-    buildModelInterpretCtx({
-      selfModel: input.model,
-      sourceFile: input.sourceFile,
-      sourceId: input.sourceId,
-    }),
-  );
-  if (!result.ok) {
-    for (const failure of result.failure) input.diagnostics.push(failure);
-    return undefined;
-  }
-  return { field: result.value.field };
-}
-
-// `@@base` names a base model (bare identifier, resolved downstream) plus a
-// quoted discriminator value. Base-model existence stays in the caller.
-export function interpretModelBase(input: {
-  readonly node: ModelAttributeAst;
-  readonly model: ModelSymbol;
-  readonly sourceFile: SourceFile;
-  readonly sourceId: string;
-  readonly diagnostics: ContractSourceDiagnostic[];
-}): { readonly base: string; readonly value: string } | undefined {
-  const result = interpretAttribute(
-    input.node,
-    baseModelSpec,
-    buildModelInterpretCtx({
-      selfModel: input.model,
-      sourceFile: input.sourceFile,
-      sourceId: input.sourceId,
-    }),
-  );
-  if (!result.ok) {
-    for (const failure of result.failure) input.diagnostics.push(failure);
-    return undefined;
-  }
-  return { base: result.value.base, value: result.value.value };
-}
-
-export function interpretFieldMapName(input: {
-  readonly model: ModelSymbol;
-  readonly field: FieldSymbol;
-  readonly defaultValue: string;
-  readonly sourceFile: SourceFile;
-  readonly sourceId: string;
-  readonly diagnostics: ContractSourceDiagnostic[];
-}): string {
-  const node = findFieldAttributeNode(input.field, 'map');
-  if (node === undefined) return input.defaultValue;
-  const result = interpretAttribute(
-    node,
-    mapFieldSpec,
-    buildFieldInterpretCtx({
-      selfModel: input.model,
-      field: input.field,
-      sourceFile: input.sourceFile,
-      sourceId: input.sourceId,
-    }),
-  );
-  if (!result.ok) {
-    for (const failure of result.failure) input.diagnostics.push(failure);
-    return input.defaultValue;
-  }
-  return result.value.name;
-}

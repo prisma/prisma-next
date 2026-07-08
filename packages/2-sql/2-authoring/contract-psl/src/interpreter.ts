@@ -98,12 +98,14 @@ import {
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
 import {
+  baseModelSpec,
+  controlModelSpec,
+  discriminatorModelSpec,
   findModelAttributeNode,
-  interpretModelBase,
-  interpretModelConstraint,
-  interpretModelControl,
-  interpretModelDiscriminator,
-  interpretModelIndex,
+  idModelSpec,
+  indexModelSpec,
+  interpretModelAttribute,
+  uniqueModelSpec,
 } from './sql-attribute-specs';
 
 type NamedTypeSymbol = ScalarSymbol | TypeAliasSymbol;
@@ -646,15 +648,16 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (node === undefined) {
         continue;
       }
-      const parsed = interpretModelControl({
+      const parsed = interpretModelAttribute({
         node,
+        spec: controlModelSpec,
         model,
         sourceFile: input.sourceFile,
         sourceId,
         diagnostics,
       });
       if (parsed !== undefined) {
-        controlPolicy = parsed;
+        controlPolicy = parsed.policy;
       }
       continue;
     }
@@ -683,9 +686,9 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (node === undefined) {
         continue;
       }
-      const parsed = interpretModelConstraint({
+      const parsed = interpretModelAttribute({
         node,
-        attributeName: 'id',
+        spec: idModelSpec,
         model,
         sourceFile: input.sourceFile,
         sourceId,
@@ -729,9 +732,9 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (node === undefined) {
         continue;
       }
-      const parsed = interpretModelConstraint({
+      const parsed = interpretModelAttribute({
         node,
-        attributeName: 'unique',
+        spec: uniqueModelSpec,
         model,
         sourceFile: input.sourceFile,
         sourceId,
@@ -763,8 +766,9 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (node === undefined) {
         continue;
       }
-      const parsed = interpretModelIndex({
+      const parsed = interpretModelAttribute({
         node,
+        spec: indexModelSpec,
         model,
         sourceFile: input.sourceFile,
         sourceId,
@@ -1298,8 +1302,9 @@ function collectPolymorphismDeclarations(
   for (const model of models) {
     const discriminatorNode = findModelAttributeNode(model, 'discriminator');
     if (discriminatorNode !== undefined) {
-      const parsed = interpretModelDiscriminator({
+      const parsed = interpretModelAttribute({
         node: discriminatorNode,
+        spec: discriminatorModelSpec,
         model,
         sourceFile,
         sourceId,
@@ -1323,8 +1328,9 @@ function collectPolymorphismDeclarations(
 
     const baseNode = findModelAttributeNode(model, 'base');
     if (baseNode !== undefined) {
-      const parsed = interpretModelBase({
+      const parsed = interpretModelAttribute({
         node: baseNode,
+        spec: baseModelSpec,
         model,
         sourceFile,
         sourceId,
