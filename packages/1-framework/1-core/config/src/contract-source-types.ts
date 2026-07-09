@@ -49,14 +49,41 @@ export interface ContractSourceContext {
   readonly capabilities: CapabilityMatrix;
 }
 
-/** Lets format-aware tooling avoid file-extension sniffing and opaque loader introspection. */
+/**
+ * Formats the first-party toolchain recognizes. Lets format-aware tooling
+ * avoid file-extension sniffing and opaque loader introspection. Providers
+ * may declare any other string; tooling treats those as opaque.
+ */
 export type ContractSourceFormat = 'psl' | 'typescript';
 
-export interface ContractSourceProvider {
-  /** Absent means format-aware tooling must leave the source untouched. */
-  readonly sourceFormat?: ContractSourceFormat;
+export interface ContractSourceProviderBase {
   readonly inputs?: readonly string[];
   readonly load: (
     context: ContractSourceContext,
   ) => Promise<Result<Contract, ContractSourceDiagnostics>>;
 }
+
+export interface PslContractSourceProvider extends ContractSourceProviderBase {
+  readonly sourceFormat: 'psl';
+}
+
+export interface TypeScriptContractSourceProvider extends ContractSourceProviderBase {
+  readonly sourceFormat: 'typescript';
+}
+
+/**
+ * Third-party or unspecified source formats. Absent (or unrecognized)
+ * `sourceFormat` means format-aware tooling must leave the source untouched.
+ *
+ * The open `string` overlaps the literal members, so a bare
+ * `sourceFormat === 'psl'` comparison never narrows the union — narrowing
+ * flows only through capability guards owned by the authoring layer.
+ */
+export interface OpaqueContractSourceProvider extends ContractSourceProviderBase {
+  readonly sourceFormat?: string;
+}
+
+export type ContractSourceProvider =
+  | PslContractSourceProvider
+  | TypeScriptContractSourceProvider
+  | OpaqueContractSourceProvider;

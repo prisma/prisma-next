@@ -565,6 +565,57 @@ describe('defineConfig', () => {
     });
     expect(() => validateConfig(config)).not.toThrow();
   });
+
+  it('accepts a provider with an unknown sourceFormat string', () => {
+    const config = createValidConfig({
+      contract: {
+        source: createSourceProvider({ sourceFormat: 'made-up-format' }),
+      },
+    });
+
+    const result = defineConfig(config);
+    expect(result.contract?.source.sourceFormat).toBe('made-up-format');
+  });
+
+  it('rejects a non-string sourceFormat', () => {
+    const config = createValidConfig({
+      contract: {
+        source: createSourceProvider({ sourceFormat: 123 }),
+      },
+    });
+
+    expect(() => defineConfig(config)).toThrow('Config validation failed');
+  });
+
+  it('passes a provider carrying an extra interpret key through validation untouched', () => {
+    const source = createSourceProvider({
+      sourceFormat: 'psl',
+      inputs: ['./schema.prisma'],
+      interpret: () => [],
+    });
+    const config = createValidConfig({ contract: { source } });
+
+    const result = defineConfig(config);
+    expect(result.contract?.source).toBe(source);
+  });
+
+  it('accepts the first-party psl and typescript provider shapes', () => {
+    // Mirrors the source shapes produced by prismaContract() (psl) and
+    // typescriptContract*() (typescript) so those fixtures stay valid.
+    const pslConfig = createValidConfig({
+      contract: {
+        source: createSourceProvider({ sourceFormat: 'psl', inputs: ['./schema.prisma'] }),
+      },
+    });
+    const typescriptConfig = createValidConfig({
+      contract: {
+        source: createSourceProvider({ sourceFormat: 'typescript' }),
+      },
+    });
+
+    expect(() => defineConfig(pslConfig)).not.toThrow();
+    expect(() => defineConfig(typescriptConfig)).not.toThrow();
+  });
 });
 
 describe('formatter section', () => {
