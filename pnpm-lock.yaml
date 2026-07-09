@@ -3682,9 +3682,15 @@ importers:
         specifier: 'catalog:'
         version: 8.21.0
     devDependencies:
+      '@prisma-next/emitter':
+        specifier: workspace:0.14.0
+        version: link:../../1-framework/3-tooling/emitter
       '@prisma-next/psl-parser':
         specifier: workspace:0.14.0
         version: link:../../1-framework/2-authoring/psl-parser
+      '@prisma-next/sql-contract-emitter':
+        specifier: workspace:0.14.0
+        version: link:../../2-sql/3-tooling/emitter
       '@prisma-next/test-utils':
         specifier: workspace:0.14.0
         version: link:../../../test/utils

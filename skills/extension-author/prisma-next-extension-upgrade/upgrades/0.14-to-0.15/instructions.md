@@ -413,4 +413,32 @@ for pack authors: a pack that declares a table's storage coordinate but no domai
 model mapped to it now makes `contract infer` throw (malformed pack); packs normally
 ship storage + domain together, so no action for well-formed packs. No extension-author
 action required. Incidental substrate diff only.
+
+TML-2965 (native-enum-ts-authoring): a native Postgres enum + `pg.enum` column is now
+authorable in the TypeScript DSL, producing a contract byte-identical to the PSL
+`native_enum` equivalent (including in a non-`public` schema). The `packages/3-extensions/`
+diff is additive: `@prisma-next/extension-postgres` gains `src/contract/native-enum.ts` —
+`nativeEnum(name, ...values)` returns a handle whose entity name is `name` and whose
+Postgres type name defaults to `name`; chain `.map(typeName)` to override the Postgres
+type name only. A column binds the handle through `field.column(pg.enum(handle))` (the
+deferred column descriptor resolved at contract-build time). The module exports
+`nativeEnum` / `pg` / `NativeEnumHandle` from `src/exports/contract-builder.ts`;
+`package.json` gains
+`@prisma-next/emitter` and `@prisma-next/sql-contract-emitter` devDependencies for the
+new test's `.d.ts` emission assertion. All net-new exports — nothing existing was
+changed or removed. No extension-author action required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2828 (variant relations on the narrowed accessor, PR #933): the
+`packages/3-extensions/` diff is confined to `@prisma-next/sql-orm-client` (itself an
+extension). The `.variant('X')`-narrowed predicate accessor now surfaces relations the
+variant model declares in the contract, alongside the base model's relations —
+`createModelAccessor` resolves a variant-owned relation against the variant's
+coordinates (variant table for MTI, base table for STI), and
+`VariantAwareModelAccessor` intersects in the variant's relation accessors so
+`t.variant('Feature').where(x => x.assignee.some(…))` type-checks and plans a correct
+EXISTS. Purely additive to the ORM client's query surface; no extension-author SPI
+(`@prisma-next/contract`, `@prisma-next/framework-components`, …) changed. No
+extension-author action required. Incidental substrate diff only.
 -->

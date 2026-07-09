@@ -103,16 +103,9 @@ type EntityRefColumnResult = { readonly typeParams?: Record<string, unknown> } &
   readonly nativeType: string;
 };
 
-function qualifiedTypeName(typeName: string, namespaceId?: string): string {
-  return namespaceId !== undefined ? `${namespaceId}.${typeName}` : typeName;
-}
-
 function makeCodecDescriptor(options: {
   readonly codecId: string;
-  readonly columnFromEntity?: (
-    entity: unknown,
-    namespaceId?: string,
-  ) => EntityRefColumnResult | undefined;
+  readonly columnFromEntity?: (entity: unknown) => EntityRefColumnResult | undefined;
 }): AnyCodecDescriptor {
   return {
     codecId: options.codecId,
@@ -131,10 +124,9 @@ function makeCodecDescriptor(options: {
 
 const nativeEnumCodec = makeCodecDescriptor({
   codecId: 'test/native-enum@1',
-  columnFromEntity: (entity, namespaceId) => {
+  columnFromEntity: (entity) => {
     const enumEntity = entity as TestNativeEnum;
-    const typeName = qualifiedTypeName(enumEntity.typeName, namespaceId);
-    return { typeParams: { typeName }, nativeType: typeName };
+    return { typeParams: { typeName: enumEntity.typeName }, nativeType: enumEntity.typeName };
   },
 });
 
@@ -244,6 +236,12 @@ namespace docs {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    // `nativeType` / `typeParams.typeName` stay bare here: schema-qualification
+    // (e.g. `auth.aal_level`) is a Postgres-target concern applied when the
+    // target builds the namespace (`postgresCreateNamespace`), not something
+    // the generic interpreter or its `TestSqlNamespace` double perform. Real
+    // Postgres qualification is covered by
+    // `target-postgres/test/psl-pg-enum-column.test.ts`.
     expect(result.value.storage).toMatchObject({
       namespaces: {
         docs: {
@@ -253,8 +251,8 @@ namespace docs {
                 columns: {
                   aal: {
                     codecId: 'test/native-enum@1',
-                    nativeType: 'docs.AalLevel',
-                    typeParams: { typeName: 'docs.AalLevel' },
+                    nativeType: 'AalLevel',
+                    typeParams: { typeName: 'AalLevel' },
                     nullable: false,
                     valueSet: {
                       plane: 'storage',

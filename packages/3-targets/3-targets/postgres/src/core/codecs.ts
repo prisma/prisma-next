@@ -243,32 +243,71 @@ export class PgEnumDescriptor extends CodecDescriptorImpl<PgEnumParams> {
 
   /**
    * Authoring-time hook a `pg.enum(<ref>)` type constructor calls once it has
-   * resolved its ref argument to the referenced `native_enum` entity: given
-   * that entity and the field's namespace id, produces this codec's
-   * per-column `typeParams` and native type. The type name is schema-qualified
-   * for a named non-default schema (matching `format_type()`); `public` and
-   * the unbound namespace stay bare (`search_path`). `nativeType` mirrors
-   * `typeParams.typeName` — the same value {@link metaFor} derives at
-   * render time — so the column's declared native type and the render-time
-   * cast agree. Returns `undefined` if `entity` is not a `PostgresNativeEnum`
-   * (a contributor bug, not a user-schema error — the caller decides how to
+   * resolved its ref argument to the referenced `native_enum` entity:
+   * produces this codec's per-column `typeParams` and native type from the
+   * entity's bare type name. Schema-qualification (`auth.aal_level` for a
+   * named non-default schema) is not this hook's concern — the field's
+   * namespace isn't known at this call site for every authoring path (the TS
+   * builder resolves a column before it knows its model's namespace), so it is
+   * applied later, at contract construction, by {@link qualifyNativeType} via
+   * the target's `authoring.qualifyColumnType` hook. `nativeType` mirrors
+   * `typeParams.typeName` — the same value {@link metaFor} derives at render
+   * time — so the column's declared native type and the render-time cast
+   * agree. Returns `undefined` if `entity` is not a `PostgresNativeEnum` (a
+   * contributor bug, not a user-schema error — the caller decides how to
    * report it).
    */
   columnFromEntity(
     entity: object,
-    namespaceId?: string,
   ): { readonly typeParams: PgEnumParams; readonly nativeType: string } | undefined {
     if (!PostgresNativeEnum.is(entity)) return undefined;
-    const qualifyNativeType =
-      namespaceId !== undefined &&
-      namespaceId !== DEFAULT_NAMESPACE_ID &&
-      namespaceId !== UNBOUND_NAMESPACE_ID;
-    const typeName = qualifyNativeType ? `${namespaceId}.${entity.typeName}` : entity.typeName;
-    return { typeParams: { typeName }, nativeType: typeName };
+    return { typeParams: { typeName: entity.typeName }, nativeType: entity.typeName };
+  }
+
+  /**
+   * Schema-qualifies this native enum type's name for the namespace the
+   * consuming column lives in: `${namespaceId}.${typeName}` for a named
+   * non-default schema, bare for the target's default schema (`public`) or
+   * the late-bound unbound sentinel (whose schema `search_path` resolves at
+   * runtime). Postgres's `format_type()` reports the bare name for a
+   * public-schema type, so a public column's declared native type must stay
+   * bare to match. Owned here because the codec owns its native type.
+   */
+  qualifyNativeType(typeName: string, namespaceId: string): string {
+    return namespaceId === DEFAULT_NAMESPACE_ID || namespaceId === UNBOUND_NAMESPACE_ID
+      ? typeName
+      : `${namespaceId}.${typeName}`;
   }
 }
 
 export const pgEnumDescriptor = new PgEnumDescriptor();
+
+/**
+ * Contract-construction-time column-type qualifier the Postgres target
+ * contributes through `authoring.qualifyColumnType`.
+ * `buildSqlContractFromDefinition` calls this for every column as it is
+ * constructed, passing the column's bare type info and its owning
+ * `namespaceId`; a native-enum column (`pg/enum@1`) gets its type name
+ * schema-qualified for that namespace (via
+ * {@link PgEnumDescriptor.qualifyNativeType}), keeping `nativeType` and
+ * `typeParams.typeName` in sync. Every other codec passes through unchanged.
+ * Both the PSL `pg.enum(Ref)` path and the TS `pg.enum(handle)` path route
+ * through here — the dispatch keys off the codec id, not authoring surface.
+ */
+export function postgresQualifyColumnType(
+  input: {
+    readonly codecId: string;
+    readonly nativeType: string;
+    readonly typeParams?: Record<string, unknown>;
+  },
+  namespaceId: string,
+): { readonly nativeType: string; readonly typeParams?: Record<string, unknown> } {
+  if (input.codecId !== PG_ENUM_CODEC_ID) return input;
+  const bareTypeName = input.typeParams?.['typeName'];
+  if (typeof bareTypeName !== 'string') return input;
+  const qualified = pgEnumDescriptor.qualifyNativeType(bareTypeName, namespaceId);
+  return { nativeType: qualified, typeParams: { ...input.typeParams, typeName: qualified } };
+}
 
 /**
  * Postgres `text[]` codec. Encode is an identity pass-through: the pg wire

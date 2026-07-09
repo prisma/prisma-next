@@ -24,7 +24,7 @@ import {
   postgresAuthoringTypes,
 } from '../src/core/authoring';
 import { PG_ENUM_CODEC_ID } from '../src/core/codec-ids';
-import { pgEnumDescriptor } from '../src/core/codecs';
+import { pgEnumDescriptor, postgresQualifyColumnType } from '../src/core/codecs';
 import type { PostgresSchema } from '../src/core/postgres-schema';
 import { postgresCreateNamespace } from '../src/core/postgres-schema';
 
@@ -70,6 +70,12 @@ const postgresTarget = {
   version: '0.0.1',
   capabilities: {},
   defaultNamespaceId: 'public',
+  // Native-enum column type names are schema-qualified at construction via the
+  // target's `authoring.qualifyColumnType` hook, so this minimal target must
+  // carry it (production reads it off the real Postgres pack). `type` is
+  // included only so `authoring` shares a property with `AuthoringContributions`
+  // (a weak, all-optional type); build-contract reads `qualifyColumnType`.
+  authoring: { type: postgresAuthoringTypes, qualifyColumnType: postgresQualifyColumnType },
 };
 
 const scalarColumnDescriptors = new Map<string, { codecId: string; nativeType: string }>([

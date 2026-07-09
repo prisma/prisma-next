@@ -411,10 +411,7 @@ interface EntityRefColumnFromEntityResult {
 }
 
 interface EntityRefResolvingCodecDescriptor extends AnyCodecDescriptor {
-  readonly columnFromEntity: (
-    entity: unknown,
-    namespaceId?: string,
-  ) => EntityRefColumnFromEntityResult | undefined;
+  readonly columnFromEntity: (entity: unknown) => EntityRefColumnFromEntityResult | undefined;
 }
 
 /**
@@ -435,10 +432,13 @@ function hasColumnFromEntityHook(
  * namespace's already-lowered extension entities (keyed by the declared
  * `entityRefArg.entityKind`, then block name), and converts the resolved
  * entity to column params via the `columnFromEntity` authoring hook on the
- * codec descriptor registered for `descriptor.output.codecId`. A `valueSet`
- * ref is attached when the same namespace derived a value-set under the
- * same block name (the generic `deriveValueSet` mechanism), scoped to the
- * field's own namespace.
+ * codec descriptor registered for `descriptor.output.codecId`. The `nativeType`
+ * / `typeParams.typeName` `columnFromEntity` returns are bare — schema
+ * qualification (e.g. `auth.aal_level`) is a target concern, applied later
+ * when the target builds the field's namespace. A `valueSet` ref is
+ * attached when the same namespace derived a value-set under the same block
+ * name (the generic `deriveValueSet` mechanism), scoped to the field's own
+ * namespace.
  */
 function resolveEntityRefTypeConstructorCall(input: {
   readonly call: ResolvedTypeConstructorCall;
@@ -495,7 +495,7 @@ function resolveEntityRefTypeConstructorCall(input: {
     );
   }
 
-  const resolved = codecDescriptor.columnFromEntity(entity, input.namespaceId);
+  const resolved = codecDescriptor.columnFromEntity(entity);
   if (resolved === undefined) {
     return reportUnknownRef();
   }
