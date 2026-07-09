@@ -207,8 +207,10 @@ export interface MockRuntime extends RuntimeQueryable {
 /**
  * Builds a contract with a mixed-polymorphism Task hierarchy:
  * - Task (base, table: tasks, discriminator: type)
- * - Bug (STI, table: tasks, value: bug) with `severity` field
- * - Feature (MTI, table: features, value: feature) with `priority` field
+ * - Bug (STI, table: tasks, value: bug) with `severity` field and an
+ *   `assignee` relation (assignee_id → assignees.id, on the base table)
+ * - Feature (MTI, table: features, value: feature) with `priority` field and
+ *   an `assignee` relation (assignee_id → assignees.id, on the variant table)
  *
  * A non-polymorphic `Project` parent (table: projects_tbl) owns a `tasks`
  * relation targeting the polymorphic `Task`, so an include can be planned
@@ -270,25 +272,56 @@ export function buildMixedPolyContract(): TestContract {
   };
 
   domainModels['Bug'] = {
-    fields: { severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } } },
-    relations: {},
+    fields: {
+      severity: { nullable: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+      assigneeId: { nullable: true, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+    },
+    relations: {
+      assignee: {
+        to: { model: 'Assignee', namespace: 'public' },
+        cardinality: 'N:1',
+        on: { localFields: ['assigneeId'], targetFields: ['id'] },
+      },
+    },
     storage: {
       namespaceId: 'public',
       table: 'tasks',
-      fields: { severity: { column: 'severity' } },
+      fields: { severity: { column: 'severity' }, assigneeId: { column: 'assignee_id' } },
     },
     base: { model: 'Task', namespace: 'public' },
   };
 
   domainModels['Feature'] = {
-    fields: { priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } } },
-    relations: {},
+    fields: {
+      priority: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+      assigneeId: { nullable: true, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+    },
+    relations: {
+      assignee: {
+        to: { model: 'Assignee', namespace: 'public' },
+        cardinality: 'N:1',
+        on: { localFields: ['assigneeId'], targetFields: ['id'] },
+      },
+    },
     storage: {
       namespaceId: 'public',
       table: 'features',
-      fields: { priority: { column: 'priority' } },
+      fields: { priority: { column: 'priority' }, assigneeId: { column: 'assignee_id' } },
     },
     base: { model: 'Task', namespace: 'public' },
+  };
+
+  domainModels['Assignee'] = {
+    fields: {
+      id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
+      name: { nullable: false, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+    },
+    relations: {},
+    storage: {
+      namespaceId: 'public',
+      table: 'assignees',
+      fields: { id: { column: 'id' }, name: { column: 'name' } },
+    },
   };
 
   raw.storage.namespaces.public.entries.table.tasks = {
@@ -299,6 +332,7 @@ export function buildMixedPolyContract(): TestContract {
       severity: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
       project_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: true },
       parent_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: true },
+      assignee_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: true },
     },
     primaryKey: { columns: ['id'] },
     uniques: [],
@@ -321,6 +355,18 @@ export function buildMixedPolyContract(): TestContract {
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      assignee_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: true },
+    },
+    primaryKey: { columns: ['id'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  };
+
+  raw.storage.namespaces.public.entries.table.assignees = {
+    columns: {
+      id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+      name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
     },
     primaryKey: { columns: ['id'] },
     uniques: [],
