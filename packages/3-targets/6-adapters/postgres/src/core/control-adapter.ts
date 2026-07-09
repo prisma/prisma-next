@@ -1176,13 +1176,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
     // RLS enablement is a table attribute (`pg_class.relrowsecurity`), not a
     // function of the policy set — a table can have RLS on with zero
-    // policies (deny-all) or policies present with RLS off.
+    // policies (deny-all) or policies present with RLS off. relkind covers
+    // both plain ('r') and partitioned ('p') tables: the table listing above
+    // (`information_schema.tables`, BASE TABLE) includes partitioned parents,
+    // and Postgres supports RLS on them.
     const rlsEnabledResult = await driver.query<{ tablename: string; rls_enabled: boolean }>(
       `SELECT c.relname AS tablename, c.relrowsecurity AS rls_enabled
          FROM pg_catalog.pg_class c
          JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
          WHERE n.nspname = $1
-           AND c.relkind = 'r'
+           AND c.relkind IN ('r', 'p')
          ORDER BY c.relname`,
       [schema],
     );

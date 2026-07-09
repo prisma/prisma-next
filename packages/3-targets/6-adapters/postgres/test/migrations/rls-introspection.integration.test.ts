@@ -99,6 +99,21 @@ describe.sequential('RLS introspection', () => {
     expect(tables['open_wide']?.rlsEnabled).toBe(false);
   });
 
+  it('stamps rlsEnabled on a partitioned parent table (relkind p)', {
+    timeout: testTimeout,
+  }, async () => {
+    await driver!.query(
+      'CREATE TABLE events (id int NOT NULL, region text NOT NULL) PARTITION BY LIST (region)',
+    );
+    await driver!.query("CREATE TABLE events_eu PARTITION OF events FOR VALUES IN ('eu')");
+    await driver!.query('ALTER TABLE events ENABLE ROW LEVEL SECURITY');
+
+    const schema = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(schema);
+
+    expect(schema.namespaces['public']!.tables['events']?.rlsEnabled).toBe(true);
+  });
+
   it('returns roles excluding system roles', {
     timeout: testTimeout,
   }, async () => {
