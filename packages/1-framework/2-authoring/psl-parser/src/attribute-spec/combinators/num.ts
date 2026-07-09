@@ -4,8 +4,8 @@ import { NumberLiteralExprAst } from '../../syntax/ast/expressions';
 import type { ArgType } from '../types';
 import { leafDiagnostic } from './diagnostic';
 
-// Any number literal (integers and floats alike) reduced to its numeric value. For an
-// integer-only constraint use `int()`.
+// A general number literal — any number, including floats — reduced to its numeric value.
+// Use `int()` when only integer literals are allowed.
 export function num(): ArgType<number> {
   return {
     kind: 'num',

@@ -36,7 +36,6 @@ export {
   namespacePslExtensionBlocks,
 } from '@prisma-next/framework-components/psl-ast';
 export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
-export { bareIdentifier } from '../attribute-spec/combinators/bare-identifier';
 export { bool } from '../attribute-spec/combinators/bool';
 export { leafDiagnostic } from '../attribute-spec/combinators/diagnostic';
 export { entityRef } from '../attribute-spec/combinators/entity-ref';
@@ -50,7 +49,6 @@ export { list } from '../attribute-spec/combinators/list';
 export { num } from '../attribute-spec/combinators/num';
 export { oneOf } from '../attribute-spec/combinators/one-of';
 export { record } from '../attribute-spec/combinators/record';
-export { scalarLiteral } from '../attribute-spec/combinators/scalar-literal';
 export { str } from '../attribute-spec/combinators/str';
 export { fieldAttribute } from '../attribute-spec/field-attribute';
 export { interpretAttribute } from '../attribute-spec/interpret';

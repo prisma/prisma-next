@@ -2,7 +2,6 @@ import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 import type { ArgType, InterpretCtx } from '../src/exports';
 import {
-  bareIdentifier,
   bool,
   entityRef,
   fieldAttribute,
@@ -17,7 +16,6 @@ import {
   num,
   oneOf,
   record,
-  scalarLiteral,
   str,
 } from '../src/exports';
 import { Cursor, parse, parseAttribute } from '../src/parse';
@@ -407,47 +405,6 @@ describe('entityRef', () => {
   });
 });
 
-describe('bareIdentifier', () => {
-  it('accepts a bare identifier and returns its text', () => {
-    const { expr, ctx } = argOf('Critical');
-
-    const result = bareIdentifier().parse(expr, ctx);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toBe('Critical');
-  });
-
-  it('rejects a string literal', () => {
-    const { expr, ctx } = argOf('"Critical"');
-
-    const result = bareIdentifier().parse(expr, ctx);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.failure).toHaveLength(1);
-      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
-    }
-  });
-
-  it('rejects a number token', () => {
-    const { expr, ctx } = argOf('42');
-
-    const result = bareIdentifier().parse(expr, ctx);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.failure).toHaveLength(1);
-  });
-
-  it('rejects a function call', () => {
-    const { expr, ctx } = argOf('uuid()');
-
-    const result = bareIdentifier().parse(expr, ctx);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.failure).toHaveLength(1);
-  });
-});
-
 describe('list', () => {
   it('maps each element through the element combinator', () => {
     const { expr, ctx } = argOf('["a", "b"]');
@@ -563,65 +520,6 @@ describe('record', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
-  });
-});
-
-describe('scalarLiteral', () => {
-  it('accepts a string literal and returns its decoded value', () => {
-    const { expr, ctx } = argOf('"hello"');
-
-    const result = scalarLiteral().parse(expr, ctx);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toBe('hello');
-  });
-
-  it('accepts a number literal and returns its numeric value', () => {
-    const { expr, ctx } = argOf('1.5');
-
-    const result = scalarLiteral().parse(expr, ctx);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toBe(1.5);
-  });
-
-  it('accepts a boolean literal and returns its boolean value', () => {
-    const { expr, ctx } = argOf('true');
-
-    const result = scalarLiteral().parse(expr, ctx);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toBe(true);
-  });
-
-  it('rejects a bare identifier', () => {
-    const { expr, ctx } = argOf('Cascade');
-
-    const result = scalarLiteral().parse(expr, ctx);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.failure).toHaveLength(1);
-      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
-    }
-  });
-
-  it('rejects an array literal', () => {
-    const { expr, ctx } = argOf('[1]');
-
-    const result = scalarLiteral().parse(expr, ctx);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.failure).toHaveLength(1);
-  });
-
-  it('rejects a function call', () => {
-    const { expr, ctx } = argOf('now()');
-
-    const result = scalarLiteral().parse(expr, ctx);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.failure).toHaveLength(1);
   });
 });
 

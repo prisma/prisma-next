@@ -935,7 +935,7 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    // A quoted string fails the `bareIdentifier()` positional shape at the spec.
+    // A quoted string fails the `oneOf(identifier(member))` positional shape at the spec.
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );
@@ -956,7 +956,7 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    // A function call fails the `bareIdentifier()` positional shape at the spec.
+    // A function call fails the `oneOf(identifier(member))` positional shape at the spec.
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );
