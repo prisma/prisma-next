@@ -21,11 +21,11 @@ The complete external-enum vertical — represent → type → cast → runtime 
 - **The work:** lift generic entries serialization into `SqlContractSerializerBase`; rewire the Postgres + SQLite serializers to delegate; `native_enum` stays excluded via non-enumerability. Slice spec: [`slices/generic-namespace-entries-serialization/spec.md`](slices/generic-namespace-entries-serialization/spec.md).
 - **Origin:** review point O1 on PR #906.
 
-### TS authoring mirror — deferred, [TML-2965]
+### TS authoring mirror — in progress, [TML-2965]
 
-- **Outcome:** a `native_enum` is authorable in the TS DSL (`helpers.nativeEnum(…)` + `field.column(pg.enum(handle))`), producing a contract byte-identical to the PSL version.
-- **The work:** a generic **`ContractDefinition` pack-entity attachment** — route author-declared, namespace-scoped pack entities into `entries.<kind>` at `createNamespace` time (the closed author-facing set is `models`/`valueObjects`/`enums` today). This is **shared with RLS role/policy**, which face the identical gap. Plus a `pg.enum(handle)` descriptor function and `helpers.nativeEnum` ergonomics. The column/codec plumbing (`ColumnTypeDescriptor.valueSet` / `valueSetEnforcement`) already exists.
-- **Why deferred:** not MVP-blocking — Supabase authors in PSL. Best sequenced with the RLS TS-authoring surface, which needs the identical attachment mechanism.
+- **Outcome:** a `native_enum` is authorable in the TS DSL (`nativeEnum(…)` + `field.column(pg.enum(handle))`), producing a contract byte-identical to the PSL version.
+- **The work:** a generic **`ContractDefinition` pack-entity attachment** — route author-declared, namespace-scoped pack entities into `entries.<kind>` (+ derive their value-set) through the `defineContract` chain, following the `enums` wiring; a bespoke `nativeEnum(...)` handle + deferred `pg.enum(handle)` descriptor; and relocating type-name qualification out of the codec into a generic build-stage step (so a named schema like `auth` is authorable in TS). Slice spec: [`slices/native-enum-ts-authoring/spec.md`](slices/native-enum-ts-authoring/spec.md).
+- **Follow-ups:** RLS `role`/`policy` TS wiring rides the same seam (unexercised here); the auto-composed generic `type.pg.enum` path repair is [TML-2983](https://linear.app/prisma-company/issue/TML-2983).
 - **Proven by:** a PSL + TS byte-identical parity test.
 
 ### Parser `refKind` for entity-ref type-constructor arguments — deferred, [TML-2978]

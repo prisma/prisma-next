@@ -882,6 +882,9 @@ export function buildContractDefinition(definition: ContractInput): ContractDefi
     ...(definition.enums && Object.keys(definition.enums).length > 0
       ? { enums: definition.enums }
       : {}),
+    ...(definition.packEntities && Object.keys(definition.packEntities).length > 0
+      ? { packEntities: definition.packEntities }
+      : {}),
     models,
   };
 }
