@@ -89,6 +89,35 @@ describe('formatErrorOutput - conflicts', () => {
   });
 });
 
+describe('formatErrorOutput - issues list label fallback', () => {
+  it('labels a PSL-diagnostic issue by its `kind` and a schema-diff issue by its `reason`', () => {
+    // The `meta.issues` channel is shared: PSL interpretation diagnostics stamp
+    // `kind` (their diagnostic code); schema-diff issues carry no `kind` and stamp
+    // `reason` instead. The renderer prefers `kind`, falls back to `reason`, then
+    // to a generic `issue` label.
+    const error: CliErrorEnvelope = {
+      ...baseError,
+      code: 'PN-RUN-3000',
+      domain: 'RUN',
+      summary: 'Failed to resolve contract source',
+      meta: {
+        issues: [
+          { kind: 'PSL_ORPHANED_BACKRELATION_LIST', message: 'orphaned backrelation list' },
+          { reason: 'not-found', message: 'Table "post" is missing from database' },
+          { message: 'issue with neither kind nor reason' },
+        ],
+      },
+    };
+
+    const flags = parseGlobalFlags({ verbose: true, 'no-color': true });
+    const stripped = stripAnsi(formatErrorOutput(error, flags));
+
+    expect(stripped).toContain('[PSL_ORPHANED_BACKRELATION_LIST] orphaned backrelation list');
+    expect(stripped).toContain('[not-found] Table "post" is missing from database');
+    expect(stripped).toContain('[issue] issue with neither kind nor reason');
+  });
+});
+
 describe('formatErrorOutput - planner warnings on apply failure', () => {
   it('prints a Warnings block when meta carries plannerWarnings', () => {
     const error: CliErrorEnvelope = {

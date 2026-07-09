@@ -153,7 +153,7 @@ export interface MigrateResult {
  * - `readAllMarkers()` for the from-state (when no `--from` is given), preserving
  *   the full marker including `invariants` (not just `storageHash`).
  * - `planSpacePath()` (shared with `executeMigrate`) for per-space path selection,
- *   which feeds `graphWalkStrategy()` with the same target hash, target invariants,
+ *   which feeds `resolveRecordedPath()` with the same target hash, target invariants,
  *   and current marker as the real apply path uses.
  *
  * Returns BEFORE any write boundary (`runMigration` / marker / DDL). No
@@ -206,7 +206,7 @@ async function executeMigrateShowCommand(
   const appGraph = aggregate.app.graph();
 
   // Resolve the --to target (defaults to the on-disk contract, same as migrate).
-  // Also capture the ref's invariants so planSpacePath feeds graphWalkStrategy the
+  // Also capture the ref's invariants so planSpacePath feeds resolveRecordedPath the
   // same target invariants that real migrate would use (refInvariants ?? headRef.invariants).
   let targetHash: string = contractHash;
   let refInvariants: readonly string[] | undefined;
@@ -262,7 +262,7 @@ async function executeMigrateShowCommand(
   // - Omitted: read the live DB marker via readAllMarkers() — the same source migrate uses.
   //
   // Full marker records (storageHash + invariants) are preserved so planSpacePath
-  // can feed graphWalkStrategy the complete currentMarker — exactly as executeMigrate
+  // can feed resolveRecordedPath the complete currentMarker — exactly as executeMigrate
   // does via familyInstance.readAllMarkers(). A stripped { storageHash, invariants: [] }
   // marker would produce a different `required` set and a different (incorrect) path.
   type LiveMarker = { readonly storageHash: string; readonly invariants: readonly string[] };
@@ -359,7 +359,7 @@ async function executeMigrateShowCommand(
   }
 
   // Walk the path via planSpacePath — the same helper executeMigrate uses.
-  // planSpacePath feeds graphWalkStrategy identical inputs (targetHash, targetInvariants,
+  // planSpacePath feeds resolveRecordedPath identical inputs (targetHash, targetInvariants,
   // currentMarker with full invariants), so the preview path is always the path migrate runs.
   //
   // Canonical schedule order: extensions alphabetically first, then app — mirroring the

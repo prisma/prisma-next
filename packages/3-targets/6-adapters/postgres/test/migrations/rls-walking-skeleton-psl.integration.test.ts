@@ -217,7 +217,7 @@ describe.sequential('RLS walking skeleton — PSL author → plan → apply → 
         frameworkComponents,
       });
 
-      expect(verifyResult.schema.schemaDiffIssues).toEqual([]);
+      expect(verifyResult.schema.issues).toEqual([]);
     },
     testTimeout,
   );

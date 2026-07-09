@@ -1,6 +1,6 @@
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { graphWalkStrategy } from '../../../src/aggregate/strategies/graph-walk';
+import { resolveRecordedPath } from '../../../src/aggregate/strategies/resolve-recorded-path';
 import type { AggregateContractSpace } from '../../../src/aggregate/types';
 import { EMPTY_CONTRACT_HASH } from '../../../src/constants';
 import type { OnDiskMigrationPackage } from '../../../src/package';
@@ -19,12 +19,12 @@ function makeSpace(
   });
 }
 
-describe('graphWalkStrategy', () => {
+describe('resolveRecordedPath', () => {
   it('walks the shortest path from the live marker to the on-disk head ref', () => {
     const headHash = 'sha256:cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
 
-    const outcome = graphWalkStrategy({
+    const outcome = resolveRecordedPath({
       aggregateTargetId: 'postgres',
       space: makeSpace([pkg], headHash),
       currentMarker: null,
@@ -36,7 +36,7 @@ describe('graphWalkStrategy', () => {
     expect(outcome.result.plan.destination.storageHash).toBe(headHash);
     // origin null because no marker yet — runner skips origin validation.
     expect(outcome.result.plan.origin).toBe(null);
-    expect(outcome.result.strategy).toBe('graph-walk');
+    expect(outcome.result.strategy).toBe('resolve-recorded-path');
   });
 
   it('returns unreachable when the live marker is not connected to the head', () => {
@@ -47,7 +47,7 @@ describe('graphWalkStrategy', () => {
       to: 'sha256:not-the-head',
     });
 
-    const outcome = graphWalkStrategy({
+    const outcome = resolveRecordedPath({
       aggregateTargetId: 'postgres',
       space: makeSpace([pkg], headHash),
       currentMarker: null,
@@ -62,7 +62,7 @@ describe('graphWalkStrategy', () => {
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
     const space = makeSpace([pkg], headHash, ['cipher:create-v1']);
 
-    const outcome = graphWalkStrategy({
+    const outcome = resolveRecordedPath({
       aggregateTargetId: 'postgres',
       space,
       currentMarker: null,
@@ -77,7 +77,7 @@ describe('graphWalkStrategy', () => {
     const headHash = 'sha256:cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
 
-    const outcome = graphWalkStrategy({
+    const outcome = resolveRecordedPath({
       aggregateTargetId: 'postgres',
       space: makeSpace([pkg], headHash),
       currentMarker: null,
@@ -93,7 +93,7 @@ describe('graphWalkStrategy', () => {
     const headHash = 'sha256:cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
 
-    const outcome = graphWalkStrategy({
+    const outcome = resolveRecordedPath({
       aggregateTargetId: 'postgres',
       space: makeSpace([pkg], headHash),
       currentMarker: null,
@@ -108,7 +108,7 @@ describe('graphWalkStrategy', () => {
     const headHash = 'sha256:cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
 
-    const outcome = graphWalkStrategy({
+    const outcome = resolveRecordedPath({
       aggregateTargetId: 'postgres',
       space: makeSpace([pkg], headHash),
       currentMarker: { storageHash: headHash, invariants: [] },
@@ -124,7 +124,7 @@ describe('graphWalkStrategy', () => {
     // Graph is empty, head ref points at the empty-contract sentinel,
     // and the marker is also absent. findPathWithDecision returns ok
     // with an empty path because fromHash === toHash.
-    const outcome = graphWalkStrategy({
+    const outcome = resolveRecordedPath({
       aggregateTargetId: 'postgres',
       space: makeSpace([], EMPTY_CONTRACT_HASH),
       currentMarker: null,

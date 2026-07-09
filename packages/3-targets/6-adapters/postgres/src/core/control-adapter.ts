@@ -28,13 +28,13 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
-  PrimaryKey,
+  PrimaryKeyInput,
   SqlCheckConstraintIRInput,
-  SqlColumnIR,
-  SqlForeignKeyIR,
-  SqlIndexIR,
+  SqlColumnIRInput,
+  SqlForeignKeyIRInput,
+  SqlIndexIRInput,
   SqlReferentialAction,
-  SqlUniqueIR,
+  SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
 import {
   buildControlTableBootstrapQueries,
@@ -906,11 +906,11 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       string,
       {
         name: string;
-        columns: Record<string, SqlColumnIR>;
-        primaryKey?: PrimaryKey;
-        foreignKeys: readonly SqlForeignKeyIR[];
-        uniques: readonly SqlUniqueIR[];
-        indexes: readonly SqlIndexIR[];
+        columns: Record<string, SqlColumnIRInput>;
+        primaryKey?: PrimaryKeyInput;
+        foreignKeys: readonly SqlForeignKeyIRInput[];
+        uniques: readonly SqlUniqueIRInput[];
+        indexes: readonly SqlIndexIRInput[];
         checks?: SqlCheckConstraintIRInput[];
       }
     > = {};
@@ -919,7 +919,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       const tableName = tableRow.table_name;
 
       // Process columns for this table
-      const columns: Record<string, SqlColumnIR> = {};
+      const columns: Record<string, SqlColumnIRInput> = {};
       for (const colRow of columnsByTable.get(tableName) ?? []) {
         let nativeType = colRow.udt_name;
         const formattedType = colRow.formatted_type
@@ -955,12 +955,26 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           nativeType = normalizeSchemaNativeType(nativeType.slice(0, -2));
         }
 
+        // Resolved values comparable against the contract-derived expected
+        // side: the normalized full native type (`[]` appended for arrays)
+        // and the structured parse of the raw default. Raw fields stay
+        // untouched alongside — the relational walk still reads and
+        // normalizes them itself.
+        const resolvedNativeType = `${normalizeSchemaNativeType(nativeType)}${many ? '[]' : ''}`;
+        const rawDefault = colRow.column_default ?? undefined;
         columns[colRow.column_name] = {
           name: colRow.column_name,
           nativeType,
           nullable: colRow.is_nullable === 'YES',
-          ...ifDefined('default', colRow.column_default ?? undefined),
+          ...ifDefined('default', rawDefault),
           ...ifDefined('many', many),
+          resolvedNativeType,
+          ...ifDefined(
+            'resolvedDefault',
+            rawDefault !== undefined
+              ? parsePostgresDefault(rawDefault, resolvedNativeType)
+              : undefined,
+          ),
         };
       }
 
@@ -969,7 +983,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       const primaryKeyColumns = pkRows
         .sort((a, b) => a.ordinal_position - b.ordinal_position)
         .map((row) => row.column_name);
-      const primaryKey: PrimaryKey | undefined =
+      const primaryKey: PrimaryKeyInput | undefined =
         primaryKeyColumns.length > 0
           ? {
               columns: primaryKeyColumns,
@@ -1007,7 +1021,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           });
         }
       }
-      const foreignKeys: readonly SqlForeignKeyIR[] = Array.from(foreignKeysMap.values()).map(
+      const foreignKeys: readonly SqlForeignKeyIRInput[] = Array.from(foreignKeysMap.values()).map(
         (fk) => ({
           columns: Object.freeze([...fk.columns]) as readonly string[],
           referencedTable: fk.referencedTable,
@@ -1037,7 +1051,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           });
         }
       }
-      const uniques: readonly SqlUniqueIR[] = Array.from(uniquesMap.values()).map((uq) => ({
+      const uniques: readonly SqlUniqueIRInput[] = Array.from(uniquesMap.values()).map((uq) => ({
         columns: Object.freeze([...uq.columns]) as readonly string[],
         name: uq.name,
       }));
@@ -1075,7 +1089,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           });
         }
       }
-      const indexes: readonly SqlIndexIR[] = Array.from(indexesMap.values()).map((idx) => ({
+      const indexes: readonly SqlIndexIRInput[] = Array.from(indexesMap.values()).map((idx) => ({
         columns: Object.freeze([...idx.columns]) as readonly string[],
         name: idx.name,
         unique: idx.unique,

@@ -1,10 +1,15 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { ControlPolicySubject } from '@prisma-next/family-sql/control';
-import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { entityAt, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { isPostgresSchema } from '../postgres-schema';
+import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
+import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
+import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
+import { issueColumnName } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 
 /**
@@ -56,7 +61,7 @@ function resolveNamespaceIdForTable(
   return UNBOUND_NAMESPACE_ID;
 }
 
-function resolveNamespaceIdForDdlSchema(
+export function resolveNamespaceIdForDdlSchema(
   contract: Contract<SqlStorage>,
   ddlSchemaName: string,
 ): string {
@@ -143,65 +148,80 @@ export function resolvePostgresCallControlPolicySubject(
 }
 
 /**
- * Issue kinds that describe the absence of a whole, top-level Postgres
- * object — the same kinds `createsNewTopLevelObject` recognises for calls.
- * Used by {@link resolvePostgresIssueCreationFactoryName} to decide whether
- * a `tolerated` subject permits the issue to flow into the planner
+ * Node kinds that describe the absence of a whole, top-level Postgres
+ * object — the same objects `createsNewTopLevelObject` recognises for calls.
+ * Used by {@link resolvePostgresNodeIssueCreationFactoryName} to decide
+ * whether a `tolerated` subject permits the issue to flow into the planner
  * (create-if-absent) and to seed the suppressed-subject warning's
- * `factoryName` when the planner is skipped.
+ * `factoryName` when the planner is skipped. RLS policy creation is not
+ * listed here — policy issues never reach this issue-based partition (they
+ * are routed to `planPostgresSchemaDiff` and gated via the call-based
+ * {@link resolvePostgresCallControlPolicySubject} instead).
  */
-const POSTGRES_ISSUE_CREATION_FACTORY: Readonly<Record<string, string>> = Object.freeze({
-  missing_schema: 'createSchema',
-  missing_table: 'createTable',
-  missing_rls_policy: 'createRlsPolicy',
+const POSTGRES_NODE_CREATION_FACTORY: Readonly<Record<string, string>> = Object.freeze({
+  [PostgresSchemaNodeKind.namespace]: 'createSchema',
+  [PostgresSchemaNodeKind.table]: 'createTable',
 });
 
-export function resolvePostgresIssueCreationFactoryName(issue: SchemaIssue): string | undefined {
-  return POSTGRES_ISSUE_CREATION_FACTORY[issue.kind];
+export function resolvePostgresNodeIssueCreationFactoryName(
+  issue: SchemaDiffIssue<SqlSchemaDiffNode>,
+): string | undefined {
+  if (issue.reason !== 'not-found') return undefined;
+  const node = issue.expected ?? issue.actual;
+  if (node === undefined) return undefined;
+  return POSTGRES_NODE_CREATION_FACTORY[node.nodeKind];
 }
 
 /**
- * Resolve the control-policy subject coordinate for a single
- * {@link SchemaIssue}. Mirrors the resolution `resolvePostgresCallControlPolicySubject`
- * performs for a generated DDL call, but works *off the issue* — so the
- * planner can partition issues by effective policy before the diff engine
- * runs. `createsNewObject` is derived from the issue's kind: schema/table/
- * type-missing issues describe a brand-new top-level object; everything else
- * touches an existing object.
+ * Resolve the control-policy subject coordinate for a single node-typed
+ * {@link SchemaDiffIssue}. Mirrors the resolution
+ * `resolvePostgresCallControlPolicySubject` performs for a generated DDL
+ * call, but works *off the issue* — so the planner can partition issues by
+ * effective policy before the diff engine runs. `createsNewObject` is
+ * derived from the node kind + reason: a `not-found` schema/table describes
+ * a brand-new top-level object; everything else touches an existing object.
  *
- * An `extra_table` issue carries no contract namespace coordinate (the table
- * isn't in any contract namespace), so the subject's `namespaceId` falls
- * back to {@link UNBOUND_NAMESPACE_ID}; the call-side resolver does the same
- * for the `DropTableCall` it produces.
+ * A `not-expected` table carries no contract namespace coordinate (the live
+ * table isn't claimed by any contract namespace), so the subject's
+ * `namespaceId` falls back to {@link UNBOUND_NAMESPACE_ID} via
+ * `resolveNamespaceIdForTable`'s own fallback — the call-side resolver does
+ * the same for the `DropTableCall` it produces.
  */
-export function resolvePostgresIssueControlPolicySubject(
-  issue: SchemaIssue,
+export function resolvePostgresNodeIssueControlPolicySubject(
+  issue: SchemaDiffIssue<SqlSchemaDiffNode>,
   contract: Contract<SqlStorage>,
 ): ControlPolicySubject | undefined {
-  const createsNewObject = POSTGRES_ISSUE_CREATION_FACTORY[issue.kind] !== undefined;
+  const node = issue.expected ?? issue.actual;
+  if (node === undefined) return undefined;
 
-  if (issue.kind === 'missing_schema' && issue.namespaceId) {
-    return { namespaceId: issue.namespaceId, createsNewObject };
-  }
-
-  if ('table' in issue && issue.table) {
-    const namespaceId =
-      'namespaceId' in issue && issue.namespaceId
-        ? issue.namespaceId
-        : resolveNamespaceIdForTable(contract, issue.table, undefined);
-    const table = entityAt<StorageTable>(contract.storage, {
-      namespaceId,
-      entityKind: 'table',
-      entityName: issue.table,
-    });
+  if (node.nodeKind === PostgresSchemaNodeKind.namespace) {
+    const namespaceNode = blindCast<
+      PostgresNamespaceSchemaNode,
+      'a postgres-namespace diff node is always a PostgresNamespaceSchemaNode'
+    >(node);
     return {
-      namespaceId,
-      ...ifDefined('explicitNodeControlPolicy', table?.control),
-      table: issue.table,
-      ...ifDefined('column', 'column' in issue ? issue.column : undefined),
-      createsNewObject,
+      namespaceId: resolveNamespaceIdForDdlSchema(contract, namespaceNode.schemaName),
+      createsNewObject: issue.reason === 'not-found',
     };
   }
 
-  return undefined;
+  const tableName = issue.path[2];
+  if (tableName === undefined) return undefined;
+  const ddlSchemaName = issue.path[1];
+  const namespaceId = resolveNamespaceIdForTable(contract, tableName, ddlSchemaName);
+  const table = entityAt<StorageTable>(contract.storage, {
+    namespaceId,
+    entityKind: 'table',
+    entityName: tableName,
+  });
+  const createsNewObject =
+    node.nodeKind === PostgresSchemaNodeKind.table && issue.reason === 'not-found';
+
+  return {
+    namespaceId,
+    ...ifDefined('explicitNodeControlPolicy', table?.control),
+    table: tableName,
+    ...ifDefined('column', issueColumnName(issue)),
+    createsNewObject,
+  };
 }

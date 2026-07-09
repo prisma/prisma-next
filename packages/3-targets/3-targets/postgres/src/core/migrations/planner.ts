@@ -19,24 +19,32 @@ import type {
   MigrationPlanWithAuthoringSurface,
   MigrationScaffoldContext,
   SchemaDiffIssue,
-  SchemaIssue,
+  SchemaOwnership,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
-import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
+import { PostgresSchemaNodeKind, type SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import {
   formatPostgresControlPolicySubjectLabel,
+  resolveNamespaceIdForDdlSchema,
   resolvePostgresCallControlPolicySubject,
-  resolvePostgresIssueControlPolicySubject,
-  resolvePostgresIssueCreationFactoryName,
+  resolvePostgresNodeIssueControlPolicySubject,
+  resolvePostgresNodeIssueCreationFactoryName,
 } from './control-policy';
-import { diffPostgresDatabaseSchema } from './diff-database-schema';
-import { planIssues } from './issue-planner';
+import { buildPostgresPlanDiff } from './diff-database-schema';
+import {
+  coalesceSubtreeIssues,
+  issueNode,
+  issueSchemaName,
+  issueTableName,
+  planIssues,
+} from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import {
   CreatePostgresRlsPolicyCall,
@@ -82,18 +90,20 @@ export type PostgresPlanResult =
 /**
  * Postgres migration planner — a thin wrapper over `planIssues`.
  *
- * `plan()` verifies the live schema against the target contract (producing
- * `SchemaIssue[]`) and delegates to `planIssues` with the unified
- * `postgresPlannerStrategies` list: enum-change, NOT-NULL backfill,
- * type-change, nullable-tightening, codec-hook storage types,
- * component-declared dependency installs, and shared-temp-default /
- * empty-table-guarded NOT-NULL add-column. The same strategy list runs for
- * `migration plan`, `db update`, and `db init`; behavior diverges purely on
- * `policy.allowedOperationClasses` (the data-safe strategies short-circuit
- * when `'data'` is excluded). The issue planner applies operation-class
- * policy gates and emits a single `PostgresOpFactoryCall[]` that drives both
- * the runtime-ops view (via `renderOps`) and the `renderTypeScript()`
- * authoring surface.
+ * `plan()` diffs the target contract against the live schema via the one
+ * differ (`buildPostgresPlanDiff`, producing node-typed `SchemaDiffIssue[]`)
+ * and delegates to `planIssues` with the unified `postgresPlannerStrategies`
+ * list: NOT-NULL backfill, type-change, nullable-tightening, codec-hook
+ * storage types, component-declared dependency installs, and
+ * shared-temp-default / empty-table-guarded NOT-NULL add-column. The same
+ * strategy list runs for `migration plan`, `db update`, and `db init`;
+ * behavior diverges purely on `policy.allowedOperationClasses` (the
+ * data-safe strategies short-circuit when `'data'` is excluded). The issue
+ * planner applies operation-class policy gates and emits a single
+ * `PostgresOpFactoryCall[]` that drives both the runtime-ops view (via
+ * `renderOps`) and the `renderTypeScript()` authoring surface. RLS policy
+ * drift (the structural half of the same one-differ tree) is handled
+ * separately via `planPostgresSchemaDiff`.
  */
 export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgres'> {
   readonly #lowerer: ExecuteRequestLowerer | undefined;
@@ -129,6 +139,11 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
      * the marker row by the right space.
      */
     readonly spaceId: string;
+    /**
+     * Ownership oracle over the contract-space composition — see
+     * {@link SqlMigrationPlannerPlanOptions.ownership}.
+     */
+    readonly ownership?: SchemaOwnership;
   }): PostgresPlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
@@ -158,25 +173,60 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return policyResult;
     }
 
-    // One combined database-schema diff drives the whole plan: the relational
-    // findings (+ namespace presence) become structural DDL via `planIssues`,
-    // the policy findings become RLS ops via `planPostgresSchemaDiff`. Verify
-    // runs the same underlying comparison (via `verifyDatabaseSchema`) and
-    // rejects on non-empty. The caller-supplied `keepDiffIssue` predicate is
-    // applied blindly — any scoping (e.g. multi-space ownership) is the
-    // orchestration's, never worked out here.
+    // The one combined tree diff drives the whole plan: relational findings
+    // become structural DDL via `planIssues`, policy findings become RLS ops
+    // via `planPostgresSchemaDiff`. Verify runs its own full-tree node diff
+    // (`diffSchema`) over the same schema and rejects on a
+    // surviving failure.
     PostgresDatabaseSchemaNode.assert(options.schema);
-    const rawDiff = diffPostgresDatabaseSchema({
+    const { issues: rawIssues } = buildPostgresPlanDiff({
       contract: options.contract,
       actualSchema: options.schema,
-      strict:
-        options.policy.allowedOperationClasses.includes('widening') ||
-        options.policy.allowedOperationClasses.includes('destructive'),
-      typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
     });
-    const databaseDiff = options.keepDiffIssue ? rawDiff.filter(options.keepDiffIssue) : rawDiff;
-    const schemaIssues = this.collectSchemaIssues(options, databaseDiff.issues);
+    const policyDiffIssues = rawIssues.filter((issue) => isPolicyDiffIssue(issue));
+    const relationalDiffIssues = rawIssues.filter((issue) => !isPolicyDiffIssue(issue));
+
+    // The generic differ is total and un-gated: strict-mode extras filtering
+    // (dropping `not-expected` findings outside strict mode, mirroring the
+    // retired coordinate walk's `if (strict) { ...extra_* } }` guards),
+    // subtree coalescing (a missing/extra table also emits an issue for
+    // every child under it — redundant once the table-level Create/Drop call
+    // already accounts for the whole subtree), and ownership are all post-diff
+    // planner steps.
+    //
+    // Ownership: a live extra is only this plan's to drop when no contract
+    // space owns it. The differ ran against THIS space's contract, so a table
+    // a sibling space owns surfaces here as `not-expected`; the planner asks
+    // the ownership oracle (the passive aggregate) whether any space declares
+    // it and, if so, leaves it alone — it is a sibling's table, not an orphan.
+    // A table no space owns stays a genuine extra to drop under a destructive
+    // policy. Ownership lives in the aggregate; the planner only asks. Absent
+    // oracle (single-space, none handed) keeps every extra. Coalescing MUST
+    // run before this so a sibling-owned table's child issues have already
+    // collapsed into the one table-level issue that carries the table name.
+    const strict =
+      options.policy.allowedOperationClasses.includes('widening') ||
+      options.policy.allowedOperationClasses.includes('destructive');
+    const coalesced = coalesceSubtreeIssues(relationalDiffIssues);
+    const owned = retainUnownedExtras(coalesced, options.ownership, options.contract);
+    const gated = strict ? owned : owned.filter((issue) => issue.reason !== 'not-expected');
+
+    // Namespace presence (`CREATE SCHEMA`) is a planner-only op-generation
+    // concern stitched in here rather than inside the shared diff — verify
+    // never needs it (a missing schema already surfaces as a `not-found`
+    // table in the relational findings). These synthesized issues are added
+    // AFTER coalescing/scoping (never coalesced against the table diff —
+    // their path is an ancestor of every table path under that schema, so
+    // running them through the same coalesce would swallow the table-level
+    // `not-found` issues that drive `CREATE TABLE`) and are NOT subject to
+    // sibling-space scoping, matching the retired coordinate walk exactly.
+    const namespaceIssues = verifyPostgresNamespacePresence({
+      contract: options.contract,
+      schema: options.schema,
+    });
+    const schemaIssues = [...namespaceIssues, ...gated];
+
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
     const storageTypes = options.contract.storage.types ?? {};
     // The strategy layer reads the live schema by bare table name for existence
@@ -197,8 +247,8 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       issues: schemaIssues,
       contract: options.contract,
       resolveControlPolicySubject: (issue) =>
-        resolvePostgresIssueControlPolicySubject(issue, options.contract),
-      resolveCreationFactoryName: resolvePostgresIssueCreationFactoryName,
+        resolvePostgresNodeIssueControlPolicySubject(issue, options.contract),
+      resolveCreationFactoryName: resolvePostgresNodeIssueCreationFactoryName,
       formatSubjectLabel: (factoryName, subject) =>
         formatPostgresControlPolicySubjectLabel(factoryName, subject, options.contract),
     });
@@ -210,7 +260,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       // `db update` / `db init`, which means data-safety strategies needing
       // from/to comparisons (unsafe type change, nullable tightening) are
       // inapplicable there — reconciliation falls through to
-      // `mapIssueToCall`'s direct destructive handlers.
+      // `mapNodeIssueToCall`'s direct destructive handlers.
       fromContract: options.fromContract,
       schemaName,
       codecHooks,
@@ -225,7 +275,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return plannerFailure(result.failure);
     }
 
-    const schemaDiffCalls = this.planPostgresSchemaDiff(options, databaseDiff.schemaDiffIssues);
+    const schemaDiffCalls = this.planPostgresSchemaDiff(options, policyDiffIssues);
     const schemaDiffPartition = partitionCallsByControlPolicy({
       calls: schemaDiffCalls,
       contract: options.contract,
@@ -284,10 +334,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
   }
 
   /**
-   * Maps the RLS policy presence findings of the shared
-   * `diffPostgresDatabaseSchema` (already ownership-filtered) into
-   * `ENABLE RLS` / `CREATE POLICY` / `DROP POLICY` ops. It no longer re-diffs —
-   * it consumes the `schemaDiffIssues` of the one combined diff.
+   * Maps the RLS policy presence findings of the one combined tree diff
+   * (`buildPostgresPlanDiff`, already ownership-filtered) into `ENABLE RLS`
+   * / `CREATE POLICY` / `DROP POLICY` ops. It does not re-diff — it consumes
+   * exactly the policy-node subset of the shared diff's issues.
    */
   private planPostgresSchemaDiff(
     options: PlannerOptionsWithComponents,
@@ -298,10 +348,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const seenEnableTables = new Set<string>();
 
     for (const issue of filteredDiffIssues) {
-      // 'mismatch' is unreachable for content-addressed policies: the wire name
+      // 'not-equal' is unreachable for content-addressed policies: the wire name
       // encodes the body hash, so two policies sharing a local key (same name)
       // are always equal and isEqualTo never returns false.
-      if (issue.outcome === 'missing') {
+      if (issue.reason === 'not-found') {
         const expected = issue.expected;
         PostgresPolicySchemaNode.assert(expected);
         // expected.namespaceId is the DDL schema name (resolved during projection);
@@ -322,7 +372,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
             policyNodeToContractPolicy(expected),
           ),
         );
-      } else if (issue.outcome === 'extra' && allowsDestructive) {
+      } else if (issue.reason === 'not-expected' && allowsDestructive) {
         const actual = issue.actual;
         PostgresPolicySchemaNode.assert(actual);
         const schemaForTable = resolveDdlSchemaForNamespaceStorage(
@@ -348,50 +398,106 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     }
     return null;
   }
-
-  /**
-   * The structural issue list `planIssues` consumes: the relational findings
-   * from the shared `diffPostgresDatabaseSchema` plus namespace presence.
-   *
-   * Schema presence (`missing_schema` → `CREATE SCHEMA`) is a planner-only
-   * op-generation concern, so it is stitched in here rather than inside the
-   * shared diff — verify never needs it (a missing schema already surfaces as
-   * `missing_table` in the relational findings). It reads `existingSchemas` off
-   * the database root, so it takes the whole tree. Policy drift is handled
-   * separately via `planPostgresSchemaDiff` from the same shared diff's
-   * `schemaDiffIssues`.
-   */
-  private collectSchemaIssues(
-    options: PlannerOptionsWithComponents,
-    relationalIssues: readonly SchemaIssue[],
-  ): readonly SchemaIssue[] {
-    const namespaceIssues = verifyPostgresNamespacePresence({
-      contract: options.contract,
-      schema: options.schema,
-    });
-    if (namespaceIssues.length === 0) {
-      return relationalIssues;
-    }
-    return [...namespaceIssues, ...relationalIssues];
-  }
 }
 
 /**
- * Returns the one namespace node whose tables the relational strategy layer
- * probes for live-table existence — the node matching the planner's resolved
- * schema name, or the first namespace when none matches. `undefined` when the
- * tree has no namespaces, so the strategy context uses its empty-schema default.
+ * A diff issue whose node is an RLS policy — the structural half of the one
+ * combined tree diff, routed to `planPostgresSchemaDiff` instead of
+ * `planIssues`.
+ */
+function isPolicyDiffIssue(issue: SchemaDiffIssue<SqlSchemaDiffNode>): boolean {
+  const node = issue.expected ?? issue.actual;
+  return node !== undefined && PostgresPolicySchemaNode.is(node);
+}
+
+/**
+ * Drops a `not-expected` issue when it is a whole extra TABLE that some
+ * contract space owns, asking the ownership oracle per node.
+ *
+ * The consultation applies ONLY to table-level extras — a live table this
+ * space's contract lacks — identified by asking the issue's own node
+ * (`nodeKind === table`), never by counting path segments. `declaresEntity`
+ * answers over the whole composition (self included), keyed on the schema-IR
+ * entity coordinate so a genuine orphan in one namespace is never conflated
+ * with a same-named table a sibling space declares in another, or with a
+ * same-named non-table entity (an enum, an RLS policy) a sibling declares in
+ * the SAME namespace: a positive answer means another space owns THIS table
+ * in THIS namespace (a table this space owned would be in its expected tree,
+ * never an extra) — leave it. A negative answer means no space owns it — a
+ * genuine orphan to drop. `entityKind` is the literal `'table'` here: this
+ * function only ever asks about a node already confirmed to be
+ * `PostgresSchemaNodeKind.table` (checked just above), and the diff tree's
+ * `nodeKind` vocabulary (`'postgres-table'`) is distinct from the storage
+ * `entries` vocabulary `elementCoordinates` walks (`'table'`) — the literal
+ * is that storage-entries spelling, not the node kind.
+ *
+ * The issue path carries the *resolved DDL schema* (e.g. `public`), but a
+ * contract space's own declared namespace id can be the unbound sentinel
+ * (`__unbound__`) that resolves to that schema — the two spellings would
+ * never string-match. `resolveNamespaceIdForDdlSchema` recovers the raw
+ * namespace id THIS space's own contract would use for that DDL schema, so
+ * a table this space's own unbound namespace declares (and any sibling
+ * whose own unbound namespace resolves the same way) is compared on the
+ * same coordinate the aggregate's `elementCoordinates` walk yields.
+ *
+ * A DEEPER extra (an extra column/constraint on a table this space DOES own —
+ * only the child drifted, so the table is in the expected tree) is this
+ * space's own drift and is always kept for dropping; asking the oracle there
+ * would wrongly suppress it, because the owned table answers `true`. Shallower
+ * issues (namespace/root) are never ownership-scoped here. No oracle ⇒ every
+ * extra is kept (single-space plan).
+ */
+function retainUnownedExtras(
+  issues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
+  ownership: SchemaOwnership | undefined,
+  contract: Contract<SqlStorage>,
+): readonly SchemaDiffIssue<SqlSchemaDiffNode>[] {
+  if (ownership === undefined) return issues;
+  return issues.filter((issue) => {
+    if (issue.reason !== 'not-expected') return true;
+    const node = issueNode(issue);
+    if (node === undefined || node.nodeKind !== PostgresSchemaNodeKind.table) return true;
+    const ddlSchemaName = issueSchemaName(issue);
+    const tableName = issueTableName(issue);
+    if (ddlSchemaName === undefined || tableName === undefined) return true;
+    const namespaceId = resolveNamespaceIdForDdlSchema(contract, ddlSchemaName);
+    return !ownership.declaresEntity({ namespaceId, entityKind: 'table', entityName: tableName });
+  });
+}
+
+/**
+ * Returns the one namespace node the relational strategy layer probes for
+ * live-table existence and reads codec-hook context off — the namespace
+ * matching the planner's resolved schema name, or the first namespace when
+ * none matches. `undefined` when the tree has no namespaces, so the strategy
+ * context uses its empty-schema default.
  *
  * The relational strategies key tables by bare name, so they can only probe one
  * namespace at a time; probing across every namespace at once is future work.
+ *
+ * Returns the real `PostgresNamespaceSchemaNode` reference rather than a
+ * projection: `storageTypePlanCallStrategy` hands this same value to codec
+ * `planTypeOperations` hooks as `schema`, and hooks read the Postgres-specific
+ * `nativeEnumTypeNames` field off it (via `PostgresNamespaceSchemaNode.is`) to
+ * decide whether a native enum type already exists — a projection that only
+ * copies `tables` would silently drop that signal. `StrategyContext.schema`'s
+ * declared type (`SqlSchemaIR`, shared with SQLite's flat shape) doesn't
+ * capture this, so the return is `blindCast` the same way `namespaceSchemaNodes`
+ * in the family's relational walk already treats a namespace node as a
+ * structurally-`SqlSchemaIR`-shaped value.
  */
 function relationalNamespaceNode(
   schema: PostgresDatabaseSchemaNode,
   schemaName: string,
 ): SqlSchemaIR | undefined {
   const namespaceNodes = Object.values(schema.namespaces);
-  const byName = namespaceNodes.find((node) => node.schemaName === schemaName);
-  return byName ?? namespaceNodes[0];
+  const namespaceNode =
+    namespaceNodes.find((node) => node.schemaName === schemaName) ?? namespaceNodes[0];
+  if (namespaceNode === undefined) return undefined;
+  return blindCast<
+    SqlSchemaIR,
+    'PostgresNamespaceSchemaNode carries tables (+ nativeEnumTypeNames, read by codec hooks via PostgresNamespaceSchemaNode.is) structurally compatible with the SqlSchemaIR shape the strategy layer declares'
+  >(namespaceNode);
 }
 
 /**

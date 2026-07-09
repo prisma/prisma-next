@@ -1,5 +1,7 @@
+import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { PrimaryKey, type PrimaryKeyInput } from './primary-key';
+import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import { SqlCheckConstraintIR, type SqlCheckConstraintIRInput } from './sql-check-constraint-ir';
 import { type SqlAnnotations, SqlColumnIR, type SqlColumnIRInput } from './sql-column-ir';
 import { SqlForeignKeyIR, type SqlForeignKeyIRInput } from './sql-foreign-key-ir';
@@ -32,8 +34,17 @@ export interface SqlTableIRInput {
  * walks see a uniform AST regardless of whether the input was a
  * plain-data literal (from introspection) or already-constructed
  * class instances.
+ *
+ * Implements `DiffableNode` so a flat (single-schema) tree is directly
+ * diffable: `id` is the table name; `isEqualTo` is identity (the table's
+ * structural drift is entirely expressed by its children); `children()`
+ * yields every column, the primary key (when present), every foreign key,
+ * unique, index, and check constraint — the same composition and order as
+ * the Postgres table node, minus policies.
  */
-export class SqlTableIR extends SqlSchemaIRNode {
+export class SqlTableIR extends SqlSchemaIRNode implements DiffableNode {
+  override readonly nodeKind = RelationalSchemaNodeKind.table;
+
   readonly name: string;
   readonly columns: Readonly<Record<string, SqlColumnIR>>;
   readonly foreignKeys: ReadonlyArray<SqlForeignKeyIR>;
@@ -78,5 +89,24 @@ export class SqlTableIR extends SqlSchemaIRNode {
       );
     }
     freezeNode(this);
+  }
+
+  get id(): string {
+    return this.name;
+  }
+
+  isEqualTo(other: DiffableNode): boolean {
+    return this.id === other.id;
+  }
+
+  children(): readonly DiffableNode[] {
+    return [
+      ...Object.values(this.columns),
+      ...(this.primaryKey ? [this.primaryKey] : []),
+      ...this.foreignKeys,
+      ...this.uniques,
+      ...this.indexes,
+      ...(this.checks ?? []),
+    ];
   }
 }

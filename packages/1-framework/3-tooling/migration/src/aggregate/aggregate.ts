@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract, StorageNamespace } from '@prisma-next/contract/types';
-import { elementCoordinates } from '@prisma-next/framework-components/ir';
+import type { SchemaEntityCoordinate } from '@prisma-next/framework-components/control';
+import { coordinateKey, elementCoordinates } from '@prisma-next/framework-components/ir';
 import { join } from 'pathe';
 import {
   errorBundleNotFoundForGraphNode,
@@ -292,9 +293,13 @@ export function createContractSpaceAggregate(args: {
   const { targetId, app, extensions, checkIntegrity } = args;
   const ordered: readonly AggregateContractSpace[] = [app, ...extensions];
   const byId = new Map(ordered.map((m) => [m.spaceId, m]));
-  const spaceDeclares = (space: AggregateContractSpace, entityName: string): boolean => {
+  const spaceDeclares = (
+    space: AggregateContractSpace,
+    coordinate: SchemaEntityCoordinate,
+  ): boolean => {
+    const key = coordinateKey(coordinate);
     for (const coord of elementCoordinates(space.contract().storage)) {
-      if (coord.entityName === entityName) return true;
+      if (coordinateKey(coord) === key) return true;
     }
     return false;
   };
@@ -306,9 +311,9 @@ export function createContractSpaceAggregate(args: {
     hasSpace: (id) => byId.has(id),
     space: (id) => byId.get(id),
     spaces: () => ordered,
-    declaresEntity: (entityName) => ordered.some((space) => spaceDeclares(space, entityName)),
-    declaringSpaces: (entityName) =>
-      ordered.filter((space) => spaceDeclares(space, entityName)).map((s) => s.spaceId),
+    declaresEntity: (coordinate) => ordered.some((space) => spaceDeclares(space, coordinate)),
+    declaringSpaces: (coordinate) =>
+      ordered.filter((space) => spaceDeclares(space, coordinate)).map((s) => s.spaceId),
     checkIntegrity,
   };
 }

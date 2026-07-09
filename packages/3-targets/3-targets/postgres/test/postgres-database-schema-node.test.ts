@@ -8,6 +8,7 @@ import {
 import { PostgresNamespaceSchemaNode } from '../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresRoleSchemaNode } from '../src/core/schema-ir/postgres-role-schema-node';
 import { PostgresTableSchemaNode } from '../src/core/schema-ir/postgres-table-schema-node';
+import type { SqlSchemaDiffNode } from '../src/core/schema-ir/schema-node-kinds';
 
 const tableA = new PostgresTableSchemaNode({
   name: 'profiles',
@@ -63,7 +64,7 @@ describe('PostgresDatabaseSchemaNode', () => {
     const node = new PostgresDatabaseSchemaNode(baseInput);
     const children = node.children();
     for (const child of children) {
-      expect(PostgresRoleSchemaNode.is(child as SqlSchemaIRNode)).toBe(false);
+      expect(PostgresRoleSchemaNode.is(child as SqlSchemaDiffNode)).toBe(false);
     }
   });
 

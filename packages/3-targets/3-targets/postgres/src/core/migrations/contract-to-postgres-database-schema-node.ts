@@ -1,5 +1,7 @@
 import type { ContractToSchemaIROptions } from '@prisma-next/family-sql/control';
 import { contractNamespaceToSchemaIR } from '@prisma-next/family-sql/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresContract } from '../postgres-schema';
@@ -83,10 +85,32 @@ export function contractToPostgresDatabaseSchemaNode(
     for (const tableName of Object.keys(ns.table)) {
       const sqlTable = sqlTables[tableName];
       if (sqlTable === undefined) continue;
+      // The family conversion stamps `referencedSchema` with the FK target's
+      // namespace id verbatim, which can be the unbound sentinel. Resolve it
+      // to the real live DDL schema here — introspected FKs already carry the
+      // live schema, so this is what lets an expected FK pair (by diff-node
+      // id) with its introspected counterpart.
+      const foreignKeys = sqlTable.foreignKeys.map(
+        (fk) =>
+          new SqlForeignKeyIR({
+            columns: fk.columns,
+            referencedTable: fk.referencedTable,
+            referencedColumns: fk.referencedColumns,
+            ...ifDefined('referencedSchema', fk.referencedSchema),
+            ...ifDefined('name', fk.name),
+            ...ifDefined('onDelete', fk.onDelete),
+            ...ifDefined('onUpdate', fk.onUpdate),
+            ...ifDefined('annotations', fk.annotations),
+            resolvedReferencedNamespace: resolveDdlSchemaForNamespaceStorage(
+              contract.storage,
+              fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
+            ),
+          }),
+      );
       tables[tableName] = new PostgresTableSchemaNode({
         name: sqlTable.name,
         columns: sqlTable.columns,
-        foreignKeys: sqlTable.foreignKeys,
+        foreignKeys,
         uniques: sqlTable.uniques,
         indexes: sqlTable.indexes,
         ...ifDefined('primaryKey', sqlTable.primaryKey),

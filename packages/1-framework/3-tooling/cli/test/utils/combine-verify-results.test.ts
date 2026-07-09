@@ -1,6 +1,5 @@
 import type {
   SchemaDiffIssue,
-  SchemaIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
@@ -10,31 +9,18 @@ function makeResult(overrides: {
   spaceId: string;
   ok: boolean;
   summary: string;
-  fail?: number;
-  issues?: readonly SchemaIssue[];
-  schemaDiffIssues?: readonly SchemaDiffIssue[];
+  issues?: readonly SchemaDiffIssue[];
 }): VerifyDatabaseSchemaResult {
-  const fail = overrides.fail ?? (overrides.ok ? 0 : 1);
+  const defaultIssues: readonly SchemaDiffIssue[] = overrides.ok
+    ? []
+    : [{ path: [overrides.spaceId], reason: 'not-found', message: overrides.summary }];
   const result: VerifyDatabaseSchemaResult = {
     ok: overrides.ok,
     summary: overrides.summary,
     contract: { storageHash: `sha256:${overrides.spaceId}-storage` },
     target: { expected: 'postgres' },
     schema: {
-      issues: overrides.issues ?? [],
-      schemaDiffIssues: overrides.schemaDiffIssues ?? [],
-      root: {
-        status: overrides.ok ? 'pass' : 'fail',
-        kind: 'space',
-        name: overrides.spaceId,
-        contractPath: '',
-        code: 'SPACE',
-        message: overrides.summary,
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      },
-      counts: { pass: 0, warn: 0, fail, totalNodes: fail },
+      issues: overrides.issues ?? defaultIssues,
     },
     timings: { total: 0 },
   };
@@ -60,6 +46,10 @@ describe('combineVerifyResults', () => {
       ok: true,
       summary: 'Database schema satisfies contract',
     });
+    expect(combined.result.schema).toEqual({
+      issues: [],
+      warnings: { issues: [] },
+    });
     expect(combined.unclaimed).toEqual([]);
   });
 
@@ -81,6 +71,7 @@ describe('combineVerifyResults', () => {
       ok: false,
       summary: 'Database schema does not satisfy contract (1 failure)',
     });
+    expect(combined.result.schema.issues).toHaveLength(1);
   });
 
   it('falls back to the failing space summary when the app passes but an extension fails', () => {
@@ -95,7 +86,6 @@ describe('combineVerifyResults', () => {
           spaceId: 'cipher',
           ok: false,
           summary: 'Database schema does not satisfy contract (1 failure)',
-          fail: 1,
         }),
       ],
     ]);
@@ -105,9 +95,9 @@ describe('combineVerifyResults', () => {
     expect(combined.result).toMatchObject({
       ok: false,
       summary: 'Database schema does not satisfy contract (1 failure)',
-      schema: { counts: { fail: 1 } },
       code: 'PN-RUN-3010',
     });
+    expect(combined.result.schema.issues).toHaveLength(1);
   });
 
   it('returns a non-`ok` envelope when any space fails, even when the app passes', () => {
@@ -119,7 +109,10 @@ describe('combineVerifyResults', () => {
           spaceId: 'cipher',
           ok: false,
           summary: 'Schema verification found 2 issue(s)',
-          fail: 2,
+          issues: [
+            { path: ['a'], reason: 'not-found', message: 'missing a' },
+            { path: ['b'], reason: 'not-found', message: 'missing b' },
+          ],
         }),
       ],
     ]);
@@ -128,8 +121,7 @@ describe('combineVerifyResults', () => {
 
     expect(combined.result.ok).toBe(false);
     expect(combined.result.summary).not.toContain('matches contract');
-    expect(combined.result.schema.root.status).toBe('fail');
-    expect(combined.result.schema.root.message).toBe('Aggregate schema mismatch');
+    expect(combined.result.schema.issues).toHaveLength(2);
     expect(combined.result.meta?.strict).toBe(true);
   });
 
@@ -189,11 +181,8 @@ describe('combineVerifyResults', () => {
         'app',
         makeResult({ spaceId: 'app', ok: true, summary: 'Database schema satisfies contract' }),
       ],
-      ['cipher', makeResult({ spaceId: 'cipher', ok: false, summary: 'cipher failure', fail: 1 })],
-      [
-        'pgvector',
-        makeResult({ spaceId: 'pgvector', ok: false, summary: 'pgvector failure', fail: 1 }),
-      ],
+      ['cipher', makeResult({ spaceId: 'cipher', ok: false, summary: 'cipher failure' })],
+      ['pgvector', makeResult({ spaceId: 'pgvector', ok: false, summary: 'pgvector failure' })],
     ]);
 
     const combined = combineVerifyResults(perSpace, 'app', false, []);
@@ -201,19 +190,16 @@ describe('combineVerifyResults', () => {
     expect(combined.result).toMatchObject({
       ok: false,
       summary: 'cipher failure',
-      schema: { counts: { fail: 2 } },
     });
+    expect(combined.result.schema.issues).toHaveLength(2);
   });
 
   it('uses the default `PN-RUN-3010` code when a failing app result carries no code', () => {
-    const failingWithoutCode: VerifyDatabaseSchemaResult = {
-      ...makeResult({
-        spaceId: 'app',
-        ok: false,
-        summary: 'Database schema does not satisfy contract (1 failure)',
-        fail: 1,
-      }),
-    };
+    const failingWithoutCode: VerifyDatabaseSchemaResult = makeResult({
+      spaceId: 'app',
+      ok: false,
+      summary: 'Database schema does not satisfy contract (1 failure)',
+    });
     const stripped = { ...failingWithoutCode };
     delete stripped.code;
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([['app', stripped]]);
@@ -226,21 +212,14 @@ describe('combineVerifyResults', () => {
     });
   });
 
-  it('concatenates issues and schemaDiffIssues from all spaces into the combined result', () => {
-    const appStructuralIssue: SchemaIssue = {
-      kind: 'missing_table',
-      table: 'profiles',
-      message: 'Table "profiles" is missing from the database',
-    };
+  it('concatenates issues from all spaces into the combined result', () => {
     const appDiffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_app_abc'],
-      outcome: 'missing',
       reason: 'not-found',
       message: "RLS policy 'policy_app_abc' is missing from the database",
     };
     const extDiffIssue: SchemaDiffIssue = {
       path: ['public', 'audit_log', 'policy_cipher_def'],
-      outcome: 'extra',
       reason: 'not-expected',
       message: "RLS policy 'policy_cipher_def' is present in the database but not in the contract",
     };
@@ -252,8 +231,7 @@ describe('combineVerifyResults', () => {
           spaceId: 'app',
           ok: true,
           summary: 'Database schema satisfies contract',
-          issues: [appStructuralIssue],
-          schemaDiffIssues: [appDiffIssue],
+          issues: [appDiffIssue],
         }),
       ],
       [
@@ -262,14 +240,13 @@ describe('combineVerifyResults', () => {
           spaceId: 'cipher',
           ok: true,
           summary: 'Schema matches contract',
-          schemaDiffIssues: [extDiffIssue],
+          issues: [extDiffIssue],
         }),
       ],
     ]);
 
     const combined = combineVerifyResults(perSpace, 'app', false, []);
 
-    expect(combined.result.schema.issues).toEqual([appStructuralIssue]);
-    expect(combined.result.schema.schemaDiffIssues).toEqual([appDiffIssue, extDiffIssue]);
+    expect(combined.result.schema.issues).toEqual([appDiffIssue, extDiffIssue]);
   });
 });

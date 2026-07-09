@@ -1,18 +1,8 @@
-import type { ExpectationFailureReason, SchemaIssue } from './control-result-types';
-
-/**
- * Legacy vocabulary for the failure reason, mirrored by
- * {@link ExpectationFailureReason} (`extra` → `not-expected`, `missing` →
- * `not-found`, `mismatch` → `not-equal`). Both fields are stamped at the one
- * producer site ({@link diffSchemas}), so they cannot drift; `outcome` and its
- * target/family-internal consumers retire with the issue-type merge.
- */
-export type SchemaDiffOutcome = 'missing' | 'extra' | 'mismatch';
+import type { ExpectationFailureReason } from './control-operation-results';
 
 export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   /** Path from the root node down to the diffed node, as a sequence of local keys. */
   readonly path: readonly string[];
-  readonly outcome: SchemaDiffOutcome;
   /** Why the actual state fails the expectation. Consumers filter on this field. */
   readonly reason: ExpectationFailureReason;
   readonly message: string;
@@ -44,8 +34,15 @@ function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
   map.set(key, node);
 }
 
-function outcomeMessage(outcome: SchemaDiffOutcome, path: readonly string[]): string {
-  return `${outcome}: ${path.join('/')}`;
+/**
+ * The issue's own default message: the path, nothing else. `reason` already
+ * carries why the node is flagged as structured data; turning that into a
+ * human label ("missing: …" / "extra: …" / "mismatch: …") is a presentation
+ * concern for whoever renders the issue (the CLI verify formatter), not the
+ * differ's.
+ */
+function pathMessage(path: readonly string[]): string {
+  return path.join('/');
 }
 
 function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
@@ -53,9 +50,8 @@ function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): 
   return [
     {
       path,
-      outcome: 'missing',
       reason: 'not-found',
-      message: outcomeMessage('missing', path),
+      message: pathMessage(path),
       expected: node,
     },
     ...node.children().flatMap((c) => emitMissingSubtree(c, path)),
@@ -67,9 +63,8 @@ function emitExtraSubtree(node: DiffableNode, parentPath: readonly string[]): Sc
   return [
     {
       path,
-      outcome: 'extra',
       reason: 'not-expected',
-      message: outcomeMessage('extra', path),
+      message: pathMessage(path),
       actual: node,
     },
     ...node.children().flatMap((c) => emitExtraSubtree(c, path)),
@@ -102,9 +97,8 @@ function diffPair(
   if (!expected.isEqualTo(actual)) {
     issues.push({
       path,
-      outcome: 'mismatch',
       reason: 'not-equal',
-      message: outcomeMessage('mismatch', path),
+      message: pathMessage(path),
       expected,
       actual,
     });
@@ -156,47 +150,25 @@ function diffChildren(
 }
 
 /**
- * The two issue representations a `SchemaDiff` carries: `SchemaIssue` from the
- * legacy relational differ (coordinate-based) and `SchemaDiffIssue` from the
- * generic node differ (carrying the schema-IR node it concerns).
- */
-export type DiffIssue<TNode extends DiffableNode = DiffableNode> =
-  | SchemaIssue
-  | SchemaDiffIssue<TNode>;
-
-/**
  * The result of diffing a contract's expected schema against the introspected
- * actual schema: two issue lists, kept distinct because two diffing mechanisms
- * produce them (the relational check and the generic node differ). Carries no
- * verdict, verification tree, or counts — those are the verifier's own
- * presentation, built from the same underlying comparison.
+ * actual schema: one node-typed issue list. Carries no verdict, verification
+ * tree, or counts — those are the verifier's own presentation, built from the
+ * same underlying comparison.
  *
- * `TNode` is the concrete schema-IR node the `schemaDiffIssues` carry; it
- * defaults to `DiffableNode`, so this is purely additive — a caller that wants
- * the concrete node opts in (the Postgres planner uses the concrete node type),
+ * `TNode` is the concrete schema-IR node the issues carry; it defaults to
+ * `DiffableNode`, so this is purely additive — a caller that wants the
+ * concrete node opts in (the Postgres planner uses the concrete node type),
  * everyone else keeps the default unchanged.
  */
 export class SchemaDiff<TNode extends DiffableNode = DiffableNode> {
-  readonly issues: readonly SchemaIssue[];
-  readonly schemaDiffIssues: readonly SchemaDiffIssue<TNode>[];
+  readonly issues: readonly SchemaDiffIssue<TNode>[];
 
-  constructor(issues: readonly SchemaIssue[], schemaDiffIssues: readonly SchemaDiffIssue<TNode>[]) {
+  constructor(issues: readonly SchemaDiffIssue<TNode>[]) {
     this.issues = issues;
-    this.schemaDiffIssues = schemaDiffIssues;
   }
 
-  /** Fans `keep` across both issue lists, returning a new `SchemaDiff` narrowed to the survivors. */
-  filter(keep: (issue: DiffIssue<TNode>) => boolean): SchemaDiff<TNode> {
-    return new SchemaDiff(this.issues.filter(keep), this.schemaDiffIssues.filter(keep));
+  /** Returns a new `SchemaDiff` narrowed to the issues `keep` returns true for. */
+  filter(keep: (issue: SchemaDiffIssue<TNode>) => boolean): SchemaDiff<TNode> {
+    return new SchemaDiff(this.issues.filter(keep));
   }
-}
-
-/**
- * The SPI a SQL target implements to compare a contract's expected schema
- * against the introspected actual schema. How the comparison is computed —
- * relational check, generic node differ, namespace pairing — is private to
- * the implementer; verify and plan consume only the returned `SchemaDiff`.
- */
-export interface SchemaDiffer<TInput> {
-  diff(input: TInput): SchemaDiff;
 }

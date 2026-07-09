@@ -1,7 +1,6 @@
 import type { ControlPolicy } from '@prisma-next/contract/types';
-import type { SchemaVerificationNode } from './control-result-types';
 
-export type VerificationStatus = SchemaVerificationNode['status'];
+export type VerificationStatus = 'pass' | 'warn' | 'fail';
 
 export type VerifierOutcome = VerificationStatus | 'suppress';
 

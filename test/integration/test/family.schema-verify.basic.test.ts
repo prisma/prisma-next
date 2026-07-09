@@ -80,12 +80,8 @@ describe('family instance schemaVerify - basic', () => {
 
         expect(result).toMatchObject({
           ok: true,
-          schema: {
-            counts: { fail: 0, pass: expect.any(Number) },
-            root: { status: 'pass' },
-          },
+          schema: { issues: [] },
         });
-        expect(result.schema.counts.pass).toBeGreaterThan(0);
       },
       timeouts.spinUpPpgDev,
     );
@@ -106,7 +102,7 @@ describe('family instance schemaVerify - basic', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with missing_table issue',
+      'returns ok=false with a not-found issue for the missing table',
       async () => {
         const contract = defineContract({
           models: {
@@ -127,18 +123,9 @@ describe('family instance schemaVerify - basic', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result).toMatchObject({
-          ok: false,
-          schema: {
-            counts: { fail: expect.any(Number) },
-            root: { status: 'fail' },
-          },
-        });
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(result.schema.issues).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({ kind: 'missing_table', table: 'post' }),
-          ]),
+        expect(result.ok).toBe(false);
+        expect(result.schema.issues).toContainEqual(
+          expect.objectContaining({ reason: 'not-found', path: ['database', 'public', 'post'] }),
         );
       },
       timeouts.spinUpPpgDev,
@@ -158,7 +145,7 @@ describe('family instance schemaVerify - basic', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with missing_column issue',
+      'returns ok=false with a not-found issue for the missing column',
       async () => {
         const contract = defineContract({
           models: {
@@ -173,17 +160,12 @@ describe('family instance schemaVerify - basic', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result).toMatchObject({
-          ok: false,
-          schema: {
-            counts: { fail: expect.any(Number) },
-          },
-        });
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(result.schema.issues).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({ kind: 'missing_column', table: 'user', column: 'email' }),
-          ]),
+        expect(result.ok).toBe(false);
+        expect(result.schema.issues).toContainEqual(
+          expect.objectContaining({
+            reason: 'not-found',
+            path: ['database', 'public', 'user', 'column:email'],
+          }),
         );
       },
       timeouts.spinUpPpgDev,

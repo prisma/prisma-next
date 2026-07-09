@@ -1,10 +1,10 @@
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { printPslFromFlat as printPslFromSql } from '../fixtures';
 
 describe('printPsl', () => {
   it('schema with 1:N relation', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         user: {
           name: 'user',
@@ -36,7 +36,7 @@ describe('printPsl', () => {
           indexes: [{ columns: ['user_id'], unique: false }],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -64,7 +64,7 @@ describe('printPsl', () => {
   });
 
   it('schema with 1:1 relation (FK column is unique)', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         user: {
           name: 'user',
@@ -95,7 +95,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -121,7 +121,7 @@ describe('printPsl', () => {
   });
 
   it('schema with 1:1 relation from a composite unique foreign key', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         account: {
           name: 'account',
@@ -165,7 +165,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -194,7 +194,7 @@ describe('printPsl', () => {
   });
 
   it('self-referencing FK', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         employee: {
           name: 'employee',
@@ -219,7 +219,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -239,7 +239,7 @@ describe('printPsl', () => {
   });
 
   it('multiple FKs to same table (named relations)', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         user: {
           name: 'user',
@@ -285,7 +285,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -313,7 +313,7 @@ describe('printPsl', () => {
   });
 
   it('composite FK relation fields use table name', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         product: {
           name: 'product',
@@ -361,7 +361,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -389,7 +389,7 @@ describe('printPsl', () => {
   });
 
   it('onDelete and onUpdate referential actions', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         parent: {
           name: 'parent',
@@ -425,7 +425,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -450,7 +450,7 @@ describe('printPsl', () => {
   });
 
   it('preserves foreign key constraint names with relation map arguments', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         team: {
           name: 'team',
@@ -481,7 +481,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
 
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -507,7 +507,7 @@ describe('printPsl', () => {
   });
 
   it('orders cyclic table dependencies deterministically', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         alpha: {
           name: 'alpha',
@@ -540,7 +540,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
 
     const result = printPslFromSql(schemaIR);
     const betaIndex = result.indexOf('model Beta');

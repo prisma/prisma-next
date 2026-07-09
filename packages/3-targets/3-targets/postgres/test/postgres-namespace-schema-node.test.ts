@@ -1,9 +1,9 @@
-import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
-import { describe, expect, expectTypeOf, it, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { PostgresNamespaceSchemaNode } from '../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresPolicySchemaNode } from '../src/core/schema-ir/postgres-policy-schema-node';
 import { PostgresRoleSchemaNode } from '../src/core/schema-ir/postgres-role-schema-node';
 import { PostgresTableSchemaNode } from '../src/core/schema-ir/postgres-table-schema-node';
+import type { SqlSchemaDiffNode } from '../src/core/schema-ir/schema-node-kinds';
 
 const policy = new PostgresPolicySchemaNode({
   name: 'read_own_a1b2c3d4',
@@ -72,7 +72,7 @@ describe('PostgresNamespaceSchemaNode', () => {
     const node = new PostgresNamespaceSchemaNode(baseInput);
     const children = node.children();
     for (const child of children) {
-      expect(PostgresRoleSchemaNode.is(child as SqlSchemaIRNode)).toBe(false);
+      expect(PostgresRoleSchemaNode.is(child as SqlSchemaDiffNode)).toBe(false);
     }
   });
 
@@ -121,9 +121,9 @@ describe('PostgresNamespaceSchemaNode', () => {
       expect(PostgresNamespaceSchemaNode.is(policy)).toBe(false);
     });
   });
-});
 
-test('PostgresNamespaceSchemaNode is assignable to SqlSchemaIR', () => {
-  const node = new PostgresNamespaceSchemaNode(baseInput);
-  expectTypeOf(node).toExtend<SqlSchemaIR>();
+  it('carries a `tables` field readable by legacy per-schema consumers reading SqlSchemaIRNode structurally', () => {
+    const node = new PostgresNamespaceSchemaNode(baseInput);
+    expect(Object.keys(node.tables)).toEqual(['profiles', 'orders']);
+  });
 });

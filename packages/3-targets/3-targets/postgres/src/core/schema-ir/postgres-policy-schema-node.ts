@@ -1,6 +1,6 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { assertNode, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { RlsPolicyOperation } from '../postgres-rls-policy';
 import { PostgresSchemaNodeKind } from './schema-node-kinds';
@@ -38,6 +38,7 @@ export interface PostgresPolicySchemaNodeInput {
  */
 export class PostgresPolicySchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.policy;
+
   readonly name: string;
   readonly prefix: string;
   readonly tableName: string;
@@ -84,10 +85,6 @@ export class PostgresPolicySchemaNode extends SqlSchemaIRNode implements Diffabl
   }
 
   static assert(node: SqlSchemaIRNode | undefined): asserts node is PostgresPolicySchemaNode {
-    if (node === undefined || !PostgresPolicySchemaNode.is(node)) {
-      throw new Error(
-        `Expected a PostgresPolicySchemaNode but got nodeKind=${node?.nodeKind ?? 'undefined'}`,
-      );
-    }
+    assertNode(node, 'PostgresPolicySchemaNode', PostgresPolicySchemaNode.is);
   }
 }

@@ -1,16 +1,16 @@
 import type {
   ControlAdapterInstance,
   ControlFamilyInstance,
-  DiffIssue,
   MigrationOperationPolicy,
   MigrationPlanner,
   MigrationPlanWithAuthoringSurface,
+  SchemaOwnership,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { synthStrategy } from '../../../src/aggregate/strategies/synth';
+import { planFromDiff } from '../../../src/aggregate/strategies/plan-from-diff';
 import type { AggregateContractSpace } from '../../../src/aggregate/types';
 import { makeAggregateContractSpace } from '../../fixtures';
 
@@ -20,6 +20,8 @@ const POLICY: MigrationOperationPolicy = {
 
 const STUB_ADAPTER: ControlAdapterInstance<'sql', 'postgres'> =
   {} as unknown as ControlAdapterInstance<'sql', 'postgres'>;
+
+const STUB_OWNERSHIP: SchemaOwnership = { declaresEntity: () => false };
 
 function makeSpace(spaceId: string, tables: Record<string, unknown>): AggregateContractSpace {
   return makeAggregateContractSpace({
@@ -45,14 +47,14 @@ function makeStubPlan(targetId: string): MigrationPlanWithAuthoringSurface {
   };
 }
 
-describe('synthStrategy', () => {
-  it('passes the full schema and a diff filter that drops only other spaces’ extras', async () => {
+describe('planFromDiff', () => {
+  it('passes the full schema and the ownership oracle straight through to the planner', async () => {
     let observedSchema: unknown;
-    let observedKeep: ((issue: DiffIssue) => boolean) | undefined;
+    let observedOwnership: SchemaOwnership | undefined;
     const stubPlanner: MigrationPlanner<'sql', 'postgres'> = {
-      plan: ({ schema, keepDiffIssue }) => {
+      plan: ({ schema, ownership }) => {
         observedSchema = schema;
-        observedKeep = keepDiffIssue;
+        observedOwnership = ownership;
         return { kind: 'success', plan: makeStubPlan('placeholder') };
       },
       emptyMigration: () => {
@@ -81,11 +83,17 @@ describe('synthStrategy', () => {
       },
     };
 
-    const outcome = await synthStrategy({
+    // The aggregate satisfies `SchemaOwnership`; the strategy forwards it
+    // verbatim. Here `cipher_state` is owned by some (sibling) space.
+    const ownership: SchemaOwnership = {
+      declaresEntity: (coordinate) => coordinate.entityName === 'cipher_state',
+    };
+
+    const outcome = await planFromDiff({
       aggregateTargetId: 'postgres',
       currentMarker: null,
       space: appSpace,
-      declaredByAnotherSpace: (name) => name === 'cipher_state',
+      ownership,
       schemaIntrospection: liveSchema,
       adapter: STUB_ADAPTER,
       migrations: stubMigrations,
@@ -95,9 +103,9 @@ describe('synthStrategy', () => {
 
     expect(outcome.kind).toBe('ok');
     if (outcome.kind !== 'ok') return;
-    // Synth strategy stamps the aggregate's targetId, not the planner's.
+    // The strategy stamps the aggregate's targetId, not the planner's.
     expect(outcome.result.plan.targetId).toBe('postgres');
-    expect(outcome.result.strategy).toBe('synth');
+    expect(outcome.result.strategy).toBe('plan-from-diff');
     expect(outcome.result.migrationEdges).toEqual([
       {
         dirName: '',
@@ -116,49 +124,9 @@ describe('synthStrategy', () => {
       'orphan_table',
     ]);
 
-    // … and a keep-predicate it applies to its diff. The planner holds no
-    // ownership logic: the predicate drops exactly the extras a sibling
-    // contract space declares, keeps every non-extra finding, and keeps
-    // extras no space declares (the planner may DROP those under policy).
-    const keep = observedKeep;
-    expect(keep).toBeDefined();
-    if (keep === undefined) return;
-    const missingIssue: DiffIssue = {
-      kind: 'missing_table',
-      table: 'cipher_state',
-      reason: 'not-found',
-      message: 'missing',
-    };
-    const siblingExtraIssue: DiffIssue = {
-      kind: 'extra_table',
-      table: 'cipher_state',
-      reason: 'not-expected',
-      message: 'extra',
-    };
-    const undeclaredExtraIssue: DiffIssue = {
-      kind: 'extra_table',
-      table: 'orphan_table',
-      reason: 'not-expected',
-      message: 'extra',
-    };
-    const siblingExtraDiffIssue: DiffIssue = {
-      path: ['public', 'cipher_state'],
-      outcome: 'extra',
-      reason: 'not-expected',
-      message: 'extra',
-      actual: { tableName: 'cipher_state' } as never,
-    };
-    const missingDiffIssue: DiffIssue = {
-      path: ['public', 'app_user', 'policy_x'],
-      outcome: 'missing',
-      reason: 'not-found',
-      message: 'missing',
-    };
-    expect(keep(missingIssue)).toBe(true);
-    expect(keep(siblingExtraIssue)).toBe(false);
-    expect(keep(undeclaredExtraIssue)).toBe(true);
-    expect(keep(siblingExtraDiffIssue)).toBe(false);
-    expect(keep(missingDiffIssue)).toBe(true);
+    // … and the same ownership oracle object. The planner asks it who owns
+    // each extra; this strategy holds no ownership logic of its own.
+    expect(observedOwnership).toBe(ownership);
   });
 
   it('forwards planner failures verbatim', async () => {
@@ -183,11 +151,11 @@ describe('synthStrategy', () => {
       contractToSchema: () => ({ tables: {} }),
     };
 
-    const outcome = await synthStrategy({
+    const outcome = await planFromDiff({
       aggregateTargetId: 'postgres',
       currentMarker: null,
       space: makeSpace('app', {}),
-      declaredByAnotherSpace: () => false,
+      ownership: STUB_OWNERSHIP,
       schemaIntrospection: { tables: {} },
       adapter: STUB_ADAPTER,
       migrations: stubMigrations,

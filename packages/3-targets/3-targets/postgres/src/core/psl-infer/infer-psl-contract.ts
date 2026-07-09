@@ -36,12 +36,8 @@ import {
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
 import type { SqlModelStorage } from '@prisma-next/sql-contract/types';
-import type {
-  SqlColumnIR,
-  SqlForeignKeyIR,
-  SqlSchemaIR,
-  SqlTableIR,
-} from '@prisma-next/sql-schema-ir/types';
+import type { SqlColumnIR, SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
@@ -255,7 +251,7 @@ function resolveForeignKeys(
     resultTables[tableName] =
       keptForeignKeys.length === table.foreignKeys.length
         ? table
-        : { ...table, foreignKeys: keptForeignKeys };
+        : new SqlTableIR({ ...table, foreignKeys: keptForeignKeys });
   }
 
   return { tables: resultTables, extraRelationsByTable, crossSpaceFieldNamesByTable };
@@ -335,16 +331,15 @@ export function inferPostgresPslContract(
             'output is a later slice).',
         );
       }
-      tables[tableName] = table;
+      tables[tableName] = new SqlTableIR(table);
     }
   }
-
   const {
     tables: resolvedTables,
     extraRelationsByTable,
     crossSpaceFieldNamesByTable,
   } = resolveForeignKeys(tables, owners);
-  const schemaIR: SqlSchemaIR = { tables: resolvedTables };
+  const schemaIR = new SqlSchemaIR({ tables: resolvedTables });
 
   const options: PslPrinterOptions = {
     typeMap: createPostgresTypeMap(new Set()),

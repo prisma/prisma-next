@@ -4,8 +4,10 @@ import type {
   ControlDriverInstance,
   ControlExtensionDescriptor,
   ControlFamilyInstance,
+  SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { hasSchemaSubjectClassifier } from '@prisma-next/framework-components/control';
 import {
   type AggregateContractSpace,
   collectAggregateNamespaces,
@@ -14,6 +16,7 @@ import {
   verifyMigration,
 } from '@prisma-next/migration-tools/aggregate';
 import { castAs } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from '../../utils/cli-errors';
 import {
@@ -115,6 +118,17 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
         contract: collectAggregateNamespaces(aggregate),
       });
 
+  // The subject-granularity + entity-kind classifiers are an injected
+  // capability — not every family provides one — detected the same way the
+  // other optional per-family capabilities are (`hasSchemaView`, …), never
+  // assumed.
+  const classifySubjectGranularity = hasSchemaSubjectClassifier(familyInstance)
+    ? (issue: SchemaDiffIssue) => familyInstance.classifySubjectGranularity(issue)
+    : undefined;
+  const classifyEntityKind = hasSchemaSubjectClassifier(familyInstance)
+    ? (issue: SchemaDiffIssue) => familyInstance.classifyEntityKind(issue)
+    : undefined;
+
   emitVerifySpan(onProgress, 'spanStart');
   const verifyResult = verifyMigration({
     aggregate,
@@ -122,6 +136,8 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
     schemaIntrospection,
     mode: options.mode,
     verifySchemaForSpace: createPerSpaceVerifier(options),
+    ...ifDefined('classifySubjectGranularity', classifySubjectGranularity),
+    ...ifDefined('classifyEntityKind', classifyEntityKind),
   });
   return finaliseVerifyResult({ verifyResult, aggregate, skipMarker, onProgress });
 }
@@ -276,19 +292,6 @@ function buildSkippedSchemaResult(space: AggregateContractSpace): VerifyDatabase
     target: { expected: contract.target },
     schema: {
       issues: [],
-      schemaDiffIssues: [],
-      root: {
-        status: 'pass',
-        kind: 'skipped',
-        name: space.spaceId,
-        contractPath: '',
-        code: 'SKIPPED',
-        message: 'Schema verification skipped',
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      },
-      counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
     },
     timings: { total: 0 },
   };

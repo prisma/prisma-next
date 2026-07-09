@@ -1,6 +1,7 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import {
+  assertNode,
   PrimaryKey,
   type SqlAnnotations,
   SqlCheckConstraintIR,
@@ -27,12 +28,18 @@ export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
  * `SqlTableIR` calls `freezeNode` in its own constructor, which prevents
  * subclass field initialisation.
  *
- * `id` is the table name. `children()` returns the policy nodes on this table.
- * `isEqualTo` is identity — two table nodes are equal iff their ids (names)
- * match. Columns are not compared here; they become child nodes later.
+ * `id` is the table name. `isEqualTo` is identity — two table nodes are equal
+ * iff their ids (names) match; the table's own structural drift is entirely
+ * expressed by its children. `children()` returns every column, the primary
+ * key (when present), every foreign key, unique, index, and check constraint,
+ * plus the policy nodes — one flat list, so a drifted column and a drifted
+ * policy are both reported by the same walk. Order is deterministic (object
+ * key order for columns, array order for the rest) so two structurally equal
+ * tables always produce the same child list.
  */
 export class PostgresTableSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.table;
+
   readonly name: string;
   readonly columns: Readonly<Record<string, SqlColumnIR>>;
   readonly foreignKeys: ReadonlyArray<SqlForeignKeyIR>;
@@ -90,7 +97,15 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
   }
 
   children(): readonly DiffableNode[] {
-    return this.policies;
+    return [
+      ...Object.values(this.columns),
+      ...(this.primaryKey ? [this.primaryKey] : []),
+      ...this.foreignKeys,
+      ...this.uniques,
+      ...this.indexes,
+      ...(this.checks ?? []),
+      ...this.policies,
+    ];
   }
 
   static is(node: SqlSchemaIRNode): node is PostgresTableSchemaNode {
@@ -98,10 +113,6 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
   }
 
   static assert(node: SqlSchemaIRNode): asserts node is PostgresTableSchemaNode {
-    if (!PostgresTableSchemaNode.is(node)) {
-      throw new Error(
-        `Expected a PostgresTableSchemaNode but got nodeKind=${node.nodeKind ?? 'undefined'}`,
-      );
-    }
+    assertNode(node, 'PostgresTableSchemaNode', PostgresTableSchemaNode.is);
   }
 }

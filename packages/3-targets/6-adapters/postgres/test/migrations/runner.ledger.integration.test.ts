@@ -3,7 +3,7 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import {
   type AggregateMigrationEdgeRef,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
@@ -411,7 +411,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     if (planResult.kind !== 'success') throw new Error('expected planner success');
 
     const synthEdges = [
-      buildSynthMigrationEdge({
+      buildFabricatedMigrationEdge({
         currentMarkerStorageHash: null,
         destinationStorageHash: contract.storage.storageHash,
         operationCount: planResult.plan.operations.length,

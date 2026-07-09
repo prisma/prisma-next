@@ -1,19 +1,19 @@
 import {
   type AggregateMigrationEdgeRef,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 
-export type SynthMigrationEdgesPlan = {
+export type FabricatedMigrationEdgesPlan = {
   readonly origin?: { readonly storageHash: string } | null;
   readonly destination: { readonly storageHash: string };
   readonly operations: readonly unknown[];
 };
 
-export function synthMigrationEdges(
-  plan: SynthMigrationEdgesPlan,
+export function buildFabricatedMigrationEdges(
+  plan: FabricatedMigrationEdgesPlan,
 ): readonly AggregateMigrationEdgeRef[] {
   return [
-    buildSynthMigrationEdge({
+    buildFabricatedMigrationEdge({
       currentMarkerStorageHash: plan.origin?.storageHash,
       destinationStorageHash: plan.destination.storageHash,
       operationCount: plan.operations.length,

@@ -1,6 +1,7 @@
 import { flatPslModels } from '@prisma-next/framework-components/psl-ast';
 import { printPsl } from '@prisma-next/psl-printer';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIRInput } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { inferPostgresPslContract } from '../../src/core/psl-infer/infer-psl-contract';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
@@ -8,10 +9,10 @@ import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-n
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 import { inferPslAstFromFlat as sqlSchemaIrToPslAst } from './fixtures';
 
-function ir(partial: Partial<SqlSchemaIR> & Pick<SqlSchemaIR, 'tables'>): SqlSchemaIR {
-  return {
+function ir(partial: Partial<SqlSchemaIRInput> & Pick<SqlSchemaIRInput, 'tables'>): SqlSchemaIR {
+  return new SqlSchemaIR({
     ...partial,
-  };
+  });
 }
 
 describe('inferPostgresPslContract', () => {

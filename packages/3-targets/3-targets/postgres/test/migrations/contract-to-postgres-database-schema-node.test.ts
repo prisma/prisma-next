@@ -1,6 +1,7 @@
-import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { asNamespaceId, coreHash, profileHash } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { contractToPostgresDatabaseSchemaNode } from '../../src/core/migrations/contract-to-postgres-database-schema-node';
@@ -10,6 +11,7 @@ import { type PostgresContract, PostgresSchema } from '../../src/core/postgres-s
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
+import type { SqlSchemaDiffNode } from '../../src/core/schema-ir/schema-node-kinds';
 import { postgresRenderDefault } from '../../src/exports/control';
 
 const TABLE_NAME = 'profiles';
@@ -125,7 +127,7 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
     );
     expect(root.roles).toContainEqual(expect.objectContaining({ name: 'app_user' }));
     for (const child of root.children()) {
-      expect(PostgresNamespaceSchemaNode.is(child as SqlSchemaIRNode)).toBe(true);
+      expect(PostgresNamespaceSchemaNode.is(child as SqlSchemaDiffNode)).toBe(true);
     }
   });
 
@@ -194,5 +196,98 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
     expect(() =>
       contractToPostgresDatabaseSchemaNode(makeContract({ policies: [orphan] }), projectionOptions),
     ).toThrow(/missing_table/);
+  });
+});
+
+describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespace', () => {
+  function contractWithFk(targetNamespaceId: string): PostgresContract {
+    const schema = new PostgresSchema({
+      id: SCHEMA_NAME,
+      entries: {
+        table: {
+          users: new StorageTable({
+            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+          [TABLE_NAME]: new StorageTable({
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [
+              {
+                source: {
+                  namespaceId: asNamespaceId(SCHEMA_NAME),
+                  tableName: TABLE_NAME,
+                  columns: ['user_id'],
+                },
+                target: {
+                  namespaceId: asNamespaceId(targetNamespaceId),
+                  tableName: 'users',
+                  columns: ['id'],
+                },
+                constraint: true,
+                index: true,
+              },
+            ],
+            uniques: [],
+            indexes: [],
+          }),
+        },
+      },
+    });
+    return {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:fk-resolution-test'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:fk-resolution-test'),
+        namespaces: { [SCHEMA_NAME]: schema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+  }
+
+  it('resolves an unbound FK target namespace to the real DDL schema', () => {
+    const root = contractToPostgresDatabaseSchemaNode(
+      contractWithFk(UNBOUND_NAMESPACE_ID),
+      projectionOptions,
+    );
+    const fk = root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME]?.foreignKeys[0];
+    expect(fk?.referencedSchema).toBe(UNBOUND_NAMESPACE_ID);
+    expect(fk?.resolvedReferencedNamespace).toBe('public');
+  });
+
+  it('resolves a named FK target namespace through its DDL schema name', () => {
+    const root = contractToPostgresDatabaseSchemaNode(
+      contractWithFk(SCHEMA_NAME),
+      projectionOptions,
+    );
+    const fk = root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME]?.foreignKeys[0];
+    expect(fk?.resolvedReferencedNamespace).toBe('public');
+  });
+
+  it('an unbound-namespace contract FK pairs by id with an introspected public FK', () => {
+    const root = contractToPostgresDatabaseSchemaNode(
+      contractWithFk(UNBOUND_NAMESPACE_ID),
+      projectionOptions,
+    );
+    const expectedFk = root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME]?.foreignKeys[0];
+    const introspectedFk = new SqlForeignKeyIR({
+      columns: ['user_id'],
+      referencedTable: 'users',
+      referencedColumns: ['id'],
+      referencedSchema: 'public',
+      name: 'profiles_user_id_fkey',
+    });
+    expect(expectedFk?.id).toBe(introspectedFk.id);
   });
 });

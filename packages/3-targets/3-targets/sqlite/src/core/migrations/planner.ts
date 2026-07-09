@@ -15,12 +15,13 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import type {
   MigrationPlanner,
   MigrationScaffoldContext,
-  SchemaIssue,
+  SchemaDiffIssue,
+  SchemaOwnership,
 } from '@prisma-next/framework-components/control';
-import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
-import { blindCast } from '@prisma-next/utils/casts';
-import { diffSqliteDatabaseSchema } from './diff-database-schema';
-import { planIssues } from './issue-planner';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { RelationalSchemaNodeKind, type SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { buildSqlitePlanDiff } from './diff-database-schema';
+import { coalesceSubtreeIssues, issueNode, planIssues } from './issue-planner';
 import {
   type SqliteMigrationDestinationInfo,
   TypeScriptRenderableSqliteMigration,
@@ -41,16 +42,18 @@ export type SqlitePlanResult =
 /**
  * SQLite migration planner — a thin wrapper over `planIssues`.
  *
- * `plan()` verifies the live schema against the target contract (producing
- * `SchemaIssue[]`) and delegates to `planIssues` with the registered
- * strategies. Strategies absorb groups of related issues into composite
- * recipes (e.g. recreating a table to apply type/nullability/default/
- * constraint changes at once); anything not absorbed by a strategy flows
- * through `mapIssueToCall` in the issue planner as a one-off call.
+ * `plan()` diffs the live schema against the target contract via the one
+ * differ (`buildSqlitePlanDiff`, producing node-typed `SchemaDiffIssue[]`)
+ * and delegates to `planIssues` with the registered strategies. Strategies
+ * absorb groups of related issues into composite recipes (e.g. recreating a
+ * table to apply type/nullability/default/constraint changes at once);
+ * anything not absorbed by a strategy flows through `mapNodeIssueToCall` in
+ * the issue planner as a one-off call.
  *
- * FK-backing indexes are surfaced by `verifySqlSchema`'s index expansion
- * (see `verify-sql-schema.ts:459-469`), so `mapIssueToCall` handles them
- * uniformly alongside user-declared indexes.
+ * FK-backing indexes are already merged into the expected table node's
+ * `indexes` at derivation (`contractToSchemaIR`'s `convertTable`), so
+ * `mapNodeIssueToCall` handles them uniformly alongside user-declared
+ * indexes — no separate expansion step in the planner.
  */
 export class SqliteMigrationPlanner
   implements SqlMigrationPlanner<SqlitePlanTargetDetails>, MigrationPlanner<'sql', 'sqlite'>
@@ -83,6 +86,11 @@ export class SqliteMigrationPlanner
      * the marker row by the right space.
      */
     readonly spaceId: string;
+    /**
+     * Ownership oracle over the contract-space composition — see
+     * {@link SqlMigrationPlannerPlanOptions.ownership}.
+     */
+    readonly ownership?: SchemaOwnership;
   }): SqlitePlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
@@ -107,17 +115,13 @@ export class SqliteMigrationPlanner
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) return policyResult;
 
-    const schemaIssues = this.collectSchemaIssues(options);
+    const { expected, actual, issues } = this.collectSchemaIssues(options);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
-    const storageTypes = options.contract.storage.types ?? {};
 
     const result = planIssues({
-      issues: schemaIssues,
-      toContract: options.contract,
-      fromContract: options.fromContract,
-      codecHooks,
-      storageTypes,
-      schema: sqliteFlatSchema(options.schema),
+      issues,
+      expected,
+      actual,
       policy: options.policy,
       frameworkComponents: options.frameworkComponents,
       strategies: sqlitePlannerStrategies,
@@ -178,30 +182,101 @@ export class SqliteMigrationPlanner
     return null;
   }
 
-  private collectSchemaIssues(options: SqlMigrationPlannerPlanOptions): readonly SchemaIssue[] {
+  /**
+   * Diffs the target contract against the live schema via the one differ
+   * (the same tree-building `diffSqliteSchema` uses, plus the
+   * op-render stamper) and prepares the issue list `planIssues` consumes.
+   *
+   * Three passes, in order:
+   * 1. Subtree coalescing — the differ is total (a missing/extra table also
+   *    emits an issue for every column/constraint under it); those nested
+   *    issues are redundant once the table-level `CreateTable`/`DropTable`
+   *    call already accounts for the whole subtree. Runs FIRST, over the
+   *    complete diff: a sibling-owned extra table's column issues must
+   *    collapse into its one table-level issue before the ownership pass,
+   *    because a bare column node carries no table reference — if coalescing
+   *    ran after ownership dropped the table-level issue, the orphaned column
+   *    issues would survive and the planner would emit drops against a
+   *    sibling space's table.
+   * 2. Ownership — a live extra is only this plan's to drop when no contract
+   *    space owns it. The differ ran against THIS space's contract, so a
+   *    table a sibling owns surfaces here as `not-expected`; the planner asks
+   *    the ownership oracle (the passive aggregate) whether any space declares
+   *    it and, if so, leaves it alone. A table no space owns stays a genuine
+   *    extra. Ownership lives in the aggregate; the planner only asks. No
+   *    oracle (single-space) keeps every extra.
+   * 3. Strict-mode extras gating — `not-expected` (extra table/column/
+   *    constraint) issues are dropped entirely outside strict mode, mirroring
+   *    the retired coordinate walk's `if (strict) { ...extra_* } }` guards:
+   *    an additive-only plan must never even consider dropping an unclaimed
+   *    object, not just refuse to emit the drop.
+   */
+  private collectSchemaIssues(options: SqlMigrationPlannerPlanOptions): {
+    readonly expected: SqlSchemaIR;
+    readonly actual: SqlSchemaIR;
+    readonly issues: readonly SchemaDiffIssue[];
+  } {
     const allowed = options.policy.allowedOperationClasses;
     const strict = allowed.includes('widening') || allowed.includes('destructive');
-    const rawDiff = diffSqliteDatabaseSchema({
+    const {
+      expected,
+      actual,
+      issues: rawIssues,
+    } = buildSqlitePlanDiff({
       contract: options.contract,
       actualSchema: options.schema,
-      strict,
-      typeMetadataRegistry: new Map(),
       frameworkComponents: options.frameworkComponents,
     });
-    // The caller-supplied predicate is applied blindly — any scoping (e.g.
-    // multi-space ownership) is the orchestration's, never worked out here.
-    const diff = options.keepDiffIssue ? rawDiff.filter(options.keepDiffIssue) : rawDiff;
-    return diff.issues;
+    const coalesced = coalesceSubtreeIssues(rawIssues);
+    const owned = retainUnownedExtras(coalesced, options.ownership);
+    const issues = strict ? owned : owned.filter((issue) => issue.reason !== 'not-expected');
+    return { expected, actual, issues };
   }
 }
 
 /**
- * SQLite has a single, flat schema — its introspected node IS a per-schema
- * `SqlSchemaIR`, never the multi-namespace tree the Postgres target builds. The
- * planner consumes that flat shape directly when building ops.
+ * Drops a `not-expected` issue when it is a whole extra TABLE that some
+ * contract space owns, asking the ownership oracle per node.
+ *
+ * The consultation applies ONLY to table-level extras — a live table this
+ * space's contract lacks — identified by asking the issue's own node
+ * (`nodeKind === table`), never by counting path segments. SQLite is a
+ * single-namespace target, so every coordinate is qualified with the shared
+ * `UNBOUND_NAMESPACE_ID` sentinel (the same one the aggregate's declared
+ * entities carry for this target). `entityKind` is the literal `'table'`:
+ * this function only ever asks about a node already confirmed to be
+ * `RelationalSchemaNodeKind.table` (checked just above), and that's a
+ * diff-tree `nodeKind` spelling (`'sql-table'`) distinct from the storage
+ * `entries` vocabulary `elementCoordinates` walks (`'table'`) — the literal
+ * is that storage-entries spelling. `declaresEntity` answers over the whole
+ * composition (self included), so a positive answer on such a table means
+ * another space owns it (a table this space owned would be in its expected
+ * tree, never an extra): leave it. A negative answer means no space owns
+ * it — a genuine orphan to drop.
+ *
+ * A DEEPER extra (an extra column/constraint on a table this space DOES own —
+ * only the child drifted, so the table is in the expected tree) is this
+ * space's own drift and is always kept for dropping; asking the oracle there
+ * would wrongly suppress it, because the owned table answers `true`. No oracle
+ * ⇒ every extra is kept (single-space plan).
  */
-function sqliteFlatSchema(schema: SqlSchemaIRNode): SqlSchemaIR {
-  return blindCast<SqlSchemaIR, 'the SQLite introspected node is a flat per-schema SqlSchemaIR'>(
-    schema,
-  );
+function retainUnownedExtras(
+  issues: readonly SchemaDiffIssue[],
+  ownership: SchemaOwnership | undefined,
+): readonly SchemaDiffIssue[] {
+  if (ownership === undefined) return issues;
+  return issues.filter((issue) => {
+    if (issue.reason !== 'not-expected') return true;
+    const node = issueNode(issue);
+    if (node === undefined || node.nodeKind !== RelationalSchemaNodeKind.table) return true;
+    const tableName = issue.path[1];
+    return (
+      tableName === undefined ||
+      !ownership.declaresEntity({
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        entityKind: 'table',
+        entityName: tableName,
+      })
+    );
+  });
 }

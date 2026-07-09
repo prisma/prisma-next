@@ -452,7 +452,7 @@ describe('SQLite Migration E2E - FK preservation through recreate-table', () => 
     // absorbs into a destructive recreate. The new FK postcheck (added by
     // `buildRecreatePostchecks`) verifies that `pragma_foreign_key_list`
     // reports the FK after recreate — if the postcheck SQL is wrong, the
-    // runner fails before the harness's `verifySqlSchema` would have caught
+    // runner fails before the harness's schema verify would have caught
     // it.
     const DESTRUCTIVE = { allowedOperationClasses: ['additive', 'destructive'] } as const;
     const User = model('User', { fields: { id: int.id(), name: text } });
