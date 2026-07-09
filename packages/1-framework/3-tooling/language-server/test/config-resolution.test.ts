@@ -1,6 +1,5 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { PrismaNextConfig } from '@prisma-next/config-loader';
 import * as configLoader from '@prisma-next/config-loader';
@@ -9,6 +8,7 @@ import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framewor
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import * as control from '@prisma-next/framework-components/control';
 import { timeouts } from '@prisma-next/test-utils';
+import { join } from 'pathe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resolveConfigInputs, resolveControlStackInputs } from '../src/config-resolution';
 

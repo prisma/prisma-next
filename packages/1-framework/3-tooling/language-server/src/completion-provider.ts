@@ -20,7 +20,7 @@ import type {
 export interface PslCompletionCandidateSource {
   readonly scalarTypes: readonly string[];
   readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
-  readonly symbolTable?: SymbolTable;
+  readonly symbolTable: SymbolTable;
 }
 
 export interface ProvidePslCompletionItemsInput {
@@ -292,7 +292,7 @@ function provideNamespaceMemberCompletionItems(
   return modelTypeCompletionItems(
     context,
     sourceFile,
-    namespaceCandidates(source.symbolTable?.topLevel.namespaces[context.namespace]),
+    namespaceCandidates(source.symbolTable.topLevel.namespaces[context.namespace]),
   );
 }
 
@@ -333,11 +333,8 @@ function configuredScalarCandidates(
 }
 
 function topLevelSymbolCandidates(
-  symbolTable: SymbolTable | undefined,
+  symbolTable: SymbolTable,
 ): readonly ModelTypeCompletionCandidate[] {
-  if (symbolTable === undefined) {
-    return [];
-  }
   const { topLevel } = symbolTable;
   return [
     ...symbolCandidates(
@@ -367,12 +364,7 @@ function topLevelSymbolCandidates(
   ];
 }
 
-function allNamespaceCandidates(
-  symbolTable: SymbolTable | undefined,
-): readonly ModelTypeCompletionCandidate[] {
-  if (symbolTable === undefined) {
-    return [];
-  }
+function allNamespaceCandidates(symbolTable: SymbolTable): readonly ModelTypeCompletionCandidate[] {
   return Object.values(symbolTable.topLevel.namespaces)
     .sort((left, right) => compareNames(left.name, right.name))
     .map(namespaceQualifierCandidate);
