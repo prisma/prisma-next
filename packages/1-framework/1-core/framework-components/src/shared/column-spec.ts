@@ -17,18 +17,6 @@ import type { CodecInstanceContext } from './codec-types';
  *
  * @template TCodecId Narrowed codec id literal for sites that thread a specific codec id through the type system.
  */
-/**
- * Late-resolved pack-entity reference: `entityKind`/`entityName` identify a
- * pack entity whose final placement depends on data not yet known when the
- * descriptor carrying this reference is built — e.g. an owning namespace
- * resolved only once the surrounding structure is assembled.
- */
-export type EntityRef = {
-  readonly entityKind: string;
-  readonly entityName: string;
-  readonly entity: unknown;
-};
-
 export type ColumnTypeDescriptor<TCodecId extends string = string> = {
   readonly codecId: TCodecId;
   readonly nativeType: string;
@@ -44,6 +32,19 @@ export type ColumnTypeDescriptor<TCodecId extends string = string> = {
    */
   readonly valueSet?: ValueSetRef;
   readonly entityRef?: EntityRef;
+};
+
+/**
+ * Late-resolved pack-entity reference — a field on the type descriptor it is
+ * declared on: `entityKind`/`entityName` identify a pack entity whose final
+ * placement depends on data not yet known when the descriptor carrying this
+ * reference is built — e.g. an owning namespace resolved only once the
+ * surrounding structure is assembled.
+ */
+export type EntityRef = {
+  readonly entityKind: string;
+  readonly entityName: string;
+  readonly entity: unknown;
 };
 
 /**

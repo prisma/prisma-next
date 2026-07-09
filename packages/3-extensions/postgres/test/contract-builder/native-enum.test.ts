@@ -14,8 +14,9 @@
  *      typeParams.typeName, valueSet ref }`, with `nativeType` from the mapped
  *      Postgres type name (schema-qualified for `auth`, bare for `public`) and
  *      `valueSet.entityName` from the entity name — proving qualification
- *      happens at build-stage assembly (D2's `qualifyTypeName`), not at
- *      `pg.enum()` call time, and that name/type-name stay distinct.
+ *      happens when the Postgres target builds the namespace
+ *      (`postgresCreateNamespace`), not at `pg.enum()` call time, and that
+ *      name/type-name stay distinct.
  *   3. No CHECK constraint is written (the native type itself enforces
  *      membership).
  *   4. `nativeEnum` rejects an empty or duplicate-valued member list.

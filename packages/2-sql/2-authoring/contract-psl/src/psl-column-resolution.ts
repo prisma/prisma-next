@@ -40,7 +40,6 @@ import {
   NumberLiteralExprAst,
   StringLiteralExprAst,
 } from '@prisma-next/psl-parser/syntax';
-import { qualifyTypeName } from '@prisma-next/sql-contract/qualify-type-name';
 
 import {
   lowerDefaultFunctionWithRegistry,
@@ -427,41 +426,16 @@ function hasColumnFromEntityHook(
 }
 
 /**
- * Schema-qualifies an entity-ref-resolved column's type name, when the
- * codec's `columnFromEntity` result names one via `typeParams.typeName`
- * (the convention a named-type-backed codec like `pg/enum@1` uses — a codec
- * that doesn't set `typeParams.typeName`, e.g. one resolving to an unnamed
- * structural type, is left untouched). `nativeType` and `typeParams.typeName`
- * are kept in sync, mirroring the invariant `columnFromEntity` itself
- * documents.
- */
-function qualifyEntityRefColumnResult(
-  resolved: EntityRefColumnFromEntityResult,
-  namespaceId: string | undefined,
-  defaultNamespaceId: string | undefined,
-): EntityRefColumnFromEntityResult {
-  const typeName = resolved.typeParams?.['typeName'];
-  if (typeof typeName !== 'string') {
-    return resolved;
-  }
-  const qualified = qualifyTypeName(typeName, namespaceId, defaultNamespaceId);
-  return {
-    ...resolved,
-    nativeType: qualified,
-    typeParams: { ...resolved.typeParams, typeName: qualified },
-  };
-}
-
-/**
  * Resolves a type-constructor call whose descriptor declares an
  * `entityRefArg` (e.g. `pg.enum(AalLevel)`): extracts the call's sole
  * positional-argument ref string, resolves it against the field's
  * namespace's already-lowered extension entities (keyed by the declared
  * `entityRefArg.entityKind`, then block name), and converts the resolved
  * entity to column params via the `columnFromEntity` authoring hook on the
- * codec descriptor registered for `descriptor.output.codecId`. The bare type
- * name `columnFromEntity` returns is then schema-qualified against the
- * field's namespace (see `qualifyEntityRefColumnResult`). A `valueSet` ref is
+ * codec descriptor registered for `descriptor.output.codecId`. The `nativeType`
+ * / `typeParams.typeName` `columnFromEntity` returns are bare — schema
+ * qualification (e.g. `auth.aal_level`) is a target concern, applied later
+ * when the target builds the field's namespace. A `valueSet` ref is
  * attached when the same namespace derived a value-set under the same block
  * name (the generic `deriveValueSet` mechanism), scoped to the field's own
  * namespace.
@@ -470,7 +444,6 @@ function resolveEntityRefTypeConstructorCall(input: {
   readonly call: ResolvedTypeConstructorCall;
   readonly descriptor: AuthoringTypeConstructorDescriptor;
   readonly namespaceId: string | undefined;
-  readonly defaultNamespaceId: string | undefined;
   readonly namespaceExtensionEntities:
     | Readonly<Record<string, Readonly<Record<string, unknown>>>>
     | undefined;
@@ -522,15 +495,10 @@ function resolveEntityRefTypeConstructorCall(input: {
     );
   }
 
-  const rawResolved = codecDescriptor.columnFromEntity(entity);
-  if (rawResolved === undefined) {
+  const resolved = codecDescriptor.columnFromEntity(entity);
+  if (resolved === undefined) {
     return reportUnknownRef();
   }
-  const resolved = qualifyEntityRefColumnResult(
-    rawResolved,
-    input.namespaceId,
-    input.defaultNamespaceId,
-  );
 
   const derivedValueSet = input.namespaceExtensionEntities?.['valueSet']?.[ref];
   if (derivedValueSet !== undefined && input.namespaceId === undefined) {
@@ -604,13 +572,6 @@ export function resolveFieldTypeDescriptor(input: {
    */
   readonly namespaceId?: string;
   /**
-   * The target's default namespace id (e.g. Postgres's `'public'`) — consulted
-   * only when a type constructor's descriptor declares an `entityRefArg`, to
-   * decide whether the resolved entity's type name needs schema-qualifying
-   * against `namespaceId` (see `qualifyEntityRefColumnResult`).
-   */
-  readonly defaultNamespaceId?: string;
-  /**
    * Extension entities already lowered for this namespace (the exact shape
    * `lowerExtensionBlocksForNamespace` in the interpreter produces), keyed
    * by entries-slot discriminator then block name. Consulted only when a
@@ -671,7 +632,6 @@ export function resolveFieldTypeDescriptor(input: {
         call: input.field.typeConstructor,
         descriptor: typeDescriptor,
         namespaceId: input.namespaceId,
-        defaultNamespaceId: input.defaultNamespaceId,
         namespaceExtensionEntities: input.namespaceExtensionEntities,
         codecLookup: input.codecLookup,
         diagnostics: input.diagnostics,

@@ -467,8 +467,6 @@ interface BuildModelNodeInput {
   readonly diagnostics: ContractSourceDiagnostic[];
   /** Resolved namespace id keyed by model name — used to stamp the target namespace on FKs. */
   readonly modelNamespaceIds: ReadonlyMap<string, string>;
-  /** The target's default namespace id (e.g. Postgres's `'public'`) — forwarded to `collectResolvedFields` for entity-ref type-name schema-qualification. */
-  readonly defaultNamespaceId: string;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
   readonly capabilities: CapabilityMatrix;
   /**
@@ -523,7 +521,6 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     ...ifDefined('enumHandles', input.enumHandles),
     capabilities: input.capabilities,
     ...ifDefined('namespaceId', modelNamespaceId),
-    defaultNamespaceId: input.defaultNamespaceId,
     ...ifDefined('namespaceExtensionEntities', namespaceExtensionEntitiesForModel),
     ...ifDefined('codecLookup', input.codecLookup),
   });
@@ -2018,7 +2015,6 @@ export function interpretPslDocumentToSqlContract(
       symbolTable: input.symbolTable,
       diagnostics,
       modelNamespaceIds,
-      defaultNamespaceId,
       ...(enumHandlesByName.size > 0 ? { enumHandles: enumHandlesByName } : {}),
       capabilities: input.capabilities,
       ...(namespaceExtensionEntities.size > 0 ? { namespaceExtensionEntities } : {}),

@@ -23,6 +23,7 @@ import {
 } from '@prisma-next/contract/types';
 import { type CapabilityMatrix, mergeCapabilityMatrices } from '@prisma-next/contract-authoring';
 import type {
+  AuthoringContributions,
   AuthoringEntityTypeDescriptor,
   AuthoringEntityTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
@@ -30,13 +31,13 @@ import { isAuthoringEntityTypeDescriptor } from '@prisma-next/framework-componen
 import type { CodecLookup, ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
+import { tableEntityKind, valueSetEntityKind } from '@prisma-next/sql-contract/entity-kinds';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
   type IndexTypeMap,
   type IndexTypeRegistration,
 } from '@prisma-next/sql-contract/index-types';
-import { qualifyTypeName } from '@prisma-next/sql-contract/qualify-type-name';
 import {
   applyFkDefaults,
   type CheckConstraintInput,
@@ -181,31 +182,22 @@ function isValueObjectField(
 
 /**
  * Resolves a deferred entity-ref column descriptor (e.g. a `pg.enum(handle)`
- * column) against the field's now-known owning namespace: schema-qualifies
- * `nativeType` / `typeParams.typeName` via `qualifyTypeName` (mirroring the
- * PSL entity-ref resolution path) and attaches the storage `valueSet` ref the
- * harvested entity's derived value-set is stored under. A descriptor with no
- * `entityRef` (the ordinary case) passes through unchanged.
+ * column) against the field's now-known owning namespace: attaches the
+ * storage `valueSet` ref the collected entity's derived value-set is stored
+ * under. `nativeType` / `typeParams.typeName` stay bare here — schema
+ * qualification (e.g. `auth.aal_level`) is a target concern applied in the
+ * next step, `qualifyColumnDescriptor`. A descriptor with no `entityRef` (the
+ * ordinary case) passes through unchanged.
  */
 function resolveEntityRefDescriptor(
   descriptor: ColumnTypeDescriptor,
   namespaceId: string,
-  defaultNamespaceId: string,
 ): ColumnTypeDescriptor {
   const entityRef = descriptor.entityRef;
   if (entityRef === undefined) return descriptor;
 
-  const rawTypeName = descriptor.typeParams?.['typeName'];
-  const qualified =
-    typeof rawTypeName === 'string'
-      ? qualifyTypeName(rawTypeName, namespaceId, defaultNamespaceId)
-      : undefined;
-
   return {
     ...descriptor,
-    ...(qualified !== undefined
-      ? { nativeType: qualified, typeParams: { ...descriptor.typeParams, typeName: qualified } }
-      : {}),
     valueSet: {
       plane: 'storage',
       entityKind: 'valueSet',
@@ -215,13 +207,87 @@ function resolveEntityRefDescriptor(
   };
 }
 
-type HarvestedPackEntities = Record<string, Record<string, Record<string, unknown>>>;
+/**
+ * A target's contract-construction-time column-type qualifier, contributed
+ * through `target.authoring.qualifyColumnType`. Given a column's bare type
+ * info and its owning `namespaceId`, it returns the type info the target's
+ * schema semantics require (e.g. Postgres schema-qualifies a native-enum
+ * column's type name to `auth.aal_level`). The dispatch keys off the codec
+ * id, so every codec — including ones needing no change — is passed through
+ * and the caller stays codec-blind. Targets without the hook leave every
+ * column bare.
+ */
+type ColumnTypeQualifier = (
+  input: {
+    readonly codecId: string;
+    readonly nativeType: string;
+    readonly typeParams?: Record<string, unknown>;
+  },
+  namespaceId: string,
+) => { readonly nativeType: string; readonly typeParams?: Record<string, unknown> };
 
 /**
- * Records a deferred column's entity-ref into the namespace-scoped harvest
+ * Structural check for a target that contributes a `qualifyColumnType` hook
+ * on its authoring contributions. Duck-typed (mirroring
+ * `contract-psl`'s `hasColumnFromEntityHook`) so the SQL family stays blind
+ * to the target's qualification logic and no framework/family interface has
+ * to name the hook.
+ */
+function hasColumnTypeQualifier(
+  authoring: AuthoringContributions,
+): authoring is AuthoringContributions & { readonly qualifyColumnType: ColumnTypeQualifier } {
+  return 'qualifyColumnType' in authoring && typeof authoring.qualifyColumnType === 'function';
+}
+
+function resolveColumnTypeQualifier(
+  target: ContractDefinition['target'],
+): ColumnTypeQualifier | undefined {
+  const authoring = target.authoring;
+  if (authoring === undefined) return undefined;
+  return hasColumnTypeQualifier(authoring) ? authoring.qualifyColumnType : undefined;
+}
+
+/**
+ * Applies the target's `qualifyColumnType` hook to a scalar column descriptor
+ * at construction, so the storage column and the domain field (which derives
+ * its `type.typeParams` from the storage column) are both built already
+ * qualified in a single pass. A descriptor whose codec the target leaves
+ * unchanged passes through untouched.
+ */
+function qualifyColumnDescriptor(
+  descriptor: ColumnTypeDescriptor,
+  namespaceId: string,
+  qualify: ColumnTypeQualifier | undefined,
+): ColumnTypeDescriptor {
+  if (qualify === undefined) return descriptor;
+  const qualified = qualify(
+    {
+      codecId: descriptor.codecId,
+      nativeType: descriptor.nativeType,
+      ...ifDefined('typeParams', descriptor.typeParams),
+    },
+    namespaceId,
+  );
+  if (
+    qualified.nativeType === descriptor.nativeType &&
+    qualified.typeParams === descriptor.typeParams
+  ) {
+    return descriptor;
+  }
+  return {
+    ...descriptor,
+    nativeType: qualified.nativeType,
+    ...ifDefined('typeParams', qualified.typeParams),
+  };
+}
+
+type CollectedPackEntities = Record<string, Record<string, Record<string, unknown>>>;
+
+/**
+ * Records a deferred column's entity-ref into the namespace-scoped collection
  * accumulator, keyed the same way author-declared `packEntities` are
  * (`namespaceId → entityKind → entityName`) — folded into the same namespace
- * assembly `derivePackEntityValueSets`/`entries.<kind>` step, so a harvested
+ * assembly `derivePackEntityValueSets`/`entries.<kind>` step, so a collected
  * entity gets its value-set the same way an author-declared one does.
  *
  * The same handle reused by many columns in one namespace is normal (a native
@@ -231,12 +297,12 @@ type HarvestedPackEntities = Record<string, Record<string, Record<string, unknow
  * of them, silently mismatching the other column's type/cast. PSL hard-errors
  * on the equivalent (`PSL_DUPLICATE_DECLARATION`); the TS path rejects it too.
  */
-function harvestPackEntity(
-  harvested: HarvestedPackEntities,
+function collectPackEntityFromColumn(
+  collected: CollectedPackEntities,
   namespaceId: string,
   entityRef: NonNullable<ColumnTypeDescriptor['entityRef']>,
 ): void {
-  const forNs = harvested[namespaceId] ?? {};
+  const forNs = collected[namespaceId] ?? {};
   const forKind = forNs[entityRef.entityKind] ?? {};
   const existing = forKind[entityRef.entityName];
   if (existing !== undefined && existing !== entityRef.entity) {
@@ -246,38 +312,38 @@ function harvestPackEntity(
   }
   forKind[entityRef.entityName] = entityRef.entity;
   forNs[entityRef.entityKind] = forKind;
-  harvested[namespaceId] = forNs;
+  collected[namespaceId] = forNs;
 }
 
 /**
  * Merges the author-declared `packEntities` for one namespace with the entities
- * harvested from that namespace's deferred entity-ref columns. A harvested
+ * collected from that namespace's deferred entity-ref columns. A collected
  * entity that shadows a *different* declared entity of the same kind+name (or
- * vice-versa) is the same name-collision bug `harvestPackEntity` guards against
- * across columns, so it is rejected the same way — by entity identity, so the
- * same handle declared and used by a column does not throw.
+ * vice-versa) is the same name-collision bug `collectPackEntityFromColumn`
+ * guards against across columns, so it is rejected the same way — by entity
+ * identity, so the same handle declared and used by a column does not throw.
  */
-function mergeHarvestedPackEntities(
+function mergeCollectedPackEntities(
   namespaceId: string,
   declared: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
-  harvested: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
+  collected: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
 ): Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined {
-  if (declared === undefined) return harvested;
-  if (harvested === undefined) return declared;
-  const kinds = new Set([...Object.keys(declared), ...Object.keys(harvested)]);
+  if (declared === undefined) return collected;
+  if (collected === undefined) return declared;
+  const kinds = new Set([...Object.keys(declared), ...Object.keys(collected)]);
   const result: Record<string, Readonly<Record<string, unknown>>> = {};
   for (const kind of kinds) {
     const declaredForKind = declared[kind];
-    const harvestedForKind = harvested[kind];
-    for (const [name, entity] of Object.entries(harvestedForKind ?? {})) {
+    const collectedForKind = collected[kind];
+    for (const [name, entity] of Object.entries(collectedForKind ?? {})) {
       const existing = declaredForKind?.[name];
       if (existing !== undefined && existing !== entity) {
         throw new Error(
-          `buildSqlContractFromDefinition: two different "${kind}" entities named "${name}" in namespace "${namespaceId}" — a harvested pack entity conflicts with an author-declared one; pack-entity names must be unique per namespace.`,
+          `buildSqlContractFromDefinition: two different "${kind}" entities named "${name}" in namespace "${namespaceId}" — a collected pack entity conflicts with an author-declared one; pack-entity names must be unique per namespace.`,
         );
       }
     }
-    result[kind] = { ...declaredForKind, ...harvestedForKind };
+    result[kind] = { ...declaredForKind, ...collectedForKind };
   }
   return result;
 }
@@ -434,7 +500,7 @@ function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): S
  * author-declared pack entity claiming one of these would silently clobber
  * or be clobbered by the managed slot, so it is rejected outright.
  */
-const MANAGED_ENTRY_KINDS = new Set(['table', 'valueSet']);
+const MANAGED_ENTRY_KINDS = new Set([tableEntityKind.kind, valueSetEntityKind.kind]);
 
 function assertNoManagedPackEntityKinds(
   namespaceId: string,
@@ -534,6 +600,7 @@ export function buildSqlContractFromDefinition(
 ): Contract<SqlStorage> {
   const target = definition.target.targetId;
   const defaultNamespaceId = definition.target.defaultNamespaceId;
+  const qualifyColumnType = resolveColumnTypeQualifier(definition.target);
   const targetFamily = 'sql';
   const resolveNamespaceId = (m: ModelNode): string =>
     m.namespaceId !== undefined && m.namespaceId.length > 0 ? m.namespaceId : defaultNamespaceId;
@@ -552,7 +619,7 @@ export function buildSqlContractFromDefinition(
   const modelNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];
   const modelsByNamespace: Record<string, Record<string, ContractModel>> = {};
-  const harvestedPackEntities: HarvestedPackEntities = {};
+  const collectedPackEntities: CollectedPackEntities = {};
   const rootEntries: Array<{
     readonly tableName: string;
     readonly namespaceId: string;
@@ -627,24 +694,30 @@ export function buildSqlContractFromDefinition(
 
       // A field authored through a deferred entity-ref column helper (e.g.
       // `pg.enum(handle)`) carries `descriptor.entityRef`: the referenced
-      // entity is harvested into `harvestedPackEntities` (folded into the
+      // entity is collected into `collectedPackEntities` (folded into the
       // same `entries.<kind>` + `entries.valueSet` assembly an author-declared
       // `packEntities` entry goes through) and the descriptor is resolved
       // against this field's now-known `namespaceId` — the builder call that
-      // produced it ran before the enclosing model associated one.
+      // produced it ran before the enclosing model associated one. The
+      // descriptor is then handed to the target's `qualifyColumnType` hook,
+      // which schema-qualifies a native-enum column's type name for its
+      // namespace. Keying off the codec id (inside the hook) catches both the
+      // TS `pg.enum(handle)` path (via `entityRef`) and the PSL `pg.enum(Ref)`
+      // path (resolved inline in the interpreter, no `entityRef`). Because the
+      // storage column is built from this qualified descriptor and the domain
+      // field derives its `type.typeParams` from that column, both come out
+      // qualified in this single pass.
       let resolvedField: FieldNode | ValueObjectFieldNode = field;
       if (!isValueObjectField(field)) {
-        const entityRef = field.descriptor.entityRef;
+        let descriptor = field.descriptor;
+        const entityRef = descriptor.entityRef;
         if (entityRef !== undefined) {
-          harvestPackEntity(harvestedPackEntities, namespaceId, entityRef);
-          resolvedField = {
-            ...field,
-            descriptor: resolveEntityRefDescriptor(
-              field.descriptor,
-              namespaceId,
-              defaultNamespaceId,
-            ),
-          };
+          collectPackEntityFromColumn(collectedPackEntities, namespaceId, entityRef);
+          descriptor = resolveEntityRefDescriptor(descriptor, namespaceId);
+        }
+        descriptor = qualifyColumnDescriptor(descriptor, namespaceId, qualifyColumnType);
+        if (descriptor !== field.descriptor) {
+          resolvedField = { ...field, descriptor };
         }
       }
 
@@ -973,10 +1046,10 @@ export function buildSqlContractFromDefinition(
   const entityTypesByDiscriminator = collectEntityTypeDescriptorsByDiscriminator(definition);
   const namespaces: SqlStorageInput['namespaces'] = Object.fromEntries(
     [...namespaceCoordinateIds].sort().map((id) => {
-      const packEntitiesForNs = mergeHarvestedPackEntities(
+      const packEntitiesForNs = mergeCollectedPackEntities(
         id,
         definition.packEntities?.[id],
-        harvestedPackEntities[id],
+        collectedPackEntities[id],
       );
       assertNoManagedPackEntityKinds(id, packEntitiesForNs);
 
