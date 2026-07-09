@@ -2,8 +2,8 @@
 
 > Fresh implementer. Slice `sql-default`, branch `tml-2956-sql-default`. Do NOT push or touch GitHub. Commit everything as ONE signed commit.
 
-## ⛔ ABSOLUTE TOOLING RULE — this is now repo law (`.agents/rules/terminal-search-only.mdc`)
-**NEVER call the regex/codebase-search MCP tool — it HANGS and deadlocks the run.** This has already killed three dispatches; do not become the fourth.
+## ⛔ ABSOLUTE TOOLING RULE (operator standing order for dispatches in this environment)
+**NEVER call the regex/codebase-search MCP tool — it HANGS and deadlocks the run.** This has already killed three dispatches; do not become the fourth. (This is the operator's standing instruction for how work is dispatched here — not a committed project rule.)
 **This brief is search-free: every path, line number, and code snippet you need is below. You should NOT need to search at all.** If you nonetheless think you must look something up, use `rg`/`grep` in the **terminal** only — never a non-terminal search tool. If you feel you need to search to complete the task, STOP and report that the brief was under-specified.
 
 ## Part A — fix `funcCall()` to reject namespaced callees
