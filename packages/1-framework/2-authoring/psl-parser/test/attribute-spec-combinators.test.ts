@@ -6,6 +6,7 @@ import {
   entityRef,
   fieldAttribute,
   fieldRef,
+  funcCall,
   identifier,
   int,
   interpretAttribute,
@@ -14,6 +15,7 @@ import {
   nodePslSpan,
   oneOf,
   record,
+  scalarLiteral,
   str,
 } from '../src/exports';
 import { Cursor, parse, parseAttribute } from '../src/parse';
@@ -468,6 +470,136 @@ describe('record', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+  });
+});
+
+describe('scalarLiteral', () => {
+  it('accepts a string literal and returns its decoded value', () => {
+    const { expr, ctx } = argOf('"hello"');
+
+    const result = scalarLiteral().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe('hello');
+  });
+
+  it('accepts a number literal and returns its numeric value', () => {
+    const { expr, ctx } = argOf('1.5');
+
+    const result = scalarLiteral().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(1.5);
+  });
+
+  it('accepts a boolean literal and returns its boolean value', () => {
+    const { expr, ctx } = argOf('true');
+
+    const result = scalarLiteral().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(true);
+  });
+
+  it('rejects a bare identifier', () => {
+    const { expr, ctx } = argOf('Cascade');
+
+    const result = scalarLiteral().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects an array literal', () => {
+    const { expr, ctx } = argOf('[1]');
+
+    const result = scalarLiteral().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('rejects a function call', () => {
+    const { expr, ctx } = argOf('now()');
+
+    const result = scalarLiteral().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('funcCall', () => {
+  it('accepts a nullary call and returns an empty argument list', () => {
+    const { expr, ctx } = argOf('now()');
+
+    const result = funcCall().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.name).toBe('now');
+      expect(result.value.args).toEqual([]);
+      expect(result.value.raw).toBe('now()');
+    }
+  });
+
+  it('captures each argument as its verbatim source text', () => {
+    const { expr, ctx } = argOf('dbgenerated("gen_random_uuid()")');
+
+    const result = funcCall().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.name).toBe('dbgenerated');
+      expect(result.value.args).toHaveLength(1);
+      expect(result.value.args[0]?.raw).toBe('"gen_random_uuid()"');
+    }
+  });
+
+  it('preserves a numeric argument as source text', () => {
+    const { expr, ctx } = argOf('uuid(7)');
+
+    const result = funcCall().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.name).toBe('uuid');
+      expect(result.value.args).toHaveLength(1);
+      expect(result.value.args[0]?.raw).toBe('7');
+    }
+  });
+
+  it('rejects a bare identifier', () => {
+    const { expr, ctx } = argOf('now');
+
+    const result = funcCall().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a string literal', () => {
+    const { expr, ctx } = argOf('"now"');
+
+    const result = funcCall().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('rejects an array literal', () => {
+    const { expr, ctx } = argOf('[1]');
+
+    const result = funcCall().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
   });
 });
 
