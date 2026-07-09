@@ -84,6 +84,21 @@ describe.sequential('RLS introspection', () => {
     expect(policy!.permissive).toBe(true);
   });
 
+  it('stamps rlsEnabled per table from pg_class.relrowsecurity', {
+    timeout: testTimeout,
+  }, async () => {
+    await driver!.query('CREATE TABLE guarded (id int PRIMARY KEY)');
+    await driver!.query('CREATE TABLE open_wide (id int PRIMARY KEY)');
+    await driver!.query('ALTER TABLE guarded ENABLE ROW LEVEL SECURITY');
+
+    const schema = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(schema);
+
+    const tables = schema.namespaces['public']!.tables;
+    expect(tables['guarded']?.rlsEnabled).toBe(true);
+    expect(tables['open_wide']?.rlsEnabled).toBe(false);
+  });
+
   it('returns roles excluding system roles', {
     timeout: testTimeout,
   }, async () => {

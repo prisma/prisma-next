@@ -83,6 +83,7 @@ function schemaWithPolicies(policies: PostgresRlsPolicy[]): PostgresDatabaseSche
             uniques: [],
             indexes: [],
             policies: policies.map(toPolicyNode),
+            rlsEnabled: false,
           }),
         },
         nativeEnumTypeNames: [],

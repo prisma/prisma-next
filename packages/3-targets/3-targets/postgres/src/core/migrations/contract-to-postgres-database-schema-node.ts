@@ -117,6 +117,9 @@ export function contractToPostgresDatabaseSchemaNode(
         ...ifDefined('annotations', sqlTable.annotations),
         ...ifDefined('checks', sqlTable.checks),
         policies: policiesByTable.get(tableName) ?? [],
+        // Marker-driven, never derived from the policy set: the `rls` entry
+        // is the single authored source of enablement.
+        rlsEnabled: Object.hasOwn(ns.rls, tableName),
       });
     }
 

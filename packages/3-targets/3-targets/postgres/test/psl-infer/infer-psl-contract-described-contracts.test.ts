@@ -32,6 +32,7 @@ function idColumnTable(name: string, foreignKeys: PostgresTableSchemaNode['forei
     uniques: [],
     indexes: [],
     policies: [],
+    rlsEnabled: false,
   });
 }
 
@@ -274,6 +275,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -327,6 +329,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -380,6 +383,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -405,6 +409,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -439,6 +444,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });

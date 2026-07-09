@@ -23,6 +23,7 @@ const tableA = new PostgresTableSchemaNode({
   uniques: [],
   indexes: [],
   policies: [policy],
+  rlsEnabled: false,
 });
 
 const tableB = new PostgresTableSchemaNode({
@@ -32,6 +33,7 @@ const tableB = new PostgresTableSchemaNode({
   uniques: [],
   indexes: [],
   policies: [],
+  rlsEnabled: false,
 });
 
 const baseInput = {

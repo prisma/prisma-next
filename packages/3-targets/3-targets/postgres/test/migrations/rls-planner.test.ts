@@ -154,6 +154,7 @@ function schemaWith(policies: readonly PostgresRlsPolicy[]): PostgresDatabaseSch
             uniques: [],
             indexes: [],
             policies: policies.map(policyNode),
+            rlsEnabled: false,
           }),
         },
         nativeEnumTypeNames: [],

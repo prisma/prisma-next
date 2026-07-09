@@ -17,6 +17,14 @@ import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
 export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
   readonly policies?: readonly PostgresPolicySchemaNode[];
+  /**
+   * Whether row-level security is enabled on this table. Expected side:
+   * stamped from the contract's `entries.rls` marker (never from the
+   * policy set). Actual side: stamped from `pg_class.relrowsecurity` at
+   * introspection. Required with no default so every construction site
+   * supplies a deliberate value.
+   */
+  readonly rlsEnabled: boolean;
 }
 
 /**
@@ -49,10 +57,12 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
   declare readonly annotations?: SqlAnnotations;
   declare readonly checks?: ReadonlyArray<SqlCheckConstraintIR>;
   readonly policies: readonly PostgresPolicySchemaNode[];
+  readonly rlsEnabled: boolean;
 
   constructor(input: PostgresTableSchemaNodeInput) {
     super();
     this.name = input.name;
+    this.rlsEnabled = input.rlsEnabled;
     this.columns = Object.freeze(
       Object.fromEntries(
         Object.entries(input.columns).map(([key, col]) => [

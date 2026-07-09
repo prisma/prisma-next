@@ -150,6 +150,19 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
     expect(PostgresDatabaseSchemaNode.is(root)).toBe(true);
   });
 
+  it('stamps rlsEnabled true from marker presence, even with zero policies', () => {
+    const root = contractToPostgresDatabaseSchemaNode(
+      makeContract({ rlsMarkedTables: [TABLE_NAME] }),
+      projectionOptions,
+    );
+    expect(root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME]?.rlsEnabled).toBe(true);
+  });
+
+  it('stamps rlsEnabled false on a table without a marker', () => {
+    const root = contractToPostgresDatabaseSchemaNode(makeContract({}), projectionOptions);
+    expect(root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME]?.rlsEnabled).toBe(false);
+  });
+
   it('carries owned DDL schema names in existingSchemas on the root', () => {
     const root = contractToPostgresDatabaseSchemaNode(makeContract({}), projectionOptions);
     expect(root.existingSchemas).toEqual([SCHEMA_NAME]);

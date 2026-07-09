@@ -55,6 +55,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
               uniques: [],
               foreignKeys: [],
               indexes: [],
+              rlsEnabled: false,
             }),
           },
           nativeEnumTypeNames: [],
@@ -95,6 +96,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
               uniques: [],
               foreignKeys: [],
               indexes: [],
+              rlsEnabled: false,
             }),
           },
           nativeEnumTypeNames: [],
@@ -145,6 +147,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
               uniques: [],
               foreignKeys: [],
               indexes: [],
+              rlsEnabled: false,
             }),
           },
           nativeEnumTypeNames: [],
@@ -390,6 +393,7 @@ describe('NOT NULL column without default uses temporary default', () => {
         uniques: [],
         foreignKeys: [],
         indexes: [],
+        rlsEnabled: false,
       }),
     );
 
@@ -480,6 +484,7 @@ describe('NOT NULL column without default uses temporary default', () => {
             uniques: [],
             foreignKeys: [],
             indexes: [],
+            rlsEnabled: false,
           }),
         },
       },
@@ -658,6 +663,7 @@ function buildUserTableSchema(): PostgresTableSchemaNode {
     uniques: [{ columns: ['email'], name: 'user_email_key' }],
     foreignKeys: [],
     indexes: [{ columns: ['email'], name: 'user_email_idx', unique: false }],
+    rlsEnabled: false,
   });
 }
 
@@ -799,6 +805,7 @@ function buildUserTableSchemaWithoutEmail(): PostgresTableSchemaNode {
     uniques: [],
     foreignKeys: [],
     indexes: [],
+    rlsEnabled: false,
   });
 }
 
@@ -828,5 +835,6 @@ function buildPostTableSchema(): PostgresTableSchemaNode {
       },
     ],
     indexes: [{ columns: ['userId'], name: 'post_userId_idx', unique: false }],
+    rlsEnabled: false,
   });
 }

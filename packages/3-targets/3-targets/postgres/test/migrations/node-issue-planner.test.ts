@@ -170,6 +170,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);
@@ -201,6 +202,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);
@@ -233,6 +235,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);
@@ -253,6 +256,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
       orphan: new PostgresTableSchemaNode({
         name: 'orphan',
@@ -264,6 +268,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);

@@ -74,6 +74,7 @@ function profilesTable(options?: { readonly idNullable?: boolean }): PostgresTab
     uniques: [],
     indexes: [],
     policies: [],
+    rlsEnabled: false,
   });
 }
 
@@ -105,6 +106,7 @@ function enumsNamespaceWithStrayTable(
         uniques: [],
         indexes: [],
         policies: policy === undefined ? [] : [policy],
+        rlsEnabled: false,
       }),
     },
     nativeEnumTypeNames: [],

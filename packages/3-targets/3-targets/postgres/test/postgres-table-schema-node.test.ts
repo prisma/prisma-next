@@ -22,6 +22,7 @@ const tableInput = {
   foreignKeys: [],
   uniques: [],
   indexes: [],
+  rlsEnabled: false,
 };
 
 describe('PostgresTableSchemaNode', () => {
@@ -37,6 +38,7 @@ describe('PostgresTableSchemaNode', () => {
       foreignKeys: [],
       uniques: [],
       indexes: [],
+      rlsEnabled: false,
     });
     expect(table.id).toBe('orders');
   });
@@ -47,6 +49,24 @@ describe('PostgresTableSchemaNode', () => {
     const other = new PostgresTableSchemaNode({ ...tableInput, name: 'other', policies: [] });
     expect(a.isEqualTo(same)).toBe(true);
     expect(a.isEqualTo(other)).toBe(false);
+  });
+
+  it('carries rlsEnabled as supplied', () => {
+    const enabled = new PostgresTableSchemaNode({ ...tableInput, rlsEnabled: true, policies: [] });
+    const disabled = new PostgresTableSchemaNode({ ...tableInput, policies: [] });
+    expect(enabled.rlsEnabled).toBe(true);
+    expect(disabled.rlsEnabled).toBe(false);
+  });
+
+  it('isEqualTo stays name-only: nodes differing only in rlsEnabled are equal (the differ does not compare the attribute yet)', () => {
+    const enabled = new PostgresTableSchemaNode({ ...tableInput, rlsEnabled: true, policies: [] });
+    const disabled = new PostgresTableSchemaNode({ ...tableInput, policies: [] });
+    expect(enabled.isEqualTo(disabled)).toBe(true);
+  });
+
+  it('rlsEnabled adds no children()', () => {
+    const table = new PostgresTableSchemaNode({ ...tableInput, rlsEnabled: true, policies: [] });
+    expect(table.children()).toEqual([table.columns['id'], table.columns['user_id']]);
   });
 
   it('children() returns columns plus policies when there are no other constraints', () => {
@@ -66,6 +86,7 @@ describe('PostgresTableSchemaNode', () => {
       foreignKeys: [],
       uniques: [],
       indexes: [],
+      rlsEnabled: false,
       policies: [],
     });
     expect(table.children()).toEqual([]);
@@ -84,6 +105,7 @@ describe('PostgresTableSchemaNode', () => {
       uniques: [{ columns: ['user_id', 'status'] }],
       indexes: [{ columns: ['status'], unique: false }],
       checks: [{ name: 'chk_status', column: 'status', permittedValues: ['active', 'inactive'] }],
+      rlsEnabled: false,
       policies: [basePolicy],
     });
 
@@ -112,6 +134,7 @@ describe('PostgresTableSchemaNode', () => {
       foreignKeys: [{ columns: ['user_id'], referencedTable: 'users', referencedColumns: ['id'] }],
       uniques: [],
       indexes: [],
+      rlsEnabled: false,
       policies: [basePolicy],
     });
 
@@ -129,6 +152,7 @@ describe('PostgresTableSchemaNode', () => {
       uniques: [],
       indexes: [],
       checks: [],
+      rlsEnabled: false,
       policies: [basePolicy],
     });
 

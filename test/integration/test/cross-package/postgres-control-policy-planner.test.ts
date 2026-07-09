@@ -80,6 +80,7 @@ function liveSchemaWithUsers(
             uniques: [],
             foreignKeys: [],
             indexes: [],
+            rlsEnabled: false,
           }),
         },
         nativeEnumTypeNames: [],
