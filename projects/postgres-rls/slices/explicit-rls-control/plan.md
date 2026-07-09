@@ -18,6 +18,8 @@ Per-dispatch gate (from [`drive/calibration/dod.md`](../../../../drive/calibrati
 
 ## W3 — `rlsEnabled` state on both schema-IR sides (parallel, unconsumed)
 
+**Side-task first (own commit; plan amendment after W2):** adopt `@@rls` in `examples/supabase`'s schema (its `policy_select` targets an unmarked model, which W2's new rule correctly rejects — `fixtures:check` is red on exactly this) and regenerate fixtures, so `fixtures:check` is a trustworthy gate again for W3–W5. The example's e2e additions stay in W6.
+
 **Outcome:** `PostgresTableSchemaNode` carries `rlsEnabled: boolean`. Expected side: `contractToPostgresDatabaseSchemaNode` stamps it from marker presence (never from the policy set). Actual side: adapter introspection reads `pg_class.relrowsecurity` per table (today only op pre/postchecks read it, `checks.ts:382-415`). **`isEqualTo` is untouched** — the differ does not yet see the attribute, so behavior is nil.
 **Completed when:** node/derivation unit tests + an adapter-postgres integration test pin the stamp on both sides; every `PostgresTableSchemaNode` construction site (derivation, introspection, tests) supplies the field; all suites green untouched.
 **Hands to W5:** both trees carry trustworthy `rlsEnabled` values.
@@ -36,7 +38,7 @@ Per-dispatch gate (from [`drive/calibration/dod.md`](../../../../drive/calibrati
 
 ## W6 — Examples, e2e, upgrade instructions, slice gate
 
-**Outcome:** the Supabase walking-skeleton example's policy-bearing models carry `@@rls`; fixtures regenerated (`fixtures:emit` — expect current `contract.json` diffs, no historical migration snapshot churn, no new migration since live state already has RLS on); the skeleton e2e gains the AC-3 fail-closed behavioral probe (drop last policy → verify clean → rows still denied under `SET ROLE`) and the AC-4 rename round-trip (prefix change → exactly one `ALTER POLICY … RENAME TO` → apply → verify clean). Upgrade instructions recorded (`record-upgrade-instructions`) for the new SPI slot + the policy-requires-`@@rls` authoring rule. A golden diff of real `plan()` output over the committed examples proves non-RLS op parity.
+**Outcome:** marker adoption in `examples/supabase` landed in W3 (plan amendment); W6 verifies it end-to-end and sweeps any remaining policy-authoring fixtures (`packages/3-extensions/*`); the skeleton e2e gains the AC-3 fail-closed behavioral probe (drop last policy → verify clean → rows still denied under `SET ROLE`) and the AC-4 rename round-trip (prefix change → exactly one `ALTER POLICY … RENAME TO` → apply → verify clean). Upgrade instructions recorded (`record-upgrade-instructions`) for the new SPI slot + the policy-requires-`@@rls` authoring rule. A golden diff of real `plan()` output over the committed examples proves non-RLS op parity.
 **Completed when:** full slice gate green — build, forced typecheck, whole Lint job (incl. framework-vocabulary ratchet), `fixtures:check`, `test:packages` + `test:integration` + `test:e2e`, multi-space guards, `check:upgrade-coverage --mode pr --prev $(git merge-base origin/main HEAD)`; slice-DoD checklist walked verbatim (incl. QA-side items); `origin/main` synced before final validation + push.
 
 ## Sequencing & handoffs
