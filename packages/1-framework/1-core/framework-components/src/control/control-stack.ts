@@ -62,7 +62,6 @@ export interface ControlStack<
   readonly authoringContributions: AssembledAuthoringContributions;
   /** Names of the top-level zero-arg type constructors in the assembled authoring namespace — the base scalars of the composed stack. */
   readonly scalarTypes: ReadonlyArray<string>;
-  readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly controlMutationDefaults: ControlMutationDefaults;
   readonly capabilities: CapabilityMatrix;
 }
@@ -246,34 +245,6 @@ export function assembleAuthoringContributions(
   };
 }
 
-export function assembleScalarTypeDescriptors(
-  descriptors: ReadonlyArray<
-    Pick<ComponentMetadata, 'scalarTypeDescriptors'> & { readonly id?: string }
-  >,
-): ReadonlyMap<string, string> {
-  const result = new Map<string, string>();
-  const owners = new Map<string, string>();
-
-  for (const descriptor of descriptors) {
-    const descriptorMap = descriptor.scalarTypeDescriptors;
-    if (!descriptorMap) continue;
-    const descriptorId = descriptor.id ?? '<unknown>';
-    for (const [typeName, codecId] of descriptorMap) {
-      const existingOwner = owners.get(typeName);
-      if (existingOwner !== undefined) {
-        throw new Error(
-          `Duplicate scalar type descriptor "${typeName}". ` +
-            `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
-        );
-      }
-      result.set(typeName, codecId);
-      owners.set(typeName, descriptorId);
-    }
-  }
-
-  return result;
-}
-
 export function assembleControlMutationDefaults(
   descriptors: ReadonlyArray<
     Pick<ComponentMetadata, 'controlMutationDefaults'> & { readonly id?: string }
@@ -424,14 +395,14 @@ export function extractCodecLookup(
 }
 
 export function validateScalarTypeCodecIds(
-  scalarTypeDescriptors: ReadonlyMap<string, string>,
+  typeNamespace: AuthoringTypeNamespace,
   codecLookup: CodecLookup,
 ): string[] {
   const errors: string[] = [];
-  for (const [typeName, codecId] of scalarTypeDescriptors) {
-    if (!codecLookup.get(codecId)) {
+  for (const [typeName, output] of collectScalarTypeConstructors(typeNamespace)) {
+    if (!codecLookup.get(output.codecId)) {
       errors.push(
-        `Scalar type "${typeName}" references codec "${codecId}" which is not registered by any component.`,
+        `Scalar type "${typeName}" references codec "${output.codecId}" which is not registered by any component.`,
       );
     }
   }
@@ -541,7 +512,6 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
   const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...orderedExtensionPacks];
 
   const codecLookup = extractCodecLookup(allDescriptors);
-  const scalarTypeDescriptors = assembleScalarTypeDescriptors(allDescriptors);
   const authoringContributions = assembleAuthoringContributions(allDescriptors);
 
   return {
@@ -557,7 +527,6 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     codecLookup,
     authoringContributions,
     scalarTypes: [...collectScalarTypeConstructors(authoringContributions.type).keys()],
-    scalarTypeDescriptors,
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
     capabilities: mergeCapabilityMatrices({}, [
       target,

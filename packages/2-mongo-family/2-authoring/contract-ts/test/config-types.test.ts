@@ -11,7 +11,7 @@ import { typescriptContract, typescriptContractFromPath } from '../src/config-ty
 const emptyContext: ContractSourceContext = {
   composedExtensionPacks: [],
   composedExtensionContracts: new Map(),
-  scalarTypeDescriptors: new Map(),
+
   authoringContributions: {
     field: {},
     type: {},

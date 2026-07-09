@@ -5,7 +5,6 @@ import type { CreateControlStackInput } from '../src/control/control-stack';
 import {
   assembleAuthoringContributions,
   assembleControlMutationDefaults,
-  assembleScalarTypeDescriptors,
   buildExtensionLoadOrder,
   createControlStack,
   extractCodecLookup,
@@ -886,48 +885,6 @@ describe('extractCodecLookup', () => {
   });
 });
 
-describe('assembleScalarTypeDescriptors', () => {
-  it('returns empty map when no descriptors contribute', () => {
-    const result = assembleScalarTypeDescriptors([createDescriptor()]);
-    expect(result.size).toBe(0);
-  });
-
-  it('merges scalar type descriptors from multiple descriptors', () => {
-    const result = assembleScalarTypeDescriptors([
-      createDescriptor({
-        id: 'target',
-        scalarTypeDescriptors: new Map([
-          ['String', 'pg/text@1'],
-          ['Int', 'pg/int4@1'],
-        ]),
-      }),
-      createDescriptor({
-        id: 'extension',
-        scalarTypeDescriptors: new Map([['Vector', 'pgvector/vector@1']]),
-      }),
-    ]);
-    expect(result.size).toBe(3);
-    expect(result.get('String')).toBe('pg/text@1');
-    expect(result.get('Int')).toBe('pg/int4@1');
-    expect(result.get('Vector')).toBe('pgvector/vector@1');
-  });
-
-  it('throws on duplicate type name from different descriptors', () => {
-    expect(() =>
-      assembleScalarTypeDescriptors([
-        createDescriptor({
-          id: 'desc-a',
-          scalarTypeDescriptors: new Map([['String', 'a/text@1']]),
-        }),
-        createDescriptor({
-          id: 'desc-b',
-          scalarTypeDescriptors: new Map([['String', 'b/text@1']]),
-        }),
-      ]),
-    ).toThrow(/Duplicate scalar type descriptor "String".*"desc-b".*"desc-a"/);
-  });
-});
-
 describe('assembleControlMutationDefaults', () => {
   const stubLower = () => ({
     ok: true as const,
@@ -1150,21 +1107,33 @@ describe('createControlStack', () => {
 });
 
 describe('validateScalarTypeCodecIds', () => {
-  it('returns errors for unregistered codec IDs', () => {
-    const descriptors = new Map([['String', 'missing/codec@1']]);
+  it('returns errors naming type and codec for unregistered codec IDs on zero-arg constructors', () => {
+    const namespace = {
+      String: {
+        kind: 'typeConstructor' as const,
+        output: { codecId: 'missing/codec@1', nativeType: 'text' },
+      },
+    };
     const lookup: CodecLookup = {
       get: () => undefined,
       targetTypesFor: () => undefined,
       metaFor: () => undefined,
       renderOutputTypeFor: () => undefined,
     };
-    const errors = validateScalarTypeCodecIds(descriptors, lookup);
+    const errors = validateScalarTypeCodecIds(namespace, lookup);
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatch(/Scalar type "String" references codec "missing\/codec@1"/);
+    expect(errors[0]).toMatch(
+      /Scalar type "String" references codec "missing\/codec@1" which is not registered/,
+    );
   });
 
   it('returns empty array when all codec IDs are registered', () => {
-    const descriptors = new Map([['String', 'test/text@1']]);
+    const namespace = {
+      String: {
+        kind: 'typeConstructor' as const,
+        output: { codecId: 'test/text@1', nativeType: 'text' },
+      },
+    };
     const lookup: CodecLookup = {
       get: (id: string) =>
         id === 'test/text@1'
@@ -1180,8 +1149,25 @@ describe('validateScalarTypeCodecIds', () => {
       metaFor: () => undefined,
       renderOutputTypeFor: () => undefined,
     };
-    const errors = validateScalarTypeCodecIds(descriptors, lookup);
+    const errors = validateScalarTypeCodecIds(namespace, lookup);
     expect(errors).toEqual([]);
+  });
+
+  it('ignores parameterized constructors — only top-level zero-arg scalars are checked', () => {
+    const namespace = {
+      Vector: {
+        kind: 'typeConstructor' as const,
+        args: [{ kind: 'number' as const, name: 'dimensions' }],
+        output: { codecId: 'missing/vector@1', nativeType: 'vector' },
+      },
+    };
+    const lookup: CodecLookup = {
+      get: () => undefined,
+      targetTypesFor: () => undefined,
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
+    };
+    expect(validateScalarTypeCodecIds(namespace, lookup)).toEqual([]);
   });
 });
 

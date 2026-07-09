@@ -4,7 +4,6 @@ import { createSqliteBuiltinCodecLookup } from '../src/core/codec-lookup';
 import {
   createSqliteDefaultFunctionRegistry,
   createSqliteMutationDefaultGeneratorDescriptors,
-  createSqliteScalarTypeDescriptors,
   sqliteScalarAuthoringTypes,
 } from '../src/core/control-mutation-defaults';
 import runtimeAdapterDescriptor from '../src/core/runtime-adapter';
@@ -109,13 +108,25 @@ describe('sqlite runtime mutation default generators', () => {
 });
 
 describe('sqliteScalarAuthoringTypes', () => {
-  const legacyMap = createSqliteScalarTypeDescriptors();
   const codecLookup = createSqliteBuiltinCodecLookup();
   const namespace: AuthoringTypeNamespace = sqliteScalarAuthoringTypes;
 
-  it('mirrors every legacy scalar as a zero-arg type constructor with manifest-derived nativeType', () => {
-    expect(Object.keys(namespace).sort()).toEqual([...legacyMap.keys()].sort());
-    for (const [name, codecId] of legacyMap) {
+  // The legacy scalar-type map channel (name-to-codecId, retired in TML-2985) is gone; the pinned
+  // name → codecId pairs below carry the retired map's claims forward.
+  const expectedScalars = [
+    ['String', 'sqlite/text@1'],
+    ['Int', 'sqlite/integer@1'],
+    ['BigInt', 'sqlite/bigint@1'],
+    ['Float', 'sqlite/real@1'],
+    ['Decimal', 'sqlite/text@1'],
+    ['DateTime', 'sqlite/datetime@1'],
+    ['Json', 'sqlite/json@1'],
+    ['Bytes', 'sqlite/blob@1'],
+  ] as const;
+
+  it('pins every base scalar as a zero-arg type constructor with manifest-derived nativeType', () => {
+    expect(Object.keys(namespace).sort()).toEqual(expectedScalars.map(([name]) => name).sort());
+    for (const [name, codecId] of expectedScalars) {
       expect(namespace[name]).toEqual({
         kind: 'typeConstructor',
         output: { codecId, nativeType: codecLookup.targetTypesFor(codecId)?.[0] },

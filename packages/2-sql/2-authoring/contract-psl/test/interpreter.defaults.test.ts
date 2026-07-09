@@ -8,7 +8,7 @@ import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
   postgresTarget,
-  sqliteScalarTypeDescriptors,
+  sqliteScalarColumnDescriptors,
   sqliteTarget,
   symbolTableInputFromParseArgs,
 } from './fixtures';
@@ -498,7 +498,7 @@ model UuidNativeBad {
     const result = interpretPslDocumentToSqlContractInternal({
       ...document,
       target: sqliteTarget,
-      scalarColumnDescriptors: sqliteScalarTypeDescriptors,
+      scalarColumnDescriptors: sqliteScalarColumnDescriptors,
       composedExtensionContracts: new Map(),
       controlMutationDefaults: builtinControlMutationDefaults,
       authoringContributions: sqliteTemporalContributions,

@@ -194,7 +194,6 @@ describe('defineConfig', () => {
     const result = await config.source.load({
       composedExtensionPacks: [],
       composedExtensionContracts: new Map(),
-      scalarTypeDescriptors: new Map(),
       authoringContributions: {
         field: {},
         type: {},

@@ -10,7 +10,7 @@ import {
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
-  sqliteScalarTypeDescriptors,
+  sqliteScalarColumnDescriptors,
   sqliteTarget,
   symbolTableInputFromParseArgs,
 } from './fixtures';
@@ -1102,7 +1102,7 @@ model User {
 
       const result = interpretPslDocumentToSqlContract({
         target: sqliteTarget,
-        scalarColumnDescriptors: sqliteScalarTypeDescriptors,
+        scalarColumnDescriptors: sqliteScalarColumnDescriptors,
         composedExtensionContracts: new Map(),
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
@@ -1139,7 +1139,7 @@ model User {
 
       const result = interpretPslDocumentToSqlContract({
         target: sqliteTarget,
-        scalarColumnDescriptors: sqliteScalarTypeDescriptors,
+        scalarColumnDescriptors: sqliteScalarColumnDescriptors,
         composedExtensionContracts: new Map(),
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,

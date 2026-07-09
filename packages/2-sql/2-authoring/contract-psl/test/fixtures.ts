@@ -362,7 +362,7 @@ export function symbolTableInputFromParseArgs(args: {
   });
 }
 
-export const sqliteScalarTypeDescriptors = new Map([
+export const sqliteScalarColumnDescriptors = new Map([
   ['String', { codecId: 'sqlite/text@1', nativeType: 'text' }],
   ['Boolean', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
   ['Int', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
@@ -373,18 +373,6 @@ export const sqliteScalarTypeDescriptors = new Map([
   ['Json', { codecId: 'sqlite/json@1', nativeType: 'text' }],
   ['Bytes', { codecId: 'sqlite/blob@1', nativeType: 'blob' }],
 ] as const);
-
-export const postgresCodecIdOnlyDescriptors = new Map<string, string>([
-  ['String', 'pg/text@1'],
-  ['Boolean', 'pg/bool@1'],
-  ['Int', 'pg/int4@1'],
-  ['BigInt', 'pg/int8@1'],
-  ['Float', 'pg/float8@1'],
-  ['Decimal', 'pg/numeric@1'],
-  ['DateTime', 'pg/timestamptz@1'],
-  ['Json', 'pg/jsonb@1'],
-  ['Bytes', 'pg/bytea@1'],
-]);
 
 const targetTypesByCodecId: Record<string, readonly string[]> = {
   'pg/text@1': ['text'],
@@ -424,7 +412,6 @@ export function createPostgresTestContext(
   return {
     composedExtensionPacks: [],
     composedExtensionContracts: new Map(),
-    scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
     authoringContributions: {
       field: {},
       type: postgresScalarAuthoringTypes,

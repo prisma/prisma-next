@@ -1,10 +1,7 @@
 import mongoAdapter from '@prisma-next/adapter-mongo/control';
 import mongoDriver from '@prisma-next/driver-mongo/control';
 import { mongoFamilyDescriptor } from '@prisma-next/family-mongo/control';
-import {
-  collectScalarTypeConstructors,
-  type ScalarTypeConstructorOutput,
-} from '@prisma-next/framework-components/authoring';
+import { collectScalarTypeConstructors } from '@prisma-next/framework-components/authoring';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
@@ -18,16 +15,6 @@ const stack = createControlStack({
   adapter: mongoAdapter,
   driver: mongoDriver,
 });
-
-function legacyScalarTypeConstructorOutputs(): ReadonlyMap<string, ScalarTypeConstructorOutput> {
-  const result = new Map<string, ScalarTypeConstructorOutput>();
-  for (const [name, codecId] of stack.scalarTypeDescriptors) {
-    const nativeType = stack.codecLookup.targetTypesFor(codecId)?.[0];
-    if (nativeType === undefined) continue;
-    result.set(name, { codecId, nativeType });
-  }
-  return result;
-}
 
 function namespaceScalarTypeCodecIds(): ReadonlyMap<string, string> {
   const result = new Map<string, string>();
@@ -66,13 +53,13 @@ function emit(scalarTypeCodecIds: ReadonlyMap<string, string>) {
   });
 }
 
-describe('mongo scalar-type parity: unified namespace vs legacy map channel', () => {
-  it('derives identical {codecId, nativeType} from the namespace and pins every base scalar', () => {
+// The legacy scalar-type map channel (name-to-codecId, retired in TML-2985) is gone; the pinned literals
+// below carry the parity claim forward — they are the exact
+// {codecId, nativeType} pairs the retired map + codecLookup derivation produced.
+describe('mongo scalar types derived from the unified namespace', () => {
+  it('pins every base scalar to its {codecId, nativeType}', () => {
     const derived = collectScalarTypeConstructors(stack.authoringContributions.type);
 
-    expect(Object.fromEntries(derived)).toEqual(
-      Object.fromEntries(legacyScalarTypeConstructorOutputs()),
-    );
     expect(Object.fromEntries(derived)).toEqual({
       String: { codecId: 'mongo/string@1', nativeType: 'string' },
       Int: { codecId: 'mongo/int32@1', nativeType: 'int' },
@@ -84,18 +71,14 @@ describe('mongo scalar-type parity: unified namespace vs legacy map channel', ()
   });
 
   it('exposes the derived scalar names as controlStack.scalarTypes', () => {
-    expect([...stack.scalarTypes].sort()).toEqual([...stack.scalarTypeDescriptors.keys()].sort());
-  });
-
-  it('emits a byte-identical contract from namespace-derived and legacy-derived scalar maps', () => {
-    const fromNamespace = emit(namespaceScalarTypeCodecIds());
-    const fromLegacy = emit(stack.scalarTypeDescriptors);
-
-    expect(fromNamespace.ok).toBe(true);
-    expect(fromLegacy.ok).toBe(true);
-    if (!fromNamespace.ok || !fromLegacy.ok) return;
-    expect(fromNamespace.value).toEqual(fromLegacy.value);
-    expect(JSON.stringify(fromNamespace.value)).toBe(JSON.stringify(fromLegacy.value));
+    expect([...stack.scalarTypes].sort()).toEqual([
+      'Boolean',
+      'DateTime',
+      'Float',
+      'Int',
+      'ObjectId',
+      'String',
+    ]);
   });
 
   it('resolves ObjectId fields (incl. the mandated _id) through the derived map', () => {

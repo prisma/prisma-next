@@ -9,11 +9,6 @@ import { mongoContract } from '../src/exports/provider';
 const originalCwd = process.cwd();
 const tempDirs: string[] = [];
 
-const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
-  ['String', 'mongo/string@1'],
-  ['ObjectId', 'mongo/objectId@1'],
-]);
-
 const mongoScalarAuthoringTypes = {
   String: { kind: 'typeConstructor', output: { codecId: 'mongo/string@1', nativeType: 'string' } },
   ObjectId: {
@@ -26,7 +21,6 @@ function createMongoTestContext(overrides?: Partial<ContractSourceContext>): Con
   return {
     composedExtensionPacks: [],
     composedExtensionContracts: new Map(),
-    scalarTypeDescriptors: mongoScalarTypeDescriptors,
     authoringContributions: {
       field: {},
       type: mongoScalarAuthoringTypes,

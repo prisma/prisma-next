@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { collectScalarTypeConstructors } from '@prisma-next/framework-components/authoring';
 import {
   APP_SPACE_ID,
   assembleAuthoringContributions,
@@ -14,8 +15,7 @@ import {
   postgresCreateNamespace,
 } from '@prisma-next/target-postgres/types';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
-import { createPostgresScalarTypeDescriptors } from '../../src/core/control-mutation-defaults';
+import { postgresScalarAuthoringTypes } from '../../src/core/control-mutation-defaults';
 import {
   controlAdapter,
   createDriver,
@@ -55,16 +55,7 @@ function buildScalarTypeDescriptors(): ReadonlyMap<
   string,
   { codecId: string; nativeType: string }
 > {
-  const codecIdMap = createPostgresScalarTypeDescriptors();
-  const codecLookup = createPostgresBuiltinCodecLookup();
-  const result = new Map<string, { codecId: string; nativeType: string }>();
-  for (const [typeName, codecId] of codecIdMap) {
-    const nativeType = codecLookup.targetTypesFor(codecId)?.[0];
-    if (nativeType !== undefined) {
-      result.set(typeName, { codecId, nativeType });
-    }
-  }
-  return result;
+  return collectScalarTypeConstructors(postgresScalarAuthoringTypes);
 }
 
 function buildPslContract() {

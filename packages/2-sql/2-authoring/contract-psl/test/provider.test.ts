@@ -773,7 +773,7 @@ model Document {
   });
 
   describe('scalar derivation from the unified namespace', () => {
-    it('resolves base scalars from top-level zero-arg constructors, ignoring the legacy map channel', async () => {
+    it('resolves base scalars from top-level zero-arg constructors', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
       const schemaPath = join(tempDir, 'schema.prisma');
@@ -783,7 +783,6 @@ model Document {
       const contract = prismaContract('./schema.prisma', baseOptions);
       const result = await contract.source.load(
         createPostgresTestContext({
-          scalarTypeDescriptors: new Map(),
           resolvedInputs: [schemaPath],
         }),
       );

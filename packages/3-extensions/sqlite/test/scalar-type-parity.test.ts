@@ -20,16 +20,6 @@ const stack = createControlStack({
   driver: sqliteDriver,
 });
 
-function legacyScalarColumnDescriptors(): ReadonlyMap<string, ScalarTypeConstructorOutput> {
-  const result = new Map<string, ScalarTypeConstructorOutput>();
-  for (const [name, codecId] of stack.scalarTypeDescriptors) {
-    const nativeType = stack.codecLookup.targetTypesFor(codecId)?.[0];
-    if (nativeType === undefined) continue;
-    result.set(name, { codecId, nativeType });
-  }
-  return result;
-}
-
 const REPRESENTATIVE_SCHEMA = `model sample {
   id        Int      @id
   name      String
@@ -65,13 +55,13 @@ function emit(scalarColumnDescriptors: ReadonlyMap<string, ScalarTypeConstructor
   });
 }
 
-describe('sqlite scalar-type parity: unified namespace vs legacy map channel', () => {
-  it('derives identical {codecId, nativeType} from the namespace and pins every base scalar', () => {
+// The legacy scalar-type map channel (name-to-codecId, retired in TML-2985) is gone; the pinned literals
+// below carry the parity claim forward — they are the exact
+// {codecId, nativeType} pairs the retired map + codecLookup derivation produced.
+describe('sqlite scalar types derived from the unified namespace', () => {
+  it('pins every base scalar to its {codecId, nativeType}', () => {
     const derived = collectScalarTypeConstructors(stack.authoringContributions.type);
 
-    expect(Object.fromEntries(derived)).toEqual(
-      Object.fromEntries(legacyScalarColumnDescriptors()),
-    );
     expect(Object.fromEntries(derived)).toEqual({
       String: { codecId: 'sqlite/text@1', nativeType: 'text' },
       Int: { codecId: 'sqlite/integer@1', nativeType: 'integer' },
@@ -85,17 +75,46 @@ describe('sqlite scalar-type parity: unified namespace vs legacy map channel', (
   });
 
   it('exposes the derived scalar names as controlStack.scalarTypes', () => {
-    expect([...stack.scalarTypes].sort()).toEqual([...stack.scalarTypeDescriptors.keys()].sort());
+    expect([...stack.scalarTypes].sort()).toEqual([
+      'BigInt',
+      'Bytes',
+      'DateTime',
+      'Decimal',
+      'Float',
+      'Int',
+      'Json',
+      'String',
+    ]);
   });
 
-  it('emits a byte-identical contract from namespace-derived and legacy-derived scalar maps', () => {
-    const fromNamespace = emit(collectScalarTypeConstructors(stack.authoringContributions.type));
-    const fromLegacy = emit(legacyScalarColumnDescriptors());
+  it('emits a contract whose columns pin the namespace-derived {codecId, nativeType}', () => {
+    const result = emit(collectScalarTypeConstructors(stack.authoringContributions.type));
 
-    expect(fromNamespace.ok).toBe(true);
-    expect(fromLegacy.ok).toBe(true);
-    if (!fromNamespace.ok || !fromLegacy.ok) return;
-    expect(fromNamespace.value).toEqual(fromLegacy.value);
-    expect(JSON.stringify(fromNamespace.value)).toBe(JSON.stringify(fromLegacy.value));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toMatchObject({
+      storage: {
+        namespaces: {
+          __unbound__: {
+            entries: {
+              table: {
+                sample: {
+                  columns: {
+                    id: { codecId: 'sqlite/integer@1', nativeType: 'integer' },
+                    name: { codecId: 'sqlite/text@1', nativeType: 'text' },
+                    big: { codecId: 'sqlite/bigint@1', nativeType: 'integer' },
+                    ratio: { codecId: 'sqlite/real@1', nativeType: 'real' },
+                    price: { codecId: 'sqlite/text@1', nativeType: 'text' },
+                    createdAt: { codecId: 'sqlite/datetime@1', nativeType: 'text' },
+                    payload: { codecId: 'sqlite/json@1', nativeType: 'text' },
+                    raw: { codecId: 'sqlite/blob@1', nativeType: 'blob' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
   });
 });

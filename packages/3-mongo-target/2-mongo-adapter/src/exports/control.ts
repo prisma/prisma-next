@@ -19,8 +19,7 @@ import { MongoControlAdapterImpl } from '../core/mongo-control-adapter';
 
 /**
  * The base PSL scalars as zero-arg type constructors in the unified authoring
- * channel. Mirrors the descriptor's `scalarTypeDescriptors` map with explicit
- * `nativeType` values pinned to the codec manifests
+ * channel, with explicit `nativeType` values pinned to the codec manifests
  * (`codecLookup.targetTypesFor(codecId)[0]`).
  */
 export const mongoScalarAuthoringTypes = {
@@ -42,14 +41,6 @@ export const mongoAdapterDescriptor: MongoControlAdapterDescriptor<'mongo'> = {
   targetId: 'mongo',
   version: '0.0.1',
   authoring: { type: mongoScalarAuthoringTypes },
-  scalarTypeDescriptors: new Map([
-    ['String', 'mongo/string@1'],
-    ['Int', 'mongo/int32@1'],
-    ['Boolean', 'mongo/bool@1'],
-    ['DateTime', 'mongo/date@1'],
-    ['ObjectId', 'mongo/objectId@1'],
-    ['Float', 'mongo/double@1'],
-  ]),
   types: {
     codecTypes: {
       import: {

@@ -21,16 +21,6 @@ const stack = createControlStack({
   driver: postgresDriver,
 });
 
-function legacyScalarColumnDescriptors(): ReadonlyMap<string, ScalarTypeConstructorOutput> {
-  const result = new Map<string, ScalarTypeConstructorOutput>();
-  for (const [name, codecId] of stack.scalarTypeDescriptors) {
-    const nativeType = stack.codecLookup.targetTypesFor(codecId)?.[0];
-    if (nativeType === undefined) continue;
-    result.set(name, { codecId, nativeType });
-  }
-  return result;
-}
-
 const REPRESENTATIVE_SCHEMA = `model sample {
   id        Int      @id
   name      String
@@ -67,13 +57,13 @@ function emit(scalarColumnDescriptors: ReadonlyMap<string, ScalarTypeConstructor
   });
 }
 
-describe('postgres scalar-type parity: unified namespace vs legacy map channel', () => {
-  it('derives identical {codecId, nativeType} from the namespace and pins every base scalar', () => {
+// The legacy scalar-type map channel (name-to-codecId, retired in TML-2985) is gone; the pinned literals
+// below carry the parity claim forward — they are the exact
+// {codecId, nativeType} pairs the retired map + codecLookup derivation produced.
+describe('postgres scalar types derived from the unified namespace', () => {
+  it('pins every base scalar to its {codecId, nativeType}', () => {
     const derived = collectScalarTypeConstructors(stack.authoringContributions.type);
 
-    expect(Object.fromEntries(derived)).toEqual(
-      Object.fromEntries(legacyScalarColumnDescriptors()),
-    );
     expect(Object.fromEntries(derived)).toEqual({
       String: { codecId: 'pg/text@1', nativeType: 'text' },
       Boolean: { codecId: 'pg/bool@1', nativeType: 'bool' },
@@ -88,17 +78,48 @@ describe('postgres scalar-type parity: unified namespace vs legacy map channel',
   });
 
   it('exposes the derived scalar names as controlStack.scalarTypes', () => {
-    expect([...stack.scalarTypes].sort()).toEqual([...stack.scalarTypeDescriptors.keys()].sort());
+    expect([...stack.scalarTypes].sort()).toEqual([
+      'BigInt',
+      'Boolean',
+      'Bytes',
+      'DateTime',
+      'Decimal',
+      'Float',
+      'Int',
+      'Json',
+      'String',
+    ]);
   });
 
-  it('emits a byte-identical contract from namespace-derived and legacy-derived scalar maps', () => {
-    const fromNamespace = emit(collectScalarTypeConstructors(stack.authoringContributions.type));
-    const fromLegacy = emit(legacyScalarColumnDescriptors());
+  it('emits a contract whose columns pin the namespace-derived {codecId, nativeType}', () => {
+    const result = emit(collectScalarTypeConstructors(stack.authoringContributions.type));
 
-    expect(fromNamespace.ok).toBe(true);
-    expect(fromLegacy.ok).toBe(true);
-    if (!fromNamespace.ok || !fromLegacy.ok) return;
-    expect(fromNamespace.value).toEqual(fromLegacy.value);
-    expect(JSON.stringify(fromNamespace.value)).toBe(JSON.stringify(fromLegacy.value));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toMatchObject({
+      storage: {
+        namespaces: {
+          public: {
+            entries: {
+              table: {
+                sample: {
+                  columns: {
+                    id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+                    name: { codecId: 'pg/text@1', nativeType: 'text' },
+                    active: { codecId: 'pg/bool@1', nativeType: 'bool' },
+                    big: { codecId: 'pg/int8@1', nativeType: 'int8' },
+                    ratio: { codecId: 'pg/float8@1', nativeType: 'float8' },
+                    price: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
+                    createdAt: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
+                    payload: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
+                    raw: { codecId: 'pg/bytea@1', nativeType: 'bytea' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
   });
 });

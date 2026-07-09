@@ -2,6 +2,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import pgvectorControl from '@prisma-next/extension-pgvector/control';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyControl from '@prisma-next/family-sql/control';
+import { collectScalarTypeConstructors } from '@prisma-next/framework-components/authoring';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { defineContract } from '@prisma-next/postgres/contract-builder';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
@@ -25,13 +26,7 @@ const stack = createControlStack({
 });
 
 function buildColumnDescriptorMap() {
-  const result = new Map<string, { codecId: string; nativeType: string }>();
-  for (const [typeName, codecId] of stack.scalarTypeDescriptors) {
-    const targetTypes = stack.codecLookup.targetTypesFor(codecId);
-    const nativeType = targetTypes?.[0] ?? codecId;
-    result.set(typeName, { codecId, nativeType });
-  }
-  return result;
+  return collectScalarTypeConstructors(stack.authoringContributions.type);
 }
 
 function interpretWithRealPacks(schema: string) {

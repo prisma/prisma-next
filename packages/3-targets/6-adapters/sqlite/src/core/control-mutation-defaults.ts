@@ -309,21 +309,9 @@ const sqliteDefaultFunctionRegistryEntries = [
   ['dbgenerated', { lower: lowerDbgenerated, usageSignatures: ['dbgenerated("...")'] }],
 ] satisfies ReadonlyArray<readonly [string, ControlMutationDefaultEntry]>;
 
-const sqliteScalarTypeDescriptors = new Map<string, string>([
-  ['String', SQLITE_TEXT_CODEC_ID],
-  ['Int', SQLITE_INTEGER_CODEC_ID],
-  ['BigInt', SQLITE_BIGINT_CODEC_ID],
-  ['Float', SQLITE_REAL_CODEC_ID],
-  ['Decimal', SQLITE_TEXT_CODEC_ID],
-  ['DateTime', SQLITE_DATETIME_CODEC_ID],
-  ['Json', SQLITE_JSON_CODEC_ID],
-  ['Bytes', SQLITE_BLOB_CODEC_ID],
-]);
-
 /**
  * The base PSL scalars as zero-arg type constructors in the unified authoring
- * channel. Mirrors {@link sqliteScalarTypeDescriptors} with explicit
- * `nativeType` values pinned to the codec manifests
+ * channel, with explicit `nativeType` values pinned to the codec manifests
  * (`codecLookup.targetTypesFor(codecId)[0]`).
  */
 export const sqliteScalarAuthoringTypes = {
@@ -384,8 +372,4 @@ export function createSqliteMutationDefaultGeneratorDescriptors(): readonly Muta
     ),
     timestampNowControlDescriptor(),
   ];
-}
-
-export function createSqliteScalarTypeDescriptors(): ReadonlyMap<string, string> {
-  return new Map(sqliteScalarTypeDescriptors);
 }

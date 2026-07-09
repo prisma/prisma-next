@@ -20,7 +20,7 @@ import {
   postgresScalarTypeDescriptors,
   postgresTarget,
   sqliteEnumInferenceCodecs,
-  sqliteScalarTypeDescriptors,
+  sqliteScalarColumnDescriptors,
   sqliteTarget,
   symbolTableInputFromParseArgs,
   testEnumEntityContributions,
@@ -612,7 +612,7 @@ describe.each([
   {
     targetName: 'sqlite',
     target: sqliteTarget,
-    scalarColumnDescriptors: sqliteScalarTypeDescriptors,
+    scalarColumnDescriptors: sqliteScalarColumnDescriptors,
     enumInferenceCodecs: sqliteEnumInferenceCodecs,
   },
 ])('enum @@type inference ($targetName)', ({
