@@ -14,6 +14,7 @@ import {
   list,
   modelAttribute,
   nodePslSpan,
+  num,
   oneOf,
   record,
   scalarLiteral,
@@ -152,6 +153,56 @@ describe('int', () => {
     const { expr, ctx } = argOf('"42"');
 
     const result = int().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('num', () => {
+  it('parses an integer literal into its number value', () => {
+    const { expr, ctx } = argOf('5');
+
+    const result = num().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(5);
+  });
+
+  it('parses a fractional literal into its number value', () => {
+    const { expr, ctx } = argOf('1.5');
+
+    const result = num().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(1.5);
+  });
+
+  it('rejects a string literal with the threaded code', () => {
+    const { expr, ctx } = argOf('"5"');
+
+    const result = num().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a boolean literal', () => {
+    const { expr, ctx } = argOf('true');
+
+    const result = num().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('rejects a bare identifier', () => {
+    const { expr, ctx } = argOf('Cascade');
+
+    const result = num().parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
@@ -575,10 +626,10 @@ describe('scalarLiteral', () => {
 });
 
 describe('funcCall', () => {
-  it('accepts a nullary call and returns an empty argument list', () => {
+  it('accepts a nullary call whose callee matches the pinned name', () => {
     const { expr, ctx } = argOf('now()');
 
-    const result = funcCall().parse(expr, ctx);
+    const result = funcCall('now').parse(expr, ctx);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -588,10 +639,22 @@ describe('funcCall', () => {
     }
   });
 
+  it('rejects a call whose callee differs from the pinned name', () => {
+    const { expr, ctx } = argOf('uuid()');
+
+    const result = funcCall('now').parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
   it('captures each argument as its verbatim source text', () => {
     const { expr, ctx } = argOf('dbgenerated("gen_random_uuid()")');
 
-    const result = funcCall().parse(expr, ctx);
+    const result = funcCall('dbgenerated').parse(expr, ctx);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -604,7 +667,7 @@ describe('funcCall', () => {
   it('preserves a numeric argument as source text', () => {
     const { expr, ctx } = argOf('uuid(7)');
 
-    const result = funcCall().parse(expr, ctx);
+    const result = funcCall('uuid').parse(expr, ctx);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -617,7 +680,7 @@ describe('funcCall', () => {
   it('rejects a bare identifier', () => {
     const { expr, ctx } = argOf('now');
 
-    const result = funcCall().parse(expr, ctx);
+    const result = funcCall('now').parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -629,7 +692,7 @@ describe('funcCall', () => {
   it('rejects a string literal', () => {
     const { expr, ctx } = argOf('"now"');
 
-    const result = funcCall().parse(expr, ctx);
+    const result = funcCall('now').parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
@@ -638,7 +701,7 @@ describe('funcCall', () => {
   it('rejects an array literal', () => {
     const { expr, ctx } = argOf('[1]');
 
-    const result = funcCall().parse(expr, ctx);
+    const result = funcCall('now').parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
@@ -647,7 +710,7 @@ describe('funcCall', () => {
   it('rejects a namespaced callee', () => {
     const { expr, ctx } = argOf('foo.now()');
 
-    const result = funcCall().parse(expr, ctx);
+    const result = funcCall('now').parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);

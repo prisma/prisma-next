@@ -35,7 +35,7 @@ describe('composed mutation default registries', () => {
       ...input,
     });
 
-  it('rejects known default functions when no components contribute handlers', () => {
+  it('rejects a default function call as invalid syntax when no components contribute handlers', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
@@ -53,8 +53,8 @@ describe('composed mutation default registries', () => {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-          message: expect.stringContaining('uuid'),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Expected one of'),
         }),
       ]),
     );

@@ -1,5 +1,10 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type {
+  ControlMutationDefaultRegistry,
+  ParsedDefaultFunctionCall,
+} from '@prisma-next/framework-components/control';
+import type {
+  ArgType,
   AttributeSpec,
   FieldSymbol,
   InterpretCtx,
@@ -7,6 +12,7 @@ import type {
 } from '@prisma-next/psl-parser';
 import {
   bareIdentifier,
+  bool,
   entityRef,
   fieldAttribute,
   fieldRef,
@@ -16,10 +22,10 @@ import {
   leafDiagnostic,
   list,
   modelAttribute,
+  num,
   oneOf,
   optional,
   record,
-  scalarLiteral,
   str,
 } from '@prisma-next/psl-parser';
 import type {
@@ -140,9 +146,28 @@ export function interpretFieldAttribute<Out>(input: {
 export const mapModelSpec = modelAttribute('map', { positional: [{ key: 'name', type: str() }] });
 export const mapFieldSpec = fieldAttribute('map', { positional: [{ key: 'name', type: str() }] });
 
-export const defaultSpec = fieldAttribute('default', {
-  positional: [{ key: 'value', type: oneOf(scalarLiteral(), list(scalarLiteral()), funcCall()) }],
-});
+type DefaultArgValue =
+  | string
+  | number
+  | boolean
+  | (string | number | boolean)[]
+  | ParsedDefaultFunctionCall;
+
+// Compose the non-enum `@default` value grammar for a single field. Literal arms stay flexible
+// (string/number/boolean); the list arm exists only for list fields; and one name-pinned
+// `funcCall(name)` arm is added per registered mutation-default function. Shape now maps to
+// field kind, so an array on a scalar field (or a scalar on a list field) fails as invalid syntax.
+export function buildDefaultSpec(input: {
+  readonly isList: boolean;
+  readonly registry: ControlMutationDefaultRegistry;
+}) {
+  const literal = () => oneOf(str(), num(), bool());
+  const funcArms = [...input.registry.keys()].map((name) => funcCall(name));
+  const valueArms: readonly [ArgType<DefaultArgValue>, ...ArgType<DefaultArgValue>[]] = input.isList
+    ? [list(literal()), ...funcArms]
+    : [str(), num(), bool(), ...funcArms];
+  return fieldAttribute('default', { positional: [{ key: 'value', type: oneOf(...valueArms) }] });
+}
 
 export const enumDefaultSpec = fieldAttribute('default', {
   positional: [{ key: 'member', type: bareIdentifier() }],

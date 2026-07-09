@@ -695,7 +695,7 @@ model Document {
   });
 
   describe('given provider inputs without assembled mutation defaults', () => {
-    it('reports unknown default function when context has no mutation defaults', async () => {
+    it('rejects a default function call as invalid syntax when the registry is empty', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
       const schemaPath = join(tempDir, 'schema.prisma');
@@ -726,8 +726,8 @@ model Document {
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-            message: expect.stringContaining('uuid'),
+            code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+            message: expect.stringContaining('Expected one of'),
           }),
         ]),
       );

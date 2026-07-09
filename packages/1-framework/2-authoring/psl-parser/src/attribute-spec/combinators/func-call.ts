@@ -7,11 +7,11 @@ import { printSyntax } from '../../syntax/ast-helpers';
 import type { ArgType } from '../types';
 import { leafDiagnostic } from './diagnostic';
 
-// A function-call argument (`now()`, `dbgenerated("...")`) parsed into the framework
-// `ParsedDefaultFunctionCall` shape. Registry-agnostic: the callee name is not validated
-// here, and each argument is captured as verbatim source text — the downstream default
+// A name-pinned function-call argument (`funcCall('now')` matches `now()`) parsed into the
+// framework `ParsedDefaultFunctionCall` shape. The callee must be an unqualified identifier
+// equal to `name`; each argument is captured as verbatim source text — the downstream default
 // registry re-parses those strings (`dbgenerated` needs the quotes preserved).
-export function funcCall(): ArgType<ParsedDefaultFunctionCall> {
+export function funcCall(name: string): ArgType<ParsedDefaultFunctionCall> {
   return {
     kind: 'funcCall',
     label: 'function call',
@@ -23,9 +23,12 @@ export function funcCall(): ArgType<ParsedDefaultFunctionCall> {
       if (qname === undefined || qname.dot() !== undefined || qname.colon() !== undefined) {
         return notOk([leafDiagnostic(ctx, arg, 'Expected a function call')]);
       }
-      const name = qname.identifier()?.token()?.text;
-      if (name === undefined) {
+      const calleeName = qname.identifier()?.token()?.text;
+      if (calleeName === undefined) {
         return notOk([leafDiagnostic(ctx, arg, 'Expected a function call')]);
+      }
+      if (calleeName !== name) {
+        return notOk([leafDiagnostic(ctx, arg, `Expected ${name}()`)]);
       }
       const args = Array.from(arg.args(), (argument) => {
         const node = argument.value() ?? argument;
@@ -35,7 +38,7 @@ export function funcCall(): ArgType<ParsedDefaultFunctionCall> {
         };
       });
       return ok({
-        name,
+        name: calleeName,
         raw: printSyntax(arg.syntax).trim(),
         args,
         span: nodePslSpan(arg.syntax, ctx.sourceFile),

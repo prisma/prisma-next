@@ -47,6 +47,7 @@ export { identifier } from '../attribute-spec/combinators/identifier';
 export { int } from '../attribute-spec/combinators/int';
 export type { ListOptions } from '../attribute-spec/combinators/list';
 export { list } from '../attribute-spec/combinators/list';
+export { num } from '../attribute-spec/combinators/num';
 export { oneOf } from '../attribute-spec/combinators/one-of';
 export { record } from '../attribute-spec/combinators/record';
 export { scalarLiteral } from '../attribute-spec/combinators/scalar-literal';

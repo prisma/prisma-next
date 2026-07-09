@@ -28,7 +28,7 @@ const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults(
 
 function expectDiagnosticForSchema(
   schema: string,
-  diagnostic: { readonly code: string; readonly message: string },
+  diagnostic: { readonly code: string; readonly message?: string },
 ): void {
   const document = symbolTableInputFromParseArgs({ schema, sourceId: 'schema.prisma' });
   const result = interpretPslDocumentToSqlContract({
@@ -39,8 +39,12 @@ function expectDiagnosticForSchema(
 
   expect(result.ok).toBe(false);
   if (result.ok) return;
+  const expected =
+    diagnostic.message === undefined
+      ? { code: diagnostic.code }
+      : { code: diagnostic.code, message: diagnostic.message };
   expect(result.failure.diagnostics).toEqual(
-    expect.arrayContaining([expect.objectContaining(diagnostic)]),
+    expect.arrayContaining([expect.objectContaining(expected)]),
   );
 }
 
@@ -1406,33 +1410,25 @@ describe('interpretPslDocumentToSqlContract list-field constructs', () => {
     });
   });
 
-  it('rejects a scalar literal default on a list field', () => {
+  it('rejects a scalar literal default on a list field as invalid syntax', () => {
     expectDiagnosticForSchema(
       `model Post {
   id Int @id
   tags String[] @default("x")
 }
 `,
-      {
-        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
-        message:
-          'Field "Post.tags" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.',
-      },
+      { code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' },
     );
   });
 
-  it('rejects a scalar numeric default on a list field', () => {
+  it('rejects a scalar numeric default on a list field as invalid syntax', () => {
     expectDiagnosticForSchema(
       `model Post {
   id Int @id
   scores Int[] @default(5)
 }
 `,
-      {
-        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
-        message:
-          'Field "Post.scores" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.',
-      },
+      { code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' },
     );
   });
 

@@ -27,13 +27,12 @@ import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
-import {
-  type FieldSymbol,
-  type ModelSymbol,
-  nodePslSpan,
-  type PslSpan,
-  type ResolvedAttribute,
-  type ResolvedTypeConstructorCall,
+import type {
+  FieldSymbol,
+  ModelSymbol,
+  PslSpan,
+  ResolvedAttribute,
+  ResolvedTypeConstructorCall,
 } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 
@@ -46,7 +45,7 @@ import {
 } from './psl-attribute-parsing';
 import { mapPslHelperArgs } from './psl-authoring-arguments';
 import {
-  defaultSpec,
+  buildDefaultSpec,
   findFieldAttributeNode,
   interpretFieldAttribute,
 } from './sql-attribute-specs';
@@ -895,9 +894,13 @@ export function lowerDefaultForField(input: {
 } {
   const node = findFieldAttributeNode(input.field, 'default');
   if (node === undefined) return {};
+  const spec = buildDefaultSpec({
+    isList: input.isList ?? false,
+    registry: input.defaultFunctionRegistry,
+  });
   const interpreted = interpretFieldAttribute({
     node,
-    spec: defaultSpec,
+    spec,
     model: input.model,
     field: input.field,
     sourceFile: input.sourceFile,
@@ -908,16 +911,7 @@ export function lowerDefaultForField(input: {
   const value = interpreted.value;
 
   if (Array.isArray(value)) {
-    if (input.isList) {
-      return { defaultValue: { kind: 'literal', value: [...value] } };
-    }
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_VALUE',
-      message: `Unsupported default value "${JSON.stringify(value)}"`,
-      sourceId: input.sourceId,
-      span: nodePslSpan(node.syntax, input.sourceFile),
-    });
-    return {};
+    return { defaultValue: { kind: 'literal', value: [...value] } };
   }
 
   if (typeof value === 'object') {
@@ -976,15 +970,6 @@ export function lowerDefaultForField(input: {
     return { executionDefaults: { onCreate: lowered.value.generated } };
   }
 
-  if (input.isList) {
-    input.diagnostics.push({
-      code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
-      message: `Field "${input.modelName}.${input.fieldName}" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.`,
-      sourceId: input.sourceId,
-      span: nodePslSpan(node.syntax, input.sourceFile),
-    });
-    return {};
-  }
   return { defaultValue: { kind: 'literal', value } };
 }
 
