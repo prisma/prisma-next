@@ -223,6 +223,13 @@ type HarvestedPackEntities = Record<string, Record<string, Record<string, unknow
  * (`namespaceId → entityKind → entityName`) — folded into the same namespace
  * assembly `derivePackEntityValueSets`/`entries.<kind>` step, so a harvested
  * entity gets its value-set the same way an author-declared one does.
+ *
+ * The same handle reused by many columns in one namespace is normal (a native
+ * enum type backs any number of columns) and records the identical entity once.
+ * Two *different* entity instances sharing a name+kind in one namespace is a
+ * name collision — the emitted `entries.valueSet.<name>` could only reflect one
+ * of them, silently mismatching the other column's type/cast. PSL hard-errors
+ * on the equivalent (`PSL_DUPLICATE_DECLARATION`); the TS path rejects it too.
  */
 function harvestPackEntity(
   harvested: HarvestedPackEntities,
@@ -231,12 +238,27 @@ function harvestPackEntity(
 ): void {
   const forNs = harvested[namespaceId] ?? {};
   const forKind = forNs[entityRef.entityKind] ?? {};
+  const existing = forKind[entityRef.entityName];
+  if (existing !== undefined && existing !== entityRef.entity) {
+    throw new Error(
+      `buildSqlContractFromDefinition: two different "${entityRef.entityKind}" entities named "${entityRef.entityName}" in namespace "${namespaceId}" — pack-entity names must be unique per namespace.`,
+    );
+  }
   forKind[entityRef.entityName] = entityRef.entity;
   forNs[entityRef.entityKind] = forKind;
   harvested[namespaceId] = forNs;
 }
 
+/**
+ * Merges the author-declared `packEntities` for one namespace with the entities
+ * harvested from that namespace's deferred entity-ref columns. A harvested
+ * entity that shadows a *different* declared entity of the same kind+name (or
+ * vice-versa) is the same name-collision bug `harvestPackEntity` guards against
+ * across columns, so it is rejected the same way — by entity identity, so the
+ * same handle declared and used by a column does not throw.
+ */
 function mergeHarvestedPackEntities(
+  namespaceId: string,
   declared: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
   harvested: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
 ): Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined {
@@ -245,7 +267,17 @@ function mergeHarvestedPackEntities(
   const kinds = new Set([...Object.keys(declared), ...Object.keys(harvested)]);
   const result: Record<string, Readonly<Record<string, unknown>>> = {};
   for (const kind of kinds) {
-    result[kind] = { ...declared[kind], ...harvested[kind] };
+    const declaredForKind = declared[kind];
+    const harvestedForKind = harvested[kind];
+    for (const [name, entity] of Object.entries(harvestedForKind ?? {})) {
+      const existing = declaredForKind?.[name];
+      if (existing !== undefined && existing !== entity) {
+        throw new Error(
+          `buildSqlContractFromDefinition: two different "${kind}" entities named "${name}" in namespace "${namespaceId}" — a harvested pack entity conflicts with an author-declared one; pack-entity names must be unique per namespace.`,
+        );
+      }
+    }
+    result[kind] = { ...declaredForKind, ...harvestedForKind };
   }
   return result;
 }
@@ -942,6 +974,7 @@ export function buildSqlContractFromDefinition(
   const namespaces: SqlStorageInput['namespaces'] = Object.fromEntries(
     [...namespaceCoordinateIds].sort().map((id) => {
       const packEntitiesForNs = mergeHarvestedPackEntities(
+        id,
         definition.packEntities?.[id],
         harvestedPackEntities[id],
       );

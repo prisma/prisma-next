@@ -61,6 +61,10 @@ function buildNativeEnumHandle<
  * `entries.valueSet` key). The Postgres type name defaults to `name`; use
  * `.map(typeName)` to override it (PSL's `@@map`).
  *
+ * A handle referenced by columns in N different namespaces materialises N
+ * native enum types (one per namespace) — by design: a Postgres type lives in
+ * exactly one schema, and PSL can't share a type across schemas either.
+ *
  * @example
  * ```ts
  * // name === Postgres type name

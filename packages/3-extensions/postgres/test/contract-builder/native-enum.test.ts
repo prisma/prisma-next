@@ -175,6 +175,66 @@ describe('nativeEnum + pg.enum (TS native-enum authoring)', () => {
     expect(() => nativeEnum('DupEnum', 'a', 'b', 'a')).toThrow(/duplicate member value "a"/);
   });
 
+  it('rejects two DIFFERENT handles sharing a name, used by columns in the same namespace', () => {
+    // Distinct entities (different member sets) sharing name `Status` — the
+    // emitted valueSet could only reflect one, silently mismatching the other
+    // column. PSL hard-errors on the equivalent; the TS path must too.
+    const statusA = nativeEnum('Status', 'a', 'b');
+    const statusB = nativeEnum('Status', 'x', 'y');
+
+    expect(() =>
+      defineContract({
+        models: {
+          Task: model('Task', {
+            fields: {
+              id: field.column(intColumn).id(),
+              status: field.column(pg.enum(statusA)),
+            },
+          }).sql({ table: 'tasks' }),
+          Job: model('Job', {
+            fields: {
+              id: field.column(intColumn).id(),
+              status: field.column(pg.enum(statusB)),
+            },
+          }).sql({ table: 'jobs' }),
+        },
+      }),
+    ).toThrow(/two different "native_enum" entities named "Status" in namespace "public"/);
+  });
+
+  it('allows the SAME handle used by two columns in one namespace (one entity, one value-set)', () => {
+    const Status = nativeEnum('Status', 'a', 'b');
+
+    const contract = defineContract({
+      models: {
+        Task: model('Task', {
+          fields: {
+            id: field.column(intColumn).id(),
+            status: field.column(pg.enum(Status)),
+          },
+        }).sql({ table: 'tasks' }),
+        Job: model('Job', {
+          fields: {
+            id: field.column(intColumn).id(),
+            status: field.column(pg.enum(Status)),
+          },
+        }).sql({ table: 'jobs' }),
+      },
+    });
+
+    const ns = namespace(contract.storage.namespaces, 'public');
+    expect(ns.entries.native_enum?.['Status']).toEqual(Status.entity);
+    expect(ns.valueSet?.['Status']).toEqual({ kind: 'valueSet', values: ['a', 'b'] });
+    expect(ns.table['tasks']?.columns['status']).toMatchObject({
+      codecId: 'pg/enum@1',
+      valueSet: { entityKind: 'valueSet', entityName: 'Status', namespaceId: 'public' },
+    });
+    expect(ns.table['jobs']?.columns['status']).toMatchObject({
+      codecId: 'pg/enum@1',
+      valueSet: { entityKind: 'valueSet', entityName: 'Status', namespaceId: 'public' },
+    });
+  });
+
   describe('emitted typing (via generateContractDts, not typeof contract)', () => {
     const AalLevel = nativeEnum('AalLevel', 'aal1', 'aal2', 'aal3').map('aal_level');
 

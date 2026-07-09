@@ -58,6 +58,13 @@ One reviewer holds: **"a native enum authored in TS produces the same contract a
 - **`valueObjects` cautionary tale.** `valueObjects` sits on `ContractDefinition` but was never wired through `defineContract`'s ergonomic factory — only the low-level `buildSqlContractFromDefinition`. The new pack-entity field must be wired through `defineContract(scaffold, factory)`, not just the low-level entry, or authors can't reach it.
 - **`helpers.native_enum` / `type.pg.enum` already exist** on the composed helper surface but are non-functional (the former needs a raw PSL-AST input and derives no value-set; the latter throws). Don't mistake them for half-wired — the new `nativeEnum` helper is the real path; these are bypassed.
 
+## Known asymmetries (harvest-from-usage model)
+
+Because a TS native enum reaches the contract only by being referenced in a `pg.enum(handle)` column (harvested into the field's model namespace), two edges differ from PSL — both benign, one a documented follow-up:
+
+- **A handle referenced in N namespaces materializes N native-enum types** (one per schema, each qualified to its namespace). This matches PSL — a Postgres type lives in one schema; PSL can't share a type across schemas either — so it is by design, noted on `nativeEnum`.
+- **A `nativeEnum(…)` declared but never used** by any column is absent from the contract, whereas an unused PSL `native_enum` block still lowers a (serialized) `entries.valueSet.<name>`. Minor and only for inert enums; **follow-up**, not fixed here. (Duplicate names within one namespace *are* rejected, matching PSL's `PSL_DUPLICATE_DECLARATION`.)
+
 ## Slice-specific done conditions
 
 - A `native_enum` + `pg.enum(handle)` column authored via `defineContract` (TS), in the default schema **and** in a named schema (`auth`), yields a `Contract` that `toEqual`s the PSL-authored equivalent in memory, and an emitted `contract.json` byte-identical to the PSL one (parity test), with the column typed as the value union in QB/ORM on the emitted path and out-of-set input rejected via the existing value-set machinery.
