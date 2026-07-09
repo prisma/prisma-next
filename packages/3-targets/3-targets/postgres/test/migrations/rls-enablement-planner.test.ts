@@ -241,6 +241,41 @@ describe('enablement neutrality', () => {
   });
 });
 
+describe('tolerated-table grading', () => {
+  it('plans ENABLE on an existing tolerated table (enablement is creation-class, like the policy set it guards)', async () => {
+    const policy = contractPolicy('p_read_ab12cd34');
+    const contract = buildContract({ marked: true, policies: [policy], control: 'tolerated' });
+    const schema = actualSchema({ rlsEnabled: false, policies: [policy] });
+
+    const opIds = await opIdsOf(plan(contract, schema, ALL_CLASSES_POLICY));
+    expect(opIds).toEqual([`rowLevelSecurity.public.${TABLE_NAME}`]);
+  });
+
+  it('creates the policy set AND enables RLS together on a tolerated table', async () => {
+    const policy = contractPolicy('p_read_ab12cd34');
+    const contract = buildContract({ marked: true, policies: [policy], control: 'tolerated' });
+    const schema = actualSchema({ rlsEnabled: false });
+
+    const opIds = await opIdsOf(plan(contract, schema, ALL_CLASSES_POLICY));
+    expect(opIds).toEqual([
+      `rowLevelSecurity.public.${TABLE_NAME}`,
+      `rlsPolicy.public.${TABLE_NAME}.p_read_ab12cd34`,
+    ]);
+  });
+
+  it('never plans DISABLE on a tolerated table (marker removal suppresses with a warning)', async () => {
+    const contract = buildContract({ marked: false, control: 'tolerated' });
+    const schema = actualSchema({ rlsEnabled: true });
+
+    const result = plan(contract, schema, ALL_CLASSES_POLICY);
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+    const ops = await Promise.all(result.plan.operations);
+    expect(ops).toEqual([]);
+    expect(result.warnings ?? []).not.toEqual([]);
+  });
+});
+
 describe('external-table grading', () => {
   it('plans nothing for an external table with RLS on and no marker, surfacing a suppression warning', async () => {
     const contract = buildContract({ marked: false, control: 'external' });
