@@ -1,9 +1,14 @@
+import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
 import { describe, expect, it } from 'vitest';
+import { createSqliteBuiltinCodecLookup } from '../src/core/codec-lookup';
 import {
   createSqliteDefaultFunctionRegistry,
   createSqliteMutationDefaultGeneratorDescriptors,
+  createSqliteScalarTypeDescriptors,
+  sqliteScalarAuthoringTypes,
 } from '../src/core/control-mutation-defaults';
 import runtimeAdapterDescriptor from '../src/core/runtime-adapter';
+import sqliteAdapterDescriptor from '../src/exports/control';
 
 const stubSpan = {
   start: { offset: 0, line: 1, column: 1 },
@@ -100,5 +105,25 @@ describe('sqlite runtime mutation default generators', () => {
     );
 
     expect(generator?.generate()).toBeInstanceOf(Date);
+  });
+});
+
+describe('sqliteScalarAuthoringTypes', () => {
+  const legacyMap = createSqliteScalarTypeDescriptors();
+  const codecLookup = createSqliteBuiltinCodecLookup();
+  const namespace: AuthoringTypeNamespace = sqliteScalarAuthoringTypes;
+
+  it('mirrors every legacy scalar as a zero-arg type constructor with manifest-derived nativeType', () => {
+    expect(Object.keys(namespace).sort()).toEqual([...legacyMap.keys()].sort());
+    for (const [name, codecId] of legacyMap) {
+      expect(namespace[name]).toEqual({
+        kind: 'typeConstructor',
+        output: { codecId, nativeType: codecLookup.targetTypesFor(codecId)?.[0] },
+      });
+    }
+  });
+
+  it('is wired as the adapter descriptor authoring type contribution', () => {
+    expect(sqliteAdapterDescriptor.authoring?.type).toBe(sqliteScalarAuthoringTypes);
   });
 });

@@ -14,6 +14,7 @@ import type {
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
+  collectContributedDescriptorPaths,
   mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
@@ -156,21 +157,45 @@ export function extractComponentIds(
 }
 
 export function assembleAuthoringContributions(
-  descriptors: ReadonlyArray<{ readonly authoring?: AuthoringContributions }>,
+  descriptors: ReadonlyArray<{ readonly id?: string; readonly authoring?: AuthoringContributions }>,
 ): AssembledAuthoringContributions {
   const field = {} as Record<string, unknown>;
   const type = {} as Record<string, unknown>;
   const entityTypes = {} as Record<string, unknown>;
   const pslBlockDescriptors: Record<string, unknown> = {};
 
+  const pathOwners = new Map<string, string>();
+  const claimContributedPaths = (
+    namespace: Record<string, unknown>,
+    descriptorKind: string,
+    label: string,
+    descriptorId: string,
+  ): void => {
+    for (const path of collectContributedDescriptorPaths(namespace, descriptorKind)) {
+      const key = `${label}:${path}`;
+      const existingOwner = pathOwners.get(key);
+      if (existingOwner !== undefined) {
+        throw new Error(
+          `Duplicate authoring ${label} helper "${path}". ` +
+            `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
+        );
+      }
+      pathOwners.set(key, descriptorId);
+    }
+  };
+
   for (const descriptor of descriptors) {
+    const descriptorId = descriptor.id ?? '<unknown>';
     if (descriptor.authoring?.field) {
+      claimContributedPaths(descriptor.authoring.field, 'fieldPreset', 'field', descriptorId);
       mergeAuthoringNamespaces(field, descriptor.authoring.field, [], 'fieldPreset', 'field');
     }
     if (descriptor.authoring?.type) {
+      claimContributedPaths(descriptor.authoring.type, 'typeConstructor', 'type', descriptorId);
       mergeAuthoringNamespaces(type, descriptor.authoring.type, [], 'typeConstructor', 'type');
     }
     if (descriptor.authoring?.entityTypes) {
+      claimContributedPaths(descriptor.authoring.entityTypes, 'entity', 'entity', descriptorId);
       mergeAuthoringNamespaces(
         entityTypes,
         descriptor.authoring.entityTypes,
@@ -180,6 +205,12 @@ export function assembleAuthoringContributions(
       );
     }
     if (descriptor.authoring?.pslBlockDescriptors) {
+      claimContributedPaths(
+        descriptor.authoring.pslBlockDescriptors,
+        'pslBlock',
+        'pslBlock',
+        descriptorId,
+      );
       mergeAuthoringNamespaces(
         pslBlockDescriptors,
         descriptor.authoring.pslBlockDescriptors,

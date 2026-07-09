@@ -594,6 +594,33 @@ export function mergeAuthoringNamespaces(
 }
 
 /**
+ * Collects the full dotted paths of every well-formed descriptor of
+ * `descriptorKind` in a raw contribution tree, using the same boundary
+ * classification as {@link mergeAuthoringNamespaces}. Lets assembly-level
+ * callers attribute each contributed path to its contributing component
+ * before merging, so a same-path collision can be reported naming both
+ * contributors.
+ */
+export function collectContributedDescriptorPaths(
+  namespace: Record<string, unknown>,
+  descriptorKind: string,
+  path: readonly string[] = [],
+): string[] {
+  const paths: string[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isWellFormedDescriptor(value, descriptorKind)) {
+      paths.push(currentPath.join('.'));
+      continue;
+    }
+    if (isCopyableNamespaceObject(value)) {
+      paths.push(...collectContributedDescriptorPaths(value, descriptorKind, currentPath));
+    }
+  }
+  return paths;
+}
+
+/**
  * Shape shared by every `Authoring*Namespace` type: a tree whose leaves are
  * descriptors of type `D` and whose internal nodes are sub-namespaces of the
  * same shape. `collectDescriptorPaths` and `collectDescriptorEntries` are

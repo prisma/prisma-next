@@ -179,6 +179,80 @@ describe('assembleAuthoringContributions', () => {
     ).toThrow(/Duplicate authoring field helper "dup"/);
   });
 
+  it('lands top-level type constructors from a descriptor in the merged namespace', () => {
+    const stringConstructor = {
+      kind: 'typeConstructor',
+      output: { codecId: 'pg/text@1', nativeType: 'text' },
+    } as const;
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        kind: 'adapter',
+        id: 'adapter-a',
+        authoring: { type: { String: stringConstructor } },
+      }),
+    ]);
+    expect(result.type['String']).toEqual(stringConstructor);
+  });
+
+  it('rejects two descriptors contributing the same top-level type constructor naming both', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          id: 'adapter-a',
+          authoring: {
+            type: {
+              String: { kind: 'typeConstructor', output: { codecId: 'a@1', nativeType: 'text' } },
+            },
+          },
+        }),
+        createDescriptor({
+          id: 'adapter-b',
+          authoring: {
+            type: {
+              String: { kind: 'typeConstructor', output: { codecId: 'b@1', nativeType: 'text' } },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(
+      /Duplicate authoring type helper "String"\. Descriptor "adapter-b" conflicts with "adapter-a"/,
+    );
+  });
+
+  it('merges top-level String alongside namespaced sql.String', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        id: 'family-sql',
+        authoring: {
+          type: {
+            sql: {
+              String: {
+                kind: 'typeConstructor',
+                output: { codecId: 'sql/varchar@1', nativeType: 'character varying' },
+              },
+            },
+          },
+        },
+      }),
+      createDescriptor({
+        id: 'adapter-a',
+        authoring: {
+          type: {
+            String: {
+              kind: 'typeConstructor',
+              output: { codecId: 'pg/text@1', nativeType: 'text' },
+            },
+          },
+        },
+      }),
+    ]);
+    expect(Object.keys(result.type).sort()).toEqual(['String', 'sql']);
+    expect(result.type['String']).toMatchObject({ output: { codecId: 'pg/text@1' } });
+    expect(result.type['sql']).toMatchObject({
+      String: { output: { codecId: 'sql/varchar@1' } },
+    });
+  });
+
   it('rejects malformed descriptor values during merge instead of recursing into primitives', () => {
     // A descriptor missing `output` fails the canonical leaf guard but is a plain object, so the walker would historically recurse INTO it and, on the second registration of the same path, try to walk through the inner `'fieldPreset'` string of the `kind` property — either silently mangling state or infinite-looping. The walker now rejects the malformed value with a clear path-aware error.
     expect(() =>

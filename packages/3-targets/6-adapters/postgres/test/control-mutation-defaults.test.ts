@@ -1,9 +1,13 @@
+import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
 import {
   createPostgresDefaultFunctionRegistry,
   createPostgresMutationDefaultGeneratorDescriptors,
   createPostgresScalarTypeDescriptors,
+  postgresScalarAuthoringTypes,
 } from '../src/core/control-mutation-defaults';
+import postgresAdapterDescriptor from '../src/exports/control';
 import runtimeAdapterDescriptor from '../src/exports/runtime';
 
 const stubSpan = {
@@ -424,5 +428,25 @@ describe('createPostgresScalarTypeDescriptors', () => {
 
   it('maps String to pg/text@1', () => {
     expect(descriptors.get('String')).toBe('pg/text@1');
+  });
+});
+
+describe('postgresScalarAuthoringTypes', () => {
+  const legacyMap = createPostgresScalarTypeDescriptors();
+  const codecLookup = createPostgresBuiltinCodecLookup();
+  const namespace: AuthoringTypeNamespace = postgresScalarAuthoringTypes;
+
+  it('mirrors every legacy scalar as a zero-arg type constructor with manifest-derived nativeType', () => {
+    expect(Object.keys(namespace).sort()).toEqual([...legacyMap.keys()].sort());
+    for (const [name, codecId] of legacyMap) {
+      expect(namespace[name]).toEqual({
+        kind: 'typeConstructor',
+        output: { codecId, nativeType: codecLookup.targetTypesFor(codecId)?.[0] },
+      });
+    }
+  });
+
+  it('is wired as the adapter descriptor authoring type contribution', () => {
+    expect(postgresAdapterDescriptor.authoring?.type).toBe(postgresScalarAuthoringTypes);
   });
 });

@@ -1,5 +1,6 @@
 import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import { timestampNowControlDescriptor } from '@prisma-next/family-sql/control';
+import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
 import type {
   ControlMutationDefaultEntry,
   DefaultFunctionLoweringContext,
@@ -293,6 +294,27 @@ const postgresScalarTypeDescriptors = new Map<string, string>([
   ['Json', 'pg/jsonb@1'],
   ['Bytes', 'pg/bytea@1'],
 ]);
+
+/**
+ * The base PSL scalars as zero-arg type constructors in the unified authoring
+ * channel. Mirrors {@link postgresScalarTypeDescriptors} with explicit
+ * `nativeType` values pinned to the codec manifests
+ * (`codecLookup.targetTypesFor(codecId)[0]`).
+ */
+export const postgresScalarAuthoringTypes = {
+  String: { kind: 'typeConstructor', output: { codecId: 'pg/text@1', nativeType: 'text' } },
+  Boolean: { kind: 'typeConstructor', output: { codecId: 'pg/bool@1', nativeType: 'bool' } },
+  Int: { kind: 'typeConstructor', output: { codecId: 'pg/int4@1', nativeType: 'int4' } },
+  BigInt: { kind: 'typeConstructor', output: { codecId: 'pg/int8@1', nativeType: 'int8' } },
+  Float: { kind: 'typeConstructor', output: { codecId: 'pg/float8@1', nativeType: 'float8' } },
+  Decimal: { kind: 'typeConstructor', output: { codecId: 'pg/numeric@1', nativeType: 'numeric' } },
+  DateTime: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
+  },
+  Json: { kind: 'typeConstructor', output: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' } },
+  Bytes: { kind: 'typeConstructor', output: { codecId: 'pg/bytea@1', nativeType: 'bytea' } },
+} as const satisfies AuthoringTypeNamespace;
 
 export function createPostgresDefaultFunctionRegistry(): ReadonlyMap<
   string,
