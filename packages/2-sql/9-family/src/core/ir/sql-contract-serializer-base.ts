@@ -22,7 +22,7 @@ import {
 } from '@prisma-next/sql-contract/validators';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { JsonObject } from '@prisma-next/utils/json';
+import type { JsonObject, JsonValue } from '@prisma-next/utils/json';
 import { type Type, type } from 'arktype';
 
 const NamespaceRawSchema = type({
@@ -207,5 +207,51 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
 
   protected constructTargetContract(hydrated: Contract<SqlStorage>): TContract {
     return hydrated as TContract;
+  }
+
+  /**
+   * Serializes a namespace's `entries` dict by walking every enumerable
+   * kind — no kind is named here, mirroring the generic hydrate walk in
+   * `hydrateSqlNamespaceEntry` above. `table` is the SQL family's one
+   * universal base kind (every namespace carries it), so it is always
+   * emitted, even when empty; every other kind — target- or
+   * pack-contributed — is emitted only when it holds at least one entry.
+   * A kind carried non-enumerable on `entries` is excluded here for free,
+   * since `Object.entries` honors enumerability.
+   */
+  protected serializeNamespaceEntries(
+    entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+  ): Record<string, Record<string, JsonObject>> {
+    const out: Record<string, Record<string, JsonObject>> = {
+      table: this.serializeEntries(entries['table'] ?? {}),
+    };
+    for (const [kind, record] of Object.entries(entries)) {
+      if (kind === 'table' || record == null || Object.keys(record).length === 0) {
+        continue;
+      }
+      out[kind] = this.serializeEntries(record);
+    }
+    return out;
+  }
+
+  private serializeEntries(entries: Readonly<Record<string, unknown>>): Record<string, JsonObject> {
+    const out: Record<string, JsonObject> = {};
+    for (const [name, entry] of Object.entries(entries)) {
+      out[name] = this.serializeJsonObject(entry);
+    }
+    return out;
+  }
+
+  protected serializeJsonObject(value: unknown): JsonObject {
+    return blindCast<
+      JsonObject,
+      'serializeJsonValue round-trips an IR node through JSON, yielding a JsonObject'
+    >(this.serializeJsonValue(value));
+  }
+
+  private serializeJsonValue(value: unknown): JsonValue {
+    return blindCast<JsonValue, 'JSON.parse(JSON.stringify(x)) yields a JsonValue'>(
+      JSON.parse(JSON.stringify(value)),
+    );
   }
 }

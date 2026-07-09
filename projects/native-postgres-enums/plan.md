@@ -15,6 +15,12 @@ The complete external-enum vertical — represent → type → cast → runtime 
 
 ## Forward work
 
+### Generic namespace-`entries` serialization — in progress, [TML-2981]
+
+- **Outcome:** the SQL contract serializer emits a namespace's entity kinds by iterating `entries` (symmetric with the already-generic hydrate path), so an extension-contributed kind round-trips with no serializer edit; byte-identical emitted output.
+- **The work:** lift generic entries serialization into `SqlContractSerializerBase`; rewire the Postgres + SQLite serializers to delegate; `native_enum` stays excluded via non-enumerability. Slice spec: [`slices/generic-namespace-entries-serialization/spec.md`](slices/generic-namespace-entries-serialization/spec.md).
+- **Origin:** review point O1 on PR #906.
+
 ### TS authoring mirror — deferred, [TML-2965]
 
 - **Outcome:** a `native_enum` is authorable in the TS DSL (`helpers.nativeEnum(…)` + `field.column(pg.enum(handle))`), producing a contract byte-identical to the PSL version.
