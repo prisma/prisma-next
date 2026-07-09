@@ -352,6 +352,20 @@ export interface AuthoringPslBlockDescriptor {
    * for keys absent from `parameters`.
    */
   readonly variadicParameters?: boolean;
+  /**
+   * Declares that the model named by the block's ref parameter `parameter`
+   * must carry the bare `@@` model attribute `attribute`. The family
+   * interpreter enforces this generically over the whole parsed document —
+   * declaration order of the block and the model does not matter — and
+   * emits `PSL_EXTENSION_TARGET_MODEL_MISSING_ATTRIBUTE` naming the block
+   * and the model when the attribute is absent. A parameter that is
+   * missing or does not resolve to a model is not this rule's concern
+   * (missing-parameter and unresolved-ref diagnostics own those cases).
+   */
+  readonly requiresModelAttribute?: {
+    readonly parameter: string;
+    readonly attribute: string;
+  };
 }
 
 export type AuthoringPslBlockDescriptorNamespace = {

@@ -45,6 +45,7 @@ import {
   type BlockSymbol,
   type CompositeTypeSymbol,
   type FieldSymbol,
+  findBlockDescriptor,
   keywordPslSpan,
   type ModelSymbol,
   type NamespaceSymbol,
@@ -313,6 +314,47 @@ function buildEntityTypesByDiscriminator(
   };
   walk(namespace);
   return result;
+}
+
+/**
+ * Enforces `AuthoringPslBlockDescriptor.requiresModelAttribute` over one
+ * scope (the top level or one namespace): every block whose descriptor
+ * declares the requirement must name a model that carries the required
+ * bare `@@` attribute. Runs on the parsed symbol table, so it is
+ * independent of block/model declaration order and of lowering order. A
+ * missing parameter or an unresolvable model is skipped — the
+ * missing-required-parameter and unresolved-ref diagnostics own those
+ * failure modes.
+ */
+function validateBlockModelAttributeRequirements(input: {
+  readonly scopes: readonly {
+    readonly models: Readonly<Record<string, ModelSymbol>>;
+    readonly blocks: Readonly<Record<string, BlockSymbol>>;
+  }[];
+  readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): void {
+  for (const scope of input.scopes) {
+    for (const blockSymbol of Object.values(scope.blocks)) {
+      const descriptor = findBlockDescriptor(input.pslBlockDescriptors, blockSymbol.keyword);
+      const requirement = descriptor?.requiresModelAttribute;
+      if (requirement === undefined) continue;
+      const captured = blockSymbol.block.parameters[requirement.parameter];
+      if (captured?.kind !== 'ref') continue;
+      const model = scope.models[captured.identifier];
+      if (model === undefined) continue;
+      if (model.attributes.some((attribute) => attribute.name === requirement.attribute)) {
+        continue;
+      }
+      input.diagnostics.push({
+        code: 'PSL_EXTENSION_TARGET_MODEL_MISSING_ATTRIBUTE',
+        message: `\`${blockSymbol.keyword}\` block "${blockSymbol.block.name}" targets model "${captured.identifier}", which does not declare \`@@${requirement.attribute}\`. Add \`@@${requirement.attribute}\` to model "${captured.identifier}".`,
+        sourceId: input.sourceId,
+        span: captured.span,
+      });
+    }
+  }
 }
 
 /**
@@ -1810,6 +1852,12 @@ export function interpretPslDocumentToSqlContract(
     targetId: input.target.targetId,
     sourceId,
     sourceFile,
+    diagnostics,
+  });
+  validateBlockModelAttributeRequirements({
+    scopes: [topLevel, ...namespaceSymbols],
+    pslBlockDescriptors: input.authoringContributions?.pslBlockDescriptors ?? {},
+    sourceId,
     diagnostics,
   });
   const models: ModelSymbol[] = [];
