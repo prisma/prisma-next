@@ -22,6 +22,11 @@ import {
   type ValueSetRef,
 } from '@prisma-next/contract/types';
 import { type CapabilityMatrix, mergeCapabilityMatrices } from '@prisma-next/contract-authoring';
+import type {
+  AuthoringEntityTypeDescriptor,
+  AuthoringEntityTypeNamespace,
+} from '@prisma-next/framework-components/authoring';
+import { isAuthoringEntityTypeDescriptor } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
@@ -44,6 +49,7 @@ import {
   toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
+import { deriveValueSetFromEntity } from '@prisma-next/sql-contract/value-set-derivation-hook';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
@@ -310,7 +316,94 @@ function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): S
       ids.add(model.namespaceId);
     }
   }
+  for (const id of Object.keys(definition.packEntities ?? {})) {
+    if (id.length > 0) {
+      ids.add(id);
+    }
+  }
   return ids;
+}
+
+/**
+ * Entry kinds the framework assembler itself manages (`table` from models,
+ * `valueSet` from `enums` and pack-entity value-set derivation). An
+ * author-declared pack entity claiming one of these would silently clobber
+ * or be clobbered by the managed slot, so it is rejected outright.
+ */
+const MANAGED_ENTRY_KINDS = new Set(['table', 'valueSet']);
+
+function assertNoManagedPackEntityKinds(
+  namespaceId: string,
+  packEntitiesForNs: Readonly<Record<string, unknown>> | undefined,
+): void {
+  if (packEntitiesForNs === undefined) return;
+  for (const kind of Object.keys(packEntitiesForNs)) {
+    if (MANAGED_ENTRY_KINDS.has(kind)) {
+      throw new Error(
+        `buildSqlContractFromDefinition: packEntities in namespace "${namespaceId}" declares entry kind "${kind}", which is managed by the framework (table/valueSet) and cannot be supplied via packEntities.`,
+      );
+    }
+  }
+}
+
+/**
+ * Walks the flat `entityTypes` namespace tree contributed by the target pack
+ * and every extension pack, indexing descriptors by their `discriminator` —
+ * the same string a pack entity's entries-map key (`entries.<kind>`) uses.
+ * Mirrors `contract-psl`'s `buildEntityTypesByDiscriminator`, recomposed here
+ * from the packs `ContractDefinition` already carries (`target` +
+ * `extensionPacks`) since the TS assembler has no single pre-merged
+ * `AuthoringContributions` input to read the way the PSL interpreter does.
+ */
+function collectEntityTypeDescriptorsByDiscriminator(
+  definition: ContractDefinition,
+): ReadonlyMap<string, AuthoringEntityTypeDescriptor> {
+  const result = new Map<string, AuthoringEntityTypeDescriptor>();
+  const walk = (namespace: AuthoringEntityTypeNamespace): void => {
+    for (const value of Object.values(namespace)) {
+      if (isAuthoringEntityTypeDescriptor(value)) {
+        result.set(value.discriminator, value);
+      } else {
+        walk(value);
+      }
+    }
+  };
+  const components = [definition.target, ...Object.values(definition.extensionPacks ?? {})];
+  for (const component of components) {
+    const entityTypes = component.authoring?.entityTypes;
+    if (entityTypes !== undefined) {
+      walk(entityTypes);
+    }
+  }
+  return result;
+}
+
+/**
+ * Derives value-sets for every pack entity declared in one namespace,
+ * reusing the same `SqlValueSetDerivingEntityTypeOutput.deriveValueSet` hook
+ * `contract-psl`'s `lowerExtensionBlocksForNamespace` folds into
+ * `entries.valueSet` on the PSL path — so a TS-attached entity (e.g. a
+ * native enum) gets its value-set the same way. Entity kinds with no
+ * registered descriptor, or whose descriptor output doesn't derive a
+ * value-set, contribute nothing.
+ */
+function derivePackEntityValueSets(
+  packEntitiesForNs: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
+  entityTypesByDiscriminator: ReadonlyMap<string, AuthoringEntityTypeDescriptor>,
+): Record<string, StorageValueSetInput> | undefined {
+  if (packEntitiesForNs === undefined) return undefined;
+  let result: Record<string, StorageValueSetInput> | undefined;
+  for (const [kind, entitiesByName] of Object.entries(packEntitiesForNs)) {
+    const descriptor = entityTypesByDiscriminator.get(kind);
+    if (descriptor === undefined) continue;
+    for (const [name, entity] of Object.entries(entitiesByName)) {
+      const derivedValueSet = deriveValueSetFromEntity(descriptor.output, entity);
+      if (derivedValueSet === undefined) continue;
+      result ??= {};
+      result[name] = derivedValueSet;
+    }
+  }
+  return result;
 }
 
 function ensureUnboundNamespaceSlot(
@@ -749,13 +842,27 @@ export function buildSqlContractFromDefinition(
   }
 
   const { createNamespace } = definition;
+  const entityTypesByDiscriminator = collectEntityTypeDescriptorsByDiscriminator(definition);
   const namespaces: SqlStorageInput['namespaces'] = Object.fromEntries(
     [...namespaceCoordinateIds].sort().map((id) => {
-      const valueSetEntries = storageValueSetsByNs[id];
+      const packEntitiesForNs = definition.packEntities?.[id];
+      assertNoManagedPackEntityKinds(id, packEntitiesForNs);
+
+      const enumValueSetEntries = storageValueSetsByNs[id];
+      const packValueSetEntries = derivePackEntityValueSets(
+        packEntitiesForNs,
+        entityTypesByDiscriminator,
+      );
+      const valueSetEntries =
+        enumValueSetEntries !== undefined || packValueSetEntries !== undefined
+          ? { ...enumValueSetEntries, ...packValueSetEntries }
+          : undefined;
+
       const nsInput: SqlNamespaceInput = {
         id,
         entries: {
           table: tablesByNamespace[id] ?? {},
+          ...packEntitiesForNs,
           ...(valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0
             ? { valueSet: valueSetEntries }
             : {}),

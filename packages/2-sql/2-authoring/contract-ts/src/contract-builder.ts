@@ -18,6 +18,7 @@ import {
   type ComposedAuthoringHelpers,
   createComposedAuthoringHelpers,
 } from './composed-authoring-helpers';
+import type { PackEntitiesInput } from './contract-definition';
 import {
   type ContractInput,
   type ContractModelBuilder,
@@ -76,6 +77,7 @@ type ContractDefinition<
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
   readonly enums?: Enums;
+  readonly packEntities?: PackEntitiesInput;
 };
 
 type ContractScaffold<
@@ -101,6 +103,7 @@ type ContractScaffold<
   readonly models?: never;
   readonly codecLookup?: CodecLookup;
   readonly enums?: Enums;
+  readonly packEntities?: PackEntitiesInput;
 };
 
 type ContractFactory<
@@ -114,6 +117,7 @@ type ContractFactory<
   readonly types?: Types;
   readonly models?: Models;
   readonly enums?: Enums;
+  readonly packEntities?: PackEntitiesInput;
 };
 
 function validateTargetPackRef(
@@ -322,6 +326,7 @@ type BoundDefinitionInput<
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
   readonly enums?: Record<string, EnumTypeHandle>;
+  readonly packEntities?: PackEntitiesInput;
 };
 
 // A bare `Record<string, EnumTypeHandle>` (no literal keys) is the widened
@@ -344,6 +349,43 @@ type WithFamilyTarget<
   F extends FamilyPackRef<string>,
   T extends TargetPackRef<'sql', string>,
 > = Input & { readonly family: F; readonly target: T };
+
+// Deep-merges packEntities authored on the scaffold definition with those
+// returned from the factory callback — three levels deep (namespace, kind,
+// name), unlike `enums`' flat shallow merge, since a factory-declared
+// namespace/kind must not silently drop a scaffold-declared sibling entry
+// under the same namespace or kind.
+function mergePackEntityNames(
+  a: Readonly<Record<string, unknown>> | undefined,
+  b: Readonly<Record<string, unknown>> | undefined,
+): Readonly<Record<string, unknown>> {
+  return { ...(a ?? {}), ...(b ?? {}) };
+}
+
+function mergePackEntityKinds(
+  a: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
+  b: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
+): Readonly<Record<string, Readonly<Record<string, unknown>>>> {
+  const kinds = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
+  const result: Record<string, Readonly<Record<string, unknown>>> = {};
+  for (const kind of kinds) {
+    result[kind] = mergePackEntityNames(a?.[kind], b?.[kind]);
+  }
+  return result;
+}
+
+function mergePackEntities(
+  a: PackEntitiesInput | undefined,
+  b: PackEntitiesInput | undefined,
+): PackEntitiesInput | undefined {
+  if (a === undefined && b === undefined) return undefined;
+  const namespaces = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
+  const result: Record<string, Readonly<Record<string, Readonly<Record<string, unknown>>>>> = {};
+  for (const namespaceId of namespaces) {
+    result[namespaceId] = mergePackEntityKinds(a?.[namespaceId], b?.[namespaceId]);
+  }
+  return result;
+}
 
 /**
  * Shared builder that assembles a SqlContract with pre-bound family and target.
@@ -390,6 +432,7 @@ export function buildBoundContract<
     readonly types?: Record<string, StorageTypeInstance>;
     readonly models?: Record<string, ModelLike>;
     readonly enums?: Record<string, EnumTypeHandle>;
+    readonly packEntities?: PackEntitiesInput;
   },
 >(
   family: F,
@@ -415,6 +458,7 @@ export function buildBoundContract(
         readonly types?: Record<string, StorageTypeInstance>;
         readonly models?: Record<string, ModelLike>;
         readonly enums?: Record<string, EnumTypeHandle>;
+        readonly packEntities?: PackEntitiesInput;
       })
     | undefined,
 ) {
@@ -429,11 +473,13 @@ export function buildBoundContract(
       }),
     );
     const mergedEnums = { ...(definition.enums ?? {}), ...built.enums };
+    const mergedPackEntities = mergePackEntities(definition.packEntities, built.packEntities);
     return buildContractFromDsl({
       ...full,
       ...ifDefined('types', built.types),
       ...ifDefined('models', built.models),
       ...ifDefined('enums', Object.keys(mergedEnums).length > 0 ? mergedEnums : undefined),
+      ...ifDefined('packEntities', mergedPackEntities),
     });
   }
 
