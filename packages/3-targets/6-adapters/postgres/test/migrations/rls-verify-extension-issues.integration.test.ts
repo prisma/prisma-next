@@ -7,7 +7,11 @@ import {
   computeContentHash,
   normalizePredicate,
 } from '@prisma-next/target-postgres/rls-canonicalize';
-import { PostgresRlsPolicy, PostgresSchema } from '@prisma-next/target-postgres/types';
+import {
+  PostgresRlsEnablement,
+  PostgresRlsPolicy,
+  PostgresSchema,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -63,6 +67,12 @@ function buildContractWithPolicy(): Contract<SqlStorage> {
         }),
       },
       policy: { [policy.name]: policy },
+      rls: {
+        [TABLE_NAME]: new PostgresRlsEnablement({
+          tableName: TABLE_NAME,
+          namespaceId: UNBOUND_NAMESPACE_ID,
+        }),
+      },
     },
   });
 

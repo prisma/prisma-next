@@ -19,8 +19,14 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresTableSource } from './ast/table-source';
 import { PG_TEXT_CODEC_ID } from './codec-ids';
-import { nativeEnumEntityKind, policyEntityKind, roleEntityKind } from './entity-kinds';
+import {
+  nativeEnumEntityKind,
+  policyEntityKind,
+  rlsEnablementEntityKind,
+  roleEntityKind,
+} from './entity-kinds';
 import type { PostgresNativeEnum } from './postgres-native-enum';
+import type { PostgresRlsEnablement } from './postgres-rls-enablement';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
 import { escapeLiteral } from './sql-utils';
@@ -30,6 +36,7 @@ export type PostgresContract = Contract<SqlStorage> & { readonly target: 'postgr
 export type PostgresNamespaceEntries = SqlNamespaceEntries & {
   readonly policy?: Readonly<Record<string, PostgresRlsPolicy>>;
   readonly role?: Readonly<Record<string, PostgresRole>>;
+  readonly rls?: Readonly<Record<string, PostgresRlsEnablement>>;
   readonly native_enum?: Readonly<Record<string, PostgresNativeEnum>>;
 };
 
@@ -72,7 +79,12 @@ export class PostgresSchema extends SqlNamespaceBase {
 
     const dispatched = hydrateNamespaceEntities(
       input.entries,
-      composeSqlEntityKinds([policyEntityKind, roleEntityKind, nativeEnumEntityKind]),
+      composeSqlEntityKinds([
+        policyEntityKind,
+        roleEntityKind,
+        rlsEnablementEntityKind,
+        nativeEnumEntityKind,
+      ]),
       'carry',
     );
 
@@ -108,7 +120,7 @@ export class PostgresSchema extends SqlNamespaceBase {
     this.entries = Object.freeze(
       blindCast<
         PostgresNamespaceEntries,
-        'composeSqlEntityKinds([policyEntityKind, roleEntityKind, nativeEnumEntityKind]) supplies table→StorageTable, valueSet→StorageValueSet, policy→PostgresRlsPolicy, role→PostgresRole, native_enum→PostgresNativeEnum descriptors'
+        'composeSqlEntityKinds([policyEntityKind, roleEntityKind, rlsEnablementEntityKind, nativeEnumEntityKind]) supplies table→StorageTable, valueSet→StorageValueSet, policy→PostgresRlsPolicy, role→PostgresRole, rls→PostgresRlsEnablement, native_enum→PostgresNativeEnum descriptors'
       >(entriesInput),
     );
     Object.defineProperty(this, 'kind', {
@@ -134,6 +146,10 @@ export class PostgresSchema extends SqlNamespaceBase {
 
   get role(): Readonly<Record<string, PostgresRole>> {
     return this.entries.role ?? Object.freeze({});
+  }
+
+  get rls(): Readonly<Record<string, PostgresRlsEnablement>> {
+    return this.entries.rls ?? Object.freeze({});
   }
 
   /**

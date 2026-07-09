@@ -1,4 +1,8 @@
 export {
+  PostgresRlsEnablement,
+  type PostgresRlsEnablementInput,
+} from '../core/postgres-rls-enablement';
+export {
   PostgresRlsPolicy,
   type PostgresRlsPolicyInput,
   type RlsPolicyOperation,

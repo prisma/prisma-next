@@ -21,6 +21,7 @@ import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+import { PostgresRlsEnablement } from '../../src/core/postgres-rls-enablement';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
@@ -79,6 +80,13 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
   for (const p of policies) {
     policyEntries[p.name] = p;
   }
+  const rlsEntries: Record<string, PostgresRlsEnablement> = {};
+  for (const p of policies) {
+    rlsEntries[p.tableName] = new PostgresRlsEnablement({
+      tableName: p.tableName,
+      namespaceId: p.namespaceId,
+    });
+  }
 
   const schema = new PostgresSchema({
     id: SCHEMA_NAME,
@@ -96,6 +104,7 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
         }),
       },
       policy: policyEntries,
+      rls: rlsEntries,
     },
   });
 

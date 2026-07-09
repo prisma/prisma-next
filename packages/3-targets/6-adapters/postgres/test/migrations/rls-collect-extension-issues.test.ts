@@ -9,6 +9,7 @@ import {
   PostgresDatabaseSchemaNode,
   PostgresNamespaceSchemaNode,
   PostgresPolicySchemaNode,
+  PostgresRlsEnablement,
   PostgresRlsPolicy,
   PostgresSchema,
   PostgresTableSchemaNode,
@@ -110,6 +111,12 @@ function buildContract(policies: readonly PostgresRlsPolicy[]): Contract<SqlStor
         }),
       },
       policy: policyEntries,
+      rls: {
+        [TABLE_NAME]: new PostgresRlsEnablement({
+          tableName: TABLE_NAME,
+          namespaceId: SCHEMA_NAME,
+        }),
+      },
     },
   });
   return {

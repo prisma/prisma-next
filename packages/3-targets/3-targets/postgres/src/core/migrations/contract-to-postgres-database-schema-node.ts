@@ -127,6 +127,12 @@ export function contractToPostgresDatabaseSchemaNode(
           `contract-to-postgres-database-schema-node: policy "${policyName}" references table "${tableName}" not present in namespace "${ddlSchema}"`,
         );
       }
+      if (!Object.hasOwn(ns.rls, tableName)) {
+        const policyPrefix = tablePolicies[0]?.prefix ?? '(unknown)';
+        throw new Error(
+          `contract-to-postgres-database-schema-node: policy "${policyPrefix}" targets table "${tableName}" in namespace "${ddlSchema}", which is not RLS-controlled. Mark the model with @@rls (entries.rls["${tableName}"]) or remove the policy.`,
+        );
+      }
     }
 
     namespaces[ddlSchema] = new PostgresNamespaceSchemaNode({
