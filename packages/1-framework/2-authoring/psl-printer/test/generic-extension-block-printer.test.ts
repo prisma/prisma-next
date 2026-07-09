@@ -410,6 +410,79 @@ describe('generic extension-block printer (P2)', () => {
     });
   });
 
+  // Variadic blocks (descriptor `parameters: {}` + `variadicParameters: true`,
+  // e.g. the Postgres `native_enum` block) carry their body as undeclared
+  // parameter keys in AST insertion order, plus `@@` block attributes. Both
+  // must render — a printer that walks only declared descriptor parameters
+  // emits an empty block and silently drops `@@map`.
+  describe('variadic block rendering (native_enum shape)', () => {
+    const variadicDescriptors = {
+      native_enum: {
+        kind: 'pslBlock' as const,
+        keyword: 'native_enum',
+        discriminator: 'native_enum',
+        name: { required: true },
+        parameters: {},
+        variadicParameters: true,
+      },
+    };
+
+    it('renders variadic value parameters in insertion order with a @@ block attribute', () => {
+      const block: PslExtensionBlock = {
+        kind: 'native_enum',
+        name: 'AalLevel',
+        parameters: {
+          aal1: valueParam('"aal1"'),
+          aal2: valueParam('"aal2"'),
+          aal3: valueParam('"aal3"'),
+        },
+        blockAttributes: [
+          {
+            name: 'map',
+            args: [{ kind: 'positional', value: '"aal_level"', span: STUB_SPAN }],
+            span: STUB_SPAN,
+          },
+        ],
+        span: STUB_SPAN,
+      };
+
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [makeNs([], [block])],
+        span: STUB_SPAN,
+      };
+
+      const output = printPslFromAst(ast, { pslBlockDescriptors: variadicDescriptors });
+
+      expect(output).toContain(
+        'native_enum AalLevel {\n  aal1 = "aal1"\n  aal2 = "aal2"\n  aal3 = "aal3"\n  @@map("aal_level")\n}',
+      );
+    });
+
+    it('renders a variadic block without block attributes', () => {
+      const block: PslExtensionBlock = {
+        kind: 'native_enum',
+        name: 'Status',
+        parameters: { draft: valueParam('"draft"'), done: valueParam('"done"') },
+        blockAttributes: [],
+        span: STUB_SPAN,
+      };
+
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [makeNs([], [block])],
+        span: STUB_SPAN,
+      };
+
+      const output = printPslFromAst(ast, { pslBlockDescriptors: variadicDescriptors });
+
+      expect(output).toContain('native_enum Status {\n  draft = "draft"\n  done = "done"\n}');
+      expect(output).not.toContain('@@');
+    });
+  });
+
   describe('block with unregistered discriminator', () => {
     it('throws naming the unrecognised discriminator', () => {
       const block: PslExtensionBlock = {
