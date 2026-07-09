@@ -1123,16 +1123,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const nativeEnumResult = await driver.query<{ typname: string }>(
-      `SELECT t.typname
+    const nativeEnumResult = await driver.query<{ typname: string; enumvalues: unknown }>(
+      `SELECT t.typname, array_agg(e.enumlabel ORDER BY e.enumsortorder) AS enumvalues
          FROM pg_catalog.pg_type t
          JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+         JOIN pg_catalog.pg_enum e ON e.enumtypid = t.oid
          WHERE t.typtype = 'e'
            AND n.nspname = $1
+         GROUP BY t.typname
          ORDER BY t.typname`,
       [schema],
     );
-    const nativeEnumTypeNames = nativeEnumResult.rows.map((r) => r.typname);
+    const nativeEnums = nativeEnumResult.rows.map((r) => ({
+      typeName: r.typname,
+      values: parsePgNameArray(r.enumvalues),
+    }));
+    const nativeEnumTypeNames = nativeEnums.map((e) => e.typeName);
     const policiesResult = await driver.query<{
       schemaname: string;
       tablename: string;
@@ -1186,6 +1192,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       schemaName: schema,
       tables,
       nativeEnumTypeNames,
+      nativeEnums,
     });
     return { namespace, pgVersion: await this.getPostgresVersion(driver) };
   }
