@@ -84,7 +84,7 @@ retains the original DoD order; AC2 is retired._
 
 ### Implement M1: Provider union + capability seam
 
-**Status:** ☐ Not started
+**Status:** ► In progress — slice 01 delivered, PR open (D1 `19113b122`, D2 `e08581e78`; complete on merge)
 
 _Outcomes_
 `ContractSourceProvider` is a `sourceFormat`-keyed union (`Psl…`/`TypeScript…`/`Opaque…`

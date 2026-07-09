@@ -39,16 +39,29 @@ returns `false` against every real config.
 
 ## Slice Definition of Done (beyond CI / reviewer / project-DoD)
 
-- [ ] SDoD1 — Guard unit tests (TC-1): psl provider with `interpret` → narrows true;
+- [x] SDoD1 — Guard unit tests (TC-1): psl provider with `interpret` → narrows true;
       `typescript` provider → false; opaque/unknown `sourceFormat` string → false;
-      `sourceFormat: 'psl'` without the method → false.
-- [ ] SDoD2 — Schema tests (TC-2): arktype admits unknown `sourceFormat` strings and a
-      provider object carrying an extra `interpret` key; existing config fixtures
-      (sql + mongo, contract-ts + contract-psl) validate unchanged.
-- [ ] SDoD3 — All in-repo consumers compile (TC-3); any consumer that matched
-      exhaustively on the closed enum treats unknown strings as opaque.
-- [ ] SDoD4 — `pnpm lint:deps` green with the new psl-parser → config edge (TC-17);
-      cast-ratchet count unchanged; zero new `blindCast`/`castAs`.
+      `sourceFormat: 'psl'` without the method → false. ✓ `e08581e78`
+      (`psl-parser/test/interpret.test.ts` 7-case matrix + `interpret.test-d.ts`;
+      guard invoked against plain-union-typed values — reviewer-verified).
+- [x] SDoD2 — Schema tests (TC-2): arktype admits unknown `sourceFormat` strings and a
+      provider object carrying an extra `interpret` key (same-reference `toBe` proof);
+      existing config fixtures validate unchanged. ✓ `19113b122`
+      (`config/test/config-validation.test.ts:569-624`).
+- [x] SDoD3 — All in-repo consumers compile (TC-3): zero consumer fallout — the
+      overlapping-union design absorbed every call site; comparison-only usage
+      verified on disk (`cli …/format.ts:44`, `language-server/schema-inputs.ts:19`).
+      ✓ workspace typecheck 143/143.
+- [x] SDoD4 — `pnpm lint:deps` green with the new psl-parser → config edge (TC-17);
+      cast-ratchet unchanged; zero new `blindCast`/`castAs`. ✓ both dispatches +
+      post-merge revalidation (1183 modules / 2680 edges).
+
+**Slice-close ritual (2026-07-09):** reviewer verdict SATISFIED across D1+D2, 4/4 SDoD
+PASS; `origin/main` merged (`2fe1f474e`) and full gates re-run green before push;
+grep gate — zero `projects/` references in long-lived files; manual QA:
+**N/A — no user-observable change** (pure type seam + a guard nothing calls yet; the
+guard returns `false` against every real config until slice 03 lands).
+Known-flaky observations recorded in `reviews/code-review.md § Orchestrator notes`.
 
 ## Edge cases (pre-investigated)
 
