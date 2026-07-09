@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { PrimaryKey } from '../src/ir/primary-key';
+import { relationalNodeGranularity } from '../src/ir/schema-node-kinds';
 import { SqlCheckConstraintIR } from '../src/ir/sql-check-constraint-ir';
 import { SqlColumnDefaultIR } from '../src/ir/sql-column-default-ir';
 import { SqlColumnIR } from '../src/ir/sql-column-ir';
@@ -87,21 +88,21 @@ describe('SqlSchemaIRNode discriminants', () => {
 });
 
 /**
- * `diffRole` is the declared verdict-classification discriminant the family's
- * post-diff filters key on (issue category + strict gating) — never a naming
- * convention over `nodeKind`. It lives on the prototype (a getter), so it is
- * absent from spreads, `Object.keys`, and JSON, keeping serialization and
- * `toEqual` against flat literals unchanged.
+ * A schema-IR node carries NO verdict-classification of its own — only its
+ * `nodeKind` identity. The family's `relationalNodeGranularity` map is the one
+ * place that turns a relational `nodeKind` into the framework-neutral subject
+ * granularity its diff issues carry; the node itself exposes no `diffRole` or
+ * `subjectGranularity` member.
  */
-describe('SqlSchemaIRNode diffRole', () => {
+describe('relationalNodeGranularity map (granularity is off the node)', () => {
   it.each([
     ['SqlSchemaIR', new SqlSchemaIR({ tables: {} }), 'structural'],
     [
       'SqlTableIR',
       new SqlTableIR({ name: 't', columns: {}, foreignKeys: [], uniques: [], indexes: [] }),
-      'table',
+      'entity',
     ],
-    ['SqlColumnIR', new SqlColumnIR({ name: 'id', nativeType: 'int4', nullable: false }), 'column'],
+    ['SqlColumnIR', new SqlColumnIR({ name: 'id', nativeType: 'int4', nullable: false }), 'field'],
     ['SqlColumnDefaultIR', new SqlColumnDefaultIR({ raw: '0' }), 'auxiliary'],
     ['PrimaryKey', new PrimaryKey({ columns: ['id'] }), 'auxiliary'],
     [
@@ -120,9 +121,9 @@ describe('SqlSchemaIRNode diffRole', () => {
       new SqlCheckConstraintIR({ name: 'chk', column: 'status', permittedValues: ['a'] }),
       'auxiliary',
     ],
-  ] as const)('%s declares diffRole %s, non-enumerable', (_label, node, expectedRole) => {
-    expect(node.diffRole).toBe(expectedRole);
-    expect(Object.keys(node)).not.toContain('diffRole');
-    expect(JSON.parse(JSON.stringify(node))).not.toHaveProperty('diffRole');
+  ] as const)('%s: nodeKind maps to granularity %s; node exposes no role member', (_label, node, expectedGranularity) => {
+    expect(relationalNodeGranularity(node.nodeKind)).toBe(expectedGranularity);
+    expect('diffRole' in node).toBe(false);
+    expect('subjectGranularity' in node).toBe(false);
   });
 });

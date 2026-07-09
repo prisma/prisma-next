@@ -1,7 +1,7 @@
 import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { SqlSchemaDiffResult } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
-import { resolveSemanticSatisfaction } from '@prisma-next/family-sql/diff';
+import { resolveSemanticSatisfaction, stampSubjectGranularity } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas } from '@prisma-next/framework-components/control';
@@ -13,7 +13,10 @@ import type { PostgresContract } from '../postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
 import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
-import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
+import {
+  postgresDiffSubjectGranularity,
+  type SqlSchemaDiffNode,
+} from '../schema-ir/schema-node-kinds';
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
 import { resolvePostgresNodeIssueControlPolicySubject } from './control-policy';
 
@@ -161,15 +164,14 @@ export function diffPostgresSchema(input: {
   const normalizedActual = normalizePostgresActualForDiff(expected, actual);
   const relationalOwned = ownedSchemaNames(expected);
   const structuralOwned = ownedSchemaNames(fullExpected);
-  const issues = diffSchemas(expected, normalizedActual).filter((issue) => {
+  const issues = stampSubjectGranularity(
+    diffSchemas(expected, normalizedActual),
+    postgresDiffSubjectGranularity,
+  ).filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;
-    const node = blindCast<
-      SqlSchemaIRNode | undefined,
-      'every node in a Postgres schema diff tree is a SqlSchemaIRNode; diffRole is its required discriminant'
-    >(issue.actual ?? issue.expected);
-    const owned = node?.diffRole === 'structural' ? structuralOwned : relationalOwned;
+    const owned = issue.subjectGranularity === 'structural' ? structuralOwned : relationalOwned;
     return owned.has(namespaceSegment);
   });
   const namespacePairs = Object.values(expected.namespaces).map((ns) => ({
@@ -265,12 +267,16 @@ export function buildPostgresPlanDiff(input: {
   const issues = blindCast<
     readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
     'both trees are PostgresDatabaseSchemaNodes, so every diff-issue node is a SqlSchemaDiffNode'
-  >(diffSchemas(expected, normalizedActual)).filter((issue) => {
+  >(
+    stampSubjectGranularity(
+      diffSchemas(expected, normalizedActual),
+      postgresDiffSubjectGranularity,
+    ),
+  ).filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;
-    const node = issue.actual ?? issue.expected;
-    const owned = node?.diffRole === 'structural' ? structuralOwned : relationalOwned;
+    const owned = issue.subjectGranularity === 'structural' ? structuralOwned : relationalOwned;
     return owned.has(namespaceSegment);
   });
   return { expected, actual: normalizedActual, issues };

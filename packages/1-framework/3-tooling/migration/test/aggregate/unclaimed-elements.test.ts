@@ -10,17 +10,9 @@ import {
   stripExtraFindings,
 } from '../../src/aggregate/unclaimed-elements';
 
-/**
- * Structural stand-in for a SQL schema-diff node: the strip reads `diffRole`
- * and `id` structurally off issue nodes, never importing family node classes.
- */
-function diffNode(id: string, diffRole: string): DiffableNode {
-  return {
-    id,
-    diffRole,
-    isEqualTo: () => true,
-    children: () => [],
-  } as never;
+/** A minimal diff node: the strip reads only the issue's stamped granularity + path. */
+function diffNode(id: string): DiffableNode {
+  return { id, isEqualTo: () => true, children: () => [] };
 }
 
 function extraTableIssue(name: string): SchemaDiffIssue {
@@ -28,7 +20,8 @@ function extraTableIssue(name: string): SchemaDiffIssue {
     path: ['database', 'public', name],
     reason: 'not-expected',
     message: `extra: ${name}`,
-    actual: diffNode(name, 'table'),
+    subjectGranularity: 'entity',
+    actual: diffNode(name),
   };
 }
 
@@ -37,7 +30,8 @@ function extraColumnIssueUnder(tableName: string, columnName: string): SchemaDif
     path: ['database', 'public', tableName, `column:${columnName}`],
     reason: 'not-expected',
     message: `extra column: ${columnName}`,
-    actual: diffNode(`column:${columnName}`, 'column'),
+    subjectGranularity: 'field',
+    actual: diffNode(`column:${columnName}`),
   };
 }
 
@@ -46,20 +40,18 @@ function extraPolicyIssue(tableName: string, policyName: string): SchemaDiffIssu
     path: ['database', 'public', tableName, policyName],
     reason: 'not-expected',
     message: `RLS policy '${policyName}' is present in the database but not in the contract`,
-    actual: {
-      ...(diffNode(policyName, 'structural') as object),
-      tableName,
-    } as never,
+    subjectGranularity: 'structural',
+    actual: diffNode(policyName),
   };
 }
 
-/** A Mongo-shape extra collection issue: no `diffRole`, path is the bare collection name. */
+/** A document-family extra-collection issue: no stamped granularity, path is the bare name. */
 function extraCollectionIssue(name: string): SchemaDiffIssue {
   return {
     path: [name],
     reason: 'not-expected',
     message: `Extra collection "${name}" exists in the database but not in the contract`,
-    actual: { id: name, isEqualTo: () => true, children: () => [] },
+    actual: diffNode(name),
   };
 }
 
@@ -116,7 +108,8 @@ describe('stripExtraFindings', () => {
       path: ['database', 'public', 'user', 'column:email'],
       reason: 'not-found',
       message: 'm',
-      expected: diffNode('column:email', 'column'),
+      subjectGranularity: 'field',
+      expected: diffNode('column:email'),
     };
     const result = makeResult({
       ok: false,
@@ -218,7 +211,8 @@ describe('collectExtraElementCoordinates', () => {
           path: ['database', 'tenant_b', 'orphan_table'],
           reason: 'not-expected',
           message: 'extra: orphan_table',
-          actual: diffNode('orphan_table', 'table'),
+          subjectGranularity: 'entity',
+          actual: diffNode('orphan_table'),
         },
       ],
     });

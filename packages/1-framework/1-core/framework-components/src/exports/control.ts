@@ -100,7 +100,11 @@ export {
   extractComponentIds,
   extractQueryOperationTypeImports,
 } from '../control/control-stack';
-export type { DiffableNode, SchemaDiffIssue } from '../control/schema-diff';
+export type {
+  DiffableNode,
+  SchemaDiffIssue,
+  SchemaSubjectGranularity,
+} from '../control/schema-diff';
 export { diffSchemas, SchemaDiff } from '../control/schema-diff';
 export type {
   SchemaVerifier,

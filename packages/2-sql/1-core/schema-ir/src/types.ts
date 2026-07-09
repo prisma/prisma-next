@@ -10,7 +10,7 @@
  */
 
 export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
-export { RelationalSchemaNodeKind } from './ir/schema-node-kinds';
+export { RelationalSchemaNodeKind, relationalNodeGranularity } from './ir/schema-node-kinds';
 export {
   SqlCheckConstraintIR,
   type SqlCheckConstraintIRInput,
@@ -31,7 +31,7 @@ export {
 } from './ir/sql-foreign-key-ir';
 export { SqlIndexIR, type SqlIndexIRInput } from './ir/sql-index-ir';
 export { SqlSchemaIR, type SqlSchemaIRInput } from './ir/sql-schema-ir';
-export { assertNode, type SqlSchemaDiffRole, SqlSchemaIRNode } from './ir/sql-schema-ir-node';
+export { assertNode, SqlSchemaIRNode } from './ir/sql-schema-ir-node';
 export { SqlTableIR, type SqlTableIRInput } from './ir/sql-table-ir';
 export { SqlUniqueIR, type SqlUniqueIRInput } from './ir/sql-unique-ir';
 

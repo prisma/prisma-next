@@ -8,13 +8,12 @@ import {
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,
-  type SqlSchemaDiffRole,
   SqlSchemaIRNode,
   type SqlTableIRInput,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import type { PostgresPolicySchemaNode } from './postgres-policy-schema-node';
-import { PostgresSchemaNodeKind, postgresNodeRole } from './schema-node-kinds';
+import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
 export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
   readonly policies?: readonly PostgresPolicySchemaNode[];
@@ -41,9 +40,6 @@ export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
 export class PostgresTableSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.table;
 
-  override get diffRole(): SqlSchemaDiffRole {
-    return postgresNodeRole(this.nodeKind);
-  }
   readonly name: string;
   readonly columns: Readonly<Record<string, SqlColumnIR>>;
   readonly foreignKeys: ReadonlyArray<SqlForeignKeyIR>;

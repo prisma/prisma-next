@@ -1,7 +1,4 @@
 import { IRNodeBase } from '@prisma-next/framework-components/ir';
-import { relationalNodeRole, type SqlSchemaDiffRole } from './schema-node-kinds';
-
-export type { SqlSchemaDiffRole } from './schema-node-kinds';
 
 /**
  * SQL Schema IR node base. Carries the family-level
@@ -36,20 +33,6 @@ export abstract class SqlSchemaIRNode extends IRNodeBase {
    * object.
    */
   abstract readonly nodeKind: string;
-
-  /**
-   * {@link SqlSchemaDiffRole}, resolved from `nodeKind` via the one real map
-   * in `relationalNodeRole` — verdict logic dispatches on this, never on the
-   * `nodeKind` spelling and never via a hand-written per-class return.
-   * Implemented as a getter so it stays off the instance (invisible to
-   * spreads, `Object.keys`, and JSON), unlike `nodeKind`. Target-specific
-   * concretions whose `nodeKind` is outside the relational vocabulary (e.g.
-   * Postgres's namespace/table/policy/role) override this with their own
-   * map lookup.
-   */
-  get diffRole(): SqlSchemaDiffRole {
-    return relationalNodeRole(this.nodeKind);
-  }
 
   constructor() {
     super();

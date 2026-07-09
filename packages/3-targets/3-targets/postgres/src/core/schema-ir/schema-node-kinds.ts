@@ -1,5 +1,8 @@
-import type { DiffableNode } from '@prisma-next/framework-components/control';
-import type { SqlSchemaDiffRole, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import type {
+  DiffableNode,
+  SchemaSubjectGranularity,
+} from '@prisma-next/framework-components/control';
+import { relationalNodeGranularity, type SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 
 /**
  * A Postgres schema-diff-tree node: a `SqlSchemaIRNode` that also implements
@@ -28,20 +31,42 @@ export type PostgresSchemaNodeKind =
   (typeof PostgresSchemaNodeKind)[keyof typeof PostgresSchemaNodeKind];
 
 /**
- * The one real map from a Postgres-specific `nodeKind` to its
- * {@link SqlSchemaDiffRole} — each `Postgres*SchemaNode`'s `diffRole` getter
- * dispatches on `nodeKind` equality against this map (never a
- * `nodeKind`-suffix string match).
+ * The one real map from a Postgres-specific `nodeKind` to the
+ * framework-neutral {@link SchemaSubjectGranularity} its diff issues carry —
+ * resolution is by `nodeKind` equality against this map, never a
+ * `nodeKind`-suffix string match and never anything stamped on the node.
  */
-const POSTGRES_NODE_ROLES: Readonly<Record<PostgresSchemaNodeKind, SqlSchemaDiffRole>> = {
+const POSTGRES_NODE_GRANULARITY: Readonly<
+  Record<PostgresSchemaNodeKind, SchemaSubjectGranularity>
+> = {
   [PostgresSchemaNodeKind.database]: 'structural',
   [PostgresSchemaNodeKind.namespace]: 'namespace',
-  [PostgresSchemaNodeKind.table]: 'table',
+  [PostgresSchemaNodeKind.table]: 'entity',
   [PostgresSchemaNodeKind.policy]: 'structural',
   [PostgresSchemaNodeKind.role]: 'structural',
 };
 
-/** Looks up the declared role for a Postgres-specific `nodeKind`. */
-export function postgresNodeRole(nodeKind: PostgresSchemaNodeKind): SqlSchemaDiffRole {
-  return POSTGRES_NODE_ROLES[nodeKind];
+function isPostgresSchemaNodeKind(nodeKind: string): nodeKind is PostgresSchemaNodeKind {
+  return Object.hasOwn(POSTGRES_NODE_GRANULARITY, nodeKind);
+}
+
+/** Looks up the subject granularity for a Postgres-specific `nodeKind`. */
+export function postgresNodeGranularity(
+  nodeKind: PostgresSchemaNodeKind,
+): SchemaSubjectGranularity {
+  return POSTGRES_NODE_GRANULARITY[nodeKind];
+}
+
+/**
+ * The subject granularity for any node kind that appears in a Postgres diff
+ * tree — the tree mixes Postgres-specific kinds (database/namespace/table/
+ * policy/role) with the relational leaf kinds (columns, constraints, indexes,
+ * …), so this dispatches to whichever family/target map owns the kind. The
+ * target's differ stamps this onto each issue; the family verdict and the
+ * framework aggregate read the stamped granularity, never the node.
+ */
+export function postgresDiffSubjectGranularity(nodeKind: string): SchemaSubjectGranularity {
+  return isPostgresSchemaNodeKind(nodeKind)
+    ? postgresNodeGranularity(nodeKind)
+    : relationalNodeGranularity(nodeKind);
 }

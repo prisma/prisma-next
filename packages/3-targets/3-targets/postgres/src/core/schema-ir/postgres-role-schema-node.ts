@@ -1,12 +1,8 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import {
-  assertNode,
-  type SqlSchemaDiffRole,
-  SqlSchemaIRNode,
-} from '@prisma-next/sql-schema-ir/types';
+import { assertNode, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
-import { PostgresSchemaNodeKind, postgresNodeRole } from './schema-node-kinds';
+import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
 export interface PostgresRoleSchemaNodeInput {
   readonly name: string;
@@ -30,9 +26,6 @@ export interface PostgresRoleSchemaNodeInput {
 export class PostgresRoleSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.role;
 
-  override get diffRole(): SqlSchemaDiffRole {
-    return postgresNodeRole(this.nodeKind);
-  }
   readonly name: string;
   readonly namespaceId: string;
 

@@ -18,14 +18,23 @@ import type { SchemaDiffIssue } from '@prisma-next/framework-components/control'
 import { diffSchemas } from '@prisma-next/framework-components/control';
 import { entityAt } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import {
+  relationalNodeGranularity,
+  SqlColumnIR,
+  SqlSchemaIR,
+  SqlTableIR,
+} from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { extractCodecControlHooks } from '../src/core/assembly';
 import {
   neutralizeFlatExpectedFkSchemas,
   normalizeFlatActualForDiff,
 } from '../src/core/diff/diff-tree-normalization';
-import { computeSqlDiffVerdict, computeStorageTypeVerdict } from '../src/core/diff/schema-verify';
+import {
+  computeSqlDiffVerdict,
+  computeStorageTypeVerdict,
+  stampSubjectGranularity,
+} from '../src/core/diff/schema-verify';
 import type { DefaultNormalizer, NativeTypeNormalizer } from '../src/core/diff/sql-schema-diff';
 import { contractToSchemaIR } from '../src/core/migrations/contract-to-schema-ir';
 import {
@@ -126,7 +135,7 @@ function runVerdict(options: {
     contractToSchemaIR(options.contract, { annotationNamespace: 'pg' }),
   );
   const actual = normalizeFlatActualForDiff(expected, stampLikeIntrospection(options.schema));
-  const issues = diffSchemas(expected, actual);
+  const issues = stampSubjectGranularity(diffSchemas(expected, actual), relationalNodeGranularity);
   const diffVerdict = computeSqlDiffVerdict({
     issues,
     resolveControlPolicy: (issue) => resolveControlPolicy(issue, options.contract),
@@ -772,9 +781,10 @@ describe('differ verdict — check constraints', () => {
         },
       },
     });
-    const liveOnlyCheckIssues = diffSchemas(expectedNoChecks, actualDrift).filter((i) =>
-      i.path.includes('check:post_status_check'),
-    );
+    const liveOnlyCheckIssues = stampSubjectGranularity(
+      diffSchemas(expectedNoChecks, actualDrift),
+      relationalNodeGranularity,
+    ).filter((i) => i.path.includes('check:post_status_check'));
     expect(liveOnlyCheckIssues[0]?.reason).toBe('not-expected');
     const strictVerdict = computeSqlDiffVerdict({
       issues: liveOnlyCheckIssues,

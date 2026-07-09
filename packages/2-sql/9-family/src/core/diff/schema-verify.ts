@@ -18,6 +18,7 @@ import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   SchemaDiffIssue,
+  SchemaSubjectGranularity,
   VerifierIssueCategory,
   VerifierOutcome,
   VerifyDatabaseSchemaResult,
@@ -33,7 +34,7 @@ import type { CodecControlHooks } from '../migrations/types';
 import { verifierDisposition } from './verifier-disposition';
 
 // ============================================================================
-// Issue classification — declared node role + reason → target-neutral category
+// Subject-granularity stamping — nodeKind → framework-neutral granularity
 // ============================================================================
 
 function issueNode(issue: SchemaDiffIssue): SqlSchemaIRNode | undefined {
@@ -41,32 +42,57 @@ function issueNode(issue: SchemaDiffIssue): SqlSchemaIRNode | undefined {
   if (node === undefined) return undefined;
   return blindCast<
     SqlSchemaIRNode,
-    'every node in a SQL schema diff tree is a SqlSchemaIRNode; diffRole/nodeKind are its required discriminants'
+    'every node in a SQL schema diff tree is a SqlSchemaIRNode; nodeKind is its identity'
   >(node);
 }
 
 /**
+ * Stamps each issue's framework-neutral {@link SchemaSubjectGranularity} onto
+ * it, resolved from the issue's node's `nodeKind` via the target-provided
+ * `granularityOf` map. Called by the target's differ once it has produced the
+ * raw issues — the node carries only its `nodeKind` identity, never a
+ * classification, so the granularity every downstream consumer reads (the
+ * family verdict here, the framework aggregate's unclaimed-elements sweep)
+ * lives on the issue, resolved by the family/target that owns the node
+ * vocabulary. An issue with no node is passed through unstamped.
+ */
+export function stampSubjectGranularity(
+  issues: readonly SchemaDiffIssue[],
+  granularityOf: (nodeKind: string) => SchemaSubjectGranularity,
+): readonly SchemaDiffIssue[] {
+  return issues.map((issue) => {
+    const node = issueNode(issue);
+    if (node === undefined) return issue;
+    return { ...issue, subjectGranularity: granularityOf(node.nodeKind) };
+  });
+}
+
+// ============================================================================
+// Issue classification — subject granularity + reason → target-neutral category
+// ============================================================================
+
+/**
  * Re-keys the legacy `classifySqlVerifierIssueKind` category mapping on the
- * diff node's declared `diffRole` + the issue reason. The vocabulary maps
- * one-to-one: an undeclared live table or namespace is
- * `extraTopLevelObject`, an undeclared live column `extraNestedElement`,
+ * issue's stamped {@link SchemaSubjectGranularity} + the issue reason. The
+ * vocabulary maps one-to-one: an undeclared live entity or namespace is
+ * `extraTopLevelObject`, an undeclared live field `extraNestedElement`,
  * undeclared auxiliaries (constraints, indexes, defaults) and structural
  * leaves (policies) `extraAuxiliary`; a value-set drift on a check node is
  * `valueDrift`; every other paired divergence is `declaredIncompatible`;
- * anything the database lacks is `declaredMissing`. `diffRole` is declared
- * per node class, so target and extension node kinds classify without the
- * family importing them.
+ * anything the database lacks is `declaredMissing`. The granularity is
+ * stamped by the target's differ, so target and extension node kinds
+ * classify without the family importing them.
  */
 export function classifySqlDiffIssue(issue: SchemaDiffIssue): VerifierIssueCategory {
   if (issue.reason === 'not-found') {
     return 'declaredMissing';
   }
   if (issue.reason === 'not-expected') {
-    const role = issueNode(issue)?.diffRole;
-    if (role === 'table' || role === 'namespace') {
+    const granularity = issue.subjectGranularity;
+    if (granularity === 'entity' || granularity === 'namespace') {
       return 'extraTopLevelObject';
     }
-    if (role === 'column') {
+    if (granularity === 'field') {
       return 'extraNestedElement';
     }
     return 'extraAuxiliary';
@@ -79,14 +105,19 @@ export function classifySqlDiffIssue(issue: SchemaDiffIssue): VerifierIssueCateg
 
 /**
  * Whether a `not-expected` issue is a strict-mode-only finding. The legacy
- * walk detected every relational extra (namespaces, tables, columns, and
+ * walk detected every relational extra (namespaces, entities, fields, and
  * their auxiliaries) only under `--strict`; the structural diff (roots, RLS
  * policies, roles) was never strict-gated — its extras fail in both modes.
- * Keyed on the node's declared `diffRole`.
+ * Keyed on the issue's stamped granularity.
  */
 function isStrictOnlyExtra(issue: SchemaDiffIssue): boolean {
-  const role = issueNode(issue)?.diffRole;
-  return role === 'namespace' || role === 'table' || role === 'column' || role === 'auxiliary';
+  const granularity = issue.subjectGranularity;
+  return (
+    granularity === 'namespace' ||
+    granularity === 'entity' ||
+    granularity === 'field' ||
+    granularity === 'auxiliary'
+  );
 }
 
 // ============================================================================
