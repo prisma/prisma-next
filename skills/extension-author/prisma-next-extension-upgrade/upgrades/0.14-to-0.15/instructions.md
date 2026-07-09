@@ -209,6 +209,49 @@ changes:
         - "verifyType:"
         - "verifyType("
       anyMatch: true
+  - id: policy-target-models-require-rls-attribute
+    summary: |
+      If your extension's contract space authors `policy_select` blocks (PSL), each block's
+      `target` model must now declare `@@rls`; `contract emit` / `build:contract-space` fails
+      with `PSL_EXTENSION_TARGET_MODEL_MISSING_ATTRIBUTE` otherwise. Add `@@rls` to the
+      policy-bearing models and re-emit; the contract gains an `rls` marker entity
+      (`entries.rls[tableName]`) and a new storage hash.
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "policy_select"
+      anyMatch: true
+  - id: postgres-table-schema-node-rls-enabled-required
+    summary: |
+      `PostgresTableSchemaNodeInput.rlsEnabled` (from `@prisma-next/target-postgres/types`) is
+      now a required boolean, and `isEqualTo` compares it alongside the table name. Every
+      `new PostgresTableSchemaNode({ ... })` construction in your extension (planner tests,
+      diff-tree fixtures, tooling) must supply it explicitly - `false` for a table that is not
+      RLS-controlled. The expected side derives the value from the contract's `entries.rls`
+      marker; the actual side from `pg_class.relrowsecurity` at introspection.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "new PostgresTableSchemaNode("
+      anyMatch: true
+  - id: authoring-contributions-model-attributes-slot
+    summary: |
+      `AuthoringContributions` gains a `modelAttributes` slot and the assembled control-stack
+      shape (`AssembledAuthoringContributions`) is now five fields - code that constructs the
+      assembled shape literally (e.g. a stubbed `ContractSourceContext.authoringContributions`
+      in tests) must add `modelAttributes: {}`. New SPI for pack authors: a target/extension
+      pack can contribute declarative `@@` model attributes via
+      `AuthoringContributions.modelAttributes` (an `AuthoringModelAttributeDescriptor` carries
+      the bare attribute name, an ADR-231 `modelAttribute()` spec, and a lowering that files an
+      entity into the namespace's `entries[attribute][key]`), and a PSL block descriptor can
+      declare `requiresModelAttribute: { parameter, attribute }` to demand that the model
+      named by a ref parameter carries a bare `@@` attribute.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "AssembledAuthoringContributions"
+        - "authoringContributions: {"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
