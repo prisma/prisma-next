@@ -34,7 +34,7 @@ namespace public {
 - **Diff:** table `isEqualTo` compares `rlsEnabled` — the first table-attribute comparison (today it is identity-only, `postgres-table-schema-node.ts:95-97`). A `not-equal` table issue plans `EnableRowLevelSecurityCall` (expected `true`) or a **new `DisableRowLevelSecurityCall`** (expected `false`). Disable is classed destructive — it opens row access, so it requires the destructive allowance like `dropRlsPolicy`; enable stays additive.
 - **The imperative path dies:** `planPostgresSchemaDiff`'s enable-on-first-new-policy (`seenEnableTables`, `planner.ts:348-367`) is deleted. This fixes today's gap where a table with in-sync policies but RLS off is never re-enabled (project DoD: "policies declared with RLS off → `ENABLE`").
 - **Fail-closed semantics fall out of the model:** removing the last policy on a marked table changes nothing about enablement (expected `true`, actual `true` → no issue; deny-all). `DISABLE` plans only when the marker is removed. No special cases.
-- **Verify:** enablement drift is a table `not-equal` issue → `declaredIncompatible` (`schema-verify.ts:101-121` fallthrough), graded per the table's control policy by the existing disposition — managed fails, external suppresses. No verify plumbing changes.
+- **Verify:** enablement drift is a table `not-equal` issue → `declaredIncompatible` (`schema-verify.ts:101-121` fallthrough), graded per the table's control policy by the existing disposition. **Amended during W5 (spec was wrong, code follows the framework):** under `external` the documented disposition suppresses only extras and value drift; declared-shape incompatibilities fail — the same verdict external *column* drift gets. So external enablement drift and a declared-missing policy fail verify (the plan side still never touches an external table). An external table that genuinely runs RLS declares `@@rls` — the marker is part of its declared shape. No verify plumbing changes.
 
 ### D3 — Policy rename plans as `ALTER POLICY … RENAME TO`
 
@@ -46,7 +46,7 @@ namespace public {
 
 ### D4 — Managed/external grading, proven per op
 
-The machinery already exists (`@@control` → `StorageTable.control`; `partitionCallsByControlPolicy` on the RLS call list, `planner.ts:278-287`; per-issue resolution in verify). This slice proves and completes the RLS behaviors: on an **external** table no enable/disable/create/drop/rename op is ever emitted and verify suppresses RLS drift; on a **managed** table the contract owns the full policy set and the enablement bit (extras dropped under the destructive allowance, drift fails verify). The rename call resolves its control-policy subject via the owning table like create/drop.
+The machinery already exists (`@@control` → `StorageTable.control`; `partitionCallsByControlPolicy` on the RLS call list, `planner.ts:278-287`; per-issue resolution in verify). This slice proves and completes the RLS behaviors: on an **external** table no enable/disable/create/drop/rename op is ever emitted, and verify grades RLS drift exactly as it grades relational drift under `external` (extras suppressed; declared-shape incompatibilities fail — amended during W5, see D2); on a **managed** table the contract owns the full policy set and the enablement bit (extras dropped under the destructive allowance, drift fails verify). The rename call resolves its control-policy subject via the owning table like create/drop.
 
 ## Behaviour contract
 
@@ -76,7 +76,7 @@ New Postgres entity kind (`rls` marker) in namespace `entries` — serialized, r
 
 - **Table with policies in sync but RLS off** re-enables under the attribute diff — today's imperative path misses it (`planner.ts:336-387`); pin it.
 - **Multiple same-hash policies on one table** during rename pairing — deterministic sorted-name pairing, leftovers create/drop (D3).
-- **External table with RLS enabled and no marker** — expected `false` vs actual `true` is a real issue, suppressed by disposition; must not plan a `DISABLE`.
+- **External table with RLS enabled and no marker** — expected `false` vs actual `true` is a real issue; never plans a `DISABLE`, and per the amended D2 it fails verify like any external declared-shape drift — the fix is declaring `@@rls` on the external model.
 - **Marker on a model with zero policies** is legal and plans `ENABLE` (deny-all is the point of fail-closed).
 - **Existing example migration chains:** adding `@@rls` changes each example's current `contract.json` (new entity) but not historical migration snapshots; live DB state already has RLS on from slice-1 ops, so post-apply verify stays clean with no new migration. `fixtures:check` must be green after regen.
 
