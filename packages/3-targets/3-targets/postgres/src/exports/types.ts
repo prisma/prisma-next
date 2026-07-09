@@ -1,3 +1,4 @@
+export { PostgresNativeEnum, type PostgresNativeEnumInput } from '../core/postgres-native-enum';
 export {
   PostgresRlsEnablement,
   type PostgresRlsEnablementInput,

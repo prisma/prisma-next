@@ -972,12 +972,18 @@ describe('compileSelect MTI JOINs', () => {
       'severity',
       'project_id',
       'parent_id',
+      'assignee_id',
     ]);
     const featuresMtiProjection = [
       ProjectionItem.of(
         'features__priority',
         ColumnRef.of('features', 'priority'),
         codecRefForColumn(contract, 'features', 'priority'),
+      ),
+      ProjectionItem.of(
+        'features__assignee_id',
+        ColumnRef.of('features', 'assignee_id'),
+        codecRefForColumn(contract, 'features', 'assignee_id'),
       ),
     ];
 
@@ -1003,12 +1009,18 @@ describe('compileSelect MTI JOINs', () => {
       'severity',
       'project_id',
       'parent_id',
+      'assignee_id',
     ]);
     const featuresMtiProjection = [
       ProjectionItem.of(
         'features__priority',
         ColumnRef.of('features', 'priority'),
         codecRefForColumn(contract, 'features', 'priority'),
+      ),
+      ProjectionItem.of(
+        'features__assignee_id',
+        ColumnRef.of('features', 'assignee_id'),
+        codecRefForColumn(contract, 'features', 'assignee_id'),
       ),
     ];
 
@@ -1034,6 +1046,7 @@ describe('compileSelect MTI JOINs', () => {
       'severity',
       'project_id',
       'parent_id',
+      'assignee_id',
     ]);
 
     const plan = compileSelect(contract, 'public', 'tasks', state, 'Task');

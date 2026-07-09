@@ -444,9 +444,10 @@ export type ModelAccessor<
 
 /**
  * The predicate accessor for a collection narrowed to a variant. When a real
- * variant is selected its (possibly MTI) fields are merged onto the base
- * accessor so `t.variant('Feature').where(x => x.priority…)` type-checks; with
- * no variant the accessor is the plain base `ModelAccessor` and is unchanged.
+ * variant is selected its (possibly MTI) fields and relations are merged onto
+ * the base accessor so `t.variant('Feature').where(x => x.priority…)` and
+ * `t.variant('Feature').where(x => x.assignee.some(…))` type-check; with no
+ * variant the accessor is the plain base `ModelAccessor` and is unchanged.
  */
 export type VariantAwareModelAccessor<
   TContract extends Contract<SqlStorage>,
@@ -457,13 +458,8 @@ export type VariantAwareModelAccessor<
   ? VariantName extends VariantNames<TContract, ModelName, NsId>
     ? ScalarModelAccessor<TContract, ModelName, NsId> &
         ScalarModelAccessor<TContract, VariantName, NsId> &
-        // Relations are surfaced from the base model only, not the variant.
-        // A variant model may declare its own relations in the contract, but
-        // the runtime `createModelAccessor` resolves relations against the
-        // base `modelName`, so surfacing variant relations here would type a
-        // predicate the runtime can't honour. Variant-relation predicates are
-        // therefore deliberately not exposed on the variant-narrowed accessor.
-        RelationModelAccessor<TContract, ModelName>
+        RelationModelAccessor<TContract, ModelName> &
+        RelationModelAccessor<TContract, VariantName>
     : ModelAccessor<TContract, ModelName, NsId>
   : ModelAccessor<TContract, ModelName, NsId>;
 

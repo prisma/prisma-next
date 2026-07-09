@@ -309,7 +309,10 @@ export function isPostgresSchema(ns: unknown): ns is PostgresSchema {
  * The factory has no per-call state — every named id deterministically
  * maps to a distinct schema instance — so callers can pass it through
  * by reference and trust the resulting `SqlStorage.namespaces` map to
- * be value-stable for a given input set.
+ * be value-stable for a given input set. Native-enum column type names are
+ * schema-qualified earlier, at column construction, via the target's
+ * `authoring.qualifyColumnType` hook (`postgresQualifyColumnType`), so this
+ * factory just materialises the namespace from already-qualified entries.
  */
 export function postgresCreateNamespace(input: SqlNamespaceInput): PostgresSchema {
   const schemaInput: PostgresSchemaInput = {

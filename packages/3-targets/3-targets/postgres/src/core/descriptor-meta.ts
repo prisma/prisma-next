@@ -6,6 +6,7 @@ import {
   postgresAuthoringPslBlockDescriptors,
   postgresAuthoringTypes,
 } from './authoring';
+import { postgresQualifyColumnType } from './codecs';
 import { postgresTargetDescriptorMetaRuntime } from './descriptor-meta-runtime';
 import { DEFAULT_NAMESPACE_ID } from './namespace-ids';
 import { postgresCreateNamespace } from './postgres-schema';
@@ -20,6 +21,7 @@ const postgresTargetDescriptorMetaBase = {
     pslBlockDescriptors: postgresAuthoringPslBlockDescriptors,
     modelAttributes: postgresAuthoringModelAttributes,
     createNamespace: postgresCreateNamespace,
+    qualifyColumnType: postgresQualifyColumnType,
   },
 } as const;
 
