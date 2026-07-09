@@ -1,14 +1,21 @@
 # Slice: sql-default
 
-_(In-project slice. Parent: `projects/typed-attribute-parsers/`. Split out of the `sql-attributes` slice mid-flight — see that slice's Open Question 1. Outcome it contributes: `@default` becomes spec-driven, completing "every SQL attribute validates its arguments through the kit".)_
+_(In-project slice. Parent: `projects/typed-attribute-parsers/`. Split out of the `sql-attributes` slice mid-flight — see that slice's Open Question 1. Outcome it contributes: `@default` becomes spec-driven on **both** its lowering paths, completing "every SQL attribute validates its arguments through the kit".)_
 
 ## At a glance
 
-Migrate the SQL `@default` attribute off its hand-written string parsers (`parseDefaultLiteralValue`, `parseDefaultFunctionCall`, `parseListDefaultExpression`) onto a declarative `AttributeSpec`, growing the kit with the pieces `@default` needs — a scalar-literal leaf and a registry-parameterised `funcCall` leaf. `@default` is the long pole of the SQL migration: it is the only SQL attribute whose value is a *choice* of literal / array-literal / function-call, and it hands function calls to the existing `ControlMutationDefaultRegistry`.
+Migrate the SQL `@default` attribute off its hand-written string parsers onto declarative `AttributeSpec`s. `@default` is the long pole of the SQL migration and has **two** lowering paths, selected by field type:
+
+- **Non-enum fields** (`lowerDefaultForField`, `psl-column-resolution.ts`) — the value is a scalar literal, an array literal, or a function call, parsed today by `parseDefaultLiteralValue` / `parseListDefaultExpression` / `parseDefaultFunctionCall`.
+- **Enum-typed fields** (`lowerEnumDefaultForField`, `psl-field-resolution.ts`) — the value is a bare enum-member identifier (`@default(ADMIN)`), parsed today by inline regex checks.
+
+Both migrate in this slice.
 
 ## Chosen design
 
-The `@default` value is one positional argument that is exactly one of three argument shapes. Model it as a `oneOf` whose arms produce a **tagged** result so the interpreter can branch without re-inspecting the AST:
+Two specs, one per path, both named `'default'`; the caller already branches on the field's `enumHandle` (`psl-field-resolution.ts` ~line 470) and picks the matching spec. **Only argument *syntax* moves to specs; every *semantic* rule stays in the interpreter.**
+
+**Non-enum spec** — the value is one of three shapes, distinguished by the interpreter via the `oneOf` output's runtime shape:
 
 ```ts
 fieldAttribute('default', {
@@ -16,64 +23,74 @@ fieldAttribute('default', {
     {
       key: 'value',
       type: oneOf(
-        scalarLiteral(),          // → { kind: 'literal', value: string | number | boolean }
-        list(scalarLiteral()),    // → (string | number | boolean)[]  (array-literal default)
-        funcCall(),               // → { kind: 'call', call: ParsedDefaultFunctionCall }
+        scalarLiteral(),          // → string | number | boolean (a literal default)
+        list(scalarLiteral()),    // → (string | number | boolean)[] (an array-literal default)
+        funcCall(),               // → ParsedDefaultFunctionCall (a function default)
       ),
     },
   ],
 })
 ```
 
-**Only argument *syntax* moves to the spec.** Every *semantic* rule stays in `lowerDefaultForField` (`psl-column-resolution.ts`): the list-field-requires-array rule (`PSL_LIST_DEFAULT_NOT_ARRAY`), registry lowering (`lowerDefaultFunctionWithRegistry`, `PSL_UNKNOWN_DEFAULT_FUNCTION`), generator applicability + codec matching (`PSL_INVALID_DEFAULT_APPLICABILITY`), and the exactly-one-positional rule. The interpreter switches on the tagged `oneOf` output and applies those checks exactly as today.
+The interpreter switches on the shape (primitive → literal, array → list, object → registry path) and keeps every semantic rule in `lowerDefaultForField`: the `isList` + `PSL_LIST_DEFAULT_NOT_ARRAY` rule, registry lowering (`lowerDefaultFunctionWithRegistry`, `PSL_UNKNOWN_DEFAULT_FUNCTION`), generator applicability + codec matching + preset-only guard (`PSL_INVALID_DEFAULT_APPLICABILITY`).
+
+**Enum spec** — the value is a single bare identifier (the member name):
+
+```ts
+fieldAttribute('default', { positional: [{ key: 'member', type: bareIdentifier() }] })
+```
+
+The interpreter matches the extracted member name against `enumHandle.enumMembers` (keeping `PSL_ENUM_UNKNOWN_DEFAULT_MEMBER`). The "must be a member name, not a raw value or function" shape-check (`PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME`) is now enforced by the spec: a quoted string / function-call / array in an enum `@default` fails the `bareIdentifier()` matcher with the kit's `PSL_INVALID_ATTRIBUTE_SYNTAX`.
 
 **Kit growth** (in `@prisma-next/psl-parser`):
-- `scalarLiteral()` — a `String`/`Number`/`Boolean` literal AST → a tagged scalar value. (The decoded value, via the AST's `.value()`, never re-slicing text.)
-- `funcCall()` — a `FunctionCallAst` → a `ParsedDefaultFunctionCall` (name + each argument's rendered source text + spans). It is **registry-agnostic**: it performs no name/registry validation, so the framework kit never imports the SQL `ControlMutationDefaultRegistry`. The interpreter hands the parsed call straight to the existing `lowerDefaultFunctionWithRegistry`, which keeps the registry lookup, `PSL_UNKNOWN_DEFAULT_FUNCTION`, applicability, and lowering. (A `funcCallFrom(registry)` decorator was considered and dropped — see Design note.)
-- Array defaults reuse the existing `list()` combinator over `scalarLiteral()`.
+- `scalarLiteral()` — `String`/`Number`/`Boolean` literal → its decoded value. **(Shipped in D1.)**
+- `funcCall()` — `FunctionCallAst` → `ParsedDefaultFunctionCall` (registry-agnostic; the kit does not import the SQL registry). **(Shipped in D1.)**
+- `bareIdentifier()` — a bare `IdentifierAst` → its text, with a neutral label ("an identifier"); no validation (member-existence stays semantic). **(D3.)** A generic leaf, not enum-specific — the framework kit must not know about "enum members".
+- Array defaults reuse the existing `list()`.
 
-The list-vs-scalar precedence that `oneOf` gives (scalar → array → call) matches the current fall-through in `lowerDefaultForField`.
-
-**Design note — `funcCall` vs `funcCallFrom` (resolved).** A registry-parameterised `funcCallFrom(registry)` could be built as a thin decorator over `funcCall()` (parse the call, then check `registry.has(name)`). It was dropped: Option A keeps `PSL_UNKNOWN_DEFAULT_FUNCTION` semantic in `lowerDefaultFunctionWithRegistry`, so a parse-time registry check would duplicate a check that must stay in the interpreter — and it would force the framework kit to import the SQL default registry (a layering smell). Plain registry-agnostic `funcCall()` is the whole kit surface `@default` needs.
+**Design note — `funcCall` vs `funcCallFrom` (resolved).** `funcCallFrom(registry)` could be a thin decorator over `funcCall()`, but it was dropped: Option A keeps `PSL_UNKNOWN_DEFAULT_FUNCTION` semantic in the interpreter, so a parse-time registry check would duplicate it — and it would force the framework kit to import the SQL default registry (a layering smell). Registry-agnostic `funcCall()` is the whole kit surface the function path needs.
 
 ## Coherence rationale
 
-One outcome — "`@default` is spec-driven; the three default string-parsers are deleted; the SQL family is now entirely spec-driven." The kit growth (`scalarLiteral`, `funcCall`/`funcCallFrom`) exists only to serve `@default`. Sized as its own PR precisely because it introduces the kit's first registry-parameterised combinator and preserves six semantic diagnostic codes — bundling it into `sql-attributes` would have pushed that PR past a single coherent review.
+One outcome — "`@default` is spec-driven on both paths; the default string-parsers (three non-enum + the enum inline regex checks) are deleted; the SQL family is now entirely spec-driven." Sized as its own PR because it introduces the kit's first structured-call combinator and preserves the most semantic diagnostic codes of any SQL attribute.
 
 ## Scope
 
-**In:** the `@default` spec + interpret wiring; the `scalarLiteral` + `funcCall`/`funcCallFrom` combinators (with unit tests); reuse of `list()` for array defaults; deletion of `parseDefaultLiteralValue`, `parseDefaultFunctionCall`, `parseListDefaultExpression` (+ their private helpers `decodeLiteralElement`, the `ListDefaultParse` type) once `@default` no longer calls them.
+**In:** the non-enum `defaultSpec` + enum `enumDefaultSpec`; the interpret wiring in `lowerDefaultForField` + `lowerEnumDefaultForField`; the `scalarLiteral` + `funcCall` (D1) and `bareIdentifier` (D3) combinators with unit tests; reuse of `list()`; deletion of `parseDefaultLiteralValue`, `parseDefaultFunctionCall`, `parseListDefaultExpression` (+ `decodeLiteralElement`, the `ListDefaultParse` type) and the inline regex checks in `lowerEnumDefaultForField`.
 
 **Out:**
-- **Bare enum-member defaults** (`@default(SomeEnumValue)`) — not currently supported or tested; this is a migration, not a new feature. Do NOT add enum-member parsing.
-- **The string-based registry internals** — `lowerDefaultFunctionWithRegistry` and the registry entries keep parsing `arg.raw` strings; `funcCall` feeds them the same `ParsedDefaultFunctionCall` shape they consume today.
-- **The interpreter's semantic checks** — list-vs-scalar, registry lowering, applicability, codec matching, exactly-one-positional — all stay.
-- **Mongo `@default`** — slice 3.
+- **The string-based registry internals** — `lowerDefaultFunctionWithRegistry` and its entries keep parsing `arg.raw`; `funcCall` feeds them the same `ParsedDefaultFunctionCall` shape.
+- **The interpreter's semantic checks** — list-vs-scalar, registry lowering, applicability, codec matching, exactly-one-positional, and enum-member matching — all stay.
+- **Mongo `@default`** — slice 3 (family).
 
 ## Pre-investigated edge cases
 
 | Edge case | Disposition | Notes |
 | --------- | ----------- | ----- |
-| List field `@default([...])` vs scalar | Semantic; stays in interpreter | The spec accepts both `scalarLiteral` and `list(scalarLiteral)`; the `isList` + `PSL_LIST_DEFAULT_NOT_ARRAY` rule stays in `lowerDefaultForField`. |
-| Function default (`now()`, `autoincrement()`, `dbgenerated(...)`) | `funcCall` builds `ParsedDefaultFunctionCall`; registry lowers it | Registry-parameterised; preserve `PSL_UNKNOWN_DEFAULT_FUNCTION` and the "Supported functions: …" message. |
-| Generator applicability / codec matching | Semantic; stays | `PSL_INVALID_DEFAULT_APPLICABILITY` + the preset-only-generator guard stay in `lowerDefaultForField`. |
-| `@default(garbage)` (a bare identifier — not literal/array/func) | Now `PSL_INVALID_ATTRIBUTE_SYNTAX` (was `PSL_INVALID_DEFAULT_VALUE`) | **Resolved (operator: Option A)** — arg-shape errors unify under the kit syntax code; the semantic default codes are preserved. Update the test(s) asserting the old `PSL_INVALID_DEFAULT_VALUE` for this case. |
-| `#906` native enums | No interaction | Native-enum *types* (`native_enum`/`pg.enum`) changed column resolution, not `@default` lowering; `lowerDefaultForField` is unchanged on current `main`. |
+| Field type selects the path | Caller already branches on `enumHandle` | Non-enum → `defaultSpec`; enum → `enumDefaultSpec`. Two spec objects, both named `'default'`. |
+| Non-enum list `@default([...])` vs scalar | Semantic; stays | `isList` + `PSL_LIST_DEFAULT_NOT_ARRAY` stay in `lowerDefaultForField`. |
+| Function default (`now()`, `dbgenerated("…")`) | `funcCall` → `ParsedDefaultFunctionCall`; registry lowers | `funcCall` renders each arg's **verbatim source text** (quotes preserved — `dbgenerated`'s handler re-parses the quoted string). Preserve `PSL_UNKNOWN_DEFAULT_FUNCTION`. |
+| Generator applicability / codec matching | Semantic; stays | `PSL_INVALID_DEFAULT_APPLICABILITY` + preset-only guard stay. |
+| Enum member not in the enum | Semantic; stays | `PSL_ENUM_UNKNOWN_DEFAULT_MEMBER` stays (interpreter matches against `enumHandle`). |
+| `@default(garbage)` on a non-enum field | Now `PSL_INVALID_ATTRIBUTE_SYNTAX` (was `PSL_INVALID_DEFAULT_VALUE`) | Operator: Option A. Update the asserting test(s). |
+| `@default("x")` / `@default(fn())` on an enum field | Now `PSL_INVALID_ATTRIBUTE_SYNTAX` (was `PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME`) | Operator: Option A — the shape-check moves into the `bareIdentifier()` matcher. `PSL_ENUM_UNKNOWN_DEFAULT_MEMBER` (a real member miss) is unchanged. |
+| `#906` native enums | No interaction with lowering | Native-enum *types* changed column resolution, not `@default` lowering; both lowering functions are unchanged on current `main`. |
 
 ## Slice-specific done conditions
 
-- [ ] `@default` is validated + lowered via a spec through `interpretAttribute`; the tagged `oneOf` output drives the interpreter's existing semantic branches.
-- [ ] `parseDefaultLiteralValue`, `parseDefaultFunctionCall`, `parseListDefaultExpression` deleted (`rg` each → zero); the registry + `lowerDefaultFunctionWithRegistry` retained.
-- [ ] Semantic default codes preserved (`PSL_UNKNOWN_DEFAULT_FUNCTION`, `PSL_INVALID_DEFAULT_APPLICABILITY`, `PSL_LIST_DEFAULT_NOT_ARRAY`, exactly-one-positional); arg-shape errors may become `PSL_INVALID_ATTRIBUTE_SYNTAX` (pending Open Question 1).
-- [ ] `pnpm fixtures:check` clean; `interpreter.defaults.test.ts` green; vocab green (kit growth may move the threshold — bump to the new count if so).
+- [ ] Both `@default` paths validated + lowered via specs through `interpretAttribute`.
+- [ ] `parseDefaultLiteralValue`, `parseDefaultFunctionCall`, `parseListDefaultExpression` deleted (`rg` each → zero); `lowerEnumDefaultForField`'s inline `isQuotedString`/`isFunctionCall` regex checks gone. Registry + `lowerDefaultFunctionWithRegistry` + `enumHandle` matching retained.
+- [ ] Semantic codes preserved: `PSL_UNKNOWN_DEFAULT_FUNCTION`, `PSL_INVALID_DEFAULT_APPLICABILITY`, `PSL_LIST_DEFAULT_NOT_ARRAY`, `PSL_ENUM_UNKNOWN_DEFAULT_MEMBER`. Shape-error codes (`PSL_INVALID_DEFAULT_VALUE`, `PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME`) shift to `PSL_INVALID_ATTRIBUTE_SYNTAX` (operator: Option A).
+- [ ] `pnpm fixtures:check` clean; `interpreter.defaults.test.ts` + the enum-default tests green; vocab green (bump threshold if kit growth moves it).
 
 ## Open Questions
 
-_None open._ Both design questions are resolved: (1) `@default(garbage)` → `PSL_INVALID_ATTRIBUTE_SYNTAX` (operator: Option A); (2) `funcCallFrom` dropped in favour of registry-agnostic `funcCall()` (see Design note).
+_None open._ Resolved: (1) both lowering paths in scope (operator); (2) shape-error codes → `PSL_INVALID_ATTRIBUTE_SYNTAX`, semantic codes preserved (operator: Option A); (3) `funcCallFrom` dropped for registry-agnostic `funcCall()`.
 
 ## References
 
-- Parent project: `projects/typed-attribute-parsers/spec.md`; sibling slice: `slices/sql-attributes/` (the generic wrappers + `sql-attribute-specs.ts` plumbing this slice reuses).
-- Current `@default` code: `packages/2-sql/2-authoring/contract-psl/src/psl-column-resolution.ts` (`lowerDefaultForField`, `parseDefaultLiteralValue`, `parseListDefaultExpression`); `default-function-registry.ts` (`parseDefaultFunctionCall`, `lowerDefaultFunctionWithRegistry`, `ParsedDefaultFunctionCall`).
+- Parent project: `projects/typed-attribute-parsers/spec.md`; sibling slice `slices/sql-attributes/` (the generic `interpretFieldAttribute` wrapper + `sql-attribute-specs.ts` plumbing this slice reuses).
+- Non-enum path: `packages/2-sql/2-authoring/contract-psl/src/psl-column-resolution.ts` (`lowerDefaultForField`, `parseDefaultLiteralValue`, `parseListDefaultExpression`); `default-function-registry.ts` (`parseDefaultFunctionCall`, `lowerDefaultFunctionWithRegistry`, `ParsedDefaultFunctionCall`).
+- Enum path: `packages/2-sql/2-authoring/contract-psl/src/psl-field-resolution.ts` (`lowerEnumDefaultForField`).
 - Kit: `packages/1-framework/2-authoring/psl-parser/src/attribute-spec/**`.
-- Tests: `packages/2-sql/2-authoring/contract-psl/test/interpreter.defaults.test.ts` (24 cases).
+- Tests: `interpreter.defaults.test.ts` (non-enum, 24 cases) + the enum-default cases in `interpreter.enum.test.ts`.

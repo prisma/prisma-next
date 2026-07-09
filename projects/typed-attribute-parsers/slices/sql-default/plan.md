@@ -2,7 +2,7 @@
 
 **Slice spec:** `projects/typed-attribute-parsers/slices/sql-default/spec.md`
 
-Two dispatches: grow the kit (proven in isolation), then migrate `@default` and delete the dead string parsers. `@default` is one PR; keep it to these two coherent dispatches.
+Three dispatches: grow the kit (D1, proven in isolation), migrate the non-enum `@default` path (D2), then the enum `@default` path + its small kit leaf (D3). `@default` is one PR; both lowering paths (non-enum + enum) migrate in this slice (operator decision).
 
 ### D1 — Kit: `scalarLiteral()` + `funcCall()` combinators
 - **Outcome:** two new leaf combinators in `@prisma-next/psl-parser`, each unit-tested in isolation:
@@ -19,4 +19,11 @@ Two dispatches: grow the kit (proven in isolation), then migrate `@default` and 
 - **Builds on:** D1.
 - **Gate:** psl-parser build (D1 changed the kit); sql-contract-psl typecheck + test (`interpreter.defaults.test.ts`); `pnpm fixtures:check`; `rg` gates for the three deleted helpers; `lint:framework-vocabulary`; `lint:deps`.
 
-_(As-shipped target: `@default` spec-driven; the three default string-parsers gone; the SQL family now entirely spec-driven. D1 carries the kit-growth risk — the registry-agnostic `funcCall` + its output-type home; D2 is the mechanical migration + the six preserved semantic codes.)_
+### D3 — Kit `bareIdentifier()` + migrate the enum `@default` path
+- **Outcome:** a `bareIdentifier()` leaf combinator in `@prisma-next/psl-parser` (bare `IdentifierAst` → its text; neutral label "an identifier"; no validation), unit-tested. `enumDefaultSpec = fieldAttribute('default', { positional: [{ key: 'member', type: bareIdentifier() }] })` added to `sql-attribute-specs.ts`; `lowerEnumDefaultForField` (`psl-field-resolution.ts`) rewritten to interpret via the generic `interpretFieldAttribute` wrapper and match the extracted member name against `enumHandle.enumMembers`.
+- **Deletions:** the inline `isQuotedString` / `isFunctionCall` regex checks + the exactly-one-positional guard in `lowerEnumDefaultForField` (now spec-enforced). Keep the `enumHandle.enumMembers` matching + `PSL_ENUM_UNKNOWN_DEFAULT_MEMBER`.
+- **Behaviour parity:** enum-member defaults resolve to the same value; `pnpm fixtures:check` clean. `@default("x")` / `@default(fn())` on an enum field now emit `PSL_INVALID_ATTRIBUTE_SYNTAX` instead of `PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME` (operator: Option A) — find + update the asserting tests (in `interpreter.enum.test.ts`; `rg` for `PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME`). `PSL_ENUM_UNKNOWN_DEFAULT_MEMBER` unchanged.
+- **Builds on:** D1 (kit pattern), D2 (the `defaultSpec` plumbing + interpret wiring it mirrors).
+- **Gate:** psl-parser build + test (new combinator); sql-contract-psl typecheck + test (enum-default cases); `pnpm fixtures:check`; `rg` gates; `lint:framework-vocabulary`; `lint:deps`.
+
+_(As-shipped target: `@default` spec-driven on both paths; the three non-enum string-parsers + the enum inline regex checks gone; the SQL family now entirely spec-driven. D1/D3 carry the kit-growth risk; D2/D3 are the migrations + the preserved semantic codes.)_
