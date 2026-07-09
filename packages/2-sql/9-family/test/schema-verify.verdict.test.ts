@@ -30,11 +30,7 @@ import {
   neutralizeFlatExpectedFkSchemas,
   normalizeFlatActualForDiff,
 } from '../src/core/diff/diff-tree-normalization';
-import {
-  computeSqlDiffVerdict,
-  computeStorageTypeVerdict,
-  stampSubjectGranularity,
-} from '../src/core/diff/schema-verify';
+import { computeSqlDiffVerdict, computeStorageTypeVerdict } from '../src/core/diff/schema-verify';
 import type { DefaultNormalizer, NativeTypeNormalizer } from '../src/core/diff/sql-schema-diff';
 import { contractToSchemaIR } from '../src/core/migrations/contract-to-schema-ir';
 import {
@@ -135,12 +131,13 @@ function runVerdict(options: {
     contractToSchemaIR(options.contract, { annotationNamespace: 'pg' }),
   );
   const actual = normalizeFlatActualForDiff(expected, stampLikeIntrospection(options.schema));
-  const issues = stampSubjectGranularity(diffSchemas(expected, actual), relationalNodeGranularity);
+  const issues = diffSchemas(expected, actual);
   const diffVerdict = computeSqlDiffVerdict({
     issues,
     resolveControlPolicy: (issue) => resolveControlPolicy(issue, options.contract),
     strict: options.strict,
     defaultControlPolicy: options.contract.defaultControlPolicy,
+    granularityOf: relationalNodeGranularity,
   });
   const namespacesWithTables = Object.values(options.contract.storage.namespaces).filter(
     (ns) => Object.keys(ns.entries.table ?? {}).length > 0,
@@ -781,22 +778,23 @@ describe('differ verdict — check constraints', () => {
         },
       },
     });
-    const liveOnlyCheckIssues = stampSubjectGranularity(
-      diffSchemas(expectedNoChecks, actualDrift),
-      relationalNodeGranularity,
-    ).filter((i) => i.path.includes('check:post_status_check'));
+    const liveOnlyCheckIssues = diffSchemas(expectedNoChecks, actualDrift).filter((i) =>
+      i.path.includes('check:post_status_check'),
+    );
     expect(liveOnlyCheckIssues[0]?.reason).toBe('not-expected');
     const strictVerdict = computeSqlDiffVerdict({
       issues: liveOnlyCheckIssues,
       resolveControlPolicy: () => undefined,
       strict: true,
       defaultControlPolicy: undefined,
+      granularityOf: relationalNodeGranularity,
     });
     const lenientVerdict = computeSqlDiffVerdict({
       issues: liveOnlyCheckIssues,
       resolveControlPolicy: () => undefined,
       strict: false,
       defaultControlPolicy: undefined,
+      granularityOf: relationalNodeGranularity,
     });
     expect(strictVerdict.failures).toHaveLength(1);
     expect(lenientVerdict.failures).toHaveLength(0);

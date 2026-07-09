@@ -11,10 +11,12 @@ import type {
   ControlFamilyInstance,
   ControlStack,
   CoreSchemaView,
+  DiffSubjectGranularity,
   MigrationPlanOperation,
   OperationPreview,
   OperationPreviewCapable,
   PslContractInferCapable,
+  SchemaDiffIssue,
   SchemaViewCapable,
   SignDatabaseResult,
   VerifyDatabaseResult,
@@ -48,7 +50,7 @@ import type {
   SqlControlTargetDescriptor,
   SqlDescribedContractSpace,
 } from './control-target-descriptor';
-import { verifySqlSchemaByDiff } from './diff/schema-verify';
+import { classifyDiffSubjectGranularity, verifySqlSchemaByDiff } from './diff/schema-verify';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
 import type { SqlSchemaDiffFn } from './migrations/schema-differ';
 import type {
@@ -230,6 +232,17 @@ export interface SqlControlFamilyInstance
     readonly strict: boolean;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): VerifyDatabaseSchemaResult;
+
+  /**
+   * Classifies a diff issue's subject granularity on demand, resolved from
+   * its node's `nodeKind` via the target's classifier. Satisfies the
+   * {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+   * capability that framework consumers spanning contract spaces (the
+   * migration aggregate's unclaimed-elements sweep) detect via
+   * `hasSchemaSubjectClassifier` and call instead of reading family/target
+   * node vocabulary. Nothing is stamped on the issue or the node.
+   */
+  classifySubjectGranularity(issue: SchemaDiffIssue): DiffSubjectGranularity | undefined;
 
   sign(options: {
     readonly driver: SqlControlDriverInstance<string>;
@@ -546,6 +559,15 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     { readonly diffSchema?: SqlSchemaDiffFn },
     'reading the target-descriptor diffSchema hook'
   >(target).diffSchema;
+  // The target's nodeKind → granularity classifier, resolved on demand by the
+  // verdict and by the instance's `classifySubjectGranularity` method below —
+  // never stamped onto an issue. Read lazily for the same
+  // construction-only-stub reason as `diffSchema`; the throw happens at call
+  // time.
+  const targetGranularityOf = blindCast<
+    { readonly classifySubjectGranularity?: (nodeKind: string) => DiffSubjectGranularity },
+    'reading the target-descriptor classifySubjectGranularity hook'
+  >(target).classifySubjectGranularity;
   // `contract infer` needs each extension pack's already-assembled contract,
   // carried as-is (no merging — that is the contract-spaces machinery's
   // concern), paired with the `spaceId` its descriptor was registered under
@@ -720,6 +742,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           `SQL target "${target.targetId}" is missing the required diffSchema descriptor operation`,
         );
       }
+      if (!targetGranularityOf) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required classifySubjectGranularity descriptor operation`,
+        );
+      }
       // THE VERDICT: the target's full-tree node diff, graded by the
       // family's post-diff filters (strict gating + control-policy
       // disposition), plus the codec verifyType hook findings. The result
@@ -730,7 +757,26 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         strict: options.strict,
         frameworkComponents: options.frameworkComponents,
         diffSchema,
+        granularityOf: targetGranularityOf,
       });
+    },
+
+    /**
+     * Classifies a diff issue's subject granularity on demand, by resolving
+     * its node's `nodeKind` through the target's classifier — the
+     * {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+     * capability. Framework consumers spanning contract spaces (the
+     * migration aggregate's unclaimed-elements sweep) detect and call this
+     * instead of reaching into the concrete schema-IR node, which they
+     * cannot read; nothing is stamped on the issue or the node.
+     */
+    classifySubjectGranularity(issue: SchemaDiffIssue): DiffSubjectGranularity | undefined {
+      if (!targetGranularityOf) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required classifySubjectGranularity descriptor operation`,
+        );
+      }
+      return classifyDiffSubjectGranularity(issue, targetGranularityOf);
     },
     async sign(options: {
       readonly driver: SqlControlDriverInstance<string>;

@@ -1,7 +1,10 @@
 import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { SqlSchemaDiffResult } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
-import { resolveSemanticSatisfaction, stampSubjectGranularity } from '@prisma-next/family-sql/diff';
+import {
+  classifyDiffSubjectGranularity,
+  resolveSemanticSatisfaction,
+} from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas } from '@prisma-next/framework-components/control';
@@ -164,14 +167,12 @@ export function diffPostgresSchema(input: {
   const normalizedActual = normalizePostgresActualForDiff(expected, actual);
   const relationalOwned = ownedSchemaNames(expected);
   const structuralOwned = ownedSchemaNames(fullExpected);
-  const issues = stampSubjectGranularity(
-    diffSchemas(expected, normalizedActual),
-    postgresDiffSubjectGranularity,
-  ).filter((issue) => {
+  const issues = diffSchemas(expected, normalizedActual).filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;
-    const owned = issue.subjectGranularity === 'structural' ? structuralOwned : relationalOwned;
+    const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
+    const owned = granularity === 'structural' ? structuralOwned : relationalOwned;
     return owned.has(namespaceSegment);
   });
   const namespacePairs = Object.values(expected.namespaces).map((ns) => ({
@@ -267,16 +268,12 @@ export function buildPostgresPlanDiff(input: {
   const issues = blindCast<
     readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
     'both trees are PostgresDatabaseSchemaNodes, so every diff-issue node is a SqlSchemaDiffNode'
-  >(
-    stampSubjectGranularity(
-      diffSchemas(expected, normalizedActual),
-      postgresDiffSubjectGranularity,
-    ),
-  ).filter((issue) => {
+  >(diffSchemas(expected, normalizedActual)).filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;
-    const owned = issue.subjectGranularity === 'structural' ? structuralOwned : relationalOwned;
+    const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
+    const owned = granularity === 'structural' ? structuralOwned : relationalOwned;
     return owned.has(namespaceSegment);
   });
   return { expected, actual: normalizedActual, issues };

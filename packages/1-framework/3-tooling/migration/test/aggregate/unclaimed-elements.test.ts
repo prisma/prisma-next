@@ -1,27 +1,46 @@
 import type {
   DiffableNode,
+  DiffSubjectGranularity,
   SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
+import type { SchemaSubjectClassifier } from '../../src/aggregate/unclaimed-elements';
 import {
   collectExtraElementCoordinates,
   stripExtraFindings,
 } from '../../src/aggregate/unclaimed-elements';
 
-/** A minimal diff node: the strip reads only the issue's stamped granularity + path. */
-function diffNode(id: string): DiffableNode {
-  return { id, isEqualTo: () => true, children: () => [] };
+/**
+ * A minimal diff node carrying a fake `kind` discriminator — the strip never
+ * reads it directly, only via the injected `classify` capability below,
+ * mirroring how a real family/target classifier resolves granularity from a
+ * node's `nodeKind`.
+ */
+function diffNode(id: string, kind?: string): DiffableNode & { readonly kind?: string } {
+  return { id, isEqualTo: () => true, children: () => [], ...ifDefined('kind', kind) };
 }
+
+/** A fake classifier keyed on the fixture nodes' `kind`, standing in for a real family/target one. */
+const classify: SchemaSubjectClassifier = (issue) => {
+  const node = issue.actual ?? issue.expected;
+  const kind = (node as { readonly kind?: string } | undefined)?.kind;
+  const granularity: Readonly<Record<string, DiffSubjectGranularity>> = {
+    table: 'entity',
+    column: 'field',
+    policy: 'structural',
+  };
+  return kind !== undefined ? granularity[kind] : undefined;
+};
 
 function extraTableIssue(name: string): SchemaDiffIssue {
   return {
     path: ['database', 'public', name],
     reason: 'not-expected',
     message: `extra: ${name}`,
-    subjectGranularity: 'entity',
-    actual: diffNode(name),
+    actual: diffNode(name, 'table'),
   };
 }
 
@@ -30,8 +49,7 @@ function extraColumnIssueUnder(tableName: string, columnName: string): SchemaDif
     path: ['database', 'public', tableName, `column:${columnName}`],
     reason: 'not-expected',
     message: `extra column: ${columnName}`,
-    subjectGranularity: 'field',
-    actual: diffNode(`column:${columnName}`),
+    actual: diffNode(`column:${columnName}`, 'column'),
   };
 }
 
@@ -40,12 +58,11 @@ function extraPolicyIssue(tableName: string, policyName: string): SchemaDiffIssu
     path: ['database', 'public', tableName, policyName],
     reason: 'not-expected',
     message: `RLS policy '${policyName}' is present in the database but not in the contract`,
-    subjectGranularity: 'structural',
-    actual: diffNode(policyName),
+    actual: diffNode(policyName, 'policy'),
   };
 }
 
-/** A document-family extra-collection issue: no stamped granularity, path is the bare name. */
+/** A document-family extra-collection issue: no classifiable kind, path is the bare name. */
 function extraCollectionIssue(name: string): SchemaDiffIssue {
   return {
     path: [name],
@@ -75,7 +92,7 @@ function makeResult(args: {
 describe('stripExtraFindings', () => {
   it('returns the result unchanged when there are no extras', () => {
     const result = makeResult({ ok: true });
-    expect(stripExtraFindings(result)).toBe(result);
+    expect(stripExtraFindings(result, classify)).toBe(result);
   });
 
   it('strict extras-only failure passes after the strip (table + its descendants dropped)', () => {
@@ -84,14 +101,14 @@ describe('stripExtraFindings', () => {
       issues: [extraTableIssue('legacy'), extraColumnIssueUnder('legacy', 'id')],
     });
 
-    const stripped = stripExtraFindings(result);
+    const stripped = stripExtraFindings(result, classify);
 
     expect(stripped.schema.issues).toEqual([]);
     expect(stripped.ok).toBe(true);
     expect(stripped.summary).toBe('Database schema satisfies contract');
   });
 
-  it('a Mongo-shape extra collection issue is stripped the same way', () => {
+  it('a Mongo-shape extra collection issue is stripped the same way (no classifier injected)', () => {
     const result = makeResult({
       ok: false,
       issues: [extraCollectionIssue('a'), extraCollectionIssue('b')],
@@ -108,15 +125,14 @@ describe('stripExtraFindings', () => {
       path: ['database', 'public', 'user', 'column:email'],
       reason: 'not-found',
       message: 'm',
-      subjectGranularity: 'field',
-      expected: diffNode('column:email'),
+      expected: diffNode('column:email', 'column'),
     };
     const result = makeResult({
       ok: false,
       issues: [missingColumn, extraTableIssue('legacy')],
     });
 
-    const stripped = stripExtraFindings(result);
+    const stripped = stripExtraFindings(result, classify);
 
     expect(stripped.ok).toBe(false);
     expect(stripped.schema.issues).toEqual([missingColumn]);
@@ -130,7 +146,7 @@ describe('stripExtraFindings', () => {
       issues: [extraColumnIssueUnder('user', 'stale')],
     });
 
-    const stripped = stripExtraFindings(result);
+    const stripped = stripExtraFindings(result, classify);
 
     expect(stripped).toBe(result);
     expect(stripped.ok).toBe(false);
@@ -145,7 +161,7 @@ describe('stripExtraFindings', () => {
       issues: [extraTableIssue('cipher_state'), policyIssue],
     });
 
-    const stripped = stripExtraFindings(result);
+    const stripped = stripExtraFindings(result, classify);
 
     expect(stripped.schema.issues).toEqual([policyIssue]);
     expect(stripped.ok).toBe(false);
@@ -162,7 +178,7 @@ describe('stripExtraFindings', () => {
       ],
     });
 
-    const stripped = stripExtraFindings(result);
+    const stripped = stripExtraFindings(result, classify);
 
     expect(stripped.schema.issues).toEqual([policyIssue]);
     expect(stripped.ok).toBe(false);
@@ -174,7 +190,7 @@ describe('stripExtraFindings', () => {
       issues: [extraPolicyIssue('user', 'policy_rogue')],
     });
 
-    const stripped = stripExtraFindings(result);
+    const stripped = stripExtraFindings(result, classify);
 
     expect(stripped).toBe(result);
     expect(stripped.schema.issues).toHaveLength(1);
@@ -193,7 +209,7 @@ describe('collectExtraElementCoordinates', () => {
       ],
     });
 
-    const coordinates = [...collectExtraElementCoordinates(result)].sort((a, b) =>
+    const coordinates = [...collectExtraElementCoordinates(result, classify)].sort((a, b) =>
       a.entityName.localeCompare(b.entityName),
     );
     expect(coordinates).toEqual([
@@ -211,13 +227,12 @@ describe('collectExtraElementCoordinates', () => {
           path: ['database', 'tenant_b', 'orphan_table'],
           reason: 'not-expected',
           message: 'extra: orphan_table',
-          subjectGranularity: 'entity',
-          actual: diffNode('orphan_table'),
+          actual: diffNode('orphan_table', 'table'),
         },
       ],
     });
 
-    const coordinates = [...collectExtraElementCoordinates(result)].sort((a, b) =>
+    const coordinates = [...collectExtraElementCoordinates(result, classify)].sort((a, b) =>
       a.namespaceId.localeCompare(b.namespaceId),
     );
     expect(coordinates).toEqual([

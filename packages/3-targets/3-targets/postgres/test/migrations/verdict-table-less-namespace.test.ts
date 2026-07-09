@@ -9,6 +9,7 @@ import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-da
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresPolicySchemaNode } from '../../src/core/schema-ir/postgres-policy-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
+import { postgresDiffSubjectGranularity } from '../../src/core/schema-ir/schema-node-kinds';
 
 /**
  * Table-less contract namespaces (e.g. an enums-only schema) are invisible
@@ -133,6 +134,7 @@ function assertVerdict(
       strict,
       frameworkComponents: [],
       diffSchema: diffPostgresSchema,
+      granularityOf: postgresDiffSubjectGranularity,
     });
     expect({ strict, ok: result.ok }).toEqual({ strict, ok: expectedOk });
   }

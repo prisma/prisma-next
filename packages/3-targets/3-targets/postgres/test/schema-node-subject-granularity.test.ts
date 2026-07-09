@@ -90,8 +90,8 @@ describe('Postgres schema nodes carry no role/granularity of their own', () => {
       'PostgresRoleSchemaNode',
       new PostgresRoleSchemaNode({ name: 'authenticated', namespaceId: UNBOUND_NAMESPACE_ID }),
     ],
-  ] as const)('%s exposes no diffRole or subjectGranularity member', (_label, node) => {
+  ] as const)('%s exposes no diffRole or classification member of its own', (_label, node) => {
     expect('diffRole' in node).toBe(false);
-    expect('subjectGranularity' in node).toBe(false);
+    expect('nodeKind' in node).toBe(true);
   });
 });

@@ -8,7 +8,11 @@ import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
 import type { ContractMarkerRecordLike } from './marker-types';
 import type { AggregateContractSpace, ContractSpaceAggregate } from './types';
-import { collectExtraElementCoordinates, stripExtraFindings } from './unclaimed-elements';
+import {
+  collectExtraElementCoordinates,
+  type SchemaSubjectClassifier,
+  stripExtraFindings,
+} from './unclaimed-elements';
 
 /**
  * Caller policy for the verifier. Today's only knob is
@@ -33,6 +37,14 @@ export interface VerifierInput {
     space: AggregateContractSpace,
     mode: 'strict' | 'lenient',
   ) => VerifyDatabaseSchemaResult;
+  /**
+   * Classifies a diff issue's subject granularity on demand — the injected
+   * capability the caller reads off the family instance (via
+   * `hasSchemaSubjectClassifier`) when it has one. Absent for families that
+   * classify nothing (Mongo); the unclaimed-elements sweep falls back to
+   * path shape in that case. Never stamped onto the issue or the node.
+   */
+  readonly classifySubjectGranularity?: SchemaSubjectClassifier;
 }
 
 /**
@@ -125,7 +137,14 @@ export function verifyMigration(input: VerifierInput): VerifierOutput {
 }
 
 function runVerifyMigration(input: VerifierInput): VerifierOutput {
-  const { aggregate, markersBySpaceId, schemaIntrospection, mode, verifySchemaForSpace } = input;
+  const {
+    aggregate,
+    markersBySpaceId,
+    schemaIntrospection,
+    mode,
+    verifySchemaForSpace,
+    classifySubjectGranularity,
+  } = input;
   const allSpaces: ReadonlyArray<AggregateContractSpace> = [aggregate.app, ...aggregate.extensions];
   const aggregateSpaceIds = new Set(allSpaces.map((m) => m.spaceId));
 
@@ -176,8 +195,8 @@ function runVerifyMigration(input: VerifierInput): VerifierOutput {
   const extraCoordinates = new Map<string, SchemaEntityCoordinate>();
   for (const space of allSpaces) {
     const result = verifySchemaForSpace(schemaIntrospection, space, mode);
-    schemaPerSpace.set(space.spaceId, stripExtraFindings(result));
-    for (const coordinate of collectExtraElementCoordinates(result)) {
+    schemaPerSpace.set(space.spaceId, stripExtraFindings(result, classifySubjectGranularity));
+    for (const coordinate of collectExtraElementCoordinates(result, classifySubjectGranularity)) {
       extraCoordinates.set(coordinateKey(coordinate), coordinate);
     }
   }

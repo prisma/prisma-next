@@ -1,6 +1,6 @@
 import type {
   DiffableNode,
-  SchemaSubjectGranularity,
+  DiffSubjectGranularity,
 } from '@prisma-next/framework-components/control';
 import { relationalNodeGranularity, type SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 
@@ -32,28 +32,25 @@ export type PostgresSchemaNodeKind =
 
 /**
  * The one real map from a Postgres-specific `nodeKind` to the
- * framework-neutral {@link SchemaSubjectGranularity} its diff issues carry —
+ * framework-neutral {@link DiffSubjectGranularity} its diff issues carry —
  * resolution is by `nodeKind` equality against this map, never a
  * `nodeKind`-suffix string match and never anything stamped on the node.
  */
-const POSTGRES_NODE_GRANULARITY: Readonly<
-  Record<PostgresSchemaNodeKind, SchemaSubjectGranularity>
-> = {
-  [PostgresSchemaNodeKind.database]: 'structural',
-  [PostgresSchemaNodeKind.namespace]: 'namespace',
-  [PostgresSchemaNodeKind.table]: 'entity',
-  [PostgresSchemaNodeKind.policy]: 'structural',
-  [PostgresSchemaNodeKind.role]: 'structural',
-};
+const POSTGRES_NODE_GRANULARITY: Readonly<Record<PostgresSchemaNodeKind, DiffSubjectGranularity>> =
+  {
+    [PostgresSchemaNodeKind.database]: 'structural',
+    [PostgresSchemaNodeKind.namespace]: 'namespace',
+    [PostgresSchemaNodeKind.table]: 'entity',
+    [PostgresSchemaNodeKind.policy]: 'structural',
+    [PostgresSchemaNodeKind.role]: 'structural',
+  };
 
 function isPostgresSchemaNodeKind(nodeKind: string): nodeKind is PostgresSchemaNodeKind {
   return Object.hasOwn(POSTGRES_NODE_GRANULARITY, nodeKind);
 }
 
 /** Looks up the subject granularity for a Postgres-specific `nodeKind`. */
-export function postgresNodeGranularity(
-  nodeKind: PostgresSchemaNodeKind,
-): SchemaSubjectGranularity {
+export function postgresNodeGranularity(nodeKind: PostgresSchemaNodeKind): DiffSubjectGranularity {
   return POSTGRES_NODE_GRANULARITY[nodeKind];
 }
 
@@ -61,11 +58,13 @@ export function postgresNodeGranularity(
  * The subject granularity for any node kind that appears in a Postgres diff
  * tree — the tree mixes Postgres-specific kinds (database/namespace/table/
  * policy/role) with the relational leaf kinds (columns, constraints, indexes,
- * …), so this dispatches to whichever family/target map owns the kind. The
- * target's differ stamps this onto each issue; the family verdict and the
- * framework aggregate read the stamped granularity, never the node.
+ * …), so this dispatches to whichever family/target map owns the kind. Called
+ * on demand by consumers (the family verdict, the framework aggregate's
+ * unclaimed-elements sweep, via the {@link
+ * import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+ * capability) — never stamped onto the issue or the node.
  */
-export function postgresDiffSubjectGranularity(nodeKind: string): SchemaSubjectGranularity {
+export function postgresDiffSubjectGranularity(nodeKind: string): DiffSubjectGranularity {
   return isPostgresSchemaNodeKind(nodeKind)
     ? postgresNodeGranularity(nodeKind)
     : relationalNodeGranularity(nodeKind);

@@ -1,9 +1,21 @@
 import type {
+  DiffSubjectGranularity,
   SchemaDiffIssue,
   SchemaEntityCoordinate,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { coordinateKey, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+
+/**
+ * Classifies a diff issue's subject granularity on demand — the injected
+ * capability a contract space's family/target instance provides (via
+ * `hasSchemaSubjectClassifier`). This module never imports family node
+ * classes and never reads a classification off the node or the issue;
+ * absent entirely for families that classify nothing (Mongo).
+ */
+export type SchemaSubjectClassifier = (
+  issue: SchemaDiffIssue,
+) => DiffSubjectGranularity | undefined;
 
 function pathIsUnder(path: readonly string[], prefix: readonly string[]): boolean {
   if (path.length < prefix.length) return false;
@@ -12,15 +24,17 @@ function pathIsUnder(path: readonly string[], prefix: readonly string[]): boolea
 
 /**
  * Whether an issue's subject is a WHOLE top-level entity — as opposed to
- * something nested under one (e.g. a field, an index, or a policy). Reads the
- * issue's `subjectGranularity`, which the producing family/target stamps
- * (this aggregate never imports family node classes and never reads a
- * classification off the node). Families that don't classify leave it absent;
- * for those the `path` shape answers instead — their top-level entity's path
- * is exactly its own name (one segment), so anything deeper is nested.
+ * something nested under one (e.g. a field, an index, or a policy). Calls
+ * the injected `classify` capability, which resolves this from the issue's
+ * node `nodeKind` (this aggregate never reaches into the node itself).
+ * Absent `classify` (or a `classify` that returns nothing for this issue —
+ * a family that doesn't classify, e.g. Mongo) falls back to path shape: a
+ * top-level entity's path is exactly its own name (one segment), so
+ * anything deeper is nested.
  */
-function isWholeEntityIssue(issue: SchemaDiffIssue): boolean {
-  if (issue.subjectGranularity !== undefined) return issue.subjectGranularity === 'entity';
+function isWholeEntityIssue(issue: SchemaDiffIssue, classify?: SchemaSubjectClassifier): boolean {
+  const granularity = classify?.(issue);
+  if (granularity !== undefined) return granularity === 'entity';
   return issue.path.length === 1;
 }
 
@@ -39,13 +53,16 @@ function isWholeEntityIssue(issue: SchemaDiffIssue): boolean {
  * issue-based (`ok` ⇔ the list is empty), so a space whose only failures
  * were top-level extras passes after the strip.
  */
-export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDatabaseSchemaResult {
+export function stripExtraFindings(
+  result: VerifyDatabaseSchemaResult,
+  classify?: SchemaSubjectClassifier,
+): VerifyDatabaseSchemaResult {
   const droppedTablePaths = result.schema.issues
-    .filter((issue) => issue.reason === 'not-expected' && isWholeEntityIssue(issue))
+    .filter((issue) => issue.reason === 'not-expected' && isWholeEntityIssue(issue, classify))
     .map((issue) => issue.path);
   const issues = result.schema.issues.filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
-    if (issue.subjectGranularity === 'structural') return true;
+    if (classify?.(issue) === 'structural') return true;
     return !droppedTablePaths.some((prefix) => pathIsUnder(issue.path, prefix));
   });
 
@@ -96,8 +113,11 @@ export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDa
  * over a non-table entity kind needs a real per-family kind here instead of
  * the literal.
  */
-function schemaDiffIssueCoordinate(issue: SchemaDiffIssue): SchemaEntityCoordinate | undefined {
-  if (!isWholeEntityIssue(issue)) return undefined;
+function schemaDiffIssueCoordinate(
+  issue: SchemaDiffIssue,
+  classify?: SchemaSubjectClassifier,
+): SchemaEntityCoordinate | undefined {
+  if (!isWholeEntityIssue(issue, classify)) return undefined;
   const entityName = issue.path[issue.path.length - 1];
   if (entityName === undefined) return undefined;
   const namespaceId =
@@ -114,11 +134,12 @@ function schemaDiffIssueCoordinate(issue: SchemaDiffIssue): SchemaEntityCoordina
  */
 export function collectExtraElementCoordinates(
   result: VerifyDatabaseSchemaResult,
+  classify?: SchemaSubjectClassifier,
 ): readonly SchemaEntityCoordinate[] {
   const seen = new Map<string, SchemaEntityCoordinate>();
   for (const issue of result.schema.issues) {
     if (issue.reason !== 'not-expected') continue;
-    const coordinate = schemaDiffIssueCoordinate(issue);
+    const coordinate = schemaDiffIssueCoordinate(issue, classify);
     if (coordinate === undefined) continue;
     seen.set(coordinateKey(coordinate), coordinate);
   }

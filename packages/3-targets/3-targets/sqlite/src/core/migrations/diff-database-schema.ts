@@ -4,7 +4,6 @@ import { buildNativeTypeExpander, contractToSchemaIR } from '@prisma-next/family
 import {
   neutralizeFlatExpectedFkSchemas,
   normalizeFlatActualForDiff,
-  stampSubjectGranularity,
   verifySqlSchemaByDiff,
 } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
@@ -81,6 +80,7 @@ export function verifySqliteDatabaseSchema(
     strict: input.strict,
     frameworkComponents: input.frameworkComponents,
     diffSchema: diffSqliteSchema,
+    granularityOf: relationalNodeGranularity,
   });
 }
 
@@ -140,10 +140,7 @@ export function diffSqliteSchema(input: {
           'the SQLite introspection adapter always produces a flat SqlSchemaIR root'
         >(input.schema);
   const normalizedActual = normalizeFlatActualForDiff(expected, actual);
-  const issues = stampSubjectGranularity(
-    diffSchemas(expected, normalizedActual),
-    relationalNodeGranularity,
-  );
+  const issues = diffSchemas(expected, normalizedActual);
   const namespacesWithTables = Object.values(input.contract.storage.namespaces).filter(
     (ns) => Object.keys(ns.entries.table ?? {}).length > 0,
   );

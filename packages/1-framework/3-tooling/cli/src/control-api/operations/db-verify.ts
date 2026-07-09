@@ -4,8 +4,10 @@ import type {
   ControlDriverInstance,
   ControlExtensionDescriptor,
   ControlFamilyInstance,
+  SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { hasSchemaSubjectClassifier } from '@prisma-next/framework-components/control';
 import {
   type AggregateContractSpace,
   collectAggregateNamespaces,
@@ -14,6 +16,7 @@ import {
   verifyMigration,
 } from '@prisma-next/migration-tools/aggregate';
 import { castAs } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from '../../utils/cli-errors';
 import {
@@ -115,6 +118,13 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
         contract: collectAggregateNamespaces(aggregate),
       });
 
+  // The subject-granularity classifier is an injected capability, not every
+  // family provides it (Mongo doesn't) — detected the same way the other
+  // optional per-family capabilities are (`hasSchemaView`, …), never assumed.
+  const classifySubjectGranularity = hasSchemaSubjectClassifier(familyInstance)
+    ? (issue: SchemaDiffIssue) => familyInstance.classifySubjectGranularity(issue)
+    : undefined;
+
   emitVerifySpan(onProgress, 'spanStart');
   const verifyResult = verifyMigration({
     aggregate,
@@ -122,6 +132,7 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
     schemaIntrospection,
     mode: options.mode,
     verifySchemaForSpace: createPerSpaceVerifier(options),
+    ...ifDefined('classifySubjectGranularity', classifySubjectGranularity),
   });
   return finaliseVerifyResult({ verifyResult, aggregate, skipMarker, onProgress });
 }

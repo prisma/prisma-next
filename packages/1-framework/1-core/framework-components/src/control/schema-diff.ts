@@ -1,45 +1,11 @@
 import type { ExpectationFailureReason } from './control-operation-results';
 
-/**
- * Framework-neutral granularity of the entity a {@link SchemaDiffIssue}
- * concerns, stamped by the family/target that produces the issue (the
- * differ itself is family-blind and never sets it). Cross-family framework
- * consumers — the migration aggregate's unclaimed-elements sweep — read this
- * instead of reaching into the concrete schema-IR node: the node carries no
- * classification of its own, only its `nodeKind` identity, and the family
- * maps that identity to a granularity when it produces the issue.
- *
- * - `namespace`: a whole namespace.
- * - `entity`: a whole top-level entity (the thing a namespace contains).
- * - `field`: a field of an entity.
- * - `auxiliary`: a secondary part of an entity (an index, a default, a key).
- * - `structural`: a cross-cutting object (an access policy, a role, a tree
- *   root) that is the owning space's own concern, never a sibling's
- *   unclaimed entity.
- *
- * Absent for families that don't classify — for those, a consumer reads
- * granularity from path shape instead.
- */
-export type SchemaSubjectGranularity =
-  | 'namespace'
-  | 'entity'
-  | 'field'
-  | 'auxiliary'
-  | 'structural';
-
 export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   /** Path from the root node down to the diffed node, as a sequence of local keys. */
   readonly path: readonly string[];
   /** Why the actual state fails the expectation. Consumers filter on this field. */
   readonly reason: ExpectationFailureReason;
   readonly message: string;
-  /**
-   * The granularity of the issue's subject, stamped by the producing
-   * family/target (absent when unclassified — see
-   * {@link SchemaSubjectGranularity}). Framework consumers spanning families
-   * read this rather than the concrete node.
-   */
-  readonly subjectGranularity?: SchemaSubjectGranularity;
   /** The expected (desired-side) node, when available. Absent for `not-expected` issues. */
   readonly expected?: TNode;
   /** The actual (current-side) node, when available. Absent for `not-found` issues. */

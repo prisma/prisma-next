@@ -9,7 +9,11 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlSchemaDiffFn } from '@prisma-next/family-sql/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlColumnIR, SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import {
+  relationalNodeGranularity,
+  SqlColumnIR,
+  SqlSchemaIR,
+} from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchemaByDiff } from '../src/core/diff/schema-verify';
 import { createTestContract } from './schema-verify.helpers';
@@ -43,6 +47,7 @@ describe('verifySqlSchemaByDiff surfaces warnings without failing', () => {
       strict: false,
       frameworkComponents: [],
       diffSchema: stubDiff('observed'),
+      granularityOf: relationalNodeGranularity,
     });
 
     expect(result.ok).toBe(true);
@@ -58,6 +63,7 @@ describe('verifySqlSchemaByDiff surfaces warnings without failing', () => {
       strict: false,
       frameworkComponents: [],
       diffSchema: stubDiff('managed'),
+      granularityOf: relationalNodeGranularity,
     });
 
     expect(result.ok).toBe(false);

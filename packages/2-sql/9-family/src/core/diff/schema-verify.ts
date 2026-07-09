@@ -17,8 +17,8 @@ import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
+  DiffSubjectGranularity,
   SchemaDiffIssue,
-  SchemaSubjectGranularity,
   VerifierIssueCategory,
   VerifierOutcome,
   VerifyDatabaseSchemaResult,
@@ -34,7 +34,7 @@ import type { CodecControlHooks } from '../migrations/types';
 import { verifierDisposition } from './verifier-disposition';
 
 // ============================================================================
-// Subject-granularity stamping — nodeKind → framework-neutral granularity
+// Subject-granularity classification — nodeKind → framework-neutral granularity
 // ============================================================================
 
 function issueNode(issue: SchemaDiffIssue): SqlSchemaIRNode | undefined {
@@ -47,24 +47,21 @@ function issueNode(issue: SchemaDiffIssue): SqlSchemaIRNode | undefined {
 }
 
 /**
- * Stamps each issue's framework-neutral {@link SchemaSubjectGranularity} onto
- * it, resolved from the issue's node's `nodeKind` via the target-provided
- * `granularityOf` map. Called by the target's differ once it has produced the
- * raw issues — the node carries only its `nodeKind` identity, never a
- * classification, so the granularity every downstream consumer reads (the
- * family verdict here, the framework aggregate's unclaimed-elements sweep)
- * lives on the issue, resolved by the family/target that owns the node
- * vocabulary. An issue with no node is passed through unstamped.
+ * Resolves an issue's framework-neutral {@link DiffSubjectGranularity} on
+ * demand, from the issue's node's `nodeKind` via the target-provided
+ * `granularityOf` map. The node carries only its `nodeKind` identity, never a
+ * classification, and nothing is stamped onto the issue — every consumer
+ * (the family verdict below, the framework aggregate's unclaimed-elements
+ * sweep via {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable})
+ * calls this the same way, resolved by the family/target that owns the node
+ * vocabulary. `undefined` for an issue with no node.
  */
-export function stampSubjectGranularity(
-  issues: readonly SchemaDiffIssue[],
-  granularityOf: (nodeKind: string) => SchemaSubjectGranularity,
-): readonly SchemaDiffIssue[] {
-  return issues.map((issue) => {
-    const node = issueNode(issue);
-    if (node === undefined) return issue;
-    return { ...issue, subjectGranularity: granularityOf(node.nodeKind) };
-  });
+export function classifyDiffSubjectGranularity(
+  issue: SchemaDiffIssue,
+  granularityOf: (nodeKind: string) => DiffSubjectGranularity,
+): DiffSubjectGranularity | undefined {
+  const node = issueNode(issue);
+  return node === undefined ? undefined : granularityOf(node.nodeKind);
 }
 
 // ============================================================================
@@ -73,22 +70,25 @@ export function stampSubjectGranularity(
 
 /**
  * Re-keys the legacy `classifySqlVerifierIssueKind` category mapping on the
- * issue's stamped {@link SchemaSubjectGranularity} + the issue reason. The
- * vocabulary maps one-to-one: an undeclared live entity or namespace is
- * `extraTopLevelObject`, an undeclared live field `extraNestedElement`,
- * undeclared auxiliaries (constraints, indexes, defaults) and structural
- * leaves (policies) `extraAuxiliary`; a value-set drift on a check node is
- * `valueDrift`; every other paired divergence is `declaredIncompatible`;
- * anything the database lacks is `declaredMissing`. The granularity is
- * stamped by the target's differ, so target and extension node kinds
- * classify without the family importing them.
+ * issue's {@link DiffSubjectGranularity} (resolved via `granularityOf`) + the
+ * issue reason. The vocabulary maps one-to-one: an undeclared live entity or
+ * namespace is `extraTopLevelObject`, an undeclared live field
+ * `extraNestedElement`, undeclared auxiliaries (constraints, indexes,
+ * defaults) and structural leaves (policies) `extraAuxiliary`; a value-set
+ * drift on a check node is `valueDrift`; every other paired divergence is
+ * `declaredIncompatible`; anything the database lacks is `declaredMissing`.
+ * `granularityOf` is the target's classifier, so target and extension node
+ * kinds classify without the family importing them.
  */
-export function classifySqlDiffIssue(issue: SchemaDiffIssue): VerifierIssueCategory {
+export function classifySqlDiffIssue(
+  issue: SchemaDiffIssue,
+  granularityOf: (nodeKind: string) => DiffSubjectGranularity,
+): VerifierIssueCategory {
   if (issue.reason === 'not-found') {
     return 'declaredMissing';
   }
   if (issue.reason === 'not-expected') {
-    const granularity = issue.subjectGranularity;
+    const granularity = classifyDiffSubjectGranularity(issue, granularityOf);
     if (granularity === 'entity' || granularity === 'namespace') {
       return 'extraTopLevelObject';
     }
@@ -108,10 +108,13 @@ export function classifySqlDiffIssue(issue: SchemaDiffIssue): VerifierIssueCateg
  * walk detected every relational extra (namespaces, entities, fields, and
  * their auxiliaries) only under `--strict`; the structural diff (roots, RLS
  * policies, roles) was never strict-gated — its extras fail in both modes.
- * Keyed on the issue's stamped granularity.
+ * Keyed on the issue's granularity, resolved via `granularityOf`.
  */
-function isStrictOnlyExtra(issue: SchemaDiffIssue): boolean {
-  const granularity = issue.subjectGranularity;
+function isStrictOnlyExtra(
+  issue: SchemaDiffIssue,
+  granularityOf: (nodeKind: string) => DiffSubjectGranularity,
+): boolean {
+  const granularity = classifyDiffSubjectGranularity(issue, granularityOf);
   return (
     granularity === 'namespace' ||
     granularity === 'entity' ||
@@ -131,6 +134,8 @@ export interface SqlDiffVerdictInput {
   readonly resolveControlPolicy: (issue: SchemaDiffIssue) => ControlPolicy | undefined;
   readonly strict: boolean;
   readonly defaultControlPolicy: ControlPolicy | undefined;
+  /** The target's classifier: a diff issue node's `nodeKind` → its subject granularity. */
+  readonly granularityOf: (nodeKind: string) => DiffSubjectGranularity;
 }
 
 export interface SqlDiffVerdict {
@@ -149,14 +154,18 @@ export function computeSqlDiffVerdict(input: SqlDiffVerdictInput): SqlDiffVerdic
   const failures: SchemaDiffIssue[] = [];
   const warnings: SchemaDiffIssue[] = [];
   for (const issue of input.issues) {
-    if (!input.strict && issue.reason === 'not-expected' && isStrictOnlyExtra(issue)) {
+    if (
+      !input.strict &&
+      issue.reason === 'not-expected' &&
+      isStrictOnlyExtra(issue, input.granularityOf)
+    ) {
       continue;
     }
     const tablePolicy = input.resolveControlPolicy(issue);
     const policy = effectiveControlPolicy(tablePolicy, input.defaultControlPolicy);
     const disposition: VerifierOutcome = dispositionForCategory(
       policy,
-      classifySqlDiffIssue(issue),
+      classifySqlDiffIssue(issue, input.granularityOf),
     );
     if (disposition === 'suppress') continue;
     if (disposition === 'warn') {
@@ -234,6 +243,8 @@ export interface VerifySqlSchemaByDiffInput {
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   /** The target's full-tree node diff (`diffSchema` descriptor hook). */
   readonly diffSchema: SqlSchemaDiffFn;
+  /** The target's classifier: a diff issue node's `nodeKind` → its subject granularity. */
+  readonly granularityOf: (nodeKind: string) => DiffSubjectGranularity;
 }
 
 /**
@@ -257,6 +268,7 @@ export function verifySqlSchemaByDiff(
     resolveControlPolicy: verdictDiff.resolveControlPolicy,
     strict: input.strict,
     defaultControlPolicy: input.contract.defaultControlPolicy,
+    granularityOf: input.granularityOf,
   });
   const storageTypeVerdict = computeStorageTypeVerdict({
     contract: input.contract,

@@ -90,9 +90,10 @@ describe('SqlSchemaIRNode discriminants', () => {
 /**
  * A schema-IR node carries NO verdict-classification of its own — only its
  * `nodeKind` identity. The family's `relationalNodeGranularity` map is the one
- * place that turns a relational `nodeKind` into the framework-neutral subject
- * granularity its diff issues carry; the node itself exposes no `diffRole` or
- * `subjectGranularity` member.
+ * place that turns a relational `nodeKind` into the framework-neutral
+ * granularity its diff issues classify as, resolved on demand by consumers;
+ * the node itself exposes no `diffRole` member or any classification of its
+ * own.
  */
 describe('relationalNodeGranularity map (granularity is off the node)', () => {
   it.each([
@@ -124,6 +125,5 @@ describe('relationalNodeGranularity map (granularity is off the node)', () => {
   ] as const)('%s: nodeKind maps to granularity %s; node exposes no role member', (_label, node, expectedGranularity) => {
     expect(relationalNodeGranularity(node.nodeKind)).toBe(expectedGranularity);
     expect('diffRole' in node).toBe(false);
-    expect('subjectGranularity' in node).toBe(false);
   });
 });

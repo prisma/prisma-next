@@ -1,15 +1,18 @@
 export type { ImportRequirement } from '@prisma-next/ts-render';
 export type { ContractSerializer } from '../control/contract-serializer';
 export type {
+  DiffSubjectGranularity,
   MigratableTargetDescriptor,
   OperationPreviewCapable,
   PslContractInferCapable,
+  SchemaSubjectClassifierCapable,
   SchemaViewCapable,
 } from '../control/control-capabilities';
 export {
   hasMigrations,
   hasOperationPreview,
   hasPslContractInfer,
+  hasSchemaSubjectClassifier,
   hasSchemaView,
 } from '../control/control-capabilities';
 export type {
@@ -100,11 +103,7 @@ export {
   extractComponentIds,
   extractQueryOperationTypeImports,
 } from '../control/control-stack';
-export type {
-  DiffableNode,
-  SchemaDiffIssue,
-  SchemaSubjectGranularity,
-} from '../control/schema-diff';
+export type { DiffableNode, SchemaDiffIssue } from '../control/schema-diff';
 export { diffSchemas, SchemaDiff } from '../control/schema-diff';
 export type {
   SchemaVerifier,

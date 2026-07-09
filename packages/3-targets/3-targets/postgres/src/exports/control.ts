@@ -21,6 +21,7 @@ import type { PostgresContract } from '../core/postgres-schema';
 import { PostgresSchemaVerifier } from '../core/postgres-schema-verifier';
 import { inferPostgresPslContract } from '../core/psl-infer/infer-psl-contract';
 import { PostgresDatabaseSchemaNode } from '../core/schema-ir/postgres-database-schema-node';
+import { postgresDiffSubjectGranularity } from '../core/schema-ir/schema-node-kinds';
 
 export function postgresRenderDefault(def: ColumnDefault, column: StorageColumn): string {
   if (def.kind === 'function') {
@@ -41,6 +42,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     diffSchema(input) {
       return diffPostgresSchema(input);
     },
+    classifySubjectGranularity: postgresDiffSubjectGranularity,
     migrations: {
       createPlanner(adapter: SqlControlAdapter<'postgres'>) {
         return createPostgresMigrationPlanner(adapter);

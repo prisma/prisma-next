@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   ContractSerializer,
+  DiffSubjectGranularity,
   MigratableTargetDescriptor,
   SchemaVerifier,
 } from '@prisma-next/framework-components/control';
@@ -69,6 +70,17 @@ export interface SqlControlTargetDescriptor<
    * rejects when a surviving issue is a failure.
    */
   readonly diffSchema: SqlSchemaDiffFn;
+  /**
+   * Classifies a diff-tree node's `nodeKind` into its framework-neutral
+   * {@link DiffSubjectGranularity} — the target owns the full node vocabulary
+   * that appears in its diff tree (its own kinds plus the relational kinds it
+   * delegates to), so it is the one place that can resolve this. The family
+   * verdict calls it inline per issue (never stamping the result); the
+   * framework aggregate's unclaimed-elements sweep reaches the same
+   * classifier via the family instance's `classifySubjectGranularity`
+   * capability.
+   */
+  readonly classifySubjectGranularity: (nodeKind: string) => DiffSubjectGranularity;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

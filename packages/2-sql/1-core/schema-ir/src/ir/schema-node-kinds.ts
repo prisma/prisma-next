@@ -1,4 +1,4 @@
-import type { SchemaSubjectGranularity } from '@prisma-next/framework-components/control';
+import type { DiffSubjectGranularity } from '@prisma-next/framework-components/control';
 
 /**
  * The `nodeKind` discriminant for each relational schema-diff leaf node.
@@ -24,7 +24,7 @@ export type RelationalSchemaNodeKind =
 
 /**
  * The one real map from a relational `nodeKind` to the framework-neutral
- * {@link SchemaSubjectGranularity} its diff issues carry — the SQL family's
+ * {@link DiffSubjectGranularity} its diff issues carry — the SQL family's
  * post-diff filters (issue category, strict-mode gating) and the framework
  * aggregate's unclaimed-elements sweep key on the granularity, never on the
  * `nodeKind` spelling and never on anything stamped on the node. Resolution
@@ -33,7 +33,7 @@ export type RelationalSchemaNodeKind =
  * outside this family layer's vocabulary and map their own kinds directly.
  */
 const RELATIONAL_NODE_GRANULARITY: Readonly<
-  Record<RelationalSchemaNodeKind, SchemaSubjectGranularity>
+  Record<RelationalSchemaNodeKind, DiffSubjectGranularity>
 > = {
   [RelationalSchemaNodeKind.schema]: 'structural',
   [RelationalSchemaNodeKind.table]: 'entity',
@@ -56,7 +56,7 @@ function isRelationalSchemaNodeKind(nodeKind: string): nodeKind is RelationalSch
  * namespace/table/policy/role) — those map their own kinds directly rather
  * than through this family-level map.
  */
-export function relationalNodeGranularity(nodeKind: string): SchemaSubjectGranularity {
+export function relationalNodeGranularity(nodeKind: string): DiffSubjectGranularity {
   if (!isRelationalSchemaNodeKind(nodeKind)) {
     throw new Error(`relationalNodeGranularity: unrecognized relational node kind "${nodeKind}"`);
   }

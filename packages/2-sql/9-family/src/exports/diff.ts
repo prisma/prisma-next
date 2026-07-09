@@ -24,10 +24,10 @@ export type {
   VerifySqlSchemaByDiffInput,
 } from '../core/diff/schema-verify';
 export {
+  classifyDiffSubjectGranularity,
   classifySqlDiffIssue,
   computeSqlDiffVerdict,
   computeStorageTypeVerdict,
-  stampSubjectGranularity,
   verifySqlSchemaByDiff,
 } from '../core/diff/schema-verify';
 export type { NativeTypeNormalizer } from '../core/diff/sql-schema-diff';
