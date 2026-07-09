@@ -37,6 +37,8 @@ model Session {
 
 **3. Grade: inferred blocks carry no explicit `control`.** The block inherits the contract's `defaultControl`, exactly like every other inferred element — this is the spec of record's R6 ("all inference is managed"). For the Supabase Slice F run (`defaultControl: 'external'`) the result is faithful: the DB owns the types, Prisma Next emits no DDL. **Transitional gap, accepted:** under `defaultControl: 'managed'` the inferred enum claims a lifecycle the planner does not yet enforce — the Contract→SchemaIR projection hardcodes `nativeEnumTypeNames: []` ([contract-to-postgres-database-schema-node.ts:135](../../../../packages/3-targets/3-targets/postgres/src/core/migrations/contract-to-postgres-database-schema-node.ts)) until Phase-2 Slices A/B land, which make the grade true retroactively with no contract change. The gap is documented where the throw's remediation text used to live.
 
+**4. Enum-bearing output is namespace-wrapped (pinned during D2a).** The interpreter deliberately skips extension entities in the unspecified top-level bucket — a `native_enum` block only lowers inside an explicit `namespace { … }` block. So when (and only when) the introspected namespace contains native enum types, infer wraps its whole output in `namespace <schemaName> { … }`; enum-free output stays byte-identical to today's flat form (no fixture churn, TML-2958's stopgap semantics preserved). Teaching the interpreter to lower the default bucket was rejected: it touches contract-psl semantics for every schema, out of this slice's scope.
+
 ## Coherence rationale (slice-INVEST · _Small_)
 
 One reviewer holds: **"`contract infer` adopts native enum types instead of throwing."** The pieces are interdependent — emission is impossible without member values (introspection), the blocks are dead weight without the column references, and the columns dangle without the blocks. One PR, one rollback unit, no differ/ops surface touched.
@@ -69,7 +71,11 @@ One reviewer holds: **"`contract infer` adopts native enum types instead of thro
 
 ## Open questions
 
-- **Enum arrays**: emit `pg.enum(Name)` list columns vs a named diagnostic — settle in the plan against what the Phase-1 authoring surface actually accepts for list columns.
+- **Enum arrays**: ~~emit `pg.enum(Name)` list columns vs a named diagnostic~~ — settled in D2a: Phase-1 authoring already accepts `pg.enum(E)[]` (proven through the production interpret chain), so infer emits the list form.
+
+## Follow-ups discovered during the build (not in-slice)
+
+- **Serialized pack contracts expose no enum type names.** `PostgresContractSerializer` strips `native_enum` entries (only the derived `valueSet`, keyed by handle name, survives in `contract.json`), so the pack-owned subtraction matches only in-memory described contracts. Near-zero production impact while infer is single-namespace (the pack's enums live in `auth`, which app-side infer never introspects), but it becomes real with multi-namespace infer (TML-2958) or any pack declaring enums in `public`. Options: serialize `native_enum` entries, re-derive them on deserialize, or match via pack columns' `typeParams.typeName`. Documented at `describedNativeEnumOwnersByTypeName`.
 
 ## References
 
