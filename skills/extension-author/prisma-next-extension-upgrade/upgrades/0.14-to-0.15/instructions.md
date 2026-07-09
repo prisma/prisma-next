@@ -639,3 +639,14 @@ at boot. The change only accepts inputs the old `instanceof` check rejected —
 nothing that resolved before resolves differently — and the two guards are
 additive. No extension-author action required. Incidental substrate diff only.
 -->
+
+<!--
+TML-2990 (decode included ORM child rows): the `packages/3-extensions/` diff is
+confined to `@prisma-next/sql-orm-client` and its tests. Single-query ORM includes
+now decode child-row storage values through the same column codecs used for top-level
+rows, including Postgres `bytea` / timestamp values that arrive from JSON aggregation
+as text. The follow-up keeps include decode metadata keyed by the resolved column
+codec ref, so adapter runtime codec instances do not need to expose descriptor-backed
+`codec.id` during include normalization. No extension-author SPI changed; existing
+extensions do not need migration work. Incidental substrate diff only.
+-->
