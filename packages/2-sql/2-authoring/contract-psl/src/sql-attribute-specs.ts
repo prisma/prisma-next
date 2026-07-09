@@ -6,6 +6,7 @@ import type {
   ModelSymbol,
 } from '@prisma-next/psl-parser';
 import {
+  bareIdentifier,
   entityRef,
   fieldAttribute,
   fieldRef,
@@ -141,6 +142,10 @@ export const mapFieldSpec = fieldAttribute('map', { positional: [{ key: 'name', 
 
 export const defaultSpec = fieldAttribute('default', {
   positional: [{ key: 'value', type: oneOf(scalarLiteral(), list(scalarLiteral()), funcCall()) }],
+});
+
+export const enumDefaultSpec = fieldAttribute('default', {
+  positional: [{ key: 'member', type: bareIdentifier() }],
 });
 
 export const idFieldSpec = fieldAttribute('id', { named: { map: optional(str()) } });

@@ -393,7 +393,7 @@ model Post {
     );
   });
 
-  it('multi-argument enum defaults emit PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT', () => {
+  it('multi-argument enum defaults are rejected as invalid attribute syntax', () => {
     const result = interpret(`
 enum Priority {
   @@type("pg/text@1")
@@ -407,14 +407,13 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
+    // An extra positional argument fails the single-positional shape at the spec.
     expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );
   });
 
-  it('named-argument enum defaults emit PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT', () => {
+  it('named-argument enum defaults are rejected as invalid attribute syntax', () => {
     const result = interpret(`
 enum Priority {
   @@type("pg/text@1")
@@ -427,10 +426,9 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
+    // The required positional `member` is missing, so the spec rejects the shape.
     expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );
   });
 
@@ -924,7 +922,7 @@ model Post {
     expect(result.failure.diagnostics[0]?.message).toMatch(/Priority/);
   });
 
-  it('quoted raw value @default("low") on an enum field emits diagnostic', () => {
+  it('quoted raw value @default("low") on an enum field is rejected as invalid attribute syntax', () => {
     const result = interpret(`
 enum Priority {
   @@type("pg/text@1")
@@ -939,14 +937,13 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
+    // A quoted string fails the `bareIdentifier()` positional shape at the spec.
     expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );
   });
 
-  it('function default @default(uuid()) on an enum field emits diagnostic', () => {
+  it('function default @default(uuid()) on an enum field is rejected as invalid attribute syntax', () => {
     const result = interpret(`
 enum Priority {
   @@type("pg/text@1")
@@ -961,10 +958,9 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
+    // A function call fails the `bareIdentifier()` positional shape at the spec.
     expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );
   });
 

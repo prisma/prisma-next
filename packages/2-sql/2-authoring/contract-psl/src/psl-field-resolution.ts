@@ -12,6 +12,7 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { FieldSymbol, ModelSymbol, ResolvedAttribute } from '@prisma-next/psl-parser';
+import { nodePslSpan } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -25,6 +26,7 @@ import {
   resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
 import {
+  enumDefaultSpec,
   findFieldAttributeNode,
   findModelAttributeNode,
   idFieldSpec,
@@ -43,46 +45,36 @@ type LoweredFieldDefault = {
 function lowerEnumDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
-  readonly defaultAttribute: ResolvedAttribute;
+  readonly field: FieldSymbol;
+  readonly model: ModelSymbol;
+  readonly sourceFile: SourceFile;
   readonly enumHandle: EnumTypeHandle;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): LoweredFieldDefault {
-  const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'positional');
-  const hasNamedEntries = input.defaultAttribute.args.some((arg) => arg.kind === 'named');
-  const expressionEntry = positionalEntries[0];
-  if (hasNamedEntries || positionalEntries.length !== 1 || expressionEntry === undefined) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-      message: `Field "${input.modelName}.${input.fieldName}" @default on an enum field expects exactly one positional enum member argument.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
-
-  const raw = expressionEntry.value.trim();
-  const isQuotedString = /^(['"]).*\1$/.test(raw);
-  const isFunctionCall = raw.includes('(') && raw.endsWith(')');
-
-  if (isQuotedString || isFunctionCall) {
-    input.diagnostics.push({
-      code: 'PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME',
-      message: `Field "${input.modelName}.${input.fieldName}" @default on an enum field must name a member (e.g. @default(Low)), not a raw value or function.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
-
-  const match = input.enumHandle.enumMembers.find((m) => m.name === raw);
+  const { modelName, fieldName, field, model, sourceFile, enumHandle, sourceId, diagnostics } =
+    input;
+  const node = findFieldAttributeNode(field, 'default');
+  if (node === undefined) return {};
+  const interpreted = interpretFieldAttribute({
+    node,
+    spec: enumDefaultSpec,
+    model,
+    field,
+    sourceFile,
+    sourceId,
+    diagnostics,
+  });
+  if (interpreted === undefined) return {};
+  const member = interpreted.member;
+  const match = enumHandle.enumMembers.find((m) => m.name === member);
   if (!match) {
-    const validNames = input.enumHandle.enumMembers.map((m) => m.name).join(', ');
-    input.diagnostics.push({
+    const validNames = enumHandle.enumMembers.map((m) => m.name).join(', ');
+    diagnostics.push({
       code: 'PSL_ENUM_UNKNOWN_DEFAULT_MEMBER',
-      message: `Field "${input.modelName}.${input.fieldName}" @default(${raw}) does not name a member of ${input.enumHandle.enumName}. Valid members: ${validNames}.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
+      message: `Field "${modelName}.${fieldName}" @default(${member}) does not name a member of ${enumHandle.enumName}. Valid members: ${validNames}.`,
+      sourceId,
+      span: nodePslSpan(node.syntax, sourceFile),
     });
     return {};
   }
@@ -471,7 +463,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         ? lowerEnumDefaultForField({
             modelName: model.name,
             fieldName: field.name,
-            defaultAttribute,
+            field,
+            model,
+            sourceFile: input.sourceFile,
             enumHandle,
             sourceId,
             diagnostics,

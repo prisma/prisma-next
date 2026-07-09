@@ -2,6 +2,7 @@ import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 import type { ArgType, InterpretCtx } from '../src/exports';
 import {
+  bareIdentifier,
   bool,
   entityRef,
   fieldAttribute,
@@ -349,6 +350,47 @@ describe('entityRef', () => {
     const { expr, ctx } = argOf('[Task]');
 
     const result = entityRef().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('bareIdentifier', () => {
+  it('accepts a bare identifier and returns its text', () => {
+    const { expr, ctx } = argOf('Critical');
+
+    const result = bareIdentifier().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe('Critical');
+  });
+
+  it('rejects a string literal', () => {
+    const { expr, ctx } = argOf('"Critical"');
+
+    const result = bareIdentifier().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a number token', () => {
+    const { expr, ctx } = argOf('42');
+
+    const result = bareIdentifier().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('rejects a function call', () => {
+    const { expr, ctx } = argOf('uuid()');
+
+    const result = bareIdentifier().parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
