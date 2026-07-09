@@ -333,7 +333,11 @@ export function inferPostgresPslContract(
       );
       if (owner !== undefined) {
         const owned = packOwnedEnumTypesByNamespace.get(namespace.schemaName) ?? new Map();
+        // Columns reference the type either bare or schema-qualified —
+        // `format_type` qualifies a type outside the connection's
+        // search_path — so both spellings are owned.
         owned.set(typeName, owner.spaceId);
+        owned.set(`${namespace.schemaName}.${typeName}`, owner.spaceId);
         packOwnedEnumTypesByNamespace.set(namespace.schemaName, owned);
         continue;
       }
@@ -418,8 +422,20 @@ export function inferPostgresPslContract(
   } = resolveForeignKeys(tables, owners);
   const schemaIR = new SqlSchemaIR({ tables: resolvedTables });
 
+  // Live introspection reports an enum column's nativeType schema-qualified
+  // whenever the type sits outside the connection's search_path (`format_type`
+  // semantics; e.g. `auth.aal_level`), while `pg_type.typname` — the
+  // definitions key — is always bare. Register the qualified spelling as an
+  // alias so those columns resolve; block emission stays keyed on the bare
+  // name (one block per type).
+  const enumTypeNames = new Set(enumDefinitions.keys());
+  if (wrapNamespaceName !== undefined) {
+    for (const typeName of enumDefinitions.keys()) {
+      enumTypeNames.add(`${wrapNamespaceName}.${typeName}`);
+    }
+  }
   const enumInfo: EnumInfo = {
-    typeNames: new Set(enumDefinitions.keys()),
+    typeNames: enumTypeNames,
     definitions: enumDefinitions,
   };
   const options: PslPrinterOptions = {
@@ -502,10 +518,20 @@ export function buildPslDocumentAst(
     [...modelNames].map(([tableName, result]) => [tableName, result.name]),
   );
 
-  const { enumNameMap, enumBlocks } = buildNativeEnumBlocks(
+  const { enumNameMap: bareEnumNameMap, enumBlocks } = buildNativeEnumBlocks(
     options.enumInfo?.definitions ?? new Map(),
     modelNames,
   );
+
+  // Columns reference an enum type bare or schema-qualified (`format_type`
+  // qualifies types outside the search_path); alias the qualified spelling
+  // onto the same PSL name. Blocks stay keyed on the bare name.
+  const enumNameMap = new Map(bareEnumNameMap);
+  if (namespaceName !== undefined) {
+    for (const [typeName, pslName] of bareEnumNameMap) {
+      enumNameMap.set(`${namespaceName}.${typeName}`, pslName);
+    }
+  }
 
   const reservedNamedTypeNames = createReservedNamedTypeNames(modelNames, enumNameMap);
 

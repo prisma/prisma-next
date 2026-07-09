@@ -4808,6 +4808,9 @@ importers:
       '@prisma-next/psl-parser':
         specifier: workspace:0.14.0
         version: link:../../packages/1-framework/2-authoring/psl-parser
+      '@prisma-next/psl-printer':
+        specifier: workspace:0.14.0
+        version: link:../../packages/1-framework/2-authoring/psl-printer
       '@prisma-next/sql-builder':
         specifier: workspace:0.14.0
         version: link:../../packages/2-sql/4-lanes/sql-builder

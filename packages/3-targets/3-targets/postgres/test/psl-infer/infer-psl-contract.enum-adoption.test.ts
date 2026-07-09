@@ -240,6 +240,29 @@ describe('native enum adoption — happy path', () => {
     expect(output).toContain('pg.enum(AalLevel)?');
   });
 
+  it('resolves a schema-qualified column nativeType (live introspection reports auth.aal_level)', () => {
+    // `format_type` schema-qualifies a type outside the connection's
+    // search_path, so a live auth-schema column carries `auth.aal_level`
+    // while `pg_type.typname` (the definitions key) stays bare.
+    const output = inferAndPrint(
+      tree({
+        auth: namespaceNode(
+          'auth',
+          {
+            sessions: table('sessions', {
+              id: idColumn,
+              aal: { name: 'aal', nativeType: 'auth.aal_level', nullable: true },
+            }),
+          },
+          [AAL_LEVEL],
+        ),
+      }),
+    );
+
+    expect(output).toContain('pg.enum(AalLevel)?');
+    expect(output).not.toContain('Unsupported(');
+  });
+
   it('runs enum type names through the top-level name transforms', () => {
     const output = inferAndPrint(
       tree({
@@ -367,6 +390,23 @@ describe('pack-owned enum subtraction (by type name)', () => {
     });
 
     expect(() => inferPostgresPslContract(dbTree, [pack])).toThrow(
+      /aal_level.*(pack|space "pack")/i,
+    );
+
+    const qualifiedTree = tree({
+      auth: namespaceNode(
+        'auth',
+        {
+          app_notes: table('app_notes', {
+            id: idColumn,
+            aal: { name: 'aal', nativeType: 'auth.aal_level', nullable: true },
+          }),
+        },
+        [AAL_LEVEL],
+      ),
+    });
+
+    expect(() => inferPostgresPslContract(qualifiedTree, [pack])).toThrow(
       /aal_level.*(pack|space "pack")/i,
     );
   });
