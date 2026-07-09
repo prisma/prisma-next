@@ -1,4 +1,21 @@
 /**
+ * ⚠️ ACCEPTED-UNDER-PROTEST DEBT — DELETE IN SLICE 2.6 (`unify-unique-and-index-nodes`).
+ *
+ * A unique constraint IS a unique index. This slice modeled uniques and indexes
+ * as two separate node kinds (`SqlUniqueIR` vs `SqlIndexIR` — even though
+ * `SqlIndexIR` already carries `unique: boolean`), so the strict-by-kind differ
+ * cannot pair a contract unique with a live unique index. This whole file
+ * exists only to reconcile those two representations after the fact — it
+ * should not exist.
+ *
+ * The fix — delete `SqlUniqueIR`, model unique enforcement as
+ * `SqlIndexIR { unique: true }` on both derivation and introspection, and
+ * delete `diff-tree-normalization.ts` — is specified in
+ * `projects/postgres-rls/slices/unify-unique-and-index-nodes/spec.md` and
+ * scheduled as the very next slice. Do NOT extend this.
+ */
+
+/**
  * Pre-diff tree normalization: adjustments to the actual/expected trees the
  * generic differ (`diffSchemas`) runs over, so legacy semantic-equivalence
  * rules (a unique constraint satisfied by a unique index, an FK schema

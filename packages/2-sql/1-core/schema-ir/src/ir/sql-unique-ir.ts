@@ -1,3 +1,19 @@
+/**
+ * ⚠️ ACCEPTED-UNDER-PROTEST DEBT — DELETE IN SLICE 2.6 (`unify-unique-and-index-nodes`).
+ *
+ * A unique constraint IS a unique index. This slice modeled uniques and indexes
+ * as two separate node kinds (`SqlUniqueIR` vs `SqlIndexIR` — even though
+ * `SqlIndexIR` already carries `unique: boolean`), so the strict-by-kind differ
+ * cannot pair a contract unique with a live unique index. `SqlUniqueIR` is a
+ * strict subset of `SqlIndexIR` and should not be a separate node kind.
+ *
+ * The fix — delete `SqlUniqueIR`, model unique enforcement as
+ * `SqlIndexIR { unique: true }` on both derivation and introspection, and
+ * delete `diff-tree-normalization.ts` — is specified in
+ * `projects/postgres-rls/slices/unify-unique-and-index-nodes/spec.md` and
+ * scheduled as the very next slice. Do NOT extend this.
+ */
+
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
