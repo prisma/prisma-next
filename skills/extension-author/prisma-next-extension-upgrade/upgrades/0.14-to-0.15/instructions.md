@@ -259,3 +259,14 @@ model mapped to it now makes `contract infer` throw (malformed pack); packs norm
 ship storage + domain together, so no action for well-formed packs. No extension-author
 action required. Incidental substrate diff only.
 -->
+
+<!--
+Mongo PSL enum inference defaults (PR #934): the Mongo PSL interpreter now derives
+its default enum-inference codec ids from the target's PSL `String`/`Int` scalar type
+descriptors when `enumInferenceCodecs` is not passed, so bare-member enums resolve on
+every config surface. The only `packages/3-extensions/` touch is `mongo`'s
+`defineConfig` dropping its now-redundant explicit `enumInferenceCodecs` wiring — the
+derived default is the identical codec-id pair, and the `mongoContract` option remains
+available as an override. No extension-author API changed; behaviour is identical.
+No extension-author action required. Incidental substrate diff only.
+-->
