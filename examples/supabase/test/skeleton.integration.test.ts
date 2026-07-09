@@ -42,10 +42,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
+import { computeStorageHash } from '@prisma-next/contract/hashing';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import supabasePack from '@prisma-next/extension-supabase/pack';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import type { PostgresSchema } from '@prisma-next/target-postgres/types';
@@ -535,6 +537,214 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
         ).toBeDefined();
         expect(policyIssue?.reason).toBe('not-found');
       }
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  // Deep-clones the committed contract JSON, applies `mutate` to the clone,
+  // and recomputes the storage hash so markers/ledger/verify stay
+  // self-consistent for the mutated variant.
+  function contractVariant(mutate: (clone: typeof contractJson) => void): unknown {
+    const clone = structuredClone(contractJson);
+    mutate(clone);
+    const { storageHash: _priorHash, ...storageWithoutHash } = clone.storage;
+    const nextHash = computeStorageHash({
+      target: clone.target,
+      targetFamily: clone.targetFamily,
+      storage: storageWithoutHash,
+      ...sqlContractCanonicalizationHooks,
+    });
+    (clone.storage as { storageHash: string }).storageHash = String(nextHash);
+    return clone;
+  }
+
+  async function seedProfilesAndGrant(connectionString: string, ownerA: string, ownerB: string) {
+    await withClient(connectionString, async (pgClient) => {
+      const now = new Date().toISOString();
+      await pgClient.query(
+        'INSERT INTO auth.users (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3), ($4, $5, $3, $3)',
+        [ownerA, 'alice@example.com', now, ownerB, 'bob@example.com'],
+      );
+      await pgClient.query(
+        'INSERT INTO public.profile (id, username, "userId") VALUES ($1, $2, $3), ($4, $5, $6)',
+        [
+          'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          'alice',
+          ownerA,
+          'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          'bob',
+          ownerB,
+        ],
+      );
+      await pgClient.query('GRANT SELECT ON public.profile TO authenticated');
+    });
+  }
+
+  async function rowsVisibleToAuthenticated(
+    connectionString: string,
+    ownerSub: string,
+  ): Promise<readonly { username: string }[]> {
+    return withClient(connectionString, async (pgClient) => {
+      await pgClient.query(
+        `SELECT set_config('request.jwt.claims', '{"sub":"${ownerSub}"}', false)`,
+      );
+      await pgClient.query('SET ROLE authenticated');
+      const result = await pgClient.query<{ username: string }>(
+        'SELECT username FROM public.profile',
+      );
+      await pgClient.query('RESET ROLE');
+      return result.rows;
+    });
+  }
+
+  it(
+    'C — fail-closed: removing the last policy keeps RLS on and denies all rows',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+      await seedProfilesAndGrant(connectionString, ownerA, ownerB);
+
+      // The policy filters before the change (sanity: alice sees her row).
+      expect(await rowsVisibleToAuthenticated(connectionString, ownerA)).toEqual([
+        { username: 'alice' },
+      ]);
+
+      // Drop the last policy from the contract; keep the rls marker.
+      const noPolicyContract = contractVariant((clone) => {
+        (clone.storage.namespaces.public.entries as { policy: unknown }).policy = {};
+      });
+
+      // Plan: exactly the policy drop — no enablement change anywhere.
+      const planResult = await client.dbUpdate({
+        contract: noPolicyContract,
+        mode: 'plan',
+        migrationsDir,
+        acceptDataLoss: true,
+      });
+      if (!planResult.ok) {
+        throw new Error(`db update plan failed: ${JSON.stringify(planResult.failure, null, 2)}`);
+      }
+      const planIds = planResult.value.plan.operations.map((op) => op.id);
+      expect(planIds).toEqual([`rlsPolicy.public.profile.${POLICY_WIRE_NAME}.drop`]);
+
+      const applyResult = await client.dbUpdate({
+        contract: noPolicyContract,
+        mode: 'apply',
+        migrationsDir,
+        acceptDataLoss: true,
+      });
+      if (!applyResult.ok) {
+        throw new Error(`db update apply failed: ${JSON.stringify(applyResult.failure, null, 2)}`);
+      }
+
+      // Verify clean against the policy-less (still marked) contract.
+      const deserialized = new PostgresContractSerializer().deserializeContract(
+        noPolicyContract as Parameters<PostgresContractSerializer['deserializeContract']>[0],
+      );
+      const verifyResult = await client.dbVerify({
+        contract: deserialized,
+        migrationsDir,
+        strict: false,
+        skipSchema: false,
+        skipMarker: false,
+      });
+      expect(
+        verifyResult.ok,
+        `dbVerify failed: ${!verifyResult.ok ? JSON.stringify(verifyResult.failure) : ''}`,
+      ).toBe(true);
+      if (verifyResult.ok) {
+        for (const [spaceId, schemaResult] of verifyResult.value.schemaResults) {
+          expect(
+            schemaResult.ok,
+            `space "${spaceId}" failed: ${JSON.stringify(schemaResult.schema?.issues)}`,
+          ).toBe(true);
+        }
+      }
+
+      // Behavioral proof: RLS is still enabled with zero policies — deny-all.
+      expect(await rowsVisibleToAuthenticated(connectionString, ownerA)).toEqual([]);
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'D — prefix-only policy rename plans exactly one ALTER POLICY … RENAME TO and keeps filtering',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+      await seedProfilesAndGrant(connectionString, ownerA, ownerB);
+
+      const hashSuffix = POLICY_WIRE_NAME.slice(POLICY_WIRE_NAME.lastIndexOf('_') + 1);
+      const renamedWireName = `profile_owner_read_v2_${hashSuffix}`;
+
+      const renamedContract = contractVariant((clone) => {
+        // The entries key is the PSL block name (the prefix); the wire name
+        // lives on the entity's own `name` field.
+        const entries = clone.storage.namespaces.public.entries as {
+          policy: Record<string, { name: string; prefix: string }>;
+        };
+        const existing = Object.values(entries.policy)[0];
+        if (existing === undefined) throw new Error('expected the committed policy entry');
+        entries.policy = {
+          profile_owner_read_v2: {
+            ...existing,
+            name: renamedWireName,
+            prefix: 'profile_owner_read_v2',
+          },
+        };
+      });
+
+      // Plan: exactly one rename — no drop, no create, no enablement change.
+      const planResult = await client.dbUpdate({
+        contract: renamedContract,
+        mode: 'plan',
+        migrationsDir,
+      });
+      if (!planResult.ok) {
+        throw new Error(`db update plan failed: ${JSON.stringify(planResult.failure, null, 2)}`);
+      }
+      const planIds = planResult.value.plan.operations.map((op) => op.id);
+      expect(planIds).toEqual([`rlsPolicy.public.profile.${POLICY_WIRE_NAME}.rename`]);
+
+      const applyResult = await client.dbUpdate({
+        contract: renamedContract,
+        mode: 'apply',
+        migrationsDir,
+      });
+      if (!applyResult.ok) {
+        throw new Error(`db update apply failed: ${JSON.stringify(applyResult.failure, null, 2)}`);
+      }
+
+      // Verify clean against the renamed contract.
+      const deserialized = new PostgresContractSerializer().deserializeContract(
+        renamedContract as Parameters<PostgresContractSerializer['deserializeContract']>[0],
+      );
+      const verifyResult = await client.dbVerify({
+        contract: deserialized,
+        migrationsDir,
+        strict: false,
+        skipSchema: false,
+        skipMarker: false,
+      });
+      expect(
+        verifyResult.ok,
+        `dbVerify failed: ${!verifyResult.ok ? JSON.stringify(verifyResult.failure) : ''}`,
+      ).toBe(true);
+      if (verifyResult.ok) {
+        for (const [spaceId, schemaResult] of verifyResult.value.schemaResults) {
+          expect(
+            schemaResult.ok,
+            `space "${spaceId}" failed: ${JSON.stringify(schemaResult.schema?.issues)}`,
+          ).toBe(true);
+        }
+      }
+
+      // The renamed policy still filters rows.
+      expect(await rowsVisibleToAuthenticated(connectionString, ownerA)).toEqual([
+        { username: 'alice' },
+      ]);
     },
     timeouts.spinUpPpgDev * 4,
   );
