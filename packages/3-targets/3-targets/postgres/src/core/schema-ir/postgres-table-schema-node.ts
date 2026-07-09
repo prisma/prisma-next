@@ -12,6 +12,7 @@ import {
   type SqlTableIRInput,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { PostgresPolicySchemaNode } from './postgres-policy-schema-node';
 import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
@@ -36,8 +37,8 @@ export interface PostgresTableSchemaNodeInput extends SqlTableIRInput {
  * `SqlTableIR` calls `freezeNode` in its own constructor, which prevents
  * subclass field initialisation.
  *
- * `id` is the table name. `isEqualTo` is identity — two table nodes are equal
- * iff their ids (names) match; the table's own structural drift is entirely
+ * `id` is the table name. `isEqualTo` compares id + `rlsEnabled` — the
+ * table's one own diffable attribute; all other structural drift is
  * expressed by its children. `children()` returns every column, the primary
  * key (when present), every foreign key, unique, index, and check constraint,
  * plus the policy nodes — one flat list, so a drifted column and a drifted
@@ -102,8 +103,19 @@ export class PostgresTableSchemaNode extends SqlSchemaIRNode implements Diffable
     return this.name;
   }
 
+  /**
+   * Equal iff the ids (names) match AND `rlsEnabled` matches — the table's
+   * one own attribute in the diff; all other structural drift is expressed
+   * by children. A paired `not-equal` therefore always means enablement
+   * drift, which the planner maps to ENABLE/DISABLE ROW LEVEL SECURITY.
+   */
   isEqualTo(other: DiffableNode): boolean {
-    return this.id === other.id;
+    const node = blindCast<
+      SqlSchemaIRNode,
+      'every diff-tree node the differ pairs is a SqlSchemaIRNode'
+    >(other);
+    PostgresTableSchemaNode.assert(node);
+    return this.id === node.id && this.rlsEnabled === node.rlsEnabled;
   }
 
   children(): readonly DiffableNode[] {

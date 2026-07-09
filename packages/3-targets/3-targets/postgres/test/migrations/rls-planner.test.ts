@@ -138,7 +138,13 @@ function policyNode(policy: PostgresRlsPolicy): PostgresPolicySchemaNode {
   });
 }
 
-function schemaWith(policies: readonly PostgresRlsPolicy[]): PostgresDatabaseSchemaNode {
+// Live-side tree. `rlsEnabled` defaults to true: the contract fixtures mark
+// the table, so the in-sync scenarios need the live bit on; the
+// enablement-drift matrix lives in rls-enablement-planner.test.ts.
+function schemaWith(
+  policies: readonly PostgresRlsPolicy[],
+  options?: { readonly rlsEnabled?: boolean },
+): PostgresDatabaseSchemaNode {
   return new PostgresDatabaseSchemaNode({
     namespaces: {
       public: new PostgresNamespaceSchemaNode({
@@ -154,7 +160,7 @@ function schemaWith(policies: readonly PostgresRlsPolicy[]): PostgresDatabaseSch
             uniques: [],
             indexes: [],
             policies: policies.map(policyNode),
-            rlsEnabled: false,
+            rlsEnabled: options?.rlsEnabled ?? true,
           }),
         },
         nativeEnumTypeNames: [],

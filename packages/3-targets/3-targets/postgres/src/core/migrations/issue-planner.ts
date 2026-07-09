@@ -63,6 +63,7 @@ import {
   CreateIndexCall,
   CreateSchemaCall,
   CreateTableCall,
+  DisableRowLevelSecurityCall,
   DropCheckConstraintCall,
   DropColumnCall,
   DropConstraintCall,
@@ -70,6 +71,7 @@ import {
   DropIndexCall,
   DropNotNullCall,
   DropTableCall,
+  EnableRowLevelSecurityCall,
   type PostgresOpFactoryCall,
   SetDefaultCall,
   SetNotNullCall,
@@ -163,6 +165,7 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
     case 'createTable':
       return 'table';
     case 'enableRowLevelSecurity':
+    case 'disableRowLevelSecurity':
       return 'rlsEnable';
     case 'createRlsPolicy':
       return 'rlsPolicy';
@@ -465,6 +468,7 @@ function fkSpecFromNode(fk: SqlForeignKeyIR, tableName: string): ForeignKeySpec 
  */
 function buildCreateTableCallsFromNode(
   schemaName: string,
+  ddlSchemaName: string,
   table: PostgresTableSchemaNode,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): PostgresOpFactoryCall[] {
@@ -509,6 +513,13 @@ function buildCreateTableCallsFromNode(
     const constraintName = unique.name ?? `${table.name}_${unique.columns.join('_')}_key`;
     calls.push(new AddUniqueCall(schemaName, table.name, constraintName, [...unique.columns]));
   }
+  // Marker-driven: a newly-created table that is RLS-controlled enables RLS
+  // as part of its creation bundle. The policy set never decides this. The
+  // resolved schema (not the emission sentinel) binds into the op's
+  // relrowsecurity checks.
+  if (table.rlsEnabled) {
+    calls.push(new EnableRowLevelSecurityCall(ddlSchemaName, table.name));
+  }
   return calls;
 }
 
@@ -519,6 +530,11 @@ function nodeConflict(kind: SqlPlannerConflict['kind'], message: string): SqlPla
 function mapTableNodeIssue(
   issue: SchemaDiffIssue,
   schemaName: string,
+  // The diff tree's RESOLVED physical schema. Enablement ops bind it into
+  // their `pg_class`/`pg_namespace` checks (the emission sentinel would
+  // never match a live nspname), mirroring the schema the retired
+  // policy-half enable resolved via `resolveDdlSchemaForNamespaceStorage`.
+  ddlSchemaName: string,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
   if (issue.reason === 'not-found') {
@@ -526,7 +542,7 @@ function mapTableNodeIssue(
       PostgresTableSchemaNode,
       'a not-found table issue always carries the expected PostgresTableSchemaNode'
     >(issue.expected);
-    return ok(buildCreateTableCallsFromNode(schemaName, table, codecHooks));
+    return ok(buildCreateTableCallsFromNode(schemaName, ddlSchemaName, table, codecHooks));
   }
   if (issue.reason === 'not-expected') {
     const table = blindCast<
@@ -535,8 +551,18 @@ function mapTableNodeIssue(
     >(issue.actual);
     return ok([new DropTableCall(schemaName, table.name)]);
   }
-  // Unreachable: PostgresTableSchemaNode.isEqualTo is identity.
-  return notOk(nodeConflict('unsupportedOperation', `Unexpected table drift: ${issue.message}`));
+  // A paired table `not-equal` can only mean enablement drift: `isEqualTo`
+  // compares name + `rlsEnabled`, and paired nodes share the name. The
+  // expected side is authoritative (marker-driven, never the policy set).
+  const table = blindCast<
+    PostgresTableSchemaNode,
+    'a not-equal table issue always carries the expected PostgresTableSchemaNode'
+  >(issue.expected);
+  return ok([
+    table.rlsEnabled
+      ? new EnableRowLevelSecurityCall(ddlSchemaName, table.name)
+      : new DisableRowLevelSecurityCall(ddlSchemaName, table.name),
+  ]);
 }
 
 function mapColumnNodeIssue(
@@ -787,7 +813,7 @@ export function mapNodeIssueToCall(
 
   switch (node.nodeKind) {
     case PostgresSchemaNodeKind.table:
-      return mapTableNodeIssue(issue, schemaName, ctx.codecHooks);
+      return mapTableNodeIssue(issue, schemaName, ddlSchemaName, ctx.codecHooks);
     case RelationalSchemaNodeKind.column:
       return mapColumnNodeIssue(issue, schemaName, tableName, ctx.codecHooks);
     case RelationalSchemaNodeKind.columnDefault: {
@@ -952,6 +978,10 @@ export function planIssues(
     ...byCategory('unique'),
     ...byCategory('index'),
     ...byCategory('foreignKey'),
+    // Enablement changes run after all relational DDL (the table must exist)
+    // and before the policy calls the planner appends after `planIssues` —
+    // the same position the retired imperative enable-on-first-policy used.
+    ...byCategory('rlsEnable'),
   ];
 
   return ok({ calls });

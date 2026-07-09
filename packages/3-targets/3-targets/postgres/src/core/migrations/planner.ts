@@ -27,6 +27,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
+import { parseRlsPolicyWireName } from '../rls/wire-name';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
 import { PostgresSchemaNodeKind, type SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
@@ -49,7 +50,7 @@ import type { PostgresOpFactoryCall } from './op-factory-call';
 import {
   CreatePostgresRlsPolicyCall,
   DropPostgresRlsPolicyCall,
-  EnableRowLevelSecurityCall,
+  RenamePostgresRlsPolicyCall,
 } from './op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
@@ -335,17 +336,40 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
   /**
    * Maps the RLS policy presence findings of the one combined tree diff
-   * (`buildPostgresPlanDiff`, already ownership-filtered) into `ENABLE RLS`
-   * / `CREATE POLICY` / `DROP POLICY` ops. It does not re-diff — it consumes
-   * exactly the policy-node subset of the shared diff's issues.
+   * (`buildPostgresPlanDiff`, already ownership-filtered) into
+   * `CREATE POLICY` / `DROP POLICY` / `ALTER POLICY … RENAME TO` ops. It
+   * does not re-diff — it consumes exactly the policy-node subset of the
+   * shared diff's issues. Enablement is NOT decided here: `ENABLE`/`DISABLE
+   * ROW LEVEL SECURITY` derive from the table's marker-driven `rlsEnabled`
+   * attribute diff on the relational side.
+   *
+   * Rename post-pass: a `not-found` and a `not-expected` policy on the SAME
+   * table whose wire-name content hashes match but prefixes differ are one
+   * prefix-only rename, collapsed into a single non-destructive
+   * `RenamePostgresRlsPolicyCall`. Multi-candidate hash groups pair
+   * deterministically by sorted wire name; leftovers proceed as
+   * create/drop. Unparseable wire names never pair.
+   *
+   * The pairing runs only when the policy allows `widening` (rename's
+   * class). Without it (db-init's additive-only set), pairing degrades
+   * deliberately to the additive half: the new name is CREATEd and the old
+   * policy survives live until a widening/destructive-allowed plan runs —
+   * emitting an ungated widening rename would only fail at the runner's
+   * class re-enforcement.
    */
   private planPostgresSchemaDiff(
     options: PlannerOptionsWithComponents,
     filteredDiffIssues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
   ): readonly PostgresOpFactoryCall[] {
     const allowsDestructive = options.policy.allowedOperationClasses.includes('destructive');
-    const calls: PostgresOpFactoryCall[] = [];
-    const seenEnableTables = new Set<string>();
+    const allowsWidening = options.policy.allowedOperationClasses.includes('widening');
+
+    interface PolicyFinding {
+      readonly node: PostgresPolicySchemaNode;
+      readonly schemaForTable: string;
+    }
+    const missing: PolicyFinding[] = [];
+    const extra: PolicyFinding[] = [];
 
     for (const issue of filteredDiffIssues) {
       // 'not-equal' is unreachable for content-addressed policies: the wire name
@@ -356,30 +380,90 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         PostgresPolicySchemaNode.assert(expected);
         // expected.namespaceId is the DDL schema name (resolved during projection);
         // this re-resolution is a no-op as long as PostgresSchema.ddlSchemaName() returns this.id.
-        const schemaForTable = resolveDdlSchemaForNamespaceStorage(
-          options.contract.storage,
-          expected.namespaceId,
-        );
-        const tableKey = `${schemaForTable}.${expected.tableName}`;
-        if (!seenEnableTables.has(tableKey)) {
-          seenEnableTables.add(tableKey);
-          calls.push(new EnableRowLevelSecurityCall(schemaForTable, expected.tableName));
-        }
-        calls.push(
-          new CreatePostgresRlsPolicyCall(
-            schemaForTable,
-            expected.tableName,
-            policyNodeToContractPolicy(expected),
+        missing.push({
+          node: expected,
+          schemaForTable: resolveDdlSchemaForNamespaceStorage(
+            options.contract.storage,
+            expected.namespaceId,
           ),
-        );
-      } else if (issue.reason === 'not-expected' && allowsDestructive) {
+        });
+      } else if (issue.reason === 'not-expected') {
         const actual = issue.actual;
         PostgresPolicySchemaNode.assert(actual);
-        const schemaForTable = resolveDdlSchemaForNamespaceStorage(
-          options.contract.storage,
-          actual.namespaceId,
+        extra.push({
+          node: actual,
+          schemaForTable: resolveDdlSchemaForNamespaceStorage(
+            options.contract.storage,
+            actual.namespaceId,
+          ),
+        });
+      }
+    }
+
+    const calls: PostgresOpFactoryCall[] = [];
+    const renamedExtras = new Set<PolicyFinding>();
+    const renamedMissing = new Set<PolicyFinding>();
+    const pairingKey = (finding: PolicyFinding, hash: string): string =>
+      JSON.stringify([finding.schemaForTable, finding.node.tableName, hash]);
+
+    if (allowsWidening) {
+      const extrasByGroup = new Map<string, PolicyFinding[]>();
+      for (const finding of extra) {
+        const parsed = parseRlsPolicyWireName(finding.node.name);
+        if (parsed === undefined) continue;
+        const key = pairingKey(finding, parsed.hash);
+        const group = extrasByGroup.get(key) ?? [];
+        group.push(finding);
+        extrasByGroup.set(key, group);
+      }
+      for (const group of extrasByGroup.values()) {
+        group.sort((a, b) => (a.node.name < b.node.name ? -1 : a.node.name > b.node.name ? 1 : 0));
+      }
+
+      const sortedMissing = [...missing].sort((a, b) =>
+        a.node.name < b.node.name ? -1 : a.node.name > b.node.name ? 1 : 0,
+      );
+      for (const missingFinding of sortedMissing) {
+        const parsed = parseRlsPolicyWireName(missingFinding.node.name);
+        if (parsed === undefined) continue;
+        const candidates = extrasByGroup.get(pairingKey(missingFinding, parsed.hash));
+        const candidate = candidates?.shift();
+        if (candidate === undefined) continue;
+        // Same name would never surface as missing+extra (the differ pairs by
+        // name), so a matched candidate always differs in prefix only.
+        renamedExtras.add(candidate);
+        renamedMissing.add(missingFinding);
+        calls.push(
+          new RenamePostgresRlsPolicyCall(
+            missingFinding.schemaForTable,
+            missingFinding.node.tableName,
+            candidate.node.name,
+            missingFinding.node.name,
+          ),
         );
-        calls.push(new DropPostgresRlsPolicyCall(schemaForTable, actual.tableName, actual.name));
+      }
+    }
+
+    for (const finding of missing) {
+      if (renamedMissing.has(finding)) continue;
+      calls.push(
+        new CreatePostgresRlsPolicyCall(
+          finding.schemaForTable,
+          finding.node.tableName,
+          policyNodeToContractPolicy(finding.node),
+        ),
+      );
+    }
+    if (allowsDestructive) {
+      for (const finding of extra) {
+        if (renamedExtras.has(finding)) continue;
+        calls.push(
+          new DropPostgresRlsPolicyCall(
+            finding.schemaForTable,
+            finding.node.tableName,
+            finding.node.name,
+          ),
+        );
       }
     }
 

@@ -58,10 +58,29 @@ describe('PostgresTableSchemaNode', () => {
     expect(disabled.rlsEnabled).toBe(false);
   });
 
-  it('isEqualTo stays name-only: nodes differing only in rlsEnabled are equal (the differ does not compare the attribute yet)', () => {
+  it('isEqualTo compares rlsEnabled: nodes differing only in rlsEnabled are NOT equal (the first table-attribute comparison)', () => {
     const enabled = new PostgresTableSchemaNode({ ...tableInput, rlsEnabled: true, policies: [] });
     const disabled = new PostgresTableSchemaNode({ ...tableInput, policies: [] });
-    expect(enabled.isEqualTo(disabled)).toBe(true);
+    expect(enabled.isEqualTo(disabled)).toBe(false);
+    expect(disabled.isEqualTo(enabled)).toBe(false);
+  });
+
+  it('isEqualTo holds for same name and same rlsEnabled regardless of other structure', () => {
+    const a = new PostgresTableSchemaNode({
+      ...tableInput,
+      rlsEnabled: true,
+      policies: [basePolicy],
+    });
+    const b = new PostgresTableSchemaNode({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsEnabled: true,
+      policies: [],
+    });
+    expect(a.isEqualTo(b)).toBe(true);
   });
 
   it('rlsEnabled adds no children()', () => {
