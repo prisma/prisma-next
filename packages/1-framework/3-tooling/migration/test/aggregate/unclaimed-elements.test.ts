@@ -197,8 +197,8 @@ describe('collectExtraElementCoordinates', () => {
       a.entityName.localeCompare(b.entityName),
     );
     expect(coordinates).toEqual([
-      { namespaceId: UNBOUND_NAMESPACE_ID, entityName: 'legacy' },
-      { namespaceId: 'public', entityName: 'stray' },
+      { namespaceId: UNBOUND_NAMESPACE_ID, entityKind: 'table', entityName: 'legacy' },
+      { namespaceId: 'public', entityKind: 'table', entityName: 'stray' },
     ]);
   });
 
@@ -221,8 +221,8 @@ describe('collectExtraElementCoordinates', () => {
       a.namespaceId.localeCompare(b.namespaceId),
     );
     expect(coordinates).toEqual([
-      { namespaceId: 'public', entityName: 'orphan_table' },
-      { namespaceId: 'tenant_b', entityName: 'orphan_table' },
+      { namespaceId: 'public', entityKind: 'table', entityName: 'orphan_table' },
+      { namespaceId: 'tenant_b', entityKind: 'table', entityName: 'orphan_table' },
     ]);
   });
 });

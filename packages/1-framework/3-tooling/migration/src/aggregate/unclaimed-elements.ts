@@ -1,9 +1,9 @@
 import type {
   SchemaDiffIssue,
-  SchemaOwnershipCoordinate,
+  SchemaEntityCoordinate,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { coordinateKey, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 function pathIsUnder(path: readonly string[], prefix: readonly string[]): boolean {
   if (path.length < prefix.length) return false;
@@ -69,7 +69,7 @@ export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDa
 }
 
 /**
- * The namespace-qualified coordinate a `not-expected` `SchemaDiffIssue`
+ * The schema-IR entity coordinate a `not-expected` `SchemaDiffIssue`
  * addresses, when its subject is a whole top-level entity. A nested leaf
  * (a field, an index, a policy on an undeclared entity) has no entity of
  * its own to report here.
@@ -83,18 +83,30 @@ export function stripExtraFindings(result: VerifyDatabaseSchemaResult): VerifyDa
  * separate segment, so every entity they declare implicitly shares one
  * namespace — the same sentinel the aggregate's own coordinate walk uses
  * for those families.
+ *
+ * `entityKind` is stamped `'table'` for both path shapes. For the
+ * namespace-qualified (SQL family) shape this is exact: on that differ, a
+ * whole-entity `'not-expected'` issue is always a live table — no other
+ * storage entity kind (an enum's `valueSet`, an RLS `policy`) is represented
+ * as a node in the schema-diff tree. For the bare, single-segment shape
+ * (families that stamp no granularity, e.g. a Mongo collection extra)
+ * `'table'` is a placeholder, not a real classification: no ownership
+ * consumer queries `declaresEntity` for those families today, so nothing
+ * reads this value as true. A family that starts asking ownership questions
+ * over a non-table entity kind needs a real per-family kind here instead of
+ * the literal.
  */
-function schemaDiffIssueCoordinate(issue: SchemaDiffIssue): SchemaOwnershipCoordinate | undefined {
+function schemaDiffIssueCoordinate(issue: SchemaDiffIssue): SchemaEntityCoordinate | undefined {
   if (!isWholeEntityIssue(issue)) return undefined;
   const entityName = issue.path[issue.path.length - 1];
   if (entityName === undefined) return undefined;
   const namespaceId =
     issue.path.length === 3 ? (issue.path[1] ?? UNBOUND_NAMESPACE_ID) : UNBOUND_NAMESPACE_ID;
-  return { namespaceId, entityName };
+  return { namespaceId, entityKind: 'table', entityName };
 }
 
 /**
- * The namespace-qualified coordinates of every live element this contract
+ * The schema-IR entity coordinates of every live element this contract
  * space's diff reports as `not-expected`, deduplicated. The verifier gathers
  * these across all spaces and keeps only the coordinates no contract space
  * declares — the standalone unclaimed-elements list, reported once for the
@@ -102,13 +114,13 @@ function schemaDiffIssueCoordinate(issue: SchemaDiffIssue): SchemaOwnershipCoord
  */
 export function collectExtraElementCoordinates(
   result: VerifyDatabaseSchemaResult,
-): readonly SchemaOwnershipCoordinate[] {
-  const seen = new Map<string, SchemaOwnershipCoordinate>();
+): readonly SchemaEntityCoordinate[] {
+  const seen = new Map<string, SchemaEntityCoordinate>();
   for (const issue of result.schema.issues) {
     if (issue.reason !== 'not-expected') continue;
     const coordinate = schemaDiffIssueCoordinate(issue);
     if (coordinate === undefined) continue;
-    seen.set(`${coordinate.namespaceId} ${coordinate.entityName}`, coordinate);
+    seen.set(coordinateKey(coordinate), coordinate);
   }
   return [...seen.values()];
 }

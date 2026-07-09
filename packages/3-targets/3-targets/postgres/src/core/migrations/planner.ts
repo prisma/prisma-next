@@ -417,13 +417,19 @@ function isPolicyDiffIssue(issue: SchemaDiffIssue<SqlSchemaDiffNode>): boolean {
  * The consultation applies ONLY to table-level extras — a live table this
  * space's contract lacks — identified by asking the issue's own node
  * (`nodeKind === table`), never by counting path segments. `declaresEntity`
- * answers over the whole composition (self included), keyed on the
- * namespace-qualified coordinate so a genuine orphan in one namespace is
- * never conflated with a same-named table a sibling space declares in
- * another: a positive answer means another space owns THIS table in THIS
- * namespace (a table this space owned would be in its expected tree, never
- * an extra) — leave it. A negative answer means no space owns it — a
- * genuine orphan to drop.
+ * answers over the whole composition (self included), keyed on the schema-IR
+ * entity coordinate so a genuine orphan in one namespace is never conflated
+ * with a same-named table a sibling space declares in another, or with a
+ * same-named non-table entity (an enum, an RLS policy) a sibling declares in
+ * the SAME namespace: a positive answer means another space owns THIS table
+ * in THIS namespace (a table this space owned would be in its expected tree,
+ * never an extra) — leave it. A negative answer means no space owns it — a
+ * genuine orphan to drop. `entityKind` is the literal `'table'` here: this
+ * function only ever asks about a node already confirmed to be
+ * `PostgresSchemaNodeKind.table` (checked just above), and the diff tree's
+ * `nodeKind` vocabulary (`'postgres-table'`) is distinct from the storage
+ * `entries` vocabulary `elementCoordinates` walks (`'table'`) — the literal
+ * is that storage-entries spelling, not the node kind.
  *
  * The issue path carries the *resolved DDL schema* (e.g. `public`), but a
  * contract space's own declared namespace id can be the unbound sentinel
@@ -455,7 +461,7 @@ function retainUnownedExtras(
     const tableName = issueTableName(issue);
     if (ddlSchemaName === undefined || tableName === undefined) return true;
     const namespaceId = resolveNamespaceIdForDdlSchema(contract, ddlSchemaName);
-    return !ownership.declaresEntity({ namespaceId, entityName: tableName });
+    return !ownership.declaresEntity({ namespaceId, entityKind: 'table', entityName: tableName });
   });
 }
 

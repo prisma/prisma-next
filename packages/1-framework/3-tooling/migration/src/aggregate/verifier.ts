@@ -1,7 +1,8 @@
 import type {
-  SchemaOwnershipCoordinate,
+  SchemaEntityCoordinate,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { coordinateKey } from '@prisma-next/framework-components/ir';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
@@ -172,12 +173,12 @@ function runVerifyMigration(input: VerifierInput): VerifierOutput {
   // stripped), and every extra coordinate across all spaces, deduplicated
   // and kept only when no contract space declares it at that coordinate.
   const schemaPerSpace = new Map<string, VerifyDatabaseSchemaResult>();
-  const extraCoordinates = new Map<string, SchemaOwnershipCoordinate>();
+  const extraCoordinates = new Map<string, SchemaEntityCoordinate>();
   for (const space of allSpaces) {
     const result = verifySchemaForSpace(schemaIntrospection, space, mode);
     schemaPerSpace.set(space.spaceId, stripExtraFindings(result));
     for (const coordinate of collectExtraElementCoordinates(result)) {
-      extraCoordinates.set(`${coordinate.namespaceId} ${coordinate.entityName}`, coordinate);
+      extraCoordinates.set(coordinateKey(coordinate), coordinate);
     }
   }
   const unclaimed = [

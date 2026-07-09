@@ -243,7 +243,12 @@ export class SqliteMigrationPlanner
  * (`nodeKind === table`), never by counting path segments. SQLite is a
  * single-namespace target, so every coordinate is qualified with the shared
  * `UNBOUND_NAMESPACE_ID` sentinel (the same one the aggregate's declared
- * entities carry for this target). `declaresEntity` answers over the whole
+ * entities carry for this target). `entityKind` is the literal `'table'`:
+ * this function only ever asks about a node already confirmed to be
+ * `RelationalSchemaNodeKind.table` (checked just above), and that's a
+ * diff-tree `nodeKind` spelling (`'sql-table'`) distinct from the storage
+ * `entries` vocabulary `elementCoordinates` walks (`'table'`) — the literal
+ * is that storage-entries spelling. `declaresEntity` answers over the whole
  * composition (self included), so a positive answer on such a table means
  * another space owns it (a table this space owned would be in its expected
  * tree, never an extra): leave it. A negative answer means no space owns
@@ -267,7 +272,11 @@ function retainUnownedExtras(
     const tableName = issue.path[1];
     return (
       tableName === undefined ||
-      !ownership.declaresEntity({ namespaceId: UNBOUND_NAMESPACE_ID, entityName: tableName })
+      !ownership.declaresEntity({
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        entityKind: 'table',
+        entityName: tableName,
+      })
     );
   });
 }

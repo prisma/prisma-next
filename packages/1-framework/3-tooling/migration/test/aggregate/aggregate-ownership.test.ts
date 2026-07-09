@@ -7,7 +7,7 @@ import { makeAggregateContractSpace } from '../fixtures';
 
 function makeSpace(
   spaceId: string,
-  namespaces: Record<string, { table?: Record<string, unknown> }>,
+  namespaces: Record<string, Record<string, Record<string, unknown>>>,
 ): AggregateContractSpace {
   return makeAggregateContractSpace({
     spaceId,
@@ -34,7 +34,11 @@ function makeAggregate(
   });
 }
 
-const inPublic = (entityName: string) => ({ namespaceId: 'public', entityName });
+const inPublic = (entityName: string, entityKind = 'table') => ({
+  namespaceId: 'public',
+  entityKind,
+  entityName,
+});
 
 // The migration planner consults the aggregate as a `SchemaOwnership` oracle:
 // per live extra node it asks `declaresEntity` whether any space owns it, so a
@@ -87,8 +91,43 @@ describe('ContractSpaceAggregate ownership queries', () => {
     const app = makeSpace('app', { tenant_a: { table: { users: {} } } });
     const aggregate = makeAggregate(app, []);
 
-    expect(aggregate.declaresEntity({ namespaceId: 'tenant_a', entityName: 'users' })).toBe(true);
-    expect(aggregate.declaresEntity({ namespaceId: 'tenant_b', entityName: 'users' })).toBe(false);
-    expect(aggregate.declaringSpaces({ namespaceId: 'tenant_b', entityName: 'users' })).toEqual([]);
+    expect(
+      aggregate.declaresEntity({
+        namespaceId: 'tenant_a',
+        entityKind: 'table',
+        entityName: 'users',
+      }),
+    ).toBe(true);
+    expect(
+      aggregate.declaresEntity({
+        namespaceId: 'tenant_b',
+        entityKind: 'table',
+        entityName: 'users',
+      }),
+    ).toBe(false);
+    expect(
+      aggregate.declaringSpaces({
+        namespaceId: 'tenant_b',
+        entityKind: 'table',
+        entityName: 'users',
+      }),
+    ).toEqual([]);
+  });
+
+  it('does not conflate the same bare entity name declared as a different entity kind', () => {
+    // `app` declares a TABLE named `app_user` in `public`, plus a value set
+    // (an enum-like entity) ALSO named `widget` in the same namespace as a
+    // live table named `widget`. A live `widget` TABLE the differ reports as
+    // an extra is a genuine orphan — nobody declares a `widget` TABLE — even
+    // though `app` separately declares a `widget` value set. The oracle must
+    // distinguish entity kind, not just namespace and name.
+    const app = makeSpace('app', {
+      public: { table: { app_user: {} }, valueSet: { widget: {} } },
+    });
+    const aggregate = makeAggregate(app, []);
+
+    expect(aggregate.declaresEntity(inPublic('widget', 'table'))).toBe(false);
+    expect(aggregate.declaresEntity(inPublic('widget', 'valueSet'))).toBe(true);
+    expect(aggregate.declaringSpaces(inPublic('widget', 'table'))).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
+  SchemaEntityCoordinate,
   SchemaOwnership,
-  SchemaOwnershipCoordinate,
 } from '@prisma-next/framework-components/control';
 import type { MigrationGraph } from '../graph';
 import type { IntegrityQueryOptions, IntegrityViolation } from '../integrity-violation';
@@ -97,7 +97,7 @@ export interface AggregateContractSpace {
  *   lex-ascending.
  * - `declaresEntity(coordinate)` / `declaringSpaces(coordinate)`: ownership
  *   queries — does any contract space declare a storage entity at this
- *   namespace-qualified coordinate, and which spaces do? The verifier's
+ *   coordinate (namespace, entity kind, and name), and which spaces do? The verifier's
  *   unclaimed-elements pass asks these of the diff's extra findings; the
  *   migration planner asks `declaresEntity` per live extra node to decide
  *   whether some space owns it (the aggregate satisfies the framework
@@ -116,7 +116,7 @@ export interface ContractSpaceAggregate extends SchemaOwnership {
   hasSpace(id: string): boolean;
   space(id: string): AggregateContractSpace | undefined;
   spaces(): readonly AggregateContractSpace[];
-  declaresEntity(coordinate: SchemaOwnershipCoordinate): boolean;
-  declaringSpaces(coordinate: SchemaOwnershipCoordinate): readonly string[];
+  declaresEntity(coordinate: SchemaEntityCoordinate): boolean;
+  declaringSpaces(coordinate: SchemaEntityCoordinate): readonly string[];
   checkIntegrity(opts?: IntegrityQueryOptions): readonly IntegrityViolation[];
 }

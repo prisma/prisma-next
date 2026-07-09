@@ -10,11 +10,11 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type {
+  SchemaEntityCoordinate,
   SchemaOwnership,
-  SchemaOwnershipCoordinate,
 } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { coordinateKey, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -94,12 +94,17 @@ function buildLiveSchema(): SqlSchemaIR {
 // space — as if the aggregate declared `cipher_state` (a sibling's table).
 // SQLite is a single-namespace target, so every declared entity is
 // implicitly qualified with `UNBOUND_NAMESPACE_ID`.
-const ownsOnly = (...names: string[]): SchemaOwnership => {
-  const owned = new Set(names);
-  return {
-    declaresEntity: (coordinate: SchemaOwnershipCoordinate) => owned.has(coordinate.entityName),
-  };
+const ownsOnly = (...coordinates: readonly SchemaEntityCoordinate[]): SchemaOwnership => {
+  const owned = new Set(coordinates.map(coordinateKey));
+  return { declaresEntity: (coordinate) => owned.has(coordinateKey(coordinate)) };
 };
+
+/** A table coordinate in SQLite's sole (unbound) namespace — the common case. */
+const table = (entityName: string): SchemaEntityCoordinate => ({
+  namespaceId: UNBOUND_NAMESPACE_ID,
+  entityKind: 'table',
+  entityName,
+});
 
 describe('SQLite planner ownership consultation', () => {
   it('drops every unclaimed table under a destructive policy when no ownership oracle is supplied', async () => {
@@ -133,7 +138,7 @@ describe('SQLite planner ownership consultation', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
-      ownership: ownsOnly('app_user', 'cipher_state'),
+      ownership: ownsOnly(table('app_user'), table('cipher_state')),
     });
 
     expect(result.kind).toBe('success');
@@ -190,7 +195,7 @@ describe('SQLite planner ownership consultation', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
-      ownership: ownsOnly('app_user'),
+      ownership: ownsOnly(table('app_user')),
     });
 
     expect(result.kind).toBe('success');
@@ -199,5 +204,33 @@ describe('SQLite planner ownership consultation', () => {
     const dropColumnIds = ops.filter((op) => op.id.startsWith('dropColumn.')).map((op) => op.id);
     expect(dropColumnIds).toEqual(['dropColumn.app_user.legacy_col']);
     expect(ops.some((op) => op.id.startsWith('dropTable.'))).toBe(false);
+  });
+
+  it('drops a table extra even when the oracle declares a same-named entity of a different kind', async () => {
+    // The oracle declares `orphan_table` — but as a value set (an enum-like
+    // entity), not a table. Ownership must match on entity kind, not just
+    // name: a same-named non-table declaration does not make the live
+    // orphan_table TABLE owned, so it is still dropped.
+    const planner = createSqliteMigrationPlanner(stubLowerer);
+
+    const result = planner.plan({
+      contract: buildContract(),
+      schema: buildLiveSchema(),
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+      ownership: ownsOnly(table('app_user'), table('cipher_state'), {
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        entityKind: 'valueSet',
+        entityName: 'orphan_table',
+      }),
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+    const ops = await Promise.all(result.plan.operations);
+    const dropIds = ops.filter((op) => op.id.startsWith('dropTable.')).map((op) => op.id);
+    expect(dropIds).toEqual(['dropTable.orphan_table']);
   });
 });
