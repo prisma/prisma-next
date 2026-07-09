@@ -300,9 +300,9 @@ export const postgresAuthoringPslBlockDescriptors = {
       },
       using: { kind: 'value', codecId: 'pg/text@1', required: true },
     },
-    // A policy may only target an RLS-controlled model (spec D1): the model
-    // named by `target` must declare `@@rls`, or the load fails with a
-    // diagnostic naming the model and the policy prefix.
+    // A policy may only target an RLS-controlled model: the model named by
+    // `target` must declare `@@rls`, or the load fails with a diagnostic
+    // naming the model and the policy prefix.
     requiresModelAttribute: { parameter: 'target', attribute: 'rls' },
   },
   /**

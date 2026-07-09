@@ -124,7 +124,7 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
     expect(table?.policies).toContainEqual(expect.objectContaining({ name: policy.name }));
   });
 
-  it('throws when a policy targets a table that carries no rls marker (AC-2, derivation)', () => {
+  it('throws at derivation time when a policy targets a table that carries no rls marker', () => {
     const policy = makePolicy('read_own_profiles_a1b2c3d4');
     expect(() =>
       contractToPostgresDatabaseSchemaNode(makeContract({ policies: [policy] }), projectionOptions),

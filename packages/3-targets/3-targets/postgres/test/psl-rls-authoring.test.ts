@@ -5,9 +5,9 @@
  *     contribution to a `PostgresRlsEnablement` marker in `entries.rls`,
  *     keyed by table name, without clobbering block-produced entry kinds.
  *  2. Serializer round-trip: a contract carrying `policy`, `role`, AND `rls`
- *     entries survives serialize → deserialize losslessly (AC-1).
+ *     entries survives serialize → deserialize losslessly.
  *  3. Diagnostics: duplicate `@@rls`; `@@rls` without the Postgres pack;
- *     `policy_*` targeting an unmarked model (AC-2 load-time half), naming
+ *     `policy_*` targeting an unmarked model at load time, naming
  *     the model and the policy prefix, order-independently.
  */
 
@@ -212,7 +212,7 @@ namespace public {
   });
 });
 
-describe('policy_* blocks require an @@rls-marked target model (AC-2, load time)', () => {
+describe('policy_* blocks require an @@rls-marked target model at load time', () => {
   it('accepts a policy whose target model declares @@rls', () => {
     const result = interpret(MARKED_MODEL_WITH_POLICY);
     expect(result.ok).toBe(true);
@@ -291,7 +291,7 @@ namespace public {
   });
 });
 
-describe('PostgresContractSerializer rls round-trip (AC-1)', () => {
+describe('PostgresContractSerializer rls round-trip survives serialize → deserialize', () => {
   function makeContractWithAllThreeKinds() {
     const base = createSqlContract({
       storage: {
