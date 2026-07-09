@@ -9,6 +9,7 @@ import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
+  AuthoringModelAttributeDescriptorNamespace,
   AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
@@ -41,6 +42,7 @@ export interface AssembledAuthoringContributions {
   readonly type: AuthoringTypeNamespace;
   readonly entityTypes: AuthoringEntityTypeNamespace;
   readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
+  readonly modelAttributes: AuthoringModelAttributeDescriptorNamespace;
 }
 
 export interface ControlStack<
@@ -162,6 +164,7 @@ export function assembleAuthoringContributions(
   const type = {} as Record<string, unknown>;
   const entityTypes = {} as Record<string, unknown>;
   const pslBlockDescriptors: Record<string, unknown> = {};
+  const modelAttributes: Record<string, unknown> = {};
 
   for (const descriptor of descriptors) {
     if (descriptor.authoring?.field) {
@@ -188,6 +191,15 @@ export function assembleAuthoringContributions(
         'pslBlock',
       );
     }
+    if (descriptor.authoring?.modelAttributes) {
+      mergeAuthoringNamespaces(
+        modelAttributes,
+        descriptor.authoring.modelAttributes,
+        [],
+        'modelAttribute',
+        'modelAttribute',
+      );
+    }
   }
 
   const fieldNamespace = field as AuthoringFieldNamespace;
@@ -197,11 +209,16 @@ export function assembleAuthoringContributions(
     AuthoringPslBlockDescriptorNamespace,
     'merge target accumulator narrows to typed namespace post-merge'
   >(pslBlockDescriptors);
+  const modelAttributeNamespace = blindCast<
+    AuthoringModelAttributeDescriptorNamespace,
+    'merge target accumulator narrows to typed namespace post-merge'
+  >(modelAttributes);
   assertNoCrossRegistryCollisions(
     typeNamespace,
     fieldNamespace,
     entityTypeNamespace,
     pslBlockDescriptorNamespace,
+    modelAttributeNamespace,
   );
 
   return {
@@ -209,6 +226,7 @@ export function assembleAuthoringContributions(
     type: typeNamespace,
     entityTypes: entityTypeNamespace,
     pslBlockDescriptors: pslBlockDescriptorNamespace,
+    modelAttributes: modelAttributeNamespace,
   };
 }
 

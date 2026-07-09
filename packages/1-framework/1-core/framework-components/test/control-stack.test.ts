@@ -133,6 +133,7 @@ describe('assembleAuthoringContributions', () => {
       type: {},
       entityTypes: {},
       pslBlockDescriptors: {},
+      modelAttributes: {},
     });
   });
 
@@ -1030,6 +1031,7 @@ describe('createControlStack', () => {
       type: {},
       entityTypes: {},
       pslBlockDescriptors: {},
+      modelAttributes: {},
     });
   });
 });

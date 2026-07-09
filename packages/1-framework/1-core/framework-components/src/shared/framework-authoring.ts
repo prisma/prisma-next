@@ -358,6 +358,72 @@ export type AuthoringPslBlockDescriptorNamespace = {
   readonly [name: string]: AuthoringPslBlockDescriptor | AuthoringPslBlockDescriptorNamespace;
 };
 
+/**
+ * Context surfaced to a model-attribute lowering at call time: the entity
+ * context shared with entity-type factories, plus the declaring model's
+ * name, its mapped storage table name, and the namespace id the lowered
+ * entity should be filed under.
+ */
+export interface AuthoringModelAttributeContext extends AuthoringEntityContext {
+  readonly modelName: string;
+  readonly tableName: string;
+  readonly namespaceId: string;
+}
+
+/**
+ * What a model-attribute lowering returns when it produces an entity: `key`
+ * is the identity the entity is stored under within its `entries` slot
+ * (`entries[attribute][key]`); `entity` is the value stored there. A
+ * lowering that instead pushed a diagnostic through
+ * {@link AuthoringModelAttributeContext.diagnostics} returns `undefined` —
+ * the same convention {@link AuthoringEntityTypeFactoryOutput} uses.
+ */
+export interface AuthoringModelAttributeLoweringOutput {
+  readonly key: string;
+  readonly entity: unknown;
+}
+
+/**
+ * Declarative descriptor for an extension-contributed `@@` model attribute.
+ *
+ * An extension registers one of these per bare attribute name it
+ * contributes (e.g. `rls`, no arguments). The framework owns the generic
+ * consult in the interpreter's model-attribute loop; the contribution
+ * supplies only `spec` and `lower`.
+ *
+ * - `attribute` is the bare `@@` attribute name this descriptor claims and,
+ *   by the one-string rule, the `entries` slot its lowered entities are
+ *   grouped under (`entries[attribute][key]`).
+ * - `spec` is opaque to the framework core: an ADR-231 attribute-spec kit
+ *   `AttributeSpec<Out>` value (`modelAttribute(name, {...})` from
+ *   `@prisma-next/psl-parser`). Framework core does not depend on
+ *   psl-parser and never inspects this field; the SQL interpreter, which
+ *   does depend on psl-parser, parses the attribute's arguments against it.
+ * - `lower` receives the parsed arguments and the declaring model's
+ *   context, and returns the entity to file into `entries`, or `undefined`
+ *   after pushing a diagnostic via `ctx.diagnostics`.
+ *
+ * `Out` defaults to `never` — not `unknown` — for the same contravariance
+ * reason documented on {@link AuthoringEntityTypeFactoryOutput}: a concrete
+ * pack literal's narrower `lower(parsed: ConcreteOut, ctx)` is only
+ * assignable to this base shape when the base parameter is the bottom type.
+ */
+export interface AuthoringModelAttributeDescriptor<Out = never> {
+  readonly kind: 'modelAttribute';
+  readonly attribute: string;
+  readonly spec: unknown;
+  readonly lower: (
+    parsed: Out,
+    ctx: AuthoringModelAttributeContext,
+  ) => AuthoringModelAttributeLoweringOutput | undefined;
+}
+
+export type AuthoringModelAttributeDescriptorNamespace = {
+  readonly [name: string]:
+    | AuthoringModelAttributeDescriptor
+    | AuthoringModelAttributeDescriptorNamespace;
+};
+
 export interface AuthoringContributions {
   readonly type?: AuthoringTypeNamespace;
   readonly field?: AuthoringFieldNamespace;
@@ -374,6 +440,15 @@ export interface AuthoringContributions {
    * registry of descriptors that teach the parser how to read those blocks.
    */
   readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
+  /**
+   * Registry of declarative `@@` model attribute descriptors this
+   * contribution registers, keyed by arbitrary path segments. Each leaf is
+   * an {@link AuthoringModelAttributeDescriptor} that claims a bare model
+   * attribute name. The framework owns the generic consult in the SQL
+   * interpreter's model-attribute loop; the contribution supplies only the
+   * declarative spec and the lowering.
+   */
+  readonly modelAttributes?: AuthoringModelAttributeDescriptorNamespace;
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
@@ -416,6 +491,12 @@ export function isAuthoringPslBlockDescriptor(
   value: AuthoringPslBlockDescriptor | AuthoringPslBlockDescriptorNamespace,
 ): value is AuthoringPslBlockDescriptor {
   return 'kind' in value && value.kind === 'pslBlock';
+}
+
+export function isAuthoringModelAttributeDescriptor(
+  value: AuthoringModelAttributeDescriptor | AuthoringModelAttributeDescriptorNamespace,
+): value is AuthoringModelAttributeDescriptor {
+  return 'kind' in value && value.kind === 'modelAttribute';
 }
 
 /**
@@ -498,6 +579,17 @@ function isWellFormedDescriptor(value: unknown, descriptorKind: string): boolean
       if (!('parameters' in value)) return false;
       const parameters = value.parameters;
       return typeof parameters === 'object' && parameters !== null && !Array.isArray(parameters);
+    }
+    case 'modelAttribute': {
+      if (
+        !('attribute' in value) ||
+        typeof value.attribute !== 'string' ||
+        value.attribute.length === 0
+      ) {
+        return false;
+      }
+      if (!('spec' in value)) return false;
+      return 'lower' in value && typeof value.lower === 'function';
     }
     default:
       return false;
@@ -776,11 +868,68 @@ function assertPslBlocksHaveFactories(
   }
 }
 
+function collectModelAttributeEntries(
+  namespace: AuthoringModelAttributeDescriptorNamespace,
+  path: readonly string[] = [],
+): DescriptorEntry[] {
+  const entries: DescriptorEntry[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isAuthoringModelAttributeDescriptor(value)) {
+      // `isAuthoringModelAttributeDescriptor` narrows on `kind` alone; reject a
+      // `kind: 'modelAttribute'` value that is missing the rest of the shape.
+      if (!isWellFormedDescriptor(value, 'modelAttribute')) {
+        throw new Error(
+          `Malformed authoring modelAttribute contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/attribute) but does not satisfy the modelAttribute descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+        );
+      }
+      entries.push({ path: currentPath.join('.'), discriminator: value.attribute });
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const record = blindCast<
+        Readonly<Record<string, unknown>>,
+        'walker descends into modelAttribute namespace'
+      >(value);
+      const hasKind = record['kind'] === 'modelAttribute';
+      const hasAttribute = typeof record['attribute'] === 'string';
+      if (hasKind || (hasAttribute && 'spec' in record)) {
+        throw new Error(
+          `Malformed authoring modelAttribute contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/attribute) but does not satisfy the modelAttribute descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+        );
+      }
+      entries.push(...collectModelAttributeEntries(value, currentPath));
+    }
+  }
+  return entries;
+}
+
+/**
+ * Throws when two modelAttribute contributions — at any paths, even
+ * different ones — claim the same bare `@@` attribute name. Dispatch in the
+ * SQL interpreter is by attribute name, not by registration path, so two
+ * descriptors claiming the same name would have one silently shadow the
+ * other.
+ */
+function assertUniqueModelAttributeNames(entries: readonly DescriptorEntry[]): void {
+  const seen = new Map<string, string>();
+  for (const { path, discriminator: attribute } of entries) {
+    const existing = seen.get(attribute);
+    if (existing !== undefined) {
+      throw new Error(
+        `Duplicate modelAttribute "${attribute}" registered at both "${existing}" and "${path}". Each modelAttribute contribution must claim a unique attribute name.`,
+      );
+    }
+    seen.set(attribute, path);
+  }
+}
+
 export function assertNoCrossRegistryCollisions(
   typeNamespace: AuthoringTypeNamespace,
   fieldNamespace: AuthoringFieldNamespace,
   entityTypeNamespace: AuthoringEntityTypeNamespace = {},
   pslBlockNamespace: AuthoringPslBlockDescriptorNamespace = {},
+  modelAttributeNamespace: AuthoringModelAttributeDescriptorNamespace = {},
 ): void {
   const typePaths = new Set(
     collectDescriptorPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
@@ -814,6 +963,7 @@ export function assertNoCrossRegistryCollisions(
   }
 
   assertPslBlocksHaveFactories(entityTypeNamespace, pslBlockNamespace);
+  assertUniqueModelAttributeNames(collectModelAttributeEntries(modelAttributeNamespace));
 }
 
 export function resolveAuthoringTemplateValue(
