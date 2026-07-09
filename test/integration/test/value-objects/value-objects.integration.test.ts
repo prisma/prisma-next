@@ -84,7 +84,7 @@ function interpretMongoPsl(schema: string) {
     symbolTable: table,
     sourceFile,
     sourceId: 'test.prisma',
-    scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    scalarTypeCodecIds: mongoScalarTypeDescriptors,
   });
 }
 

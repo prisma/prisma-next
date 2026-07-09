@@ -126,7 +126,7 @@ function makeContractFromPsl(): MongoContract {
     symbolTable,
     sourceFile,
     sourceId: 'tasks.prisma',
-    scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    scalarTypeCodecIds: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
   });
   if (!result.ok) {

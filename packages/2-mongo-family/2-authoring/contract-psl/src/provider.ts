@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
+import { collectScalarTypeConstructors } from '@prisma-next/framework-components/authoring';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
@@ -57,11 +58,17 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
           });
         }
 
+        const scalarTypeCodecIds: ReadonlyMap<string, string> = new Map(
+          [...collectScalarTypeConstructors(context.authoringContributions.type)].map(
+            ([name, output]) => [name, output.codecId],
+          ),
+        );
+
         const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
         const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
           document,
           sourceFile,
-          scalarTypes: [...context.scalarTypeDescriptors.keys()],
+          scalarTypes: [...scalarTypeCodecIds.keys()],
           pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
         });
 
@@ -77,7 +84,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
           sourceFile,
           sourceId: schemaPath,
           seedDiagnostics,
-          scalarTypeDescriptors: context.scalarTypeDescriptors,
+          scalarTypeCodecIds,
           codecLookup: context.codecLookup,
           authoringContributions: context.authoringContributions,
           ...ifDefined('enumInferenceCodecs', options?.enumInferenceCodecs),
