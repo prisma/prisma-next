@@ -586,8 +586,9 @@ function generateTableLiteralType(table: StorageTable): string {
         ? `; readonly typeParams: ${serializeTypeParamsLiteral(col.typeParams)}`
         : '';
     const typeRefSpec = col.typeRef ? `; readonly typeRef: ${serializeValue(col.typeRef)}` : '';
+    const manySpec = col.many === true ? '; readonly many: true' : '';
     columns.push(
-      `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable}${defaultSpec}${typeParamsSpec}${typeRefSpec} }`,
+      `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable}${manySpec}${defaultSpec}${typeParamsSpec}${typeRefSpec} }`,
     );
   }
 

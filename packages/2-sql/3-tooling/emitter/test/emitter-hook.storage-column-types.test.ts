@@ -1053,4 +1053,37 @@ describe('StorageColumnTypes', () => {
       "readonly labels: ReadonlyArray<CodecTypes['pg/text@1']['input']> | null",
     );
   });
+
+  it('projects many: true onto the storage table column literal for a native many[] column', () => {
+    const contract = createContract({
+      models: {
+        Post: {
+          storage: { table: 'post', fields: { tags: { column: 'tags' } } },
+          fields: {
+            tags: { nullable: false, many: true, type: { kind: 'scalar', codecId: 'pg/text@1' } },
+          },
+          relations: {},
+        },
+      },
+      storage: {
+        tables: {
+          post: {
+            columns: {
+              tags: { nativeType: 'text', codecId: 'pg/text@1', nullable: false, many: true },
+            },
+            primaryKey: { columns: ['tags'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+
+    const dts = generateContractDts(contract, sqlEmission, [], testHashes);
+
+    expect(dts).toContain(
+      "readonly tags: { readonly nativeType: 'text'; readonly codecId: 'pg/text@1'; readonly nullable: false; readonly many: true }",
+    );
+  });
 });

@@ -96,6 +96,32 @@ describe('OperationRegistry', () => {
     ).not.toThrow();
   });
 
+  it('accepts a list (many) self', () => {
+    const registry = createOperationRegistry();
+
+    expect(() => registry.register('has', descriptor({ self: { many: true } }))).not.toThrow();
+  });
+
+  it('accepts a list (many) self with elementTraits', () => {
+    const registry = createOperationRegistry();
+
+    expect(() =>
+      registry.register('has', descriptor({ self: { many: true, elementTraits: ['equality'] } })),
+    ).not.toThrow();
+  });
+
+  it('throws when self combines many with codecId', () => {
+    const registry = createOperationRegistry();
+
+    expect(() =>
+      registry.register('bad', {
+        // @ts-expect-error — SelfSpec disallows many alongside codecId
+        self: { many: true, codecId: 'pg/text@1' },
+        impl: noopImpl,
+      }),
+    ).toThrow('Operation "bad" self has both codecId and traits');
+  });
+
   it('accepts self-less operation', () => {
     const registry = createOperationRegistry();
 

@@ -33,7 +33,7 @@ export type Expression<T extends ScopeField> = QueryOperationReturn & {
   buildAst(): AstExpression;
 };
 
-type CodecIdsWithTrait<
+export type CodecIdsWithTrait<
   CT extends Record<string, { readonly input: unknown }>,
   RequiredTraits extends readonly string[],
 > = {

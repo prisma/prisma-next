@@ -10,8 +10,14 @@ export interface ReturnSpec {
 }
 
 export type SelfSpec =
-  | { readonly codecId: string; readonly traits?: never }
-  | { readonly traits: readonly string[]; readonly codecId?: never };
+  | { readonly codecId: string; readonly traits?: never; readonly many?: never }
+  | { readonly traits: readonly string[]; readonly codecId?: never; readonly many?: never }
+  | {
+      readonly many: true;
+      readonly elementTraits?: readonly string[];
+      readonly codecId?: never;
+      readonly traits?: never;
+    };
 
 export interface OperationEntry {
   readonly self?: SelfSpec;
@@ -42,10 +48,12 @@ export function createOperationRegistry<
       if (descriptor.self) {
         const hasCodecId = descriptor.self.codecId !== undefined;
         const hasTraits = descriptor.self.traits !== undefined && descriptor.self.traits.length > 0;
-        if (!hasCodecId && !hasTraits) {
+        const hasMany = descriptor.self.many === true;
+        const targetCount = Number(hasCodecId) + Number(hasTraits) + Number(hasMany);
+        if (targetCount === 0) {
           throw new Error(`Operation "${name}" self has neither codecId nor traits`);
         }
-        if (hasCodecId && hasTraits) {
+        if (targetCount > 1) {
           throw new Error(`Operation "${name}" self has both codecId and traits`);
         }
       }

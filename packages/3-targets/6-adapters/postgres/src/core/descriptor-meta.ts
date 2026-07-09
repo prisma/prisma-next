@@ -1,8 +1,14 @@
 import type { CodecControlHooks, ExpandNativeTypeInput } from '@prisma-next/family-sql/control';
+import type { AnyExpression } from '@prisma-next/sql-relational-core/ast';
+import { LiteralExpr } from '@prisma-next/sql-relational-core/ast';
 import {
   buildOperation,
   type CodecExpression,
+  type CodecIdsWithTrait,
+  type CodecValue,
+  codecOf,
   type Expression,
+  type ScalarListExpression,
   type TraitExpression,
   toExpr,
 } from '@prisma-next/sql-relational-core/expression';
@@ -38,6 +44,8 @@ import {
   SQL_VARCHAR_CODEC_ID,
 } from '@prisma-next/target-postgres/codec-ids';
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
+import { blindCast } from '@prisma-next/utils/casts';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { QueryOperationTypes } from '../types/operation-types';
 
 // ============================================================================ Helper functions for reducing boilerplate ============================================================================
@@ -133,6 +141,24 @@ const identityHooks: CodecControlHooks = { expandNativeType: ({ nativeType }) =>
 
 type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
 
+/**
+ * Lower a whole-array operand for the array filter ops. A raw JS array renders
+ * as a `ARRAY[...]` literal; a list expression (another list column) is lowered
+ * through its own AST.
+ */
+function arrayOperandToExpr(operand: unknown): AnyExpression {
+  return Array.isArray(operand) ? LiteralExpr.of(operand) : toExpr(operand);
+}
+
+/** Element {@link CodecRef} for a list receiver, preserving type params when present. */
+function elementCodecOf(self: unknown) {
+  const listCodec = codecOf(self);
+  if (listCodec === undefined) return undefined;
+  return listCodec.typeParams === undefined
+    ? { codecId: listCodec.codecId }
+    : { codecId: listCodec.codecId, typeParams: listCodec.typeParams };
+}
+
 export function postgresQueryOperations<CT extends CodecTypesBase>(): QueryOperationTypes<CT> {
   return {
     ilike: {
@@ -146,6 +172,256 @@ export function postgresQueryOperations<CT extends CodecTypesBase>(): QueryOpera
           args: [toExpr(self), toExpr(pattern, { codecId: PG_TEXT_CODEC_ID })],
           returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
           lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} ILIKE {{arg0}}' },
+        });
+      },
+    },
+    has: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        elem: CodecExpression<CodecId, false, CT>,
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        const listCodec = codecOf(self);
+        const elementCodec =
+          listCodec === undefined
+            ? undefined
+            : listCodec.typeParams === undefined
+              ? { codecId: listCodec.codecId }
+              : { codecId: listCodec.codecId, typeParams: listCodec.typeParams };
+        return buildOperation({
+          method: 'has',
+          args: [toExpr(self), toExpr(elem, elementCodec)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'infix',
+            template: '{{arg0}} = ANY({{self}})',
+          },
+        });
+      },
+    },
+    arrayContains: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        other: readonly CodecValue<CodecId, false, CT>[] | ScalarListExpression<CodecId, false>,
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'arrayContains',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} @> {{arg0}}' },
+        });
+      },
+    },
+    containedBy: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        other: readonly CodecValue<CodecId, false, CT>[] | ScalarListExpression<CodecId, false>,
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'containedBy',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} <@ {{arg0}}' },
+        });
+      },
+    },
+    overlaps: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        other: readonly CodecValue<CodecId, false, CT>[] | ScalarListExpression<CodecId, false>,
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'overlaps',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} && {{arg0}}' },
+        });
+      },
+    },
+    eq: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['equality']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'eq',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} = {{arg0}}' },
+        });
+      },
+    },
+    ne: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['equality']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'ne',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} <> {{arg0}}' },
+        });
+      },
+    },
+    gt: {
+      self: { many: true, elementTraits: ['order'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['order']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'gt',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} > {{arg0}}' },
+        });
+      },
+    },
+    lt: {
+      self: { many: true, elementTraits: ['order'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['order']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'lt',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} < {{arg0}}' },
+        });
+      },
+    },
+    gte: {
+      self: { many: true, elementTraits: ['order'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['order']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'gte',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} >= {{arg0}}' },
+        });
+      },
+    },
+    lte: {
+      self: { many: true, elementTraits: ['order'] },
+      impl: <CodecId extends CodecIdsWithTrait<CT, ['order']>>(
+        self: ScalarListExpression<CodecId, false>,
+        other: ScalarListExpression<CodecId, false> | readonly CodecValue<CodecId, false, CT>[],
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'lte',
+          args: [toExpr(self), arrayOperandToExpr(other)],
+          returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} <= {{arg0}}' },
+        });
+      },
+    },
+    length: {
+      self: { many: true },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+      ): Expression<{ codecId: 'pg/int4@1'; nullable: false }> => {
+        return buildOperation({
+          method: 'length',
+          args: [toExpr(self)],
+          returns: { codecId: PG_INT4_CODEC_ID, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: 'cardinality({{self}})',
+          },
+        });
+      },
+    },
+    index: {
+      self: { many: true },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        i: CodecExpression<'pg/int4@1', false, CT>,
+      ): Expression<{ codecId: CodecId; nullable: true }> => {
+        const listCodec = codecOf(self);
+        const elementCodec =
+          listCodec === undefined
+            ? undefined
+            : listCodec.typeParams === undefined
+              ? { codecId: listCodec.codecId }
+              : { codecId: listCodec.codecId, typeParams: listCodec.typeParams };
+        return buildOperation<{ codecId: CodecId; nullable: true }>({
+          method: 'index',
+          args: [toExpr(self), toExpr(i, { codecId: PG_INT4_CODEC_ID })],
+          returns: {
+            codecId: blindCast<
+              CodecId,
+              "the element codecId resolved from the list receiver's own codec is, by construction, this op's declared element CodecId; the runtime string can't be tied back to the generic"
+            >(listCodec?.codecId),
+            nullable: true,
+            ...ifDefined('codec', elementCodec),
+          },
+          lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}}[{{arg0}}]' },
+        });
+      },
+    },
+    arrayAppend: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        elem: CodecExpression<CodecId, false, CT>,
+      ): Expression<{ codecId: CodecId; nullable: false; many: true }> => {
+        const elementCodec = elementCodecOf(self);
+        return buildOperation<{ codecId: CodecId; nullable: false; many: true }>({
+          method: 'arrayAppend',
+          args: [toExpr(self), toExpr(elem, elementCodec)],
+          returns: {
+            codecId: blindCast<
+              CodecId,
+              "the element codecId resolved from the list receiver's own codec is, by construction, this op's declared element CodecId; the runtime string can't be tied back to the generic"
+            >(codecOf(self)?.codecId),
+            nullable: false,
+            many: true,
+            ...ifDefined('codec', elementCodec),
+          },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: 'array_append({{self}}, {{arg0}})',
+          },
+        });
+      },
+    },
+    arrayRemove: {
+      self: { many: true, elementTraits: ['equality'] },
+      impl: <CodecId extends keyof CT & string>(
+        self: ScalarListExpression<CodecId, false>,
+        elem: CodecExpression<CodecId, false, CT>,
+      ): Expression<{ codecId: CodecId; nullable: false; many: true }> => {
+        const elementCodec = elementCodecOf(self);
+        return buildOperation<{ codecId: CodecId; nullable: false; many: true }>({
+          method: 'arrayRemove',
+          args: [toExpr(self), toExpr(elem, elementCodec)],
+          returns: {
+            codecId: blindCast<
+              CodecId,
+              "the element codecId resolved from the list receiver's own codec is, by construction, this op's declared element CodecId; the runtime string can't be tied back to the generic"
+            >(codecOf(self)?.codecId),
+            nullable: false,
+            many: true,
+            ...ifDefined('codec', elementCodec),
+          },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: 'array_remove({{self}}, {{arg0}})',
+          },
         });
       },
     },
