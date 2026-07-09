@@ -1934,6 +1934,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:0.14.0
         version: link:../../0-foundation/utils
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       vscode-languageserver:
         specifier: 'catalog:'
         version: 10.0.0

@@ -1,15 +1,18 @@
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findNearestConfigPathForFile } from '@prisma-next/config-loader';
 import type { SymbolTable } from '@prisma-next/psl-parser';
 import { type FormatOptions, format } from '@prisma-next/psl-parser/format';
+import { join } from 'pathe';
 import {
   type CompletionItem,
   type Connection,
   type Diagnostic,
   DiagnosticSeverity,
   DidChangeWatchedFilesNotification,
+  type DocumentDiagnosticReport,
+  DocumentDiagnosticReportKind,
   type FoldingRange,
+  type FullDocumentDiagnosticReport,
   type InitializeParams,
   type InitializeResult,
   type Position,
@@ -25,12 +28,12 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { classifyPslCompletionContext } from './completion-context';
 import { providePslCompletionItems } from './completion-provider';
 import { CONFIG_FILENAME, resolveConfigInputs } from './config-resolution';
-import { ParseDiagnosticSeverity } from './diagnostic-mapping';
+import { type LspDiagnostic, ParseDiagnosticSeverity } from './diagnostic-mapping';
 import { computeFoldingRanges } from './folding-ranges';
 import type { PipelineInputs } from './pipeline';
 import {
-  type CachedDocument,
   createProjectArtifacts,
+  type DocumentArtifacts,
   type ProjectArtifacts,
 } from './project-artifacts';
 import type { SchemaInputSet } from './schema-inputs';
@@ -42,7 +45,7 @@ export interface LanguageServer {
    * Exposed for future features (completion, semantic tokens); nothing consumes
    * them yet.
    */
-  getDocumentAst(uri: string): CachedDocument | undefined;
+  getDocumentAst(uri: string): DocumentArtifacts | undefined;
   getProjectSymbolTable(uri: string): SymbolTable | undefined;
 }
 
@@ -58,17 +61,32 @@ interface ProjectState {
   readonly artifacts: ProjectArtifacts;
 }
 
+/**
+ * One entry per managed config: either the load in flight or the loaded
+ * project — never both, never a settled load without an entry decision.
+ */
+type ManagedProject =
+  | {
+      readonly status: 'loading';
+      readonly load: Promise<ProjectState>;
+      /**
+       * Whether a loaded project existed when this load (chain) began — a
+       * failed reload must still clear the markers push clients were shown,
+       * while a failed first load must not publish anything.
+       */
+      readonly hadLoadedProject: boolean;
+    }
+  | { readonly status: 'loaded'; readonly project: ProjectState };
+
 const semanticTokenSourceLimit = 100_000;
 
 export function createServer(connection: Connection): LanguageServer {
   const documents = new TextDocuments(TextDocument);
-  const projects = new Map<string, ProjectState>();
-  const projectLoads = new Map<string, Promise<ProjectState>>();
+  const managedProjects = new Map<string, ManagedProject>();
   const documentConfigPaths = new Map<string, string>();
   let rootPath = process.cwd();
   let watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
-  let supportsWatchedFilesRegistration = false;
-  let clientSupportsSnippets = false;
+  let clientCapabilities = noClientCapabilities;
   let disposed = false;
 
   function sendDiagnostics(params: PublishDiagnosticsParams): void {
@@ -95,27 +113,43 @@ export function createServer(connection: Connection): LanguageServer {
       documentConfigPaths.delete(uri);
       return;
     }
-    const computed = project.artifacts.update(
-      uri,
-      document.getText(),
-      project.inputs,
-      project.controlStack,
-    );
-    if (computed === null) {
+    const artifacts = project.artifacts.document(uri);
+    if (artifacts === undefined) {
       sendDiagnostics({ uri, diagnostics: [] });
       return;
     }
-    const diagnostics: Diagnostic[] = computed.map((diagnostic) => ({
-      range: diagnostic.range,
-      message: diagnostic.message,
-      code: diagnostic.code,
-      severity: toLspSeverity(diagnostic.severity),
-      source: 'prisma-next',
-    }));
-    sendDiagnostics({ uri, diagnostics });
+    sendDiagnostics({ uri, diagnostics: toDiagnostics(artifacts.diagnostics) });
+  }
+
+  /**
+   * Project-scoped so a future multi-input symbol table can attach
+   * `relatedDocuments` for cross-file effects.
+   */
+  function buildDocumentDiagnosticReport(
+    project: ProjectState,
+    uri: string,
+  ): FullDocumentDiagnosticReport {
+    const artifacts = project.artifacts.document(uri);
+    return {
+      kind: DocumentDiagnosticReportKind.Full,
+      items: artifacts === undefined ? [] : toDiagnostics(artifacts.diagnostics),
+    };
   }
 
   async function resolveProjectForDocument(uri: string): Promise<ProjectState | undefined> {
+    const project = await projectForNearestConfig(uri);
+    if (project === undefined || project.inputs.includes(uri)) {
+      return project;
+    }
+    // Only the config's declared inputs are managed: a stray document beside
+    // a config keeps no association, so reads and events never reach it — and
+    // a project it alone caused to load is dropped again.
+    documentConfigPaths.delete(uri);
+    dropProjectWithoutManagedDocuments(project.configPath);
+    return undefined;
+  }
+
+  async function projectForNearestConfig(uri: string): Promise<ProjectState | undefined> {
     const knownConfigPath = documentConfigPaths.get(uri);
     if (knownConfigPath !== undefined) {
       const project = await resolveProjectIfLoadable(knownConfigPath);
@@ -130,7 +164,13 @@ export function createServer(connection: Connection): LanguageServer {
       return undefined;
     }
 
-    const configPath = await findNearestConfigPathForFile(filePath);
+    let configPath: string | undefined;
+    try {
+      configPath = await findNearestConfigPathForFile(filePath);
+    } catch {
+      // Config discovery walks the filesystem; a failure means "no project".
+      return undefined;
+    }
     if (configPath === undefined) {
       return undefined;
     }
@@ -153,40 +193,62 @@ export function createServer(connection: Connection): LanguageServer {
   }
 
   async function resolveProject(configPath: string): Promise<ProjectState> {
-    const existing = projects.get(configPath);
-    if (existing !== undefined) {
-      return existing;
+    const entry = managedProjects.get(configPath);
+    if (entry === undefined) {
+      return startProjectLoad(configPath);
     }
-    const existingLoad = projectLoads.get(configPath);
-    if (existingLoad !== undefined) {
-      return existingLoad;
-    }
-    return queueProjectLoad(configPath);
+    return entry.status === 'loaded' ? entry.project : entry.load;
   }
 
   function refreshProject(configPath: string): Promise<ProjectState> {
-    return queueProjectLoad(configPath);
+    return startProjectLoad(configPath);
   }
 
-  function queueProjectLoad(configPath: string): Promise<ProjectState> {
-    const previousLoad = projectLoads.get(configPath) ?? Promise.resolve();
-    const load = previousLoad
+  // A load replaces the entry with `loading` immediately, so reads during a
+  // config reload await the fresh resolution instead of the pre-reload
+  // project. A failed load leaves its entry in place — every awaiter funnels
+  // the failure into `stopManagingProject`, which needs the entry to decide
+  // whether push clears are owed.
+  function startProjectLoad(configPath: string): Promise<ProjectState> {
+    const existing = managedProjects.get(configPath);
+    const previousLoad = existing?.status === 'loading' ? existing.load : undefined;
+    const hadLoadedProject =
+      existing?.status === 'loaded' ||
+      (existing?.status === 'loading' && existing.hadLoadedProject);
+    const load: Promise<ProjectState> = (previousLoad ?? Promise.resolve(undefined))
       .catch(() => undefined)
       .then(() => loadProject(configPath))
-      .finally(() => {
-        if (projectLoads.get(configPath) === load) {
-          projectLoads.delete(configPath);
+      .then((project) => {
+        // A load that outlives the last association must not keep a project
+        // entry alive.
+        if (isCurrentLoad(configPath, load)) {
+          if (hasManagedDocuments(configPath)) {
+            managedProjects.set(configPath, { status: 'loaded', project });
+          } else {
+            managedProjects.delete(configPath);
+          }
         }
+        return project;
       });
-    projectLoads.set(configPath, load);
+    managedProjects.set(configPath, { status: 'loading', load, hadLoadedProject });
     return load;
+  }
+
+  function isCurrentLoad(configPath: string, load: Promise<ProjectState>): boolean {
+    const entry = managedProjects.get(configPath);
+    return entry?.status === 'loading' && entry.load === load;
   }
 
   async function loadProject(configPath: string): Promise<ProjectState> {
     const resolution = await resolveConfigInputs(configPath);
-    // Preserve open-document ASTs across config reloads; the project symbol table
-    // refreshes on the next publish against the new stack.
-    const artifacts = projects.get(configPath)?.artifacts ?? createProjectArtifacts();
+    // A fresh store per load: a config reload can change what a parse
+    // produces (inputs, control stack), so later reads must derive from the
+    // new resolution rather than anything computed under the old one.
+    const artifacts = createProjectArtifacts({
+      inputs: resolution.inputs,
+      controlStack: resolution.controlStack,
+      getText: (uri) => documents.get(uri)?.getText(),
+    });
     const project: ProjectState =
       resolution.formatter === undefined
         ? {
@@ -202,16 +264,18 @@ export function createServer(connection: Connection): LanguageServer {
             controlStack: resolution.controlStack,
             artifacts,
           };
-    projects.set(configPath, project);
     return project;
   }
 
   function stopManagingProject(configPath: string): void {
-    const hadProject = projects.delete(configPath);
+    const entry = managedProjects.get(configPath);
+    const hadProject =
+      entry?.status === 'loaded' || (entry?.status === 'loading' && entry.hadLoadedProject);
+    managedProjects.delete(configPath);
     for (const document of documents.all()) {
       if (documentConfigPaths.get(document.uri) === configPath) {
         documentConfigPaths.delete(document.uri);
-        if (hadProject) {
+        if (hadProject && !clientCapabilities.pullDiagnostics) {
           sendDiagnostics({ uri: document.uri, diagnostics: [] });
         }
       }
@@ -222,6 +286,11 @@ export function createServer(connection: Connection): LanguageServer {
     for (const document of documents.all()) {
       const knownConfigPath = documentConfigPaths.get(document.uri);
       if (knownConfigPath === configPath) {
+        if ((await resolveProjectForDocument(document.uri)) === undefined) {
+          // The reload dropped a previously managed document; clear its markers.
+          sendDiagnostics({ uri: document.uri, diagnostics: [] });
+          continue;
+        }
         await publish(document.uri);
         continue;
       }
@@ -253,13 +322,8 @@ export function createServer(connection: Connection): LanguageServer {
       return [];
     }
 
-    let project: ProjectState | undefined;
-    try {
-      project = await resolveProjectForDocument(uri);
-    } catch {
-      return [];
-    }
-    if (project === undefined || !project.inputs.includes(uri)) {
+    const project = await resolveProjectForDocument(uri);
+    if (project === undefined) {
       return [];
     }
 
@@ -298,15 +362,15 @@ export function createServer(connection: Connection): LanguageServer {
       return emptySemanticTokens();
     }
 
-    const cached = project.artifacts.getDocument(uri);
-    if (cached === undefined || cached.text !== text) {
+    const artifacts = project.artifacts.document(uri);
+    if (artifacts === undefined) {
       return emptySemanticTokens();
     }
 
     const source = {
-      document: cached.document,
-      sourceFile: cached.sourceFile,
-      symbolTable: project.artifacts.getSymbolTable(),
+      document: artifacts.document,
+      sourceFile: artifacts.sourceFile,
+      symbolTable: project.artifacts.symbolTable(),
       scalarTypes: project.controlStack.scalarTypes,
     };
     return buildSemanticTokens(source, range);
@@ -318,38 +382,32 @@ export function createServer(connection: Connection): LanguageServer {
       return [];
     }
 
-    let project: ProjectState | undefined;
-    try {
-      project = await resolveProjectForDocument(uri);
-    } catch {
-      return [];
-    }
-    if (project === undefined || !project.inputs.includes(uri)) {
+    const project = await resolveProjectForDocument(uri);
+    if (project === undefined) {
       return [];
     }
 
-    const cached = currentDocumentArtifact(project, uri, document.getText());
-    const symbolTable = project.artifacts.getSymbolTable();
-    if (cached === undefined || symbolTable === undefined) {
+    const artifacts = project.artifacts.document(uri);
+    if (artifacts === undefined) {
       return [];
     }
 
     try {
       const context = classifyPslCompletionContext({
-        document: cached.document,
-        sourceFile: cached.sourceFile,
+        document: artifacts.document,
+        sourceFile: artifacts.sourceFile,
         position,
       });
       return [
         ...providePslCompletionItems({
           context,
-          sourceFile: cached.sourceFile,
+          sourceFile: artifacts.sourceFile,
           candidates: {
             scalarTypes: project.controlStack.scalarTypes,
             pslBlockDescriptors: project.controlStack.pslBlockDescriptors,
-            symbolTable,
+            symbolTable: project.artifacts.symbolTable(),
           },
-          clientSupportsSnippets,
+          clientSupportsSnippets: clientCapabilities.completionSnippets,
         }),
       ];
     } catch {
@@ -357,27 +415,10 @@ export function createServer(connection: Connection): LanguageServer {
     }
   }
 
-  function currentDocumentArtifact(
-    project: ProjectState,
-    uri: string,
-    text: string,
-  ): CachedDocument | undefined {
-    const cached = project.artifacts.getDocument(uri);
-    if (cached?.sourceFile.text === text) {
-      return cached;
-    }
-
-    if (project.artifacts.update(uri, text, project.inputs, project.controlStack) === null) {
-      return undefined;
-    }
-    return project.artifacts.getDocument(uri);
-  }
-
   connection.onInitialize(async (params): Promise<InitializeResult> => {
-    rootPath = resolveRootPath(params.rootUri, params.rootPath);
+    rootPath = resolveRootPath(params);
     watchedConfigGlob = join(rootPath, '**', CONFIG_FILENAME);
-    supportsWatchedFilesRegistration = clientSupportsWatchedFilesRegistration(params);
-    clientSupportsSnippets = clientSupportsCompletionSnippets(params);
+    clientCapabilities = resolveClientCapabilities(params);
 
     return {
       capabilities: {
@@ -390,12 +431,24 @@ export function createServer(connection: Connection): LanguageServer {
           range: true,
         },
         completionProvider: { triggerCharacters: ['.'] },
+        // Both flags reflect the current single-input implementation scope —
+        // not a property of PSL. Once the project symbol table merges multiple
+        // inputs, an edit in one file can change diagnostics in another and
+        // these must flip alongside that work.
+        ...(clientCapabilities.pullDiagnostics
+          ? {
+              diagnosticProvider: {
+                interFileDependencies: false,
+                workspaceDiagnostics: false,
+              },
+            }
+          : {}),
       },
     };
   });
 
   connection.onInitialized(() => {
-    if (supportsWatchedFilesRegistration) {
+    if (clientCapabilities.watchedFilesRegistration) {
       void connection
         .sendRequest(RegistrationRequest.type, {
           registrations: [
@@ -419,13 +472,29 @@ export function createServer(connection: Connection): LanguageServer {
       params.changes.map((change) => filePathFromUri(change.uri)),
     );
     for (const configPath of changedConfigPaths) {
-      try {
-        await refreshProject(configPath);
-      } catch {
-        stopManagingProject(configPath);
-        continue;
+      // Only live (or currently loading) projects are refreshed eagerly, so a
+      // config change cannot resurrect a project dropped when its last input
+      // closed; a config that newly gains an open input is still picked up
+      // lazily below through per-document rediscovery.
+      if (managedProjects.has(configPath)) {
+        try {
+          await refreshProject(configPath);
+        } catch {
+          stopManagingProject(configPath);
+          continue;
+        }
       }
-      await republishOpenDocumentsForConfig(configPath);
+      if (!clientCapabilities.pullDiagnostics) {
+        await republishOpenDocumentsForConfig(configPath);
+      }
+    }
+    if (
+      clientCapabilities.pullDiagnostics &&
+      clientCapabilities.diagnosticsRefresh &&
+      changedConfigPaths.size > 0 &&
+      !disposed
+    ) {
+      void connection.languages.diagnostics.refresh().catch(() => undefined);
     }
   });
 
@@ -439,37 +508,54 @@ export function createServer(connection: Connection): LanguageServer {
     semanticTokensForDocument(params.textDocument.uri, params.range),
   );
 
-  connection.onFoldingRanges(async (params): Promise<FoldingRange[]> => {
-    let project: ProjectState | undefined;
-    try {
-      project = await resolveProjectForDocument(params.textDocument.uri);
-    } catch {
-      return [];
+  connection.languages.diagnostics.on(async (params): Promise<DocumentDiagnosticReport> => {
+    const project = await resolveProjectForDocument(params.textDocument.uri);
+    if (project === undefined) {
+      return { kind: DocumentDiagnosticReportKind.Full, items: [] };
     }
+    return buildDocumentDiagnosticReport(project, params.textDocument.uri);
+  });
+
+  connection.onFoldingRanges(async (params): Promise<FoldingRange[]> => {
+    const project = await resolveProjectForDocument(params.textDocument.uri);
     if (project === undefined) {
       return [];
     }
-    const cached = project.artifacts.getDocument(params.textDocument.uri);
-    if (cached === undefined) {
+    const artifacts = project.artifacts.document(params.textDocument.uri);
+    if (artifacts === undefined) {
       return [];
     }
-    return computeFoldingRanges(cached.document, cached.sourceFile);
+    return computeFoldingRanges(artifacts.document, artifacts.sourceFile);
   });
 
   documents.onDidOpen((event) => {
+    artifactsForDocument(event.document.uri)?.documentChanged(event.document.uri);
+    if (clientCapabilities.pullDiagnostics) {
+      return;
+    }
     publishSafely(event.document.uri);
   });
   documents.onDidChangeContent((event) => {
+    artifactsForDocument(event.document.uri)?.documentChanged(event.document.uri);
+    if (clientCapabilities.pullDiagnostics) {
+      return;
+    }
     publishSafely(event.document.uri);
   });
   documents.onDidClose((event) => {
     const uri = event.document.uri;
     const configPath = documentConfigPaths.get(uri);
-    if (configPath !== undefined) {
-      projects.get(configPath)?.artifacts.remove(uri);
-    }
+    artifactsForDocument(uri)?.documentClosed(uri);
     documentConfigPaths.delete(uri);
-    sendDiagnostics({ uri, diagnostics: [] });
+    // A live project always has at least one open input; when the last one
+    // closes the project is dropped, and a reopen re-resolves and reloads the
+    // config from scratch.
+    if (configPath !== undefined) {
+      dropProjectWithoutManagedDocuments(configPath);
+    }
+    if (!clientCapabilities.pullDiagnostics) {
+      sendDiagnostics({ uri, diagnostics: [] });
+    }
   });
 
   documents.listen(connection);
@@ -477,7 +563,31 @@ export function createServer(connection: Connection): LanguageServer {
 
   function artifactsForDocument(uri: string): ProjectArtifacts | undefined {
     const configPath = documentConfigPaths.get(uri);
-    return configPath === undefined ? undefined : projects.get(configPath)?.artifacts;
+    if (configPath === undefined) {
+      return undefined;
+    }
+    const entry = managedProjects.get(configPath);
+    return entry?.status === 'loaded' ? entry.project.artifacts : undefined;
+  }
+
+  function hasManagedDocuments(configPath: string): boolean {
+    for (const managedConfigPath of documentConfigPaths.values()) {
+      if (managedConfigPath === configPath) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Deletes only loaded entries: an in-flight load settles through the
+  // association check in startProjectLoad and cleans up after itself.
+  function dropProjectWithoutManagedDocuments(configPath: string): void {
+    if (hasManagedDocuments(configPath)) {
+      return;
+    }
+    if (managedProjects.get(configPath)?.status === 'loaded') {
+      managedProjects.delete(configPath);
+    }
   }
 
   return {
@@ -485,13 +595,25 @@ export function createServer(connection: Connection): LanguageServer {
       disposed = true;
       connection.dispose();
     },
-    getDocumentAst: (uri) => artifactsForDocument(uri)?.getDocument(uri),
-    getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.getSymbolTable(),
+    getDocumentAst: (uri) => artifactsForDocument(uri)?.document(uri),
+    // `| undefined` only because the uri may be unmanaged (closed, non-input,
+    // or projectless); a managed document's project always yields a symbolTable.
+    getProjectSymbolTable: (uri) => artifactsForDocument(uri)?.symbolTable(),
   };
 }
 
 function emptySemanticTokens(): SemanticTokens {
   return { data: [] };
+}
+
+function toDiagnostics(computed: readonly LspDiagnostic[]): Diagnostic[] {
+  return computed.map((diagnostic) => ({
+    range: diagnostic.range,
+    message: diagnostic.message,
+    code: diagnostic.code,
+    severity: toLspSeverity(diagnostic.severity),
+    source: 'prisma-next',
+  }));
 }
 
 function toLspSeverity(severity: number): DiagnosticSeverity {
@@ -507,23 +629,43 @@ function toLspSeverity(severity: number): DiagnosticSeverity {
   }
 }
 
-function clientSupportsWatchedFilesRegistration(params: InitializeParams): boolean {
-  return params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true;
+interface ResolvedClientCapabilities {
+  readonly watchedFilesRegistration: boolean;
+  readonly completionSnippets: boolean;
+  readonly pullDiagnostics: boolean;
+  readonly diagnosticsRefresh: boolean;
 }
 
-function clientSupportsCompletionSnippets(params: InitializeParams): boolean {
-  return params.capabilities.textDocument?.completion?.completionItem?.snippetSupport === true;
+const noClientCapabilities: ResolvedClientCapabilities = {
+  watchedFilesRegistration: false,
+  completionSnippets: false,
+  pullDiagnostics: false,
+  diagnosticsRefresh: false,
+};
+
+function resolveClientCapabilities(params: InitializeParams): ResolvedClientCapabilities {
+  return {
+    watchedFilesRegistration:
+      params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true,
+    completionSnippets:
+      params.capabilities.textDocument?.completion?.completionItem?.snippetSupport === true,
+    pullDiagnostics: params.capabilities.textDocument?.diagnostic !== undefined,
+    diagnosticsRefresh: params.capabilities.workspace?.diagnostics?.refreshSupport === true,
+  };
 }
 
-function resolveRootPath(
-  rootUri: string | null | undefined,
-  rootPath: string | null | undefined,
-): string {
-  if (rootUri) {
-    return fileURLToPath(rootUri);
+function resolveRootPath(params: InitializeParams): string {
+  // Single-root scope: the first workspace folder wins; multi-root workspaces
+  // are out of scope. `rootUri` / `rootPath` are the deprecated fallbacks.
+  const workspaceFolder = params.workspaceFolders?.[0];
+  if (workspaceFolder !== undefined) {
+    return fileURLToPath(workspaceFolder.uri);
   }
-  if (rootPath) {
-    return rootPath;
+  if (params.rootUri) {
+    return fileURLToPath(params.rootUri);
+  }
+  if (params.rootPath) {
+    return params.rootPath;
   }
   return process.cwd();
 }
