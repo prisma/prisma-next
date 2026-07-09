@@ -112,6 +112,19 @@ describe('mongo() facade', () => {
     expect(mocks.createMongoRuntime).not.toHaveBeenCalled();
   });
 
+  it('forwards custom collections to mongoOrm', () => {
+    class FakeRepository {}
+    mongo({
+      contract: fakeContract,
+      url: 'mongodb://localhost:27017/mydb',
+      collections: { User: FakeRepository },
+    });
+
+    expect(mocks.mongoOrm).toHaveBeenCalledWith(
+      expect.objectContaining({ collections: { User: FakeRepository } }),
+    );
+  });
+
   it('builds the runtime exactly once on the first runtime() call from a url', async () => {
     const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
 

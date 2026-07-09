@@ -32,6 +32,7 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
+import { blindCast } from '@prisma-next/utils/casts';
 import type { MongoIncludeExpr } from './collection-state';
 import { emptyCollectionState, type MongoCollectionState } from './collection-state';
 import { compileMongoQuery } from './compile';
@@ -154,7 +155,34 @@ function resolveCollectionName(model: MongoModelDefinition, modelName: string): 
   return model.storage.collection ?? modelName;
 }
 
-class MongoCollectionImpl<
+type MongoCollectionConstructor<
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
+  ModelName extends string & keyof MongoModelsMap<TContract>,
+  TIncludes extends MongoIncludeSpec<TContract, ModelName>,
+  TVariant extends string,
+> = new (
+  contract: TContract,
+  modelName: ModelName,
+  executor: MongoQueryExecutor,
+) => Collection<TContract, ModelName, TIncludes, TVariant>;
+
+/**
+ * The extendable Mongo ORM collection ([ADR 175](../../../../../docs/architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md)).
+ * Subclass it to add domain methods that start chains, mirroring the SQL ORM's
+ * `Collection`:
+ *
+ * ```typescript
+ * class UserRepository extends Collection<Contract, 'User'> {
+ *   byName(name: string) { return this.where({ name }); }
+ * }
+ * ```
+ *
+ * Register subclasses via `mongoOrm({ collections: { User: UserRepository } })` (keyed
+ * by model name). Chaining methods clone through `this.constructor`, so a chain started
+ * from a subclass stays an instance of that subclass. Subclasses must keep the base
+ * constructor signature `(contract, modelName, executor)`.
+ */
+export class Collection<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
@@ -270,12 +298,7 @@ class MongoCollectionImpl<
 
     return this.#clone({
       includes: [...this.#state.includes, includeExpr],
-    }) as unknown as MongoCollectionImpl<
-      TContract,
-      ModelName,
-      TIncludes & Record<K, true>,
-      TVariant
-    >;
+    }) as unknown as Collection<TContract, ModelName, TIncludes & Record<K, true>, TVariant>;
   }
 
   orderBy(
@@ -804,14 +827,16 @@ class MongoCollectionImpl<
     return { ...data, [model.discriminator.field]: variantEntry.value };
   }
 
+  // Clones instantiate through `this.constructor` so chains started from a custom
+  // subclass keep returning that subclass (same pattern as the SQL ORM Collection).
   #clone(
     overrides: Partial<MongoCollectionState>,
-  ): MongoCollectionImpl<TContract, ModelName, TIncludes, TVariant> {
-    const instance = new MongoCollectionImpl<TContract, ModelName, TIncludes, TVariant>(
-      this.#contract,
-      this.#modelName,
-      this.#executor,
-    );
+  ): Collection<TContract, ModelName, TIncludes, TVariant> {
+    const Ctor = blindCast<
+      MongoCollectionConstructor<TContract, ModelName, TIncludes, TVariant>,
+      'this.constructor is this Collection (sub)class; subclasses keep the base constructor signature'
+    >(this.constructor);
+    const instance = new Ctor(this.#contract, this.#modelName, this.#executor);
     instance.#state = { ...this.#state, ...overrides };
     instance.#collectionName = this.#collectionName;
     instance.#variantName = this.#variantName;
@@ -821,12 +846,12 @@ class MongoCollectionImpl<
   #cloneWithVariant<VNew extends string>(
     overrides: Partial<MongoCollectionState>,
     variantName: string,
-  ): MongoCollectionImpl<TContract, ModelName, TIncludes, VNew> {
-    const instance = new MongoCollectionImpl<TContract, ModelName, TIncludes, VNew>(
-      this.#contract,
-      this.#modelName,
-      this.#executor,
-    );
+  ): Collection<TContract, ModelName, TIncludes, VNew> {
+    const Ctor = blindCast<
+      MongoCollectionConstructor<TContract, ModelName, TIncludes, VNew>,
+      'this.constructor is this Collection (sub)class; subclasses keep the base constructor signature'
+    >(this.constructor);
+    const instance = new Ctor(this.#contract, this.#modelName, this.#executor);
     instance.#state = { ...this.#state, ...overrides };
     instance.#collectionName = this.#collectionName;
     instance.#variantName = variantName;
@@ -842,5 +867,5 @@ export function createMongoCollection<
   modelName: ModelName,
   executor: MongoQueryExecutor,
 ): MongoCollection<TContract, ModelName> {
-  return new MongoCollectionImpl(contract, modelName, executor);
+  return new Collection(contract, modelName, executor);
 }

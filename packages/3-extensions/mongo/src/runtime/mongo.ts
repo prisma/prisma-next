@@ -6,7 +6,12 @@ import type {
   MongoContract,
   MongoContractWithTypeMaps,
 } from '@prisma-next/mongo-contract';
-import type { MongoOrmClient, MongoQueryPlan, MongoRawClient } from '@prisma-next/mongo-orm';
+import type {
+  AnyMongoCollectionClass,
+  MongoOrmClient,
+  MongoQueryPlan,
+  MongoRawClient,
+} from '@prisma-next/mongo-orm';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import type { MongoMiddleware, MongoRuntime } from '@prisma-next/mongo-runtime';
 import { createMongoRuntime, type MongoExecutionContext } from '@prisma-next/mongo-runtime';
@@ -26,8 +31,9 @@ type UnboundEnums<TContract extends MongoContractWithTypeMaps<MongoContract, Any
 
 export interface MongoClient<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
+  Collections extends Partial<Record<string, AnyMongoCollectionClass>> = Record<never, never>,
 > {
-  readonly orm: MongoOrmClient<TContract>;
+  readonly orm: MongoOrmClient<TContract, Collections>;
   readonly query: MongoStaticContext<TContract>['query'];
   readonly raw: MongoRawClient<TContract>;
   readonly contract: TContract;
@@ -58,10 +64,13 @@ export interface MongoBindingOptions {
 
 export type MongoOptionsWithContract<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
+  Collections extends Partial<Record<string, AnyMongoCollectionClass>> = Record<never, never>,
 > = MongoBindingOptions &
   MongoOptionsBase & {
     readonly contract: TContract;
     readonly contractJson?: never;
+    /** Custom `Collection` subclasses keyed by model name, forwarded to `mongoOrm`. */
+    readonly collections?: Collections;
   };
 
 /**
@@ -71,10 +80,13 @@ export type MongoOptionsWithContract<
  */
 export type MongoOptionsWithContractJson<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
+  Collections extends Partial<Record<string, AnyMongoCollectionClass>> = Record<never, never>,
 > = MongoBindingOptions &
   MongoOptionsBase & {
     readonly contractJson: unknown;
     readonly contract?: never;
+    /** Custom `Collection` subclasses keyed by model name, forwarded to `mongoOrm`. */
+    readonly collections?: Collections;
     /**
      * @internal phantom field; never set at runtime, only references TContract
      * so that strict tsc/biome don't flag the type parameter as unused.
@@ -84,7 +96,10 @@ export type MongoOptionsWithContractJson<
 
 export type MongoOptions<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
-> = MongoOptionsWithContract<TContract> | MongoOptionsWithContractJson<TContract>;
+  Collections extends Partial<Record<string, AnyMongoCollectionClass>> = Record<never, never>,
+> =
+  | MongoOptionsWithContract<TContract, Collections>
+  | MongoOptionsWithContractJson<TContract, Collections>;
 
 function hasContractJson<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
@@ -109,13 +124,18 @@ function resolveContract<
  */
 export default function mongo<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
->(options: MongoOptionsWithContract<TContract>): MongoClient<TContract>;
+  Collections extends Partial<Record<string, AnyMongoCollectionClass>> = Record<never, never>,
+>(options: MongoOptionsWithContract<TContract, Collections>): MongoClient<TContract, Collections>;
 export default function mongo<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
->(options: MongoOptionsWithContractJson<TContract>): MongoClient<TContract>;
+  Collections extends Partial<Record<string, AnyMongoCollectionClass>> = Record<never, never>,
+>(
+  options: MongoOptionsWithContractJson<TContract, Collections>,
+): MongoClient<TContract, Collections>;
 export default function mongo<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
->(options: MongoOptions<TContract>): MongoClient<TContract> {
+  Collections extends Partial<Record<string, AnyMongoCollectionClass>> = Record<never, never>,
+>(options: MongoOptions<TContract, Collections>): MongoClient<TContract, Collections> {
   const contract = resolveContract(options);
   let binding = resolveOptionalMongoBinding(options);
 
@@ -175,9 +195,10 @@ export default function mongo<
     return new AsyncIterableResult(iterate());
   }
 
-  const orm = mongoOrm<TContract>({
+  const orm = mongoOrm<TContract, Collections>({
     contract,
     executor: { execute },
+    ...ifDefined('collections', options.collections),
   });
 
   return {

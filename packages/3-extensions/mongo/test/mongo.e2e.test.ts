@@ -1,3 +1,4 @@
+import { Collection } from '@prisma-next/mongo-orm';
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -115,6 +116,44 @@ describe('mongo() facade — e2e (replica set)', {
         await expect(db.connect({ uri: replSet.getUri(), dbName: 'facade_twice' })).rejects.toThrow(
           'Mongo client already connected',
         );
+      } finally {
+        await db.close();
+      }
+    },
+    timeouts.spinUpMongoMemoryServer,
+  );
+  it(
+    'a custom Collection subclass round-trips through the facade',
+    async () => {
+      class UserRepository extends Collection<Contract, 'User'> {
+        byEmail(email: string) {
+          return this.where({ email });
+        }
+      }
+
+      const db = mongo<Contract, { User: typeof UserRepository }>({
+        contractJson,
+        uri: replSet.getUri(),
+        dbName: 'facade_custom_collection',
+        collections: { User: UserRepository },
+      });
+
+      try {
+        expect(db.orm.users).toBeInstanceOf(UserRepository);
+
+        await db.orm.users.create({
+          name: 'Alice',
+          email: 'alice@example.com',
+          loginCount: 1,
+          tags: ['admin'],
+          homeAddress: null,
+        });
+
+        const alice = await db.orm.users.byEmail('alice@example.com').first();
+        expect(alice?.name).toBe('Alice');
+
+        const chained = db.orm.users.byEmail('alice@example.com');
+        expect(chained).toBeInstanceOf(UserRepository);
       } finally {
         await db.close();
       }

@@ -2,6 +2,8 @@
 
 > **Note (later supersession):** this ADR was written before [ADR 183 — Aggregation pipeline only, never find API](ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md). On the Mongo family, ORM reads compile to aggregation pipelines (`AggregateCommand`) only — `FindCommand` is not a peer compilation target. Wherever this ADR pairs `FindCommand / AggregateCommand`, read `AggregateCommand` only.
 
+> **Status update:** the custom-collection half of the Mongo target has landed: `@prisma-next/mongo-orm` exports an extendable `Collection` class, `mongoOrm({ collections })` / `mongo({ collections })` register subclasses by model name, and chaining preserves the subclass (clone-through-`this.constructor`, as in the SQL ORM). The shared-interface *extraction* (a framework-level `Collection` both families implement) remains future work per "spike then extract".
+
 ## At a glance
 
 The same chaining API works for both families. The consumer doesn't know (or care) whether the data lives in Postgres or MongoDB:
