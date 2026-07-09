@@ -81,6 +81,18 @@ export interface SqlControlTargetDescriptor<
    * capability.
    */
   readonly classifySubjectGranularity: (nodeKind: string) => DiffSubjectGranularity;
+  /**
+   * Classifies a diff-tree node's `nodeKind` into its storage `entityKind` —
+   * the same vocabulary the contract storage's `entries` dictionary keys use
+   * (e.g. `'table'`). Sibling of `classifySubjectGranularity`, resolved the
+   * same way: the target owns the full node vocabulary, so it is the one
+   * place that can resolve this. `undefined` for a node kind with no
+   * storage entity of its own (a column, an index, …). The framework
+   * aggregate's unclaimed-elements sweep reaches this via the family
+   * instance's `classifyEntityKind` capability, so it never hardcodes a
+   * family entity kind.
+   */
+  readonly classifyEntityKind: (nodeKind: string) => string | undefined;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

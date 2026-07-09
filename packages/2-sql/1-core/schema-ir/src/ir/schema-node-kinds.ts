@@ -62,3 +62,25 @@ export function relationalNodeGranularity(nodeKind: string): DiffSubjectGranular
   }
   return RELATIONAL_NODE_GRANULARITY[nodeKind];
 }
+
+/**
+ * The one real map from a relational `nodeKind` to its storage `entityKind`
+ * — the same vocabulary the contract storage's `entries` dictionary keys use
+ * (`elementCoordinates` walks it). Only the whole-table kind has an entity of
+ * its own; every other relational node (a column, an index, …) is nested
+ * under one and maps to nothing here.
+ */
+const RELATIONAL_NODE_ENTITY_KIND: Partial<Readonly<Record<RelationalSchemaNodeKind, string>>> = {
+  [RelationalSchemaNodeKind.table]: 'table',
+};
+
+/**
+ * Looks up the storage `entityKind` for a relational `nodeKind` — sibling of
+ * {@link relationalNodeGranularity}, resolved by `nodeKind` equality against
+ * {@link RELATIONAL_NODE_ENTITY_KIND}. `undefined` for a target-specific kind
+ * (targets map their own kinds directly) or a relational kind with no entity
+ * of its own.
+ */
+export function relationalNodeEntityKind(nodeKind: string): string | undefined {
+  return isRelationalSchemaNodeKind(nodeKind) ? RELATIONAL_NODE_ENTITY_KIND[nodeKind] : undefined;
+}

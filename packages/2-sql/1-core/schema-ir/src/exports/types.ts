@@ -18,6 +18,7 @@ export {
   assertNode,
   PrimaryKey,
   RelationalSchemaNodeKind,
+  relationalNodeEntityKind,
   relationalNodeGranularity,
   SqlCheckConstraintIR,
   SqlColumnDefaultIR,

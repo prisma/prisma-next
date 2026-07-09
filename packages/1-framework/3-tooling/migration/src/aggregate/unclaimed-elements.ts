@@ -17,6 +17,24 @@ export type SchemaSubjectClassifier = (
   issue: SchemaDiffIssue,
 ) => DiffSubjectGranularity | undefined;
 
+/**
+ * Classifies a diff issue's subject storage `entityKind` on demand — the
+ * sibling injected capability (`hasSchemaSubjectClassifier`'s
+ * `classifyEntityKind`) that resolves the same per-family vocabulary the
+ * contract storage's `entries` dictionary uses. This module never hardcodes
+ * a family entity kind; absent for families that classify nothing.
+ */
+export type SchemaEntityKindClassifier = (issue: SchemaDiffIssue) => string | undefined;
+
+/**
+ * Placeholder `entityKind` for a whole-entity issue detected via the
+ * classifier-absent path-shape fallback (no family/target injects a
+ * classifier — e.g. a document family). Not a real family vocabulary term:
+ * no ownership consumer queries `declaresEntity` for a family in this state
+ * today.
+ */
+export const UNCLASSIFIED_ENTITY_KIND = 'unclassified-entity';
+
 function pathIsUnder(path: readonly string[], prefix: readonly string[]): boolean {
   if (path.length < prefix.length) return false;
   return prefix.every((segment, i) => path[i] === segment);
@@ -101,27 +119,25 @@ export function stripExtraFindings(
  * namespace — the same sentinel the aggregate's own coordinate walk uses
  * for those families.
  *
- * `entityKind` is stamped with a hardcoded placeholder value (below) for
- * both path shapes. For the namespace-qualified shape this is exact: on
- * that differ, a whole-entity `'not-expected'` issue is always that one
- * kind — no other storage entity kind is represented as a node in the
- * schema-diff tree. For the bare, single-segment shape (families that
- * stamp no granularity) the placeholder is not a real classification: no
- * ownership consumer queries `declaresEntity` for those families today, so
- * nothing reads this value as true. A family that starts asking ownership
- * questions over a different entity kind needs a real per-family kind here
- * instead of the placeholder.
+ * `entityKind` is asked from the injected `classifyEntityKind` capability —
+ * this module never names a family entity kind itself. Absent a classifier
+ * (the classifier-absent path-shape fallback, e.g. a document family) the
+ * coordinate carries {@link UNCLASSIFIED_ENTITY_KIND}: no ownership
+ * consumer queries `declaresEntity` for a family in that state today, so
+ * nothing reads the value as true.
  */
 function schemaDiffIssueCoordinate(
   issue: SchemaDiffIssue,
   classify?: SchemaSubjectClassifier,
+  classifyEntityKind?: SchemaEntityKindClassifier,
 ): SchemaEntityCoordinate | undefined {
   if (!isWholeEntityIssue(issue, classify)) return undefined;
   const entityName = issue.path[issue.path.length - 1];
   if (entityName === undefined) return undefined;
   const namespaceId =
     issue.path.length === 3 ? (issue.path[1] ?? UNBOUND_NAMESPACE_ID) : UNBOUND_NAMESPACE_ID;
-  return { namespaceId, entityKind: 'table', entityName };
+  const entityKind = classifyEntityKind?.(issue) ?? UNCLASSIFIED_ENTITY_KIND;
+  return { namespaceId, entityKind, entityName };
 }
 
 /**
@@ -134,11 +150,12 @@ function schemaDiffIssueCoordinate(
 export function collectExtraElementCoordinates(
   result: VerifyDatabaseSchemaResult,
   classify?: SchemaSubjectClassifier,
+  classifyEntityKind?: SchemaEntityKindClassifier,
 ): readonly SchemaEntityCoordinate[] {
   const seen = new Map<string, SchemaEntityCoordinate>();
   for (const issue of result.schema.issues) {
     if (issue.reason !== 'not-expected') continue;
-    const coordinate = schemaDiffIssueCoordinate(issue, classify);
+    const coordinate = schemaDiffIssueCoordinate(issue, classify, classifyEntityKind);
     if (coordinate === undefined) continue;
     seen.set(coordinateKey(coordinate), coordinate);
   }

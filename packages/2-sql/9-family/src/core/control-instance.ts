@@ -50,7 +50,11 @@ import type {
   SqlControlTargetDescriptor,
   SqlDescribedContractSpace,
 } from './control-target-descriptor';
-import { classifyDiffSubjectGranularity, verifySqlSchemaByDiff } from './diff/schema-verify';
+import {
+  classifyDiffEntityKind,
+  classifyDiffSubjectGranularity,
+  verifySqlSchemaByDiff,
+} from './diff/schema-verify';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
 import type { SqlSchemaDiffFn } from './migrations/schema-differ';
 import type {
@@ -243,6 +247,15 @@ export interface SqlControlFamilyInstance
    * node vocabulary. Nothing is stamped on the issue or the node.
    */
   classifySubjectGranularity(issue: SchemaDiffIssue): DiffSubjectGranularity | undefined;
+
+  /**
+   * Classifies a diff issue's subject storage `entityKind` on demand,
+   * resolved from its node's `nodeKind` via the target's classifier —
+   * sibling of `classifySubjectGranularity` above, part of the same
+   * {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+   * capability. Nothing is stamped on the issue or the node.
+   */
+  classifyEntityKind(issue: SchemaDiffIssue): string | undefined;
 
   sign(options: {
     readonly driver: SqlControlDriverInstance<string>;
@@ -568,6 +581,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     { readonly classifySubjectGranularity?: (nodeKind: string) => DiffSubjectGranularity },
     'reading the target-descriptor classifySubjectGranularity hook'
   >(target).classifySubjectGranularity;
+  // The target's nodeKind → storage entityKind classifier — sibling of
+  // `targetGranularityOf` above, read the same lazy way for the same
+  // construction-only-stub reason.
+  const targetEntityKindOf = blindCast<
+    { readonly classifyEntityKind?: (nodeKind: string) => string | undefined },
+    'reading the target-descriptor classifyEntityKind hook'
+  >(target).classifyEntityKind;
   // `contract infer` needs each extension pack's already-assembled contract,
   // carried as-is (no merging — that is the contract-spaces machinery's
   // concern), paired with the `spaceId` its descriptor was registered under
@@ -777,6 +797,21 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         );
       }
       return classifyDiffSubjectGranularity(issue, targetGranularityOf);
+    },
+    /**
+     * Classifies a diff issue's subject storage `entityKind` on demand, by
+     * resolving its node's `nodeKind` through the target's classifier —
+     * the sibling of `classifySubjectGranularity` above, and part of the
+     * same {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+     * capability.
+     */
+    classifyEntityKind(issue: SchemaDiffIssue): string | undefined {
+      if (!targetEntityKindOf) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required classifyEntityKind descriptor operation`,
+        );
+      }
+      return classifyDiffEntityKind(issue, targetEntityKindOf);
     },
     async sign(options: {
       readonly driver: SqlControlDriverInstance<string>;

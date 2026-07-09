@@ -10,6 +10,7 @@ import type { ContractMarkerRecordLike } from './marker-types';
 import type { AggregateContractSpace, ContractSpaceAggregate } from './types';
 import {
   collectExtraElementCoordinates,
+  type SchemaEntityKindClassifier,
   type SchemaSubjectClassifier,
   stripExtraFindings,
 } from './unclaimed-elements';
@@ -45,6 +46,14 @@ export interface VerifierInput {
    * in that case. Never stamped onto the issue or the node.
    */
   readonly classifySubjectGranularity?: SchemaSubjectClassifier;
+  /**
+   * Classifies a diff issue's subject storage `entityKind` on demand — the
+   * sibling injected capability read off the family instance alongside
+   * `classifySubjectGranularity`. Absent for families that classify
+   * nothing; the unclaimed-elements sweep falls back to a placeholder in
+   * that case. Never stamped onto the issue or the node.
+   */
+  readonly classifyEntityKind?: SchemaEntityKindClassifier;
 }
 
 /**
@@ -144,6 +153,7 @@ function runVerifyMigration(input: VerifierInput): VerifierOutput {
     mode,
     verifySchemaForSpace,
     classifySubjectGranularity,
+    classifyEntityKind,
   } = input;
   const allSpaces: ReadonlyArray<AggregateContractSpace> = [aggregate.app, ...aggregate.extensions];
   const aggregateSpaceIds = new Set(allSpaces.map((m) => m.spaceId));
@@ -196,7 +206,11 @@ function runVerifyMigration(input: VerifierInput): VerifierOutput {
   for (const space of allSpaces) {
     const result = verifySchemaForSpace(schemaIntrospection, space, mode);
     schemaPerSpace.set(space.spaceId, stripExtraFindings(result, classifySubjectGranularity));
-    for (const coordinate of collectExtraElementCoordinates(result, classifySubjectGranularity)) {
+    for (const coordinate of collectExtraElementCoordinates(
+      result,
+      classifySubjectGranularity,
+      classifyEntityKind,
+    )) {
       extraCoordinates.set(coordinateKey(coordinate), coordinate);
     }
   }

@@ -7,7 +7,10 @@ import type {
   MigrationRunner,
 } from '@prisma-next/framework-components/control';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
-import { relationalNodeGranularity } from '@prisma-next/sql-schema-ir/types';
+import {
+  relationalNodeEntityKind,
+  relationalNodeGranularity,
+} from '@prisma-next/sql-schema-ir/types';
 import { sqliteTargetDescriptorMeta } from './descriptor-meta';
 import { diffSqliteSchema, sqliteContractToSchema } from './migrations/diff-database-schema';
 import { createSqliteMigrationPlanner } from './migrations/planner';
@@ -29,6 +32,7 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
       return diffSqliteSchema(input);
     },
     classifySubjectGranularity: relationalNodeGranularity,
+    classifyEntityKind: relationalNodeEntityKind,
     migrations: {
       createPlanner(adapter: SqlControlAdapter<'sqlite'>): MigrationPlanner<'sql', 'sqlite'> {
         return createSqliteMigrationPlanner(adapter);

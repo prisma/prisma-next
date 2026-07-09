@@ -118,11 +118,15 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
         contract: collectAggregateNamespaces(aggregate),
       });
 
-  // The subject-granularity classifier is an injected capability — not every
-  // family provides one — detected the same way the other optional
-  // per-family capabilities are (`hasSchemaView`, …), never assumed.
+  // The subject-granularity + entity-kind classifiers are an injected
+  // capability — not every family provides one — detected the same way the
+  // other optional per-family capabilities are (`hasSchemaView`, …), never
+  // assumed.
   const classifySubjectGranularity = hasSchemaSubjectClassifier(familyInstance)
     ? (issue: SchemaDiffIssue) => familyInstance.classifySubjectGranularity(issue)
+    : undefined;
+  const classifyEntityKind = hasSchemaSubjectClassifier(familyInstance)
+    ? (issue: SchemaDiffIssue) => familyInstance.classifyEntityKind(issue)
     : undefined;
 
   emitVerifySpan(onProgress, 'spanStart');
@@ -133,6 +137,7 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
     mode: options.mode,
     verifySchemaForSpace: createPerSpaceVerifier(options),
     ...ifDefined('classifySubjectGranularity', classifySubjectGranularity),
+    ...ifDefined('classifyEntityKind', classifyEntityKind),
   });
   return finaliseVerifyResult({ verifyResult, aggregate, skipMarker, onProgress });
 }

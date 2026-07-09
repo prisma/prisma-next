@@ -64,6 +64,23 @@ export function classifyDiffSubjectGranularity(
   return node === undefined ? undefined : granularityOf(node.nodeKind);
 }
 
+/**
+ * Resolves an issue's storage `entityKind` on demand, from the issue's
+ * node's `nodeKind` via the target-provided `entityKindOf` map — the sibling
+ * of {@link classifyDiffSubjectGranularity}, called the same way by the same
+ * consumers (via
+ * {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}).
+ * `undefined` for an issue with no node, or for a node kind with no storage
+ * entity of its own.
+ */
+export function classifyDiffEntityKind(
+  issue: SchemaDiffIssue,
+  entityKindOf: (nodeKind: string) => string | undefined,
+): string | undefined {
+  const node = issueNode(issue);
+  return node === undefined ? undefined : entityKindOf(node.nodeKind);
+}
+
 // ============================================================================
 // Issue classification — subject granularity + reason → target-neutral category
 // ============================================================================

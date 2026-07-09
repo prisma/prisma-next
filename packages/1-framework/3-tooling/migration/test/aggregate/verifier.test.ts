@@ -6,6 +6,10 @@ import { describe, expect, it } from 'vitest';
 import { createContractSpaceAggregate } from '../../src/aggregate/aggregate';
 import type { ContractMarkerRecordLike } from '../../src/aggregate/marker-types';
 import type { AggregateContractSpace, ContractSpaceAggregate } from '../../src/aggregate/types';
+import type {
+  SchemaEntityKindClassifier,
+  SchemaSubjectClassifier,
+} from '../../src/aggregate/unclaimed-elements';
 import { verifyMigration } from '../../src/aggregate/verifier';
 import { makeAggregateContractSpace } from '../fixtures';
 
@@ -75,6 +79,15 @@ const FULL_SCHEMA_VERIFY = (
   };
 };
 
+/**
+ * The classifier fixtures standing in for a real family's
+ * `hasSchemaSubjectClassifier` capability: every `FULL_SCHEMA_VERIFY` issue
+ * is a bare single-segment path naming a whole table, so both classifiers
+ * resolve it the same way regardless of path shape.
+ */
+const CLASSIFY_SUBJECT_GRANULARITY: SchemaSubjectClassifier = () => 'entity';
+const CLASSIFY_ENTITY_KIND: SchemaEntityKindClassifier = () => 'table';
+
 function extraTables(result: VerifyDatabaseSchemaResult | undefined): string[] {
   return (result?.schema.issues ?? [])
     .flatMap((issue) =>
@@ -96,6 +109,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: { tables: {} },
         mode: 'strict',
         verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
       expect(result.ok).toBe(true);
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({ kind: 'absent' });
@@ -118,6 +133,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: { tables: {} },
         mode: 'strict',
         verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({ kind: 'ok' });
     });
@@ -135,6 +152,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: { tables: {} },
         mode: 'strict',
         verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({
         kind: 'hashMismatch',
@@ -163,6 +182,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: { tables: {} },
         mode: 'strict',
         verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
       expect(result.assertOk().markerCheck.perSpace.get('cipher')).toEqual({
         kind: 'missingInvariants',
@@ -185,6 +206,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: { tables: {} },
         mode: 'strict',
         verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
       expect(result.assertOk().markerCheck.orphanMarkers.map((o) => o.spaceId)).toEqual([
         'cipher',
@@ -219,6 +242,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: liveSchema,
         mode: 'strict',
         verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
 
       const schemaCheck = result.assertOk().schemaCheck;
@@ -253,6 +278,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: liveSchema,
         mode: 'strict',
         verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
 
       // `orphan_table` is declared by no space, so it appears exactly once —
@@ -286,6 +313,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: liveSchema,
         mode: 'lenient',
         verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
 
       expect(result.assertOk().schemaCheck.unclaimed).toEqual(['another_orphan', 'mystery_table']);
@@ -305,6 +334,8 @@ describe('verifyMigration', () => {
         schemaIntrospection: liveSchema,
         mode: 'strict',
         verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
 
       const schemaCheck = result.assertOk().schemaCheck;
@@ -335,6 +366,8 @@ describe('verifyMigration', () => {
         },
         mode: 'strict',
         verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
 
       const schemaCheck = result.assertOk().schemaCheck;

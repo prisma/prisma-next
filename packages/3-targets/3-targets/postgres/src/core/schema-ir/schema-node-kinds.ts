@@ -2,7 +2,11 @@ import type {
   DiffableNode,
   DiffSubjectGranularity,
 } from '@prisma-next/framework-components/control';
-import { relationalNodeGranularity, type SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import {
+  relationalNodeEntityKind,
+  relationalNodeGranularity,
+  type SqlSchemaIRNode,
+} from '@prisma-next/sql-schema-ir/types';
 
 /**
  * A Postgres schema-diff-tree node: a `SqlSchemaIRNode` that also implements
@@ -68,4 +72,35 @@ export function postgresDiffSubjectGranularity(nodeKind: string): DiffSubjectGra
   return isPostgresSchemaNodeKind(nodeKind)
     ? postgresNodeGranularity(nodeKind)
     : relationalNodeGranularity(nodeKind);
+}
+
+/**
+ * The one real map from a Postgres-specific `nodeKind` to its storage
+ * `entityKind` — the same vocabulary the contract storage's `entries`
+ * dictionary keys use. Only the whole-table kind has an entity of its own;
+ * database/namespace/policy/role nodes map to nothing here (a namespace is
+ * addressed by id, not by an `entries` kind; policies and roles are
+ * structural, never a sibling space's unclaimed entity).
+ */
+const POSTGRES_NODE_ENTITY_KIND: Partial<Readonly<Record<PostgresSchemaNodeKind, string>>> = {
+  [PostgresSchemaNodeKind.table]: 'table',
+};
+
+/** Looks up the storage entityKind for a Postgres-specific `nodeKind`. */
+export function postgresNodeEntityKind(nodeKind: PostgresSchemaNodeKind): string | undefined {
+  return POSTGRES_NODE_ENTITY_KIND[nodeKind];
+}
+
+/**
+ * The storage `entityKind` for any node kind that appears in a Postgres diff
+ * tree — sibling of {@link postgresDiffSubjectGranularity}, dispatching the
+ * same way to whichever family/target map owns the kind. Called on demand by
+ * the framework aggregate's unclaimed-elements sweep via the {@link
+ * import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+ * capability — never stamped onto the issue or the node.
+ */
+export function postgresDiffSubjectEntityKind(nodeKind: string): string | undefined {
+  return isPostgresSchemaNodeKind(nodeKind)
+    ? postgresNodeEntityKind(nodeKind)
+    : relationalNodeEntityKind(nodeKind);
 }

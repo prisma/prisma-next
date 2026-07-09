@@ -7,10 +7,14 @@ import type {
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
-import type { SchemaSubjectClassifier } from '../../src/aggregate/unclaimed-elements';
+import type {
+  SchemaEntityKindClassifier,
+  SchemaSubjectClassifier,
+} from '../../src/aggregate/unclaimed-elements';
 import {
   collectExtraElementCoordinates,
   stripExtraFindings,
+  UNCLASSIFIED_ENTITY_KIND,
 } from '../../src/aggregate/unclaimed-elements';
 
 /**
@@ -33,6 +37,13 @@ const classify: SchemaSubjectClassifier = (issue) => {
     policy: 'structural',
   };
   return kind !== undefined ? granularity[kind] : undefined;
+};
+
+/** A fake entity-kind classifier keyed on the fixture nodes' `kind`, sibling of `classify` above. */
+const classifyEntityKind: SchemaEntityKindClassifier = (issue) => {
+  const node = issue.actual ?? issue.expected;
+  const kind = (node as { readonly kind?: string } | undefined)?.kind;
+  return kind === 'table' ? 'table' : undefined;
 };
 
 function extraTableIssue(name: string): SchemaDiffIssue {
@@ -209,11 +220,15 @@ describe('collectExtraElementCoordinates', () => {
       ],
     });
 
-    const coordinates = [...collectExtraElementCoordinates(result, classify)].sort((a, b) =>
-      a.entityName.localeCompare(b.entityName),
-    );
+    const coordinates = [
+      ...collectExtraElementCoordinates(result, classify, classifyEntityKind),
+    ].sort((a, b) => a.entityName.localeCompare(b.entityName));
     expect(coordinates).toEqual([
-      { namespaceId: UNBOUND_NAMESPACE_ID, entityKind: 'table', entityName: 'legacy' },
+      {
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        entityKind: UNCLASSIFIED_ENTITY_KIND,
+        entityName: 'legacy',
+      },
       { namespaceId: 'public', entityKind: 'table', entityName: 'stray' },
     ]);
   });
@@ -232,12 +247,24 @@ describe('collectExtraElementCoordinates', () => {
       ],
     });
 
-    const coordinates = [...collectExtraElementCoordinates(result, classify)].sort((a, b) =>
-      a.namespaceId.localeCompare(b.namespaceId),
-    );
+    const coordinates = [
+      ...collectExtraElementCoordinates(result, classify, classifyEntityKind),
+    ].sort((a, b) => a.namespaceId.localeCompare(b.namespaceId));
     expect(coordinates).toEqual([
       { namespaceId: 'public', entityKind: 'table', entityName: 'orphan_table' },
       { namespaceId: 'tenant_b', entityKind: 'table', entityName: 'orphan_table' },
+    ]);
+  });
+
+  it('falls back to the unclassified placeholder when no entity-kind classifier is injected', () => {
+    const result = makeResult({
+      ok: false,
+      issues: [extraTableIssue('stray')],
+    });
+
+    const coordinates = [...collectExtraElementCoordinates(result, classify)];
+    expect(coordinates).toEqual([
+      { namespaceId: 'public', entityKind: UNCLASSIFIED_ENTITY_KIND, entityName: 'stray' },
     ]);
   });
 });

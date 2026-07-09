@@ -87,15 +87,23 @@ export type DiffSubjectGranularity = 'namespace' | 'entity' | 'field' | 'auxilia
 
 /**
  * Capability declaring that a family can classify a {@link SchemaDiffIssue}'s
- * subject granularity on demand, by resolving its node's `nodeKind` through
- * the family/target vocabulary it owns. Consumed by framework code that spans
- * contract spaces (the migration aggregate's unclaimed-elements sweep) and
- * cannot itself read family/target node vocabulary. `undefined` when the
- * issue's node kind is unrecognized, or when the family injects no
- * classifier at all — callers fall back to path shape in that case.
+ * subject granularity, and separately its storage `entityKind`, on demand —
+ * both resolved from its node's `nodeKind` through the family/target
+ * vocabulary it owns. Consumed by framework code that spans contract spaces
+ * (the migration aggregate's unclaimed-elements sweep) and cannot itself read
+ * family/target node vocabulary, so it asks this capability instead of
+ * hardcoding a family entity kind. `undefined` when the issue's node kind is
+ * unrecognized, or when the family injects no classifier at all — callers
+ * fall back to path shape in that case.
+ *
+ * `classifyEntityKind` returns the same per-family vocabulary as the contract
+ * storage's `entries` dictionary keys (the vocabulary
+ * {@link import('../ir/storage').elementCoordinates} walks) — never a
+ * granularity word, and never a word this framework layer names itself.
  */
 export interface SchemaSubjectClassifierCapable {
   classifySubjectGranularity(issue: SchemaDiffIssue): DiffSubjectGranularity | undefined;
+  classifyEntityKind(issue: SchemaDiffIssue): string | undefined;
 }
 
 export function hasSchemaSubjectClassifier<TFamilyId extends string, TSchemaIR>(
@@ -103,6 +111,8 @@ export function hasSchemaSubjectClassifier<TFamilyId extends string, TSchemaIR>(
 ): instance is ControlFamilyInstance<TFamilyId, TSchemaIR> & SchemaSubjectClassifierCapable {
   return (
     'classifySubjectGranularity' in instance &&
-    typeof (instance as Record<string, unknown>)['classifySubjectGranularity'] === 'function'
+    typeof (instance as Record<string, unknown>)['classifySubjectGranularity'] === 'function' &&
+    'classifyEntityKind' in instance &&
+    typeof (instance as Record<string, unknown>)['classifyEntityKind'] === 'function'
   );
 }
