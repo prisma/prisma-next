@@ -898,7 +898,7 @@ model Post {
     });
   });
 
-  it('non-member identifier emits diagnostic naming the enum and the identifier', () => {
+  it('non-member identifier is rejected as invalid attribute syntax', () => {
     const result = interpret(`
 enum Priority {
   @@type("pg/text@1")
@@ -913,13 +913,11 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
+    // The spec's `oneOf(identifier('Low'), identifier('High'))` has no arm for `Critical`, so an
+    // unknown member fails the grammar rather than a downstream semantic check.
     expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'PSL_ENUM_UNKNOWN_DEFAULT_MEMBER' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );
-    expect(result.failure.diagnostics[0]?.message).toMatch(/Critical/);
-    expect(result.failure.diagnostics[0]?.message).toMatch(/Priority/);
   });
 
   it('quoted raw value @default("low") on an enum field is rejected as invalid attribute syntax', () => {

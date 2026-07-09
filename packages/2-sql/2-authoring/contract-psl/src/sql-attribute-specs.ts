@@ -11,7 +11,6 @@ import type {
   ModelSymbol,
 } from '@prisma-next/psl-parser';
 import {
-  bareIdentifier,
   bool,
   entityRef,
   fieldAttribute,
@@ -169,9 +168,16 @@ export function buildDefaultSpec(input: {
   return fieldAttribute('default', { positional: [{ key: 'value', type: oneOf(...valueArms) }] });
 }
 
-export const enumDefaultSpec = fieldAttribute('default', {
-  positional: [{ key: 'member', type: bareIdentifier() }],
-});
+// Compose the enum `@default` value grammar from the enum's own member names: one name-pinned
+// `identifier(member)` arm per member. Member-validity is thus a grammar concern — a non-member
+// identifier fails `oneOf` as invalid attribute syntax rather than a downstream semantic check.
+export function buildEnumDefaultSpec(memberNames: readonly string[]) {
+  const [first, ...rest] = memberNames.map((name) => identifier(name));
+  // memberNames is non-empty for any real enum; guard defensively so typing stays total.
+  const arms: readonly [ArgType<string>, ...ArgType<string>[]] =
+    first === undefined ? [identifier('')] : [first, ...rest];
+  return fieldAttribute('default', { positional: [{ key: 'member', type: oneOf(...arms) }] });
+}
 
 export const idFieldSpec = fieldAttribute('id', { named: { map: optional(str()) } });
 export const uniqueFieldSpec = fieldAttribute('unique', { named: { map: optional(str()) } });

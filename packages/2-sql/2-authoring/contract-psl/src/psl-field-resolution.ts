@@ -12,7 +12,6 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { FieldSymbol, ModelSymbol, ResolvedAttribute } from '@prisma-next/psl-parser';
-import { nodePslSpan } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -26,7 +25,7 @@ import {
   resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
 import {
-  enumDefaultSpec,
+  buildEnumDefaultSpec,
   findFieldAttributeNode,
   findModelAttributeNode,
   idFieldSpec,
@@ -52,13 +51,13 @@ function lowerEnumDefaultForField(input: {
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): LoweredFieldDefault {
-  const { modelName, fieldName, field, model, sourceFile, enumHandle, sourceId, diagnostics } =
-    input;
+  const { field, model, sourceFile, enumHandle, sourceId, diagnostics } = input;
   const node = findFieldAttributeNode(field, 'default');
   if (node === undefined) return {};
+  const spec = buildEnumDefaultSpec(enumHandle.enumMembers.map((m) => m.name));
   const interpreted = interpretFieldAttribute({
     node,
-    spec: enumDefaultSpec,
+    spec,
     model,
     field,
     sourceFile,
@@ -67,17 +66,10 @@ function lowerEnumDefaultForField(input: {
   });
   if (interpreted === undefined) return {};
   const member = interpreted.member;
+  // The grammar (one `identifier(member)` arm per enum member) guarantees a match; the guard
+  // keeps the narrowing total without a diagnostic — an unknown member already failed as syntax.
   const match = enumHandle.enumMembers.find((m) => m.name === member);
-  if (!match) {
-    const validNames = enumHandle.enumMembers.map((m) => m.name).join(', ');
-    diagnostics.push({
-      code: 'PSL_ENUM_UNKNOWN_DEFAULT_MEMBER',
-      message: `Field "${modelName}.${fieldName}" @default(${member}) does not name a member of ${enumHandle.enumName}. Valid members: ${validNames}.`,
-      sourceId,
-      span: nodePslSpan(node.syntax, sourceFile),
-    });
-    return {};
-  }
+  if (!match) return {};
 
   return {
     defaultValue: {
