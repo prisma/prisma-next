@@ -14,7 +14,11 @@ import type {
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
-import { PostgresControlAdapter, parsePgReloptions } from '../src/core/control-adapter';
+import {
+  PostgresControlAdapter,
+  parsePgNameArray,
+  parsePgReloptions,
+} from '../src/core/control-adapter';
 
 /**
  * These tests introspect a single schema, so the root holds exactly one
@@ -1680,6 +1684,46 @@ describe('PostgresControlAdapter', () => {
     it('returns undefined for a null or empty input', () => {
       expect(parsePgReloptions(null, 'item_body_idx')).toBeUndefined();
       expect(parsePgReloptions([], 'item_body_idx')).toBeUndefined();
+    });
+  });
+
+  describe('parsePgNameArray', () => {
+    it('passes a real JS array through as strings', () => {
+      expect(parsePgNameArray(['a', 'b'])).toEqual(['a', 'b']);
+    });
+
+    it('parses an unquoted array literal', () => {
+      expect(parsePgNameArray('{draft,review,done}')).toEqual(['draft', 'review', 'done']);
+    });
+
+    it('returns empty for an empty literal, non-strings, and non-literals', () => {
+      expect(parsePgNameArray('{}')).toEqual([]);
+      expect(parsePgNameArray(42)).toEqual([]);
+      expect(parsePgNameArray('not-a-literal')).toEqual([]);
+    });
+
+    it('parses a quoted element containing whitespace', () => {
+      expect(parsePgNameArray('{"in progress",done}')).toEqual(['in progress', 'done']);
+    });
+
+    it('parses a quoted element containing a comma', () => {
+      expect(parsePgNameArray('{"a,b",c}')).toEqual(['a,b', 'c']);
+    });
+
+    it('parses a quoted element containing an escaped double quote', () => {
+      expect(parsePgNameArray('{"say \\"hi\\"",plain}')).toEqual(['say "hi"', 'plain']);
+    });
+
+    it('parses a quoted element containing an escaped backslash', () => {
+      expect(parsePgNameArray('{"back\\\\slash"}')).toEqual(['back\\slash']);
+    });
+
+    it('parses a quoted element containing braces', () => {
+      expect(parsePgNameArray('{"{curly}",other}')).toEqual(['{curly}', 'other']);
+    });
+
+    it('does not trim significant leading/trailing whitespace inside quotes', () => {
+      expect(parsePgNameArray('{" padded "}')).toEqual([' padded ']);
     });
   });
 

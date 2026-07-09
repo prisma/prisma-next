@@ -1216,10 +1216,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
  * `name[]` (OID 1003). When the parser is absent the raw Postgres text-array
  * literal (`{role1,role2}`) is returned as a string instead of a JS array.
  * This function accepts either form and returns a plain string array.
+ *
+ * The string branch honors Postgres array-literal quoting: an element
+ * containing a comma, quote, backslash, brace, or significant whitespace is
+ * emitted double-quoted with `\"` / `\\` escapes, and unquoted elements are
+ * whitespace-trimmed — so a label like `in progress` or `say "hi"` parses to
+ * its true value instead of being split or kept escaped.
  */
-function parsePgNameArray(value: unknown): string[] {
+export function parsePgNameArray(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value as string[];
+    return value.map(String);
   }
   if (typeof value !== 'string') {
     return [];
@@ -1232,7 +1238,50 @@ function parsePgNameArray(value: unknown): string[] {
   if (inner === '') {
     return [];
   }
-  return inner.split(',').map((s) => s.trim());
+
+  const elements: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let wasQuoted = false;
+  const pushCurrent = () => {
+    elements.push(wasQuoted ? current : current.trim());
+    current = '';
+    wasQuoted = false;
+  };
+  let i = 0;
+  while (i < inner.length) {
+    const char = inner[i] as string;
+    if (inQuotes) {
+      if (char === '\\') {
+        current += inner[i + 1] ?? '';
+        i += 2;
+        continue;
+      }
+      if (char === '"') {
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      current += char;
+      i++;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = true;
+      wasQuoted = true;
+      i++;
+      continue;
+    }
+    if (char === ',') {
+      pushCurrent();
+      i++;
+      continue;
+    }
+    current += char;
+    i++;
+  }
+  pushCurrent();
+  return elements;
 }
 
 /**
