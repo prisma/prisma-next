@@ -21,10 +21,10 @@ const stampAuthoringContributions: AuthoringContributions = {
       attribute: 'stamp',
       spec: stampModelSpec,
       lower: (parsed: { readonly label: string }, ctx) => ({
-        key: ctx.tableName,
+        key: ctx.storageName,
         entity: {
           kind: 'stamp',
-          tableName: ctx.tableName,
+          tableName: ctx.storageName,
           modelName: ctx.modelName,
           namespaceId: ctx.namespaceId,
           label: parsed.label,

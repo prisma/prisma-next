@@ -18,8 +18,8 @@ function makeModelAttributeDescriptor(attribute: string) {
     kind: 'modelAttribute' as const,
     attribute,
     spec: {},
-    lower: (_parsed: never, ctx: { readonly tableName: string }) => ({
-      key: ctx.tableName,
+    lower: (_parsed: never, ctx: { readonly storageName: string }) => ({
+      key: ctx.storageName,
       entity: { attribute },
     }),
   };
@@ -36,7 +36,7 @@ describe('assembleAuthoringContributions modelAttributes', () => {
       createDescriptor({
         authoring: {
           modelAttributes: {
-            rls: makeModelAttributeDescriptor('rls'),
+            audit: makeModelAttributeDescriptor('audit'),
           },
         },
       }),
@@ -49,35 +49,37 @@ describe('assembleAuthoringContributions modelAttributes', () => {
         },
       }),
     ]);
-    expect(Object.keys(result.modelAttributes)).toEqual(['rls', 'stamp']);
+    expect(Object.keys(result.modelAttributes)).toEqual(['audit', 'stamp']);
   });
 
   it('throws on duplicate modelAttributes paths from different descriptors', () => {
     expect(() =>
       assembleAuthoringContributions([
         createDescriptor({
-          authoring: { modelAttributes: { rls: makeModelAttributeDescriptor('rls') } },
+          authoring: { modelAttributes: { audit: makeModelAttributeDescriptor('audit') } },
         }),
         createDescriptor({
           id: 'other',
-          authoring: { modelAttributes: { rls: makeModelAttributeDescriptor('rls') } },
+          authoring: { modelAttributes: { audit: makeModelAttributeDescriptor('audit') } },
         }),
       ]),
-    ).toThrow(/Duplicate authoring modelAttribute helper "rls"/);
+    ).toThrow(/Duplicate authoring modelAttribute helper "audit"/);
   });
 
   it('rejects two modelAttributes contributions at different paths claiming the same attribute name', () => {
     expect(() =>
       assembleAuthoringContributions([
         createDescriptor({
-          authoring: { modelAttributes: { rlsMarker: makeModelAttributeDescriptor('rls') } },
+          authoring: { modelAttributes: { auditMarker: makeModelAttributeDescriptor('audit') } },
         }),
         createDescriptor({
           id: 'other',
-          authoring: { modelAttributes: { anotherRls: makeModelAttributeDescriptor('rls') } },
+          authoring: { modelAttributes: { anotherAudit: makeModelAttributeDescriptor('audit') } },
         }),
       ]),
-    ).toThrow(/Duplicate modelAttribute "rls" registered at both "rlsMarker" and "anotherRls"/);
+    ).toThrow(
+      /Duplicate modelAttribute "audit" registered at both "auditMarker" and "anotherAudit"/,
+    );
   });
 
   it('rejects a malformed modelAttributes entry missing `lower`', () => {
@@ -87,11 +89,11 @@ describe('assembleAuthoringContributions modelAttributes', () => {
           authoring: {
             modelAttributes: {
               // Carries kind + attribute but missing required `lower`.
-              rls: { kind: 'modelAttribute', attribute: 'rls', spec: {} } as unknown as never,
+              audit: { kind: 'modelAttribute', attribute: 'audit', spec: {} } as unknown as never,
             },
           },
         }),
       ]),
-    ).toThrow(/Malformed authoring modelAttribute contribution at "rls"/);
+    ).toThrow(/Malformed authoring modelAttribute contribution at "audit"/);
   });
 });

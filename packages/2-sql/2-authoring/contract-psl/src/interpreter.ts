@@ -879,7 +879,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         family: input.familyId,
         target: input.targetId,
         modelName: model.name,
-        tableName,
+        storageName: tableName,
         namespaceId: modelNamespaceId ?? input.defaultNamespaceId,
         sourceId,
         diagnostics: {

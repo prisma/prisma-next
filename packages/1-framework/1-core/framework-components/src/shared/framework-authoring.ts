@@ -361,12 +361,14 @@ export type AuthoringPslBlockDescriptorNamespace = {
 /**
  * Context surfaced to a model-attribute lowering at call time: the entity
  * context shared with entity-type factories, plus the declaring model's
- * name, its mapped storage table name, and the namespace id the lowered
- * entity should be filed under.
+ * name, its mapped storage name (the name of the storage object the model
+ * maps to; which kind of object that is belongs to the family, not the
+ * framework), and the namespace id the lowered entity should be filed
+ * under.
  */
 export interface AuthoringModelAttributeContext extends AuthoringEntityContext {
   readonly modelName: string;
-  readonly tableName: string;
+  readonly storageName: string;
   readonly namespaceId: string;
 }
 
@@ -387,9 +389,8 @@ export interface AuthoringModelAttributeLoweringOutput {
  * Declarative descriptor for an extension-contributed `@@` model attribute.
  *
  * An extension registers one of these per bare attribute name it
- * contributes (e.g. `rls`, no arguments). The framework owns the generic
- * consult in the interpreter's model-attribute loop; the contribution
- * supplies only `spec` and `lower`.
+ * contributes. The framework owns the generic consult in the interpreter's
+ * model-attribute loop; the contribution supplies only `spec` and `lower`.
  *
  * - `attribute` is the bare `@@` attribute name this descriptor claims and,
  *   by the one-string rule, the `entries` slot its lowered entities are
@@ -397,8 +398,9 @@ export interface AuthoringModelAttributeLoweringOutput {
  * - `spec` is opaque to the framework core: an ADR-231 attribute-spec kit
  *   `AttributeSpec<Out>` value (`modelAttribute(name, {...})` from
  *   `@prisma-next/psl-parser`). Framework core does not depend on
- *   psl-parser and never inspects this field; the SQL interpreter, which
- *   does depend on psl-parser, parses the attribute's arguments against it.
+ *   psl-parser and never inspects this field; the family interpreter,
+ *   which does depend on psl-parser, parses the attribute's arguments
+ *   against it.
  * - `lower` receives the parsed arguments and the declaring model's
  *   context, and returns the entity to file into `entries`, or `undefined`
  *   after pushing a diagnostic via `ctx.diagnostics`.
@@ -444,7 +446,7 @@ export interface AuthoringContributions {
    * Registry of declarative `@@` model attribute descriptors this
    * contribution registers, keyed by arbitrary path segments. Each leaf is
    * an {@link AuthoringModelAttributeDescriptor} that claims a bare model
-   * attribute name. The framework owns the generic consult in the SQL
+   * attribute name. The framework owns the generic consult in the family
    * interpreter's model-attribute loop; the contribution supplies only the
    * declarative spec and the lowering.
    */
@@ -906,10 +908,10 @@ function collectModelAttributeEntries(
 
 /**
  * Throws when two modelAttribute contributions — at any paths, even
- * different ones — claim the same bare `@@` attribute name. Dispatch in the
- * SQL interpreter is by attribute name, not by registration path, so two
- * descriptors claiming the same name would have one silently shadow the
- * other.
+ * different ones — claim the same bare `@@` attribute name. The family
+ * interpreter dispatches by attribute name, not by registration path, so
+ * two descriptors claiming the same name would have one silently shadow
+ * the other.
  */
 function assertUniqueModelAttributeNames(entries: readonly DescriptorEntry[]): void {
   const seen = new Map<string, string>();
