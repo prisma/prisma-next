@@ -364,12 +364,12 @@ export interface MigrationRunnerExecutionChecks {
  * The canonical schema-IR entity coordinate: which namespace, which kind of
  * entity, and which name. A bare entity name is not a unique identity —
  * two namespaces can each declare an entity of the same name, and one
- * namespace can declare two different-kind entities (a table and an enum,
- * say) that share a name — so every schema-IR consumer that addresses one
- * live or declared entity does it by this full triple.
+ * namespace can declare two different-kind entities that share a name — so
+ * every schema-IR consumer that addresses one live or declared entity does
+ * it by this full triple.
  *
  * `entityKind` uses the same vocabulary as the contract storage's `entries`
- * dictionary (e.g. `'table'`, `'valueSet'`) — the same vocabulary
+ * dictionary — the same vocabulary
  * {@link import('../ir/storage').elementCoordinates} walks. This type has no
  * `plane`: schema IR is storage-only (contract IR spans domain and storage,
  * which is why its own coordinate type carries a plane), so a plane field

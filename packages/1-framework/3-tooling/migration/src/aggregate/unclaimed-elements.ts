@@ -11,7 +11,7 @@ import { coordinateKey, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-comp
  * capability a contract space's family/target instance provides (via
  * `hasSchemaSubjectClassifier`). This module never imports family node
  * classes and never reads a classification off the node or the issue;
- * absent entirely for families that classify nothing (Mongo).
+ * absent entirely for families that classify nothing.
  */
 export type SchemaSubjectClassifier = (
   issue: SchemaDiffIssue,
@@ -28,7 +28,7 @@ function pathIsUnder(path: readonly string[], prefix: readonly string[]): boolea
  * the injected `classify` capability, which resolves this from the issue's
  * node `nodeKind` (this aggregate never reaches into the node itself).
  * Absent `classify` (or a `classify` that returns nothing for this issue —
- * a family that doesn't classify, e.g. Mongo) falls back to path shape: a
+ * a family that doesn't classify) falls back to path shape: a
  * top-level entity's path is exactly its own name (one segment), so
  * anything deeper is nested.
  */
@@ -101,17 +101,16 @@ export function stripExtraFindings(
  * namespace — the same sentinel the aggregate's own coordinate walk uses
  * for those families.
  *
- * `entityKind` is stamped `'table'` for both path shapes. For the
- * namespace-qualified (SQL family) shape this is exact: on that differ, a
- * whole-entity `'not-expected'` issue is always a live table — no other
- * storage entity kind (an enum's `valueSet`, an RLS `policy`) is represented
- * as a node in the schema-diff tree. For the bare, single-segment shape
- * (families that stamp no granularity, e.g. a Mongo collection extra)
- * `'table'` is a placeholder, not a real classification: no ownership
- * consumer queries `declaresEntity` for those families today, so nothing
- * reads this value as true. A family that starts asking ownership questions
- * over a non-table entity kind needs a real per-family kind here instead of
- * the literal.
+ * `entityKind` is stamped with a hardcoded placeholder value (below) for
+ * both path shapes. For the namespace-qualified shape this is exact: on
+ * that differ, a whole-entity `'not-expected'` issue is always that one
+ * kind — no other storage entity kind is represented as a node in the
+ * schema-diff tree. For the bare, single-segment shape (families that
+ * stamp no granularity) the placeholder is not a real classification: no
+ * ownership consumer queries `declaresEntity` for those families today, so
+ * nothing reads this value as true. A family that starts asking ownership
+ * questions over a different entity kind needs a real per-family kind here
+ * instead of the placeholder.
  */
 function schemaDiffIssueCoordinate(
   issue: SchemaDiffIssue,

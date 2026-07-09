@@ -41,8 +41,8 @@ export interface VerifierInput {
    * Classifies a diff issue's subject granularity on demand — the injected
    * capability the caller reads off the family instance (via
    * `hasSchemaSubjectClassifier`) when it has one. Absent for families that
-   * classify nothing (Mongo); the unclaimed-elements sweep falls back to
-   * path shape in that case. Never stamped onto the issue or the node.
+   * classify nothing; the unclaimed-elements sweep falls back to path shape
+   * in that case. Never stamped onto the issue or the node.
    */
   readonly classifySubjectGranularity?: SchemaSubjectClassifier;
 }

@@ -92,7 +92,7 @@ export type DiffSubjectGranularity = 'namespace' | 'entity' | 'field' | 'auxilia
  * contract spaces (the migration aggregate's unclaimed-elements sweep) and
  * cannot itself read family/target node vocabulary. `undefined` when the
  * issue's node kind is unrecognized, or when the family injects no
- * classifier at all (Mongo) — callers fall back to path shape in that case.
+ * classifier at all — callers fall back to path shape in that case.
  */
 export interface SchemaSubjectClassifierCapable {
   classifySubjectGranularity(issue: SchemaDiffIssue): DiffSubjectGranularity | undefined;
