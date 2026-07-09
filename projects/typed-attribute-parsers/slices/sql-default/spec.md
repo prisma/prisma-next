@@ -21,11 +21,13 @@ The `@default` spec is **built per field** by `buildDefaultSpec(ctx)` / `buildEn
 
 ```ts
 oneOf(
-  str(), int(), bool(),                                    // flexible literals (codec still type-checks the value)
-  ...(isList ? [list(oneOf(str(), int(), bool()))] : []),  // list arm ONLY on list fields
+  str(), num(), bool(),                                    // flexible literals (codec still type-checks the value)
+  ...(isList ? [list(oneOf(str(), num(), bool()))] : []),  // list arm ONLY on list fields
   ...[...registry.keys()].map((name) => funcCall(name)),   // one arm per registered default function
 )
 ```
+
+(`num()` is a **new** general number-literal atom — any number, incl. floats. The existing `int()` is integer-only, so it can't stand in for `scalarLiteral`'s number handling without regressing `Float @default(1.5)`.)
 
 **Enum** (built from `enumHandle.enumMembers`):
 
@@ -36,7 +38,7 @@ oneOf(...enumMembers.map((m) => identifier(m.name)))       // e.g. Expected one 
 **Key design points:**
 - **`funcCall(name)` replaces the generic `funcCall()`; no `funcCallFrom`.** A name-pinned `funcCall(name)` (parallel to `identifier(name)`) matches a call with that callee and captures **raw args** (flexible — `lowerDefaultFunctionWithRegistry` still validates them). `oneOf(...registry.keys().map(funcCall))`, built dynamically, enumerates the open contributed set — the composition that makes the ADR's bespoke `funcCallFrom` unnecessary (ADR principle 4). The matched arm *is* the `fn` discriminant.
 - **Enum defaults are `oneOf(identifier(member)…)`** from the members — dropping `bareIdentifier()` and folding member-validity into the grammar (resolves the #938 review comment).
-- **Literals stay flexible**, composed as `oneOf(str(), int(), bool())` — dropping `scalarLiteral()` for composition of atoms (resolves the other #938 comment). No codec-typed matching (`matchingScalarLiteral` is out — Non-goals); the codec's `encodeJson` remains the literal↔type authority.
+- **Literals stay flexible**, composed as `oneOf(str(), num(), bool())` — dropping `scalarLiteral()` for composition of atoms (resolves the other #938 comment; adds a general `num()` atom since `int()` is integer-only). No codec-typed matching (`matchingScalarLiteral` is out — Non-goals); the codec's `encodeJson` remains the literal↔type authority.
 - **The `list` arm is present only on list fields** (and is the only value arm there), so array-on-scalar and scalar-on-list are grammar misses — dissolving the `isList` shape-switch and its `PSL_LIST_DEFAULT_NOT_ARRAY` / array-on-scalar `PSL_INVALID_DEFAULT_VALUE` special cases.
 
 **What stays semantic (in the interpreter):** function **arg** validation (`PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT`, via the registry), generator applicability + codec matching + preset-only guard (`PSL_INVALID_DEFAULT_APPLICABILITY`), and literal↔codec type (codec `encodeJson`). **Moved into the grammar** (Open Question 1): unknown-function-name (`PSL_UNKNOWN_DEFAULT_FUNCTION`) and unknown-enum-member (`PSL_ENUM_UNKNOWN_DEFAULT_MEMBER`).
