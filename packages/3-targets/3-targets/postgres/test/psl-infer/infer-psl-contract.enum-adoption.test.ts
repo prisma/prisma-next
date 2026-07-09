@@ -1,0 +1,486 @@
+/**
+ * Native-enum ADOPTION at the `contract infer` entry: instead of throwing,
+ * `inferPostgresPslContract` emits `native_enum` blocks + `pg.enum(<Name>)`
+ * columns from the introspected tree's `nativeEnums`, wraps enum-bearing
+ * output in an explicit `namespace <schemaName> { … }` block (the pinned
+ * design — a top-level `native_enum` never lowers), subtracts pack-owned
+ * enum types by TYPE NAME, and leaves enum-free output flat and byte-identical.
+ */
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { SqlDescribedContractSpace } from '@prisma-next/family-sql/control';
+import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
+import { assembleAuthoringContributions } from '@prisma-next/framework-components/control';
+import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
+import { buildSymbolTable } from '@prisma-next/psl-parser';
+import { parse } from '@prisma-next/psl-parser/syntax';
+import { printPsl } from '@prisma-next/psl-printer';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
+import type { SqlColumnIRInput } from '@prisma-next/sql-schema-ir/types';
+import { applicationDomainOf } from '@prisma-next/test-utils';
+import { describe, expect, it } from 'vitest';
+import {
+  postgresAuthoringEntityTypes,
+  postgresAuthoringPslBlockDescriptors,
+  postgresAuthoringTypes,
+} from '../../src/core/authoring';
+import { PG_ENUM_CODEC_ID } from '../../src/core/codec-ids';
+import { pgEnumDescriptor, postgresQualifyColumnType } from '../../src/core/codecs';
+import { PostgresNativeEnum } from '../../src/core/postgres-native-enum';
+import { PostgresSchema, postgresCreateNamespace } from '../../src/core/postgres-schema';
+import { inferPostgresPslContract } from '../../src/core/psl-infer/infer-psl-contract';
+import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
+import type { PostgresNativeEnumIntrospection } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
+
+// ---------------------------------------------------------------------------
+// Tree fixtures
+// ---------------------------------------------------------------------------
+
+function table(name: string, columns: Record<string, SqlColumnIRInput>) {
+  return new PostgresTableSchemaNode({
+    name,
+    columns,
+    primaryKey: { columns: ['id'] },
+    foreignKeys: [],
+    uniques: [],
+    indexes: [],
+    policies: [],
+  });
+}
+
+function namespaceNode(
+  schemaName: string,
+  tables: Record<string, PostgresTableSchemaNode>,
+  nativeEnums: readonly PostgresNativeEnumIntrospection[] = [],
+) {
+  return new PostgresNamespaceSchemaNode({
+    schemaName,
+    tables,
+    nativeEnumTypeNames: nativeEnums.map((e) => e.typeName),
+    nativeEnums,
+  });
+}
+
+function tree(namespaces: Record<string, PostgresNamespaceSchemaNode>) {
+  return new PostgresDatabaseSchemaNode({
+    namespaces,
+    roles: [],
+    existingSchemas: Object.keys(namespaces),
+    pgVersion: '',
+  });
+}
+
+function inferAndPrint(
+  dbTree: PostgresDatabaseSchemaNode,
+  describedContracts?: readonly SqlDescribedContractSpace[],
+): string {
+  return printPsl(inferPostgresPslContract(dbTree, describedContracts), {
+    pslBlockDescriptors: postgresAuthoringPslBlockDescriptors,
+  });
+}
+
+const idColumn: SqlColumnIRInput = { name: 'id', nativeType: 'int4', nullable: false };
+
+const AAL_LEVEL: PostgresNativeEnumIntrospection = {
+  typeName: 'aal_level',
+  values: ['aal1', 'aal2', 'aal3'],
+};
+
+function sessionsNamespace(schemaName: string) {
+  return namespaceNode(
+    schemaName,
+    {
+      sessions: table('sessions', {
+        id: idColumn,
+        aal: { name: 'aal', nativeType: 'aal_level', nullable: true },
+      }),
+    },
+    [AAL_LEVEL],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Described-contract fixture (pack owning a native enum type in-memory)
+// ---------------------------------------------------------------------------
+
+function describedContractWithNativeEnum(input: {
+  readonly namespaceId: string;
+  readonly handleName: string;
+  readonly typeName: string;
+  readonly members: readonly string[];
+  readonly tables?: readonly string[];
+}): SqlDescribedContractSpace {
+  const contract: Contract<SqlStorage> = {
+    target: 'postgres',
+    targetFamily: 'sql',
+    profileHash: profileHash('sha256:test'),
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:contract'),
+      namespaces: {
+        [input.namespaceId]: new PostgresSchema({
+          id: input.namespaceId,
+          entries: {
+            table: Object.fromEntries(
+              (input.tables ?? []).map((tableName) => [
+                tableName,
+                { columns: {}, uniques: [], indexes: [], foreignKeys: [] },
+              ]),
+            ),
+            native_enum: {
+              [input.handleName]: new PostgresNativeEnum({
+                typeName: input.typeName,
+                members: input.members,
+              }),
+            },
+          },
+        }),
+      },
+    }),
+    roots: {},
+    domain: applicationDomainOf({ models: {} }),
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
+  return { spaceId: 'pack', contract };
+}
+
+// ---------------------------------------------------------------------------
+// Production interpret harness (mirrors psl-pg-enum-column.test.ts)
+// ---------------------------------------------------------------------------
+
+const pgEnumCodec = {
+  id: PG_ENUM_CODEC_ID,
+  descriptor: pgEnumDescriptor,
+  encode: () => Promise.reject(new Error('unused')),
+  decode: () => Promise.reject(new Error('unused')),
+  encodeJson: (value) => value,
+  decodeJson: (json) => json,
+} as Codec;
+
+const codecLookup: CodecLookup = {
+  get: (id) => (id === PG_ENUM_CODEC_ID ? pgEnumCodec : undefined),
+  targetTypesFor: () => undefined,
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
+  descriptorFor: (id) => (id === PG_ENUM_CODEC_ID ? pgEnumDescriptor : undefined),
+};
+
+const assembled = assembleAuthoringContributions([
+  {
+    authoring: {
+      entityTypes: postgresAuthoringEntityTypes,
+      type: postgresAuthoringTypes,
+      pslBlockDescriptors: postgresAuthoringPslBlockDescriptors,
+    },
+  },
+]);
+
+const postgresTarget = {
+  kind: 'target' as const,
+  familyId: 'sql' as const,
+  targetId: 'postgres' as const,
+  id: 'postgres',
+  version: '0.0.1',
+  capabilities: {},
+  defaultNamespaceId: 'public',
+  authoring: { type: postgresAuthoringTypes, qualifyColumnType: postgresQualifyColumnType },
+};
+
+const scalarTypeDescriptors = new Map<string, { codecId: string; nativeType: string }>([
+  ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
+  ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
+]);
+
+function interpret(source: string) {
+  const { document, sourceFile } = parse(source);
+  const { table: symbolTable } = buildSymbolTable({
+    document,
+    sourceFile,
+    scalarTypes: [...scalarTypeDescriptors.keys()],
+    pslBlockDescriptors: assembled.pslBlockDescriptors,
+  });
+  return interpretPslDocumentToSqlContract({
+    symbolTable,
+    sourceFile,
+    sourceId: 'schema.prisma',
+    capabilities: {},
+    target: postgresTarget,
+    scalarTypeDescriptors,
+    authoringContributions: assembled,
+    composedExtensionContracts: new Map(),
+    createNamespace: postgresCreateNamespace,
+    codecLookup,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe('native enum adoption — happy path', () => {
+  it('emits a namespace-wrapped native_enum block and pg.enum column (public)', () => {
+    const output = inferAndPrint(tree({ public: sessionsNamespace('public') }));
+
+    expect(output).toContain('namespace public {');
+    expect(output).toContain('native_enum AalLevel {');
+    expect(output).toContain('aal1 = "aal1"');
+    expect(output).toContain('@@map("aal_level")');
+    expect(output).toContain('pg.enum(AalLevel)?');
+    expect(output).not.toContain('Unsupported(');
+  });
+
+  it('wraps in the introspected schema name for a non-public schema (the auth shape)', () => {
+    const output = inferAndPrint(tree({ auth: sessionsNamespace('auth') }));
+
+    expect(output).toContain('namespace auth {');
+    expect(output).toContain('native_enum AalLevel {');
+    expect(output).toContain('pg.enum(AalLevel)?');
+  });
+
+  it('runs enum type names through the top-level name transforms', () => {
+    const output = inferAndPrint(
+      tree({
+        public: namespaceNode(
+          'public',
+          {
+            user: table('user', {
+              id: idColumn,
+              role: { name: 'role', nativeType: 'user_role', nullable: false },
+            }),
+          },
+          [{ typeName: 'user_role', values: ['admin', 'user'] }],
+        ),
+      }),
+    );
+
+    expect(output).toContain('native_enum UserRole {');
+    expect(output).toContain('@@map("user_role")');
+    expect(output).toContain('pg.enum(UserRole)');
+  });
+
+  it('does not throw the old remediation diagnostic', () => {
+    expect(() =>
+      inferPostgresPslContract(tree({ public: sessionsNamespace('public') })),
+    ).not.toThrow();
+  });
+});
+
+describe('enum-free output stays flat', () => {
+  it('keeps the unspecified top-level bucket and no namespace wrapper', () => {
+    const enumFree = tree({
+      public: namespaceNode('public', { user: table('user', { id: idColumn }) }),
+    });
+
+    const ast = inferPostgresPslContract(enumFree);
+    expect(ast.namespaces).toHaveLength(1);
+    expect(ast.namespaces[0]?.name).toBe(UNSPECIFIED_PSL_NAMESPACE_ID);
+
+    const output = inferAndPrint(enumFree);
+    expect(output).not.toContain('namespace ');
+    expect(output).toContain('model User {');
+  });
+});
+
+describe('single-namespace stopgap guard', () => {
+  it('throws when enums survive and content spans multiple schemas', () => {
+    const multi = tree({
+      public: namespaceNode('public', { user: table('user', { id: idColumn }) }),
+      auth: sessionsNamespace('auth'),
+    });
+
+    expect(() => inferPostgresPslContract(multi)).toThrow(
+      /native enum adoption.*multiple schemas|multiple schemas.*native enum/i,
+    );
+  });
+
+  it('throws when an introspected enum type name carries no member values', () => {
+    const broken = tree({
+      public: new PostgresNamespaceSchemaNode({
+        schemaName: 'public',
+        tables: {},
+        nativeEnumTypeNames: ['ghost_enum'],
+        nativeEnums: [],
+      }),
+    });
+
+    expect(() => inferPostgresPslContract(broken)).toThrow(/ghost_enum.*member values/i);
+  });
+});
+
+describe('pack-owned enum subtraction (by type name)', () => {
+  const pack = describedContractWithNativeEnum({
+    namespaceId: 'auth',
+    handleName: 'AalLevel',
+    typeName: 'aal_level',
+    members: ['aal1', 'aal2', 'aal3'],
+    tables: ['sessions'],
+  });
+
+  it('omits a pack-owned enum type; enum-free remainder stays flat', () => {
+    const dbTree = tree({
+      auth: namespaceNode(
+        'auth',
+        {
+          sessions: table('sessions', { id: idColumn }),
+          app_notes: table('app_notes', { id: idColumn }),
+        },
+        [AAL_LEVEL],
+      ),
+    });
+
+    const output = inferAndPrint(dbTree, [pack]);
+
+    expect(output).not.toContain('native_enum');
+    expect(output).not.toContain('namespace ');
+    expect(output).toContain('model AppNotes {');
+    expect(output).not.toContain('model Sessions {');
+  });
+
+  it('matching is namespace-scoped: a pack owning the type elsewhere does not subtract', () => {
+    const otherPack = describedContractWithNativeEnum({
+      namespaceId: 'other',
+      handleName: 'AalLevel',
+      typeName: 'aal_level',
+      members: ['aal1'],
+    });
+
+    const output = inferAndPrint(tree({ auth: sessionsNamespace('auth') }), [otherPack]);
+
+    expect(output).toContain('native_enum AalLevel {');
+  });
+
+  it('throws an actionable error when a surviving column is typed by a pack-owned enum type', () => {
+    const dbTree = tree({
+      auth: namespaceNode(
+        'auth',
+        {
+          app_notes: table('app_notes', {
+            id: idColumn,
+            aal: { name: 'aal', nativeType: 'aal_level', nullable: true },
+          }),
+        },
+        [AAL_LEVEL],
+      ),
+    });
+
+    expect(() => inferPostgresPslContract(dbTree, [pack])).toThrow(
+      /aal_level.*(pack|space "pack")/i,
+    );
+  });
+});
+
+describe('enum-typed column defaults', () => {
+  it('parses a bare-cast string default to a literal @default', () => {
+    const output = inferAndPrint(
+      tree({
+        public: namespaceNode(
+          'public',
+          {
+            sessions: table('sessions', {
+              id: idColumn,
+              aal: {
+                name: 'aal',
+                nativeType: 'aal_level',
+                nullable: false,
+                default: "'aal1'::aal_level",
+              },
+            }),
+          },
+          [AAL_LEVEL],
+        ),
+      }),
+    );
+
+    expect(output).toContain('@default("aal1")');
+  });
+
+  it('a schema-qualified cast default is preserved raw via dbgenerated, never mis-parsed', () => {
+    const output = inferAndPrint(
+      tree({
+        auth: namespaceNode(
+          'auth',
+          {
+            sessions: table('sessions', {
+              id: idColumn,
+              aal: {
+                name: 'aal',
+                nativeType: 'aal_level',
+                nullable: false,
+                default: "'aal1'::auth.aal_level",
+              },
+            }),
+          },
+          [AAL_LEVEL],
+        ),
+      }),
+    );
+
+    expect(output).toContain('@default(dbgenerated("\'aal1\'::auth.aal_level"))');
+    expect(output).toContain('pg.enum(AalLevel)');
+  });
+});
+
+describe('adopted output lowers through the production interpret chain', () => {
+  it('the public shape interprets: pg/enum@1 column with valueSet ref and bare nativeType', () => {
+    const output = inferAndPrint(tree({ public: sessionsNamespace('public') }));
+
+    const result = interpret(output);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const ns = result.value.storage.namespaces['public'] as PostgresSchema;
+    expect(ns.valueSet?.['AalLevel']).toMatchObject({ values: ['aal1', 'aal2', 'aal3'] });
+    const aalColumn = ns.table['sessions']?.columns['aal'];
+    expect(aalColumn).toMatchObject({
+      codecId: 'pg/enum@1',
+      nativeType: 'aal_level',
+      nullable: true,
+      valueSet: {
+        plane: 'storage',
+        entityKind: 'valueSet',
+        namespaceId: 'public',
+        entityName: 'AalLevel',
+      },
+    });
+  });
+
+  it('the auth shape interprets with the schema-qualified nativeType', () => {
+    const output = inferAndPrint(tree({ auth: sessionsNamespace('auth') }));
+
+    const result = interpret(output);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const ns = result.value.storage.namespaces['auth'] as PostgresSchema;
+    const aalColumn = ns.table['sessions']?.columns['aal'];
+    expect(aalColumn).toMatchObject({
+      codecId: 'pg/enum@1',
+      nativeType: 'auth.aal_level',
+      typeParams: { typeName: 'auth.aal_level' },
+    });
+  });
+
+  it('namespace-wrapped models coordinate identically to the flat form (public)', () => {
+    const enumFree = tree({
+      public: namespaceNode('public', { user: table('user', { id: idColumn }) }),
+    });
+    const enumBearing = tree({
+      public: namespaceNode('public', { user: table('user', { id: idColumn }) }, [AAL_LEVEL]),
+    });
+
+    const flatResult = interpret(inferAndPrint(enumFree));
+    const wrappedResult = interpret(inferAndPrint(enumBearing));
+
+    expect(flatResult.ok).toBe(true);
+    expect(wrappedResult.ok).toBe(true);
+    if (!flatResult.ok || !wrappedResult.ok) return;
+
+    const flatNs = flatResult.value.storage.namespaces['public'] as PostgresSchema;
+    const wrappedNs = wrappedResult.value.storage.namespaces['public'] as PostgresSchema;
+    expect(Object.keys(wrappedNs.table)).toEqual(Object.keys(flatNs.table));
+    expect(wrappedNs.table['user']?.columns).toEqual(flatNs.table['user']?.columns);
+  });
+});

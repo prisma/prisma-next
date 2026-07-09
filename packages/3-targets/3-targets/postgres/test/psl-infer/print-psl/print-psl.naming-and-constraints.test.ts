@@ -353,7 +353,7 @@ describe('printPsl', () => {
     `);
   });
 
-  it('throws a native-enum diagnostic when a nativeEnumTypeNames annotation is present alongside a table', () => {
+  it('renames an adopted enum away from a same-named model, @@map carrying the type name', () => {
     const schemaIR = new SqlSchemaIR({
       tables: {
         user_role: {
@@ -369,28 +369,30 @@ describe('printPsl', () => {
       },
       annotations: {
         pg: {
-          nativeEnumTypeNames: ['user_role'],
+          nativeEnums: [{ typeName: 'user_role', values: ['admin', 'user'] }],
         },
       },
     });
 
-    expect(() => printPslFromSql(schemaIR)).toThrow(
-      /contract infer:.*native Postgres enum type.*user_role.*not adoptable/i,
-    );
+    const output = printPslFromSql(schemaIR);
+    expect(output).toContain('model UserRole {');
+    expect(output).toContain('native_enum UserRole2 {');
+    expect(output).toContain('@@map("user_role")');
   });
 
-  it('throws a native-enum diagnostic when multiple native enum type names are present', () => {
+  it('throws on enum type names that normalize to the same PSL name', () => {
     const schemaIR = new SqlSchemaIR({
       tables: {},
       annotations: {
         pg: {
-          nativeEnumTypeNames: ['user_role', 'UserRole'],
+          nativeEnums: [
+            { typeName: 'user_role', values: ['a'] },
+            { typeName: 'UserRole', values: ['b'] },
+          ],
         },
       },
     });
 
-    expect(() => printPslFromSql(schemaIR)).toThrow(
-      /contract infer:.*native Postgres enum type.*not adoptable/i,
-    );
+    expect(() => printPslFromSql(schemaIR)).toThrow(/enum name collisions detected/i);
   });
 });
