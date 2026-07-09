@@ -479,7 +479,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         : lowerDefaultForField({
             modelName: model.name,
             fieldName: field.name,
-            defaultAttribute,
+            field,
+            model,
+            sourceFile: input.sourceFile,
             columnDescriptor: descriptor,
             generatorDescriptorById,
             sourceId,

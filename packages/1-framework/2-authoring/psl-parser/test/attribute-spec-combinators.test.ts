@@ -601,6 +601,15 @@ describe('funcCall', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
   });
+
+  it('rejects a namespaced callee', () => {
+    const { expr, ctx } = argOf('foo.now()');
+
+    const result = funcCall().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
 });
 
 describe('combinator code through interpretAttribute', () => {

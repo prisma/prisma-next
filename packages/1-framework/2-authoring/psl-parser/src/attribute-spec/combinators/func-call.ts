@@ -9,8 +9,8 @@ import { leafDiagnostic } from './diagnostic';
 
 // A function-call argument (`now()`, `dbgenerated("...")`) parsed into the framework
 // `ParsedDefaultFunctionCall` shape. Registry-agnostic: the callee name is not validated
-// here, and each argument is captured as verbatim source text — the SQL default registry
-// re-parses those strings downstream (`dbgenerated` needs the quotes preserved).
+// here, and each argument is captured as verbatim source text — the downstream default
+// registry re-parses those strings (`dbgenerated` needs the quotes preserved).
 export function funcCall(): ArgType<ParsedDefaultFunctionCall> {
   return {
     kind: 'funcCall',
@@ -19,7 +19,11 @@ export function funcCall(): ArgType<ParsedDefaultFunctionCall> {
       if (!(arg instanceof FunctionCallAst)) {
         return notOk([leafDiagnostic(ctx, arg, 'Expected a function call')]);
       }
-      const name = arg.name()?.identifier()?.token()?.text;
+      const qname = arg.name();
+      if (qname === undefined || qname.dot() !== undefined || qname.colon() !== undefined) {
+        return notOk([leafDiagnostic(ctx, arg, 'Expected a function call')]);
+      }
+      const name = qname.identifier()?.token()?.text;
       if (name === undefined) {
         return notOk([leafDiagnostic(ctx, arg, 'Expected a function call')]);
       }

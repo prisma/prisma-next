@@ -27,33 +27,29 @@ import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
-import type {
-  FieldSymbol,
-  PslSpan,
-  ResolvedAttribute,
-  ResolvedTypeConstructorCall,
+import {
+  type FieldSymbol,
+  type ModelSymbol,
+  nodePslSpan,
+  type PslSpan,
+  type ResolvedAttribute,
+  type ResolvedTypeConstructorCall,
 } from '@prisma-next/psl-parser';
-import {
-  ArrayLiteralAst,
-  BooleanLiteralExprAst,
-  type ExpressionAst,
-  NumberLiteralExprAst,
-  StringLiteralExprAst,
-} from '@prisma-next/psl-parser/syntax';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 
+import { lowerDefaultFunctionWithRegistry } from './default-function-registry';
 import {
-  lowerDefaultFunctionWithRegistry,
-  parseDefaultFunctionCall,
-} from './default-function-registry';
-import {
-  getPositionalArgumentEntry,
   getPositionalArguments,
   parseOptionalNumericArguments,
   parseOptionalSingleIntegerArgument,
   pushInvalidAttributeArgument,
-  unquoteStringLiteral,
 } from './psl-attribute-parsing';
 import { mapPslHelperArgs } from './psl-authoring-arguments';
+import {
+  defaultSpec,
+  findFieldAttributeNode,
+  interpretFieldAttribute,
+} from './sql-attribute-specs';
 
 export type ColumnDescriptor = {
   readonly codecId: string;
@@ -881,63 +877,12 @@ export function resolveDbNativeTypeAttribute(input: {
   }
 }
 
-export function parseDefaultLiteralValue(expression: string): ColumnDefault | undefined {
-  const trimmed = expression.trim();
-  if (trimmed === 'true' || trimmed === 'false') {
-    return { kind: 'literal', value: trimmed === 'true' };
-  }
-  const numericValue = Number(trimmed);
-  if (!Number.isNaN(numericValue) && trimmed.length > 0 && !/^(['"]).*\1$/.test(trimmed)) {
-    return { kind: 'literal', value: numericValue };
-  }
-  if (/^(['"]).*\1$/.test(trimmed)) {
-    return { kind: 'literal', value: unquoteStringLiteral(trimmed) };
-  }
-  return undefined;
-}
-
-/**
- * Result of interpreting a list-field `@default(...)` expression:
- * - `{ kind: 'array', value }` — an array-literal default (possibly empty)
- * - `{ kind: 'scalar' }` — a scalar literal where an array was expected
- * - `undefined` — not an array of literals (e.g. a function call like `now()`),
- *   so the caller falls through to function-default handling.
- */
-type ListDefaultParse =
-  | { readonly kind: 'array'; readonly value: readonly (string | number | boolean)[] }
-  | { readonly kind: 'scalar' }
-  | undefined;
-
-function decodeLiteralElement(element: ExpressionAst): string | number | boolean | undefined {
-  if (element instanceof StringLiteralExprAst) return element.value();
-  if (element instanceof NumberLiteralExprAst) return element.value();
-  if (element instanceof BooleanLiteralExprAst) return element.value();
-  return undefined;
-}
-
-function parseListDefaultExpression(expression: ExpressionAst | undefined): ListDefaultParse {
-  if (expression === undefined) return undefined;
-  if (
-    expression instanceof StringLiteralExprAst ||
-    expression instanceof NumberLiteralExprAst ||
-    expression instanceof BooleanLiteralExprAst
-  ) {
-    return { kind: 'scalar' };
-  }
-  if (!(expression instanceof ArrayLiteralAst)) return undefined;
-  const value: (string | number | boolean)[] = [];
-  for (const element of expression.elements()) {
-    const decoded = decodeLiteralElement(element);
-    if (decoded === undefined) return undefined;
-    value.push(decoded);
-  }
-  return { kind: 'array', value };
-}
-
 export function lowerDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
-  readonly defaultAttribute: ResolvedAttribute;
+  readonly field: FieldSymbol;
+  readonly model: ModelSymbol;
+  readonly sourceFile: SourceFile;
   readonly columnDescriptor: ColumnDescriptor;
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly sourceId: string;
@@ -948,117 +893,99 @@ export function lowerDefaultForField(input: {
   readonly defaultValue?: ColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
 } {
-  const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'positional');
-  const namedEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'named');
+  const node = findFieldAttributeNode(input.field, 'default');
+  if (node === undefined) return {};
+  const interpreted = interpretFieldAttribute({
+    node,
+    spec: defaultSpec,
+    model: input.model,
+    field: input.field,
+    sourceFile: input.sourceFile,
+    sourceId: input.sourceId,
+    diagnostics: input.diagnostics,
+  });
+  if (interpreted === undefined) return {};
+  const value = interpreted.value;
 
-  if (namedEntries.length > 0 || positionalEntries.length !== 1) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-      message: `Field "${input.modelName}.${input.fieldName}" requires exactly one positional @default(...) expression.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
-
-  const expressionEntry = getPositionalArgumentEntry(input.defaultAttribute);
-  if (!expressionEntry) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-      message: `Field "${input.modelName}.${input.fieldName}" requires a positional @default(...) expression.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
-
-  if (input.isList) {
-    const listParse = parseListDefaultExpression(expressionEntry.expression);
-    if (listParse?.kind === 'array') {
-      return { defaultValue: { kind: 'literal', value: [...listParse.value] } };
+  if (Array.isArray(value)) {
+    if (input.isList) {
+      return { defaultValue: { kind: 'literal', value: [...value] } };
     }
-    if (listParse?.kind === 'scalar') {
-      input.diagnostics.push({
-        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
-        message: `Field "${input.modelName}.${input.fieldName}" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.`,
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_VALUE',
+      message: `Unsupported default value "${JSON.stringify(value)}"`,
+      sourceId: input.sourceId,
+      span: nodePslSpan(node.syntax, input.sourceFile),
+    });
+    return {};
+  }
+
+  if (typeof value === 'object') {
+    const lowered = lowerDefaultFunctionWithRegistry({
+      call: value,
+      registry: input.defaultFunctionRegistry,
+      context: {
         sourceId: input.sourceId,
-        span: input.defaultAttribute.span,
+        modelName: input.modelName,
+        fieldName: input.fieldName,
+        columnCodecId: input.columnDescriptor.codecId,
+      },
+    });
+
+    if (!lowered.ok) {
+      input.diagnostics.push(lowered.diagnostic);
+      return {};
+    }
+
+    if (lowered.value.kind === 'storage') {
+      return { defaultValue: lowered.value.defaultValue };
+    }
+
+    const generatorDescriptor = input.generatorDescriptorById.get(lowered.value.generated.id);
+    if (!generatorDescriptor) {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+        message: `Default generator "${lowered.value.generated.id}" is not available in the composed mutation default registry.`,
+        sourceId: input.sourceId,
+        span: value.span,
       });
       return {};
     }
-    // Not a literal at all (e.g. a function call) — fall through to the
-    // function-default path, which the list execution-default guard rejects.
+
+    // Preset-only generators (e.g. `timestampNow`) co-register their codec through the preset descriptor, so they don't carry an `applicableCodecIds` list. Such a generator surfacing on the `@default(...)` lowering path is itself the bug — emit a diagnostic pointing the user at the correct authoring surface.
+    if (generatorDescriptor.applicableCodecIds === undefined) {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+        message: `Default generator "${generatorDescriptor.id}" is not applicable to "@default(...)" lowering. Use the corresponding field preset (e.g. \`temporal.${generatorDescriptor.id === 'timestampNow' ? 'updatedAt' : generatorDescriptor.id}()\`) instead.`,
+        sourceId: input.sourceId,
+        span: value.span,
+      });
+      return {};
+    }
+
+    if (!generatorDescriptor.applicableCodecIds.includes(input.columnDescriptor.codecId)) {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+        message: `Default generator "${generatorDescriptor.id}" is not applicable to "${input.modelName}.${input.fieldName}" with codecId "${input.columnDescriptor.codecId}".`,
+        sourceId: input.sourceId,
+        span: value.span,
+      });
+      return {};
+    }
+
+    return { executionDefaults: { onCreate: lowered.value.generated } };
   }
 
-  const literalDefault = parseDefaultLiteralValue(expressionEntry.value);
-  if (literalDefault) {
-    return { defaultValue: literalDefault };
-  }
-
-  const defaultFunctionCall = parseDefaultFunctionCall(expressionEntry.value, expressionEntry.span);
-  if (!defaultFunctionCall) {
+  if (input.isList) {
     input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_VALUE',
-      message: `Unsupported default value "${expressionEntry.value}"`,
+      code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
+      message: `Field "${input.modelName}.${input.fieldName}" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.`,
       sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
+      span: nodePslSpan(node.syntax, input.sourceFile),
     });
     return {};
   }
-
-  const lowered = lowerDefaultFunctionWithRegistry({
-    call: defaultFunctionCall,
-    registry: input.defaultFunctionRegistry,
-    context: {
-      sourceId: input.sourceId,
-      modelName: input.modelName,
-      fieldName: input.fieldName,
-      columnCodecId: input.columnDescriptor.codecId,
-    },
-  });
-
-  if (!lowered.ok) {
-    input.diagnostics.push(lowered.diagnostic);
-    return {};
-  }
-
-  if (lowered.value.kind === 'storage') {
-    return { defaultValue: lowered.value.defaultValue };
-  }
-
-  const generatorDescriptor = input.generatorDescriptorById.get(lowered.value.generated.id);
-  if (!generatorDescriptor) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
-      message: `Default generator "${lowered.value.generated.id}" is not available in the composed mutation default registry.`,
-      sourceId: input.sourceId,
-      span: expressionEntry.span,
-    });
-    return {};
-  }
-
-  // Preset-only generators (e.g. `timestampNow`) co-register their codec through the preset descriptor, so they don't carry an `applicableCodecIds` list. Such a generator surfacing on the `@default(...)` lowering path is itself the bug — emit a diagnostic pointing the user at the correct authoring surface.
-  if (generatorDescriptor.applicableCodecIds === undefined) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
-      message: `Default generator "${generatorDescriptor.id}" is not applicable to "@default(...)" lowering. Use the corresponding field preset (e.g. \`temporal.${generatorDescriptor.id === 'timestampNow' ? 'updatedAt' : generatorDescriptor.id}()\`) instead.`,
-      sourceId: input.sourceId,
-      span: expressionEntry.span,
-    });
-    return {};
-  }
-
-  if (!generatorDescriptor.applicableCodecIds.includes(input.columnDescriptor.codecId)) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
-      message: `Default generator "${generatorDescriptor.id}" is not applicable to "${input.modelName}.${input.fieldName}" with codecId "${input.columnDescriptor.codecId}".`,
-      sourceId: input.sourceId,
-      span: expressionEntry.span,
-    });
-    return {};
-  }
-
-  return { executionDefaults: { onCreate: lowered.value.generated } };
+  return { defaultValue: { kind: 'literal', value } };
 }
 
 export function resolveColumnDescriptor(

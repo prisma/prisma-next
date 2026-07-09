@@ -9,6 +9,7 @@ import {
   entityRef,
   fieldAttribute,
   fieldRef,
+  funcCall,
   identifier,
   interpretAttribute,
   leafDiagnostic,
@@ -17,6 +18,7 @@ import {
   oneOf,
   optional,
   record,
+  scalarLiteral,
   str,
 } from '@prisma-next/psl-parser';
 import type {
@@ -136,6 +138,10 @@ export function interpretFieldAttribute<Out>(input: {
 
 export const mapModelSpec = modelAttribute('map', { positional: [{ key: 'name', type: str() }] });
 export const mapFieldSpec = fieldAttribute('map', { positional: [{ key: 'name', type: str() }] });
+
+export const defaultSpec = fieldAttribute('default', {
+  positional: [{ key: 'value', type: oneOf(scalarLiteral(), list(scalarLiteral()), funcCall()) }],
+});
 
 export const idFieldSpec = fieldAttribute('id', { named: { map: optional(str()) } });
 export const uniqueFieldSpec = fieldAttribute('unique', { named: { map: optional(str()) } });

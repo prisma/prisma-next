@@ -943,11 +943,13 @@ model UuidNativeBad {
       );
     });
 
-    it('rejects @default(temporal.updatedAt()) with PSL_INVALID_DEFAULT_VALUE (AC5g)', () => {
+    it('rejects @default(temporal.updatedAt()) as invalid attribute syntax (AC5g)', () => {
       // Namespaced calls inside @default(...) are not supported — the
-      // default-function parser only accepts bare identifiers. The honest
-      // rejection path is "this isn't a valid @default(...) value", not
-      // "this generator isn't applicable". Locks in which diagnostic fires.
+      // funcCall combinator only accepts a bare identifier callee, so a
+      // namespaced call fails the attribute spec before reaching the
+      // registry. The honest rejection is "this isn't valid @default(...)
+      // syntax", not "this generator isn't applicable". Locks in which
+      // diagnostic fires.
       const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id
@@ -966,9 +968,8 @@ model UuidNativeBad {
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            code: 'PSL_INVALID_DEFAULT_VALUE',
+            code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
             sourceId: 'schema.prisma',
-            message: expect.stringContaining('temporal.updatedAt()'),
           }),
         ]),
       );
