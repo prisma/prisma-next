@@ -13,6 +13,8 @@ import {
   inferRelations,
   mapDefault,
   parseRawDefault,
+  toEnumMemberName,
+  toEnumName,
   toFieldName,
   toModelName,
   toNamedTypeName,
@@ -22,12 +24,15 @@ import type {
   PslAttribute,
   PslAttributeArgument,
   PslDocumentAst,
+  PslExtensionBlock,
+  PslExtensionBlockParamValue,
   PslField,
   PslFieldAttribute,
   PslModel,
   PslModelAttribute,
   PslNamedTypeDeclaration,
   PslSpan,
+  PslTypeConstructorCall,
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
 import {
@@ -353,7 +358,7 @@ export function inferPostgresPslContract(
   });
 }
 
-function buildPslDocumentAst(
+export function buildPslDocumentAst(
   schemaIR: SqlSchemaIR,
   options: PslPrinterOptions,
   foreignKeyExtras: Pick<
@@ -374,7 +379,13 @@ function buildPslDocumentAst(
   const modelNameMap = new Map(
     [...modelNames].map(([tableName, result]) => [tableName, result.name]),
   );
-  const reservedNamedTypeNames = createReservedNamedTypeNames(modelNames);
+
+  const { enumNameMap, enumBlocks } = buildNativeEnumBlocks(
+    options.enumInfo?.definitions ?? new Map(),
+    modelNames,
+  );
+
+  const reservedNamedTypeNames = createReservedNamedTypeNames(modelNames, enumNameMap);
 
   // Cross-space entries are seeded first so a real local table of the same
   // bare name (an existing single-namespace-flat-bucket limitation, not new
@@ -385,7 +396,7 @@ function buildPslDocumentAst(
     ...buildFieldNamesByTable(schemaIR.tables),
   ]);
   const { relationsByTable } = inferRelations(schemaIR.tables, modelNameMap);
-  const namedTypes = seedNamedTypeRegistry(schemaIR, typeMap, new Map(), reservedNamedTypeNames);
+  const namedTypes = seedNamedTypeRegistry(schemaIR, typeMap, enumNameMap, reservedNamedTypeNames);
 
   const models: PslModel[] = [];
   for (const table of Object.values(schemaIR.tables)) {
@@ -393,7 +404,7 @@ function buildPslDocumentAst(
       buildModel(
         table,
         typeMap,
-        new Map(),
+        enumNameMap,
         fieldNamesByTable,
         namedTypes,
         defaultMapping,
@@ -433,7 +444,7 @@ function buildPslDocumentAst(
       makePslNamespace({
         kind: 'namespace',
         name: UNSPECIFIED_PSL_NAMESPACE_ID,
-        entries: makePslNamespaceEntries(sortedModels, [], []),
+        entries: makePslNamespaceEntries(sortedModels, [], enumBlocks),
         span: SYNTHETIC_SPAN,
       }),
     ],
@@ -442,6 +453,87 @@ function buildPslDocumentAst(
   };
 
   return ast;
+}
+
+type NativeEnumBlockResult = {
+  /** Native enum type name → PSL block name, for `pg.enum(<Name>)` field refs. */
+  readonly enumNameMap: ReadonlyMap<string, string>;
+  readonly enumBlocks: readonly PslExtensionBlock[];
+};
+
+/**
+ * Builds one `native_enum` extension-block AST node per introspected enum
+ * definition. Block names go through the shared top-level transform
+ * (`toEnumName`, intra-enum collisions throw like model collisions) and are
+ * then reserved against the model names — an enum whose PSL name a model
+ * already claims gets a numeric suffix, with `@@map` carrying the real type
+ * name. Members print as explicit `member = "value"` pairs: the member name
+ * is the sanitized value (deduplicated within the block), the JSON-encoded
+ * value carries the truth verbatim.
+ */
+function buildNativeEnumBlocks(
+  definitions: ReadonlyMap<string, readonly string[]>,
+  modelNames: ReadonlyMap<string, TopLevelNameResult>,
+): NativeEnumBlockResult {
+  const enumNames = buildTopLevelNameMap(
+    [...definitions.keys()].sort(),
+    toEnumName,
+    'enum',
+    'enum type',
+  );
+
+  const usedTopLevelNames = new Set<string>(PSL_SCALAR_TYPE_NAMES);
+  for (const result of modelNames.values()) {
+    usedTopLevelNames.add(result.name);
+  }
+
+  const enumNameMap = new Map<string, string>();
+  const enumBlocks: PslExtensionBlock[] = [];
+  for (const [typeName, result] of enumNames) {
+    const name = createUniqueFieldName(result.name, usedTopLevelNames);
+    usedTopLevelNames.add(name);
+    enumNameMap.set(typeName, name);
+    enumBlocks.push(buildNativeEnumBlock(name, typeName, definitions.get(typeName) ?? []));
+  }
+
+  return { enumNameMap, enumBlocks };
+}
+
+function buildNativeEnumBlock(
+  name: string,
+  typeName: string,
+  values: readonly string[],
+): PslExtensionBlock {
+  const usedMemberNames = new Set<string>();
+  const parameters: Record<string, PslExtensionBlockParamValue> = {};
+  for (const value of values) {
+    const memberName = createUniqueFieldName(toEnumMemberName(value), usedMemberNames);
+    usedMemberNames.add(memberName);
+    parameters[memberName] = { kind: 'value', raw: JSON.stringify(value), span: SYNTHETIC_SPAN };
+  }
+
+  return {
+    kind: 'native_enum',
+    name,
+    parameters,
+    blockAttributes:
+      name === typeName
+        ? []
+        : [
+            {
+              name: 'map',
+              args: [
+                {
+                  kind: 'positional',
+                  value: `"${escapePslString(typeName)}"`,
+                  span: SYNTHETIC_SPAN,
+                },
+              ],
+              span: SYNTHETIC_SPAN,
+            },
+          ],
+    span: SYNTHETIC_SPAN,
+  };
 }
 
 function buildModel(
@@ -582,10 +674,21 @@ function buildScalarField(
     };
   }
 
+  // An enum-typed column emits the `pg.enum(<Name>)` type-constructor call —
+  // the Phase-1 authoring form a `native_enum` ref field takes — not a bare
+  // name substitution. The printer renders `typeConstructor` when present and
+  // composes `?`/`[]` exactly like any other field type.
   let typeName = resolution.pslType;
+  let typeConstructor: PslTypeConstructorCall | undefined;
   const enumPslName = enumNameMap.get(column.nativeType);
   if (enumPslName) {
     typeName = enumPslName;
+    typeConstructor = {
+      kind: 'typeConstructor',
+      path: ['pg', 'enum'],
+      args: [positionalArg(enumPslName)],
+      span: SYNTHETIC_SPAN,
+    };
   }
   if (resolution.nativeTypeAttribute && !enumPslName) {
     typeName = resolveNamedTypeName(namedTypes, resolution);
@@ -624,6 +727,7 @@ function buildScalarField(
     kind: 'field',
     name: fieldName,
     typeName,
+    ...ifDefined('typeConstructor', typeConstructor),
     optional: column.nullable,
     list: column.many === true,
     attributes,
@@ -894,11 +998,15 @@ function buildTopLevelNameMap(
 
 function createReservedNamedTypeNames(
   modelNames: ReadonlyMap<string, TopLevelNameResult>,
+  enumNameMap: ReadonlyMap<string, string>,
 ): Set<string> {
   const reservedNames = new Set<string>(PSL_SCALAR_TYPE_NAMES);
 
   for (const result of modelNames.values()) {
     reservedNames.add(result.name);
+  }
+  for (const enumPslName of enumNameMap.values()) {
+    reservedNames.add(enumPslName);
   }
 
   return reservedNames;
