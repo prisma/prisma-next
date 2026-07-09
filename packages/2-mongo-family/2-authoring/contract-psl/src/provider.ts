@@ -10,7 +10,11 @@ import { interpretPslDocumentToMongoContract } from './interpreter';
 
 export interface MongoContractOptions {
   readonly output?: string;
-  /** The target's default codec ids for an `enum` block that omits `@@type`. */
+  /**
+   * Overrides the codec ids an `enum` block that omits `@@type` infers. When omitted,
+   * the interpreter defaults them to the target's PSL `String`/`Int` scalar type
+   * descriptors, so bare-member enums work without explicit wiring.
+   */
   readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
 }
 
