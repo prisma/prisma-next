@@ -71,18 +71,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 
-import {
-  findDuplicateFieldName,
-  getAttribute,
-  getNamedArgument,
-  getPositionalArgument,
-  mapFieldNamesToColumns,
-  parseAttributeFieldList,
-  parseConstraintMapArgument,
-  parseControlPolicyAttribute,
-  parseObjectLiteralStringMap,
-  parseQuotedStringLiteral,
-} from './psl-attribute-parsing';
+import { getAttribute, mapFieldNamesToColumns } from './psl-attribute-parsing';
 import type { ColumnDescriptor } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
@@ -108,6 +97,16 @@ import {
   normalizeReferentialAction,
   validateNavigationListFieldAttributes,
 } from './psl-relation-resolution';
+import {
+  baseModelSpec,
+  controlModelSpec,
+  discriminatorModelSpec,
+  findModelAttributeNode,
+  idModelSpec,
+  indexModelSpec,
+  interpretModelAttribute,
+  uniqueModelSpec,
+} from './sql-attribute-specs';
 
 type NamedTypeSymbol = ScalarSymbol | TypeAliasSymbol;
 
@@ -517,6 +516,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     generatorDescriptorById: input.generatorDescriptorById,
     diagnostics,
     sourceId,
+    sourceFile: input.sourceFile,
     scalarTypeDescriptors: input.scalarTypeDescriptors,
     ...ifDefined('enumHandles', input.enumHandles),
     capabilities: input.capabilities,
@@ -625,7 +625,8 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   const indexNodes: IndexNode[] = [];
   const foreignKeyNodes: ForeignKeyNode[] = [];
 
-  for (const modelAttribute of model.attributes) {
+  const modelAttributeNodes = Array.from(model.node.attributes());
+  for (const [attributeIndex, modelAttribute] of model.attributes.entries()) {
     if (modelAttribute.name === 'map') {
       continue;
     }
@@ -643,13 +644,20 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         continue;
       }
       controlPolicyDeclared = true;
-      const parsed = parseControlPolicyAttribute({
-        attribute: modelAttribute,
+      const node = modelAttributeNodes[attributeIndex];
+      if (node === undefined) {
+        continue;
+      }
+      const parsed = interpretModelAttribute({
+        node,
+        spec: controlModelSpec,
+        model,
+        sourceFile: input.sourceFile,
         sourceId,
         diagnostics,
       });
       if (parsed !== undefined) {
-        controlPolicy = parsed;
+        controlPolicy = parsed.policy;
       }
       continue;
     }
@@ -674,26 +682,22 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         blockPrimaryKeyDeclared = true;
         continue;
       }
-      const fieldNames = parseAttributeFieldList({
-        attribute: modelAttribute,
+      const node = modelAttributeNodes[attributeIndex];
+      if (node === undefined) {
+        continue;
+      }
+      const parsed = interpretModelAttribute({
+        node,
+        spec: idModelSpec,
+        model,
+        sourceFile: input.sourceFile,
         sourceId,
         diagnostics,
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        entityLabel: attributeLabel,
       });
-      if (!fieldNames) {
+      if (parsed === undefined) {
         continue;
       }
-      const duplicateFieldName = findDuplicateFieldName(fieldNames);
-      if (duplicateFieldName !== undefined) {
-        diagnostics.push({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: `${attributeLabel} list contains duplicate field "${duplicateFieldName}"`,
-          sourceId,
-          span: modelAttribute.span,
-        });
-        continue;
-      }
+      const fieldNames = parsed.fields;
       const nullableFieldName = fieldNames.find((name) => model.fields[name]?.optional === true);
       if (nullableFieldName !== undefined) {
         diagnostics.push({
@@ -716,45 +720,32 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (!columnNames) {
         continue;
       }
-      const constraintName = parseConstraintMapArgument({
-        attribute: modelAttribute,
-        sourceId,
-        diagnostics,
-        entityLabel: attributeLabel,
-        span: modelAttribute.span,
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-      });
       primaryKey = {
         columns: columnNames,
-        ...ifDefined('name', constraintName),
+        ...ifDefined('name', parsed.map),
       };
       blockPrimaryKeyDeclared = true;
       continue;
     }
-    if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
-      const fieldNames = parseAttributeFieldList({
-        attribute: modelAttribute,
-        sourceId,
-        diagnostics,
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        entityLabel: attributeLabel,
-      });
-      if (!fieldNames) {
+    if (modelAttribute.name === 'unique') {
+      const node = modelAttributeNodes[attributeIndex];
+      if (node === undefined) {
         continue;
       }
-      const duplicateFieldName = findDuplicateFieldName(fieldNames);
-      if (duplicateFieldName !== undefined) {
-        diagnostics.push({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: `${attributeLabel} list contains duplicate field "${duplicateFieldName}"`,
-          sourceId,
-          span: modelAttribute.span,
-        });
+      const parsed = interpretModelAttribute({
+        node,
+        spec: uniqueModelSpec,
+        model,
+        sourceFile: input.sourceFile,
+        sourceId,
+        diagnostics,
+      });
+      if (parsed === undefined) {
         continue;
       }
       const columnNames = mapFieldNamesToColumns({
         modelName: model.name,
-        fieldNames,
+        fieldNames: parsed.fields,
         mapping,
         sourceId,
         diagnostics,
@@ -764,67 +755,46 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (!columnNames) {
         continue;
       }
-      const constraintName = parseConstraintMapArgument({
-        attribute: modelAttribute,
+      uniqueConstraints.push({
+        columns: columnNames,
+        ...ifDefined('name', parsed.map),
+      });
+      continue;
+    }
+    if (modelAttribute.name === 'index') {
+      const node = modelAttributeNodes[attributeIndex];
+      if (node === undefined) {
+        continue;
+      }
+      const parsed = interpretModelAttribute({
+        node,
+        spec: indexModelSpec,
+        model,
+        sourceFile: input.sourceFile,
         sourceId,
         diagnostics,
-        entityLabel: attributeLabel,
-        span: modelAttribute.span,
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       });
-      if (modelAttribute.name === 'unique') {
-        uniqueConstraints.push({
-          columns: columnNames,
-          ...ifDefined('name', constraintName),
-        });
-      } else {
-        const indexEntityLabel = `Model "${model.name}" @@index`;
-        const rawTypeArg = getNamedArgument(modelAttribute, 'type');
-        let indexType: string | undefined;
-        if (rawTypeArg !== undefined) {
-          const parsed = parseQuotedStringLiteral(rawTypeArg);
-          if (parsed === undefined) {
-            diagnostics.push({
-              code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-              message: `${indexEntityLabel} type argument must be a quoted string literal`,
-              sourceId,
-              span: modelAttribute.span,
-            });
-            continue;
-          }
-          indexType = parsed;
-        }
-        const rawOptionsArg = getNamedArgument(modelAttribute, 'options');
-        let indexOptions: Record<string, string> | undefined;
-        if (rawOptionsArg !== undefined) {
-          if (indexType === undefined) {
-            diagnostics.push({
-              code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-              message: `${indexEntityLabel} options argument requires a type argument`,
-              sourceId,
-              span: modelAttribute.span,
-            });
-            continue;
-          }
-          const parsed = parseObjectLiteralStringMap({
-            raw: rawOptionsArg,
-            diagnostics,
-            sourceId,
-            span: modelAttribute.span,
-            entityLabel: indexEntityLabel,
-          });
-          if (parsed === undefined) {
-            continue;
-          }
-          indexOptions = parsed;
-        }
-        indexNodes.push({
-          columns: columnNames,
-          ...ifDefined('name', constraintName),
-          ...ifDefined('type', indexType),
-          ...ifDefined('options', indexOptions),
-        });
+      if (parsed === undefined) {
+        continue;
       }
+      const columnNames = mapFieldNamesToColumns({
+        modelName: model.name,
+        fieldNames: parsed.fields,
+        mapping,
+        sourceId,
+        diagnostics,
+        span: modelAttribute.span,
+        entityLabel: attributeLabel,
+      });
+      if (!columnNames) {
+        continue;
+      }
+      indexNodes.push({
+        columns: columnNames,
+        ...ifDefined('name', parsed.map),
+        ...ifDefined('type', parsed.type),
+        ...ifDefined('options', parsed.options),
+      });
       continue;
     }
     const uncomposedNamespace = checkUncomposedNamespace(
@@ -1319,6 +1289,7 @@ type BaseDeclaration = {
 
 function collectPolymorphismDeclarations(
   models: readonly ModelSymbol[],
+  sourceFile: SourceFile,
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
 ): {
@@ -1329,54 +1300,48 @@ function collectPolymorphismDeclarations(
   const baseDeclarations = new Map<string, BaseDeclaration>();
 
   for (const model of models) {
-    for (const attr of model.attributes) {
-      if (attr.name === 'discriminator') {
-        const fieldName = getPositionalArgument(attr);
-        if (!fieldName) {
-          diagnostics.push({
-            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Model "${model.name}" @@discriminator requires a field name argument`,
-            sourceId,
-            span: attr.span,
-          });
-          continue;
-        }
-        const discField = model.fields[fieldName];
+    const discriminatorNode = findModelAttributeNode(model, 'discriminator');
+    if (discriminatorNode !== undefined) {
+      const parsed = interpretModelAttribute({
+        node: discriminatorNode,
+        spec: discriminatorModelSpec,
+        model,
+        sourceFile,
+        sourceId,
+        diagnostics,
+      });
+      if (parsed !== undefined) {
+        const span = nodePslSpan(discriminatorNode.syntax, sourceFile);
+        const discField = model.fields[parsed.field];
         if (discField && discField.typeName !== 'String') {
           diagnostics.push({
             code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Discriminator field "${fieldName}" on model "${model.name}" must be of type String, but is "${discField.typeName}"`,
+            message: `Discriminator field "${parsed.field}" on model "${model.name}" must be of type String, but is "${discField.typeName}"`,
             sourceId,
-            span: attr.span,
+            span,
           });
-          continue;
+        } else {
+          discriminatorDeclarations.set(model.name, { fieldName: parsed.field, span });
         }
-        discriminatorDeclarations.set(model.name, { fieldName, span: attr.span });
       }
+    }
 
-      if (attr.name === 'base') {
-        const baseName = getPositionalArgument(attr, 0);
-        const rawValue = getPositionalArgument(attr, 1);
-        if (!baseName || !rawValue) {
-          diagnostics.push({
-            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Model "${model.name}" @@base requires two arguments: base model name and discriminator value`,
-            sourceId,
-            span: attr.span,
-          });
-          continue;
-        }
-        const value = parseQuotedStringLiteral(rawValue);
-        if (value === undefined) {
-          diagnostics.push({
-            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-            message: `Model "${model.name}" @@base discriminator value must be a quoted string literal`,
-            sourceId,
-            span: attr.span,
-          });
-          continue;
-        }
-        baseDeclarations.set(model.name, { baseName, value, span: attr.span });
+    const baseNode = findModelAttributeNode(model, 'base');
+    if (baseNode !== undefined) {
+      const parsed = interpretModelAttribute({
+        node: baseNode,
+        spec: baseModelSpec,
+        model,
+        sourceFile,
+        sourceId,
+        diagnostics,
+      });
+      if (parsed !== undefined) {
+        baseDeclarations.set(model.name, {
+          baseName: parsed.base,
+          value: parsed.value,
+          span: nodePslSpan(baseNode.syntax, sourceFile),
+        });
       }
     }
   }
@@ -1429,16 +1394,6 @@ function resolvePolymorphism(
 
     const model = patched[coordinateFor(modelName)];
     if (!model) continue;
-
-    if (!Object.hasOwn(model.fields, decl.fieldName)) {
-      diagnostics.push({
-        code: 'PSL_DISCRIMINATOR_FIELD_NOT_FOUND',
-        message: `Discriminator field "${decl.fieldName}" is not a field on model "${modelName}"`,
-        sourceId,
-        span: decl.span,
-      });
-      continue;
-    }
 
     const variants: Record<string, { readonly value: string }> = {};
     const seenValues = new Map<string, string>();
@@ -1970,6 +1925,7 @@ export function interpretPslDocumentToSqlContract(
     defaultNamespaceId,
     diagnostics,
     sourceId,
+    sourceFile,
   );
   // Bare-name view for unqualified relation targets and polymorphism, where
   // resolution is by bare model name. When a bare name is shared across
@@ -2064,6 +2020,7 @@ export function interpretPslDocumentToSqlContract(
 
   const { discriminatorDeclarations, baseDeclarations } = collectPolymorphismDeclarations(
     models,
+    sourceFile,
     sourceId,
     diagnostics,
   );
