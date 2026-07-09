@@ -18,7 +18,7 @@ export interface ResolveNamedTypeDeclarationsInput {
   readonly declarations: readonly NamedTypeSymbol[];
   readonly sourceId: string;
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
-  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly composedExtensions: ReadonlySet<string>;
   readonly familyId: string;
   readonly targetId: string;
@@ -178,7 +178,7 @@ export function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarations
     }
 
     const baseDescriptor =
-      input.enumTypeDescriptors.get(baseType) ?? input.scalarTypeDescriptors.get(baseType);
+      input.enumTypeDescriptors.get(baseType) ?? input.scalarColumnDescriptors.get(baseType);
     if (!baseDescriptor) {
       input.diagnostics.push({
         code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',

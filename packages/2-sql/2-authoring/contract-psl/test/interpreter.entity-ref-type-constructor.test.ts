@@ -205,7 +205,7 @@ const authoringContributions: AuthoringContributions = {
 
 const baseInput = {
   target: postgresTarget,
-  scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  scalarColumnDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
   capabilities: { sql: { scalarList: true } },
@@ -472,7 +472,7 @@ model AuthSession {
       field,
       enumTypeDescriptors: new Map(),
       namedTypeDescriptors: new Map(),
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       authoringContributions,
       composedExtensions: new Set(),
       familyId: 'sql',

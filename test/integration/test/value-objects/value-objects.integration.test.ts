@@ -101,7 +101,7 @@ function interpretSqlPsl(schema: string) {
     sourceFile,
     sourceId: 'test.prisma',
     target: postgresTarget,
-    scalarTypeDescriptors: postgresScalarTypeDescriptors,
+    scalarColumnDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,
     capabilities: { sql: { scalarList: true } },

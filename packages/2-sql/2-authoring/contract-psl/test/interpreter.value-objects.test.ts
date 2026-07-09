@@ -19,7 +19,7 @@ describe('interpretPslDocumentToSqlContract value objects and list fields', () =
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
       | 'target'
-      | 'scalarTypeDescriptors'
+      | 'scalarColumnDescriptors'
       | 'composedExtensionContracts'
       | 'createNamespace'
       | 'capabilities'
@@ -28,7 +28,7 @@ describe('interpretPslDocumentToSqlContract value objects and list fields', () =
   ) =>
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
       capabilities: { sql: { scalarList: true } },

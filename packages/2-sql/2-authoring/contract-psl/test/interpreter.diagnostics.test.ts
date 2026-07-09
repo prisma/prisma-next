@@ -18,7 +18,7 @@ import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contr
 
 const baseInput = {
   target: postgresTarget,
-  scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  scalarColumnDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
   capabilities: { sql: { scalarList: true } },
@@ -56,7 +56,7 @@ describe('interpretPslDocumentToSqlContract diagnostics', () => {
     // Intentionally bypasses strict input typing to verify missing target diagnostics.
     const result = interpretPslDocumentToSqlContract({
       ...document,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
     } as unknown as InterpretPslDocumentToSqlContractInput);
 
     expect(result.ok).toBe(false);
@@ -1102,7 +1102,7 @@ model User {
 
       const result = interpretPslDocumentToSqlContract({
         target: sqliteTarget,
-        scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+        scalarColumnDescriptors: sqliteScalarTypeDescriptors,
         composedExtensionContracts: new Map(),
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
@@ -1139,7 +1139,7 @@ model User {
 
       const result = interpretPslDocumentToSqlContract({
         target: sqliteTarget,
-        scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+        scalarColumnDescriptors: sqliteScalarTypeDescriptors,
         composedExtensionContracts: new Map(),
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,

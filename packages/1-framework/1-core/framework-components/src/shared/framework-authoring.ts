@@ -620,6 +620,35 @@ export function collectContributedDescriptorPaths(
   return paths;
 }
 
+export interface ScalarTypeConstructorOutput {
+  readonly codecId: string;
+  readonly nativeType: string;
+}
+
+/**
+ * Derives the scalar view of an assembled authoring type namespace: every
+ * **top-level** zero-arg type constructor with an explicit literal
+ * `nativeType`. A bare type name `T` in a schema is semantically the
+ * zero-arg instantiation `T()`, so these entries are exactly the base
+ * scalars a target registers. Namespaced constructors (`sql.String`),
+ * constructors declaring args, and entity-ref constructors (`pg.enum`) are
+ * not scalars and are excluded.
+ */
+export function collectScalarTypeConstructors(
+  namespace: AuthoringTypeNamespace,
+): ReadonlyMap<string, ScalarTypeConstructorOutput> {
+  const result = new Map<string, ScalarTypeConstructorOutput>();
+  for (const [name, value] of Object.entries(namespace)) {
+    if (!isAuthoringTypeConstructorDescriptor(value)) continue;
+    if (value.args !== undefined && value.args.length > 0) continue;
+    if (value.entityRefArg !== undefined) continue;
+    const nativeType = value.output.nativeType;
+    if (typeof nativeType !== 'string') continue;
+    result.set(name, { codecId: value.output.codecId, nativeType });
+  }
+  return result;
+}
+
 /**
  * Shape shared by every `Authoring*Namespace` type: a tree whose leaves are
  * descriptors of type `D` and whose internal nodes are sub-namespaces of the

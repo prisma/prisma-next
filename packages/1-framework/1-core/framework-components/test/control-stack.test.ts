@@ -1105,6 +1105,47 @@ describe('createControlStack', () => {
       entityTypes: {},
       pslBlockDescriptors: {},
     });
+    expect(state.scalarTypes).toEqual([]);
+  });
+
+  it('derives scalarTypes from top-level zero-arg constructors in the assembled namespace', () => {
+    const state = createControlStack(
+      stubInput({
+        family: createDescriptor({
+          kind: 'family',
+          id: 'sql',
+          authoring: {
+            type: {
+              sql: {
+                String: {
+                  kind: 'typeConstructor',
+                  args: [{ kind: 'number', name: 'length' }],
+                  output: { codecId: 'sql/varchar@1', nativeType: 'character varying' },
+                },
+              },
+            },
+          },
+        }),
+        target: createDescriptor({ kind: 'target', id: 'tgt' }),
+        adapter: createDescriptor({
+          kind: 'adapter',
+          id: 'adp',
+          authoring: {
+            type: {
+              String: {
+                kind: 'typeConstructor',
+                output: { codecId: 'pg/text@1', nativeType: 'text' },
+              },
+              Int: {
+                kind: 'typeConstructor',
+                output: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              },
+            },
+          },
+        }),
+      }),
+    );
+    expect(state.scalarTypes).toEqual(['String', 'Int']);
   });
 });
 

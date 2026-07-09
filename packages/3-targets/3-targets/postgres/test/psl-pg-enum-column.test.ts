@@ -72,7 +72,7 @@ const postgresTarget = {
   defaultNamespaceId: 'public',
 };
 
-const scalarTypeDescriptors = new Map<string, { codecId: string; nativeType: string }>([
+const scalarColumnDescriptors = new Map<string, { codecId: string; nativeType: string }>([
   ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
   ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
 ]);
@@ -82,7 +82,7 @@ function interpret(source: string) {
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypeDescriptors.keys()],
+    scalarTypes: [...scalarColumnDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
   return interpretPslDocumentToSqlContract({
@@ -91,7 +91,7 @@ function interpret(source: string) {
     sourceId: 'schema.prisma',
     capabilities: {},
     target: postgresTarget,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors,
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,

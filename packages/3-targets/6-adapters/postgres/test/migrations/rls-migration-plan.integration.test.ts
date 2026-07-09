@@ -60,13 +60,13 @@ function buildScalarTypeDescriptors(): ReadonlyMap<
 
 function buildPslContract() {
   const assembled = assembleAuthoringContributions([postgresTargetDescriptor]);
-  const scalarTypeDescriptors = buildScalarTypeDescriptors();
+  const scalarColumnDescriptors = buildScalarTypeDescriptors();
 
   const { document, sourceFile } = parse(PSL);
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypeDescriptors.keys()],
+    scalarTypes: [...scalarColumnDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
 
@@ -83,7 +83,7 @@ function buildPslContract() {
       capabilities: {},
       defaultNamespaceId: 'public',
     },
-    scalarTypeDescriptors,
+    scalarColumnDescriptors,
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,

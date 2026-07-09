@@ -154,7 +154,7 @@ export interface CollectResolvedFieldsInput {
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly sourceFile: SourceFile;
-  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
   readonly capabilities: CapabilityMatrix;
   /** The model's resolved namespace id — forwarded to `resolveFieldTypeDescriptor` for entity-ref value-set scoping. */
@@ -322,7 +322,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     generatorDescriptorById,
     diagnostics,
     sourceId,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors,
     enumHandles,
     capabilities,
     namespaceId,
@@ -370,7 +370,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       field,
       enumTypeDescriptors,
       namedTypeDescriptors,
-      scalarTypeDescriptors,
+      scalarColumnDescriptors,
       authoringContributions,
       composedExtensions,
       familyId,
@@ -384,7 +384,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     };
 
     if (isValueObjectField) {
-      descriptor = scalarTypeDescriptors.get('Json');
+      descriptor = scalarColumnDescriptors.get('Json');
     } else if (isListField) {
       if (capabilities['sql']?.['scalarList'] !== true) {
         diagnostics.push({

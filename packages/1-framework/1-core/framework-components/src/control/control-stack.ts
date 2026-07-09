@@ -15,6 +15,7 @@ import type {
 import {
   assertNoCrossRegistryCollisions,
   collectContributedDescriptorPaths,
+  collectScalarTypeConstructors,
   mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
@@ -59,6 +60,8 @@ export interface ControlStack<
   readonly extensionIds: ReadonlyArray<string>;
   readonly codecLookup: CodecRegistry;
   readonly authoringContributions: AssembledAuthoringContributions;
+  /** Names of the top-level zero-arg type constructors in the assembled authoring namespace — the base scalars of the composed stack. */
+  readonly scalarTypes: ReadonlyArray<string>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly controlMutationDefaults: ControlMutationDefaults;
   readonly capabilities: CapabilityMatrix;
@@ -539,6 +542,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
 
   const codecLookup = extractCodecLookup(allDescriptors);
   const scalarTypeDescriptors = assembleScalarTypeDescriptors(allDescriptors);
+  const authoringContributions = assembleAuthoringContributions(allDescriptors);
 
   return {
     family,
@@ -551,7 +555,8 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
     extensionIds: extractComponentIds(family, target, adapter, orderedExtensionPacks),
     codecLookup,
-    authoringContributions: assembleAuthoringContributions(allDescriptors),
+    authoringContributions,
+    scalarTypes: [...collectScalarTypeConstructors(authoringContributions.type).keys()],
     scalarTypeDescriptors,
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
     capabilities: mergeCapabilityMatrices({}, [

@@ -32,7 +32,7 @@ export function resolveControlStackInputs(config: PrismaNextConfig): PipelineInp
   }
   const stack = createControlStack(config);
   return {
-    scalarTypes: [...stack.scalarTypeDescriptors.keys()],
+    scalarTypes: [...stack.scalarTypes],
     pslBlockDescriptors: stack.authoringContributions.pslBlockDescriptors,
   };
 }
