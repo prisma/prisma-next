@@ -49,6 +49,7 @@
     "./index-type-validation": "./dist/index-type-validation.mjs",
     "./index-types": "./dist/index-types.mjs",
     "./pack-types": "./dist/pack-types.mjs",
+    "./qualify-type-name": "./dist/qualify-type-name.mjs",
     "./referential-action-sql": "./dist/referential-action-sql.mjs",
     "./resolve-storage-table": "./dist/resolve-storage-table.mjs",
     "./types": "./dist/types.mjs",

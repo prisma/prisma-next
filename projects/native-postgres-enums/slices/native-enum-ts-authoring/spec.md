@@ -90,14 +90,20 @@ Sequential, test-first. Each dispatch: write the failing test, then implement.
 - **Hands to:** the attachment + value-set derivation D2 rides.
 - **Focus:** the `packEntities`-shaped field threaded through the chain; the `entries` assembly extension; the `deriveValueSet` fold on the TS path. Test: a hand-constructed pack entity input (default and named namespace) → asserts `entries.<kind>` + `entries.valueSet` land.
 
-### D2 — `native-enum-ts-surface-and-deferred-qualification`
-- **Outcome:** (a) `columnFromEntity` returns the bare type name and a generic build-stage `qualifyTypeName` applies qualification in both the PSL and TS paths, with existing PSL fixtures byte-identical; (b) `nativeEnum(mappedName, ...values)` builds a handle and `field.column(pg.enum(handle))` produces a deferred descriptor that `build-contract` resolves against the field's model namespace into the same column `{ codecId, nativeType, typeParams, valueSet }` the PSL path yields.
-- **Builds on:** D1.
-- **Hands to:** the TS authoring surface the parity test drives.
-- **Focus:** relocate qualification (codec returns bare, generic helper qualifies at build for PSL + TS — `fixtures:check` must stay clean); the bespoke `nativeEnum` constructor + inline value-set; the deferred `pg.enum(handle)` descriptor + its build-time resolution. Test: TS authoring produces the column for `public` and `auth`; out-of-set/type-union type-test; PSL fixtures unchanged.
+### D2 — `relocate-type-name-qualification`
+- **Outcome:** `PgEnumDescriptor.columnFromEntity` returns the **bare** type name (drops the eager schema-qualification), and a generic `qualifyTypeName(name, namespaceId)` helper (reachable by both PSL and TS authoring without a target dependency) applies the prefix. The **PSL** path calls it at resolution (where it already holds the namespace); emitted contracts stay byte-identical.
+- **Builds on:** — (independent refactor; sequenced before D3 so the TS path can reuse the helper).
+- **Hands to:** the bare codec + `qualifyTypeName` D3's TS column path reuses.
+- **Focus:** codec returns bare name (remove the now-unused namespace param if clean); the generic helper (extract the default/unbound → bare rule); the PSL caller qualifies both `nativeType` and `typeParams.typeName`. Test: `qualifyTypeName` unit test; contract-psl tests green; **`fixtures:check` byte-identical** (the retail-store / Supabase `auth.aal_level` columns unchanged).
 
-### D3 — `psl-ts-parity`
-- **Outcome:** parity cases — a `native_enum` + `pg.enum` schema in the default schema **and** in `auth`, authored in PSL and in TS — assert in-memory `Contract` `toEqual` and emitted `contract.json` byte-equality; `fixtures:check` green.
+### D3 — `native-enum-ts-helper`
+- **Outcome:** `nativeEnum(mappedName, ...values)` builds a `native_enum` handle (validates non-empty/unique) + derives its value-set inline; `field.column(pg.enum(handle))` produces a **deferred** column descriptor that `build-contract` resolves against the field's model namespace — via D2's `qualifyTypeName` — into the same column `{ codecId, nativeType, typeParams, valueSet }` the PSL path yields; the declared entity flows into D1's `packEntities`.
 - **Builds on:** D1, D2.
+- **Hands to:** the TS authoring surface the parity test drives.
+- **Focus:** the bespoke `nativeEnum` constructor (Postgres TS surface); the deferred `pg.enum(handle)` descriptor + its build-time resolution + qualification; the ergonomic path that lands the declared entity in `packEntities` (default and named namespace). Test: TS authoring produces the column for `public` and `auth`; out-of-set/type-union type-test.
+
+### D4 — `psl-ts-parity`
+- **Outcome:** parity cases — a `native_enum` + `pg.enum` schema in the default schema **and** in `auth`, authored in PSL and in TS — assert in-memory `Contract` `toEqual` and emitted `contract.json` byte-equality; `fixtures:check` green.
+- **Builds on:** D1, D2, D3.
 - **Hands to:** the shipped capability.
 - **Focus:** the parity fixture/test (extend `ts-psl-parity.real-packs.test.ts` and/or a `parity/native-enum/` case) + full gate (build, typecheck, package + integration tests, lint:deps, lint:casts, fixtures:check).
