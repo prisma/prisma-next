@@ -13,6 +13,18 @@ class UserRepository extends Collection<Contract, 'User'> {
   byName(name: string) {
     return this.where({ name });
   }
+
+  newestFirst() {
+    return this.orderBy({ _id: -1 });
+  }
+}
+
+class NotACollection {
+  constructor(
+    public a: unknown,
+    public b: unknown,
+    public c: unknown,
+  ) {}
 }
 
 describe('custom collection typing', () => {
@@ -36,5 +48,19 @@ describe('custom collection typing', () => {
     const client = mongoOrm({ contract, executor, collections: { User: UserRepository } });
     const first = await client.users.byName('Alice').take(1).first();
     expectTypeOf(first).not.toBeAny();
+  });
+
+  it('base chaining methods preserve the subclass type', () => {
+    const client = mongoOrm({ contract, executor, collections: { User: UserRepository } });
+    const chained = client.users.byName('Alice').take(1).skip(1).newestFirst();
+    expectTypeOf(chained).toEqualTypeOf<UserRepository>();
+    expectTypeOf(
+      client.users.where({ name: 'A' }).select('name').byName('B'),
+    ).toEqualTypeOf<UserRepository>();
+  });
+
+  it('only Collection subclasses are accepted in the registry', () => {
+    // @ts-expect-error a class that does not extend Collection is rejected
+    mongoOrm({ contract, executor, collections: { User: NotACollection } });
   });
 });

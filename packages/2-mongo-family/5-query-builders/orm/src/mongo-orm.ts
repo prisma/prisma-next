@@ -6,10 +6,19 @@ import type {
 } from '@prisma-next/mongo-contract';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { MongoCollection } from './collection';
-import { createMongoCollection } from './collection';
+import { Collection, createMongoCollection, MONGO_ORM_COLLECTION_BRAND } from './collection';
 import type { MongoQueryExecutor } from './executor';
 
-export type AnyMongoCollectionClass = new (...args: never[]) => object;
+/**
+ * A `Collection` subclass constructor. The brand restricts registration to classes
+ * that actually extend `Collection`; the `never[]` parameters accept any concrete
+ * subclass constructor (constructor parameters are contravariant).
+ */
+export type AnyMongoCollectionClass = new (
+  ...args: never[]
+) => {
+  readonly [MONGO_ORM_COLLECTION_BRAND]: true;
+};
 
 export interface MongoOrmOptions<
   TContract extends MongoContract,
@@ -49,6 +58,29 @@ export type MongoOrmClient<
   readonly [K in keyof TContract['roots'] & string]: RootCollection<TContract, Collections, K>;
 };
 
+function instantiateCustomCollection(
+  CustomCtor: AnyMongoCollectionClass,
+  contract: MongoContract,
+  modelName: string,
+  executor: MongoQueryExecutor,
+): object {
+  const Ctor = blindCast<
+    new (
+      contract: MongoContract,
+      modelName: string,
+      executor: MongoQueryExecutor,
+    ) => object,
+    'registered classes extend Collection (brand-checked statically, instanceof-checked below), so they take the base constructor arguments'
+  >(CustomCtor);
+  const instance = new Ctor(contract, modelName, executor);
+  if (!(instance instanceof Collection)) {
+    throw new Error(
+      `collections["${modelName}"] must extend the Collection class exported by @prisma-next/mongo-orm`,
+    );
+  }
+  return instance;
+}
+
 export function mongoOrm<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   Collections extends Partial<Record<string, AnyMongoCollectionClass>> = Record<never, never>,
@@ -63,16 +95,12 @@ export function mongoOrm<
     >(rootRef.model);
     const CustomCtor = collections?.[rootRef.model];
     client[rootName] = CustomCtor
-      ? new (blindCast<
-          new (
-            contract: TContract,
-            modelName: string,
-            executor: MongoQueryExecutor,
-          ) => object,
-          'a registered collection class is a Collection subclass constructor'
-        >(CustomCtor))(contract, modelName, executor)
+      ? instantiateCustomCollection(CustomCtor, contract, modelName, executor)
       : createMongoCollection(contract, modelName, executor);
   }
 
-  return client as MongoOrmClient<TContract, Collections>;
+  return blindCast<
+    MongoOrmClient<TContract, Collections>,
+    'client is populated with one collection per contract root, matching the mapped type'
+  >(client);
 }

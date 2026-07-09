@@ -106,6 +106,14 @@ describe('custom collection subclasses', () => {
     expect(tasks.bugs()).toBeInstanceOf(TaskRepository);
   });
 
+  it('rejects a registered class that does not extend Collection', () => {
+    class NotACollection {}
+    const executor = createMockExecutor();
+    expect(() =>
+      mongoOrm({ contract, executor, collections: { User: NotACollection as never } }),
+    ).toThrow('must extend the Collection class');
+  });
+
   it('a directly constructed subclass executes queries', async () => {
     const executor = createMockExecutor([{ _id: '1', name: 'Alice' }]);
     const repo = new UserRepository(contract, 'User', executor);

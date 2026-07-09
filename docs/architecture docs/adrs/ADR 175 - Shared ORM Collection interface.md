@@ -30,9 +30,9 @@ const feed = await db.Post
 const user = await db.User.byEmail('alice@example.com').first();
 ```
 
-**Mongo ORM (target — not yet implemented):**
+**Mongo ORM (shipped — custom collections + chaining; the callback where-DSL is still SQL-only):**
 ```typescript
-const db = mongoOrm({ contract, runtime });
+const db = mongoOrm({ contract, executor, collections: { User: UserCollection } });
 
 // Same custom collection pattern
 class UserCollection extends Collection<Contract, 'User'> {
@@ -40,11 +40,12 @@ class UserCollection extends Collection<Contract, 'User'> {
   byEmail(email: string) { return this.where({ email }); }
 }
 
-// Identical chaining API — compiles to MongoQueryPlan instead of SqlQueryPlan
+// Same chaining shape — compiles to MongoQueryPlan instead of SqlQueryPlan.
+// where/orderBy take Mongo's object forms until the where-DSL generalizes.
 const tasks = await db.tasks
-  .where((task) => task.assigneeId.eq('u1'))
+  .where({ assigneeId: 'u1' })
   .include('assignee')
-  .orderBy([(task) => task.createdAt.desc()])
+  .orderBy({ createdAt: -1 })
   .take(10)
   .all();
 

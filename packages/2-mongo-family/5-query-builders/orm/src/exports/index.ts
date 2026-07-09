@@ -1,7 +1,7 @@
 export type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 export type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 export type { MongoCollection } from '../collection';
-export { Collection, createMongoCollection } from '../collection';
+export { Collection, createMongoCollection, MONGO_ORM_COLLECTION_BRAND } from '../collection';
 export { compileMongoQuery } from '../compile';
 export type { MongoQueryExecutor } from '../executor';
 export type {

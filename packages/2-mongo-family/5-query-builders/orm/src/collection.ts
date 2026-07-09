@@ -70,27 +70,25 @@ export interface MongoCollection<
     variantName: V,
   ): MongoCollection<TContract, ModelName, TIncludes, V>;
   /** Appends equality filters from a plain object. Values are encoded through codecs. */
-  where(
-    filter: MongoWhereFilter<TContract, ModelName>,
-  ): MongoCollection<TContract, ModelName, TIncludes, TVariant>;
+  where(filter: MongoWhereFilter<TContract, ModelName>): this;
   /** Appends a filter condition from a raw filter expression. */
-  where(filter: MongoFilterExpr): MongoCollection<TContract, ModelName, TIncludes, TVariant>;
+  where(filter: MongoFilterExpr): this;
   /** Restricts returned fields to the given subset. Returns a new immutable collection. */
-  select(
-    ...fields: ModelFieldKeys<TContract, ModelName>[]
-  ): MongoCollection<TContract, ModelName, TIncludes, TVariant>;
-  /** Adds a `$lookup` for a reference relation. Returns a new immutable collection. */
+  select(...fields: ModelFieldKeys<TContract, ModelName>[]): this;
+  /**
+   * Adds a `$lookup` for a reference relation. Returns a new immutable collection.
+   * Re-parameterizes `TIncludes`, so (unlike `where`/`orderBy`/`take`/`skip`/`select`)
+   * the static type of a custom subclass is not preserved past this call.
+   */
   include<K extends ReferenceRelationKeys<TContract, ModelName> & string>(
     relationName: K,
   ): MongoCollection<TContract, ModelName, TIncludes & Record<K, true>, TVariant>;
   /** Sets sort order. Returns a new immutable collection. */
-  orderBy(
-    spec: Partial<Record<ModelFieldKeys<TContract, ModelName>, 1 | -1>>,
-  ): MongoCollection<TContract, ModelName, TIncludes, TVariant>;
+  orderBy(spec: Partial<Record<ModelFieldKeys<TContract, ModelName>, 1 | -1>>): this;
   /** Limits the number of results. Returns a new immutable collection. */
-  take(n: number): MongoCollection<TContract, ModelName, TIncludes, TVariant>;
+  take(n: number): this;
   /** Skips the first `n` results. Returns a new immutable collection. */
-  skip(n: number): MongoCollection<TContract, ModelName, TIncludes, TVariant>;
+  skip(n: number): this;
   /** Executes the query and returns all matching rows as an async iterable. */
   all(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
   /** Executes the query with limit 1. Returns the first matching row or `null`. */
@@ -155,16 +153,11 @@ function resolveCollectionName(model: MongoModelDefinition, modelName: string): 
   return model.storage.collection ?? modelName;
 }
 
-type MongoCollectionConstructor<
-  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
-  ModelName extends string & keyof MongoModelsMap<TContract>,
-  TIncludes extends MongoIncludeSpec<TContract, ModelName>,
-  TVariant extends string,
-> = new (
-  contract: TContract,
-  modelName: ModelName,
-  executor: MongoQueryExecutor,
-) => Collection<TContract, ModelName, TIncludes, TVariant>;
+// String-key brand rather than a unique symbol, mirroring ENUM_TYPE_HANDLE_BRAND
+// (contract-authoring/enum-type.ts): string equality survives .d.mts chunk
+// de-duplication across package boundaries, unique symbols do not. The brand lets
+// `collections` registries accept only Collection subclasses at the type level.
+export const MONGO_ORM_COLLECTION_BRAND = '__prismaNextMongoOrmCollection__';
 
 /**
  * The extendable Mongo ORM collection ([ADR 175](../../../../../docs/architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md)).
@@ -179,8 +172,11 @@ type MongoCollectionConstructor<
  *
  * Register subclasses via `mongoOrm({ collections: { User: UserRepository } })` (keyed
  * by model name). Chaining methods clone through `this.constructor`, so a chain started
- * from a subclass stays an instance of that subclass. Subclasses must keep the base
- * constructor signature `(contract, modelName, executor)`.
+ * from a subclass stays an instance of that subclass — at runtime always, and statically
+ * for the methods typed `this` (`where`/`select`/`orderBy`/`take`/`skip`). `include()` and
+ * `variant()` re-parameterize the collection's generics and therefore widen the static
+ * type back to the base. Subclasses must keep the base constructor signature
+ * `(contract, modelName, executor)`.
  */
 export class Collection<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
@@ -189,6 +185,9 @@ export class Collection<
   TVariant extends string = never,
 > implements MongoCollection<TContract, ModelName, TIncludes, TVariant>
 {
+  /** Type-level brand consumed by `AnyMongoCollectionClass`; never exists at runtime. */
+  declare readonly [MONGO_ORM_COLLECTION_BRAND]: true;
+
   readonly #contract: TContract;
   readonly #modelName: ModelName;
   readonly #executor: MongoQueryExecutor;
@@ -214,15 +213,18 @@ export class Collection<
       | MongoModelDefinition
       | undefined;
     if (!model?.discriminator || !model.variants) {
-      // No polymorphism metadata on this model — return unchanged. Cast required
-      // because TS cannot verify TVariant (the current variant) is assignable to V.
-      return this as unknown as MongoCollection<TContract, ModelName, TIncludes, V>;
+      return blindCast<
+        MongoCollection<TContract, ModelName, TIncludes, V>,
+        'no polymorphism metadata — returned unchanged; TS cannot verify TVariant is assignable to V'
+      >(this);
     }
 
     const variantEntry = model.variants[variantName as string];
     if (!variantEntry) {
-      // Unknown variant name at runtime — return unchanged. Same cast rationale.
-      return this as unknown as MongoCollection<TContract, ModelName, TIncludes, V>;
+      return blindCast<
+        MongoCollection<TContract, ModelName, TIncludes, V>,
+        'unknown variant name at runtime — returned unchanged; TS cannot verify TVariant is assignable to V'
+      >(this);
     }
 
     const filter = MongoFieldFilter.eq(
@@ -235,9 +237,7 @@ export class Collection<
     );
   }
 
-  where(
-    filter: MongoWhereFilter<TContract, ModelName> | MongoFilterExpr,
-  ): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
+  where(filter: MongoWhereFilter<TContract, ModelName> | MongoFilterExpr): this {
     if (isMongoFilterExpr(filter)) {
       return this.#clone({ filters: [...this.#state.filters, filter] });
     }
@@ -245,9 +245,7 @@ export class Collection<
     return this.#clone({ filters: [...this.#state.filters, ...compiled] });
   }
 
-  select(
-    ...fields: ModelFieldKeys<TContract, ModelName>[]
-  ): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
+  select(...fields: ModelFieldKeys<TContract, ModelName>[]): this {
     return this.#clone({ selectedFields: [...(this.#state.selectedFields ?? []), ...fields] });
   }
 
@@ -296,23 +294,22 @@ export class Collection<
       cardinality: ref.cardinality,
     };
 
-    return this.#clone({
-      includes: [...this.#state.includes, includeExpr],
-    }) as unknown as Collection<TContract, ModelName, TIncludes & Record<K, true>, TVariant>;
+    return blindCast<
+      MongoCollection<TContract, ModelName, TIncludes & Record<K, true>, TVariant>,
+      'the clone carries the new include at runtime; TIncludes only tracks it statically'
+    >(this.#clone({ includes: [...this.#state.includes, includeExpr] }));
   }
 
-  orderBy(
-    spec: Partial<Record<ModelFieldKeys<TContract, ModelName>, 1 | -1>>,
-  ): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
+  orderBy(spec: Partial<Record<ModelFieldKeys<TContract, ModelName>, 1 | -1>>): this {
     const merged = { ...this.#state.orderBy, ...(spec as Readonly<Record<string, 1 | -1>>) };
     return this.#clone({ orderBy: merged });
   }
 
-  take(n: number): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
+  take(n: number): this {
     return this.#clone({ limit: n });
   }
 
-  skip(n: number): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
+  skip(n: number): this {
     return this.#clone({ offset: n });
   }
 
@@ -829,12 +826,14 @@ export class Collection<
 
   // Clones instantiate through `this.constructor` so chains started from a custom
   // subclass keep returning that subclass (same pattern as the SQL ORM Collection).
-  #clone(
-    overrides: Partial<MongoCollectionState>,
-  ): Collection<TContract, ModelName, TIncludes, TVariant> {
+  #clone(overrides: Partial<MongoCollectionState>): this {
     const Ctor = blindCast<
-      MongoCollectionConstructor<TContract, ModelName, TIncludes, TVariant>,
-      'this.constructor is this Collection (sub)class; subclasses keep the base constructor signature'
+      new (
+        contract: TContract,
+        modelName: ModelName,
+        executor: MongoQueryExecutor,
+      ) => this,
+      'this.constructor is this instance’s own (sub)class; subclasses keep the base constructor signature'
     >(this.constructor);
     const instance = new Ctor(this.#contract, this.#modelName, this.#executor);
     instance.#state = { ...this.#state, ...overrides };
@@ -843,19 +842,18 @@ export class Collection<
     return instance;
   }
 
+  // Like #clone, but re-parameterizes TVariant — so the static type is the base
+  // Collection, not `this`. The runtime instance is still the same (sub)class.
   #cloneWithVariant<VNew extends string>(
     overrides: Partial<MongoCollectionState>,
     variantName: string,
   ): Collection<TContract, ModelName, TIncludes, VNew> {
-    const Ctor = blindCast<
-      MongoCollectionConstructor<TContract, ModelName, TIncludes, VNew>,
-      'this.constructor is this Collection (sub)class; subclasses keep the base constructor signature'
-    >(this.constructor);
-    const instance = new Ctor(this.#contract, this.#modelName, this.#executor);
-    instance.#state = { ...this.#state, ...overrides };
-    instance.#collectionName = this.#collectionName;
+    const instance = this.#clone(overrides);
     instance.#variantName = variantName;
-    return instance;
+    return blindCast<
+      Collection<TContract, ModelName, TIncludes, VNew>,
+      'the discriminator filter in overrides narrows the runtime rows to VNew'
+    >(instance);
   }
 }
 

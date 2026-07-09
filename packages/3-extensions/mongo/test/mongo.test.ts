@@ -113,11 +113,13 @@ describe('mongo() facade', () => {
   });
 
   it('forwards custom collections to mongoOrm', () => {
+    // mongoOrm is mocked here, so a plain class stands in for a Collection
+    // subclass; the cast satisfies the brand-typed registry.
     class FakeRepository {}
     mongo({
       contract: fakeContract,
       url: 'mongodb://localhost:27017/mydb',
-      collections: { User: FakeRepository },
+      collections: { User: FakeRepository as never },
     });
 
     expect(mocks.mongoOrm).toHaveBeenCalledWith(
