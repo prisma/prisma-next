@@ -38,6 +38,9 @@ function buildNativeEnumHandle<
   TypeName extends string,
   Members extends readonly [string, ...string[]],
 >(name: Name, typeName: TypeName, members: Members): NativeEnumHandle<Name, TypeName, Members> {
+  if (typeName.trim().length === 0) {
+    throw new Error(`nativeEnum("${name}"): the Postgres type name must be a non-empty string.`);
+  }
   return {
     entityKind: 'native_enum',
     name,
@@ -78,6 +81,9 @@ export function nativeEnum<
   const Name extends string,
   const Members extends readonly [string, ...string[]],
 >(name: Name, ...members: Members): NativeEnumHandle<Name, Name, Members> {
+  if (name.trim().length === 0) {
+    throw new Error('nativeEnum(): name must be a non-empty string.');
+  }
   if (members.length === 0) {
     throw new Error(`nativeEnum("${name}"): must have at least one member.`);
   }

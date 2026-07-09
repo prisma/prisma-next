@@ -160,4 +160,49 @@ describe('generic pack-entity attachment (packEntities)', () => {
       }),
     ).toThrow(/entry kind "table"/);
   });
+
+  it('rejects a factory-returned pack entity colliding with a different scaffold-declared one', () => {
+    // Scaffold and factory both attach `native_enum.AalLevel` in `public`, but
+    // with different entity instances. A shallow merge would let the factory
+    // silently clobber the scaffold entity; the identity-checked merge rejects
+    // it (mirroring `mergeCollectedPackEntities` in build-contract).
+    const scaffoldEntity = new TestNativeEnum({ typeName: 'aal_level', members: ['aal1'] });
+    const factoryEntity = new TestNativeEnum({ typeName: 'aal_level', members: ['aal1', 'aal2'] });
+
+    expect(() =>
+      defineContract(
+        {
+          family: sqlFamilyPack,
+          target: postgresTargetPack,
+          createNamespace: createTestSqlNamespace,
+          extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
+          packEntities: { public: { native_enum: { AalLevel: scaffoldEntity } } },
+        },
+        () => ({ packEntities: { public: { native_enum: { AalLevel: factoryEntity } } } }),
+      ),
+    ).toThrow(
+      /two different "native_enum" entities named "AalLevel" in namespace "public" — a factory-returned pack entity conflicts with a scaffold-declared one/,
+    );
+  });
+
+  it('allows the identical pack-entity instance declared on both scaffold and factory', () => {
+    const shared = new TestNativeEnum({ typeName: 'aal_level', members: ['aal1', 'aal2'] });
+
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+        extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
+        packEntities: { public: { native_enum: { AalLevel: shared } } },
+      },
+      () => ({ packEntities: { public: { native_enum: { AalLevel: shared } } } }),
+    );
+
+    expect(contract.storage.namespaces['public']?.entries).toEqual({
+      table: {},
+      native_enum: { AalLevel: shared },
+      valueSet: { AalLevel: { kind: 'valueSet', values: ['aal1', 'aal2'] } },
+    });
+  });
 });

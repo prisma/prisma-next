@@ -576,6 +576,32 @@ function derivePackEntityValueSets(
   return result;
 }
 
+/**
+ * Merges a namespace's `enumType()`-derived value-sets with its pack-entity-
+ * derived value-sets. Both land in the same `entries.valueSet[name]` slot —
+ * which drives value-set → codec typing and the domain-enum CHECK — so a
+ * same-named entry in both would let one silently overwrite the other and
+ * corrupt whichever column resolves against it. The same collision class the
+ * `mergeCollectedPackEntities` guard rejects; the PSL path already hard-errors
+ * on the equivalent (`interpretPslDocumentToSqlContract`). Reject it here too.
+ */
+function mergeNamespaceValueSets(
+  namespaceId: string,
+  enumValueSets: Record<string, StorageValueSetInput> | undefined,
+  packValueSets: Record<string, StorageValueSetInput> | undefined,
+): Record<string, StorageValueSetInput> {
+  if (enumValueSets !== undefined && packValueSets !== undefined) {
+    for (const name of Object.keys(packValueSets)) {
+      if (Object.hasOwn(enumValueSets, name)) {
+        throw new Error(
+          `buildSqlContractFromDefinition: value-set "${name}" in namespace "${namespaceId}" is derived from both an enum and a pack entity — names must be unique per namespace.`,
+        );
+      }
+    }
+  }
+  return { ...enumValueSets, ...packValueSets };
+}
+
 function ensureUnboundNamespaceSlot(
   namespaces: SqlStorageInput['namespaces'],
   createNamespace: ContractDefinition['createNamespace'],
@@ -1060,7 +1086,7 @@ export function buildSqlContractFromDefinition(
       );
       const valueSetEntries =
         enumValueSetEntries !== undefined || packValueSetEntries !== undefined
-          ? { ...enumValueSetEntries, ...packValueSetEntries }
+          ? mergeNamespaceValueSets(id, enumValueSetEntries, packValueSetEntries)
           : undefined;
 
       const nsInput: SqlNamespaceInput = {

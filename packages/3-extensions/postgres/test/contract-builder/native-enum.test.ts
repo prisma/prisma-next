@@ -31,9 +31,18 @@ import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { pgEnumDescriptor } from '@prisma-next/target-postgres/codecs';
 import type { PostgresSchema } from '@prisma-next/target-postgres/types';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { defineContract, field, model, nativeEnum, pg } from '../../src/exports/contract-builder';
+import {
+  defineContract,
+  enumType,
+  field,
+  member,
+  model,
+  nativeEnum,
+  pg,
+} from '../../src/exports/contract-builder';
 
 const intColumn = { codecId: 'pg/int4@1', nativeType: 'int4' } as const;
+const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
 
 function namespace(namespaces: Record<string, unknown>, id: string): PostgresSchema {
   const ns = namespaces[id] as PostgresSchema | undefined;
@@ -176,6 +185,17 @@ describe('nativeEnum + pg.enum (TS native-enum authoring)', () => {
     expect(() => nativeEnum('DupEnum', 'a', 'b', 'a')).toThrow(/duplicate member value "a"/);
   });
 
+  it('rejects an empty name', () => {
+    expect(() => nativeEnum('', 'a')).toThrow(/name must be a non-empty string/);
+    expect(() => nativeEnum('   ', 'a')).toThrow(/name must be a non-empty string/);
+  });
+
+  it('rejects an empty .map() type name', () => {
+    expect(() => nativeEnum('X', 'a').map('')).toThrow(
+      /Postgres type name must be a non-empty string/,
+    );
+  });
+
   it('rejects two DIFFERENT handles sharing a name, used by columns in the same namespace', () => {
     // Distinct entities (different member sets) sharing name `Status` — the
     // emitted valueSet could only reflect one, silently mismatching the other
@@ -201,6 +221,32 @@ describe('nativeEnum + pg.enum (TS native-enum authoring)', () => {
         },
       }),
     ).toThrow(/two different "native_enum" entities named "Status" in namespace "public"/);
+  });
+
+  it('rejects a native enum and an enumType() deriving a same-named value-set in one namespace', () => {
+    // Both an `enumType()` (domain enum) and a `pg.enum(nativeEnum)` derive an
+    // `entries.valueSet['Role']` in the default namespace. That slot drives
+    // value-set → codec typing, so one silently overwriting the other would
+    // corrupt a column. PSL hard-errors on the equivalent; the TS path must too.
+    const RoleNative = nativeEnum('Role', 'user', 'admin');
+    const RoleEnum = enumType('Role', pgText, member('User', 'user'));
+
+    expect(() =>
+      defineContract({
+        enums: { Role: RoleEnum },
+        models: {
+          Account: model('Account', {
+            fields: {
+              id: field.column(intColumn).id(),
+              role: field.column(pg.enum(RoleNative)),
+              kind: field.namedType(RoleEnum),
+            },
+          }).sql({ table: 'accounts' }),
+        },
+      }),
+    ).toThrow(
+      /value-set "Role" in namespace "public" is derived from both an enum and a pack entity/,
+    );
   });
 
   it('allows the SAME handle used by two columns in one namespace (one entity, one value-set)', () => {
