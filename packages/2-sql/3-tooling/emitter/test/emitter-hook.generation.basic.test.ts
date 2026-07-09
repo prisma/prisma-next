@@ -968,7 +968,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], {
+    const types = generateContractDts(ir, sqlEmission, [], {
       ...testHashes,
       executionHash: 'test-exec-hash',
     });

@@ -17,19 +17,22 @@ const int = (): ArgType<number> => leaf('int', 0);
 
 test('a required named param becomes a required property', () => {
   const spec = fieldAttribute('demo', { named: { name: str() } });
-  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ name: string }>();
+  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ readonly name: string }>();
 });
 
 test('an optional named param becomes an optional property', () => {
   const spec = fieldAttribute('demo', { named: { name: optional(str()) } });
-  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ name?: string }>();
+  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ readonly name?: string }>();
 });
 
 test('mixed required and optional named params keep their modifiers', () => {
   const spec = fieldAttribute('demo', {
     named: { name: str(), count: optional(int()) },
   });
-  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ name: string; count?: number }>();
+  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{
+    readonly name: string;
+    readonly count?: number;
+  }>();
 });
 
 test('a positional slot contributes its key into the same keyspace', () => {
@@ -51,7 +54,10 @@ test('a positional-or-named alias collapses to one property', () => {
     positional: [{ key: 'name', type: optional(str()) }],
     named: { name: optional(str()), map: optional(str()) },
   });
-  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ name?: string; map?: string }>();
+  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{
+    name?: string;
+    readonly map?: string;
+  }>();
 });
 
 test('a spec carrying a refine still infers its output', () => {
@@ -62,7 +68,7 @@ test('a spec carrying a refine still infers its output', () => {
       return [];
     },
   });
-  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ name?: string }>();
+  expectTypeOf<InferAttr<typeof spec>>().toEqualTypeOf<{ readonly name?: string }>();
 });
 
 test('modelAttribute infers the same shape fieldAttribute would for equivalent params', () => {
@@ -75,7 +81,10 @@ test('modelAttribute infers the same shape fieldAttribute would for equivalent p
     named: { count: optional(int()) },
   });
   expectTypeOf<InferAttr<typeof modelSpec>>().toEqualTypeOf<InferAttr<typeof fieldSpec>>();
-  expectTypeOf<InferAttr<typeof modelSpec>>().toEqualTypeOf<{ name: string; count?: number }>();
+  expectTypeOf<InferAttr<typeof modelSpec>>().toEqualTypeOf<{
+    name: string;
+    readonly count?: number;
+  }>();
 });
 
 test('a model positional slot contributes its key into the keyspace', () => {

@@ -1,23 +1,13 @@
+import type { ContractRelation } from '@prisma-next/contract/types';
+import { crossRef } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
-import type {
-  ControlAdapterDescriptor,
-  ControlExtensionDescriptor,
-  ControlTargetDescriptor,
-} from '@prisma-next/framework-components/control';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { extractCodecTypeImports } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
-
-function crossRef(model: string) {
-  return { namespace: '__unbound__', model };
-}
-
 import { createEmitterTestContract as createContract } from './create-emitter-test-contract';
 
-type TestDescriptor =
-  | ControlTargetDescriptor<'sql', string>
-  | ControlAdapterDescriptor<'sql', string>
-  | ControlExtensionDescriptor<'sql', string>;
+type TestDescriptor = TargetBoundComponentDescriptor<'sql', string>;
 
 const testHashes = { storageHash: 'test-core-hash', profileHash: 'test-profile-hash' };
 
@@ -474,7 +464,7 @@ describe('sql-target-family-hook', () => {
           },
           fields: {},
           relations: {
-            partialRel: { to: crossRef('Post') },
+            partialRel: { to: crossRef('Post') } as unknown as ContractRelation,
           },
         },
       },
@@ -645,7 +635,7 @@ describe('sql-target-family-hook', () => {
             id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
           },
           relations: {},
-          owner: { kind: 'system' },
+          owner: 'system',
         },
       },
       storage: {
@@ -664,6 +654,6 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = generateContractDts(ir, sqlEmission, [], testHashes);
-    expect(types).toContain("owner: { readonly kind: 'system' }");
+    expect(types).toContain("readonly owner: 'system'");
   });
 });

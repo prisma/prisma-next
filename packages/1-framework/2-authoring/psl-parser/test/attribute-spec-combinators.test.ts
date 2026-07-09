@@ -31,7 +31,7 @@ function makeCtx(sourceFile: SourceFile): InterpretCtx {
     scalarTypes: ['String', 'Int'],
     pslBlockDescriptors: {},
   });
-  const selfModel = table.topLevel.models.M;
+  const selfModel = table.topLevel.models['M'];
   if (!selfModel) throw new Error('expected model M in the symbol table');
   return {
     level: 'field',
