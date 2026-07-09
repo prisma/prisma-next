@@ -2,9 +2,12 @@ import {
   type AnyExpression,
   BinaryExpr,
   ColumnRef,
+  ExistsExpr,
   type InsertAst,
   LiteralExpr,
+  type SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it, vi } from 'vitest';
 import { Collection } from '../src/collection';
 import { withReturningCapability } from './collection-fixtures';
@@ -35,6 +38,29 @@ function collectColumnRefs(expr: AnyExpression | undefined): ColumnRef[] {
   return refs;
 }
 
+function expectSelectWithFeatureJoin(ast: unknown): asserts ast is SelectAst {
+  expect(isSelectAst(ast)).toBe(true);
+  if (!isSelectAst(ast)) return;
+  expect(
+    ast.joins?.some(
+      (join) => join.source.kind === 'table-source' && join.source.name === 'features',
+    ),
+  ).toBe(true);
+}
+
+function expectExistsWithFeatureJoin(expr: AnyExpression | undefined): ExistsExpr {
+  expect(expr).toBeInstanceOf(ExistsExpr);
+  if (!(expr instanceof ExistsExpr)) {
+    throw new Error('Expected an EXISTS expression');
+  }
+  expect(
+    expr.subquery.joins?.some(
+      (join) => join.source.kind === 'table-source' && join.source.name === 'features',
+    ),
+  ).toBe(true);
+  return expr;
+}
+
 // The mixed poly contract is patched in at runtime, so Project/tasks are
 // absent from the static Models type. This minimal surface lets the runtime
 // test drive include('tasks', t => t.variant('Bug')) and read the resulting
@@ -47,6 +73,29 @@ interface PolyParent {
     relation: 'tasks',
     refine?: (collection: PolyVariantRefinement) => PolyVariantRefinement,
   ): { state: { includes: { nested: { variantName?: string } }[] } };
+}
+
+interface FeaturePredicateField {
+  gt(value: number): unknown;
+}
+
+interface FeaturePredicateRelation {
+  some(): unknown;
+}
+
+interface FeaturePredicate {
+  priority: FeaturePredicateField;
+  assignee: FeaturePredicateRelation;
+}
+
+interface FeatureCountCollection {
+  where(predicate: (task: FeaturePredicate) => unknown): FeatureCountCollection;
+  updateCount(data: { title: string }): Promise<number>;
+  deleteCount(): Promise<number>;
+}
+
+interface MixedPolyCountCollection {
+  variant(name: 'Feature'): FeatureCountCollection;
 }
 
 function createPolyCollection() {
@@ -347,6 +396,68 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     const included = projects.include('tasks');
 
     expect(included.state.includes[0]?.nested.variantName).toBeUndefined();
+  });
+
+  it('updateCount after variant(Feature) scopes MTI scalar predicates through the write subquery', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([[{ id: 2 }], []]);
+
+    const mixedPoly = blindCast<
+      MixedPolyCountCollection,
+      'mixed poly test contract patches Task variants outside the static fixture type'
+    >(collection);
+    const count = await mixedPoly
+      .variant('Feature')
+      .where((task) => task.priority.gt(1))
+      .updateCount({ title: 'Queued' });
+
+    expect(count).toBe(1);
+    expect(runtime.executions).toHaveLength(2);
+
+    expectSelectWithFeatureJoin(runtime.executions[0]!.plan.ast);
+
+    const writeAst = runtime.executions[1]!.plan.ast;
+    expect(writeAst.kind).toBe('update');
+    if (writeAst.kind !== 'update') {
+      throw new Error('Expected an UPDATE plan');
+    }
+    const exists = expectExistsWithFeatureJoin(writeAst.where);
+    expect(
+      collectColumnRefs(exists.subquery.where).filter(
+        (ref) => ref.table === 'features' && ref.column === 'priority',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('deleteCount after variant(Feature) scopes MTI relation predicates through the write subquery', async () => {
+    const { collection, runtime } = createMixedPolyCollection();
+    runtime.setNextResults([[{ id: 2 }], []]);
+
+    const mixedPoly = blindCast<
+      MixedPolyCountCollection,
+      'mixed poly test contract patches Task variants outside the static fixture type'
+    >(collection);
+    const count = await mixedPoly
+      .variant('Feature')
+      .where((task) => task.assignee.some())
+      .deleteCount();
+
+    expect(count).toBe(1);
+    expect(runtime.executions).toHaveLength(2);
+
+    expectSelectWithFeatureJoin(runtime.executions[0]!.plan.ast);
+
+    const writeAst = runtime.executions[1]!.plan.ast;
+    expect(writeAst.kind).toBe('delete');
+    if (writeAst.kind !== 'delete') {
+      throw new Error('Expected a DELETE plan');
+    }
+    const exists = expectExistsWithFeatureJoin(writeAst.where);
+    expect(
+      collectColumnRefs(exists.subquery.where).filter(
+        (ref) => ref.table === 'features' && ref.column === 'assignee_id',
+      ),
+    ).toHaveLength(1);
   });
 });
 
