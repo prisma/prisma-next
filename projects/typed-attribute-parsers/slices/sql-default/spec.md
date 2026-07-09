@@ -13,42 +13,33 @@ Both migrate in this slice.
 
 ## Chosen design
 
-Two specs, one per path, both named `'default'`; the caller already branches on the field's `enumHandle` (`psl-field-resolution.ts` ~line 470) and picks the matching spec. **Only argument *syntax* moves to specs; every *semantic* rule stays in the interpreter.**
+> **Design evolution (operator direction, in-PR).** D1–D4 first shipped two **static** specs with monolithic stand-ins (`scalarLiteral()`, a generic `funcCall()`, `bareIdentifier()`) plus interpreter post-validation. Per operator direction and the #938 review, the slice then evolves — **still within this PR** — to **dynamically composed** specs built per field. The dynamic design below is the slice's final shape; the static stand-ins are removed by the end (D7).
 
-**Non-enum spec** — the value is one of three shapes, distinguished by the interpreter via the `oneOf` output's runtime shape:
+The `@default` spec is **built per field** by `buildDefaultSpec(ctx)` / `buildEnumDefaultSpec(members)`, composed entirely from atomic combinators via `oneOf`, using the field's resolved context (the composed default-function registry, `isList`, and the enum's members). This lifts function-name and enum-member validity **into the grammar** — reducing post-validation — and makes each per-field spec a precise description a future language server can read for autocomplete.
 
-```ts
-fieldAttribute('default', {
-  positional: [
-    {
-      key: 'value',
-      type: oneOf(
-        scalarLiteral(),          // → string | number | boolean (a literal default)
-        list(scalarLiteral()),    // → (string | number | boolean)[] (an array-literal default)
-        funcCall(),               // → ParsedDefaultFunctionCall (a function default)
-      ),
-    },
-  ],
-})
-```
-
-The interpreter switches on the shape (primitive → literal, array → list, object → registry path) and keeps every semantic rule in `lowerDefaultForField`: the `isList` + `PSL_LIST_DEFAULT_NOT_ARRAY` rule, registry lowering (`lowerDefaultFunctionWithRegistry`, `PSL_UNKNOWN_DEFAULT_FUNCTION`), generator applicability + codec matching + preset-only guard (`PSL_INVALID_DEFAULT_APPLICABILITY`).
-
-**Enum spec** — the value is a single bare identifier (the member name):
+**Non-enum** (built from `{ isList, registry }`):
 
 ```ts
-fieldAttribute('default', { positional: [{ key: 'member', type: bareIdentifier() }] })
+oneOf(
+  str(), int(), bool(),                                    // flexible literals (codec still type-checks the value)
+  ...(isList ? [list(oneOf(str(), int(), bool()))] : []),  // list arm ONLY on list fields
+  ...[...registry.keys()].map((name) => funcCall(name)),   // one arm per registered default function
+)
 ```
 
-The interpreter matches the extracted member name against `enumHandle.enumMembers` (keeping `PSL_ENUM_UNKNOWN_DEFAULT_MEMBER`). The "must be a member name, not a raw value or function" shape-check (`PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME`) is now enforced by the spec: a quoted string / function-call / array in an enum `@default` fails the `bareIdentifier()` matcher with the kit's `PSL_INVALID_ATTRIBUTE_SYNTAX`.
+**Enum** (built from `enumHandle.enumMembers`):
 
-**Kit growth** (in `@prisma-next/psl-parser`):
-- `scalarLiteral()` — `String`/`Number`/`Boolean` literal → its decoded value. **(Shipped in D1.)**
-- `funcCall()` — `FunctionCallAst` → `ParsedDefaultFunctionCall` (registry-agnostic; the kit does not import the SQL registry). **(Shipped in D1.)**
-- `bareIdentifier()` — a bare `IdentifierAst` → its text, with a neutral label ("an identifier"); no validation (member-existence stays semantic). **(D3.)** A generic leaf, not enum-specific — the framework kit must not know about "enum members".
-- Array defaults reuse the existing `list()`.
+```ts
+oneOf(...enumMembers.map((m) => identifier(m.name)))       // e.g. Expected one of: Low | High
+```
 
-**Design note — `funcCall` vs `funcCallFrom` (resolved).** `funcCallFrom(registry)` could be a thin decorator over `funcCall()`, but it was dropped: Option A keeps `PSL_UNKNOWN_DEFAULT_FUNCTION` semantic in the interpreter, so a parse-time registry check would duplicate it — and it would force the framework kit to import the SQL default registry (a layering smell). Registry-agnostic `funcCall()` is the whole kit surface the function path needs.
+**Key design points:**
+- **`funcCall(name)` replaces the generic `funcCall()`; no `funcCallFrom`.** A name-pinned `funcCall(name)` (parallel to `identifier(name)`) matches a call with that callee and captures **raw args** (flexible — `lowerDefaultFunctionWithRegistry` still validates them). `oneOf(...registry.keys().map(funcCall))`, built dynamically, enumerates the open contributed set — the composition that makes the ADR's bespoke `funcCallFrom` unnecessary (ADR principle 4). The matched arm *is* the `fn` discriminant.
+- **Enum defaults are `oneOf(identifier(member)…)`** from the members — dropping `bareIdentifier()` and folding member-validity into the grammar (resolves the #938 review comment).
+- **Literals stay flexible**, composed as `oneOf(str(), int(), bool())` — dropping `scalarLiteral()` for composition of atoms (resolves the other #938 comment). No codec-typed matching (`matchingScalarLiteral` is out — Non-goals); the codec's `encodeJson` remains the literal↔type authority.
+- **The `list` arm is present only on list fields** (and is the only value arm there), so array-on-scalar and scalar-on-list are grammar misses — dissolving the `isList` shape-switch and its `PSL_LIST_DEFAULT_NOT_ARRAY` / array-on-scalar `PSL_INVALID_DEFAULT_VALUE` special cases.
+
+**What stays semantic (in the interpreter):** function **arg** validation (`PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT`, via the registry), generator applicability + codec matching + preset-only guard (`PSL_INVALID_DEFAULT_APPLICABILITY`), and literal↔codec type (codec `encodeJson`). **Moved into the grammar** (Open Question 1): unknown-function-name (`PSL_UNKNOWN_DEFAULT_FUNCTION`) and unknown-enum-member (`PSL_ENUM_UNKNOWN_DEFAULT_MEMBER`).
 
 ## Coherence rationale
 
@@ -85,7 +76,12 @@ One outcome — "`@default` is spec-driven on both paths; the default string-par
 
 ## Open Questions
 
-_None open._ Resolved: (1) both lowering paths in scope (operator); (2) shape-error codes → `PSL_INVALID_ATTRIBUTE_SYNTAX`, semantic codes preserved (operator: Option A); (3) `funcCallFrom` dropped for registry-agnostic `funcCall()`.
+_Resolved:_ (1) both lowering paths in scope (operator); (2) shape-error codes → `PSL_INVALID_ATTRIBUTE_SYNTAX` (operator: Option A); (3) `funcCallFrom` dropped for `oneOf(funcCall(name))` composed dynamically from the registry (operator); (4) literals stay flexible — `matchingScalarLiteral` deferred, codec `encodeJson` remains the value authority (operator).
+
+_Open (needed before D5):_
+
+1. **Do `PSL_UNKNOWN_DEFAULT_FUNCTION` and `PSL_ENUM_UNKNOWN_DEFAULT_MEMBER` shift to `PSL_INVALID_ATTRIBUTE_SYNTAX`?** The dynamic spec moves both membership checks into the grammar (goal: less post-validation); `oneOf`'s "Expected one of: …" message preserves the helpful supported-set list. Recommendation: **yes, shift them** and retire the interpreter's duplicate checks. Alternative: keep the semantic codes and use the dynamic spec only for structure + autocomplete (less reduction). Needs operator confirmation.
+2. **ADR 231 update.** The dynamic design drops the ADR's `funcCallFrom` for `oneOf(funcCall(name))` and defers `matchingScalarLiteral`. Decide whether D7 amends ADR 231 (§ "Alternatives and function calls") or records the deviation elsewhere (ADR currently left untouched by operator instruction).
 
 ## References
 

@@ -2,7 +2,7 @@
 
 **Slice spec:** `projects/typed-attribute-parsers/slices/sql-default/spec.md`
 
-Three dispatches: grow the kit (D1, proven in isolation), migrate the non-enum `@default` path (D2), then the enum `@default` path + its small kit leaf (D3). `@default` is one PR; both lowering paths (non-enum + enum) migrate in this slice (operator decision).
+D1–D4 migrated `@default` onto **static** specs (kit; non-enum; enum; legacy-parser deletion). D5–D7 then evolve those static specs into **dynamically composed** per-field specs — **still within this PR (#938)**, per operator direction + review. `@default` is one PR; both lowering paths migrate and both end up dynamically composed.
 
 ### D1 — Kit: `scalarLiteral()` + `funcCall()` combinators
 - **Outcome:** two new leaf combinators in `@prisma-next/psl-parser`, each unit-tested in isolation:
@@ -26,4 +26,29 @@ Three dispatches: grow the kit (D1, proven in isolation), migrate the non-enum `
 - **Builds on:** D1 (kit pattern), D2 (the `defaultSpec` plumbing + interpret wiring it mirrors).
 - **Gate:** psl-parser build + test (new combinator); sql-contract-psl typecheck + test (enum-default cases); `pnpm fixtures:check`; `rg` gates; `lint:framework-vocabulary`; `lint:deps`.
 
-_(As-shipped target: `@default` spec-driven on both paths; the three non-enum string-parsers + the enum inline regex checks gone; the SQL family now entirely spec-driven. D1/D3 carry the kit-growth risk; D2/D3 are the migrations + the preserved semantic codes.)_
+### D4 — Delete the legacy `parseDefaultFunctionCall` string parser
+- **Outcome:** `parseDefaultFunctionCall` + its exclusive support chain (`splitTopLevelArgs`, `createSpanFromBase`, `resolveSpanPositionFromBase`, `DefaultFunctionArgument`) deleted from `default-function-registry.ts` (dead once `funcCall` replaced it); the registry-lowering tests refactored to build `ParsedDefaultFunctionCall` inputs via a local `call()` helper. Retain `lowerDefaultFunctionWithRegistry` + `formatSupportedFunctionList`.
+- **Builds on:** D2.
+- **Gate:** sql-contract-psl typecheck + test; `fixtures:check`; `rg` zero for the deleted helpers; `lint:*`.
+
+---
+
+_The dispatches below evolve the static specs above into dynamically-composed per-field specs (operator direction + #938 review). Resolve **Open Question 1** in the slice spec (do `PSL_UNKNOWN_DEFAULT_FUNCTION` / `PSL_ENUM_UNKNOWN_DEFAULT_MEMBER` shift to `PSL_INVALID_ATTRIBUTE_SYNTAX`) before D5._
+
+### D5 — `funcCall(name)` + dynamic non-enum `@default` spec
+- **Outcome:** `funcCall` becomes name-pinned (`funcCall(name)`, parallel to `identifier(name)`) — matches a call with that callee, still captures raw args; unit-tested. `buildDefaultSpec({ isList, registry })` composes `oneOf(str(), int(), bool(), …(isList ? [list(oneOf(str(), int(), bool()))] : []), ...registry.keys().map(funcCall))`. `lowerDefaultForField` builds it per field; the `isList` shape-switch collapses (list arm present ⇔ list field). Unknown-function-name and array-on-scalar become grammar failures (`PSL_INVALID_ATTRIBUTE_SYNTAX`), retiring the interpreter's `PSL_UNKNOWN_DEFAULT_FUNCTION` emission + the array-on-scalar branch (per OQ1). Function **arg** validation stays in the registry (`PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT` unchanged).
+- **Builds on:** D2.
+- **Grounding:** the `ControlMutationDefaultRegistry` key/entry accessor; `oneOf` discriminated-output typing.
+- **Gate:** psl-parser build + test; sql-contract-psl typecheck + test (update unknown-function / array-on-scalar assertions); `fixtures:check`; `lint:*`.
+
+### D6 — Dynamic enum `@default` spec
+- **Outcome:** `buildEnumDefaultSpec(members)` = `oneOf(...members.map((m) => identifier(m.name)))` (add a `list(...)` wrapper only if enum-list defaults exist — verify). `lowerEnumDefaultForField` builds it from `enumHandle.enumMembers`; member-validity becomes a grammar failure, retiring the interpreter's `PSL_ENUM_UNKNOWN_DEFAULT_MEMBER` emission (per OQ1). `bareIdentifier()` loses its last caller.
+- **Builds on:** D3, D5.
+- **Gate:** sql-contract-psl typecheck + test (`interpreter.enum.test.ts` member-validity assertions shift); `fixtures:check`; `lint:*`.
+
+### D7 — Remove the superseded combinators
+- **Outcome:** delete `scalar-literal.ts` + `bare-identifier.ts` (+ exports + unit tests) once `rg` confirms zero callers. Per OQ2, amend ADR 231 (§ "Alternatives and function calls": `funcCallFrom` dropped for `oneOf(funcCall(name))`; `matchingScalarLiteral` deferred) or record the deviation as agreed.
+- **Builds on:** D5, D6.
+- **Gate:** psl-parser build + test; sql-contract-psl typecheck + test; `fixtures:check`; `rg` zero for `scalarLiteral`/`bareIdentifier`; `lint:framework-vocabulary` (removing combinators may move the count — adjust threshold if so); `lint:deps`.
+
+_(As-shipped target: `@default` composed dynamically per field from atomic combinators; `funcCallFrom`/`bareIdentifier`/`scalarLiteral` gone; function-name + enum-member validity in the grammar; literals and function-args still flexible (codec/registry-validated). All within PR #938. The language-server autocomplete payoff rides on top in a later, LS-scoped slice.)_
