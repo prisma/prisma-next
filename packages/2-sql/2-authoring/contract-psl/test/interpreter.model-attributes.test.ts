@@ -34,9 +34,17 @@ const stampAuthoringContributions: AuthoringContributions = {
   },
 };
 
-function interpretWith(schema: string, authoringContributions?: AuthoringContributions) {
+function interpretWith(
+  schema: string,
+  authoringContributions?: AuthoringContributions,
+  pslBlockDescriptors?: Parameters<typeof symbolTableInputFromParseArgs>[0]['pslBlockDescriptors'],
+) {
   const capturedEntries: Record<string, Record<string, Record<string, unknown>>> = {};
-  const document = symbolTableInputFromParseArgs({ schema, sourceId: 'schema.prisma' });
+  const document = symbolTableInputFromParseArgs({
+    schema,
+    sourceId: 'schema.prisma',
+    ...(pslBlockDescriptors !== undefined ? { pslBlockDescriptors } : {}),
+  });
   const createNamespace = (input: SqlNamespaceInput) => {
     capturedEntries[input.id] = { ...(capturedEntries[input.id] ?? {}), ...input.entries };
     return createTestSqlNamespace(input);
@@ -158,5 +166,46 @@ describe('contributed model attributes (AuthoringContributions.modelAttributes)'
       },
       { entityTypes: {}, field: {}, pslBlockDescriptors: {}, type: {} },
     );
+  });
+
+  it('throws when a model-attribute entries slot collides with a block-produced entries kind', () => {
+    // A block descriptor whose discriminator is `stamp` files entities under
+    // `entries.stamp` — the same slot the `@@stamp` model attribute claims.
+    const stampBlockDescriptors = {
+      stamp_block: {
+        kind: 'pslBlock' as const,
+        keyword: 'stamp_block',
+        discriminator: 'stamp',
+        name: { required: true },
+        parameters: {},
+      },
+    };
+    const collidingContributions: AuthoringContributions = {
+      ...stampAuthoringContributions,
+      entityTypes: {
+        stamp_block: {
+          kind: 'entity',
+          discriminator: 'stamp',
+          output: { factory: (raw: unknown) => raw },
+        },
+      },
+      pslBlockDescriptors: stampBlockDescriptors,
+    };
+
+    expect(() =>
+      interpretWith(
+        `namespace public {
+  model Widget {
+    id Int @id
+    @@stamp("v1")
+  }
+
+  stamp_block my_stamp {
+  }
+}`,
+        collidingContributions,
+        stampBlockDescriptors,
+      ),
+    ).toThrow(/entries slot "stamp".*contributed by both/s);
   });
 });

@@ -317,6 +317,26 @@ function buildEntityTypesByDiscriminator(
 }
 
 /**
+ * The `PSL_DUPLICATE_ATTRIBUTE` diagnostic for a model attribute declared
+ * more than once on one model. Shared by the built-in `@@control` path and
+ * the contributed-model-attribute path so the code and wording stay in one
+ * place. `name` is the bare attribute name (`control`, `rls`, …).
+ */
+function duplicateModelAttributeDiagnostic(input: {
+  readonly name: string;
+  readonly modelName: string;
+  readonly sourceId: string;
+  readonly span: ContractSourceDiagnostic['span'];
+}): ContractSourceDiagnostic {
+  return {
+    code: 'PSL_DUPLICATE_ATTRIBUTE',
+    message: `\`@@${input.name}\` declared more than once on model "${input.modelName}".`,
+    sourceId: input.sourceId,
+    ...ifDefined('span', input.span),
+  };
+}
+
+/**
  * Enforces `AuthoringPslBlockDescriptor.requiresModelAttribute` over one
  * scope (the top level or one namespace): every block whose descriptor
  * declares the requirement must name a model that carries the required
@@ -717,12 +737,14 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     }
     if (modelAttribute.name === 'control') {
       if (controlPolicyDeclared) {
-        diagnostics.push({
-          code: 'PSL_DUPLICATE_ATTRIBUTE',
-          message: `\`@@control\` declared more than once on model "${model.name}".`,
-          sourceId,
-          span: modelAttribute.span,
-        });
+        diagnostics.push(
+          duplicateModelAttributeDiagnostic({
+            name: 'control',
+            modelName: model.name,
+            sourceId,
+            span: modelAttribute.span,
+          }),
+        );
         continue;
       }
       controlPolicyDeclared = true;
@@ -882,12 +904,14 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     const contributedModelAttribute = input.modelAttributesByName.get(modelAttribute.name);
     if (contributedModelAttribute !== undefined) {
       if (declaredContributedModelAttributes.has(modelAttribute.name)) {
-        diagnostics.push({
-          code: 'PSL_DUPLICATE_ATTRIBUTE',
-          message: `\`@@${modelAttribute.name}\` declared more than once on model "${model.name}".`,
-          sourceId,
-          span: modelAttribute.span,
-        });
+        diagnostics.push(
+          duplicateModelAttributeDiagnostic({
+            name: modelAttribute.name,
+            modelName: model.name,
+            sourceId,
+            span: modelAttribute.span,
+          }),
+        );
         continue;
       }
       declaredContributedModelAttributes.add(modelAttribute.name);
@@ -2244,6 +2268,21 @@ export function interpretPslDocumentToSqlContract(
     const attributeEntities = modelAttributeEntitiesByNamespace.get(nsInput.id);
     if (entities === undefined && attributeEntities === undefined) {
       return createNamespace(nsInput);
+    }
+    // A model-attribute entries slot must not collide with a base slot
+    // (`table`, `valueSet`) or a block-produced slot — the merge below spreads
+    // `...attributeEntities` last and would otherwise silently shallow-replace
+    // it. Fail loud so a pack that files a model attribute under an
+    // already-claimed kind name is caught at composition rather than losing
+    // data. (`rls` vs `policy`/`role`/`valueSet`/`table` is disjoint today.)
+    if (attributeEntities !== undefined) {
+      for (const slot of Object.keys(attributeEntities)) {
+        if (Object.hasOwn(nsInput.entries, slot) || (entities !== undefined && slot in entities)) {
+          throw new Error(
+            `entries slot "${slot}" in namespace "${nsInput.id}" is contributed by both a model attribute and a block/base entry kind. A model-attribute entries key must be unique across the namespace's entry kinds.`,
+          );
+        }
+      }
     }
     const mergedValueSet = { ...nsInput.entries['valueSet'], ...entities?.['valueSet'] };
     const extended: SqlNamespaceInput = {
