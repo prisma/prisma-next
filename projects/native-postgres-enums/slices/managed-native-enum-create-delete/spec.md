@@ -67,6 +67,10 @@ One reviewer holds: **"migrate creates and drops a managed native enum, verify s
 
 _None blocking; the extra-object/ownership disposition follows the table precedent, discovered at implementation._
 
+## Known limitation discovered in D1 (pre-existing, not in-slice)
+
+`pruneTableLessNamespaces` drops expected namespaces containing zero tables before diffing (pinned legacy behavior, `verdict-table-less-namespace.test.ts`) — so a contract namespace containing **only** enums is invisible to verify/plan. Managed enums in table-bearing namespaces (this slice's DoD shape) are fully covered; an enums-only managed schema needs that prune revisited — follow-up, likely alongside Slice B.
+
 ## References
 
 - Node template: [`postgres-role-schema-node.ts`](../../../../packages/3-targets/3-targets/postgres/src/core/schema-ir/postgres-role-schema-node.ts); kind registry: `schema-node-kinds.ts`.

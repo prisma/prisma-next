@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { ControlPolicySubject } from '@prisma-next/family-sql/control';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { entityAt, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -28,6 +28,7 @@ import type { PostgresOpFactoryCall } from './op-factory-call';
 const OBJECT_CREATION_FACTORIES: ReadonlySet<string> = new Set<string>([
   'createTable',
   'createSchema',
+  'createNativeEnumType',
   'createRlsPolicy',
   'enableRowLevelSecurity',
 ]);
@@ -105,6 +106,27 @@ export function formatPostgresControlPolicySubjectLabel(
   return factoryName;
 }
 
+/**
+ * The declared control grade of the native enum entity whose PHYSICAL type
+ * name matches, in the given namespace. `entries.native_enum` is keyed by
+ * handle name while calls carry the type name, so `entityAt` cannot address
+ * the entity — this walks the kind map matching on the entity's `typeName`
+ * field, the same type-name matching `contract infer`'s pack subtraction
+ * uses.
+ */
+function nativeEnumControlByTypeName(
+  contract: Contract<SqlStorage>,
+  namespaceId: string,
+  typeName: string,
+): ControlPolicy | undefined {
+  const namespace = contract.storage.namespaces[namespaceId];
+  if (!isPostgresSchema(namespace)) return undefined;
+  for (const entity of Object.values(namespace.entries.native_enum ?? {})) {
+    if (entity.typeName === typeName) return entity.control;
+  }
+  return undefined;
+}
+
 export function resolvePostgresCallControlPolicySubject(
   call: PostgresOpFactoryCall,
   contract: Contract<SqlStorage>,
@@ -115,6 +137,23 @@ export function resolvePostgresCallControlPolicySubject(
   if (call.factoryName === 'createSchema' && callFields.schemaName) {
     return {
       namespaceId: resolveNamespaceIdForDdlSchema(contract, callFields.schemaName),
+      createsNewObject,
+    };
+  }
+
+  if (
+    (call.factoryName === 'createNativeEnumType' || call.factoryName === 'dropNativeEnumType') &&
+    'typeName' in call &&
+    'schemaName' in call
+  ) {
+    const namespaceId = resolveNamespaceIdForDdlSchema(contract, call.schemaName);
+    return {
+      namespaceId,
+      ...ifDefined(
+        'explicitNodeControlPolicy',
+        nativeEnumControlByTypeName(contract, namespaceId, call.typeName),
+      ),
+      typeName: call.typeName,
       createsNewObject,
     };
   }
@@ -163,6 +202,7 @@ export function resolvePostgresCallControlPolicySubject(
 const POSTGRES_NODE_CREATION_FACTORY: Readonly<Record<string, string>> = Object.freeze({
   [PostgresSchemaNodeKind.namespace]: 'createSchema',
   [PostgresSchemaNodeKind.table]: 'createTable',
+  [PostgresSchemaNodeKind.nativeEnum]: 'createNativeEnumType',
 });
 
 /**

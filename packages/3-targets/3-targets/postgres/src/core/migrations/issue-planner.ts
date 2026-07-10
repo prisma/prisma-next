@@ -45,6 +45,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
+import type { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
 import type { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
 import { quoteIdentifier } from '../sql-utils';
@@ -61,6 +62,7 @@ import {
   AddUniqueCall,
   AlterColumnTypeCall,
   CreateIndexCall,
+  CreateNativeEnumTypeCall,
   CreateSchemaCall,
   CreateTableCall,
   DisableRowLevelSecurityCall,
@@ -69,6 +71,7 @@ import {
   DropConstraintCall,
   DropDefaultCall,
   DropIndexCall,
+  DropNativeEnumTypeCall,
   DropNotNullCall,
   DropTableCall,
   EnableRowLevelSecurityCall,
@@ -152,8 +155,10 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
   switch (call.factoryName) {
     case 'createExtension':
     case 'createSchema':
+    case 'createNativeEnumType':
       return 'dep';
     case 'dropTable':
+    case 'dropNativeEnumType':
     case 'dropColumn':
     case 'dropConstraint':
     case 'dropCheckConstraint':
@@ -374,6 +379,11 @@ export function nodeIssueOrder(issue: SchemaDiffIssue): number {
   switch (node.nodeKind) {
     case PostgresSchemaNodeKind.namespace:
       return 1;
+    case PostgresSchemaNodeKind.nativeEnum:
+      // Creates order right after namespace creates within the 'dep' bucket
+      // (CREATE SCHEMA before CREATE TYPE); drops order after table drops
+      // within the 'drop' bucket (DROP TYPE only after its dependents left).
+      return issue.reason === 'not-expected' ? 17 : 2;
     case RelationalSchemaNodeKind.foreignKey:
       return issue.reason === 'not-expected' ? 10 : 60;
     case RelationalSchemaNodeKind.unique:
@@ -525,6 +535,60 @@ function buildCreateTableCallsFromNode(
 
 function nodeConflict(kind: SqlPlannerConflict['kind'], message: string): SqlPlannerConflict {
   return issueConflict(kind, message);
+}
+
+/**
+ * Managed native-enum issue -> op lowering. A missing declared type creates
+ * it; an unclaimed live type drops it (ownership-scoped upstream by
+ * `retainUnownedExtras`, destructiveness gated by the operation-class
+ * policy); a paired member-value mismatch is a NAMED unsupported diagnostic
+ * — never a silent no-op and never a drop-and-recreate. Slice B replaces the
+ * diagnostic with order-aware `ALTER TYPE ... ADD VALUE` / refusal semantics.
+ */
+function mapNativeEnumNodeIssue(
+  issue: SchemaDiffIssue,
+  ctx: StrategyContext,
+): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
+  const ddlSchemaName = issueSchemaName(issue);
+  if (ddlSchemaName === undefined) {
+    return notOk(
+      nodeConflict(
+        'unsupportedOperation',
+        `Enum issue has no schema in its path: ${issue.message}`,
+      ),
+    );
+  }
+  const schemaName = emissionSchemaName(ctx, ddlSchemaName);
+  if (issue.reason === 'not-found') {
+    const expected = blindCast<
+      PostgresNativeEnumSchemaNode,
+      'a not-found native-enum issue always carries the expected PostgresNativeEnumSchemaNode'
+    >(issue.expected);
+    return ok([new CreateNativeEnumTypeCall(schemaName, expected.typeName, expected.members)]);
+  }
+  if (issue.reason === 'not-expected') {
+    const actual = blindCast<
+      PostgresNativeEnumSchemaNode,
+      'a not-expected native-enum issue always carries the actual PostgresNativeEnumSchemaNode'
+    >(issue.actual);
+    return ok([new DropNativeEnumTypeCall(schemaName, actual.typeName)]);
+  }
+  const expected = blindCast<
+    PostgresNativeEnumSchemaNode,
+    'a not-equal native-enum issue carries both sides; the expected node names the type'
+  >(issue.expected);
+  const actualMembers = blindCast<
+    PostgresNativeEnumSchemaNode,
+    'a not-equal native-enum issue carries both sides'
+  >(issue.actual).members;
+  return notOk(
+    nodeConflict(
+      'unsupportedOperation',
+      `Native enum type "${ddlSchemaName}"."${expected.typeName}" member values changed ` +
+        `(contract declares [${expected.members.join(', ')}], database has [${actualMembers.join(', ')}]); ` +
+        'enum value changes are not auto-migrated yet. Author the change manually with `migration new`.',
+    ),
+  );
 }
 
 function mapTableNodeIssue(
@@ -812,6 +876,10 @@ export function mapNodeIssueToCall(
       'a namespace-presence issue always carries a PostgresNamespaceSchemaNode'
     >(issue.expected);
     return ok([new CreateSchemaCall(namespace.schemaName)]);
+  }
+
+  if (node.nodeKind === PostgresSchemaNodeKind.nativeEnum) {
+    return mapNativeEnumNodeIssue(issue, ctx);
   }
 
   const ddlSchemaName = issueSchemaName(issue);

@@ -17,6 +17,7 @@ import {
   AlterColumnTypeCall,
   type AlterColumnTypeOptions,
   CreateIndexCall,
+  CreateNativeEnumTypeCall,
   CreateSchemaCall,
   CreateTableCall,
   DropCheckConstraintCall,
@@ -24,6 +25,7 @@ import {
   DropConstraintCall,
   DropDefaultCall,
   DropIndexCall,
+  DropNativeEnumTypeCall,
   DropNotNullCall,
   DropTableCall,
   SetDefaultCall,
@@ -166,6 +168,27 @@ export abstract class PostgresMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return new CreateSchemaCall(options.schema).toOp(this.controlAdapter);
+  }
+
+  /**
+   * Emit a `CREATE TYPE ... AS ENUM (...)` migration operation for a managed
+   * native enum. Members render in declaration order. No adapter needed —
+   * the op renders its SQL directly.
+   */
+  protected createNativeEnumType(options: {
+    readonly schema: string;
+    readonly typeName: string;
+    readonly members: readonly string[];
+  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    return new CreateNativeEnumTypeCall(options.schema, options.typeName, options.members).toOp();
+  }
+
+  /** Emit a `DROP TYPE` migration operation for a managed native enum. */
+  protected dropNativeEnumType(options: {
+    readonly schema: string;
+    readonly typeName: string;
+  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    return new DropNativeEnumTypeCall(options.schema, options.typeName).toOp();
   }
 
   protected addColumn(options: {

@@ -83,6 +83,16 @@ export function postgresDiffSubjectGranularity(nodeKind: string): DiffSubjectGra
  * database/namespace/policy/role nodes map to nothing here (a namespace is
  * addressed by id, not by an `entries` kind; policies and roles are
  * structural, never a sibling space's unclaimed entity).
+ *
+ * The native-enum node kind is DELIBERATELY absent: the unclaimed-elements
+ * sweep builds a coordinate's `entityName` from the issue's last path
+ * segment (the node id, `native_enum:<typeName>`), while a contract space
+ * declares the entity under its handle name (`entries.native_enum` keying)
+ * — the two vocabularies cannot match, so mapping the kind would stamp
+ * coordinates that misreport pack-owned enum types as unclaimed. Enum
+ * ownership is resolved by PHYSICAL type name instead, where the consumer
+ * can reach the entity's `typeName` field (the planner's
+ * `retainUnownedExtras`, infer's pack subtraction).
  */
 const POSTGRES_NODE_ENTITY_KIND: Partial<Readonly<Record<PostgresSchemaNodeKind, string>>> = {
   [PostgresSchemaNodeKind.table]: 'table',

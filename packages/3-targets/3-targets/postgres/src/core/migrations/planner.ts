@@ -29,6 +29,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { parseRlsPolicyWireName } from '../rls/wire-name';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
+import type { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
 import { PostgresSchemaNodeKind, type SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import {
@@ -540,7 +541,30 @@ function retainUnownedExtras(
   return issues.filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
     const node = issueNode(issue);
-    if (node === undefined || node.nodeKind !== PostgresSchemaNodeKind.table) return true;
+    if (node === undefined) return true;
+    if (node.nodeKind === PostgresSchemaNodeKind.nativeEnum) {
+      // Same consultation for a whole extra native enum TYPE, keyed by the
+      // physical type name. A space that declares the enum without `@@map`
+      // matches (the entries key defaults to the type name); an `@@map`-renamed
+      // declaration is handle-keyed in `entries.native_enum` and cannot match
+      // this coordinate — the oracle's coordinate vocabulary walks entries
+      // keys, so type-name-vs-handle ownership for renamed enums is a known
+      // gap the coordinate machinery cannot express (see the deliberately
+      // absent POSTGRES_NODE_ENTITY_KIND mapping in schema-node-kinds.ts).
+      const enumTypeName = blindCast<
+        PostgresNativeEnumSchemaNode,
+        'a postgres-native-enum diff node is always a PostgresNativeEnumSchemaNode'
+      >(node).typeName;
+      const ddlSchemaName = issueSchemaName(issue);
+      if (ddlSchemaName === undefined) return true;
+      const namespaceId = resolveNamespaceIdForDdlSchema(contract, ddlSchemaName);
+      return !ownership.declaresEntity({
+        namespaceId,
+        entityKind: 'native_enum',
+        entityName: enumTypeName,
+      });
+    }
+    if (node.nodeKind !== PostgresSchemaNodeKind.table) return true;
     const ddlSchemaName = issueSchemaName(issue);
     const tableName = issueTableName(issue);
     if (ddlSchemaName === undefined || tableName === undefined) return true;

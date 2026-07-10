@@ -63,6 +63,7 @@ import {
 } from './operations/constraints';
 import { createExtension } from './operations/dependencies';
 import { createIndex, dropIndex } from './operations/indexes';
+import { createNativeEnumType, dropNativeEnumType } from './operations/native-enum-types';
 import {
   createRlsPolicy,
   disableRowLevelSecurity,
@@ -1319,6 +1320,77 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
 }
 
 // ============================================================================
+// Native enum types
+// ============================================================================
+
+export class CreateNativeEnumTypeCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'createNativeEnumType' as const;
+  readonly operationClass = 'additive' as const;
+  readonly schemaName: string;
+  readonly typeName: string;
+  readonly members: readonly string[];
+  readonly label: string;
+
+  constructor(schemaName: string, typeName: string, members: readonly string[]) {
+    super();
+    this.schemaName = schemaName;
+    this.typeName = typeName;
+    this.members = Object.freeze([...members]);
+    this.label = `Create enum type "${typeName}"`;
+    this.freeze();
+  }
+
+  toOp(): Op {
+    return createNativeEnumType(this.schemaName, this.typeName, this.members);
+  }
+
+  renderTypeScript(): string {
+    const opts = [
+      `schema: ${jsonToTsSource(this.schemaName)}`,
+      `typeName: ${jsonToTsSource(this.typeName)}`,
+      `members: ${jsonToTsSource(this.members)}`,
+    ];
+    return `this.createNativeEnumType({ ${opts.join(', ')} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
+  }
+}
+
+export class DropNativeEnumTypeCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'dropNativeEnumType' as const;
+  readonly operationClass = 'destructive' as const;
+  readonly schemaName: string;
+  readonly typeName: string;
+  readonly label: string;
+
+  constructor(schemaName: string, typeName: string) {
+    super();
+    this.schemaName = schemaName;
+    this.typeName = typeName;
+    this.label = `Drop enum type "${typeName}"`;
+    this.freeze();
+  }
+
+  toOp(): Op {
+    return dropNativeEnumType(this.schemaName, this.typeName);
+  }
+
+  renderTypeScript(): string {
+    const opts = [
+      `schema: ${jsonToTsSource(this.schemaName)}`,
+      `typeName: ${jsonToTsSource(this.typeName)}`,
+    ];
+    return `this.dropNativeEnumType({ ${opts.join(', ')} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
+  }
+}
+
+// ============================================================================
 // Data transform
 // ============================================================================
 
@@ -1562,6 +1634,8 @@ export type PostgresOpFactoryCall =
   | RawSqlCall
   | CreateExtensionCall
   | CreateSchemaCall
+  | CreateNativeEnumTypeCall
+  | DropNativeEnumTypeCall
   | CreatePostgresRlsPolicyCall
   | DropPostgresRlsPolicyCall
   | EnableRowLevelSecurityCall
