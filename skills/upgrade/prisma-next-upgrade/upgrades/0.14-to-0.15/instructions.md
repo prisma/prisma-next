@@ -167,11 +167,12 @@ emitted contract are byte-identical. No consumer action — re-scaffold via
 
 # Upgrade 0.14 → 0.15
 
-No consumer-facing action is required for this transition.
+Consumer actions for this transition are recorded in the `changes[]` entries in
+the frontmatter above.
 
-The diff under `examples/` (and the example migration snapshots) is incidental —
-emitted contract artefacts (`contract.json` / `contract.d.ts`) were regenerated
-for two internal substrate changes:
+Beyond those, the diff under `examples/` (and the example migration snapshots)
+is incidental — emitted contract artefacts (`contract.json` / `contract.d.ts`)
+were regenerated for two internal substrate changes:
 
 - **Scalar-list storage machinery.** The emitted contracts now carry the
   adapter-reported `scalarList` capability marker and the bumped envelope
@@ -184,7 +185,7 @@ for two internal substrate changes:
   `(namespace, table, column)`, disambiguating same-named tables across
   namespaces. The runtime applies defaults by namespace transparently.
 
-No user action — a re-emit picks up the new contract shape.
+Both regenerations are picked up by re-running `prisma-next contract emit`.
 
 <!--
 Exercise Mongo enums in retail-store (this PR): the retail-store example replaces
