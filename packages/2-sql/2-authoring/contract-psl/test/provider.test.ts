@@ -756,6 +756,7 @@ model Document {
             },
             entityTypes: {},
             pslBlockDescriptors: {},
+            modelAttributes: {},
           },
           resolvedInputs: [schemaPath],
         }),
