@@ -49,11 +49,7 @@ export interface ContractSourceContext {
   readonly capabilities: CapabilityMatrix;
 }
 
-/**
- * Formats the first-party toolchain recognizes. Lets format-aware tooling
- * avoid file-extension sniffing and opaque loader introspection. Providers
- * may declare any other string; tooling treats those as opaque.
- */
+/** Lets format-aware tooling avoid file-extension sniffing and opaque loader introspection. */
 export type ContractSourceFormat = 'psl' | 'typescript';
 
 export interface ContractSourceProviderBase {

@@ -2,6 +2,7 @@ import type {
   ContractSourceContext,
   ContractSourceDiagnostic,
   ContractSourceProvider,
+  PslContractSourceProvider,
 } from '@prisma-next/config/config-types';
 import type { SourceFile } from './source-file';
 import type { SymbolTable } from './symbol-table';
@@ -27,8 +28,7 @@ export interface PslInterpretInput {
  * `DocumentAst` / `SourceFile` / `SymbolTable` — because `@prisma-next/config`
  * (core) must not name authoring types.
  */
-export interface PslInterpretCapable {
-  readonly sourceFormat: 'psl';
+export interface PslInterpretCapable extends PslContractSourceProvider {
   interpret(
     input: PslInterpretInput,
     context: ContractSourceContext,
@@ -42,9 +42,7 @@ export interface PslInterpretCapable {
  * `string` overlaps `'psl'`), and the discriminant alone is no proof the
  * method exists.
  */
-export function hasPslInterpreter(
-  source: ContractSourceProvider,
-): source is ContractSourceProvider & PslInterpretCapable {
+export function hasPslInterpreter(source: ContractSourceProvider): source is PslInterpretCapable {
   return (
     source.sourceFormat === 'psl' && 'interpret' in source && typeof source.interpret === 'function'
   );

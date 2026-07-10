@@ -7,7 +7,7 @@ const load: ContractSourceProvider['load'] = async () => ok({} as never);
 
 describe('hasPslInterpreter', () => {
   it('accepts a psl provider carrying an interpret function', () => {
-    const provider: ContractSourceProvider & PslInterpretCapable = {
+    const provider: PslInterpretCapable = {
       sourceFormat: 'psl',
       load,
       interpret: () => [],
@@ -19,7 +19,7 @@ describe('hasPslInterpreter', () => {
 
   it('exposes interpret on the narrowed source', () => {
     const diagnostics = [{ code: 'PSL_DEMO', message: 'demo diagnostic' }];
-    const provider: ContractSourceProvider & PslInterpretCapable = {
+    const provider: PslInterpretCapable = {
       sourceFormat: 'psl',
       load,
       interpret: () => diagnostics,
