@@ -31,7 +31,7 @@ import {
   MONGO_TEST_SPACE_ID,
 } from '../contract-space-fixture-mongo/constants';
 import mongoTestContractSpaceExtensionDescriptor from '../contract-space-fixture-mongo/control';
-import { synthMigrationEdges } from './synth-migration-edges';
+import { buildFabricatedMigrationEdges } from './fabricated-migration-edges';
 
 const controlAdapter = new MongoControlAdapterImpl();
 
@@ -63,7 +63,7 @@ const ALL_POLICY = {
 type PerSpaceOptions = MigrationRunnerPerSpaceOptions<'mongo', 'mongo'>;
 
 function withSynthEdges(entry: Omit<PerSpaceOptions, 'migrationEdges'>): PerSpaceOptions {
-  return { ...entry, migrationEdges: synthMigrationEdges(entry.plan) };
+  return { ...entry, migrationEdges: buildFabricatedMigrationEdges(entry.plan) };
 }
 
 const extContract: MongoContract =
@@ -327,24 +327,22 @@ describe('Mongo contract-space aggregate e2e', {
         frameworkComponents: [],
       });
       expect(extVerify.ok).toBe(false);
-      expect(extVerify.schema.counts.fail).toBeGreaterThan(0);
       const indexIssues = extVerify.schema.issues.filter(
-        (i): i is typeof i & { readonly table: string } =>
-          i.kind === 'index_mismatch' && 'table' in i,
+        (i) => i.reason === 'not-equal' && i.path[1]?.startsWith('index:'),
       );
       expect(indexIssues.length).toBeGreaterThan(0);
       for (const issue of indexIssues) {
-        expect(issue.table).toBe(MONGO_TEST_COLLECTION);
+        expect(issue.path[0]).toBe(MONGO_TEST_COLLECTION);
       }
       // The remediation hint a CLI consumer would render therefore
       // points at the extension's collection, not at the app's.
       // Issues on app-owned collections without per-space projection
-      // (e.g. `extra_table` for the app's `users` from the ext
-      // contract's POV) are warnings in non-strict mode; only drift
-      // on a contract-declared element escalates to a failure, and
-      // every failure here scopes to the extension's collection.
+      // (e.g. a whole-collection extra for the app's `users` from the
+      // ext contract's POV) are warnings in non-strict mode; only
+      // drift on a contract-declared element escalates to a failure,
+      // and every failure here scopes to the extension's collection.
       for (const issue of indexIssues) {
-        expect(issue.table).not.toBe('users');
+        expect(issue.path[0]).not.toBe('users');
       }
     } finally {
       await driver.close();

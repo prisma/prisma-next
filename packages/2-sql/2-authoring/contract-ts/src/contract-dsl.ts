@@ -1583,6 +1583,15 @@ export type ContractInput<
    * default namespace. Fields reference the enum via `field.namedType(handle)`.
    */
   readonly enums?: Record<string, import('./enum-type').EnumTypeHandle>;
+  /**
+   * Author-declared pack entities, keyed by namespace id then entity kind
+   * then name — e.g. `{ auth: { native_enum: { AalLevel: <entity> } } }`.
+   * Each entity lowers into `storage.namespaces[ns].entries.<kind>`; when its
+   * registered entity-type descriptor derives a value-set, that also folds
+   * into `entries.valueSet`, mirroring how `enums` flows there. Generic on
+   * purpose — neither this type nor the assembler names a specific kind.
+   */
+  readonly packEntities?: import('./contract-definition').PackEntitiesInput;
 };
 
 export function model<

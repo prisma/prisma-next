@@ -1,10 +1,10 @@
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { printPslFromFlat as printPslFromSql } from '../fixtures';
 
 describe('printPsl', () => {
   it('escapes inferred relation field names that would start with a digit', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         account: {
           name: 'account',
@@ -38,7 +38,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -63,7 +63,7 @@ describe('printPsl', () => {
   });
 
   it('disambiguates colliding normalized field names and preserves relation references', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         account: {
           name: 'account',
@@ -106,7 +106,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -132,7 +132,7 @@ describe('printPsl', () => {
   });
 
   it('disambiguates more than two colliding normalized field names', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         account: {
           name: 'account',
@@ -160,7 +160,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -179,7 +179,7 @@ describe('printPsl', () => {
   });
 
   it('composite unique constraint and index', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         record: {
           name: 'record',
@@ -195,7 +195,7 @@ describe('printPsl', () => {
           indexes: [{ columns: ['category', 'type'], unique: false }],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -216,7 +216,7 @@ describe('printPsl', () => {
   });
 
   it('preserves named non-unique indexes', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         record: {
           name: 'record',
@@ -233,7 +233,7 @@ describe('printPsl', () => {
           ],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -252,7 +252,7 @@ describe('printPsl', () => {
   });
 
   it('preserves named primary keys and unique constraints', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         record: {
           name: 'record',
@@ -271,7 +271,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -291,7 +291,7 @@ describe('printPsl', () => {
   });
 
   it('reserved word table names are escaped', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         type: {
           name: 'type',
@@ -305,7 +305,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -322,7 +322,7 @@ describe('printPsl', () => {
   });
 
   it('throws when model names collide after normalization', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         user_profile: {
           name: 'user_profile',
@@ -345,7 +345,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
 
     expect(() => printPslFromSql(schemaIR)).toThrowErrorMatchingInlineSnapshot(`
       [Error: PSL model name collisions detected:
@@ -354,7 +354,7 @@ describe('printPsl', () => {
   });
 
   it('throws a native-enum diagnostic when a nativeEnumTypeNames annotation is present alongside a table', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         user_role: {
           name: 'user_role',
@@ -372,7 +372,7 @@ describe('printPsl', () => {
           nativeEnumTypeNames: ['user_role'],
         },
       },
-    };
+    });
 
     expect(() => printPslFromSql(schemaIR)).toThrow(
       /contract infer:.*native Postgres enum type.*user_role.*not adoptable/i,
@@ -380,14 +380,14 @@ describe('printPsl', () => {
   });
 
   it('throws a native-enum diagnostic when multiple native enum type names are present', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {},
       annotations: {
         pg: {
           nativeEnumTypeNames: ['user_role', 'UserRole'],
         },
       },
-    };
+    });
 
     expect(() => printPslFromSql(schemaIR)).toThrow(
       /contract infer:.*native Postgres enum type.*not adoptable/i,

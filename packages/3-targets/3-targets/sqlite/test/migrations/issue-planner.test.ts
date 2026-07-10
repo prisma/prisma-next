@@ -1,638 +1,379 @@
-import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { applicationDomainOf } from '@prisma-next/test-utils';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { planIssues } from '../../src/core/migrations/issue-planner';
-import { sqliteCreateNamespace } from '../../src/core/sqlite-unbound-database';
+import {
+  coalesceSubtreeIssues,
+  columnTypeChanged,
+  mapNodeIssueToCall,
+  nodeIssueOrder,
+} from '../../src/core/migrations/issue-planner';
+import type { StrategyContext } from '../../src/core/migrations/planner-strategies';
+import {
+  actualColumn,
+  checkConstraint,
+  columnDefault,
+  expectedColumn,
+  foreignKey,
+  index,
+  issue,
+  primaryKey,
+  table,
+  unique,
+} from './node-issue-helpers';
 
-function makeContract(
-  overrides: { entries: { table: Record<string, StorageTableInput> } } = { entries: { table: {} } },
-): Contract<SqlStorage> {
-  const unboundNs = sqliteCreateNamespace({
-    id: UNBOUND_NAMESPACE_ID,
-    entries: { table: overrides.entries.table },
-  });
-  return {
-    target: 'sqlite',
-    targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
-      namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
-    }),
-    roots: {},
-    domain: applicationDomainOf({ models: {} }),
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-  };
-}
-
-const emptySchema: SqlSchemaIR = { tables: {} };
-
-const baseCtx = {
-  codecHooks: new Map(),
-  storageTypes: {},
-  fromContract: null,
+const emptyCtx: StrategyContext = {
+  expected: new SqlSchemaIR({ tables: {} }),
+  actual: new SqlSchemaIR({ tables: {} }),
+  policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+  frameworkComponents: [],
 };
 
-describe('planIssues — mapIssueToCall per issue kind', () => {
-  describe('missing_table', () => {
-    it('emits CreateTableCall + per-index CreateIndexCall', () => {
-      const toContract = makeContract({
-        entries: {
-          table: {
-            user: {
-              columns: {
-                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [{ columns: ['email'] }],
-              foreignKeys: [],
-            },
-          },
-        },
-      });
-
-      const issues: SchemaIssue[] = [
-        { kind: 'missing_table', table: 'user', message: 'Table "user" is missing' },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract,
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      expect(result.value.calls).toHaveLength(2);
-      expect(result.value.calls[0]).toMatchObject({
-        factoryName: 'createTable',
-        tableName: 'user',
-        operationClass: 'additive',
-      });
-      expect(result.value.calls[1]).toMatchObject({
-        factoryName: 'createIndex',
-        tableName: 'user',
-        indexName: 'user_email_idx',
-      });
-    });
-
-    it('appends a CreateIndexCall for an FK with index=true (no explicit index covering the columns)', () => {
-      const toContract = makeContract({
-        entries: {
-          table: {
-            post: {
-              columns: {
-                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-                userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'post',
-                    columns: ['userId'],
-                  },
-                  target: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'user',
-                    columns: ['id'],
-                  },
-                  index: true,
-                  constraint: true,
-                },
-              ],
-            },
-          },
-        },
-      });
-
-      const issues: SchemaIssue[] = [
-        { kind: 'missing_table', table: 'post', message: 'Table "post" is missing' },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract,
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      expect(result.value.calls).toHaveLength(2);
-      expect(result.value.calls[1]).toMatchObject({
-        factoryName: 'createIndex',
-        tableName: 'post',
-        indexName: 'post_userId_idx',
-      });
-    });
-
-    it('skips the FK-derived index when an explicit index already covers the column set', () => {
-      const toContract = makeContract({
-        entries: {
-          table: {
-            post: {
-              columns: {
-                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-                userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [{ columns: ['userId'], name: 'idx_explicit' }],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'post',
-                    columns: ['userId'],
-                  },
-                  target: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'user',
-                    columns: ['id'],
-                  },
-                  index: true,
-                  constraint: true,
-                },
-              ],
-            },
-          },
-        },
-      });
-
-      const issues: SchemaIssue[] = [
-        { kind: 'missing_table', table: 'post', message: 'Table "post" is missing' },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract,
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      // CreateTable + 1 CreateIndex (the explicit one) — the FK-derived
-      // duplicate is deduped on column set.
-      expect(result.value.calls).toHaveLength(2);
-      expect(result.value.calls[1]).toMatchObject({
-        factoryName: 'createIndex',
-        indexName: 'idx_explicit',
-      });
-    });
-
-    it('returns conflict when issue.table is missing', () => {
-      const issues: SchemaIssue[] = [
-        // intentionally omit `table` to exercise the guard
-        { kind: 'missing_table', message: 'malformed issue' } as SchemaIssue,
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract: makeContract(),
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) throw new Error('expected failure');
-      expect(result.failure[0]?.kind).toBe('unsupportedOperation');
-    });
-
-    it('returns conflict when contract lacks the missing table (mismatched issue input)', () => {
-      const issues: SchemaIssue[] = [
-        { kind: 'missing_table', table: 'ghost', message: 'Table "ghost" is missing' },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract: makeContract(),
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) throw new Error('expected failure');
-      expect(result.failure[0]?.summary).toContain('not found in destination contract');
-    });
-  });
-
-  describe('missing_column', () => {
-    it('emits AddColumnCall', () => {
-      const toContract = makeContract({
-        entries: {
-          table: {
-            user: {
-              columns: {
-                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-                bio: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-      });
-
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'missing_column',
-          table: 'user',
-          column: 'bio',
-          message: 'Column "bio" is missing',
-        },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract,
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      expect(result.value.calls).toHaveLength(1);
-      expect(result.value.calls[0]).toMatchObject({
-        factoryName: 'addColumn',
-        tableName: 'user',
-        columnName: 'bio',
-      });
-    });
-  });
-
-  describe('index_mismatch (missing)', () => {
-    it('emits CreateIndexCall with explicit name when contract declares one', () => {
-      const toContract = makeContract({
-        entries: {
-          table: {
-            user: {
-              columns: {
-                id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [{ columns: ['id'], name: 'idx_explicit' }],
-              foreignKeys: [],
-            },
-          },
-        },
-      });
-
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'index_mismatch',
-          table: 'user',
-          expected: 'id',
-          message: 'Table "user" is missing index: id',
-        },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract,
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      expect(result.value.calls[0]).toMatchObject({
-        factoryName: 'createIndex',
-        indexName: 'idx_explicit',
-      });
-    });
-
-    it('emits a CreateIndexCall with the default name when no explicit index but a contract FK matches', () => {
-      const toContract = makeContract({
-        entries: {
-          table: {
-            post: {
-              columns: {
-                userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [
-                {
-                  source: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'post',
-                    columns: ['userId'],
-                  },
-                  target: {
-                    namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                    tableName: 'user',
-                    columns: ['id'],
-                  },
-                  index: true,
-                  constraint: true,
-                },
-              ],
-            },
-          },
-        },
-      });
-
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'index_mismatch',
-          table: 'post',
-          expected: 'userId',
-          message: 'Table "post" is missing index: userId',
-        },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract,
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      expect(result.value.calls[0]).toMatchObject({
-        factoryName: 'createIndex',
-        indexName: 'post_userId_idx',
-      });
-    });
-
-    it('returns indexIncompatible conflict for non-missing index mismatch (drift)', () => {
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'index_mismatch',
-          table: 'user',
-          expected: 'email',
-          actual: 'name',
-          message: 'Index drift on user',
-        },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract: makeContract(),
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) throw new Error('expected failure');
-      expect(result.failure[0]).toMatchObject({
-        kind: 'indexIncompatible',
-        location: { table: 'user' },
-      });
-    });
-  });
-
-  describe('extra_table', () => {
-    it('emits DropTableCall for user-table', () => {
-      const issues: SchemaIssue[] = [
-        { kind: 'extra_table', table: 'orphan', message: 'Extra table' },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract: makeContract(),
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      expect(result.value.calls[0]).toMatchObject({
-        factoryName: 'dropTable',
-        tableName: 'orphan',
-      });
-    });
-
-    it('skips control tables (_prisma_marker, _prisma_ledger) without emitting a drop or a conflict', () => {
-      const issues: SchemaIssue[] = [
-        { kind: 'extra_table', table: '_prisma_marker', message: 'Extra table' },
-        { kind: 'extra_table', table: '_prisma_ledger', message: 'Extra table' },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract: makeContract(),
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      expect(result.value.calls).toHaveLength(0);
-    });
-
-    it('does NOT skip stale temp tables (_prisma_new_*) — those are dropped', () => {
-      const issues: SchemaIssue[] = [
-        { kind: 'extra_table', table: '_prisma_new_user', message: 'Stale temp table' },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract: makeContract(),
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      expect(result.value.calls[0]).toMatchObject({
-        factoryName: 'dropTable',
-        tableName: '_prisma_new_user',
-      });
-    });
-  });
-
-  describe('extra_column', () => {
-    it('emits DropColumnCall', () => {
-      const issues: SchemaIssue[] = [
-        { kind: 'extra_column', table: 'user', column: 'old', message: 'Extra column' },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract: makeContract(),
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      expect(result.value.calls[0]).toMatchObject({
-        factoryName: 'dropColumn',
-        tableName: 'user',
-        columnName: 'old',
-      });
-    });
-  });
-
-  describe('extra_index', () => {
-    it('emits DropIndexCall', () => {
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'extra_index',
-          table: 'user',
-          indexOrConstraint: 'idx_old',
-          message: 'Extra index',
-        },
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract: makeContract(),
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      expect(result.value.calls[0]).toMatchObject({
-        factoryName: 'dropIndex',
-        tableName: 'user',
-        indexName: 'idx_old',
-      });
-    });
-  });
-
-  describe('unhandled kinds', () => {
-    it('returns unsupportedOperation conflict for type_missing (SQLite has no enums/types)', () => {
-      const issues: SchemaIssue[] = [
-        { kind: 'type_missing', typeName: 'Status', message: 'Type missing' } as SchemaIssue,
-      ];
-
-      const result = planIssues({
-        ...baseCtx,
-        issues,
-        toContract: makeContract(),
-        schema: emptySchema,
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) throw new Error('expected failure');
-      expect(result.failure[0]?.kind).toBe('unsupportedOperation');
-      expect(result.failure[0]?.summary).toContain('Unhandled issue kind');
-    });
-  });
-});
-
-describe('planIssues — emission order and bucketing', () => {
-  it('orders calls: create-table → add-column → create-index → drop-column → drop-index → drop-table', () => {
-    const toContract = makeContract({
-      entries: {
-        table: {
-          a: {
-            columns: {
-              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [{ columns: ['email'] }],
-            foreignKeys: [],
-          },
-          b: {
-            columns: {
-              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-              new_col: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
+describe('mapNodeIssueToCall — table', () => {
+  it('emits CreateTableCall + per-index CreateIndexCall for a not-found table', () => {
+    const t = table({
+      name: 'user',
+      columns: {
+        id: expectedColumn({ name: 'id', nativeType: 'INTEGER', nullable: false }),
+        email: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: false }),
       },
+      primaryKey: primaryKey(['id']),
+      indexes: [index(['email'], { name: 'user_email_idx' })],
     });
-
-    const schema: SqlSchemaIR = {
-      tables: {
-        b: {
-          name: 'b',
-          columns: {
-            id: { name: 'id', nativeType: 'INTEGER', nullable: false },
-            // schema lacks `new_col` (will be added) and has an `extra_col` (will be dropped)
-            extra_col: { name: 'extra_col', nativeType: 'TEXT', nullable: true },
-          },
-          primaryKey: { columns: ['id'] },
-          foreignKeys: [],
-          uniques: [],
-          indexes: [],
-        },
-        c_orphan: {
-          name: 'c_orphan',
-          columns: { id: { name: 'id', nativeType: 'INTEGER', nullable: false } },
-          primaryKey: { columns: ['id'] },
-          foreignKeys: [],
-          uniques: [],
-          indexes: [],
-        },
-      },
-    };
-
-    const issues: SchemaIssue[] = [
-      // Mixed order — issue planner should sort and bucket them.
-      { kind: 'extra_table', table: 'c_orphan', message: 'Extra' },
-      { kind: 'missing_table', table: 'a', message: 'Missing' },
-      { kind: 'extra_column', table: 'b', column: 'extra_col', message: 'Extra' },
-      { kind: 'missing_column', table: 'b', column: 'new_col', message: 'Missing' },
-    ];
-
-    const result = planIssues({
-      ...baseCtx,
-      issues,
-      toContract,
-      schema,
-    });
-
+    const result = mapNodeIssueToCall(
+      issue({ path: ['database', 'user'], reason: 'not-found', expected: t }),
+      emptyCtx,
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
+    expect(result.value).toHaveLength(2);
+    expect(result.value[0]).toMatchObject({ factoryName: 'createTable', tableName: 'user' });
+    expect(result.value[1]).toMatchObject({
+      factoryName: 'createIndex',
+      tableName: 'user',
+      indexName: 'user_email_idx',
+    });
+  });
 
-    const factoryOrder = result.value.calls.map((c) => c.factoryName);
-
-    // Expected order: createTable(a), addColumn(b.new_col), createIndex(a.email), dropColumn(b.extra_col), dropTable(c_orphan)
-    expect(factoryOrder).toEqual([
-      'createTable',
-      'addColumn',
-      'createIndex',
-      'dropColumn',
-      'dropTable',
+  it('emits DropTableCall for a not-expected table', () => {
+    const t = table({ name: 'orphan', columns: {} });
+    const result = mapNodeIssueToCall(
+      issue({ path: ['database', 'orphan'], reason: 'not-expected', actual: t }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value).toEqual([
+      expect.objectContaining({ factoryName: 'dropTable', tableName: 'orphan' }),
     ]);
+  });
+
+  it('skips control tables (_prisma_marker) without emitting a drop or a conflict', () => {
+    const t = table({ name: '_prisma_marker', columns: {} });
+    const result = mapNodeIssueToCall(
+      issue({ path: ['database', '_prisma_marker'], reason: 'not-expected', actual: t }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value).toHaveLength(0);
   });
 });
 
-describe('planIssues — policy gating', () => {
-  it('surfaces a per-issue conflict when destructive issue arrives under additive-only policy', () => {
-    const issues: SchemaIssue[] = [
-      { kind: 'extra_column', table: 'user', column: 'gone', message: 'Extra column' },
-    ];
+describe('mapNodeIssueToCall — column', () => {
+  it('emits AddColumnCall for a not-found column', () => {
+    const col = expectedColumn({ name: 'bio', nativeType: 'TEXT', nullable: true });
+    const result = mapNodeIssueToCall(
+      issue({ path: ['database', 'user', 'column:bio'], reason: 'not-found', expected: col }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value).toEqual([
+      expect.objectContaining({ factoryName: 'addColumn', tableName: 'user', columnName: 'bio' }),
+    ]);
+  });
 
-    const result = planIssues({
-      ...baseCtx,
-      issues,
-      toContract: makeContract(),
-      schema: emptySchema,
-      policy: { allowedOperationClasses: ['additive'] },
-    });
+  it('emits DropColumnCall for a not-expected column', () => {
+    const col = actualColumn({ name: 'old', nativeType: 'TEXT', nullable: true });
+    const result = mapNodeIssueToCall(
+      issue({ path: ['database', 'user', 'column:old'], reason: 'not-expected', actual: col }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value).toEqual([
+      expect.objectContaining({ factoryName: 'dropColumn', tableName: 'user', columnName: 'old' }),
+    ]);
+  });
 
+  it('returns a typeMismatch conflict for a not-equal column with a type change (unabsorbed)', () => {
+    const expected = expectedColumn({ name: 'age', nativeType: 'INTEGER', nullable: false });
+    const actual = actualColumn({ name: 'age', nativeType: 'TEXT', nullable: false });
+    const result = mapNodeIssueToCall(
+      issue({ path: ['database', 'user', 'column:age'], reason: 'not-equal', expected, actual }),
+      emptyCtx,
+    );
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected failure');
-    expect(result.failure[0]?.summary).toContain('"destructive"');
+    expect(result.failure.kind).toBe('typeMismatch');
+  });
+
+  it('returns a nullabilityConflict for a not-equal column with only a nullability change', () => {
+    const expected = expectedColumn({ name: 'age', nativeType: 'INTEGER', nullable: false });
+    const actual = actualColumn({ name: 'age', nativeType: 'INTEGER', nullable: true });
+    const result = mapNodeIssueToCall(
+      issue({ path: ['database', 'user', 'column:age'], reason: 'not-equal', expected, actual }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.failure.kind).toBe('nullabilityConflict');
+  });
+});
+
+describe('mapNodeIssueToCall — index', () => {
+  it('emits CreateIndexCall with the node-carried name for a not-found index', () => {
+    const idx = index(['email'], { name: 'idx_explicit' });
+    const result = mapNodeIssueToCall(
+      issue({ path: ['database', 'user', 'index:email'], reason: 'not-found', expected: idx }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value).toEqual([
+      expect.objectContaining({ factoryName: 'createIndex', indexName: 'idx_explicit' }),
+    ]);
+  });
+
+  it('falls back to the default index name when the node carries none', () => {
+    const idx = index(['userId']);
+    const result = mapNodeIssueToCall(
+      issue({ path: ['database', 'post', 'index:userId'], reason: 'not-found', expected: idx }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value).toEqual([
+      expect.objectContaining({ factoryName: 'createIndex', indexName: 'post_userId_idx' }),
+    ]);
+  });
+
+  it('emits DropIndexCall for a not-expected index', () => {
+    const idx = index(['old_col'], { name: 'idx_old' });
+    const result = mapNodeIssueToCall(
+      issue({ path: ['database', 'user', 'index:old_col'], reason: 'not-expected', actual: idx }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value).toEqual([
+      expect.objectContaining({ factoryName: 'dropIndex', indexName: 'idx_old' }),
+    ]);
+  });
+
+  it('returns an indexIncompatible conflict for an index drift (not-equal)', () => {
+    const expected = index(['email'], { name: 'idx_email' });
+    const actual = index(['email'], { name: 'idx_email', unique: true });
+    const result = mapNodeIssueToCall(
+      issue({ path: ['database', 'user', 'index:email'], reason: 'not-equal', expected, actual }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.failure.kind).toBe('indexIncompatible');
+  });
+});
+
+describe('mapNodeIssueToCall — absorbed node kinds surface as conflicts when unabsorbed', () => {
+  it('primary key: indexIncompatible', () => {
+    const result = mapNodeIssueToCall(
+      issue({
+        path: ['database', 'user', 'primary-key'],
+        reason: 'not-found',
+        expected: primaryKey(['id']),
+      }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.failure.kind).toBe('indexIncompatible');
+  });
+
+  it('unique constraint: indexIncompatible', () => {
+    const result = mapNodeIssueToCall(
+      issue({
+        path: ['database', 'user', 'unique:email'],
+        reason: 'not-found',
+        expected: unique(['email']),
+      }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.failure.kind).toBe('indexIncompatible');
+  });
+
+  it('foreign key: foreignKeyConflict', () => {
+    const fk = foreignKey({
+      columns: ['userId'],
+      referencedTable: 'user',
+      referencedColumns: ['id'],
+    });
+    const result = mapNodeIssueToCall(
+      issue({
+        path: ['database', 'post', 'foreign-key:userId->.user(id)'],
+        reason: 'not-found',
+        expected: fk,
+      }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.failure.kind).toBe('foreignKeyConflict');
+  });
+
+  it('column default: missingButNonAdditive', () => {
+    const result = mapNodeIssueToCall(
+      issue({
+        path: ['database', 'user', 'column:name', 'default'],
+        reason: 'not-found',
+        expected: columnDefault({ resolved: { kind: 'literal', value: 'x' } }),
+      }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.failure.kind).toBe('missingButNonAdditive');
+  });
+});
+
+describe('mapNodeIssueToCall — check constraint', () => {
+  it('always returns unsupportedOperation (SQLite has no CHECK DDL support)', () => {
+    const result = mapNodeIssueToCall(
+      issue({
+        path: ['database', 'user', 'check:status_check'],
+        reason: 'not-found',
+        expected: checkConstraint({
+          name: 'status_check',
+          column: 'status',
+          permittedValues: ['a', 'b'],
+        }),
+      }),
+      emptyCtx,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.failure.kind).toBe('unsupportedOperation');
+  });
+});
+
+describe('columnTypeChanged', () => {
+  it('compares resolvedNativeType when both sides carry it', () => {
+    const expected = expectedColumn({ name: 'a', nativeType: 'INTEGER', nullable: false });
+    const actual = actualColumn({
+      name: 'a',
+      nativeType: 'INTEGER',
+      nullable: false,
+      resolvedNativeType: 'TEXT',
+    });
+    expect(columnTypeChanged(expected, actual)).toBe(true);
+  });
+
+  it('is false when only nullability differs', () => {
+    const expected = expectedColumn({ name: 'a', nativeType: 'INTEGER', nullable: false });
+    const actual = actualColumn({ name: 'a', nativeType: 'INTEGER', nullable: true });
+    expect(columnTypeChanged(expected, actual)).toBe(false);
+  });
+});
+
+describe('nodeIssueOrder', () => {
+  it('orders drops before creates before alters, matching the legacy ISSUE_KIND_ORDER buckets', () => {
+    const extraTable = issue({
+      path: ['database', 'orphan'],
+      reason: 'not-expected',
+      actual: table({ name: 'orphan', columns: {} }),
+    });
+    const missingTable = issue({
+      path: ['database', 'a'],
+      reason: 'not-found',
+      expected: table({ name: 'a', columns: {} }),
+    });
+    const missingColumn = issue({
+      path: ['database', 'b', 'column:c'],
+      reason: 'not-found',
+      expected: expectedColumn({ name: 'c', nativeType: 'TEXT', nullable: true }),
+    });
+    expect(nodeIssueOrder(extraTable)).toBeLessThan(nodeIssueOrder(missingTable));
+    expect(nodeIssueOrder(missingTable)).toBeLessThan(nodeIssueOrder(missingColumn));
+  });
+});
+
+describe('coalesceSubtreeIssues', () => {
+  it('drops nested column/default issues under a not-found table', () => {
+    const t = table({
+      name: 'user',
+      columns: { id: expectedColumn({ name: 'id', nativeType: 'INTEGER', nullable: false }) },
+    });
+    const tableIssue = issue({ path: ['database', 'user'], reason: 'not-found', expected: t });
+    const nestedColumn = issue({
+      path: ['database', 'user', 'column:id'],
+      reason: 'not-found',
+      expected: t.columns['id'],
+    });
+    const nestedDefault = issue({
+      path: ['database', 'user', 'column:id', 'default'],
+      reason: 'not-found',
+      expected: { resolved: { kind: 'literal', value: 1 } },
+    });
+    const unrelated = issue({
+      path: ['database', 'other'],
+      reason: 'not-found',
+      expected: table({ name: 'other', columns: {} }),
+    });
+
+    const result = coalesceSubtreeIssues([tableIssue, nestedColumn, nestedDefault, unrelated]);
+    expect(result).toEqual([tableIssue, unrelated]);
+  });
+
+  it('drops a nested default issue under a not-found (new) column on an otherwise-matched table', () => {
+    const col = expectedColumn({ name: 'bio', nativeType: 'TEXT', nullable: true });
+    const columnIssue = issue({
+      path: ['database', 'user', 'column:bio'],
+      reason: 'not-found',
+      expected: col,
+    });
+    const nestedDefault = issue({
+      path: ['database', 'user', 'column:bio', 'default'],
+      reason: 'not-found',
+      expected: { resolved: { kind: 'literal', value: '' } },
+    });
+    const result = coalesceSubtreeIssues([columnIssue, nestedDefault]);
+    expect(result).toEqual([columnIssue]);
+  });
+
+  it('keeps sibling per-attribute issues on a matched table untouched', () => {
+    const colDrift = issue({
+      path: ['database', 'user', 'column:age'],
+      reason: 'not-equal',
+      expected: expectedColumn({ name: 'age', nativeType: 'INTEGER', nullable: false }),
+      actual: actualColumn({ name: 'age', nativeType: 'TEXT', nullable: false }),
+    });
+    const defaultMissing = issue({
+      path: ['database', 'user', 'column:age', 'default'],
+      reason: 'not-found',
+      expected: { resolved: { kind: 'literal', value: 0 } },
+    });
+    // No table-level or column-level not-found/not-expected issue present —
+    // both survive untouched.
+    expect(coalesceSubtreeIssues([colDrift, defaultMissing])).toEqual([colDrift, defaultMissing]);
+  });
+
+  it('is a no-op when there are no not-found/not-expected issues at all', () => {
+    const onlyDrift = issue({
+      path: ['database', 'user', 'column:age'],
+      reason: 'not-equal',
+      expected: expectedColumn({ name: 'age', nativeType: 'INTEGER', nullable: false }),
+      actual: actualColumn({ name: 'age', nativeType: 'TEXT', nullable: false }),
+    });
+    expect(coalesceSubtreeIssues([onlyDrift])).toEqual([onlyDrift]);
   });
 });

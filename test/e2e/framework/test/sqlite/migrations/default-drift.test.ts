@@ -8,7 +8,7 @@ import { applyMigration, int, integerColumn, pack } from './harness';
  * `parseSqliteDefault` used to return integer-affinity defaults as JS strings
  * (e.g. `'42'`) while contract literals authored with `.default(42)` are JS
  * `number`. The verifier's `literalValuesEqual` does no cross-type coercion,
- * so `42 === '42'` failed and `verifySqlSchema` reported `default_mismatch`
+ * so `42 === '42'` failed and the schema verify reported a default mismatch
  * on every plan — making real-world contracts effectively unmigratable.
  *
  * The fix mirrors `parsePostgresDefault`'s bigint handling: parse as JS

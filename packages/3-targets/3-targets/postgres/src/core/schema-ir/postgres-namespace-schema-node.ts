@@ -1,6 +1,6 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { assertNode, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { PostgresTableSchemaNode } from './postgres-table-schema-node';
 import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
@@ -12,9 +12,11 @@ export interface PostgresNamespaceSchemaNodeInput {
 
 /**
  * One-per-Postgres-schema diff-tree node. Groups the tables belonging to a
- * single namespace and satisfies the `SqlSchemaIR` shape so legacy per-schema
- * consumers (verifySqlSchema, the relational planner, toSchemaView) can
- * accept it unchanged in Unit 6.
+ * single namespace. Per-schema consumers (the relational planner,
+ * toSchemaView) read this node's `tables` field structurally via
+ * `blindCast`/`SqlSchemaIRNode` — not through a static `SqlSchemaIR`
+ * assignment — because `nodeKind` now carries this node's own literal
+ * (`postgres-namespace`), distinct from `SqlSchemaIR`'s own (`sql-schema`).
  *
  * `id` is the schema name. `isEqualTo` is identity — two namespace nodes are
  * equal iff their ids (schema names) match. `children()` returns the table
@@ -23,6 +25,7 @@ export interface PostgresNamespaceSchemaNodeInput {
  */
 export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.namespace;
+
   readonly schemaName: string;
   readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
   readonly nativeEnumTypeNames: readonly string[];
@@ -52,10 +55,6 @@ export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements Diff
   }
 
   static assert(node: SqlSchemaIRNode): asserts node is PostgresNamespaceSchemaNode {
-    if (!PostgresNamespaceSchemaNode.is(node)) {
-      throw new Error(
-        `Expected a PostgresNamespaceSchemaNode but got nodeKind=${node.nodeKind ?? 'undefined'}`,
-      );
-    }
+    assertNode(node, 'PostgresNamespaceSchemaNode', PostgresNamespaceSchemaNode.is);
   }
 }

@@ -48,9 +48,17 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
       }
     }
   }
-  // Show issues list if present (always show a short list; show full list when verbose)
+  // Show issues list if present (always show a short list; show full list when verbose).
+  // `issues` is a shared error-envelope field: PSL interpretation diagnostics stamp
+  // `kind` with their diagnostic code (e.g. `PSL_ORPHANED_BACKRELATION_LIST`); schema-diff
+  // issues carry no `kind` and stamp `reason` instead (e.g. `not-found`). Prefer whichever
+  // the producer supplied.
   if (error.meta?.['issues']) {
-    const issues = error.meta['issues'] as readonly { kind?: string; message?: string }[];
+    const issues = error.meta['issues'] as readonly {
+      kind?: string;
+      reason?: string;
+      message?: string;
+    }[];
     if (issues.length > 0) {
       const maxToShow = isVerbose(flags, 1) ? issues.length : Math.min(3, issues.length);
       const header = isVerbose(flags, 1)
@@ -58,9 +66,9 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
         : `  Issues (showing ${maxToShow} of ${issues.length}):`;
       lines.push(`${formatDimText(header)}`);
       for (const issue of issues.slice(0, maxToShow)) {
-        const kind = issue.kind ?? 'issue';
+        const label = issue.kind ?? issue.reason ?? 'issue';
         const message = issue.message ?? '';
-        lines.push(`${formatDimText(`    - [${kind}] ${message}`)}`);
+        lines.push(`${formatDimText(`    - [${label}] ${message}`)}`);
       }
       if (!isVerbose(flags, 1) && issues.length > maxToShow) {
         lines.push(`${formatDimText('  Re-run with -v/--verbose to see all issues')}`);

@@ -188,8 +188,10 @@ describe('db verify + db sign for Mongo (end-to-end)', {
         frameworkComponents: [],
       });
 
-      expect(result.ok).toBe(true);
-      expect(result.schema.counts.fail).toBe(0);
+      expect(result).toMatchObject({
+        ok: true,
+        schema: { issues: [] },
+      });
     });
 
     it('fails when expected index is missing', async () => {
@@ -209,11 +211,14 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.schema.counts.fail).toBeGreaterThan(0);
-      expect(result.schema.issues.some((i) => i.kind === 'index_mismatch')).toBe(true);
+      expect(
+        result.schema.issues.some(
+          (i) => i.reason === 'not-equal' && i.path[1]?.startsWith('index:'),
+        ),
+      ).toBe(true);
     });
 
-    it('warns on extra index in non-strict mode', async () => {
+    it('passes on extra index in non-strict mode, with no extra-index finding in the result', async () => {
       await db.createCollection('users');
       await db.collection('users').createIndex({ email: 1 }, { unique: true });
       await db.collection('users').createIndex({ createdAt: -1 });
@@ -232,7 +237,11 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(true);
-      expect(result.schema.counts.warn).toBeGreaterThan(0);
+      expect(
+        result.schema.issues.some(
+          (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+        ),
+      ).toBe(false);
     });
 
     it('fails on extra index in strict mode', async () => {
@@ -254,7 +263,11 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.schema.counts.fail).toBeGreaterThan(0);
+      expect(
+        result.schema.issues.some(
+          (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+        ),
+      ).toBe(true);
     });
 
     it('fails when expected collection is missing', async () => {
@@ -272,7 +285,9 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.schema.issues.some((i) => i.kind === 'missing_table')).toBe(true);
+      expect(
+        result.schema.issues.some((i) => i.reason === 'not-found' && i.path.length === 1),
+      ).toBe(true);
     });
   });
 

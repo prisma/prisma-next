@@ -66,6 +66,7 @@
     "./data-transform": "./dist/data-transform.mjs",
     "./ddl": "./dist/ddl.mjs",
     "./default-normalizer": "./dist/default-normalizer.mjs",
+    "./diff-database-schema": "./dist/diff-database-schema.mjs",
     "./errors": "./dist/errors.mjs",
     "./issue-planner": "./dist/issue-planner.mjs",
     "./migration": "./dist/migration.mjs",

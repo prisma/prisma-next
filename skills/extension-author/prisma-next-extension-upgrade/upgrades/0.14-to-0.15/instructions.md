@@ -72,6 +72,143 @@ changes:
         - "deriveJsonSchema"
         - "derivePolymorphicJsonSchema"
       anyMatch: true
+  - id: sql-migration-planner-keep-diff-issue-to-ownership-oracle
+    summary: |
+      `MigrationPlanner.plan()` (and the SQL family's `SqlMigrationPlannerPlanOptions`) drops the
+      `keepDiffIssue` option — a caller-supplied `(issue: DiffIssue) => boolean` predicate the
+      planner applied to its schema diff for multi-space ownership scoping. It is replaced by
+      `ownership?: SchemaOwnership` — an ownership oracle (`{ declaresEntity(entityName): boolean }`,
+      exported from `@prisma-next/framework-components/control`) that the `ContractSpaceAggregate`
+      satisfies. The planner asks it, per live extra node, whether any contract space declares that
+      entity: a node another space owns is left untouched, a node no space owns is a genuine extra it
+      may drop under a destructive policy. If your extension calls `planner.plan(...)` directly with
+      `keepDiffIssue` (rather than through the aggregate's `db init` / `db update` / `migrate`
+      orchestration, which passes the aggregate as the oracle for you), drop the predicate and pass
+      the aggregate (or any object implementing `SchemaOwnership`) as `ownership`. There is no
+      names-set and no filter function — ownership lives in the aggregate; the planner only asks.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "keepDiffIssue"
+      anyMatch: true
+  - id: family-sql-collect-sql-schema-issues-removed
+    summary: |
+      `collectSqlSchemaIssues`, `collectSqlSchemaIssuesPerNamespace`, and their
+      `CollectSqlSchemaIssuesOptions` options type are removed from `@prisma-next/family-sql/diff`.
+      They implemented the coordinate-based relational schema diff the migration planner used before
+      it moved onto the generic node differ (`plan(start, end)`). There is no drop-in replacement —
+      if your extension called either function directly to compare a contract against a live/derived
+      schema, use the generic node differ instead: `diffSchemas` (from
+      `@prisma-next/framework-components/control`) over two schema-IR trees, or a target's own
+      `buildXPlanDiff` (e.g. `buildPostgresPlanDiff` from `@prisma-next/target-postgres/diff-database-schema`,
+      `buildSqlitePlanDiff` from the sqlite target) for the same op-render-stamped comparison the
+      planner itself runs.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "collectSqlSchemaIssues"
+        - "collectSqlSchemaIssuesPerNamespace"
+        - "CollectSqlSchemaIssuesOptions"
+      anyMatch: true
+  - id: sql-control-target-descriptor-diff-database-schema-removed
+    summary: |
+      `SqlControlTargetDescriptor` (from `@prisma-next/family-sql/control`) drops the
+      `diffDatabaseSchema` field — the per-target `SchemaDiffer` hook that used to back the
+      coordinate-based relational diff. If your extension implements a custom SQL target descriptor
+      and supplied this field, remove it; the migration planner reaches the one differ directly via
+      the target's own diff-tree builder now (see the `family-sql-collect-sql-schema-issues-removed`
+      entry above). `diffSchemaForVerdict` (the full-tree node diff the verify verdict derives from)
+      is unaffected and still required.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "diffDatabaseSchema"
+      anyMatch: true
+  - id: migration-tools-aggregate-strategy-rename
+    summary: |
+      `@prisma-next/migration-tools/aggregate` renames its exported graph-walk strategy to say what
+      it does, not how it's implemented: `graphWalkStrategy` -> `resolveRecordedPath`,
+      `GraphWalkOutcome` -> `ResolveRecordedPathOutcome`, `GraphWalkStrategyInputs` ->
+      `ResolveRecordedPathInputs`. The function's behaviour, inputs, and outcome shape are
+      unchanged — only the names. If your extension imports any of these symbols directly (rather
+      than going through `planMigration`, which handles this internally), update the import names.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "graphWalkStrategy"
+        - "GraphWalkOutcome"
+        - "GraphWalkStrategyInputs"
+      anyMatch: true
+  - id: target-postgres-diff-postgres-database-schema-removed
+    summary: |
+      `diffPostgresDatabaseSchema` is removed from `@prisma-next/target-postgres/planner` — the
+      Postgres-specific coordinate-based `SchemaDiffer` implementation, retired alongside
+      `SqlControlTargetDescriptor.diffDatabaseSchema` (see the entry above). If your extension
+      imported it directly, use `buildPostgresPlanDiff` from
+      `@prisma-next/target-postgres/diff-database-schema` instead — it runs the same one-differ
+      comparison the planner itself uses (relational + RLS-policy issues in one node-typed list,
+      filter to the subset you need) and additionally stamps the op-render payload the planner reads.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "diffPostgresDatabaseSchema"
+      anyMatch: true
+  - id: schema-issue-vocabulary-retired
+    summary: |
+      The coordinate-based issue vocabulary is gone: `BaseSchemaIssue`, `SchemaIssue`,
+      `EnumValuesChangedIssue`, and the `DiffIssue` union are removed from
+      `@prisma-next/framework-components/control`. `SchemaDiffIssue` (`{ path, reason, message,
+      expected?, actual? }`) is the only issue shape everywhere now — verify results, the codec
+      `verifyType` hook, and `SchemaVerifier.issues` all report it. Its `outcome` field is also
+      gone; use `reason` (`'not-found'` | `'not-expected'` | `'not-equal'`) instead — `outcome`'s
+      `'missing'` / `'extra'` / `'mismatch'` map onto those three respectively. If your extension
+      imports any of the removed types, constructs a `{ kind, table, message }`-shaped issue by
+      hand, or reads `.outcome` off a `SchemaDiffIssue`, switch to the node-typed shape and
+      `reason`.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "BaseSchemaIssue"
+        - "EnumValuesChangedIssue"
+        - "SchemaDiffOutcome"
+        - ".outcome === 'missing'"
+        - ".outcome === 'extra'"
+        - ".outcome === 'mismatch'"
+      anyMatch: true
+  - id: schema-finding-lists-single-list
+    summary: |
+      `SchemaFindingLists` (and therefore `VerifyDatabaseSchemaResult.schema` /
+      `.schema.warnings`) collapses from two lists (`issues: SchemaIssue[]`, `schemaDiffIssues:
+      SchemaDiffIssue[]`) to one: `{ issues: SchemaDiffIssue[] }`. The framework `SchemaDiff`
+      class follows the same collapse — its constructor now takes one issue array instead of
+      two (`new SchemaDiff(issues)`, not `new SchemaDiff(issues, schemaDiffIssues)`), and
+      `.filter()` narrows the single list. If your extension reads
+      `result.schema.schemaDiffIssues` (or `.schema.warnings.schemaDiffIssues`) directly, or
+      constructs a `SchemaDiff` by hand, update both call sites to the single-list shape —
+      concatenate the old two lists into one, in the same order, if you need to reproduce prior
+      combined output.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "schemaDiffIssues"
+        - "new SchemaDiff("
+      anyMatch: true
+  - id: codec-verify-type-hook-returns-schema-diff-issue
+    summary: |
+      `CodecControlHooks.verifyType` (the storage-type verification hook,
+      `@prisma-next/family-sql/control`) now returns `readonly SchemaDiffIssue[]` instead of
+      `readonly SchemaIssue[]` — no more `kind` string; classify by `reason` instead. A storage
+      type (e.g. a native enum) only ever diverges in its value set, so every paired
+      `not-equal` finding grades as value drift (suppressed under an `external` control policy,
+      same as before); `not-found` is a missing type, `not-expected` an extra one. If your
+      extension implements a custom codec's `verifyType` hook, return `{ path, reason, message,
+      expected?, actual? }` issues instead of the old `{ kind, table, message }` shape.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "verifyType:"
+        - "verifyType("
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
@@ -235,6 +372,24 @@ substrate diff only.
 -->
 
 <!--
+Postgres-RLS slice 2.5 (one-differ-two-ir-planner, the cutover to
+`plan(start, end)`): the migration planner now diffs two derived schema IRs
+via the generic node differ instead of the coordinate-based relational walk.
+The only `packages/3-extensions/` touch is a fixture fix in
+`pgvector/test/migrations/{planner.behavior,planner.contract-to-schema-ir}.test.ts`
+— the hand-built `PostgresTableSchemaNode` foreign-key fixtures now stamp
+`resolvedReferencedSchema` (the differ pairs FK nodes by id, which folds in
+that field; an unresolved FK on a hand-built actual node no longer paired with
+the derived expected side). Test-fixture-only; no extension-author API
+changed. See the `sql-migration-planner-keep-diff-issue-to-ownership-oracle`,
+`family-sql-collect-sql-schema-issues-removed`,
+`sql-control-target-descriptor-diff-database-schema-removed`,
+`migration-tools-aggregate-strategy-rename`,
+`target-postgres-diff-postgres-database-schema-removed`,
+`schema-issue-vocabulary-retired`, `schema-finding-lists-single-list`, and
+`codec-verify-type-hook-returns-schema-diff-issue` entries above for the real
+breaking changes this slice makes to the framework SPI.
+
 TML-2976 (native Postgres enums, external Supabase types — this PR): the
 `packages/3-extensions/` diff is additive. `@prisma-next/extension-postgres` gains a
 `db.nativeEnums` accessor (new `src/runtime/native-enums.ts`; `runtime/postgres.ts`,
@@ -258,6 +413,34 @@ for pack authors: a pack that declares a table's storage coordinate but no domai
 model mapped to it now makes `contract infer` throw (malformed pack); packs normally
 ship storage + domain together, so no action for well-formed packs. No extension-author
 action required. Incidental substrate diff only.
+
+TML-2965 (native-enum-ts-authoring): a native Postgres enum + `pg.enum` column is now
+authorable in the TypeScript DSL, producing a contract byte-identical to the PSL
+`native_enum` equivalent (including in a non-`public` schema). The `packages/3-extensions/`
+diff is additive: `@prisma-next/extension-postgres` gains `src/contract/native-enum.ts` —
+`nativeEnum(name, ...values)` returns a handle whose entity name is `name` and whose
+Postgres type name defaults to `name`; chain `.map(typeName)` to override the Postgres
+type name only. A column binds the handle through `field.column(pg.enum(handle))` (the
+deferred column descriptor resolved at contract-build time). The module exports
+`nativeEnum` / `pg` / `NativeEnumHandle` from `src/exports/contract-builder.ts`;
+`package.json` gains
+`@prisma-next/emitter` and `@prisma-next/sql-contract-emitter` devDependencies for the
+new test's `.d.ts` emission assertion. All net-new exports — nothing existing was
+changed or removed. No extension-author action required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2828 (variant relations on the narrowed accessor, PR #933): the
+`packages/3-extensions/` diff is confined to `@prisma-next/sql-orm-client` (itself an
+extension). The `.variant('X')`-narrowed predicate accessor now surfaces relations the
+variant model declares in the contract, alongside the base model's relations —
+`createModelAccessor` resolves a variant-owned relation against the variant's
+coordinates (variant table for MTI, base table for STI), and
+`VariantAwareModelAccessor` intersects in the variant's relation accessors so
+`t.variant('Feature').where(x => x.assignee.some(…))` type-checks and plans a correct
+EXISTS. Purely additive to the ORM client's query surface; no extension-author SPI
+(`@prisma-next/contract`, `@prisma-next/framework-components`, …) changed. No
+extension-author action required. Incidental substrate diff only.
 -->
 
 <!--

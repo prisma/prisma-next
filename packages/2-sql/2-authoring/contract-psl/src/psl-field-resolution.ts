@@ -12,15 +12,11 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { FieldSymbol, ModelSymbol, ResolvedAttribute } from '@prisma-next/psl-parser';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import {
-  getAttribute,
-  lowerFirst,
-  parseConstraintMapArgument,
-  parseMapName,
-} from './psl-attribute-parsing';
+import { getAttribute, lowerFirst } from './psl-attribute-parsing';
 import type { ColumnDescriptor, FieldPresetContributions } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
@@ -28,6 +24,16 @@ import {
   reportUncomposedNamespace,
   resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
+import {
+  findFieldAttributeNode,
+  findModelAttributeNode,
+  idFieldSpec,
+  interpretFieldAttribute,
+  interpretModelAttribute,
+  mapFieldSpec,
+  mapModelSpec,
+  uniqueFieldSpec,
+} from './sql-attribute-specs';
 
 type LoweredFieldDefault = {
   readonly defaultValue?: ColumnDefault;
@@ -147,6 +153,7 @@ export interface CollectResolvedFieldsInput {
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
+  readonly sourceFile: SourceFile;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
   readonly capabilities: CapabilityMatrix;
@@ -259,6 +266,7 @@ function validateFieldAttributes(input: {
 function extractFieldConstraintNames(input: {
   readonly model: ModelSymbol;
   readonly field: FieldSymbol;
+  readonly sourceFile: SourceFile;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): {
@@ -269,22 +277,32 @@ function extractFieldConstraintNames(input: {
 } {
   const idAttribute = getAttribute(input.field.attributes, 'id');
   const uniqueAttribute = getAttribute(input.field.attributes, 'unique');
-  const idName = parseConstraintMapArgument({
-    attribute: idAttribute,
-    sourceId: input.sourceId,
-    diagnostics: input.diagnostics,
-    entityLabel: `Field "${input.model.name}.${input.field.name}" @id`,
-    span: input.field.span,
-    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-  });
-  const uniqueName = parseConstraintMapArgument({
-    attribute: uniqueAttribute,
-    sourceId: input.sourceId,
-    diagnostics: input.diagnostics,
-    entityLabel: `Field "${input.model.name}.${input.field.name}" @unique`,
-    span: input.field.span,
-    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-  });
+  const idNode = findFieldAttributeNode(input.field, 'id');
+  const idName =
+    idNode === undefined
+      ? undefined
+      : interpretFieldAttribute({
+          node: idNode,
+          spec: idFieldSpec,
+          model: input.model,
+          field: input.field,
+          sourceFile: input.sourceFile,
+          sourceId: input.sourceId,
+          diagnostics: input.diagnostics,
+        })?.map;
+  const uniqueNode = findFieldAttributeNode(input.field, 'unique');
+  const uniqueName =
+    uniqueNode === undefined
+      ? undefined
+      : interpretFieldAttribute({
+          node: uniqueNode,
+          spec: uniqueFieldSpec,
+          model: input.model,
+          field: input.field,
+          sourceFile: input.sourceFile,
+          sourceId: input.sourceId,
+          diagnostics: input.diagnostics,
+        })?.map;
   return { idAttribute, uniqueAttribute, idName, uniqueName };
 }
 
@@ -509,6 +527,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     const { idAttribute, uniqueAttribute, idName, uniqueName } = extractFieldConstraintNames({
       model,
       field,
+      sourceFile: input.sourceFile,
       sourceId,
       diagnostics,
     });
@@ -578,29 +597,37 @@ export function buildModelMappings(
   defaultNamespaceId: string,
   diagnostics: ContractSourceDiagnostic[],
   sourceId: string,
+  sourceFile: SourceFile,
 ): Map<string, ModelNameMapping> {
   const result = new Map<string, ModelNameMapping>();
   for (const { model, namespaceId } of modelEntries) {
-    const mapAttribute = getAttribute(model.attributes, 'map');
-    const tableName = parseMapName({
-      attribute: mapAttribute,
-      defaultValue: lowerFirst(model.name),
-      sourceId,
-      diagnostics,
-      entityLabel: `Model "${model.name}"`,
-      span: model.span,
-    });
+    const mapNode = findModelAttributeNode(model, 'map');
+    const tableName =
+      mapNode === undefined
+        ? lowerFirst(model.name)
+        : (interpretModelAttribute({
+            node: mapNode,
+            spec: mapModelSpec,
+            model,
+            sourceFile,
+            sourceId,
+            diagnostics,
+          })?.name ?? lowerFirst(model.name));
     const fieldColumns = new Map<string, string>();
     for (const field of Object.values(model.fields)) {
-      const fieldMapAttribute = getAttribute(field.attributes, 'map');
-      const columnName = parseMapName({
-        attribute: fieldMapAttribute,
-        defaultValue: field.name,
-        sourceId,
-        diagnostics,
-        entityLabel: `Field "${model.name}.${field.name}"`,
-        span: field.span,
-      });
+      const fieldMapNode = findFieldAttributeNode(field, 'map');
+      const columnName =
+        fieldMapNode === undefined
+          ? field.name
+          : (interpretFieldAttribute({
+              node: fieldMapNode,
+              spec: mapFieldSpec,
+              model,
+              field,
+              sourceFile,
+              sourceId,
+              diagnostics,
+            })?.name ?? field.name);
       fieldColumns.set(field.name, columnName);
     }
     result.set(modelCoordinateKey(namespaceId ?? defaultNamespaceId, model.name), {

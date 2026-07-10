@@ -1,6 +1,6 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { assertNode, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { PostgresNamespaceSchemaNode } from './postgres-namespace-schema-node';
 import type { PostgresRoleSchemaNode } from './postgres-role-schema-node';
 import { PostgresSchemaNodeKind } from './schema-node-kinds';
@@ -23,6 +23,7 @@ export interface PostgresDatabaseSchemaNodeInput {
  */
 export class PostgresDatabaseSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.database;
+
   readonly namespaces: Readonly<Record<string, PostgresNamespaceSchemaNode>>;
   readonly roles: readonly PostgresRoleSchemaNode[];
   readonly existingSchemas: readonly string[];
@@ -54,10 +55,6 @@ export class PostgresDatabaseSchemaNode extends SqlSchemaIRNode implements Diffa
   }
 
   static assert(node: SqlSchemaIRNode): asserts node is PostgresDatabaseSchemaNode {
-    if (!PostgresDatabaseSchemaNode.is(node)) {
-      throw new Error(
-        `Expected a PostgresDatabaseSchemaNode but got nodeKind=${node.nodeKind ?? 'undefined'}`,
-      );
-    }
+    assertNode(node, 'PostgresDatabaseSchemaNode', PostgresDatabaseSchemaNode.is);
   }
 }

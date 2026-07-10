@@ -545,7 +545,7 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
  *
  * The control-api operation is responsible for: loading the
  * contract-space aggregate, reading per-space marker rows from the
- * live database, plotting per-space paths via `graphWalkStrategy`
+ * live database, plotting per-space paths via `resolveRecordedPath`
  * (replay-only — no synth, no introspection), and dispatching
  * through the shared `runMigration` primitive. The CLI command
  * just resolves the descriptor surface (config, refs, contract

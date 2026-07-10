@@ -1,3 +1,4 @@
+import { assertDefined } from '@prisma-next/utils/assertions';
 import { describe, expect, it } from 'vitest';
 import { GreenNodeBuilder } from '../../src/syntax/green-builder';
 import {
@@ -71,14 +72,19 @@ describe('isTriviaKind / isTrivia', () => {
 
   it('classifies a token instance', () => {
     const tokens = sampleTokens(createSyntaxTree(buildSampleTree()));
-    expect(isTrivia(tokens[9])).toBe(false); // Int
-    expect(isTrivia(tokens[8])).toBe(true); // space before Int
+    const intToken = tokens[9];
+    const spaceToken = tokens[8];
+    assertDefined(intToken, 'expected a token at index 9');
+    assertDefined(spaceToken, 'expected a token at index 8');
+    expect(isTrivia(intToken)).toBe(false); // Int
+    expect(isTrivia(spaceToken)).toBe(true); // space before Int
   });
 });
 
 describe('skipTriviaToken', () => {
   it('returns the token itself when already significant', () => {
     const intToken = sampleTokens(createSyntaxTree(buildSampleTree()))[9];
+    assertDefined(intToken, 'expected a token at index 9');
     expect(skipTriviaToken(intToken, 'next')).toBe(intToken);
     expect(skipTriviaToken(intToken, 'prev')).toBe(intToken);
   });
@@ -86,13 +92,16 @@ describe('skipTriviaToken', () => {
   it('skips forward to the next significant token', () => {
     const tokens = sampleTokens(createSyntaxTree(buildSampleTree()));
     const space = tokens[1]; // between `model` and `User`
+    assertDefined(space, 'expected a token at index 1');
     expect(space.kind).toBe('Whitespace');
     expect(skipTriviaToken(space, 'next')?.text).toBe('User');
   });
 
   it('skips backward to the previous significant token', () => {
     const tokens = sampleTokens(createSyntaxTree(buildSampleTree()));
-    expect(skipTriviaToken(tokens[1], 'prev')?.text).toBe('model');
+    const space = tokens[1];
+    assertDefined(space, 'expected a token at index 1');
+    expect(skipTriviaToken(space, 'prev')?.text).toBe('model');
   });
 
   it('returns undefined when only trivia remains', () => {

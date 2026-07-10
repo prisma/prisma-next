@@ -521,19 +521,19 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
 
         expect(
           appSchemaResult?.ok,
-          `Expected app schema result ok:false after DROP POLICY; schemaDiffIssues: ${JSON.stringify(appSchemaResult?.schema.schemaDiffIssues)}`,
+          `Expected app schema result ok:false after DROP POLICY; issues: ${JSON.stringify(appSchemaResult?.schema.issues)}`,
         ).toBe(false);
 
-        const policyIssue = appSchemaResult?.schema.schemaDiffIssues.find(
+        const policyIssue = appSchemaResult?.schema.issues.find(
           (issue) =>
-            issue.outcome === 'missing' &&
+            issue.reason === 'not-found' &&
             (issue.expected ?? issue.actual)?.id === POLICY_WIRE_NAME,
         );
         expect(
           policyIssue,
-          `Expected missing schemaDiffIssue naming '${POLICY_WIRE_NAME}'; got: ${JSON.stringify(appSchemaResult?.schema.schemaDiffIssues)}`,
+          `Expected missing issue naming '${POLICY_WIRE_NAME}'; got: ${JSON.stringify(appSchemaResult?.schema.issues)}`,
         ).toBeDefined();
-        expect(policyIssue?.outcome).toBe('missing');
+        expect(policyIssue?.reason).toBe('not-found');
       }
     },
     timeouts.spinUpPpgDev * 4,

@@ -1,6 +1,7 @@
 /**
- * Unit tests for the RLS planner — verifyPostgresRlsPolicies feeds SchemaIssue[]
- * through the generic pipeline (collectSchemaIssues → planIssues → mapIssueToCall).
+ * Unit tests for the RLS planner — the one-differ tree diff feeds node-typed
+ * `SchemaDiffIssue`s through the generic pipeline (`planIssues` → the node
+ * issue-to-call mapper).
  *
  * - Fresh contract → CREATE TABLE + ENABLE RLS + CREATE POLICY ordering
  * - Edit (same prefix, different hash) → CREATE new + DROP old via missing+extra issues

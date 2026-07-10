@@ -1,5 +1,5 @@
 import type {
-  SchemaIssue,
+  SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -195,12 +195,12 @@ export function errorMarkerRequired(options?: {
 
 /**
  * Schema verification found mismatches between the database and the contract.
- * The full verification tree is preserved in `meta.verificationResult`.
+ * The full verification result is preserved in `meta.verificationResult`.
  */
 export function errorSchemaVerificationFailed(options: {
   readonly summary: string;
   readonly verificationResult: VerifyDatabaseSchemaResult;
-  readonly issues?: readonly SchemaIssue[];
+  readonly issues?: readonly SchemaDiffIssue[];
 }): CliStructuredError {
   return new CliStructuredError('3004', options.summary, {
     domain: 'RUN',

@@ -1,10 +1,10 @@
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { printPslFromFlat as printPslFromSql } from '../fixtures';
 
 describe('printPsl', () => {
   it('schema with defaults (autoincrement, now, boolean, string, number)', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         post: {
           name: 'post',
@@ -46,7 +46,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -66,7 +66,7 @@ describe('printPsl', () => {
   });
 
   it('parameterized types generate types block entries', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         contact: {
           name: 'contact',
@@ -89,7 +89,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -112,7 +112,7 @@ describe('printPsl', () => {
   });
 
   it('creates distinct named types for colliding column aliases with different resolutions', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         price: {
           name: 'price',
@@ -145,7 +145,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -174,7 +174,7 @@ describe('printPsl', () => {
   });
 
   it('reuses named types when the same alias resolves to the same storage type', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         account: {
           name: 'account',
@@ -207,7 +207,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
 
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -236,7 +236,7 @@ describe('printPsl', () => {
   });
 
   it('disambiguates named types from scalar and model identifiers', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         user: {
           name: 'user',
@@ -259,7 +259,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
 
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -283,7 +283,7 @@ describe('printPsl', () => {
   });
 
   it('unsupported (unmappable) types', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         geo_data: {
           name: 'geo_data',
@@ -306,7 +306,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -324,7 +324,7 @@ describe('printPsl', () => {
   });
 
   it('uuid default', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         item: {
           name: 'item',
@@ -342,7 +342,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -362,7 +362,7 @@ describe('printPsl', () => {
   });
 
   it('preserves non-default native types through named type attributes', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         schedule: {
           name: 'schedule',
@@ -395,7 +395,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
 
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -424,7 +424,7 @@ describe('printPsl', () => {
   });
 
   it('preserves raw Postgres defaults via dbgenerated attributes', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         data: {
           name: 'data',
@@ -455,7 +455,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next
@@ -474,7 +474,7 @@ describe('printPsl', () => {
   });
 
   it('renders raw bigint defaults as numbers', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         counter: {
           name: 'counter',
@@ -492,7 +492,7 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-    };
+    });
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// use prisma-next

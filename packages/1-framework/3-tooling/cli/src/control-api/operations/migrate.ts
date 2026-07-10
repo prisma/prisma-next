@@ -1,5 +1,5 @@
 /**
- * Backs the `migrate` command. Strategy: graph-walk-all-spaces, replay-only (no introspect/synth/planner).
+ * Backs the `migrate` command. Resolves the recorded path for every space, replay-only (no introspect/diff/planner).
  */
 
 import type { Contract } from '@prisma-next/contract/types';
@@ -12,12 +12,12 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   type AggregateContractSpace,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
   type ContractMarkerRecordLike,
   type ContractSpaceAggregate,
-  graphWalkStrategy,
   type PerSpacePlan,
   requireHeadRef,
+  resolveRecordedPath,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { errorNoInvariantPath } from '@prisma-next/migration-tools/errors';
@@ -96,7 +96,7 @@ export interface ExecuteMigrateOptions<TFamilyId extends string, TTargetId exten
  * 1. Load aggregate from disk (loader hydrates extension graphs;
  *    caller provides app-space packages).
  * 2. Read live marker rows per space (`familyInstance.readAllMarkers`).
- * 3. Per space: `graphWalkStrategy` plots the path from the live
+ * 3. Per space: `resolveRecordedPath` plots the path from the live
  *    marker to `space.headRef.hash` (or `refHash` for the app
  *    space when provided). Empty-graph spaces fail loudly — a
  *    "never planned" space is a user-error condition for replay.
@@ -326,7 +326,7 @@ export async function executeMigrate<TFamilyId extends string, TTargetId extends
  * Callers switch on `kind` and map to their own error representation:
  * `executeMigrate` throws / returns `notOk`; `executeMigrateShowCommand`
  * returns a CLI structured error. The shared discriminant guarantees both
- * paths feed `graphWalkStrategy` the same inputs.
+ * paths feed `resolveRecordedPath` the same inputs.
  *
  * @internal Exported for `executeMigrateShowCommand` to call.
  */
@@ -407,7 +407,7 @@ export function planSpacePath({
       ? space
       : { ...space, headRef: { hash: targetHash, invariants: targetInvariants } };
 
-  const walked = graphWalkStrategy({
+  const walked = resolveRecordedPath({
     aggregateTargetId: aggregate.targetId,
     space: targetSpace,
     currentMarker: liveMarker,
@@ -458,9 +458,9 @@ function buildAtHeadResolution(args: {
     },
     displayOps: [],
     destinationContract: space.contract(),
-    strategy: 'graph-walk',
+    strategy: 'declared-state',
     migrationEdges: [
-      buildSynthMigrationEdge({
+      buildFabricatedMigrationEdge({
         currentMarkerStorageHash: liveMarker?.storageHash,
         destinationStorageHash: targetHash,
         operationCount: 0,

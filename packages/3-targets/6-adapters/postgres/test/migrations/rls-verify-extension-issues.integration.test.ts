@@ -157,7 +157,7 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
     });
 
-    expect(result.schema.schemaDiffIssues).toEqual([]);
+    expect(result.schema.issues).toEqual([]);
   });
 
   it('emits a missing SchemaDiffIssue when policy is declared but absent in the database', {
@@ -209,7 +209,7 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
     });
 
-    const rlsIssues = result.schema.schemaDiffIssues.filter((i) => i.outcome === 'missing');
+    const rlsIssues = result.schema.issues.filter((i) => i.reason === 'not-found');
     expect(rlsIssues).toHaveLength(1);
     expect(rlsIssues[0]?.expected).toMatchObject({ name: policy.name });
   });
@@ -262,7 +262,7 @@ describe.sequential('RLS verify extension issues', () => {
     });
 
     expect(result.ok).toBe(false);
-    const rlsIssues = result.schema.schemaDiffIssues.filter((i) => i.outcome === 'missing');
+    const rlsIssues = result.schema.issues.filter((i) => i.reason === 'not-found');
     expect(rlsIssues[0]?.message).toContain(policy.name);
   });
 });

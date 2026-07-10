@@ -143,6 +143,7 @@ describe('generic extension-block printer (P2)', () => {
           roles: listParam([refParam('AdminRole'), refParam('EditorRole')]),
           using: valueParam('"auth.uid() = author_id"'),
         },
+        blockAttributes: [],
         span: STUB_SPAN,
       };
 
@@ -174,6 +175,7 @@ describe('generic extension-block printer (P2)', () => {
           target: refParam('User'),
           using: valueParam('"true"'),
         },
+        blockAttributes: [],
         span: STUB_SPAN,
       };
 
@@ -253,6 +255,7 @@ describe('generic extension-block printer (P2)', () => {
           target: refParam('Post'),
           using: valueParam(raw),
         },
+        blockAttributes: [],
         span: STUB_SPAN,
       };
       const ast = {
@@ -285,6 +288,7 @@ describe('generic extension-block printer (P2)', () => {
         kind: 'fixture-policy-select',
         name: 'NumericPolicy',
         parameters: { target: refParam('Post'), using: valueParam('42') },
+        blockAttributes: [],
         span: STUB_SPAN,
       };
       const ast = {
@@ -318,6 +322,7 @@ describe('generic extension-block printer (P2)', () => {
           as: optionParam('permissive'),
           target: refParam('Post'),
         },
+        blockAttributes: [],
         span: STUB_SPAN,
       };
       const ast = {
@@ -349,6 +354,7 @@ describe('generic extension-block printer (P2)', () => {
         kind: 'fixture-policy-select',
         name: 'EdgeCase',
         parameters,
+        blockAttributes: [],
         span: STUB_SPAN,
       };
       return {
@@ -416,6 +422,7 @@ describe('generic extension-block printer (P2)', () => {
         kind: 'no-such-discriminator',
         name: 'OrphanBlock',
         parameters: {},
+        blockAttributes: [],
         span: STUB_SPAN,
       };
 
@@ -462,7 +469,6 @@ describe('generic extension-block printer (P2)', () => {
           ],
           attributes: [],
           span: STUB_SPAN,
-          comment: undefined,
         },
       ];
       const ast = {

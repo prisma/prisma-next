@@ -1,32 +1,78 @@
 import type { ControlPolicy } from '@prisma-next/contract/types';
-import type {
-  SchemaIssue,
-  SchemaVerificationNode,
-} from '@prisma-next/framework-components/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { SchemaDiffIssue, VerifierOutcome } from '@prisma-next/framework-components/control';
 import type {
   MongoSchemaCollection,
   MongoSchemaIndex,
   MongoSchemaIR,
 } from '@prisma-next/mongo-schema-ir';
 import { canonicalize, deepEqual } from '@prisma-next/mongo-schema-ir';
-import { emitMongoIssueAndNodeUnderControlPolicy } from './schema-verify/mongo-control-verify-emit';
+import { ifDefined } from '@prisma-next/utils/defined';
+import { verifierDisposition } from './schema-verify/verifier-disposition';
+
+/**
+ * The Mongo schema diff, issue-only: `failures` carry the verdict (a verify
+ * passes exactly when it is empty), `warnings` the surviving warn-graded
+ * findings (live-only extras in non-strict mode, `observed` subjects).
+ *
+ * Each issue's `path` carries the coordinate — `[collectionName]` for a
+ * whole-collection finding, `[collectionName, 'index:…' | 'validator' |
+ * 'options']` for an auxiliary — and `expected`/`actual` carry the real
+ * Mongo schema-IR node the finding concerns.
+ */
+export interface MongoSchemaDiff {
+  readonly failures: readonly SchemaDiffIssue[];
+  readonly warnings: readonly SchemaDiffIssue[];
+}
+
+/**
+ * Reconciles a control-policy disposition with the Mongo family's strict-mode
+ * contract for live-only extras — the single point where `strict` and the
+ * control policy meet.
+ *
+ * The control policy decides first; only a `fail` is reconciled against the
+ * caller's base outcome. Call sites grade a live-only extra with
+ * `strict ? 'fail' : 'warn'` and a declared missing/mismatch with `fail`, so
+ * this one step encodes the whole matrix:
+ *
+ * | live-vs-declared                    | strict   | non-strict |
+ * |-------------------------------------|----------|------------|
+ * | declared missing / mismatch         | fail     | fail       |
+ * | live-only extra (managed/tolerated) | fail     | warn       |
+ * | live-only extra (external)          | suppress (extras ignored, both modes) |
+ * | anything (observed)                 | warn (both modes)     |
+ *
+ * `tolerated` does not diverge from `managed` on a non-strict extra index:
+ * both soften to `warn`, because the softening comes from the base outcome the
+ * caller already computed from `strict`, not from per-policy special-casing.
+ */
+function emitMongoIssueUnderControlPolicy(
+  controlPolicy: ControlPolicy,
+  issue: SchemaDiffIssue,
+  baseOutcome: 'fail' | 'warn',
+  failures: SchemaDiffIssue[],
+  warnings: SchemaDiffIssue[],
+): VerifierOutcome {
+  const disposition = verifierDisposition(controlPolicy, issue);
+  const outcome = disposition === 'fail' ? baseOutcome : disposition;
+  if (outcome === 'suppress') {
+    return 'suppress';
+  }
+  if (outcome === 'warn') {
+    warnings.push(issue);
+  } else {
+    failures.push(issue);
+  }
+  return outcome;
+}
 
 export function diffMongoSchemas(
   live: MongoSchemaIR,
   expected: MongoSchemaIR,
   strict: boolean,
   collectionControlPolicy: (collectionName: string) => ControlPolicy,
-): {
-  root: SchemaVerificationNode;
-  issues: SchemaIssue[];
-  counts: { pass: number; warn: number; fail: number; totalNodes: number };
-} {
-  const issues: SchemaIssue[] = [];
-  const collectionChildren: SchemaVerificationNode[] = [];
-  let pass = 0;
-  let warn = 0;
-  let fail = 0;
+): MongoSchemaDiff {
+  const failures: SchemaDiffIssue[] = [];
+  const warnings: SchemaDiffIssue[] = [];
 
   const allNames = new Set([...live.collectionNames, ...expected.collectionNames]);
 
@@ -35,120 +81,46 @@ export function diffMongoSchemas(
     const expectedColl = expected.collection(name);
 
     if (!liveColl && expectedColl) {
-      const controlPolicy = collectionControlPolicy(name);
-      const issue: SchemaIssue = {
-        kind: 'missing_table',
-        reason: 'not-found',
-        table: name,
-        message: `Collection "${name}" is missing from the database`,
-      };
-      const disposition = emitMongoIssueAndNodeUnderControlPolicy(
-        controlPolicy,
-        issue,
+      emitMongoIssueUnderControlPolicy(
+        collectionControlPolicy(name),
         {
-          status: 'fail',
-          kind: 'collection',
-          name,
-          contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${name}`,
-          code: 'MISSING_COLLECTION',
-          message: `Collection "${name}" is missing`,
-          expected: name,
-          actual: null,
-          children: [],
+          path: [name],
+          reason: 'not-found',
+          message: `Collection "${name}" is missing from the database`,
+          expected: expectedColl,
         },
-        issues,
-        collectionChildren,
+        'fail',
+        failures,
+        warnings,
       );
-      if (disposition === 'fail') fail++;
-      else if (disposition === 'warn') warn++;
       continue;
     }
 
     if (liveColl && !expectedColl) {
-      const controlPolicy = collectionControlPolicy(name);
-      const issue: SchemaIssue = {
-        kind: 'extra_table',
-        reason: 'not-expected',
-        table: name,
-        message: `Extra collection "${name}" exists in the database but not in the contract`,
-      };
-      const baseStatus = strict ? 'fail' : 'warn';
-      const disposition = emitMongoIssueAndNodeUnderControlPolicy(
-        controlPolicy,
-        issue,
+      emitMongoIssueUnderControlPolicy(
+        collectionControlPolicy(name),
         {
-          status: baseStatus,
-          kind: 'collection',
-          name,
-          contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${name}`,
-          code: 'EXTRA_COLLECTION',
-          message: `Extra collection "${name}" found`,
-          expected: null,
-          actual: name,
-          children: [],
+          path: [name],
           reason: 'not-expected',
+          message: `Extra collection "${name}" exists in the database but not in the contract`,
+          actual: liveColl,
         },
-        issues,
-        collectionChildren,
+        strict ? 'fail' : 'warn',
+        failures,
+        warnings,
       );
-      if (disposition === 'fail') fail++;
-      else if (disposition === 'warn') warn++;
       continue;
     }
 
     const lc = liveColl as MongoSchemaCollection;
     const ec = expectedColl as MongoSchemaCollection;
     const controlPolicy = collectionControlPolicy(name);
-    const indexChildren = diffIndexes(name, lc, ec, strict, controlPolicy, issues);
-    const validatorChildren = diffValidator(name, lc, ec, strict, controlPolicy, issues);
-    const optionsChildren = diffOptions(name, lc, ec, strict, controlPolicy, issues);
-    const children = [...indexChildren, ...validatorChildren, ...optionsChildren];
-
-    const worstStatus = children.reduce<'pass' | 'warn' | 'fail'>(
-      (s, c) => (c.status === 'fail' ? 'fail' : c.status === 'warn' && s !== 'fail' ? 'warn' : s),
-      'pass',
-    );
-
-    for (const c of children) {
-      if (c.status === 'pass') pass++;
-      else if (c.status === 'warn') warn++;
-      else fail++;
-    }
-
-    if (children.length === 0) {
-      pass++;
-    }
-
-    collectionChildren.push({
-      status: worstStatus,
-      kind: 'collection',
-      name,
-      contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${name}`,
-      code: worstStatus === 'pass' ? 'MATCH' : 'DRIFT',
-      message:
-        worstStatus === 'pass' ? `Collection "${name}" matches` : `Collection "${name}" has drift`,
-      expected: name,
-      actual: name,
-      children,
-    });
+    diffIndexes(name, lc, ec, strict, controlPolicy, failures, warnings);
+    diffValidator(name, lc, ec, strict, controlPolicy, failures, warnings);
+    diffOptions(name, lc, ec, strict, controlPolicy, failures, warnings);
   }
 
-  const rootStatus = fail > 0 ? 'fail' : warn > 0 ? 'warn' : 'pass';
-  const totalNodes = pass + warn + fail + collectionChildren.length;
-
-  const root: SchemaVerificationNode = {
-    status: rootStatus,
-    kind: 'root',
-    name: 'mongo-schema',
-    contractPath: 'storage',
-    code: rootStatus === 'pass' ? 'MATCH' : 'DRIFT',
-    message: rootStatus === 'pass' ? 'Schema matches' : 'Schema has drift',
-    expected: null,
-    actual: null,
-    children: collectionChildren,
-  };
-
-  return { root, issues, counts: { pass, warn, fail, totalNodes } };
+  return { failures, warnings };
 }
 
 function buildIndexLookupKey(index: MongoSchemaIndex): string {
@@ -179,9 +151,9 @@ function diffIndexes(
   expected: MongoSchemaCollection,
   strict: boolean,
   collectionControlPolicy: ControlPolicy,
-  issues: SchemaIssue[],
-): SchemaVerificationNode[] {
-  const nodes: SchemaVerificationNode[] = [];
+  failures: SchemaDiffIssue[],
+  warnings: SchemaDiffIssue[],
+): void {
   const liveLookup = new Map<string, MongoSchemaIndex>();
   for (const idx of live.indexes) liveLookup.set(buildIndexLookupKey(idx), idx);
 
@@ -189,77 +161,38 @@ function diffIndexes(
   for (const idx of expected.indexes) expectedLookup.set(buildIndexLookupKey(idx), idx);
 
   for (const [key, idx] of expectedLookup) {
-    if (liveLookup.has(key)) {
-      nodes.push({
-        status: 'pass',
-        kind: 'index',
-        name: formatIndexName(idx),
-        contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${collName}.indexes`,
-        code: 'MATCH',
-        message: `Index ${formatIndexName(idx)} matches`,
-        expected: key,
-        actual: key,
-        children: [],
-      });
-    } else {
-      const issue: SchemaIssue = {
-        kind: 'index_mismatch',
-        reason: 'not-equal',
-        table: collName,
-        indexOrConstraint: formatIndexName(idx),
-        message: `Index ${formatIndexName(idx)} missing on collection "${collName}"`,
-      };
-      emitMongoIssueAndNodeUnderControlPolicy(
+    if (!liveLookup.has(key)) {
+      emitMongoIssueUnderControlPolicy(
         collectionControlPolicy,
-        issue,
         {
-          status: 'fail',
-          kind: 'index',
-          name: formatIndexName(idx),
-          contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${collName}.indexes`,
-          code: 'MISSING_INDEX',
-          message: `Index ${formatIndexName(idx)} missing`,
-          expected: key,
-          actual: null,
-          children: [],
+          path: [collName, `index:${formatIndexName(idx)}`],
+          reason: 'not-equal',
+          message: `Index ${formatIndexName(idx)} missing on collection "${collName}"`,
+          expected: idx,
         },
-        issues,
-        nodes,
+        'fail',
+        failures,
+        warnings,
       );
     }
   }
 
   for (const [key, idx] of liveLookup) {
     if (!expectedLookup.has(key)) {
-      const issue: SchemaIssue = {
-        kind: 'extra_index',
-        reason: 'not-expected',
-        table: collName,
-        indexOrConstraint: formatIndexName(idx),
-        message: `Extra index ${formatIndexName(idx)} on collection "${collName}"`,
-      };
-      const baseStatus = strict ? 'fail' : 'warn';
-      emitMongoIssueAndNodeUnderControlPolicy(
+      emitMongoIssueUnderControlPolicy(
         collectionControlPolicy,
-        issue,
         {
-          status: baseStatus,
-          kind: 'index',
-          name: formatIndexName(idx),
-          contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${collName}.indexes`,
-          code: 'EXTRA_INDEX',
-          message: `Extra index ${formatIndexName(idx)}`,
-          expected: null,
-          actual: key,
-          children: [],
+          path: [collName, `index:${formatIndexName(idx)}`],
+          reason: 'not-expected',
+          message: `Extra index ${formatIndexName(idx)} on collection "${collName}"`,
+          actual: idx,
         },
-        issues,
-        nodes,
+        strict ? 'fail' : 'warn',
+        failures,
+        warnings,
       );
     }
   }
-
-  return nodes;
 }
 
 function diffValidator(
@@ -268,65 +201,41 @@ function diffValidator(
   expected: MongoSchemaCollection,
   strict: boolean,
   collectionControlPolicy: ControlPolicy,
-  issues: SchemaIssue[],
-): SchemaVerificationNode[] {
-  if (!live.validator && !expected.validator) return [];
+  failures: SchemaDiffIssue[],
+  warnings: SchemaDiffIssue[],
+): void {
+  if (!live.validator && !expected.validator) return;
 
   if (expected.validator && !live.validator) {
-    const issue: SchemaIssue = {
-      kind: 'type_missing',
-      reason: 'not-found',
-      table: collName,
-      message: `Validator missing on collection "${collName}"`,
-    };
-    const nodes: SchemaVerificationNode[] = [];
-    emitMongoIssueAndNodeUnderControlPolicy(
+    emitMongoIssueUnderControlPolicy(
       collectionControlPolicy,
-      issue,
       {
-        status: 'fail',
-        kind: 'validator',
-        name: 'validator',
-        contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${collName}.validator`,
-        code: 'MISSING_VALIDATOR',
-        message: 'Validator missing',
-        expected: canonicalize(expected.validator.jsonSchema),
-        actual: null,
-        children: [],
+        path: [collName, 'validator'],
+        reason: 'not-found',
+        message: `Validator missing on collection "${collName}"`,
+        expected: expected.validator,
       },
-      issues,
-      nodes,
+      'fail',
+      failures,
+      warnings,
     );
-    return nodes;
+    return;
   }
 
   if (!expected.validator && live.validator) {
-    const issue: SchemaIssue = {
-      kind: 'extra_validator',
-      reason: 'not-expected',
-      table: collName,
-      message: `Extra validator on collection "${collName}"`,
-    };
-    const nodes: SchemaVerificationNode[] = [];
-    const baseStatus = strict ? 'fail' : 'warn';
-    emitMongoIssueAndNodeUnderControlPolicy(
+    emitMongoIssueUnderControlPolicy(
       collectionControlPolicy,
-      issue,
       {
-        status: baseStatus,
-        kind: 'validator',
-        name: 'validator',
-        contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${collName}.validator`,
-        code: 'EXTRA_VALIDATOR',
-        message: 'Extra validator found',
-        expected: null,
-        actual: canonicalize(live.validator.jsonSchema),
-        children: [],
+        path: [collName, 'validator'],
+        reason: 'not-expected',
+        message: `Extra validator on collection "${collName}"`,
+        actual: live.validator,
       },
-      issues,
-      nodes,
+      strict ? 'fail' : 'warn',
+      failures,
+      warnings,
     );
-    return nodes;
+    return;
   }
 
   const liveVal = live.validator as NonNullable<typeof live.validator>;
@@ -339,56 +248,20 @@ function diffValidator(
     liveVal.validationLevel !== expectedVal.validationLevel ||
     liveVal.validationAction !== expectedVal.validationAction
   ) {
-    const issue: SchemaIssue = {
-      kind: 'type_mismatch',
-      reason: 'not-equal',
-      table: collName,
-      expected: expectedSchema,
-      actual: liveSchema,
-      message: `Validator mismatch on collection "${collName}"`,
-    };
-    const nodes: SchemaVerificationNode[] = [];
-    emitMongoIssueAndNodeUnderControlPolicy(
+    emitMongoIssueUnderControlPolicy(
       collectionControlPolicy,
-      issue,
       {
-        status: 'fail',
-        kind: 'validator',
-        name: 'validator',
-        contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${collName}.validator`,
-        code: 'VALIDATOR_MISMATCH',
-        message: 'Validator mismatch',
-        expected: {
-          jsonSchema: expectedVal.jsonSchema,
-          validationLevel: expectedVal.validationLevel,
-          validationAction: expectedVal.validationAction,
-        },
-        actual: {
-          jsonSchema: liveVal.jsonSchema,
-          validationLevel: liveVal.validationLevel,
-          validationAction: liveVal.validationAction,
-        },
-        children: [],
+        path: [collName, 'validator'],
+        reason: 'not-equal',
+        message: `Validator mismatch on collection "${collName}"`,
+        expected: expectedVal,
+        actual: liveVal,
       },
-      issues,
-      nodes,
+      'fail',
+      failures,
+      warnings,
     );
-    return nodes;
   }
-
-  return [
-    {
-      status: 'pass',
-      kind: 'validator',
-      name: 'validator',
-      contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${collName}.validator`,
-      code: 'MATCH',
-      message: 'Validator matches',
-      expected: expectedSchema,
-      actual: liveSchema,
-      children: [],
-    },
-  ];
 }
 
 function diffOptions(
@@ -397,81 +270,42 @@ function diffOptions(
   expected: MongoSchemaCollection,
   strict: boolean,
   collectionControlPolicy: ControlPolicy,
-  issues: SchemaIssue[],
-): SchemaVerificationNode[] {
-  if (!live.options && !expected.options) return [];
+  failures: SchemaDiffIssue[],
+  warnings: SchemaDiffIssue[],
+): void {
+  if (!live.options && !expected.options) return;
 
   if (!expected.options && live.options) {
-    const issue: SchemaIssue = {
-      kind: 'type_mismatch',
-      reason: 'not-equal',
-      table: collName,
-      actual: canonicalize(live.options),
-      message: `Extra collection options on "${collName}"`,
-    };
-    const nodes: SchemaVerificationNode[] = [];
-    const baseStatus = strict ? 'fail' : 'warn';
-    emitMongoIssueAndNodeUnderControlPolicy(
+    emitMongoIssueUnderControlPolicy(
       collectionControlPolicy,
-      issue,
       {
-        status: baseStatus,
-        kind: 'options',
-        name: 'options',
-        contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${collName}.options`,
-        code: 'EXTRA_OPTIONS',
-        message: 'Extra collection options found',
-        expected: null,
+        path: [collName, 'options'],
+        reason: 'not-equal',
+        message: `Extra collection options on "${collName}"`,
         actual: live.options,
-        children: [],
       },
-      issues,
-      nodes,
+      strict ? 'fail' : 'warn',
+      failures,
+      warnings,
     );
-    return nodes;
+    return;
   }
 
   if (deepEqual(live.options, expected.options)) {
-    return [
-      {
-        status: 'pass',
-        kind: 'options',
-        name: 'options',
-        contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${collName}.options`,
-        code: 'MATCH',
-        message: 'Collection options match',
-        expected: canonicalize(expected.options),
-        actual: canonicalize(live.options),
-        children: [],
-      },
-    ];
+    return;
   }
 
-  const issue: SchemaIssue = {
-    kind: 'type_mismatch',
-    reason: 'not-equal',
-    table: collName,
-    expected: canonicalize(expected.options),
-    actual: canonicalize(live.options),
-    message: `Collection options mismatch on "${collName}"`,
-  };
-  const nodes: SchemaVerificationNode[] = [];
-  emitMongoIssueAndNodeUnderControlPolicy(
+  emitMongoIssueUnderControlPolicy(
     collectionControlPolicy,
-    issue,
     {
-      status: 'fail',
-      kind: 'options',
-      name: 'options',
-      contractPath: `storage.namespaces.${UNBOUND_NAMESPACE_ID}.entries.collection.${collName}.options`,
-      code: 'OPTIONS_MISMATCH',
-      message: 'Collection options mismatch',
-      expected: expected.options,
-      actual: live.options,
-      children: [],
+      path: [collName, 'options'],
+      reason: 'not-equal',
+      message: `Collection options mismatch on "${collName}"`,
+      ...ifDefined('expected', expected.options),
+      ...ifDefined('actual', live.options),
     },
-    issues,
-    nodes,
+    'fail',
+    failures,
+    warnings,
   );
-  return nodes;
 }

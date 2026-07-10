@@ -1,4 +1,4 @@
-import type { Contract, ContractModelBase } from '@prisma-next/contract/types';
+import { type Contract, type ContractModelBase, coreHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { mongoEmission } from '../src/index';
@@ -27,7 +27,7 @@ const userModel: ContractModelBase = {
 function contractWithValueSet(values: readonly string[]): Contract {
   const base = createMongoContract({ models: { User: userModel } });
   const storage = {
-    storageHash: 'sha256:test',
+    storageHash: coreHash('sha256:test'),
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,

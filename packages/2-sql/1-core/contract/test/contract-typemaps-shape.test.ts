@@ -1,18 +1,23 @@
-import { describe, it } from 'vitest';
+import type { UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
+import { describe, expectTypeOf, it } from 'vitest';
 import type { CodecTypesOf, FieldInputTypesOf, FieldOutputTypesOf, TypeMaps } from '../src/types';
+
+type NamespacedUser<TFields> = Record<
+  typeof UNBOUND_DOMAIN_NAMESPACE_ID,
+  { readonly User: TFields }
+>;
 
 describe('Contract and TypeMaps shape', () => {
   describe('TypeMaps shape', () => {
     it('TypeMaps has locked shape with codecTypes', () => {
       type TM = TypeMaps<{ 'pg/text@1': { output: string } }>;
-      type HasCodecTypes = TM extends { readonly codecTypes: unknown } ? true : false;
-      const _codec: HasCodecTypes = true;
+      expectTypeOf<TM>().toExtend<{ readonly codecTypes: unknown }>();
     });
 
     it('CodecTypesOf extracts codecTypes from TypeMaps', () => {
       type TM = TypeMaps<{ foo: { output: number } }>;
       type CT = CodecTypesOf<TM>;
-      const _ct: CT = { foo: { output: 0 } };
+      expectTypeOf<CT>().toEqualTypeOf<{ foo: { output: number } }>();
     });
 
     it('TypeMaps accepts 4th TFieldInputTypes parameter', () => {
@@ -20,22 +25,25 @@ describe('Contract and TypeMaps shape', () => {
         Record<string, never>,
         Record<string, never>,
         Record<string, never>,
-        { User: { name: string } }
+        NamespacedUser<{ name: string }>
       >;
-      type HasFieldInputTypes = TM extends { readonly fieldInputTypes: unknown } ? true : false;
-      const _fit: HasFieldInputTypes = true;
+      expectTypeOf<TM>().toExtend<{ readonly fieldInputTypes: unknown }>();
     });
 
     it('TypeMaps defaults TFieldInputTypes to Record<string, never>', () => {
       type TM = TypeMaps;
       type FIT = FieldInputTypesOf<TM>;
-      const _fit: FIT = {};
+      expectTypeOf<FIT>().toEqualTypeOf<Record<string, never>>();
     });
 
     it('FieldOutputTypesOf extracts fieldOutputTypes from TypeMaps', () => {
-      type TM = TypeMaps<Record<string, never>, Record<string, never>, { User: { name: string } }>;
+      type TM = TypeMaps<
+        Record<string, never>,
+        Record<string, never>,
+        NamespacedUser<{ name: string }>
+      >;
       type FOT = FieldOutputTypesOf<TM>;
-      const _fot: FOT = { User: { name: 'test' } };
+      expectTypeOf<FOT>().toEqualTypeOf<NamespacedUser<{ name: string }>>();
     });
 
     it('FieldInputTypesOf extracts fieldInputTypes from TypeMaps', () => {
@@ -43,10 +51,10 @@ describe('Contract and TypeMaps shape', () => {
         Record<string, never>,
         Record<string, never>,
         Record<string, never>,
-        { User: { name: string } }
+        NamespacedUser<{ name: string }>
       >;
       type FIT = FieldInputTypesOf<TM>;
-      const _fit: FIT = { User: { name: 'test' } };
+      expectTypeOf<FIT>().toEqualTypeOf<NamespacedUser<{ name: string }>>();
     });
   });
 });

@@ -13,7 +13,7 @@ import {
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type AggregateMigrationEdgeRef,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
@@ -143,7 +143,7 @@ export function toPlanContractInfo(c: Contract<SqlStorage>) {
 
 export function synthEdges(plan: MigrationPlan): readonly AggregateMigrationEdgeRef[] {
   return [
-    buildSynthMigrationEdge({
+    buildFabricatedMigrationEdge({
       currentMarkerStorageHash: plan.origin?.storageHash,
       destinationStorageHash: plan.destination.storageHash,
       operationCount: plan.operations.length,

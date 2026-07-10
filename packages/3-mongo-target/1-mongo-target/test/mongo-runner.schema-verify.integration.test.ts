@@ -11,7 +11,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   type AggregateMigrationEdgeRef,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
@@ -136,7 +136,7 @@ function makeRunner() {
 
 function synthEdges(plan: MigrationPlan): readonly AggregateMigrationEdgeRef[] {
   return [
-    buildSynthMigrationEdge({
+    buildFabricatedMigrationEdge({
       currentMarkerStorageHash: plan.origin?.storageHash,
       destinationStorageHash: plan.destination.storageHash,
       operationCount: plan.operations.length,

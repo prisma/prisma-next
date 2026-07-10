@@ -1,10 +1,10 @@
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { inferPslAstFromFlat as sqlSchemaIrToPslAst } from '../fixtures';
 
 describe('inferPostgresPslContract — native enum diagnostic', () => {
   it('throws when the schema contains a nativeEnumTypeNames annotation', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         user: {
           name: 'user',
@@ -23,7 +23,7 @@ describe('inferPostgresPslContract — native enum diagnostic', () => {
           nativeEnumTypeNames: ['user_role'],
         },
       },
-    };
+    });
 
     expect(() => sqlSchemaIrToPslAst(schemaIR)).toThrow(
       /contract infer:.*native Postgres enum type.*user_role.*not adoptable/i,
@@ -31,7 +31,7 @@ describe('inferPostgresPslContract — native enum diagnostic', () => {
   });
 
   it('names every type in the error when multiple native enums are present', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         deployment: {
           name: 'deployment',
@@ -50,7 +50,7 @@ describe('inferPostgresPslContract — native enum diagnostic', () => {
           nativeEnumTypeNames: ['deployment_status', 'another_enum'],
         },
       },
-    };
+    });
 
     let error: Error | undefined;
     try {
@@ -63,7 +63,7 @@ describe('inferPostgresPslContract — native enum diagnostic', () => {
   });
 
   it('mentions the value-set replacement approach in the error', () => {
-    const schemaIR: SqlSchemaIR = {
+    const schemaIR = new SqlSchemaIR({
       tables: {
         user: {
           name: 'user',
@@ -79,7 +79,7 @@ describe('inferPostgresPslContract — native enum diagnostic', () => {
           nativeEnumTypeNames: ['Role'],
         },
       },
-    };
+    });
 
     expect(() => sqlSchemaIrToPslAst(schemaIR)).toThrow(/pg\/text@1/);
   });
