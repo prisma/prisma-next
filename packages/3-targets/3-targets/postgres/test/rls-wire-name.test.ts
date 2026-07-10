@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { parseRlsPolicyWireName } from '../src/core/rls/wire-name';
+import { formatRlsPolicyWireName, parseRlsPolicyWireName } from '../src/core/rls/wire-name';
+
+describe('formatRlsPolicyWireName', () => {
+  it('joins prefix and hash with an underscore', () => {
+    expect(formatRlsPolicyWireName('p_read', 'ab12cd34')).toBe('p_read_ab12cd34');
+  });
+
+  it('parse ∘ format round-trips (one module owns the format)', () => {
+    for (const [prefix, hash] of [
+      ['p_read', 'ab12cd34'],
+      ['read_own_profiles', 'deadbeef'],
+    ] as const) {
+      expect(parseRlsPolicyWireName(formatRlsPolicyWireName(prefix, hash))).toEqual({
+        prefix,
+        hash,
+      });
+    }
+  });
+});
 
 describe('parseRlsPolicyWireName', () => {
   it('splits a wire name into prefix and hash', () => {

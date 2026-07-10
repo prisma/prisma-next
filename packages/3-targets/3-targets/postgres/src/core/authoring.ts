@@ -24,6 +24,7 @@ import {
   PostgresRoleSchema,
 } from './postgres-validators';
 import { computeContentHash, normalizePredicate } from './rls/canonicalize';
+import { formatRlsPolicyWireName } from './rls/wire-name';
 
 /**
  * `pg.enum(<ref>)` registers as an ordinary type constructor whose sole
@@ -88,7 +89,7 @@ function lowerRlsPolicyFromBlock(
     operation: 'select',
     permissive: true,
   });
-  const wireName = `${prefix}_${wireHash}`;
+  const wireName = formatRlsPolicyWireName(prefix, wireHash);
 
   return new PostgresRlsPolicy({
     name: wireName,
