@@ -301,10 +301,32 @@ describe('planner ownership + policy for enum extras', () => {
     });
   }
 
-  it('never drops a live enum a sibling space declares at its type-name coordinate', async () => {
-    const result = planLive(
-      ownsOnly({ namespaceId: 'sales', entityKind: 'native_enum', entityName: 'order_status' }),
-    );
+  it('never drops a live enum a sibling space declares (by physical type name)', async () => {
+    // A sibling space declares `order_status` in `sales`; ownership resolves
+    // by physical type name over the space's storage (`compositionStorages`),
+    // not the handle coordinate — so the app plan leaves it untouched.
+    const siblingStorage = new SqlStorage({
+      storageHash: coreHash('sha256:sibling-owns-order-status'),
+      namespaces: {
+        sales: new PostgresSchema({
+          id: 'sales',
+          entries: {
+            table: {},
+            native_enum: {
+              OrderStatus: {
+                kind: 'postgres-enum',
+                typeName: 'order_status',
+                members: [...MEMBERS],
+              },
+            },
+          },
+        }),
+      },
+    });
+    const result = planLive({
+      declaresEntity: () => false,
+      compositionStorages: () => [siblingStorage],
+    });
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
     const ops = await Promise.all(result.plan.operations);
@@ -325,5 +347,159 @@ describe('planner ownership + policy for enum extras', () => {
     if (result.kind !== 'success') return;
     const ops = await Promise.all(result.plan.operations);
     expect(ops.some((op) => op.id.startsWith('dropNativeEnumType.'))).toBe(false);
+  });
+});
+
+describe('D2-F1: enum drop-safety resolves ownership by physical type name', () => {
+  // A pack declares `native_enum Status { … @@map("order_status") }` in the
+  // shared `public` schema: the entries key is the author HANDLE (`Status`),
+  // the physical type name is `order_status`. The generic coordinate matcher
+  // keys on the handle, so `declaresEntity({… entityName: 'order_status'})`
+  // returns false — the pre-fix planner wrongly dropped the pack's type. The
+  // fix resolves ownership by physical type name over every space's storage.
+  function packStorageDeclaringRenamedEnum(): SqlStorage {
+    return new SqlStorage({
+      storageHash: coreHash('sha256:pack-renamed-enum'),
+      namespaces: {
+        public: new PostgresSchema({
+          id: 'public',
+          entries: {
+            table: {},
+            native_enum: {
+              // handle `Status` != physical type name `order_status`
+              Status: {
+                kind: 'postgres-enum',
+                typeName: 'order_status',
+                members: [...MEMBERS],
+              },
+            },
+          },
+        }),
+      },
+    });
+  }
+
+  // An app whose managed contract shares the `public` schema and declares no
+  // enum of its own; the pack-owned type must not be dropped from under it.
+  function appContractInPublic(): Contract<SqlStorage> {
+    const schema = new PostgresSchema({
+      id: 'public',
+      entries: {
+        table: {
+          orders: new StorageTable({
+            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+            primaryKey: { columns: ['id'] },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+          }),
+        },
+      },
+    });
+    return {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:app-public'),
+      defaultControlPolicy: 'managed',
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:app-public'),
+        namespaces: { public: schema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+  }
+
+  function liveInPublic(nativeEnums: readonly PostgresNativeEnumIntrospection[]) {
+    return new PostgresDatabaseSchemaNode({
+      namespaces: {
+        public: new PostgresNamespaceSchemaNode({
+          schemaName: 'public',
+          tables: {
+            orders: new PostgresTableSchemaNode({
+              name: 'orders',
+              columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+              primaryKey: { columns: ['id'] },
+              foreignKeys: [],
+              uniques: [],
+              indexes: [],
+              policies: [],
+            }),
+          },
+          nativeEnumTypeNames: nativeEnums.map((e) => e.typeName),
+          nativeEnums,
+        }),
+      },
+      roles: [],
+      existingSchemas: ['public'],
+      pgVersion: 'unknown',
+    });
+  }
+
+  // A two-space composition ownership oracle: `declaresEntity` matches only
+  // handle coordinates (so it fails the physical-type-name query, exactly as
+  // the real aggregate does), while `compositionStorages` exposes every
+  // space's storage for the target's physical-identity resolution.
+  function twoSpaceOwnership(...storages: readonly SqlStorage[]): SchemaOwnership {
+    const handleCoordinates = new Set<string>();
+    for (const storage of storages) {
+      for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
+        const enums = (ns as PostgresSchema).entries.native_enum ?? {};
+        for (const handle of Object.keys(enums)) {
+          handleCoordinates.add(
+            coordinateKey({ namespaceId, entityKind: 'native_enum', entityName: handle }),
+          );
+        }
+      }
+    }
+    return {
+      declaresEntity: (coordinate) => handleCoordinates.has(coordinateKey(coordinate)),
+      compositionStorages: () => storages,
+    };
+  }
+
+  it('does NOT drop a pack-owned @@map-renamed enum under a full migrate op set', async () => {
+    const app = appContractInPublic();
+    const planner = createPostgresMigrationPlanner(stubLowerer);
+    const result = planner.plan({
+      contract: app,
+      schema: liveInPublic([{ typeName: 'order_status', values: [...MEMBERS] }]),
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+      ownership: twoSpaceOwnership(app.storage, packStorageDeclaringRenamedEnum()),
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+    const ops = await Promise.all(result.plan.operations);
+    expect(ops.some((op) => op.id === 'dropNativeEnumType.order_status')).toBe(false);
+  });
+
+  it('still drops a genuinely unowned extra enum in the same run (selectivity)', async () => {
+    const app = appContractInPublic();
+    const planner = createPostgresMigrationPlanner(stubLowerer);
+    const result = planner.plan({
+      contract: app,
+      schema: liveInPublic([
+        { typeName: 'order_status', values: [...MEMBERS] },
+        { typeName: 'unowned_mood', values: ['happy', 'sad'] },
+      ]),
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+      ownership: twoSpaceOwnership(app.storage, packStorageDeclaringRenamedEnum()),
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+    const ops = await Promise.all(result.plan.operations);
+    const dropIds = ops.filter((op) => op.id.startsWith('dropNativeEnumType.')).map((op) => op.id);
+    expect(dropIds).toEqual(['dropNativeEnumType.unowned_mood']);
   });
 });

@@ -314,6 +314,7 @@ export function createContractSpaceAggregate(args: {
     declaresEntity: (coordinate) => ordered.some((space) => spaceDeclares(space, coordinate)),
     declaringSpaces: (coordinate) =>
       ordered.filter((space) => spaceDeclares(space, coordinate)).map((s) => s.spaceId),
+    compositionStorages: () => ordered.map((space) => space.contract().storage),
     checkIntegrity,
   };
 }

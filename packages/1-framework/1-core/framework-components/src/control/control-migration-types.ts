@@ -9,7 +9,7 @@
  * with additional fields for execution (precheck SQL, execute SQL, etc.).
  */
 
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, StorageBase } from '@prisma-next/contract/types';
 import type { ImportRequirement } from '@prisma-next/ts-render';
 import type { Result } from '@prisma-next/utils/result';
 import type { TargetBoundComponentDescriptor } from '../shared/framework-components';
@@ -407,6 +407,18 @@ export interface SchemaOwnership {
    * entity at this coordinate.
    */
   declaresEntity(coordinate: SchemaEntityCoordinate): boolean;
+  /**
+   * Every contract space's storage in the composition. A target consults
+   * this to resolve ownership its own way when the generic entity
+   * coordinate cannot express the match — e.g. an object whose physical
+   * database identity differs from the authoring handle the coordinate
+   * carries (`entityName`). The framework stays blind to any such
+   * target-specific identity; it only hands over the raw storages.
+   *
+   * Optional: the passive aggregate supplies it, a bare test oracle may
+   * omit it, and targets fall back to the coordinate query.
+   */
+  compositionStorages?(): readonly Pick<StorageBase, 'namespaces'>[];
 }
 
 /**

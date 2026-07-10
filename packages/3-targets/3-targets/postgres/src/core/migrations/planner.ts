@@ -27,6 +27,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
+import { isPostgresSchema } from '../postgres-schema';
 import { parseRlsPolicyWireName } from '../rls/wire-name';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import type { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
@@ -538,31 +539,26 @@ function retainUnownedExtras(
   contract: Contract<SqlStorage>,
 ): readonly SchemaDiffIssue<SqlSchemaDiffNode>[] {
   if (ownership === undefined) return issues;
+  const ownedEnumsByDdlSchema = collectOwnedEnumTypeNames(ownership);
   return issues.filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
     const node = issueNode(issue);
     if (node === undefined) return true;
     if (node.nodeKind === PostgresSchemaNodeKind.nativeEnum) {
-      // Same consultation for a whole extra native enum TYPE, keyed by the
-      // physical type name. A space that declares the enum without `@@map`
-      // matches (the entries key defaults to the type name); an `@@map`-renamed
-      // declaration is handle-keyed in `entries.native_enum` and cannot match
-      // this coordinate — the oracle's coordinate vocabulary walks entries
-      // keys, so type-name-vs-handle ownership for renamed enums is a known
-      // gap the coordinate machinery cannot express (see the deliberately
-      // absent POSTGRES_NODE_ENTITY_KIND mapping in schema-node-kinds.ts).
+      // A whole extra native enum TYPE is owned when some space in the
+      // composition declares one with the same PHYSICAL type name in the same
+      // DDL schema. The generic entity coordinate cannot express this: its
+      // `entityName` is the authoring handle (the `entries.native_enum` key),
+      // which an `@@map`-renamed enum diverges from — so ownership resolves
+      // by type name over each space's storage (`compositionStorages`),
+      // mirroring `contract infer`'s `describedNativeEnumOwnersByTypeName`.
       const enumTypeName = blindCast<
         PostgresNativeEnumSchemaNode,
         'a postgres-native-enum diff node is always a PostgresNativeEnumSchemaNode'
       >(node).typeName;
       const ddlSchemaName = issueSchemaName(issue);
       if (ddlSchemaName === undefined) return true;
-      const namespaceId = resolveNamespaceIdForDdlSchema(contract, ddlSchemaName);
-      return !ownership.declaresEntity({
-        namespaceId,
-        entityKind: 'native_enum',
-        entityName: enumTypeName,
-      });
+      return !ownedEnumsByDdlSchema.has(`${ddlSchemaName} ${enumTypeName}`);
     }
     if (node.nodeKind !== PostgresSchemaNodeKind.table) return true;
     const ddlSchemaName = issueSchemaName(issue);
@@ -571,6 +567,36 @@ function retainUnownedExtras(
     const namespaceId = resolveNamespaceIdForDdlSchema(contract, ddlSchemaName);
     return !ownership.declaresEntity({ namespaceId, entityKind: 'table', entityName: tableName });
   });
+}
+
+/**
+ * Indexes every native enum type declared by any space in the composition by
+ * its PHYSICAL identity `${ddlSchema} ${typeName}` — the coordinate the
+ * live introspected type carries. `compositionStorages` hands over the raw
+ * space storages (the framework stays blind to enum type names); each
+ * namespace resolves to its DDL schema so a type in one schema never claims a
+ * same-named type in another. Empty when the oracle omits the accessor (a
+ * bare test oracle), so ownership falls back to keeping every extra.
+ */
+function collectOwnedEnumTypeNames(ownership: SchemaOwnership): ReadonlySet<string> {
+  const owned = new Set<string>();
+  const storages = ownership.compositionStorages?.() ?? [];
+  for (const rawStorage of storages) {
+    const storage = blindCast<
+      SqlStorage,
+      'compositionStorages in a SQL plan yields SqlStorage values (SQL-target contract spaces)'
+    >(rawStorage);
+    for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
+      if (!isPostgresSchema(ns)) continue;
+      const enums = ns.entries.native_enum;
+      if (enums === undefined) continue;
+      const ddlSchema = resolveDdlSchemaForNamespaceStorage(storage, namespaceId);
+      for (const entity of Object.values(enums)) {
+        owned.add(`${ddlSchema} ${entity.typeName}`);
+      }
+    }
+  }
+  return owned;
 }
 
 /**
