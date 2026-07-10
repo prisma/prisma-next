@@ -1006,6 +1006,60 @@ describe('contractToSchemaIR', () => {
   });
 });
 
+describe('contractToSchemaIR — flattenReferencedNamespace', () => {
+  function fkStorage(): SqlStorage {
+    return new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: {
+            table: {
+              Post: table({
+                columns: { authorId: col({ nativeType: 'text' }) },
+                foreignKeys: [
+                  {
+                    source: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'Post',
+                      columns: ['authorId'],
+                    },
+                    target: {
+                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                      tableName: 'User',
+                      columns: ['id'],
+                    },
+                    name: 'Post_authorId_fkey',
+                    constraint: true,
+                    index: false,
+                  },
+                ],
+              }),
+            },
+          },
+        }),
+      },
+    });
+  }
+
+  it('defaults the FK resolved namespace to the referenced schema', () => {
+    const result = contractToSchemaIR(wrap(fkStorage()), { renderDefault: testRenderer });
+    const fk = result.tables['Post']!.foreignKeys[0]!;
+    expect(fk.resolvedReferencedNamespace).toBe(UNBOUND_NAMESPACE_ID);
+    expect(fk.id).toContain(UNBOUND_NAMESPACE_ID);
+  });
+
+  it('flattens the FK resolved namespace to the empty namespace when requested', () => {
+    const result = contractToSchemaIR(wrap(fkStorage()), {
+      renderDefault: testRenderer,
+      flattenReferencedNamespace: true,
+    });
+    const fk = result.tables['Post']!.foreignKeys[0]!;
+    expect(fk.resolvedReferencedNamespace).toBe('');
+    expect(fk.id).not.toContain(UNBOUND_NAMESPACE_ID);
+  });
+});
+
 describe('detectDestructiveChanges', () => {
   it('returns empty for null from', () => {
     const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
