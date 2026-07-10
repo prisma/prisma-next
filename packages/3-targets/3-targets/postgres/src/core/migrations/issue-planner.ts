@@ -551,18 +551,33 @@ function mapTableNodeIssue(
     >(issue.actual);
     return ok([new DropTableCall(schemaName, table.name)]);
   }
-  // A paired table `not-equal` can only mean enablement drift: `isEqualTo`
-  // compares name + `rlsEnabled`, and paired nodes share the name. The
+  // A paired table `not-equal` means enablement drift TODAY, because
+  // `isEqualTo` compares only name + `rlsEnabled`. Key on the actual
+  // expected-vs-actual `rlsEnabled` delta rather than assuming it: emit ENABLE
+  // when it flipped on, DISABLE when it flipped off, and fail loud when
+  // `rlsEnabled` matches on both sides — that means a second table attribute
+  // drifted into `isEqualTo` and this mapper does not yet handle it. The
   // expected side is authoritative (marker-driven, never the policy set).
-  const table = blindCast<
+  const expected = blindCast<
     PostgresTableSchemaNode,
     'a not-equal table issue always carries the expected PostgresTableSchemaNode'
   >(issue.expected);
-  return ok([
-    table.rlsEnabled
-      ? new EnableRowLevelSecurityCall(ddlSchemaName, table.name)
-      : new DisableRowLevelSecurityCall(ddlSchemaName, table.name),
-  ]);
+  const actual = blindCast<
+    PostgresTableSchemaNode,
+    'a not-equal table issue always carries the actual PostgresTableSchemaNode'
+  >(issue.actual);
+  if (expected.rlsEnabled && !actual.rlsEnabled) {
+    return ok([new EnableRowLevelSecurityCall(ddlSchemaName, expected.name)]);
+  }
+  if (!expected.rlsEnabled && actual.rlsEnabled) {
+    return ok([new DisableRowLevelSecurityCall(ddlSchemaName, expected.name)]);
+  }
+  return notOk(
+    nodeConflict(
+      'unsupportedOperation',
+      `unhandled table-attribute drift on "${expected.name}": table not-equal with no rlsEnabled delta (a second table attribute drifted)`,
+    ),
+  );
 }
 
 function mapColumnNodeIssue(
