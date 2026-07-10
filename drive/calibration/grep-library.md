@@ -30,6 +30,18 @@ rg 'foreignKeyNamespacesMatch' packages/
 rg 'tables:\s*\{\s*[a-z][A-Za-z_]+\s*:' packages/ -g '*.test.ts' -g '*.test-d.ts' -g 'fixtures/*.ts' | rg -v '__unbound__|public|auth|tenant'
 ```
 
+## Contract-cast hygiene
+
+```bash
+# Descriptor contractSpace.contractJson → Contract casts outside framework-components (forbidden):
+# ControlStack owns the one sanctioned narrowing (extensionContracts assembly in
+# control-stack.ts); consumers property-pick composed contracts from the stack
+# instead of re-deriving them from extension descriptors. -U catches multi-line casts.
+# (Casts of other contractJson values — e.g. a query-builder accepting user-supplied
+# contract JSON at its API boundary — are separate boundaries, not this anti-pattern.)
+rg -U 'blindCast<[^(]*\([^)]*contractSpace!?\??\.contractJson' packages/ -g '!**/1-core/framework-components/**'
+```
+
 ## Cross-cutting anti-patterns
 
 ```bash
