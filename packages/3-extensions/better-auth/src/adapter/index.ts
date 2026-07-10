@@ -5,20 +5,38 @@
  * interface (`model: 'session'`, `where: [{ field: 'userId', … }]`) onto
  * the typed ORM collections of the `better-auth` contract space: every
  * value crosses the seam through contract codecs, every model/field/
- * operator is resolved against the shipped contract before anything
- * reaches SQL, and unknown surfaces fail fast with a
+ * operator/join target is resolved against the shipped contract before
+ * anything reaches SQL, and unknown surfaces fail fast with a
  * {@link PrismaNextAdapterError} naming the offender.
  *
- * `consumeOne`, `incrementOne`, native `join`, and `transaction` support
- * are intentionally not configured yet; the factory's built-in fallbacks
- * apply in the meantime and the config is honest about it
- * (`transaction: false`).
+ * - `consumeOne` is native: `Collection.delete()` is the atomic
+ *   find-first + identity-narrowed `DELETE … RETURNING` primitive, so two
+ *   concurrent consumers of the same row can never both receive it.
+ * - `transaction` is real: the config opens `db.transaction(...)` and
+ *   rebinds the adapter to the transaction scope's collections, so a
+ *   failing flow rolls back atomically.
+ * - `join` on `findOne`/`findMany` runs through `Collection.include()`
+ *   over the space's navigable relations; a join target the contract
+ *   cannot express is a typed error, never a silent degradation.
  */
 import { blindCast } from '@prisma-next/utils/casts';
-import { type AdapterFactory, type CleanedWhere, createAdapterFactory } from 'better-auth/adapters';
+import {
+  type AdapterFactory,
+  type AdapterFactoryConfig,
+  type CleanedWhere,
+  type CustomAdapter,
+  createAdapterFactory,
+  type JoinConfig,
+} from 'better-auth/adapters';
 import type { BetterAuthOptions } from 'better-auth/types';
-import type { AdapterCollection, AdapterRow, BetterAuthDb } from './db-surface';
+import type {
+  AdapterCollection,
+  AdapterRow,
+  BetterAuthDb,
+  BetterAuthDbCollections,
+} from './db-surface';
 import { PrismaNextAdapterError } from './errors';
+import { resolveJoinRelations } from './join';
 import {
   assertKnownField,
   assertKnownFields,
@@ -47,7 +65,31 @@ function projectRow(
   return Object.fromEntries(Object.entries(row).filter(([key]) => select.includes(key)));
 }
 
-export function prismaNextAdapter(db: BetterAuthDb): AdapterFactory<BetterAuthOptions> {
+/**
+ * BetterAuth's `CustomAdapter` methods are generic in a caller-chosen `T`
+ * the adapter cannot know or verify; every reference adapter performs this
+ * widening. The rows produced here come from the contract-typed collections,
+ * so their runtime shape is the model row BetterAuth expects.
+ */
+function widenRow<T>(row: AdapterRow): T {
+  return blindCast<
+    T,
+    "CustomAdapter's T is caller-chosen and unverifiable; the row comes from the contract-typed collection for the resolved model"
+  >(row);
+}
+
+function asRecord(value: unknown, model: string): AdapterRow {
+  if (typeof value !== 'object' || value === null) {
+    throw new PrismaNextAdapterError(
+      'INVALID_OPERATOR_VALUE',
+      `Update payload for model "${model}" must be an object.`,
+      { model },
+    );
+  }
+  return Object.fromEntries(Object.entries(value));
+}
+
+function buildCustomAdapter(db: BetterAuthDbCollections): CustomAdapter {
   const resolveModel = (model: string): ResolvedModel => {
     const spaceModel = resolveSpaceModel(model);
     return { spaceModel, collection: db.orm.public[spaceModel] };
@@ -74,107 +116,152 @@ export function prismaNextAdapter(db: BetterAuthDb): AdapterFactory<BetterAuthOp
     });
   };
 
-  return createAdapterFactory({
-    config: {
-      adapterId: 'prisma-next',
-      adapterName: 'Prisma Next Adapter',
-      supportsNumericIds: false,
-      supportsDates: true,
-      supportsBooleans: true,
-      supportsJSON: true,
-      // Transaction support arrives with the native consumeOne wiring; until
-      // then the factory executes operations sequentially — honestly declared.
-      transaction: false,
+  const applyJoins = (
+    scoped: AdapterCollection,
+    model: string,
+    spaceModel: SpaceModelName,
+    join: JoinConfig | undefined,
+  ): AdapterCollection => {
+    if (join === undefined) {
+      return scoped;
+    }
+    let joined = scoped;
+    for (const relationName of resolveJoinRelations(model, spaceModel, join)) {
+      joined = joined.include(relationName);
+    }
+    return joined;
+  };
+
+  return {
+    async create({ model, data, select }) {
+      const resolved = resolveModel(model);
+      assertKnownFields(model, resolved.spaceModel, data);
+      const row = await resolved.collection.create(data);
+      return widenRow(projectRow(row, model, resolved.spaceModel, select));
     },
-    adapter: () => ({
-      async create({ model, data, select }) {
-        const resolved = resolveModel(model);
-        assertKnownFields(model, resolved.spaceModel, data);
-        const row = await resolved.collection.create(data);
-        return widenRow(projectRow(row, model, resolved.spaceModel, select));
-      },
 
-      async findOne({ model, where, select }) {
-        const resolved = resolveModel(model);
-        const row = await scopeToWhere(resolved, model, where).first();
-        if (row === null) {
-          return null;
-        }
-        return widenRow(projectRow(row, model, resolved.spaceModel, select));
-      },
+    async findOne({ model, where, select, join }) {
+      const resolved = resolveModel(model);
+      const scoped = applyJoins(
+        scopeToWhere(resolved, model, where),
+        model,
+        resolved.spaceModel,
+        join,
+      );
+      const row = await scoped.first();
+      if (row === null) {
+        return null;
+      }
+      // With a native join the raw row must reach the factory intact — it
+      // reads the joined key off the row; select filtering happens in the
+      // factory's own output transform.
+      return widenRow(
+        join === undefined ? projectRow(row, model, resolved.spaceModel, select) : row,
+      );
+    },
 
-      async findMany({ model, where, limit, sortBy, offset, select }) {
-        const resolved = resolveModel(model);
-        let scoped = scopeToWhere(resolved, model, where);
-        if (sortBy !== undefined) {
-          scoped = scoped.orderBy(buildOrderBySelector(sortBy, model, resolved.spaceModel));
-        }
-        if (offset !== undefined && offset > 0) {
-          scoped = scoped.skip(offset);
-        }
-        scoped = scoped.take(limit);
-        const rows = await scoped.all();
-        return rows.map((row) => widenRow(projectRow(row, model, resolved.spaceModel, select)));
-      },
+    async findMany({ model, where, limit, sortBy, offset, select, join }) {
+      const resolved = resolveModel(model);
+      let scoped = applyJoins(
+        scopeToWhere(resolved, model, where),
+        model,
+        resolved.spaceModel,
+        join,
+      );
+      if (sortBy !== undefined) {
+        scoped = scoped.orderBy(buildOrderBySelector(sortBy, model, resolved.spaceModel));
+      }
+      if (offset !== undefined && offset > 0) {
+        scoped = scoped.skip(offset);
+      }
+      scoped = scoped.take(limit);
+      const rows = await scoped.all();
+      return rows.map((row) =>
+        widenRow(join === undefined ? projectRow(row, model, resolved.spaceModel, select) : row),
+      );
+    },
 
-      async update({ model, where, update }) {
-        const resolved = resolveModel(model);
-        const data = asRecord(update, model);
-        assertKnownFields(model, resolved.spaceModel, data);
-        const updated = await scopeToWhere(resolved, model, where).update(data);
-        if (updated === null) {
-          return null;
-        }
-        return widenRow(updated);
-      },
+    async update({ model, where, update }) {
+      const resolved = resolveModel(model);
+      const data = asRecord(update, model);
+      assertKnownFields(model, resolved.spaceModel, data);
+      const updated = await scopeToWhere(resolved, model, where).update(data);
+      if (updated === null) {
+        return null;
+      }
+      return widenRow(updated);
+    },
 
-      async updateMany({ model, where, update }) {
-        const resolved = resolveModel(model);
-        assertKnownFields(model, resolved.spaceModel, update);
-        return scopeToWhere(resolved, model, where).updateCount(update);
-      },
+    async updateMany({ model, where, update }) {
+      const resolved = resolveModel(model);
+      assertKnownFields(model, resolved.spaceModel, update);
+      return scopeToWhere(resolved, model, where).updateCount(update);
+    },
 
-      async delete({ model, where }) {
-        const resolved = resolveModel(model);
-        await scopeToWhere(resolved, model, where).delete();
-      },
+    async delete({ model, where }) {
+      const resolved = resolveModel(model);
+      await scopeToWhere(resolved, model, where).delete();
+    },
 
-      async deleteMany({ model, where }) {
-        const resolved = resolveModel(model);
-        return scopeToWhere(resolved, model, where).deleteCount();
-      },
+    async deleteMany({ model, where }) {
+      const resolved = resolveModel(model);
+      return scopeToWhere(resolved, model, where).deleteCount();
+    },
 
-      async count({ model, where }) {
-        const resolved = resolveModel(model);
-        const stats = await scopeToWhere(resolved, model, where).aggregate((aggregate) => ({
-          count: aggregate.count(),
-        }));
-        return stats.count;
-      },
-    }),
+    async consumeOne({ model, where }) {
+      const resolved = resolveModel(model);
+      const consumed = await scopeToWhere(resolved, model, where).delete();
+      if (consumed === null) {
+        return null;
+      }
+      return widenRow(consumed);
+    },
+
+    async count({ model, where }) {
+      const resolved = resolveModel(model);
+      const stats = await scopeToWhere(resolved, model, where).aggregate((aggregate) => ({
+        count: aggregate.count(),
+      }));
+      return stats.count;
+    },
+  };
+}
+
+const ADAPTER_CONFIG_BASE = {
+  adapterId: 'prisma-next',
+  adapterName: 'Prisma Next Adapter',
+  supportsNumericIds: false,
+  supportsDates: true,
+  supportsBooleans: true,
+  supportsJSON: true,
+} as const satisfies Partial<AdapterFactoryConfig>;
+
+export function prismaNextAdapter(db: BetterAuthDb): AdapterFactory<BetterAuthOptions> {
+  // The transaction config rebinds the adapter to the transaction scope's
+  // collections via a nested factory instance (reference-adapter pattern),
+  // which needs the auth options the outer factory was created with.
+  let lazyOptions: BetterAuthOptions = {};
+
+  const factory = createAdapterFactory({
+    config: {
+      ...ADAPTER_CONFIG_BASE,
+      transaction: (callback) =>
+        db.transaction((tx) => {
+          const transactionAdapter = createAdapterFactory({
+            config: {
+              ...ADAPTER_CONFIG_BASE,
+              transaction: false,
+            },
+            adapter: () => buildCustomAdapter(tx),
+          })(lazyOptions);
+          return callback(transactionAdapter);
+        }),
+    },
+    adapter: () => buildCustomAdapter(db),
   });
-}
 
-/**
- * BetterAuth's `CustomAdapter` methods are generic in a caller-chosen `T`
- * the adapter cannot know or verify; every reference adapter performs this
- * widening. The rows produced here come from the contract-typed collections,
- * so their runtime shape is the model row BetterAuth expects.
- */
-function widenRow<T>(row: AdapterRow): T {
-  return blindCast<
-    T,
-    "CustomAdapter's T is caller-chosen and unverifiable; the row comes from the contract-typed collection for the resolved model"
-  >(row);
-}
-
-function asRecord(value: unknown, model: string): AdapterRow {
-  if (typeof value !== 'object' || value === null) {
-    throw new PrismaNextAdapterError(
-      'INVALID_OPERATOR_VALUE',
-      `Update payload for model "${model}" must be an object.`,
-      { model },
-    );
-  }
-  return Object.fromEntries(Object.entries(value));
+  return (options) => {
+    lazyOptions = options;
+    return factory(options);
+  };
 }

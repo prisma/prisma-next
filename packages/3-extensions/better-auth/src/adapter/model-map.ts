@@ -82,3 +82,40 @@ export function assertKnownFields(
     assertKnownField(model, spaceModel, field);
   }
 }
+
+/** A navigable relation of a space model, as declared by the shipped contract. */
+export interface SpaceModelRelation {
+  readonly relationName: string;
+  readonly toModel: string;
+  readonly localField: string;
+  readonly targetField: string;
+}
+
+interface ContractDomainRelation {
+  readonly to: { readonly model: string };
+  readonly on: {
+    readonly localFields: readonly string[];
+    readonly targetFields: readonly string[];
+  };
+}
+
+const relationsBySpaceModel: ReadonlyMap<string, readonly SpaceModelRelation[]> = new Map(
+  Object.entries(contractJson.domain.namespaces.public.models).map(([modelName, modelDef]) => {
+    const relations: Readonly<Record<string, ContractDomainRelation>> =
+      'relations' in modelDef ? modelDef.relations : {};
+    return [
+      modelName,
+      Object.entries(relations).map(([relationName, relation]) => ({
+        relationName,
+        toModel: relation.to.model,
+        localField: relation.on.localFields[0] ?? '',
+        targetField: relation.on.targetFields[0] ?? '',
+      })),
+    ];
+  }),
+);
+
+/** Navigable relations declared by the shipped contract for a space model. */
+export function relationsOf(spaceModel: SpaceModelName): readonly SpaceModelRelation[] {
+  return relationsBySpaceModel.get(spaceModel) ?? [];
+}

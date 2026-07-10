@@ -3,7 +3,8 @@ export type PrismaNextAdapterErrorCode =
   | 'UNKNOWN_FIELD'
   | 'UNSUPPORTED_OPERATOR'
   | 'UNSUPPORTED_WHERE_MODE'
-  | 'INVALID_OPERATOR_VALUE';
+  | 'INVALID_OPERATOR_VALUE'
+  | 'UNKNOWN_JOIN_RELATION';
 
 /**
  * Typed error surface of the BetterAuth adapter. Every rejection names the
@@ -71,6 +72,18 @@ export function unsupportedWhereMode(
     'UNSUPPORTED_WHERE_MODE',
     `Case-insensitive comparison (mode: "insensitive") is not supported for field "${field}" on model "${model}" (operator "${operator}").`,
     { model, field, operator },
+  );
+}
+
+export function unknownJoinRelation(
+  model: string,
+  joinModel: string,
+  on: { from: string; to: string },
+): PrismaNextAdapterError {
+  return new PrismaNextAdapterError(
+    'UNKNOWN_JOIN_RELATION',
+    `No contract relation on model "${model}" joins "${joinModel}" via ${model}.${on.from} → ${joinModel}.${on.to}. The better-auth contract space declares no such navigable relation.`,
+    { model, field: on.from },
   );
 }
 

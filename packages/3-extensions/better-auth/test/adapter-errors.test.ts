@@ -37,6 +37,7 @@ function rejectingCollection(): AdapterCollection {
       return collection;
     },
     orderBy: fail,
+    include: fail,
     take: fail,
     skip: fail,
     all: fail,
@@ -59,6 +60,9 @@ const stubDb: BetterAuthDb = {
       Account: rejectingCollection(),
       Verification: rejectingCollection(),
     },
+  },
+  transaction() {
+    throw new Error('transaction must not be reached for invalid surfaces');
   },
 };
 

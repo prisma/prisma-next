@@ -59,6 +59,7 @@ export interface AdapterAggregateBuilder {
 export interface AdapterCollection {
   where(fn: (model: AdapterModelAccessor) => AnyExpression): AdapterCollection;
   orderBy(fn: (model: AdapterModelAccessor) => OrderByItem): AdapterCollection;
+  include(relation: string): AdapterCollection;
   take(count: number): AdapterCollection;
   skip(count: number): AdapterCollection;
   all(): PromiseLike<ReadonlyArray<AdapterRow>>;
@@ -74,14 +75,24 @@ export interface AdapterCollection {
 }
 
 /**
- * The minimal structural surface `prismaNextAdapter` needs from an app's
- * prisma-next client: the four contract-typed collections of the
- * `better-auth` space at their namespace coordinate. An app's ordinary `db`
- * (e.g. `PostgresClient` over an aggregate contract that includes the pack)
- * satisfies this shape without ceremony.
+ * The contract-typed collections of the `better-auth` space at their
+ * namespace coordinate — the read/write surface the adapter drives both
+ * outside and inside a transaction scope.
  */
-export interface BetterAuthDb {
+export interface BetterAuthDbCollections {
   readonly orm: {
     readonly public: Readonly<Record<SpaceModelName, AdapterCollection>>;
   };
+}
+
+/**
+ * The minimal structural surface `prismaNextAdapter` needs from an app's
+ * prisma-next client: the four contract-typed collections of the
+ * `better-auth` space plus the client's transaction API (whose scope
+ * exposes the same collections). An app's ordinary `db` (e.g.
+ * `PostgresClient` over an aggregate contract that includes the pack)
+ * satisfies this shape without ceremony.
+ */
+export interface BetterAuthDb extends BetterAuthDbCollections {
+  transaction<R>(fn: (tx: BetterAuthDbCollections) => PromiseLike<R>): Promise<R>;
 }
