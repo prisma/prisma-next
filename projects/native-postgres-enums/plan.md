@@ -18,6 +18,10 @@ The complete external-enum vertical — represent → type → cast → runtime 
 - **`contract infer` adopts native enum types** instead of throwing — introspection reads ordered member values (`pg_enum.enumsortorder`), infer emits `native_enum` blocks + `pg.enum(<Name>)` columns wrapped in an explicit `namespace <schema> { … }` block (enum-free output stays byte-identical), pack-owned types subtract by type name, and a live PGlite round trip proves infer → emit → `db verify` against the source database for the `public` and `auth.aal_level` shapes. Slice spec: [`slices/infer-native-enum-adoption/spec.md`](slices/infer-native-enum-adoption/spec.md).
 - **R6 status:** adoption shipped **ahead of Phase-2 Slices A/B** (sequencing inversion, unblocks Supabase Slice F). The managed lifecycle (`CREATE TYPE` / `DROP TYPE` / `ADD VALUE`, differ integration) is still forward work below — an inferred enum under `defaultControl: 'managed'` claims a lifecycle the planner does not yet enforce until Slices A/B land.
 
+## In flight — native_enum serializes into contract.json
+
+- **`entries.native_enum` becomes an ordinary enumerable entries kind** so it round-trips through `contract.json` and is captured by `storageHash` (hardens R1; prerequisite for the Phase-2 planner reading ordered members from storage, and for pack-owned subtraction on production-hydrated contracts). Closes the infer-adoption slice's "serialized pack contracts expose no enum type names" follow-up. Slice spec: [`slices/serialize-native-enum-entities/spec.md`](slices/serialize-native-enum-entities/spec.md).
+
 ## Forward work
 
 ### Generic namespace-`entries` serialization — shipped, [TML-2981]

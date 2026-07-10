@@ -26,6 +26,7 @@ import {
 } from '../../src/core/authoring';
 import { PG_ENUM_CODEC_ID } from '../../src/core/codec-ids';
 import { pgEnumDescriptor, postgresQualifyColumnType } from '../../src/core/codecs';
+import { PostgresContractSerializer } from '../../src/core/postgres-contract-serializer';
 import { PostgresNativeEnum } from '../../src/core/postgres-native-enum';
 import { PostgresSchema, postgresCreateNamespace } from '../../src/core/postgres-schema';
 import { inferPostgresPslContract } from '../../src/core/psl-infer/infer-psl-contract';
@@ -145,6 +146,22 @@ function describedContractWithNativeEnum(input: {
     meta: {},
   };
   return { spaceId: 'pack', contract };
+}
+
+/**
+ * Round-trips a described contract through the real serialize→JSON→hydrate
+ * machinery, so the returned space carries a contract hydrated from bytes —
+ * the production shape, where the native_enum entity only survives because
+ * D1 made it serialize. If D1's serialization did not expose type names, the
+ * hydrated contract would carry no native_enum entities and subtraction would
+ * silently stop working.
+ */
+function throughSerializedForm(space: SqlDescribedContractSpace): SqlDescribedContractSpace {
+  const serializer = new PostgresContractSerializer();
+  const json = serializer.serializeContract(space.contract);
+  const reparsed = JSON.parse(JSON.stringify(json));
+  const hydrated = serializer.deserializeContract(reparsed);
+  return { spaceId: space.spaceId, contract: hydrated };
 }
 
 // ---------------------------------------------------------------------------
@@ -409,6 +426,61 @@ describe('pack-owned enum subtraction (by type name)', () => {
     expect(() => inferPostgresPslContract(qualifiedTree, [pack])).toThrow(
       /aal_level.*(pack|space "pack")/i,
     );
+  });
+});
+
+describe('pack-owned enum subtraction from a serialized+hydrated described contract', () => {
+  const FACTOR_TYPE: PostgresNativeEnumIntrospection = {
+    typeName: 'factor_type',
+    values: ['totp', 'webauthn'],
+  };
+
+  // The pack owns `aal_level` in `auth`. It is built in-memory then round-tripped
+  // through serialize→JSON→hydrate, so the contract handed to `infer` carries the
+  // native_enum entity only because D1 made it serialize into contract.json.
+  const hydratedPack = throughSerializedForm(
+    describedContractWithNativeEnum({
+      namespaceId: 'auth',
+      handleName: 'AalLevel',
+      typeName: 'aal_level',
+      members: ['aal1', 'aal2', 'aal3'],
+      tables: ['sessions'],
+    }),
+  );
+
+  it('the hydrated contract exposes the native_enum entity as a PostgresNativeEnum (subtraction precondition)', () => {
+    const authNs = hydratedPack.contract.storage.namespaces['auth'] as PostgresSchema;
+    const entity = authNs.entries.native_enum?.['AalLevel'];
+    expect(entity).toBeInstanceOf(PostgresNativeEnum);
+    expect(entity?.typeName).toBe('aal_level');
+  });
+
+  it('subtracts the pack-owned type while emitting a non-pack-owned enum in the same run', () => {
+    const dbTree = tree({
+      auth: namespaceNode(
+        'auth',
+        {
+          mfa_factors: table('mfa_factors', {
+            id: idColumn,
+            factor: { name: 'factor', nativeType: 'factor_type', nullable: true },
+          }),
+        },
+        [AAL_LEVEL, FACTOR_TYPE],
+      ),
+    });
+
+    const output = inferAndPrint(dbTree, [hydratedPack]);
+
+    // Pack owns aal_level → omitted.
+    expect(output).not.toContain('native_enum AalLevel {');
+    expect(output).not.toContain('@@map("aal_level")');
+
+    // factor_type is not pack-owned → emitted and used, proving selective
+    // subtraction rather than blanket enum suppression.
+    expect(output).toContain('native_enum FactorType {');
+    expect(output).toContain('@@map("factor_type")');
+    expect(output).toContain('pg.enum(FactorType)?');
+    expect(output).not.toContain('Unsupported(');
   });
 });
 
