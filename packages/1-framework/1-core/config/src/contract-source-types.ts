@@ -70,10 +70,8 @@ export interface TypeScriptContractSourceProvider extends ContractSourceProvider
 /**
  * Third-party or unspecified source formats. Absent (or unrecognized)
  * `sourceFormat` means format-aware tooling must leave the source untouched.
- *
- * The open `string` overlaps the literal members, so a bare
- * `sourceFormat === 'psl'` comparison never narrows the union — narrowing
- * flows only through capability guards owned by the authoring layer.
+ * Narrowing to a known format flows only through capability guards owned by
+ * the authoring layer.
  */
 export interface OpaqueContractSourceProvider extends ContractSourceProviderBase {
   readonly sourceFormat?: string;

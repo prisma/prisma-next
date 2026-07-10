@@ -600,8 +600,7 @@ describe('defineConfig', () => {
   });
 
   it('accepts the first-party psl and typescript provider shapes', () => {
-    // Mirrors the source shapes produced by prismaContract() (psl) and
-    // typescriptContract*() (typescript) so those fixtures stay valid.
+    // Config (core) cannot import the authoring packages, so their provider shapes are mirrored here.
     const pslConfig = createValidConfig({
       contract: {
         source: createSourceProvider({ sourceFormat: 'psl', inputs: ['./schema.prisma'] }),
