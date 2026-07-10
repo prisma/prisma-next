@@ -51,6 +51,11 @@ export type AdapterRow = Record<string, unknown>;
  */
 type CountSelector = ReturnType<AggregateBuilder<Contract, 'User'>['count']>;
 
+/** The slice of a nested include collection the adapter refines (row caps). */
+export interface AdapterIncludeRefinement {
+  take(count: number): AdapterIncludeRefinement;
+}
+
 /** The slice of the ORM aggregate builder the adapter uses for `count`. */
 export interface AdapterAggregateBuilder {
   count(): CountSelector;
@@ -59,7 +64,14 @@ export interface AdapterAggregateBuilder {
 export interface AdapterCollection {
   where(fn: (model: AdapterModelAccessor) => AnyExpression): AdapterCollection;
   orderBy(fn: (model: AdapterModelAccessor) => OrderByItem): AdapterCollection;
-  include(relation: string): AdapterCollection;
+  /**
+   * The refinement parameter is `unknown` on this structural surface: the
+   * ORM's real signature types it through deep generics no minimal
+   * structural type can name, and `unknown` (a supertype of any nested
+   * collection) keeps the ORM collection assignable. The adapter narrows
+   * it back to {@link AdapterIncludeRefinement} at its single call seam.
+   */
+  include(relation: string, refine?: (related: unknown) => unknown): AdapterCollection;
   take(count: number): AdapterCollection;
   skip(count: number): AdapterCollection;
   all(): PromiseLike<ReadonlyArray<AdapterRow>>;

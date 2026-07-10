@@ -31,6 +31,7 @@ import {
 import type { BetterAuthOptions } from 'better-auth/types';
 import type {
   AdapterCollection,
+  AdapterIncludeRefinement,
   AdapterRow,
   BetterAuthDb,
   BetterAuthDbCollections,
@@ -76,6 +77,19 @@ function widenRow<T>(row: AdapterRow): T {
     T,
     "CustomAdapter's T is caller-chosen and unverifiable; the row comes from the contract-typed collection for the resolved model"
   >(row);
+}
+
+/**
+ * Applies a row cap to a nested include collection. The structural
+ * `include` signature types the refinement parameter as `never` (see
+ * `AdapterCollection.include`); the nested collection's real surface
+ * carries `take()`, narrowed back here at the single call seam.
+ */
+function capIncludedRows(related: unknown, limit: number): unknown {
+  return blindCast<
+    AdapterIncludeRefinement,
+    "the ORM's include refinement receives the nested Collection, which exposes take(); the structural surface types it unknown for assignability with the deep-generic signature"
+  >(related).take(limit);
 }
 
 function asRecord(value: unknown, model: string): AdapterRow {
@@ -126,8 +140,11 @@ function buildCustomAdapter(db: BetterAuthDbCollections): CustomAdapter {
       return scoped;
     }
     let joined = scoped;
-    for (const relationName of resolveJoinRelations(model, spaceModel, join)) {
-      joined = joined.include(relationName);
+    for (const { relationName, limit } of resolveJoinRelations(model, spaceModel, join)) {
+      joined =
+        limit === undefined
+          ? joined.include(relationName)
+          : joined.include(relationName, (related) => capIncludedRows(related, limit));
     }
     return joined;
   };

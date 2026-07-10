@@ -18,6 +18,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import baselineOps from '../migrations/20260710T1458_create_auth_tables/ops.json' with {
   type: 'json',
 };
+import { resolveJoinRelations } from '../src/adapter/join';
 import type { Contract } from '../src/contract/contract.d';
 import contractJson from '../src/contract/contract.json' with { type: 'json' };
 import type { AdapterCollection, BetterAuthDb } from '../src/exports/adapter';
@@ -282,21 +283,40 @@ describe('join', () => {
     expect(collectionCalls['User'] ?? 0).toBe(0);
   });
 
-  it('a join target without a contract relation fails with a typed error', async () => {
-    await seedSessionWithUser();
+  it('reverse one-to-many joins run natively over the backrelation', async () => {
+    const user = await seedSessionWithUser();
+    collectionCalls = {};
 
-    const error = await joinAdapter
-      .findOne({
-        model: 'user',
-        where: [{ field: 'email', value: 'irrelevant@example.com' }],
-        join: { session: true },
-      })
-      .then(() => null)
-      .catch((caught: unknown) => caught);
+    const row = await joinAdapter.findOne<{
+      id: string;
+      session: Array<{ userId: string }>;
+    }>({
+      model: 'user',
+      where: [{ field: 'id', value: user.id }],
+      join: { session: true },
+    });
+
+    expect(Array.isArray(row?.session)).toBe(true);
+    expect(row?.session).toHaveLength(1);
+    expect(row?.session[0]?.userId).toBe(user.id);
+    expect(collectionCalls['Session'] ?? 0).toBe(0);
+  });
+
+  it('a join target without a contract relation fails with a typed error', () => {
+    const error = (() => {
+      try {
+        resolveJoinRelations('user', 'User', {
+          verification: { on: { from: 'id', to: 'identifier' }, relation: 'one-to-many' },
+        });
+        return null;
+      } catch (caught) {
+        return caught;
+      }
+    })();
 
     expect(error).toBeInstanceOf(PrismaNextAdapterError);
     expect((error as PrismaNextAdapterError).code).toBe('UNKNOWN_JOIN_RELATION');
     expect(String((error as Error).message)).toContain('user');
-    expect(String((error as Error).message)).toContain('session');
+    expect(String((error as Error).message)).toContain('verification');
   });
 });

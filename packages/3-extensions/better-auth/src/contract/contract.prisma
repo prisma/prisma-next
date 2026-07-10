@@ -15,6 +15,12 @@ model User {
   createdAt     DateTime
   updatedAt     DateTime
 
+  // Backrelations are named after BetterAuth's model names (singular) so the
+  // adapter's native join path lands joined rows under the keys BetterAuth
+  // expects (`join: { session: true }` → row.session).
+  session Session[]
+  account Account[]
+
   @@map("user")
 }
 
