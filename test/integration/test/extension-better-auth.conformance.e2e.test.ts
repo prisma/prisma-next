@@ -14,8 +14,8 @@
  * test runs verbatim, including the reverse-join (one-to-many) coverage.
  *
  * KNOWN-RED — gated behind BETTER_AUTH_CONFORMANCE=1 until three
- * surfaced findings are resolved (all outside this test's scope; see the
- * dispatch report / review log for the full evidence trail):
+ * surfaced findings are resolved (all outside this test's scope; tracked
+ * under TML-2995):
  *
  * 1. Harness cleanup deletes rows user-first and relies on BetterAuth's
  *    canonical `ON DELETE CASCADE` FK semantics; the space's FKs carry no
