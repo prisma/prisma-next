@@ -92,7 +92,11 @@ describe('renameRlsPolicy op', () => {
       }).policyPresent(),
     );
     expect(op.precheck[0]?.params).toEqual(['p1']);
-    expect(op.precheck[0]?.sql).not.toContain(OLD_NAME);
+    // The op-level test can only pin that the right check AST (carrying the
+    // name) is lowered; the recording lowerer stubs the SQL, so asserting the
+    // name is absent from `op.precheck[0].sql` here would be vacuous. The real
+    // param-binding safety is rendered through the actual adapter lowerer in
+    // adapter-postgres `verification-checks-lowering.test.ts`.
   });
 
   it('lowers a parameterized new-name-present postcheck', async () => {
