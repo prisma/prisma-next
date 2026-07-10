@@ -48,6 +48,7 @@ function table(name: string, columns: Record<string, SqlColumnIRInput>) {
     uniques: [],
     indexes: [],
     policies: [],
+    rlsEnabled: false,
   });
 }
 
