@@ -907,9 +907,12 @@ function collectModelAttributeEntries(
         Readonly<Record<string, unknown>>,
         'walker descends into modelAttribute namespace'
       >(value);
-      const hasKind = record['kind'] === 'modelAttribute';
+      // `kind === 'modelAttribute'` is unreachable here: it would have made
+      // `isAuthoringModelAttributeDescriptor` true and taken the leaf branch
+      // above. A descriptor-shaped-but-kindless value (attribute + spec) is
+      // the only malformed case a sub-namespace walk can hit.
       const hasAttribute = typeof record['attribute'] === 'string';
-      if (hasKind || (hasAttribute && 'spec' in record)) {
+      if (hasAttribute && 'spec' in record) {
         throw new Error(
           `Malformed authoring modelAttribute contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/attribute) but does not satisfy the modelAttribute descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
         );
