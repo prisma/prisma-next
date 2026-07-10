@@ -31,7 +31,7 @@
     "@prisma-next/ts-render": "workspace:0.14.0",
     "@prisma-next/utils": "workspace:0.14.0",
     "@standard-schema/spec": "^1.1.0",
-    "arktype": "^2.2.0",
+    "arktype": "^2.2.2",
     "pathe": "^2.0.3"
   },
   "devDependencies": {
