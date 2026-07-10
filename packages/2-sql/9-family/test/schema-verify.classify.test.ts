@@ -74,6 +74,34 @@ describe('classifySqlDiffIssue keys on subject granularity', () => {
       'declaredIncompatible',
     );
   });
+
+  it('a target isValueDriftNode predicate routes a paired mismatch to valueDrift (target value-set kinds)', () => {
+    const isValueDrift = (nodeKind: string) => nodeKind === table.nodeKind;
+    expect(
+      classifySqlDiffIssue(issueOf('not-equal', table), fixedGranularity('entity'), isValueDrift),
+    ).toBe('valueDrift');
+    expect(
+      classifySqlDiffIssue(issueOf('not-equal', column), fixedGranularity('field'), isValueDrift),
+    ).toBe('declaredIncompatible');
+  });
+
+  it('the predicate only affects paired mismatches — not-found and not-expected keep their categories', () => {
+    const alwaysValueDrift = () => true;
+    expect(
+      classifySqlDiffIssue(
+        issueOf('not-found', table),
+        fixedGranularity('entity'),
+        alwaysValueDrift,
+      ),
+    ).toBe('declaredMissing');
+    expect(
+      classifySqlDiffIssue(
+        issueOf('not-expected', table),
+        fixedGranularity('entity'),
+        alwaysValueDrift,
+      ),
+    ).toBe('extraTopLevelObject');
+  });
 });
 
 describe('strict gating keys on subject granularity', () => {

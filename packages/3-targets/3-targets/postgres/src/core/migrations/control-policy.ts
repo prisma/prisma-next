@@ -7,6 +7,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { isPostgresSchema } from '../postgres-schema';
 import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
+import type { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
 import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
@@ -230,6 +231,31 @@ export function resolvePostgresNodeIssueControlPolicySubject(
     >(node);
     return {
       namespaceId: resolveNamespaceIdForDdlSchema(contract, namespaceNode.schemaName),
+      createsNewObject: issue.reason === 'not-found',
+    };
+  }
+
+  if (node.nodeKind === PostgresSchemaNodeKind.nativeEnum) {
+    const enumNode = blindCast<
+      PostgresNativeEnumSchemaNode,
+      'a postgres-native-enum diff node is always a PostgresNativeEnumSchemaNode'
+    >(node);
+    // The entity's grade rides on the expected-side node (entries.native_enum
+    // is keyed by handle name while the node only knows the Postgres type
+    // name, so `entityAt` cannot address the entity). A `not-expected` enum
+    // has no expected node and no contract entity — the grade falls back to
+    // the contract default, like an undeclared live table.
+    const expectedControl =
+      issue.expected !== undefined
+        ? blindCast<
+            PostgresNativeEnumSchemaNode,
+            'the expected side of a postgres-native-enum issue is the projected enum node'
+          >(issue.expected).control
+        : undefined;
+    return {
+      namespaceId: resolveNamespaceIdForDdlSchema(contract, issue.path[1] ?? enumNode.namespaceId),
+      ...ifDefined('explicitNodeControlPolicy', expectedControl),
+      typeName: enumNode.typeName,
       createsNewObject: issue.reason === 'not-found',
     };
   }

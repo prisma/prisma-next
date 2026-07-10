@@ -26,6 +26,10 @@ export {
   type PostgresNativeEnumIntrospection,
 } from '../core/schema-ir/postgres-namespace-schema-node';
 export {
+  PostgresNativeEnumSchemaNode,
+  type PostgresNativeEnumSchemaNodeInput,
+} from '../core/schema-ir/postgres-native-enum-schema-node';
+export {
   PostgresPolicySchemaNode,
   type PostgresPolicySchemaNodeInput,
 } from '../core/schema-ir/postgres-policy-schema-node';

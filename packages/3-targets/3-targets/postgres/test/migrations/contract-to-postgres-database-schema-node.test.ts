@@ -340,3 +340,82 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespac
     expect(expectedFk?.id).toBe(introspectedFk.id);
   });
 });
+
+describe('contractToPostgresDatabaseSchemaNode — native_enum projection', () => {
+  function contractWithEnum(): PostgresContract {
+    const schema = new PostgresSchema({
+      id: 'auth',
+      entries: {
+        table: { [TABLE_NAME]: profilesTable() },
+        native_enum: {
+          AalLevel: {
+            kind: 'postgres-enum',
+            typeName: 'aal_level',
+            members: ['aal1', 'aal2', 'aal3'],
+            control: 'external',
+          },
+          FactorType: {
+            kind: 'postgres-enum',
+            typeName: 'factor_type',
+            members: ['totp', 'webauthn'],
+          },
+        },
+      },
+    });
+    return {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:native-enum-projection-test'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:native-enum-projection-test'),
+        namespaces: { auth: schema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+  }
+
+  it('projects entries.native_enum into namespace-node enum children (all grades)', () => {
+    const root = contractToPostgresDatabaseSchemaNode(contractWithEnum(), projectionOptions);
+    const ns = root.namespaces['auth'];
+    const enumChildren = ns!.children().filter((child) => child.id.startsWith('native_enum:'));
+    expect(enumChildren).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          typeName: 'aal_level',
+          namespaceId: 'auth',
+          members: ['aal1', 'aal2', 'aal3'],
+          control: 'external',
+        }),
+        expect.objectContaining({
+          typeName: 'factor_type',
+          members: ['totp', 'webauthn'],
+        }),
+      ]),
+    );
+    expect(enumChildren).toHaveLength(2);
+  });
+
+  it('populates the namespace plain-data fields from the same entities (infer annotations stay coherent)', () => {
+    const root = contractToPostgresDatabaseSchemaNode(contractWithEnum(), projectionOptions);
+    const ns = root.namespaces['auth'];
+    expect(ns?.nativeEnumTypeNames.slice().sort()).toEqual(['aal_level', 'factor_type']);
+    expect(ns?.nativeEnums).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ typeName: 'aal_level', values: ['aal1', 'aal2', 'aal3'] }),
+        expect.objectContaining({ typeName: 'factor_type', values: ['totp', 'webauthn'] }),
+      ]),
+    );
+  });
+
+  it('an enum-free contract projects no enum children and empty plain fields (regression pin)', () => {
+    const root = contractToPostgresDatabaseSchemaNode(makeContract({}), projectionOptions);
+    const ns = root.namespaces[SCHEMA_NAME];
+    expect(ns?.nativeEnumTypeNames).toEqual([]);
+    expect(ns?.nativeEnums).toEqual([]);
+    expect(ns?.children().every((child) => !child.id.startsWith('native_enum:'))).toBe(true);
+  });
+});

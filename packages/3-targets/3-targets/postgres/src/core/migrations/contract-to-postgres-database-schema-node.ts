@@ -140,10 +140,20 @@ export function contractToPostgresDatabaseSchemaNode(
       }
     }
 
+    // Project every native enum entity regardless of grade — suppression is
+    // the disposition layer's job, exactly like tables/roles. Skipping
+    // external enums here would break extra-in-DB pairing.
+    const nativeEnums = Object.values(ns.entries.native_enum ?? {}).map((entity) => ({
+      typeName: entity.typeName,
+      values: entity.members,
+      ...ifDefined('control', entity.control),
+    }));
+
     namespaces[ddlSchema] = new PostgresNamespaceSchemaNode({
       schemaName: ddlSchema,
       tables,
-      nativeEnumTypeNames: [],
+      nativeEnumTypeNames: nativeEnums.map((entry) => entry.typeName),
+      nativeEnums,
     });
 
     for (const role of Object.values(ns.role)) {

@@ -24,6 +24,7 @@ import { PostgresDatabaseSchemaNode } from '../core/schema-ir/postgres-database-
 import {
   postgresDiffSubjectEntityKind,
   postgresDiffSubjectGranularity,
+  postgresValueDriftNodeKind,
 } from '../core/schema-ir/schema-node-kinds';
 
 export function postgresRenderDefault(def: ColumnDefault, column: StorageColumn): string {
@@ -47,6 +48,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     },
     classifySubjectGranularity: postgresDiffSubjectGranularity,
     classifyEntityKind: postgresDiffSubjectEntityKind,
+    classifyValueDrift: postgresValueDriftNodeKind,
     migrations: {
       createPlanner(adapter: SqlControlAdapter<'postgres'>) {
         return createPostgresMigrationPlanner(adapter);

@@ -29,6 +29,7 @@ export const PostgresSchemaNodeKind = {
   table: 'postgres-table',
   policy: 'postgres-policy',
   role: 'postgres-role',
+  nativeEnum: 'postgres-native-enum',
 } as const;
 
 export type PostgresSchemaNodeKind =
@@ -47,6 +48,7 @@ const POSTGRES_NODE_GRANULARITY: Readonly<Record<PostgresSchemaNodeKind, DiffSub
     [PostgresSchemaNodeKind.table]: 'entity',
     [PostgresSchemaNodeKind.policy]: 'structural',
     [PostgresSchemaNodeKind.role]: 'structural',
+    [PostgresSchemaNodeKind.nativeEnum]: 'entity',
   };
 
 function isPostgresSchemaNodeKind(nodeKind: string): nodeKind is PostgresSchemaNodeKind {
@@ -103,4 +105,16 @@ export function postgresDiffSubjectEntityKind(nodeKind: string): string | undefi
   return isPostgresSchemaNodeKind(nodeKind)
     ? postgresNodeEntityKind(nodeKind)
     : relationalNodeEntityKind(nodeKind);
+}
+
+/**
+ * Whether a paired `not-equal` diff issue on this Postgres node kind
+ * describes value-set drift (the `valueDrift` verifier category) rather than
+ * declared-shape incompatibility. A native enum's only pairable divergence
+ * is its ordered member values — the same semantics the check-constraint
+ * value-set carries at the relational layer — so `external` suppresses the
+ * drift while `managed` fails it.
+ */
+export function postgresValueDriftNodeKind(nodeKind: string): boolean {
+  return nodeKind === PostgresSchemaNodeKind.nativeEnum;
 }

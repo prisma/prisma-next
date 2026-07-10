@@ -96,10 +96,18 @@ export function classifyDiffEntityKind(
  * `declaredIncompatible`; anything the database lacks is `declaredMissing`.
  * `granularityOf` is the target's classifier, so target and extension node
  * kinds classify without the family importing them.
+ *
+ * `isValueDriftNode` is the target's value-set classifier for PAIRED
+ * mismatches: a target node kind whose only pairable divergence is a value
+ * set (e.g. a native enum type's ordered members) classifies `not-equal` as
+ * `valueDrift` instead of `declaredIncompatible` — the same routing the
+ * family gives its own check-constraint kind. It never affects `not-found` /
+ * `not-expected` classification.
  */
 export function classifySqlDiffIssue(
   issue: SchemaDiffIssue,
   granularityOf: (nodeKind: string) => DiffSubjectGranularity,
+  isValueDriftNode?: (nodeKind: string) => boolean,
 ): VerifierIssueCategory {
   if (issue.reason === 'not-found') {
     return 'declaredMissing';
@@ -114,7 +122,11 @@ export function classifySqlDiffIssue(
     }
     return 'extraAuxiliary';
   }
-  if (issueNode(issue)?.nodeKind === RelationalSchemaNodeKind.check) {
+  const nodeKind = issueNode(issue)?.nodeKind;
+  if (
+    nodeKind !== undefined &&
+    (nodeKind === RelationalSchemaNodeKind.check || isValueDriftNode?.(nodeKind) === true)
+  ) {
     return 'valueDrift';
   }
   return 'declaredIncompatible';
@@ -153,6 +165,8 @@ export interface SqlDiffVerdictInput {
   readonly defaultControlPolicy: ControlPolicy | undefined;
   /** The target's classifier: a diff issue node's `nodeKind` → its subject granularity. */
   readonly granularityOf: (nodeKind: string) => DiffSubjectGranularity;
+  /** The target's value-set classifier: node kinds whose paired mismatch is `valueDrift`. */
+  readonly isValueDriftNode?: (nodeKind: string) => boolean;
 }
 
 export interface SqlDiffVerdict {
@@ -182,7 +196,7 @@ export function computeSqlDiffVerdict(input: SqlDiffVerdictInput): SqlDiffVerdic
     const policy = effectiveControlPolicy(tablePolicy, input.defaultControlPolicy);
     const disposition: VerifierOutcome = dispositionForCategory(
       policy,
-      classifySqlDiffIssue(issue, input.granularityOf),
+      classifySqlDiffIssue(issue, input.granularityOf, input.isValueDriftNode),
     );
     if (disposition === 'suppress') continue;
     if (disposition === 'warn') {
@@ -262,6 +276,8 @@ export interface VerifySqlSchemaByDiffInput {
   readonly diffSchema: SqlSchemaDiffFn;
   /** The target's classifier: a diff issue node's `nodeKind` → its subject granularity. */
   readonly granularityOf: (nodeKind: string) => DiffSubjectGranularity;
+  /** The target's value-set classifier: node kinds whose paired mismatch is `valueDrift`. */
+  readonly isValueDriftNode?: (nodeKind: string) => boolean;
 }
 
 /**
@@ -286,6 +302,7 @@ export function verifySqlSchemaByDiff(
     strict: input.strict,
     defaultControlPolicy: input.contract.defaultControlPolicy,
     granularityOf: input.granularityOf,
+    ...ifDefined('isValueDriftNode', input.isValueDriftNode),
   });
   const storageTypeVerdict = computeStorageTypeVerdict({
     contract: input.contract,

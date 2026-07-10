@@ -93,6 +93,16 @@ export interface SqlControlTargetDescriptor<
    * family entity kind.
    */
   readonly classifyEntityKind: (nodeKind: string) => string | undefined;
+  /**
+   * Classifies a diff-tree node's `nodeKind` as a value-set kind: a paired
+   * `not-equal` on such a node grades as `valueDrift` (suppressed under
+   * `external`) instead of `declaredIncompatible` — e.g. a Postgres native
+   * enum type, whose only pairable divergence is its ordered members.
+   * Optional sibling of the two classifiers above; targets without
+   * value-set node kinds of their own omit it (the family's own
+   * check-constraint kind is always classified).
+   */
+  readonly classifyValueDrift?: (nodeKind: string) => boolean;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

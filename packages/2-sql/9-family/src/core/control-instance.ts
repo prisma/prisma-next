@@ -588,6 +588,12 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     { readonly classifyEntityKind?: (nodeKind: string) => string | undefined },
     'reading the target-descriptor classifyEntityKind hook'
   >(target).classifyEntityKind;
+  // The target's value-set node-kind classifier (paired mismatch grades as
+  // valueDrift) — optional third sibling, read the same lazy way.
+  const targetValueDriftOf = blindCast<
+    { readonly classifyValueDrift?: (nodeKind: string) => boolean },
+    'reading the optional target-descriptor classifyValueDrift hook'
+  >(target).classifyValueDrift;
   // `contract infer` needs each extension pack's already-assembled contract,
   // carried as-is (no merging — that is the contract-spaces machinery's
   // concern), paired with the `spaceId` its descriptor was registered under
@@ -778,6 +784,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         frameworkComponents: options.frameworkComponents,
         diffSchema,
         granularityOf: targetGranularityOf,
+        ...ifDefined('isValueDriftNode', targetValueDriftOf),
       });
     },
 
