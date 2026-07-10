@@ -3331,6 +3331,9 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:0.14.0
         version: link:../../2-sql/1-core/contract
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:0.14.0
+        version: link:../../2-sql/2-authoring/contract-ts
       '@prisma-next/target-postgres':
         specifier: workspace:0.14.0
         version: link:../../3-targets/3-targets/postgres

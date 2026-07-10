@@ -22,6 +22,7 @@
     "@prisma-next/framework-components": "workspace:0.14.0",
     "@prisma-next/migration-tools": "workspace:0.14.0",
     "@prisma-next/sql-contract": "workspace:0.14.0",
+    "@prisma-next/sql-contract-ts": "workspace:0.14.0",
     "@prisma-next/target-postgres": "workspace:0.14.0"
   },
   "devDependencies": {
