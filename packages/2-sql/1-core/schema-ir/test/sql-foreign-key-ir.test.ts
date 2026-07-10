@@ -86,19 +86,19 @@ describe('SqlForeignKeyIR', () => {
         columns: ['user_id'],
         referencedTable: 'users',
         referencedColumns: ['id'],
-        referencedSchema: '__unbound__',
+        referencedSchema: 'app_ns',
         resolvedReferencedNamespace: 'public',
       });
-      expect(fk.referencedSchema).toBe('__unbound__');
+      expect(fk.referencedSchema).toBe('app_ns');
       expect(fk.id).toBe('foreign-key:user_id->public.users(id)');
     });
 
-    it('an unbound-namespace expected FK pairs with an introspected public FK by id', () => {
+    it('an expected FK with a resolved namespace pairs with an introspected public FK by id', () => {
       const expected = new SqlForeignKeyIR({
         columns: ['user_id'],
         referencedTable: 'users',
         referencedColumns: ['id'],
-        referencedSchema: '__unbound__',
+        referencedSchema: 'app_ns',
         resolvedReferencedNamespace: 'public',
       });
       const actual = new SqlForeignKeyIR({

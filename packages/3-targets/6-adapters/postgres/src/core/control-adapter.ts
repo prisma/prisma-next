@@ -44,16 +44,19 @@ import type {
   AddColumnAction,
   AlterTableActionVisitor,
   DropDefaultAction,
+  PostgresAlterPolicyRename,
   PostgresAlterTable,
   PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
   PostgresDdlNode,
+  PostgresDisableRowLevelSecurity,
   PostgresDropPolicy,
   RlsPolicyOperation,
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
+import { parseRlsPolicyWireName } from '@prisma-next/target-postgres/rls-canonicalize';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
   PostgresDatabaseSchemaNode,
@@ -1123,16 +1126,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const nativeEnumResult = await driver.query<{ typname: string }>(
-      `SELECT t.typname
+    const nativeEnumResult = await driver.query<{ typname: string; enumvalues: unknown }>(
+      `SELECT t.typname, array_agg(e.enumlabel ORDER BY e.enumsortorder) AS enumvalues
          FROM pg_catalog.pg_type t
          JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+         JOIN pg_catalog.pg_enum e ON e.enumtypid = t.oid
          WHERE t.typtype = 'e'
            AND n.nspname = $1
+         GROUP BY t.typname
          ORDER BY t.typname`,
       [schema],
     );
-    const nativeEnumTypeNames = nativeEnumResult.rows.map((r) => r.typname);
+    const nativeEnums = nativeEnumResult.rows.map((r) => ({
+      typeName: r.typname,
+      values: parsePgNameArray(r.enumvalues),
+    }));
+    const nativeEnumTypeNames = nativeEnums.map((e) => e.typeName);
     const policiesResult = await driver.query<{
       schemaname: string;
       tablename: string;
@@ -1156,8 +1165,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase())),
       ].sort();
       const permissive = row.permissive.toUpperCase() === 'PERMISSIVE';
-      const hashSuffixMatch = /^(.+)_([0-9a-f]{8})$/.exec(row.policyname);
-      const prefix = hashSuffixMatch?.[1] ?? row.policyname;
+      const prefix = parseRlsPolicyWireName(row.policyname)?.prefix ?? row.policyname;
       const policy = new PostgresPolicySchemaNode({
         name: row.policyname,
         prefix,
@@ -1174,11 +1182,42 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       policiesByTable.set(row.tablename, list);
     }
 
+    // RLS enablement is a table attribute (`pg_class.relrowsecurity`), not a
+    // function of the policy set — a table can have RLS on with zero
+    // policies (deny-all) or policies present with RLS off. relkind covers
+    // both plain ('r') and partitioned ('p') tables: the table listing above
+    // (`information_schema.tables`, BASE TABLE) includes partitioned parents,
+    // and Postgres supports RLS on them.
+    //
+    // Kept as a SEPARATE query from the table listing on purpose. Folding
+    // relrowsecurity into the listing would mean replacing
+    // `information_schema.tables` (which filters by the connection role's
+    // grants) with a raw `pg_class` scan (which does not), changing WHICH
+    // tables the introspection returns — a real behavior shift, not a
+    // cleanup, and one the offline golden-diff can't catch (introspection is
+    // live-only). The only cost of two queries is the concurrent-DDL window:
+    // a table listed but missed by this scan defaults (`?? false`) to
+    // RLS-off. That default is fail-safe — the worst case downstream is a
+    // spurious ENABLE (idempotent), never a spurious DISABLE.
+    const rlsEnabledResult = await driver.query<{ tablename: string; rls_enabled: boolean }>(
+      `SELECT c.relname AS tablename, c.relrowsecurity AS rls_enabled
+         FROM pg_catalog.pg_class c
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = $1
+           AND c.relkind IN ('r', 'p')
+         ORDER BY c.relname`,
+      [schema],
+    );
+    const rlsEnabledByTable = new Map<string, boolean>(
+      rlsEnabledResult.rows.map((row) => [row.tablename, row.rls_enabled]),
+    );
+
     const tables: Record<string, PostgresTableSchemaNode> = {};
     for (const [tableName, input] of Object.entries(tableInputs)) {
       tables[tableName] = new PostgresTableSchemaNode({
         ...input,
         policies: policiesByTable.get(tableName) ?? [],
+        rlsEnabled: rlsEnabledByTable.get(tableName) ?? false,
       });
     }
 
@@ -1186,6 +1225,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       schemaName: schema,
       tables,
       nativeEnumTypeNames,
+      nativeEnums,
     });
     return { namespace, pgVersion: await this.getPostgresVersion(driver) };
   }
@@ -1209,10 +1249,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
  * `name[]` (OID 1003). When the parser is absent the raw Postgres text-array
  * literal (`{role1,role2}`) is returned as a string instead of a JS array.
  * This function accepts either form and returns a plain string array.
+ *
+ * The string branch honors Postgres array-literal quoting: an element
+ * containing a comma, quote, backslash, brace, or significant whitespace is
+ * emitted double-quoted with `\"` / `\\` escapes, and unquoted elements are
+ * whitespace-trimmed — so a label like `in progress` or `say "hi"` parses to
+ * its true value instead of being split or kept escaped.
  */
-function parsePgNameArray(value: unknown): string[] {
+export function parsePgNameArray(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value as string[];
+    return value.map(String);
   }
   if (typeof value !== 'string') {
     return [];
@@ -1225,7 +1271,55 @@ function parsePgNameArray(value: unknown): string[] {
   if (inner === '') {
     return [];
   }
-  return inner.split(',').map((s) => s.trim());
+
+  const elements: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let wasQuoted = false;
+  const pushCurrent = () => {
+    elements.push(wasQuoted ? current : current.trim());
+    current = '';
+    wasQuoted = false;
+  };
+  let i = 0;
+  while (i < inner.length) {
+    const char = inner.charAt(i);
+    if (inQuotes) {
+      if (char === '\\') {
+        current += inner[i + 1] ?? '';
+        i += 2;
+        continue;
+      }
+      if (char === '"') {
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      current += char;
+      i++;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = true;
+      wasQuoted = true;
+      i++;
+      continue;
+    }
+    if (char === ',') {
+      pushCurrent();
+      i++;
+      continue;
+    }
+    current += char;
+    i++;
+  }
+  // A still-open quote means the literal was malformed (e.g. `{"unterminated}`);
+  // reject rather than emit the partial value.
+  if (inQuotes) {
+    return [];
+  }
+  pushCurrent();
+  return elements;
 }
 
 /**
@@ -1718,6 +1812,22 @@ function pgRenderDropPolicy(node: PostgresDropPolicy): SqlExecuteRequest {
   };
 }
 
+function pgRenderAlterPolicyRename(node: PostgresAlterPolicyRename): SqlExecuteRequest {
+  const tableRef = `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`;
+  return {
+    sql: `ALTER POLICY ${quoteIdentifier(node.name)} ON ${tableRef} RENAME TO ${quoteIdentifier(node.newName)}`,
+    params: [],
+  };
+}
+
+function pgRenderDisableRowLevelSecurity(node: PostgresDisableRowLevelSecurity): SqlExecuteRequest {
+  const tableRef = `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`;
+  return {
+    sql: `ALTER TABLE ${tableRef} DISABLE ROW LEVEL SECURITY`,
+    params: [],
+  };
+}
+
 async function pgRenderDdlExecuteRequest(
   ast: PostgresDdlNode,
   codecLookup: CodecLookup,
@@ -1728,6 +1838,10 @@ async function pgRenderDdlExecuteRequest(
     alterTable: (node: PostgresAlterTable) => pgRenderAlterTable(node, codecLookup),
     createPolicy: (node: PostgresCreatePolicy) => Promise.resolve(pgRenderCreatePolicy(node)),
     dropPolicy: (node: PostgresDropPolicy) => Promise.resolve(pgRenderDropPolicy(node)),
+    alterPolicyRename: (node: PostgresAlterPolicyRename) =>
+      Promise.resolve(pgRenderAlterPolicyRename(node)),
+    disableRowLevelSecurity: (node: PostgresDisableRowLevelSecurity) =>
+      Promise.resolve(pgRenderDisableRowLevelSecurity(node)),
   };
   return ast.accept(visitor);
 }

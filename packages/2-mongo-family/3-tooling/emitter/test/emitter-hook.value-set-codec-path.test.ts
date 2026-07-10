@@ -1,4 +1,4 @@
-import type { Contract, ContractModelBase } from '@prisma-next/contract/types';
+import { type Contract, type ContractModelBase, coreHash } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -46,7 +46,7 @@ const itemModel: ContractModelBase = {
 function contractWithEncodedValueSet(): Contract {
   const base = createMongoContract({ models: { Item: itemModel } });
   const storage = {
-    storageHash: 'sha256:test',
+    storageHash: coreHash('sha256:test'),
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,

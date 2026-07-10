@@ -251,11 +251,23 @@ function convertIndex(index: Index): SqlIndexIRInput {
   };
 }
 
-function convertForeignKey(fk: ForeignKey): SqlForeignKeyIRInput {
+/**
+ * The FK's referenced-namespace identity comes from the target's namespace
+ * node, not the raw namespace-id string. An unbound target namespace stamps
+ * no `referencedSchema` at all — the FK node's id renders the absence as the
+ * empty segment, which is what flat (single-schema) introspection produces,
+ * so both diff sides' FK ids meet by construction. A bound namespace (or a
+ * cross-space target whose namespace lives in another contract's storage)
+ * stamps its coordinate verbatim; namespaced targets (Postgres) resolve the
+ * real DDL schema downstream.
+ */
+function convertForeignKey(fk: ForeignKey, storage: SqlStorage): SqlForeignKeyIRInput {
+  const targetNamespace = storage.namespaces[fk.target.namespaceId];
+  const targetIsUnbound = targetNamespace?.isUnbound === true;
   return {
     columns: fk.source.columns,
     referencedTable: fk.target.tableName,
-    referencedSchema: fk.target.namespaceId,
+    ...(targetIsUnbound ? {} : { referencedSchema: fk.target.namespaceId }),
     referencedColumns: fk.target.columns,
     ...ifDefined('name', fk.name),
     ...ifDefined('onDelete', fk.onDelete),
@@ -309,7 +321,9 @@ function convertTable(
     name,
     columns,
     ...ifDefined('primaryKey', table.primaryKey),
-    foreignKeys: table.foreignKeys.filter((fk) => fk.constraint !== false).map(convertForeignKey),
+    foreignKeys: table.foreignKeys
+      .filter((fk) => fk.constraint !== false)
+      .map((fk) => convertForeignKey(fk, storage)),
     uniques: table.uniques.map(convertUnique),
     indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
     ...ifDefined('checks', checks),

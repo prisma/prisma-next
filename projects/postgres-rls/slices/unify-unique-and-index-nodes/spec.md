@@ -1,38 +1,43 @@
 # Slice 2.6: unify-unique-and-index-nodes
 
-A unique constraint **is** a unique index. Model it as one schema-IR node kind — `SqlIndexIR` with `unique: true` — so the differ pairs uniques and indexes natively and the semantic-satisfaction normalization (`diff-tree-normalization.ts`) is deleted. Structural cleanup between slice 2.5 (`one-differ-two-ir-planner`) and slice 3 (`explicit-rls-control`); no user-visible change.
+Delete the semantic-satisfaction **reconciliation pass** (`diff-tree-normalization.ts`) that transforms the schema-IR trees before the differ runs. Keep `SqlUniqueIR` and `SqlIndexIR` as the two distinct structural nodes they are — a unique constraint and an index are different SQL schema elements — and let the generic differ compare the trees structurally with no massaging. Between slice 2.5 (`one-differ-two-ir-planner`) and slice 3 (`explicit-rls-control`).
+
+Full design: [`design.md`](./design.md). It is the authority for every detail; this spec states the decision and the acceptance bar.
 
 ## The problem (what 2.5 left behind, accepted under protest)
 
-The relational schema IR has **two node kinds for the same thing**:
+`diff-tree-normalization.ts`'s `resolveSemanticSatisfaction` **transforms the actual schema-IR tree before the differ walks it** — reclassifying a live unique index as a unique-constraint node, synthesizing index nodes, dropping live unique indexes so they never count as extras. Its only purpose is to implement "semantic satisfaction": a stronger live object (a unique index) silently counting as a declared weaker one (a unique constraint), and vice-versa.
 
-- `SqlIndexIR` — `{ columns, unique: boolean, name?, type?, options? }`, `nodeKind: 'sql-index'`.
-- `SqlUniqueIR` — `{ columns, name? }`, `nodeKind: 'sql-unique'`.
-
-`SqlUniqueIR` is a strict subset of `SqlIndexIR` (an index with `unique: true` and no `type`/`options`) given its own node kind. Because the differ pairs strictly by `nodeKind` + id, a unique modeled as `SqlUniqueIR` on one side of the diff can never pair with a unique index modeled as `SqlIndexIR` on the other — even though they are the same object. `diff-tree-normalization.ts`'s `resolveSemanticSatisfaction` exists **only** to reconcile those two representations after the fact (reclassify an actual unique index as a unique node; synthesize an index node for a unique constraint's backing index; never count live unique indexes as extras). The ambiguity is self-inflicted by the two-kind split.
-
-This is the same failure mode the PR #921 review surfaced repeatedly — a bespoke construct standing in for what a single well-modeled primitive already expresses. `SqlIndexIR.unique` already exists; the second node kind and its reconciliation pass should not.
+That pre-diff transformation is the debt. The differ is supposed to compare two derived trees and nothing else; a pass that massages a tree to make the verdict come out "satisfied" is exactly the anti-pattern the one-differ architecture exists to remove. The two node kinds are **not** the problem — a unique constraint (`pg_constraint`) and an index (`pg_index`) are genuinely different schema elements, modeled as separate nodes just like primary keys, foreign keys, and check constraints already are.
 
 ## Decision
 
-1. **Delete `SqlUniqueIR`.** A unique constraint is a `SqlIndexIR` with `unique: true`.
-2. **Both sides produce the one kind.** Contract→IR **derivation** emits `SqlIndexIR { unique: true }` for a contract unique constraint (today it emits `SqlUniqueIR`); **introspection** emits `SqlIndexIR { unique: true }` for a live unique index / unique constraint. So the expected schema-IR node and the actual schema-IR node are the same kind and pair natively. (The differ is unchanged — it still compares two schema-IR nodes by kind + own attributes; nothing about contract-vs-schema comparison changes, because that was never happening.)
-3. **Delete `diff-tree-normalization.ts`'s unique/index reconciliation.** With both sides one kind, `isEqualTo` compares `columns` + `type` + `options` like any other index; the cross-kind rules evaporate. The FK schema-segment neutralization in that file is a resolve-at-derivation concern — fold it into derivation (or keep it only if genuinely needed) and remove the file.
-4. **The constraint-vs-index distinction is a property, not a kind.** A named unique *constraint* drops via `DROP CONSTRAINT` (and cannot be partial/expression); a bare unique *index* drops via `DROP INDEX`. Capture that on the index node (a name / "is a named constraint" marker) and branch the op-builder on it — this is the only real difference between the two and it belongs on the op, not in a second node kind.
+**One schema-IR node per schema element; the differ does pure structural comparison with no tree transformation.** (Design §"The one principle".)
+
+1. **Delete the reconciliation pass.** Remove `resolveSemanticSatisfaction` / `normalizeFlatActualForDiff` and their call sites; both diff paths run `diffSchemas(expected, actual)` on the trees as derived. Delete the caller-less `isUniqueConstraintSatisfied` / `isIndexSatisfied`.
+2. **Keep the two nodes.** `SqlUniqueIR` (unique constraint) and `SqlIndexIR` (index, with `unique: boolean`) stay as separate structural nodes. `SqlIndexIR.isEqualTo` becomes purely symmetric (drop the `(!this.unique || node.unique)` satisfaction rule). No `constraint` marker, no merging.
+3. **No collision-avoidance machinery.** Because the two nodes have distinct id namespaces (`unique:` vs `index:`), there is no id collision — so **no introspection dedupe and no fail-loud derivation rule**. A live unique constraint and a separate same-column index coexist as their own nodes.
+4. **Fold the FK schema-segment normalization into derivation** (target-agnostic option on `contractToSchemaIR`), so no pre-diff normalization pass survives at all.
 
 ## Behaviour contract
 
-- **Verdicts and planner ops byte-identical** in every mode (strict/lenient, single/multi-space, SQL/SQLite). This slice preserves the exact behaviour 2.5's `resolveSemanticSatisfaction` port produced — it just achieves it by modeling instead of reconciliation. Proven by the same means (the verdict-parity suite, the planner/adapter op→SQL suites, the `migration plan` e2e journeys, the four multi-space guards, a golden diff of real `plan()` output) — **not** `fixtures:check`, which is emission-only.
-- The `sql-unique` node kind and `diff-tree-normalization.ts` are gone (grep-clean).
+**This is a deliberate behaviour change, not byte-neutral.** Deleting satisfaction makes a unique-vs-index mismatch structural drift (Design §"Behaviour"):
+
+- contract `@@unique` vs live unique **index** → fails (constraint missing + index extra).
+- contract `@@index` vs live unique **constraint** → fails.
+- stray live undeclared unique index → ordinary extra (strict-fails / lenient-passes).
+- contract `@@unique` vs live unique **constraint** (the round-trip) → clean.
+
+Scope is fenced to the unique/index satisfaction rules; the general strict/lenient extra-tolerance, control-policy disposition, and cross-space ownership are untouched. Proven by the verdict suite, the planner/adapter op→SQL suites, the `migration plan` e2e journeys, and the four multi-space guards — **not** `fixtures:check` (emission-only).
 
 ## Non-goals
 
-- No new drift behaviour. This is a pure remodel of an existing capability; it must not change what drift is detected or how it grades.
-- The FK schema-spelling normalization only moves to derivation if that is byte-neutral; otherwise it stays until a follow-on addresses it.
+- No merging of unique and index into one node, no `constraint` marker, no satisfaction/classification special-cases, no introspection dedupe, no fail-loud derivation rule. (Design §"Explicitly NOT in this slice".)
+- No change to the general extra-tolerance / control-policy grading or cross-space ownership.
 
 ## Acceptance criteria
 
-- **AC-1** `SqlUniqueIR` and the `sql-unique` node kind are deleted; unique enforcement is `SqlIndexIR { unique: true }` on both derivation and introspection (grep-clean for `SqlUniqueIR`).
-- **AC-2** `diff-tree-normalization.ts`'s unique/index reconciliation is deleted; the file is removed (or reduced to nothing that special-cases unique-vs-index).
-- **AC-3** The constraint-vs-index DDL distinction is preserved as a property on the index node + op-builder branch — `DROP CONSTRAINT` vs `DROP INDEX` unchanged, pinned by exact-SQL tests.
-- **AC-4** Verdict + op parity re-proven (verdict-parity suite, op→SQL suites, guards, golden diff); full slice gate green.
+- **AC-1** `resolveSemanticSatisfaction` / `normalizeFlatActualForDiff` / the `SemanticSatisfaction*` types / the caller-less satisfaction predicates are deleted; `diff-tree-normalization.ts` is gone (grep-clean). Both diff paths run the differ on the trees as derived.
+- **AC-2** `SqlUniqueIR` and `SqlIndexIR` remain two distinct nodes; `SqlIndexIR.isEqualTo` is symmetric; no `constraint` marker, no dedupe, no fail-loud rule anywhere (grep-clean for `isSuperfluousConstraintOnlyNotEqual`, `isBareUniqueIndexExtra`, any `constraint` marker on the index node).
+- **AC-3** FK schema-segment normalization is folded into derivation; no pre-diff normalization pass survives (`neutralizeFlatExpectedFkSchemas` is not called before the differ).
+- **AC-4** The structural behaviour above is pinned by rewritten verdict + planner op→SQL tests (`DROP CONSTRAINT`/`DROP INDEX`/`ADD CONSTRAINT UNIQUE`/`CREATE INDEX` per element, the four mismatch cases); the general extra-tolerance grading is provably unchanged (`schema-verify.ts` diff shows only the satisfaction deletions); full slice gate green.

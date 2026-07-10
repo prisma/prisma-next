@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractModelBase, ContractRelation } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
@@ -65,6 +65,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
+          fields: {},
           storage: {
             namespaceId: '__unbound__',
             table: 'user',
@@ -99,6 +100,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
+          fields: {},
           storage: { namespaceId: '__unbound__', table: 'nonexistent', fields: {} },
           relations: {},
         },
@@ -124,6 +126,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
+          fields: {},
           storage: {
             namespaceId: '__unbound__',
             table: 'user',
@@ -188,10 +191,7 @@ describe('sql-target-family-hook', () => {
   it('validates structure with model missing storage.table', () => {
     const ir = createContract({
       models: {
-        User: {
-          fields: {},
-          relations: {},
-        },
+        User: { fields: {}, relations: {} } as ContractModelBase,
       },
       storage: {
         tables: {
@@ -214,6 +214,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
+          fields: {},
           storage: { namespaceId: '__unbound__', table: 'nonexistent', fields: {} },
           relations: {},
         },
@@ -239,6 +240,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
+          fields: {},
           storage: {
             namespaceId: '__unbound__',
             table: 'user',
@@ -270,6 +272,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
+          fields: {},
           storage: {
             namespaceId: '__unbound__',
             table: 'user',
@@ -302,6 +305,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
+          fields: {},
           storage: { namespaceId: '__unbound__', table: 'user' },
           relations: {},
         },
@@ -578,6 +582,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
+          fields: {},
           storage: {
             namespaceId: '__unbound__',
             table: 'user',
@@ -585,7 +590,7 @@ describe('sql-target-family-hook', () => {
               id: { column: 'id' },
             },
           },
-          relations: undefined as unknown,
+          relations: undefined as unknown as Record<string, ContractRelation>,
         },
       },
       storage: {
@@ -612,6 +617,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
+          fields: {},
           storage: {
             namespaceId: '__unbound__',
             table: 'user',
@@ -619,7 +625,7 @@ describe('sql-target-family-hook', () => {
               id: { column: 'id' },
             },
           },
-          relations: 'invalid' as unknown,
+          relations: 'invalid' as unknown as Record<string, ContractRelation>,
         },
       },
       storage: {
@@ -712,6 +718,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
+          fields: {},
           storage: {
             namespaceId: '__unbound__',
             table: 'user',
@@ -901,6 +908,7 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       models: {
         User: {
+          fields: {},
           storage: {
             namespaceId: '__unbound__',
             table: 'user',
@@ -912,6 +920,7 @@ describe('sql-target-family-hook', () => {
           relations: {},
         },
         Post: {
+          fields: {},
           storage: {
             namespaceId: '__unbound__',
             table: 'post',

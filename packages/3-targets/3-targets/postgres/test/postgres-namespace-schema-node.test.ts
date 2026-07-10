@@ -23,6 +23,7 @@ const tableA = new PostgresTableSchemaNode({
   uniques: [],
   indexes: [],
   policies: [policy],
+  rlsEnabled: false,
 });
 
 const tableB = new PostgresTableSchemaNode({
@@ -32,6 +33,7 @@ const tableB = new PostgresTableSchemaNode({
   uniques: [],
   indexes: [],
   policies: [],
+  rlsEnabled: false,
 });
 
 const baseInput = {
@@ -105,6 +107,42 @@ describe('PostgresNamespaceSchemaNode', () => {
   it('instance is frozen', () => {
     const node = new PostgresNamespaceSchemaNode(baseInput);
     expect(Object.isFrozen(node)).toBe(true);
+  });
+
+  it('carries nativeEnums with typeName and ordered values', () => {
+    const node = new PostgresNamespaceSchemaNode({
+      ...baseInput,
+      nativeEnums: [{ typeName: 'status_enum', values: ['draft', 'review', 'done'] }],
+    });
+    expect(node.nativeEnums).toEqual([
+      { typeName: 'status_enum', values: ['draft', 'review', 'done'] },
+    ]);
+  });
+
+  it('nativeEnums defaults to empty when omitted', () => {
+    const node = new PostgresNamespaceSchemaNode(baseInput);
+    expect(node.nativeEnums).toEqual([]);
+  });
+
+  it('nativeEnums entries are frozen', () => {
+    const node = new PostgresNamespaceSchemaNode({
+      ...baseInput,
+      nativeEnums: [{ typeName: 'status_enum', values: ['draft', 'review'] }],
+    });
+    expect(Object.isFrozen(node.nativeEnums)).toBe(true);
+    expect(Object.isFrozen(node.nativeEnums[0])).toBe(true);
+    expect(Object.isFrozen(node.nativeEnums[0]?.values)).toBe(true);
+  });
+
+  it('nativeEnumTypeNames stays independently settable from nativeEnums', () => {
+    const node = new PostgresNamespaceSchemaNode({
+      schemaName: 'public',
+      tables: {},
+      nativeEnumTypeNames: ['status_enum'],
+      nativeEnums: [{ typeName: 'status_enum', values: ['draft', 'review'] }],
+    });
+    expect(node.nativeEnumTypeNames).toEqual(['status_enum']);
+    expect(node.nativeEnums).toEqual([{ typeName: 'status_enum', values: ['draft', 'review'] }]);
   });
 
   describe('PostgresNamespaceSchemaNode.is', () => {

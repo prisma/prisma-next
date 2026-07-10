@@ -85,18 +85,20 @@ export function contractToPostgresDatabaseSchemaNode(
     for (const tableName of Object.keys(ns.table)) {
       const sqlTable = sqlTables[tableName];
       if (sqlTable === undefined) continue;
-      // The family conversion stamps `referencedSchema` with the FK target's
-      // namespace id verbatim, which can be the unbound sentinel. Resolve it
-      // to the real live DDL schema here — introspected FKs already carry the
-      // live schema, so this is what lets an expected FK pair (by diff-node
-      // id) with its introspected counterpart.
+      // The family conversion stamps `referencedSchema` only for bound FK
+      // targets; an absent value means the FK targets the unbound namespace.
+      // Postgres restores its own coordinate for that slot (the unbound
+      // singleton's id) so the raw coordinate keeps qualifying REFERENCES
+      // clauses, and resolves the real live DDL schema — introspected FKs
+      // already carry the live schema, so this is what lets an expected FK
+      // pair (by diff-node id) with its introspected counterpart.
       const foreignKeys = sqlTable.foreignKeys.map(
         (fk) =>
           new SqlForeignKeyIR({
             columns: fk.columns,
             referencedTable: fk.referencedTable,
             referencedColumns: fk.referencedColumns,
-            ...ifDefined('referencedSchema', fk.referencedSchema),
+            referencedSchema: fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
             ...ifDefined('name', fk.name),
             ...ifDefined('onDelete', fk.onDelete),
             ...ifDefined('onUpdate', fk.onUpdate),
@@ -117,6 +119,9 @@ export function contractToPostgresDatabaseSchemaNode(
         ...ifDefined('annotations', sqlTable.annotations),
         ...ifDefined('checks', sqlTable.checks),
         policies: policiesByTable.get(tableName) ?? [],
+        // Marker-driven, never derived from the policy set: the `rls` entry
+        // is the single authored source of enablement.
+        rlsEnabled: Object.hasOwn(ns.rls, tableName),
       });
     }
 
@@ -125,6 +130,12 @@ export function contractToPostgresDatabaseSchemaNode(
         const policyName = tablePolicies[0]?.name ?? '(unknown)';
         throw new Error(
           `contract-to-postgres-database-schema-node: policy "${policyName}" references table "${tableName}" not present in namespace "${ddlSchema}"`,
+        );
+      }
+      if (!Object.hasOwn(ns.rls, tableName)) {
+        const policyPrefix = tablePolicies[0]?.prefix ?? '(unknown)';
+        throw new Error(
+          `contract-to-postgres-database-schema-node: policy "${policyPrefix}" targets table "${tableName}" in namespace "${ddlSchema}", which is not RLS-controlled. Mark the model with @@rls (entries.rls["${tableName}"]) or remove the policy.`,
         );
       }
     }

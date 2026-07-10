@@ -37,6 +37,8 @@ namespace public {
   model profile {
     id       Int @id
     owner_id Int
+
+    @@rls
   }
 
   policy_select p_read {

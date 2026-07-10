@@ -84,7 +84,7 @@ describe('inferPostgresPslContract', () => {
     expect(userField?.attributes.some((a) => a.name === 'relation')).toBe(true);
   });
 
-  it('throws an actionable diagnostic when the schema contains native Postgres enum types', () => {
+  it('adopts native Postgres enum types instead of throwing (adoption specifics live in infer-psl-contract.enum-adoption.test.ts)', () => {
     const schemaIR = ir({
       tables: {
         user: {
@@ -101,39 +101,15 @@ describe('inferPostgresPslContract', () => {
       },
       annotations: {
         pg: {
-          nativeEnumTypeNames: ['role_t'],
+          nativeEnums: [{ typeName: 'role_t', values: ['admin', 'user'] }],
         },
       },
     });
 
-    expect(() => sqlSchemaIrToPslAst(schemaIR)).toThrow(
-      /contract infer:.*native Postgres enum type.*role_t.*not adoptable/i,
-    );
-  });
-
-  it('throws naming all native enum types when multiple are present', () => {
-    const schemaIR = ir({
-      tables: {
-        applications: {
-          name: 'applications',
-          columns: {
-            id: { name: 'id', nativeType: 'int4', nullable: false },
-            status: { name: 'status', nativeType: 'application_kind', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          foreignKeys: [],
-          uniques: [],
-          indexes: [],
-        },
-      },
-      annotations: {
-        pg: {
-          nativeEnumTypeNames: ['application_kind'],
-        },
-      },
-    });
-
-    expect(() => sqlSchemaIrToPslAst(schemaIR)).toThrow('application_kind');
+    const ast = sqlSchemaIrToPslAst(schemaIR);
+    const model = flatPslModels(ast).find((m) => m.name === 'User');
+    const roleField = model?.fields.find((f) => f.name === 'role');
+    expect(roleField?.typeConstructor).toMatchObject({ path: ['pg', 'enum'] });
   });
 
   it('produces a @default(now()) attribute for raw now() defaults', () => {
@@ -283,6 +259,7 @@ describe('inferPostgresPslContract', () => {
             uniques: [],
             indexes: [],
             policies: [],
+            rlsEnabled: false,
           }),
         },
         nativeEnumTypeNames: [],

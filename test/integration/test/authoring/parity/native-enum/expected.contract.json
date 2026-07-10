@@ -97,6 +97,13 @@
     "namespaces": {
       "auth": {
         "entries": {
+          "native_enum": {
+            "AalLevel": {
+              "kind": "postgres-enum",
+              "members": ["aal1", "aal2", "aal3"],
+              "typeName": "aal_level"
+            }
+          },
           "table": {
             "session": {
               "columns": {
@@ -143,6 +150,13 @@
       },
       "public": {
         "entries": {
+          "native_enum": {
+            "Role": {
+              "kind": "postgres-enum",
+              "members": ["user", "admin"],
+              "typeName": "Role"
+            }
+          },
           "table": {
             "account": {
               "columns": {
@@ -188,7 +202,7 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:7f73f4e11dd5abf9ae63d84a5fa6851a27ad3e37bcd655635b40ccc05d766281"
+    "storageHash": "sha256:bbb95b300d7176cf35a7af2d76cb089cc7a6fe17a148867e8958912048e57640"
   },
   "capabilities": {
     "postgres": {

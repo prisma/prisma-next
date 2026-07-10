@@ -1,13 +1,15 @@
 import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
+import { type ContractModel, type ContractRelation, crossRef } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createContract } from '@prisma-next/test-utils';
+import { blindCast } from '@prisma-next/utils/casts';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { composeSqlEntityKinds } from '../src/entity-kinds';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
 import { CheckConstraint } from '../src/ir/check-constraint';
 import { StorageTable } from '../src/ir/storage-table';
-import type { ReferentialAction, SqlStorage } from '../src/types';
+import type { ReferentialAction, SqlModelFieldStorage, SqlStorage } from '../src/types';
 import {
   createSqlStorageSchema,
   StorageValueSetSchema,
@@ -18,15 +20,32 @@ import {
   validateStorageSemantics,
 } from '../src/validators';
 
-function unboundTables(tables: Record<string, unknown>) {
+function unboundTables<T extends Record<string, unknown>>(tables: T) {
   return {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
+        kind: 'test-sql-namespace',
         entries: { table: tables },
       },
     },
   };
+}
+
+// `model()` (src/factories.ts) declares its return `relations` as the loose
+// `Record<string, unknown>` — the runtime value always matches the caller's
+// literal relations argument, so this wrapper re-asserts the precise type
+// for call sites that need `ContractModel`.
+function contractModel(
+  tableName: string,
+  fields: Record<string, SqlModelFieldStorage>,
+  relations: Record<string, ContractRelation> = {},
+  namespaceId?: string,
+): ContractModel {
+  return blindCast<
+    ContractModel,
+    'model() widens `relations` to Record<string, unknown>; the argument here already matches ContractRelation'
+  >(model(tableName, fields, relations, namespaceId));
 }
 
 describe('SQL contract validators', () => {
@@ -262,7 +281,7 @@ describe('SQL contract validators', () => {
       const c = createContract<SqlStorage>({
         storage: unboundTables({ user: userTable }),
         models: {
-          User: model('user', {
+          User: contractModel('user', {
             id: { column: 'id' },
             email: { column: 'email' },
           }),
@@ -291,18 +310,18 @@ describe('SQL contract validators', () => {
           }),
         }),
         models: {
-          User: model(
+          User: contractModel(
             'user',
             { id: { column: 'id' } },
             {
               tags: {
-                to: { model: 'Tag', namespace: UNBOUND_NAMESPACE_ID },
+                to: crossRef('Tag', UNBOUND_NAMESPACE_ID),
                 cardinality: 'N:M',
                 ...relationOverrides,
               },
             },
           ),
-          Tag: model('tag', { id: { column: 'id' } }),
+          Tag: contractModel('tag', { id: { column: 'id' } }),
         },
       });
 
@@ -363,12 +382,12 @@ describe('SQL contract validators', () => {
           }),
         }),
         models: {
-          User: model(
+          User: contractModel(
             'user',
             { id: { column: 'id' } },
             {
               tags: {
-                to: { model: 'Tag', namespace: UNBOUND_NAMESPACE_ID },
+                to: crossRef('Tag', UNBOUND_NAMESPACE_ID),
                 cardinality: 'N:M',
                 on: { localFields: ['id'], targetFields: ['user_id'] },
                 through: {
@@ -381,7 +400,7 @@ describe('SQL contract validators', () => {
               },
             },
           ),
-          Tag: model('tag', { id: { column: 'id' } }),
+          Tag: contractModel('tag', { id: { column: 'id' } }),
         },
       });
       expect(() => validateSqlContractFully(c)).toThrow(/differing storage type/);
@@ -400,12 +419,12 @@ describe('SQL contract validators', () => {
           }),
         }),
         models: {
-          User: model(
+          User: contractModel(
             'user',
             { id: { column: 'id' } },
             {
               tags: {
-                to: { model: 'Tag', namespace: UNBOUND_NAMESPACE_ID, space: 'other' },
+                to: crossRef('Tag', UNBOUND_NAMESPACE_ID, 'other'),
                 cardinality: 'N:M',
                 on: { localFields: ['id'], targetFields: ['user_id'] },
                 through: {
@@ -436,12 +455,12 @@ describe('SQL contract validators', () => {
           }),
         }),
         models: {
-          Account: model(
+          Account: contractModel(
             'account',
             { tenantId: { column: 'tenant_id' } },
             {
               tags: {
-                to: { model: 'Tag', namespace: UNBOUND_NAMESPACE_ID },
+                to: crossRef('Tag', UNBOUND_NAMESPACE_ID),
                 cardinality: 'N:M',
                 on: { localFields: ['tenantId'], targetFields: ['acct_tenant'] },
                 through: {
@@ -454,7 +473,7 @@ describe('SQL contract validators', () => {
               },
             },
           ),
-          Tag: model('tag', { id: { column: 'id' } }),
+          Tag: contractModel('tag', { id: { column: 'id' } }),
         },
       });
       expect(() => validateSqlContractFully(c)).not.toThrow();
@@ -853,7 +872,6 @@ describe('SQL contract validators', () => {
     it('resolves cross-namespace FK targets by namespaceId, not by bare table name', () => {
       const rawContract = createContract({
         storage: {
-          storageHash: 'sha256:cross-ns',
           namespaces: {
             auth: {
               id: 'auth',
@@ -926,7 +944,6 @@ describe('SQL contract validators', () => {
       // to auth.users — which has only column "id", not "user_uuid".
       const rawContract = createContract({
         storage: {
-          storageHash: 'sha256:cross-ns-mismatch',
           namespaces: {
             auth: {
               id: 'auth',
@@ -1451,7 +1468,7 @@ describe('SQL contract validators', () => {
     it('rejects unknown top-level properties', () => {
       const c = createContract<SqlStorage>({
         storage: unboundTables({ users: table({ id: col('int4', 'pg/int4@1') }) }),
-        models: { User: model('users', { id: { column: 'id' } }) },
+        models: { User: contractModel('users', { id: { column: 'id' } }) },
       });
       const withUnknown = { ...c, bogusField: 'unexpected' };
       expect(() => validateSqlContractFully(withUnknown)).toThrow();
@@ -1460,7 +1477,7 @@ describe('SQL contract validators', () => {
     it('accepts valid contracts without unknown properties', () => {
       const c = createContract<SqlStorage>({
         storage: unboundTables({ users: table({ id: col('int4', 'pg/int4@1') }) }),
-        models: { User: model('users', { id: { column: 'id' } }) },
+        models: { User: contractModel('users', { id: { column: 'id' } }) },
       });
       expect(() => validateSqlContractFully(c)).not.toThrow();
     });

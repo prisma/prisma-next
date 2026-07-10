@@ -5,6 +5,7 @@ import { SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { contractToPostgresDatabaseSchemaNode } from '../../src/core/migrations/contract-to-postgres-database-schema-node';
+import { PostgresRlsEnablement } from '../../src/core/postgres-rls-enablement';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresRole } from '../../src/core/postgres-role';
 import { type PostgresContract, PostgresSchema } from '../../src/core/postgres-schema';
@@ -45,6 +46,7 @@ const profilesTable = () =>
 function makeContract(options: {
   readonly policies?: readonly PostgresRlsPolicy[];
   readonly roles?: readonly PostgresRole[];
+  readonly rlsMarkedTables?: readonly string[];
 }): PostgresContract {
   const policyEntries: Record<string, PostgresRlsPolicy> = {};
   for (const p of options.policies ?? []) {
@@ -54,12 +56,20 @@ function makeContract(options: {
   for (const r of options.roles ?? []) {
     roleEntries[r.name] = r;
   }
+  const rlsEntries: Record<string, PostgresRlsEnablement> = {};
+  for (const tableName of options.rlsMarkedTables ?? []) {
+    rlsEntries[tableName] = new PostgresRlsEnablement({
+      tableName,
+      namespaceId: SCHEMA_NAME,
+    });
+  }
   const schema = new PostgresSchema({
     id: SCHEMA_NAME,
     entries: {
       table: { [TABLE_NAME]: profilesTable() },
       policy: policyEntries,
       role: roleEntries,
+      rls: rlsEntries,
     },
   });
   return {
@@ -107,11 +117,50 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
   it('attaches a SELECT policy to its table within the namespace', () => {
     const policy = makePolicy('read_own_profiles_a1b2c3d4');
     const root = contractToPostgresDatabaseSchemaNode(
-      makeContract({ policies: [policy] }),
+      makeContract({ policies: [policy], rlsMarkedTables: [TABLE_NAME] }),
       projectionOptions,
     );
     const table = root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME];
     expect(table?.policies).toContainEqual(expect.objectContaining({ name: policy.name }));
+  });
+
+  it('throws at derivation time when a policy targets a table that carries no rls marker', () => {
+    const policy = makePolicy('read_own_profiles_a1b2c3d4');
+    expect(() =>
+      contractToPostgresDatabaseSchemaNode(makeContract({ policies: [policy] }), projectionOptions),
+    ).toThrow(/policy "read_own_profiles".*"profiles".*@@rls/s);
+  });
+
+  it('derivation-backstop error names the policy prefix, not the wire hash', () => {
+    const policy = makePolicy('read_own_profiles_a1b2c3d4');
+    expect(() =>
+      contractToPostgresDatabaseSchemaNode(makeContract({ policies: [policy] }), projectionOptions),
+    ).toThrow(
+      expect.objectContaining({
+        message: expect.not.stringContaining('a1b2c3d4'),
+      }),
+    );
+  });
+
+  it('does not throw for a marker on a table with zero policies', () => {
+    const root = contractToPostgresDatabaseSchemaNode(
+      makeContract({ rlsMarkedTables: [TABLE_NAME] }),
+      projectionOptions,
+    );
+    expect(PostgresDatabaseSchemaNode.is(root)).toBe(true);
+  });
+
+  it('stamps rlsEnabled true from marker presence, even with zero policies', () => {
+    const root = contractToPostgresDatabaseSchemaNode(
+      makeContract({ rlsMarkedTables: [TABLE_NAME] }),
+      projectionOptions,
+    );
+    expect(root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME]?.rlsEnabled).toBe(true);
+  });
+
+  it('stamps rlsEnabled false on a table without a marker', () => {
+    const root = contractToPostgresDatabaseSchemaNode(makeContract({}), projectionOptions);
+    expect(root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME]?.rlsEnabled).toBe(false);
   });
 
   it('carries owned DDL schema names in existingSchemas on the root', () => {

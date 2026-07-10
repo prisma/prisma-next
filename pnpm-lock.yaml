@@ -1616,6 +1616,9 @@ importers:
 
   packages/1-framework/2-authoring/psl-parser:
     dependencies:
+      '@prisma-next/config':
+        specifier: workspace:0.14.0
+        version: link:../../1-core/config
       '@prisma-next/framework-components':
         specifier: workspace:0.14.0
         version: link:../../1-core/framework-components
@@ -1648,6 +1651,9 @@ importers:
         specifier: workspace:0.14.0
         version: link:../../0-foundation/utils
     devDependencies:
+      '@prisma-next/contract':
+        specifier: workspace:0.14.0
+        version: link:../../0-foundation/contract
       '@prisma-next/psl-parser':
         specifier: workspace:0.14.0
         version: link:../psl-parser
@@ -1657,6 +1663,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:0.14.0
         version: link:../../../0-config/tsdown
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
       tsdown:
         specifier: 'catalog:'
         version: 0.22.1(tsx@4.22.4)(typescript@5.9.3)
@@ -4213,6 +4222,9 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/3-tooling/migration
+      '@prisma-next/psl-parser':
+        specifier: workspace:0.14.0
+        version: link:../../../1-framework/2-authoring/psl-parser
       '@prisma-next/sql-contract':
         specifier: workspace:0.14.0
         version: link:../../../2-sql/1-core/contract
@@ -4244,9 +4256,6 @@ importers:
         specifier: ^2.0.3
         version: 2.0.3
     devDependencies:
-      '@prisma-next/psl-parser':
-        specifier: workspace:0.14.0
-        version: link:../../../1-framework/2-authoring/psl-parser
       '@prisma-next/psl-printer':
         specifier: workspace:*
         version: link:../../../1-framework/2-authoring/psl-printer
@@ -4814,6 +4823,9 @@ importers:
       '@prisma-next/psl-parser':
         specifier: workspace:0.14.0
         version: link:../../packages/1-framework/2-authoring/psl-parser
+      '@prisma-next/psl-printer':
+        specifier: workspace:0.14.0
+        version: link:../../packages/1-framework/2-authoring/psl-printer
       '@prisma-next/sql-builder':
         specifier: workspace:0.14.0
         version: link:../../packages/2-sql/4-lanes/sql-builder

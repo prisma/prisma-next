@@ -17,6 +17,7 @@ const tableA = new PostgresTableSchemaNode({
   uniques: [],
   indexes: [],
   policies: [],
+  rlsEnabled: false,
 });
 
 const nsPublic = new PostgresNamespaceSchemaNode({

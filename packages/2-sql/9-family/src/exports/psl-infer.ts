@@ -18,6 +18,7 @@ export {
   deriveBackRelationFieldName,
   deriveRelationFieldName,
   pluralize,
+  toEnumMemberName,
   toEnumName,
   toFieldName,
   toModelName,

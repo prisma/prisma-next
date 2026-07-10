@@ -24,8 +24,10 @@ export interface SqlIndexIRInput {
  * Implements `DiffableNode` so an index is directly a table's diff-tree
  * child. Indexes are frequently unnamed, so `id` is derived from the column
  * tuple — the same tuple that makes two indexes the same index, so it
- * doubles as the pairing key. `isEqualTo` compares the remaining attributes:
- * `unique`, `type`, and `options`.
+ * doubles as the pairing key. `isEqualTo` is symmetric structural equality
+ * on the remaining attributes: `unique`, `type`, and `options`. A unique
+ * index and a non-unique index on the same columns are different objects
+ * and are not equal — there is no "stronger satisfies weaker".
  */
 export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.index;
@@ -61,10 +63,12 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   }
 
   /**
-   * Comparison with `this` as the expected side, matching the relational
-   * walk's index satisfaction: a unique actual index satisfies a non-unique
-   * expected index (stronger satisfies weaker), while an expected unique
-   * index requires a unique actual. Type and options compare as attributes.
+   * Symmetric structural equality: two paired index nodes are equal iff their
+   * `unique` flag, `type`, and (loosely-compared) `options` all match. There
+   * is no satisfaction — a unique index does not equal a non-unique index.
+   * `options` compares loosely (introspection stringifies reloptions); `type`
+   * compares strictly after the introspection-side btree→undefined
+   * normalization done at construction.
    */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
@@ -73,7 +77,7 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
     >(other);
     assertNode(node, 'SqlIndexIR', SqlIndexIR.is);
     return (
-      (!this.unique || node.unique) &&
+      this.unique === node.unique &&
       this.type === node.type &&
       indexOptionsLooselyEqual(this.options, node.options)
     );

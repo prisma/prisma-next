@@ -9,6 +9,7 @@ import {
   PostgresDatabaseSchemaNode,
   PostgresNamespaceSchemaNode,
   PostgresPolicySchemaNode,
+  PostgresRlsEnablement,
   PostgresRlsPolicy,
   PostgresSchema,
   PostgresTableSchemaNode,
@@ -82,6 +83,7 @@ function schemaWithPolicies(policies: PostgresRlsPolicy[]): PostgresDatabaseSche
             uniques: [],
             indexes: [],
             policies: policies.map(toPolicyNode),
+            rlsEnabled: false,
           }),
         },
         nativeEnumTypeNames: [],
@@ -110,6 +112,12 @@ function buildContract(policies: readonly PostgresRlsPolicy[]): Contract<SqlStor
         }),
       },
       policy: policyEntries,
+      rls: {
+        [TABLE_NAME]: new PostgresRlsEnablement({
+          tableName: TABLE_NAME,
+          namespaceId: SCHEMA_NAME,
+        }),
+      },
     },
   });
   return {

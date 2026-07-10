@@ -115,14 +115,14 @@ function contractToSchemaIR(
       new PostgresTableSchemaNode({
         name: t.name,
         columns: t.columns,
-        // The flat family `contractToSchemaIR` stamps `referencedSchema`
-        // verbatim (the raw contract namespace id) and never resolves
+        // The flat family `contractToSchemaIR` stamps `referencedSchema` only
+        // for bound FK targets (absent = unbound namespace) and never resolves
         // `resolvedReferencedNamespace` — that fixup is `contractToPostgresDatabaseSchemaNode`'s
         // own responsibility. The differ pairs FK nodes by id, which folds in
         // `resolvedReferencedNamespace`, so this test double must apply the same
-        // resolution the real Postgres tree-builder does, or an unresolved FK
-        // here never pairs with the differ's Postgres-tree-derived expected
-        // side and shows up as a spurious drop+recreate.
+        // restoration and resolution the real Postgres tree-builder does, or an
+        // unresolved FK here never pairs with the differ's Postgres-tree-derived
+        // expected side and shows up as a spurious drop+recreate.
         foreignKeys:
           contract === null
             ? t.foreignKeys
@@ -132,9 +132,7 @@ function contractToSchemaIR(
                     columns: fk.columns,
                     referencedTable: fk.referencedTable,
                     referencedColumns: fk.referencedColumns,
-                    ...(fk.referencedSchema !== undefined
-                      ? { referencedSchema: fk.referencedSchema }
-                      : {}),
+                    referencedSchema: fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
                     ...(fk.name !== undefined ? { name: fk.name } : {}),
                     ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
                     ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
@@ -149,6 +147,7 @@ function contractToSchemaIR(
         ...(t.primaryKey !== undefined ? { primaryKey: t.primaryKey } : {}),
         ...(t.annotations !== undefined ? { annotations: t.annotations } : {}),
         ...(t.checks !== undefined ? { checks: t.checks } : {}),
+        rlsEnabled: false,
       }),
     ]),
   );

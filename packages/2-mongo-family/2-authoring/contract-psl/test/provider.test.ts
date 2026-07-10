@@ -26,6 +26,7 @@ function createMongoTestContext(overrides?: Partial<ContractSourceContext>): Con
       type: mongoScalarAuthoringTypes,
       entityTypes: {},
       pslBlockDescriptors: {},
+      modelAttributes: {},
     },
     codecLookup: emptyCodecLookup,
     controlMutationDefaults: {

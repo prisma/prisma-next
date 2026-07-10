@@ -1,5 +1,9 @@
 export { PostgresNativeEnum, type PostgresNativeEnumInput } from '../core/postgres-native-enum';
 export {
+  PostgresRlsEnablement,
+  type PostgresRlsEnablementInput,
+} from '../core/postgres-rls-enablement';
+export {
   PostgresRlsPolicy,
   type PostgresRlsPolicyInput,
   type RlsPolicyOperation,
@@ -19,6 +23,7 @@ export {
 export {
   PostgresNamespaceSchemaNode,
   type PostgresNamespaceSchemaNodeInput,
+  type PostgresNativeEnumIntrospection,
 } from '../core/schema-ir/postgres-namespace-schema-node';
 export {
   PostgresPolicySchemaNode,

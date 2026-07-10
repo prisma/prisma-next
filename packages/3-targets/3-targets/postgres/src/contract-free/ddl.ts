@@ -3,10 +3,12 @@ import {
   AddColumnAction,
   type AnyAlterTableAction,
   DropDefaultAction,
+  PostgresAlterPolicyRename,
   PostgresAlterTable,
   PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
+  PostgresDisableRowLevelSecurity,
   PostgresDropPolicy,
   type RlsPolicyOperation,
 } from '../core/ddl/nodes';
@@ -105,4 +107,28 @@ export function dropPolicy(options: {
   readonly name: string;
 }): PostgresDropPolicy {
   return new PostgresDropPolicy(options);
+}
+
+/**
+ * Build a Postgres `ALTER POLICY … RENAME TO` DDL node.
+ * Identifiers (`schema`, `table`, `name`, `newName`) are quoted by the renderer.
+ */
+export function alterPolicyRename(options: {
+  readonly schema: string;
+  readonly table: string;
+  readonly name: string;
+  readonly newName: string;
+}): PostgresAlterPolicyRename {
+  return new PostgresAlterPolicyRename(options);
+}
+
+/**
+ * Build a Postgres `ALTER TABLE … DISABLE ROW LEVEL SECURITY` DDL node.
+ * Identifiers (`schema`, `table`) are quoted by the renderer.
+ */
+export function disableRowLevelSecurity(options: {
+  readonly schema: string;
+  readonly table: string;
+}): PostgresDisableRowLevelSecurity {
+  return new PostgresDisableRowLevelSecurity(options);
 }

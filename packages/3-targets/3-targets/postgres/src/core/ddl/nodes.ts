@@ -70,6 +70,8 @@ export interface PostgresDdlVisitor<R> {
   alterTable(node: PostgresAlterTable): R;
   createPolicy(node: PostgresCreatePolicy): R;
   dropPolicy(node: PostgresDropPolicy): R;
+  alterPolicyRename(node: PostgresAlterPolicyRename): R;
+  disableRowLevelSecurity(node: PostgresDisableRowLevelSecurity): R;
 }
 
 export abstract class PostgresDdlNode extends DdlNode {
@@ -214,9 +216,54 @@ export class PostgresDropPolicy extends PostgresDdlNode {
   }
 }
 
+export class PostgresAlterPolicyRename extends PostgresDdlNode {
+  readonly kind = 'alter-policy-rename' as const;
+  readonly schema: string;
+  readonly table: string;
+  readonly name: string;
+  readonly newName: string;
+
+  constructor(options: {
+    readonly schema: string;
+    readonly table: string;
+    readonly name: string;
+    readonly newName: string;
+  }) {
+    super();
+    this.schema = options.schema;
+    this.table = options.table;
+    this.name = options.name;
+    this.newName = options.newName;
+    this.freeze();
+  }
+
+  override accept<R>(visitor: PostgresDdlVisitor<R>): R {
+    return visitor.alterPolicyRename(this);
+  }
+}
+
+export class PostgresDisableRowLevelSecurity extends PostgresDdlNode {
+  readonly kind = 'disable-row-level-security' as const;
+  readonly schema: string;
+  readonly table: string;
+
+  constructor(options: { readonly schema: string; readonly table: string }) {
+    super();
+    this.schema = options.schema;
+    this.table = options.table;
+    this.freeze();
+  }
+
+  override accept<R>(visitor: PostgresDdlVisitor<R>): R {
+    return visitor.disableRowLevelSecurity(this);
+  }
+}
+
 export type AnyPostgresDdlNode =
   | PostgresCreateTable
   | PostgresCreateSchema
   | PostgresAlterTable
   | PostgresCreatePolicy
-  | PostgresDropPolicy;
+  | PostgresDropPolicy
+  | PostgresAlterPolicyRename
+  | PostgresDisableRowLevelSecurity;

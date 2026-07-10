@@ -1,7 +1,9 @@
+import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { coreHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
+import { PostgresNativeEnum } from '../src/core/postgres-native-enum';
 import {
   PostgresSchema,
   PostgresUnboundSchema,
@@ -255,5 +257,117 @@ describe('PostgresSchema — unknown entity kind', () => {
       entries: { table: {}, bogus: { item: {} } } as never,
     });
     expect(schema.entries['bogus']).toBeDefined();
+  });
+});
+
+describe('PostgresSchema — native_enum entries', () => {
+  const nativeEnumInput = {
+    AalLevel: {
+      kind: 'postgres-enum',
+      typeName: 'aal_level',
+      members: ['aal1', 'aal2', 'aal3'],
+      control: 'external',
+    },
+  };
+
+  it('constructs a PostgresNativeEnum instance from raw entries input', () => {
+    const schema = new PostgresSchema({
+      id: 'auth',
+      entries: { table: {}, native_enum: nativeEnumInput },
+    });
+    const nativeEnum = schema.entries.native_enum?.['AalLevel'];
+    expect(nativeEnum).toBeInstanceOf(PostgresNativeEnum);
+    expect(nativeEnum?.typeName).toBe('aal_level');
+    expect(nativeEnum?.members).toEqual(['aal1', 'aal2', 'aal3']);
+    expect(nativeEnum?.control).toBe('external');
+  });
+
+  it('native_enum is enumerable on entries', () => {
+    const schema = new PostgresSchema({
+      id: 'auth',
+      entries: { table: {}, native_enum: nativeEnumInput },
+    });
+    expect(Object.keys(schema.entries)).toContain('native_enum');
+  });
+
+  it('native_enum survives a JSON.stringify round-trip', () => {
+    const schema = new PostgresSchema({
+      id: 'auth',
+      entries: { table: {}, native_enum: nativeEnumInput },
+    });
+    const parsed = JSON.parse(JSON.stringify(schema)) as {
+      entries: Record<string, unknown>;
+    };
+    expect(parsed.entries['native_enum']).toEqual({
+      AalLevel: {
+        kind: 'postgres-enum',
+        typeName: 'aal_level',
+        members: ['aal1', 'aal2', 'aal3'],
+        control: 'external',
+      },
+    });
+  });
+
+  it('is absent from entries when no native_enum input is given', () => {
+    const schema = new PostgresSchema({ id: 'auth', entries: { table: {} } });
+    expect(schema.entries.native_enum).toBeUndefined();
+  });
+});
+
+describe('PostgresSchema — native_enum affects storageHash', () => {
+  function hashWithNativeEnum(members: readonly string[]): string {
+    return computeStorageHash({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storage: {
+        namespaces: {
+          auth: new PostgresSchema({
+            id: 'auth',
+            entries: {
+              table: {},
+              native_enum: {
+                AalLevel: { kind: 'postgres-enum', typeName: 'aal_level', members },
+              },
+            },
+          }),
+        },
+      },
+    });
+  }
+
+  it('changing native_enum members changes the computed storage hash', () => {
+    const twoMembers = hashWithNativeEnum(['aal1', 'aal2']);
+    const threeMembers = hashWithNativeEnum(['aal1', 'aal2', 'aal3']);
+    expect(twoMembers).not.toBe(threeMembers);
+  });
+
+  it('a native_enum-bearing namespace hashes differently than an otherwise-identical enum-free one', () => {
+    const withEnum = computeStorageHash({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storage: {
+        namespaces: {
+          auth: new PostgresSchema({
+            id: 'auth',
+            entries: {
+              table: {},
+              native_enum: {
+                AalLevel: { kind: 'postgres-enum', typeName: 'aal_level', members: ['aal1'] },
+              },
+            },
+          }),
+        },
+      },
+    });
+    const withoutEnum = computeStorageHash({
+      target: 'postgres',
+      targetFamily: 'sql',
+      storage: {
+        namespaces: {
+          auth: new PostgresSchema({ id: 'auth', entries: { table: {} } }),
+        },
+      },
+    });
+    expect(withEnum).not.toBe(withoutEnum);
   });
 });

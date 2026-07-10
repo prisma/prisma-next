@@ -42,6 +42,8 @@ namespace public {
     id         Int @id
     owner_id   Int
     deleted_at String?
+
+    @@rls
   }
 
   policy_select p_read {
@@ -58,6 +60,8 @@ namespace public {
     id         Int @id
     owner_id   Int
     deleted_at String?
+
+    @@rls
   }
 
   policy_select p_read {
@@ -75,6 +79,8 @@ namespace public {
     id         Int @id
     owner_id   Int
     deleted_at String?
+
+    @@rls
   }
 }
 `;

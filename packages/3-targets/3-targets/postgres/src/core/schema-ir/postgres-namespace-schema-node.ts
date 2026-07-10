@@ -4,10 +4,17 @@ import { assertNode, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { PostgresTableSchemaNode } from './postgres-table-schema-node';
 import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
+/** One introspected native Postgres enum type, in `pg_enum.enumsortorder` (declaration) order. */
+export interface PostgresNativeEnumIntrospection {
+  readonly typeName: string;
+  readonly values: readonly string[];
+}
+
 export interface PostgresNamespaceSchemaNodeInput {
   readonly schemaName: string;
   readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
   readonly nativeEnumTypeNames: readonly string[];
+  readonly nativeEnums?: readonly PostgresNativeEnumIntrospection[];
 }
 
 /**
@@ -22,6 +29,12 @@ export interface PostgresNamespaceSchemaNodeInput {
  * equal iff their ids (schema names) match. `children()` returns the table
  * nodes. Per-schema metadata is carried on the typed `nativeEnumTypeNames`
  * field, not an annotations bag.
+ *
+ * `nativeEnums` carries the same enum types with their ordered member
+ * values (`{ typeName, values }`), for consumers that need the values
+ * (PSL inference, the printer). `nativeEnumTypeNames` stays a plain name
+ * list read independently by existing consumers (codec `planTypeOperations`
+ * hooks, the infer throw) so none of them need the values to keep working.
  */
 export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.namespace;
@@ -29,12 +42,18 @@ export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements Diff
   readonly schemaName: string;
   readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
   readonly nativeEnumTypeNames: readonly string[];
+  readonly nativeEnums: readonly PostgresNativeEnumIntrospection[];
 
   constructor(input: PostgresNamespaceSchemaNodeInput) {
     super();
     this.schemaName = input.schemaName;
     this.tables = Object.freeze({ ...input.tables });
     this.nativeEnumTypeNames = Object.freeze([...input.nativeEnumTypeNames]);
+    this.nativeEnums = Object.freeze(
+      (input.nativeEnums ?? []).map((entry) =>
+        Object.freeze({ typeName: entry.typeName, values: Object.freeze([...entry.values]) }),
+      ),
+    );
     freezeNode(this);
   }
 

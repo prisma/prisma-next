@@ -170,6 +170,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);
@@ -201,6 +202,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);
@@ -233,6 +235,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);
@@ -253,6 +256,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
       orphan: new PostgresTableSchemaNode({
         name: 'orphan',
@@ -264,6 +268,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);
@@ -301,6 +306,71 @@ describe('mapNodeIssueToCall — synthesized namespace issue', () => {
     expect(result.value.map((c) => c.factoryName)).toEqual(['createSchema']);
     expect(result.value[0]).toMatchObject({ factoryName: 'createSchema', schemaName: 'auth' });
     expect(nodeIssueOrder(issue)).toBe(1);
+  });
+});
+
+describe('mapNodeIssueToCall — table rlsEnabled drift', () => {
+  const ctx = {
+    toContract: makeContract({ user: userTable }),
+    fromContract: null,
+    schemaName: 'public',
+    codecHooks: new Map(),
+    storageTypes: {},
+    schema: undefined as never,
+    policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] as const },
+    frameworkComponents: [],
+  };
+
+  function tableNode(rlsEnabled: boolean): PostgresTableSchemaNode {
+    return new PostgresTableSchemaNode({
+      name: 'user',
+      columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      policies: [],
+      rlsEnabled,
+    });
+  }
+
+  function notEqualIssue(
+    expected: PostgresTableSchemaNode,
+    actual: PostgresTableSchemaNode,
+  ): SchemaDiffIssue {
+    return {
+      path: ['database', 'public', 'user'],
+      reason: 'not-equal',
+      message: 'table user drifted',
+      expected,
+      actual,
+    };
+  }
+
+  it('maps expected-on / actual-off to enableRowLevelSecurity', () => {
+    const result = mapNodeIssueToCall(notEqualIssue(tableNode(true), tableNode(false)), ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.map((c) => c.factoryName)).toEqual(['enableRowLevelSecurity']);
+  });
+
+  it('maps expected-off / actual-on to disableRowLevelSecurity', () => {
+    const result = mapNodeIssueToCall(notEqualIssue(tableNode(false), tableNode(true)), ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.map((c) => c.factoryName)).toEqual(['disableRowLevelSecurity']);
+  });
+
+  it('fails loud on a table not-equal where rlsEnabled matches on both sides (a second attribute drifted)', () => {
+    // The differ pairs table nodes by name and `isEqualTo` compares name +
+    // rlsEnabled, so this state cannot arise today — the guard makes the
+    // "rlsEnabled is the only attribute" coupling explicit: a not-equal with
+    // no rlsEnabled delta means an unhandled second attribute drifted, and we
+    // fail rather than silently emit a bogus enable/disable.
+    const result = mapNodeIssueToCall(notEqualIssue(tableNode(true), tableNode(true)), ctx);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected notOk');
+    expect(result.failure.summary).toMatch(/unhandled table-attribute drift/i);
   });
 });
 

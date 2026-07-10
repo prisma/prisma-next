@@ -12,4 +12,8 @@ export type {
   ContractSourceDiagnostics,
   ContractSourceFormat,
   ContractSourceProvider,
+  ContractSourceProviderBase,
+  OpaqueContractSourceProvider,
+  PslContractSourceProvider,
+  TypeScriptContractSourceProvider,
 } from '../contract-source-types';

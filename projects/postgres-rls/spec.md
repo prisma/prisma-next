@@ -168,6 +168,7 @@ Inherits the team-DoD floor ([`drive/calibration/dod.md`](../../drive/calibratio
 - [ ] **Walking skeleton:** `examples/supabase` `Profile` gains `anon` SELECT + `authenticated` UPDATE-own policies; `bootstrapSupabaseShim` is extended with the Postgres roles + `auth.uid()`/`auth.jwt()`/`auth.role()` SQL functions reading session GUCs; a hermetic PGlite test proves RLS filters rows under a manual `SET ROLE`, and the verifier diffs clean. *(D3, D4, D5 end-to-end)*
 - [ ] `pnpm lint:deps` confirms no RLS reference in framework/SQL-family layers; SQLite + Mongo suites green. *(layering)*
 - [ ] The [content-addressed-naming ADR](specs/adr-content-addressed-policy-names.md) is promoted into `docs/architecture docs/adrs/`; the Postgres adapter subsystem doc gains an RLS section.
+- [ ] An ADR is written for the two authoring SPIs slice 3 introduced — `AuthoringContributions.modelAttributes` (target-contributed `@@` model attributes) and `AuthoringPslBlockDescriptor.requiresModelAttribute` (declarative "target model must carry attribute X"). Both are durable public framework surface with a single consumer today (`@@rls`); the ADR records the shape, the framework-declares/family-enforces/target-names split, and the deliberate one-pair expressiveness of `requiresModelAttribute`. *(raised in the PR #945 architect review; deferred to close-out per the ADRs-at-close-out convention.)*
 
 ## Alternatives considered
 

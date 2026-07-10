@@ -209,6 +209,88 @@ changes:
         - "verifyType:"
         - "verifyType("
       anyMatch: true
+  - id: policy-target-models-require-rls-attribute
+    summary: |
+      If your extension's contract space authors `policy_select` blocks (PSL), each block's
+      `target` model must now declare `@@rls`; `contract emit` / `build:contract-space` fails
+      with `PSL_EXTENSION_TARGET_MODEL_MISSING_ATTRIBUTE` otherwise. Add `@@rls` to the
+      policy-bearing models and re-emit; the contract gains an `rls` marker entity
+      (`entries.rls[tableName]`) and a new storage hash.
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "policy_select"
+      anyMatch: true
+  - id: postgres-table-schema-node-rls-enabled-required
+    summary: |
+      `PostgresTableSchemaNodeInput.rlsEnabled` (from `@prisma-next/target-postgres/types`) is
+      now a required boolean, and `isEqualTo` compares it alongside the table name. Every
+      `new PostgresTableSchemaNode({ ... })` construction in your extension (planner tests,
+      diff-tree fixtures, tooling) must supply it explicitly - `false` for a table that is not
+      RLS-controlled. The expected side derives the value from the contract's `entries.rls`
+      marker; the actual side from `pg_class.relrowsecurity` at introspection.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "new PostgresTableSchemaNode("
+      anyMatch: true
+  - id: authoring-contributions-model-attributes-slot
+    summary: |
+      `AuthoringContributions` gains a `modelAttributes` slot and the assembled control-stack
+      shape (`AssembledAuthoringContributions`) is now five fields - code that constructs the
+      assembled shape literally (e.g. a stubbed `ContractSourceContext.authoringContributions`
+      in tests) must add `modelAttributes: {}`. New SPI for pack authors: a target/extension
+      pack can contribute declarative `@@` model attributes via
+      `AuthoringContributions.modelAttributes` (an `AuthoringModelAttributeDescriptor` carries
+      the bare attribute name, an ADR-231 `modelAttribute()` spec, and a lowering that files an
+      entity into the namespace's `entries[attribute][key]`), and a PSL block descriptor can
+      declare `requiresModelAttribute: { parameter, attribute }` to demand that the model
+      named by a ref parameter carries a bare `@@` attribute.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "AssembledAuthoringContributions"
+        - "authoringContributions: {"
+      anyMatch: true
+  - id: native-enum-serialized-in-contract-json
+    summary: |
+      `native_enum` entities now serialize into an extension's emitted `contract.json` (previously they
+      were authoring-time-only — stripped on emit, leaving only the derived `valueSet`). If your
+      extension declares native Postgres enums — `native_enum` blocks in a `.prisma` contract, or
+      `pg.enum(...)` / `nativeEnum(...)` columns in the TypeScript DSL — re-emit your bundled contract
+      (`prisma-next contract emit`) and commit the result, so the `entries.native_enum` maps and the
+      recomputed `storageHash` land in your checked-in `contract.{json,d.ts}`. Re-emitting is what makes
+      your pack's enum type names visible in the published contract: a consumer running `contract infer`
+      with your pack in the stack subtracts your pack-owned enum types by matching those serialized type
+      names, so an un-re-emitted contract leaves the consumer re-declaring types your pack already owns.
+      The change is backward compatible (a pre-existing contract still hydrates), so re-emit at your
+      next release rather than urgently.
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "native_enum"
+        - "pg.enum("
+        - "nativeEnum("
+      anyMatch: true
+  - id: schema-ir-fk-unbound-referenced-schema-absent
+    summary: |
+      The family's `contractToSchemaIR` (from `@prisma-next/family-sql/control`) no longer stamps
+      `referencedSchema` on a derived `SqlForeignKeyIR` whose target is the unbound namespace — the
+      field is now absent for that case (it previously carried the `__unbound__` sentinel). Namespace
+      identity is answered by the namespace node's new `isUnbound` getter (on `NamespaceBase` /
+      `SqlNamespace`), never by comparing an id against the sentinel. If your extension rebuilds a
+      target schema-IR tree from a `contractToSchemaIR`-derived one and reconstructs each
+      `SqlForeignKeyIR` (as the Postgres target does in `contractToPostgresDatabaseSchemaNode`),
+      default the absent value back to the target's own coordinate for the unbound slot:
+      `referencedSchema: fk.referencedSchema ?? UNBOUND_NAMESPACE_ID`. Extensions that read
+      `referencedSchema` only for bound (named-schema) FK targets need no change — absence already
+      meant "unbound" downstream.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "SqlForeignKeyIR"
+        - "referencedSchema"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in

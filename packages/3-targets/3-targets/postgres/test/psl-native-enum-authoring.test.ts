@@ -144,6 +144,32 @@ namespace auth {
     expect(nativeEnum?.members).toEqual(['aal1', 'aal2', 'aal3']);
   });
 
+  it('unescapes a backslash-bearing @@map type name symmetrically with the printer escape', () => {
+    // The inferred-PSL printer escapes `\` → `\\` and `"` → `\"` in @@map
+    // arguments; lowering must invert both, or a round-tripped type name
+    // gains escape characters.
+    const source = `
+namespace auth {
+  native_enum Weird {
+    a = "a"
+    @@map("back\\\\slash \\"quoted\\"")
+  }
+
+  model AuthSession {
+    id Int @id
+  }
+}
+`;
+    const result = interpret(source);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const ns = result.value.storage.namespaces['auth'] as PostgresSchema;
+    const nativeEnum = ns.entries.native_enum?.['Weird'];
+    expect(nativeEnum?.typeName).toBe('back\\slash "quoted"');
+  });
+
   it('leaves control unset — the effective grade resolves from the contract-level defaultControlPolicy, not a per-node stamp', () => {
     const source = `
 namespace auth {

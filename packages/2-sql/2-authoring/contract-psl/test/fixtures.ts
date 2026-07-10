@@ -286,6 +286,7 @@ export const pgvectorAuthoringContributions = {
   entityTypes: {},
   field: {},
   pslBlockDescriptors: {},
+  modelAttributes: {},
   type: {
     ...postgresScalarAuthoringTypes,
     pgvector: {
@@ -417,6 +418,7 @@ export function createPostgresTestContext(
       type: postgresScalarAuthoringTypes,
       entityTypes: {},
       pslBlockDescriptors: {},
+      modelAttributes: {},
     },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),

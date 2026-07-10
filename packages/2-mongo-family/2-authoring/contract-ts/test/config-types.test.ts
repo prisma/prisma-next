@@ -17,6 +17,7 @@ const emptyContext: ContractSourceContext = {
     type: {},
     entityTypes: {},
     pslBlockDescriptors: {},
+    modelAttributes: {},
   },
   codecLookup: emptyCodecLookup,
   controlMutationDefaults: {
