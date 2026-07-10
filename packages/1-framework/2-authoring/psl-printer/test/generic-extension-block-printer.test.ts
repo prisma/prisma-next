@@ -508,6 +508,135 @@ describe('generic extension-block printer (P2)', () => {
       expect(output).toContain('constructor = "constructor"');
       expect(output).toContain('plain = "plain"');
     });
+
+    it('renders each variadic value kind: value, ref, option, and a nested list', () => {
+      const block: PslExtensionBlock = {
+        kind: 'native_enum',
+        name: 'Mixed',
+        parameters: {
+          scalar: valueParam('"lit"'),
+          reference: refParam('SomeRef'),
+          choice: optionParam('permissive'),
+          items: {
+            kind: 'list',
+            items: [valueParam('"a"'), valueParam('"b"'), refParam('Nested')],
+            span: STUB_SPAN,
+          },
+        },
+        blockAttributes: [],
+        span: STUB_SPAN,
+      };
+
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [makeNs([], [block])],
+        span: STUB_SPAN,
+      };
+
+      const output = printPslFromAst(ast, { pslBlockDescriptors: variadicDescriptors });
+
+      expect(output).toContain(
+        'native_enum Mixed {\n' +
+          '  scalar = "lit"\n' +
+          '  reference = SomeRef\n' +
+          '  choice = permissive\n' +
+          '  items = ["a", "b", Nested]\n' +
+          '}',
+      );
+    });
+
+    it('renders block attributes with and without args', () => {
+      const block: PslExtensionBlock = {
+        kind: 'native_enum',
+        name: 'Attrs',
+        parameters: { a: valueParam('"a"') },
+        blockAttributes: [
+          {
+            name: 'map',
+            args: [{ kind: 'positional', value: '"x"', span: STUB_SPAN }],
+            span: STUB_SPAN,
+          },
+          { name: 'something', args: [], span: STUB_SPAN },
+        ],
+        span: STUB_SPAN,
+      };
+
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [makeNs([], [block])],
+        span: STUB_SPAN,
+      };
+
+      const output = printPslFromAst(ast, { pslBlockDescriptors: variadicDescriptors });
+
+      expect(output).toContain('native_enum Attrs {\n  a = "a"\n  @@map("x")\n  @@something\n}');
+    });
+
+    it('renders a bare variadic member as its bare name, and a bare inside a list', () => {
+      const block: PslExtensionBlock = {
+        kind: 'native_enum',
+        name: 'Bares',
+        parameters: {
+          Low: { kind: 'bare', span: STUB_SPAN },
+          nested: {
+            kind: 'list',
+            items: [valueParam('"a"'), { kind: 'bare', span: STUB_SPAN }],
+            span: STUB_SPAN,
+          },
+        },
+        blockAttributes: [],
+        span: STUB_SPAN,
+      };
+
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [makeNs([], [block])],
+        span: STUB_SPAN,
+      };
+
+      const output = printPslFromAst(ast, { pslBlockDescriptors: variadicDescriptors });
+
+      expect(output).toContain('native_enum Bares {\n  Low\n  nested = ["a", ]\n}');
+    });
+
+    it('skips a variadic param whose name is a declared descriptor parameter', () => {
+      // `Object.hasOwn` guard: a variadic block whose descriptor also declares
+      // parameters renders the declared one via the declared loop and must not
+      // re-render it in the variadic loop.
+      const mixedDescriptors = {
+        native_enum: {
+          kind: 'pslBlock' as const,
+          keyword: 'native_enum',
+          discriminator: 'native_enum',
+          name: { required: true },
+          parameters: { label: { kind: 'value' as const, codecId: 'unused' } },
+          variadicParameters: true,
+        },
+      };
+      const block: PslExtensionBlock = {
+        kind: 'native_enum',
+        name: 'Mix',
+        parameters: { label: valueParam('"declared"'), extra: valueParam('"variadic"') },
+        blockAttributes: [],
+        span: STUB_SPAN,
+      };
+
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [makeNs([], [block])],
+        span: STUB_SPAN,
+      };
+
+      const output = printPslFromAst(ast, { pslBlockDescriptors: mixedDescriptors });
+
+      // `label` appears exactly once (declared loop), `extra` once (variadic loop).
+      expect(output).toContain('native_enum Mix {\n  label = "declared"\n  extra = "variadic"\n}');
+      expect(output.match(/label = "declared"/g)).toHaveLength(1);
+    });
   });
 
   describe('block with unregistered discriminator', () => {
