@@ -14,8 +14,8 @@
  * these tests pin.
  */
 import { describe, expect, it } from 'vitest';
-import type { AdapterCollection, BetterAuthDb } from '../src/adapter/index';
-import { PrismaNextAdapterError, prismaNextAdapter } from '../src/adapter/index';
+import type { AdapterCollection, BetterAuthDb } from '../src/exports/adapter';
+import { PrismaNextAdapterError, prismaNextAdapter } from '../src/exports/adapter';
 
 function rejectingCollection(): AdapterCollection {
   const fail = () => {

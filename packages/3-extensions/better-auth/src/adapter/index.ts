@@ -27,18 +27,6 @@ import {
 } from './model-map';
 import { buildOrderBySelector, buildWhereExpression } from './where';
 
-export type {
-  AdapterCollection,
-  AdapterFieldComparators,
-  AdapterModelAccessor,
-  AdapterRow,
-  BetterAuthDb,
-} from './db-surface';
-export type { PrismaNextAdapterErrorCode } from './errors';
-export { PrismaNextAdapterError } from './errors';
-export type { BetterAuthModelName, SpaceModelName } from './model-map';
-export { BETTER_AUTH_MODEL_BY_SPACE_MODEL } from './model-map';
-
 interface ResolvedModel {
   readonly spaceModel: SpaceModelName;
   readonly collection: AdapterCollection;

@@ -1,13 +1,15 @@
+export type {
+  AdapterAggregateBuilder,
+  AdapterCollection,
+  AdapterFieldComparators,
+  AdapterModelAccessor,
+  AdapterRow,
+  BetterAuthDb,
+} from '../adapter/db-surface';
+export { PrismaNextAdapterError, type PrismaNextAdapterErrorCode } from '../adapter/errors';
+export { prismaNextAdapter } from '../adapter/index';
 export {
-  type AdapterCollection,
-  type AdapterFieldComparators,
-  type AdapterModelAccessor,
-  type AdapterRow,
   BETTER_AUTH_MODEL_BY_SPACE_MODEL,
-  type BetterAuthDb,
   type BetterAuthModelName,
-  PrismaNextAdapterError,
-  type PrismaNextAdapterErrorCode,
-  prismaNextAdapter,
   type SpaceModelName,
-} from '../adapter/index';
+} from '../adapter/model-map';

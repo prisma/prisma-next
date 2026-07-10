@@ -14,13 +14,13 @@
 
 import type { PostgresClient } from '@prisma-next/postgres/runtime';
 import { expectTypeOf, test } from 'vitest';
+import type { Contract } from '../src/contract/contract.d';
 import type {
   BETTER_AUTH_MODEL_BY_SPACE_MODEL,
   BetterAuthDb,
   BetterAuthModelName,
   SpaceModelName,
-} from '../src/adapter/index';
-import type { Contract } from '../src/contract/contract.d';
+} from '../src/exports/adapter';
 
 test('every space model has a BetterAuth model mapping and vice versa', () => {
   expectTypeOf<keyof typeof BETTER_AUTH_MODEL_BY_SPACE_MODEL>().toEqualTypeOf<SpaceModelName>();

@@ -16,9 +16,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import baselineOps from '../migrations/20260710T1458_create_auth_tables/ops.json' with {
   type: 'json',
 };
-import { prismaNextAdapter } from '../src/adapter/index';
 import type { Contract } from '../src/contract/contract.d';
 import contractJson from '../src/contract/contract.json' with { type: 'json' };
+import { prismaNextAdapter } from '../src/exports/adapter';
 
 type DbAdapter = ReturnType<ReturnType<typeof prismaNextAdapter>>;
 
