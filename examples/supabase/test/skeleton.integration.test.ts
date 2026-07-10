@@ -466,9 +466,10 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
       // level, is_local=false so it persists across statement boundaries), then
       // switch to the authenticated role for the actual query.
       await withClient(connectionString, async (pgClient) => {
-        await pgClient.query(
-          `SELECT set_config('request.jwt.claims', '{"sub":"${ownerA}"}', false)`,
-        );
+        await pgClient.query('SELECT set_config($1, $2, false)', [
+          'request.jwt.claims',
+          JSON.stringify({ sub: ownerA }),
+        ]);
         await pgClient.query('SET ROLE authenticated');
 
         const result = await pgClient.query<{
@@ -576,9 +577,10 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
     ownerSub: string,
   ): Promise<readonly { username: string }[]> {
     return withClient(connectionString, async (pgClient) => {
-      await pgClient.query(
-        `SELECT set_config('request.jwt.claims', '{"sub":"${ownerSub}"}', false)`,
-      );
+      await pgClient.query('SELECT set_config($1, $2, false)', [
+        'request.jwt.claims',
+        JSON.stringify({ sub: ownerSub }),
+      ]);
       await pgClient.query('SET ROLE authenticated');
       const result = await pgClient.query<{ username: string }>(
         'SELECT username FROM public.profile',
