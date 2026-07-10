@@ -76,6 +76,7 @@ One reviewer holds: **"`contract infer` adopts native enum types instead of thro
 ## Follow-ups discovered during the build (not in-slice)
 
 - **Serialized pack contracts expose no enum type names.** `PostgresContractSerializer` strips `native_enum` entries (only the derived `valueSet`, keyed by handle name, survives in `contract.json`), so the pack-owned subtraction matches only in-memory described contracts. Near-zero production impact while infer is single-namespace (the pack's enums live in `auth`, which app-side infer never introspects), but it becomes real with multi-namespace infer (TML-2958) or any pack declaring enums in `public`. Options: serialize `native_enum` entries, re-derive them on deserialize, or match via pack columns' `typeParams.typeName`. Documented at `describedNativeEnumOwnersByTypeName`.
+- **`contract infer` cannot introspect a non-default schema from the CLI.** The control-api client's `introspect()` passes no schema selection and the adapter defaults to `public`. The auth-shaped adoption path is proven at the family level (the same introspect→infer chain the CLI wraps), but a user cannot point the CLI at an `auth`-only database today. Pre-existing limitation surfaced by this slice's D3, not caused by it; blocks the *CLI* leg of Supabase Slice F's introspect→emit pipeline alongside TML-2958.
 
 ## References
 
