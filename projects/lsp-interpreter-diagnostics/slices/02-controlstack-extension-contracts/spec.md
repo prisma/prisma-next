@@ -39,17 +39,28 @@ behavior-preserving by construction.
 
 ## Slice Definition of Done (beyond CI / reviewer / project-DoD)
 
-- [ ] SDoD1 — `ControlStack.extensionContracts` carries each contract-space-bearing
-      extension's contract keyed by space id, in extension load order semantics
-      consistent with `extensionPacks`; extensions without a contract space are
-      absent from the map (unit tests in framework-components, TC-8).
-- [ ] SDoD2 — `contract-emit.ts` context construction is pure property picks; its two
-      inline `blindCast`s are gone; net cast-ratchet ≤ baseline (the relocated cast in
-      `createControlStack` is the only `contractJson` cast in the repo).
-- [ ] SDoD3 — Emit output bit-identical: existing emit/e2e fixtures green,
-      `pnpm fixtures:check` clean (TC-8).
-- [ ] SDoD4 — Grep gate documented in `drive/calibration/grep-library.md` and passing:
-      no `contractJson` casts outside `framework-components`.
+- [x] SDoD1 — `ControlStack.extensionContracts` carries each contract-space-bearing
+      extension's contract keyed by space id, load-ordered; no-contract-space
+      extensions absent. ✓ `8e5eadd75` (order-discriminating tests; `extensionIds`
+      difference pinned).
+- [x] SDoD2 — Emit context construction is pure property picks. ✓ `d9cb3a9ce` —
+      **four** casts deleted, not two: a byte-identical twin assembly lived in
+      `client.ts` (`ControlClient.emit`), falsifying the spec's "only place" claim
+      (recorded: trace `falsified-assumption`, `learnings.md` L1). Net slice cast
+      delta −3; the relocated cast in `createControlStack` is the repo's only
+      `contractSpace.contractJson` cast (reviewer-run gate, both directions).
+- [x] SDoD3 — Emit output bit-identical: `pnpm fixtures:check` zero drift across all
+      example workspaces incl. extension-composing ones (postgis, paradedb,
+      multi-extension); e2e 109/109. ✓
+- [x] SDoD4 — Grep gate documented in `drive/calibration/grep-library.md`
+      (§ Contract-cast hygiene) and passing repo-wide, with positive control against
+      pre-change HEAD. ✓
+
+**Slice-close ritual (2026-07-10):** reviewer verdict SATISFIED across S2-D1+S2-D2,
+4/4 SDoD PASS; `origin/main` unmoved since branch — sync gate trivially satisfied;
+manual QA: **N/A — no user-observable change** (behavior-preserving refactor,
+bit-identical emit proven by fixtures). Grep gate: zero `projects/` references in
+long-lived files (the grep-library entry cites the pattern, not this project).
 
 ## Edge cases (pre-investigated)
 
