@@ -517,6 +517,30 @@
       "plane": "runtime"
     },
     {
+      "glob": "packages/3-extensions/better-auth/src/pack/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/better-auth/src/exports/pack.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/better-auth/src/contract/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/better-auth/src/exports/contract.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/3-extensions/paradedb/src/core/**",
       "domain": "extensions",
       "layer": "adapters",
