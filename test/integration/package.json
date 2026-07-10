@@ -20,6 +20,8 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
+    "@better-auth/test-utils": "^1.6.0",
+    "better-auth": "^1.6.0",
     "@prisma-next/adapter-postgres": "workspace:0.14.0",
     "@prisma-next/cli": "workspace:0.14.0",
     "@prisma-next/config-loader": "workspace:0.14.0",

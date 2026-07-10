@@ -4803,6 +4803,9 @@ importers:
 
   test/integration:
     dependencies:
+      '@better-auth/test-utils':
+        specifier: ^1.6.0
+        version: 1.6.23(@better-auth/core@1.6.23(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260515.1)(better-call@1.3.7(zod@4.4.3))(jose@6.2.3)(kysely@0.29.3)(nanostores@1.4.0))(better-auth@1.6.23(@cloudflare/workers-types@4.20260515.1)(mongodb@7.2.0(socks@2.8.9))(next@16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(pg@8.21.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))))(vitest@4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)))
       '@prisma-next/adapter-mongo':
         specifier: workspace:0.14.0
         version: link:../../packages/3-mongo-target/2-mongo-adapter
@@ -4944,6 +4947,9 @@ importers:
       arktype:
         specifier: 'catalog:'
         version: 2.2.3
+      better-auth:
+        specifier: ^1.6.0
+        version: 1.6.23(@cloudflare/workers-types@4.20260515.1)(mongodb@7.2.0(socks@2.8.9))(next@16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(pg@8.21.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)))
     devDependencies:
       '@prisma-next/framework-components':
         specifier: workspace:0.14.0
@@ -5432,6 +5438,13 @@ packages:
       '@better-auth/core': ^1.6.23
       '@better-auth/utils': 0.4.2
       '@better-fetch/fetch': 1.3.1
+
+  '@better-auth/test-utils@1.6.23':
+    resolution: {integrity: sha512-11Bz/aYHyxowwgqhw0y1lO1JxJRw5RFZ4bxQqV8UQ/KnFCh6TxmQFaMJH7n1lkRY06SzyIbqgwPAgT+JaEiY0A==}
+    peerDependencies:
+      '@better-auth/core': ^1.6.23
+      better-auth: ^1.6.23
+      vitest: ^4.1.5
 
   '@better-auth/utils@0.4.2':
     resolution: {integrity: sha512-AUxrvu+HaaODsUyzDxFgwd/8RZ1yZaYo42LXKSrU2oGgR38pS1ij8nqQKNgtTWoYGpNevNXtCfgTy6loHveW9A==}
@@ -11459,6 +11472,12 @@ snapshots:
       '@better-auth/core': 1.6.23(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260515.1)(better-call@1.3.7(zod@4.4.3))(jose@6.2.3)(kysely@0.29.3)(nanostores@1.4.0)
       '@better-auth/utils': 0.4.2
       '@better-fetch/fetch': 1.3.1
+
+  '@better-auth/test-utils@1.6.23(@better-auth/core@1.6.23(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260515.1)(better-call@1.3.7(zod@4.4.3))(jose@6.2.3)(kysely@0.29.3)(nanostores@1.4.0))(better-auth@1.6.23(@cloudflare/workers-types@4.20260515.1)(mongodb@7.2.0(socks@2.8.9))(next@16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(pg@8.21.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))))(vitest@4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)))':
+    dependencies:
+      '@better-auth/core': 1.6.23(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260515.1)(better-call@1.3.7(zod@4.4.3))(jose@6.2.3)(kysely@0.29.3)(nanostores@1.4.0)
+      better-auth: 1.6.23(@cloudflare/workers-types@4.20260515.1)(mongodb@7.2.0(socks@2.8.9))(next@16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(pg@8.21.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)))
+      vitest: 4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4))
 
   '@better-auth/utils@0.4.2':
     dependencies:
