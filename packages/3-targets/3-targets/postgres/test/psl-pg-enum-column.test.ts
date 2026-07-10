@@ -83,7 +83,7 @@ const scalarTypeDescriptors = new Map<string, { codecId: string; nativeType: str
   ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
 ]);
 
-function interpret(source: string) {
+function interpret(source: string, capabilities: Record<string, Record<string, boolean>> = {}) {
   const { document, sourceFile } = parse(source);
   const { table: symbolTable } = buildSymbolTable({
     document,
@@ -95,7 +95,7 @@ function interpret(source: string) {
     symbolTable,
     sourceFile,
     sourceId: 'schema.prisma',
-    capabilities: {},
+    capabilities,
     target: postgresTarget,
     scalarTypeDescriptors,
     authoringContributions: assembled,
@@ -169,6 +169,45 @@ describe('PSL pg.enum(Ref) field resolution', () => {
     const ns = result.value.storage.namespaces['auth'] as PostgresSchema;
     const valueSet = ns.valueSet?.['AalLevel'];
     expect(valueSet).toMatchObject({ values: ['aal1', 'aal2', 'aal3'] });
+  });
+
+  // Settles the infer-adoption open question: the Phase-1 authoring surface
+  // accepts an enum-typed list column (`pg.enum(E)[]`), so `contract infer`
+  // emits the list form for `<enum type>[]` columns instead of a diagnostic.
+  it('supports a pg.enum(E)[] list field when the target reports the scalarList capability', () => {
+    const source = `
+namespace auth {
+  native_enum AalLevel {
+    aal1 = "aal1"
+    aal2 = "aal2"
+    @@map("aal_level")
+  }
+
+  model AuthSession {
+    id   Int @id
+    aals pg.enum(AalLevel)[]
+  }
+}
+`;
+    const result = interpret(source, { sql: { scalarList: true } });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const ns = result.value.storage.namespaces['auth'] as PostgresSchema;
+    const aalsColumn = ns.table['authSession']?.columns['aals'];
+    expect(aalsColumn).toMatchObject({
+      codecId: 'pg/enum@1',
+      nativeType: 'auth.aal_level',
+      nullable: false,
+      valueSet: {
+        plane: 'storage',
+        entityKind: 'valueSet',
+        namespaceId: 'auth',
+        entityName: 'AalLevel',
+      },
+    });
+    expect(aalsColumn?.many).toBe(true);
   });
 
   it('supports a nullable pg.enum(E)? field', () => {

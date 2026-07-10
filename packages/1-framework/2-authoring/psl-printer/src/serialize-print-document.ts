@@ -132,8 +132,48 @@ function serializeExtensionBlock(
     const rendered = renderParamValue(paramValue, paramDescriptor, codecLookup, paramName);
     lines.push(`${PSL_INDENT_UNIT}${paramName} = ${rendered}`);
   }
+  if (descriptor.variadicParameters) {
+    for (const [paramName, paramValue] of Object.entries(extensionBlock.parameters)) {
+      if (Object.hasOwn(descriptor.parameters, paramName)) {
+        continue;
+      }
+      lines.push(`${PSL_INDENT_UNIT}${renderVariadicParam(paramName, paramValue)}`);
+    }
+  }
+  for (const attr of extensionBlock.blockAttributes ?? []) {
+    const args = attr.args.map((arg) => arg.value).join(', ');
+    lines.push(`${PSL_INDENT_UNIT}@@${attr.name}${args.length > 0 ? `(${args})` : ''}`);
+  }
   lines.push('}');
   return lines.join('\n');
+}
+
+/**
+ * Renders one undeclared parameter of a `variadicParameters` block (e.g. a
+ * `native_enum` member line). Variadic entries have no per-parameter
+ * descriptor, so there is no codec to round-trip a `value` through — the raw
+ * PSL literal is emitted verbatim. A `bare` entry is just its key.
+ */
+function renderVariadicParam(paramName: string, paramValue: PslExtensionBlockParamValue): string {
+  if (paramValue.kind === 'bare') {
+    return paramName;
+  }
+  return `${paramName} = ${renderVariadicValue(paramValue)}`;
+}
+
+function renderVariadicValue(paramValue: PslExtensionBlockParamValue): string {
+  switch (paramValue.kind) {
+    case 'bare':
+      return '';
+    case 'value':
+      return paramValue.raw;
+    case 'ref':
+      return paramValue.identifier;
+    case 'option':
+      return paramValue.token;
+    case 'list':
+      return `[${paramValue.items.map(renderVariadicValue).join(', ')}]`;
+  }
 }
 
 function renderParamValue(
