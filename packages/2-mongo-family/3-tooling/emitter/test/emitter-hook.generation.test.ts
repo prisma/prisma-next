@@ -136,7 +136,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
             relations: {
               posts: {
-                to: { model: 'Post', namespace: '__unbound__' },
+                to: crossRef('Post'),
                 cardinality: '1:N',
                 on: { localFields: ['_id'], targetFields: ['authorId'] },
               },
@@ -150,7 +150,7 @@ describe('mongoEmission.generateContractTypes', () => {
             },
             relations: {
               author: {
-                to: { model: 'User', namespace: '__unbound__' },
+                to: crossRef('User'),
                 cardinality: 'N:1',
                 on: { localFields: ['authorId'], targetFields: ['_id'] },
               },
@@ -195,7 +195,7 @@ describe('mongoEmission.generateContractTypes', () => {
               _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
             },
             relations: {
-              addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+              addresses: { to: crossRef('Address'), cardinality: '1:N' },
             },
             storage: {
               collection: 'users',
@@ -226,7 +226,7 @@ describe('mongoEmission.generateContractTypes', () => {
               _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
             },
             relations: {
-              comments: { to: { model: 'Comment', namespace: '__unbound__' }, cardinality: '1:N' },
+              comments: { to: crossRef('Comment'), cardinality: '1:N' },
             },
             storage: { collection: 'posts' },
           },
@@ -294,7 +294,7 @@ describe('mongoEmission.generateContractTypes', () => {
               _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
             },
             relations: {
-              addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+              addresses: { to: crossRef('Address'), cardinality: '1:N' },
             },
             storage: {
               collection: 'users',

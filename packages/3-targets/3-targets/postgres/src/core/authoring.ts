@@ -66,11 +66,37 @@ function readListRefParams(block: PslExtensionBlock, key: string): string[] {
   return param.items.flatMap((item) => (item.kind === 'ref' ? [item.identifier] : []));
 }
 
+/**
+ * Unwraps a quoted PSL string argument, inverting the printer's
+ * `escapePslString` escapes (`\\`, `\"`, `\n`, `\r`). An unknown escape
+ * sequence is kept verbatim, matching the printer-side `unescapePslString`
+ * convention.
+ */
 function unwrapQuotedString(raw: string): string {
-  if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
-    return raw.slice(1, -1).replace(/\\"/g, '"');
+  if (!(raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2)) {
+    return raw;
   }
-  return raw;
+  const inner = raw.slice(1, -1);
+  let result = '';
+  for (let i = 0; i < inner.length; i++) {
+    if (inner[i] !== '\\' || i + 1 >= inner.length) {
+      result += inner[i];
+      continue;
+    }
+    const next = inner[i + 1];
+    if (next === '\\' || next === '"') {
+      result += next;
+    } else if (next === 'n') {
+      result += '\n';
+    } else if (next === 'r') {
+      result += '\r';
+    } else {
+      result += '\\';
+      result += next;
+    }
+    i++;
+  }
+  return result;
 }
 
 function lowerRlsPolicyFromBlock(

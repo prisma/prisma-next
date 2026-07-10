@@ -13,17 +13,26 @@ The complete external-enum vertical — represent → type → cast → runtime 
 - **Representation, typing, cast, `db.nativeEnums`** (`cbb1f6e50` → `a105437f6`) — the `native_enum` pack entity + derived value-set; the `pg.enum(Ref)` column + `pg/enum@1` codec typed via the value-set → codec path; the per-column `$N::<type>` cast; the Postgres-only `db.nativeEnums` accessor. Satisfies R1–R4.
 - **Supabase demonstration + schema-qualification fix** (`b8c4a69a7`, `1a3306cf4`) — the Supabase extension declares `auth.aal_level`; the example proves the whole path end-to-end against real Postgres. Running it for real exposed that a non-`public` schema needs a **schema-qualified** type reference (`auth.aal_level`) for both the cast and `db verify` — fixed by qualifying the column's `nativeType` by its namespace. Satisfies R5 and proves R1–R4 end-to-end.
 
+## Shipped — infer adoption (R6, pulled forward from Phase 2)
+
+- **`contract infer` adopts native enum types** instead of throwing — introspection reads ordered member values (`pg_enum.enumsortorder`), infer emits `native_enum` blocks + `pg.enum(<Name>)` columns wrapped in an explicit `namespace <schema> { … }` block (enum-free output stays byte-identical), pack-owned types subtract by type name, and a live PGlite round trip proves infer → emit → `db verify` against the source database for the `public` and `auth.aal_level` shapes. Slice spec: [`slices/infer-native-enum-adoption/spec.md`](slices/infer-native-enum-adoption/spec.md).
+- **R6 status:** adoption shipped **ahead of Phase-2 Slices A/B** (sequencing inversion, unblocks Supabase Slice F). The managed lifecycle (`CREATE TYPE` / `DROP TYPE` / `ADD VALUE`, differ integration) is still forward work below — an inferred enum under `defaultControl: 'managed'` claims a lifecycle the planner does not yet enforce until Slices A/B land.
+
+## In flight — native_enum serializes into contract.json
+
+- **`entries.native_enum` becomes an ordinary enumerable entries kind** so it round-trips through `contract.json` and is captured by `storageHash` (hardens R1; prerequisite for the Phase-2 planner reading ordered members from storage, and for pack-owned subtraction on production-hydrated contracts). Closes the infer-adoption slice's "serialized pack contracts expose no enum type names" follow-up. Slice spec: [`slices/serialize-native-enum-entities/spec.md`](slices/serialize-native-enum-entities/spec.md).
+
 ## Forward work
 
-### Generic namespace-`entries` serialization — in progress, [TML-2981]
+### Generic namespace-`entries` serialization — shipped, [TML-2981]
 
-- **Outcome:** the SQL contract serializer emits a namespace's entity kinds by iterating `entries` (symmetric with the already-generic hydrate path), so an extension-contributed kind round-trips with no serializer edit; byte-identical emitted output.
+- **Outcome:** the SQL contract serializer emits a namespace's entity kinds by iterating `entries` (symmetric with the already-generic hydrate path), so an extension-contributed kind round-trips with no serializer edit; byte-identical emitted output. Merged: [PR #931](https://github.com/prisma/prisma-next/pull/931).
 - **The work:** lift generic entries serialization into `SqlContractSerializerBase`; rewire the Postgres + SQLite serializers to delegate; `native_enum` stays excluded via non-enumerability. Slice spec: [`slices/generic-namespace-entries-serialization/spec.md`](slices/generic-namespace-entries-serialization/spec.md).
 - **Origin:** review point O1 on PR #906.
 
-### TS authoring mirror — in progress, [TML-2965]
+### TS authoring mirror — shipped, [TML-2965]
 
-- **Outcome:** a `native_enum` is authorable in the TS DSL (`nativeEnum(…)` + `field.column(pg.enum(handle))`), producing a contract byte-identical to the PSL version.
+- **Outcome:** a `native_enum` is authorable in the TS DSL (`nativeEnum(…)` + `field.column(pg.enum(handle))`), producing a contract byte-identical to the PSL version. Merged: [PR #935](https://github.com/prisma/prisma-next/pull/935).
 - **The work:** a generic **`ContractDefinition` pack-entity attachment** — route author-declared, namespace-scoped pack entities into `entries.<kind>` (+ derive their value-set) through the `defineContract` chain, following the `enums` wiring; a bespoke `nativeEnum(...)` handle + deferred `pg.enum(handle)` descriptor; and relocating type-name qualification out of the codec into a generic build-stage step (so a named schema like `auth` is authorable in TS). Slice spec: [`slices/native-enum-ts-authoring/spec.md`](slices/native-enum-ts-authoring/spec.md).
 - **Follow-ups:** RLS `role`/`policy` TS wiring rides the same seam (unexercised here); the auto-composed generic `type.pg.enum` path repair is [TML-2983](https://linear.app/prisma-company/issue/TML-2983).
 - **Proven by:** a PSL + TS byte-identical parity test.
@@ -39,7 +48,7 @@ Prisma Next creates and drops the type and migrates **add-value** in place. Sati
 
 - **Slice A — create / delete (R7, R10).** The `PostgresNativeEnum` SchemaIR `DiffableNode` (identity on type name, equality over ordered members); introspection reading **ordered** values (`pg_enum.enumsortorder`); the Contract→SchemaIR projection into a new `PostgresSchemaIR.enumTypes` field; the generic differ reporting missing / extra / value-mismatch; and the `CREATE TYPE` / `DROP TYPE` ops, ordered before the columns that use the type. The `external`/`observed` grade suppresses drift, so shipped Phase-1 enums stay untouched.
 - **Slice B — add value (R8, R9).** The order-aware diff — a pure suffix-append → `ALTER TYPE … ADD VALUE`; a rename, removal, or reorder is refused with a diagnostic and never lowered to an op — plus the `ADD VALUE` op, with its non-transactional caveat surfaced to the runner.
-- **Slice C — adoption (R6).** Contract-infer emits a `managed` `native_enum` for an introspected native type (all inference is managed) instead of throwing.
+- **Slice C — adoption (R6).** Shipped ahead of Slices A/B (see "Shipped — infer adoption" above); what remains of R6 here is only the managed-grade enforcement Slices A/B provide.
 
 Do **not** start Phase 2 without a fresh triage and operator go-ahead.
 

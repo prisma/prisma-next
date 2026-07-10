@@ -116,9 +116,8 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     const { storage, ...rest } = contract;
     const namespacesJson: Record<string, JsonObject> = {};
     // Each namespace serializes to its id, its schema-kind tag, and the
-    // base's generic entries walk. Native enums are excluded upstream —
-    // carried non-enumerable on `PostgresSchema.entries`, so the walk
-    // never sees them.
+    // base's generic entries walk — every enumerable kind on
+    // `PostgresSchema.entries`, including `native_enum`.
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
       const isUnboundSlot = ns.id === UNBOUND_NAMESPACE_ID;
       namespacesJson[nsId] = {

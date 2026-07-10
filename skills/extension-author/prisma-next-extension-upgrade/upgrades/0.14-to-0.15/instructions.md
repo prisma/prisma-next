@@ -252,6 +252,26 @@ changes:
         - "AssembledAuthoringContributions"
         - "authoringContributions: {"
       anyMatch: true
+  - id: native-enum-serialized-in-contract-json
+    summary: |
+      `native_enum` entities now serialize into an extension's emitted `contract.json` (previously they
+      were authoring-time-only — stripped on emit, leaving only the derived `valueSet`). If your
+      extension declares native Postgres enums — `native_enum` blocks in a `.prisma` contract, or
+      `pg.enum(...)` / `nativeEnum(...)` columns in the TypeScript DSL — re-emit your bundled contract
+      (`prisma-next contract emit`) and commit the result, so the `entries.native_enum` maps and the
+      recomputed `storageHash` land in your checked-in `contract.{json,d.ts}`. Re-emitting is what makes
+      your pack's enum type names visible in the published contract: a consumer running `contract infer`
+      with your pack in the stack subtracts your pack-owned enum types by matching those serialized type
+      names, so an un-re-emitted contract leaves the consumer re-declaring types your pack already owns.
+      The change is backward compatible (a pre-existing contract still hydrates), so re-emit at your
+      next release rather than urgently.
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "native_enum"
+        - "pg.enum("
+        - "nativeEnum("
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in

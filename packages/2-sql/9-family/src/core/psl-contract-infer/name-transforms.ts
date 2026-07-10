@@ -127,6 +127,21 @@ export function toEnumName(pgTypeName: string): NameResult {
   return { name };
 }
 
+const VALID_IDENTIFIER_PATTERN = /^[A-Za-z_]\w*$/;
+
+/**
+ * PSL member name for a native-enum value. The value itself always prints
+ * explicitly (`member = "value"`), so the returned name never needs a map:
+ * a value that already is a valid, non-reserved identifier is kept verbatim
+ * (case included); anything else is camelCased/escaped like a field name.
+ */
+export function toEnumMemberName(value: string): string {
+  if (VALID_IDENTIFIER_PATTERN.test(value) && !needsEscaping(value)) {
+    return value;
+  }
+  return escapeIfNeeded(snakeToCamelCase(value));
+}
+
 export function pluralize(word: string): string {
   if (
     word.endsWith('s') ||

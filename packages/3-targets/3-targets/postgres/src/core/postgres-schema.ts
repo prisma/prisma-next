@@ -95,27 +95,9 @@ export class PostgresSchema extends SqlNamespaceBase {
         ? { ...dispatched, valueSet: undefined }
         : dispatched;
 
-    // `native_enum` is authoring-time-only (`PostgresContractSerializer`
-    // never re-emits it; its member values live on via the `valueSet`
-    // entry it derives). Carried as a non-enumerable property — like
-    // `kind` below — so `JSON.stringify` (the hashing pipeline's
-    // canonicalization step, `computeStorageHash` via `hashContract`)
-    // walks past it and the storage hash matches what actually gets
-    // serialized. Direct property access (`ns.entries.native_enum`)
-    // still resolves normally; only enumeration is affected.
-    const nativeEnumRaw = dispatched['native_enum'];
     const entriesInput: Record<string, Readonly<Record<string, unknown>> | undefined> = {
       ...withPresence,
     };
-    delete entriesInput['native_enum'];
-    if (nativeEnumRaw !== undefined) {
-      Object.defineProperty(entriesInput, 'native_enum', {
-        value: nativeEnumRaw,
-        enumerable: false,
-        writable: false,
-        configurable: true,
-      });
-    }
 
     this.entries = Object.freeze(
       blindCast<

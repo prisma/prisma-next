@@ -1,5 +1,4 @@
 import type {
-  EnumInfo,
   PslNativeTypeAttribute,
   PslTypeMap,
   PslTypeResolution,
@@ -126,32 +125,4 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
       return { unsupported: true, nativeType };
     },
   };
-}
-
-export function extractEnumInfo(annotations?: Record<string, unknown>): EnumInfo {
-  const pgAnnotations = annotations?.['pg'] as Record<string, unknown> | undefined;
-  const nativeEnumTypeNames = pgAnnotations?.['nativeEnumTypeNames'];
-
-  const typeNames = new Set<string>();
-  const definitions = new Map<string, readonly string[]>();
-
-  if (Array.isArray(nativeEnumTypeNames)) {
-    for (const name of nativeEnumTypeNames) {
-      if (typeof name === 'string') {
-        typeNames.add(name);
-      }
-    }
-  }
-
-  return { typeNames, definitions };
-}
-
-export function extractEnumTypeNames(annotations?: Record<string, unknown>): ReadonlySet<string> {
-  return extractEnumInfo(annotations).typeNames;
-}
-
-export function extractEnumDefinitions(
-  annotations?: Record<string, unknown>,
-): ReadonlyMap<string, readonly string[]> {
-  return extractEnumInfo(annotations).definitions;
 }

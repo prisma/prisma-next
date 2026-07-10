@@ -77,6 +77,7 @@ export function normalizePostgresActualForDiff(
       schemaName: actualNs.schemaName,
       tables,
       nativeEnumTypeNames: actualNs.nativeEnumTypeNames,
+      nativeEnums: actualNs.nativeEnums,
     });
   }
   return new PostgresDatabaseSchemaNode({

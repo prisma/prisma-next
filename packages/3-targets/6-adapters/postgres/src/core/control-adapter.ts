@@ -1126,16 +1126,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const nativeEnumResult = await driver.query<{ typname: string }>(
-      `SELECT t.typname
+    const nativeEnumResult = await driver.query<{ typname: string; enumvalues: unknown }>(
+      `SELECT t.typname, array_agg(e.enumlabel ORDER BY e.enumsortorder) AS enumvalues
          FROM pg_catalog.pg_type t
          JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+         JOIN pg_catalog.pg_enum e ON e.enumtypid = t.oid
          WHERE t.typtype = 'e'
            AND n.nspname = $1
+         GROUP BY t.typname
          ORDER BY t.typname`,
       [schema],
     );
-    const nativeEnumTypeNames = nativeEnumResult.rows.map((r) => r.typname);
+    const nativeEnums = nativeEnumResult.rows.map((r) => ({
+      typeName: r.typname,
+      values: parsePgNameArray(r.enumvalues),
+    }));
+    const nativeEnumTypeNames = nativeEnums.map((e) => e.typeName);
     const policiesResult = await driver.query<{
       schemaname: string;
       tablename: string;
@@ -1219,6 +1225,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       schemaName: schema,
       tables,
       nativeEnumTypeNames,
+      nativeEnums,
     });
     return { namespace, pgVersion: await this.getPostgresVersion(driver) };
   }
@@ -1242,10 +1249,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
  * `name[]` (OID 1003). When the parser is absent the raw Postgres text-array
  * literal (`{role1,role2}`) is returned as a string instead of a JS array.
  * This function accepts either form and returns a plain string array.
+ *
+ * The string branch honors Postgres array-literal quoting: an element
+ * containing a comma, quote, backslash, brace, or significant whitespace is
+ * emitted double-quoted with `\"` / `\\` escapes, and unquoted elements are
+ * whitespace-trimmed — so a label like `in progress` or `say "hi"` parses to
+ * its true value instead of being split or kept escaped.
  */
-function parsePgNameArray(value: unknown): string[] {
+export function parsePgNameArray(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value as string[];
+    return value.map(String);
   }
   if (typeof value !== 'string') {
     return [];
@@ -1258,7 +1271,55 @@ function parsePgNameArray(value: unknown): string[] {
   if (inner === '') {
     return [];
   }
-  return inner.split(',').map((s) => s.trim());
+
+  const elements: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let wasQuoted = false;
+  const pushCurrent = () => {
+    elements.push(wasQuoted ? current : current.trim());
+    current = '';
+    wasQuoted = false;
+  };
+  let i = 0;
+  while (i < inner.length) {
+    const char = inner.charAt(i);
+    if (inQuotes) {
+      if (char === '\\') {
+        current += inner[i + 1] ?? '';
+        i += 2;
+        continue;
+      }
+      if (char === '"') {
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      current += char;
+      i++;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = true;
+      wasQuoted = true;
+      i++;
+      continue;
+    }
+    if (char === ',') {
+      pushCurrent();
+      i++;
+      continue;
+    }
+    current += char;
+    i++;
+  }
+  // A still-open quote means the literal was malformed (e.g. `{"unterminated}`);
+  // reject rather than emit the partial value.
+  if (inQuotes) {
+    return [];
+  }
+  pushCurrent();
+  return elements;
 }
 
 /**
