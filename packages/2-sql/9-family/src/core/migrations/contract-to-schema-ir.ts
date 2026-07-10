@@ -251,7 +251,19 @@ function convertIndex(index: Index): SqlIndexIRInput {
   };
 }
 
-function convertForeignKey(fk: ForeignKey): SqlForeignKeyIRInput {
+/**
+ * `flattenReferencedNamespace` stamps the FK's `resolvedReferencedNamespace`
+ * to the empty segment — the value single-schema (flat) introspection
+ * produces. Single-schema targets (SQLite) pass it so the derived expected FK
+ * node pairs (by diff-node id) with its introspected counterpart, without a
+ * pre-diff FK-neutralization pass. Namespaced targets (Postgres) omit it and
+ * resolve the real DDL schema downstream, so the family default (which the
+ * constructor derives from `referencedSchema`) is never observed there.
+ */
+function convertForeignKey(
+  fk: ForeignKey,
+  flattenReferencedNamespace: boolean,
+): SqlForeignKeyIRInput {
   return {
     columns: fk.source.columns,
     referencedTable: fk.target.tableName,
@@ -260,6 +272,7 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIRInput {
     ...ifDefined('name', fk.name),
     ...ifDefined('onDelete', fk.onDelete),
     ...ifDefined('onUpdate', fk.onUpdate),
+    ...(flattenReferencedNamespace ? { resolvedReferencedNamespace: '' } : {}),
   };
 }
 
@@ -270,6 +283,7 @@ function convertTable(
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
   storage: SqlStorage,
+  flattenReferencedNamespace: boolean,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIRInput> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
@@ -309,7 +323,9 @@ function convertTable(
     name,
     columns,
     ...ifDefined('primaryKey', table.primaryKey),
-    foreignKeys: table.foreignKeys.filter((fk) => fk.constraint !== false).map(convertForeignKey),
+    foreignKeys: table.foreignKeys
+      .filter((fk) => fk.constraint !== false)
+      .map((fk) => convertForeignKey(fk, flattenReferencedNamespace)),
     uniques: table.uniques.map(convertUnique),
     indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
     ...ifDefined('checks', checks),
@@ -386,6 +402,15 @@ export interface ContractToSchemaIROptions {
    * schema-scoped enum storage (SQLite) omit it; enums are absent there.
    */
   readonly resolveEnumNamespaceSchema?: EnumNamespaceSchemaResolver;
+  /**
+   * Single-schema (flat) targets set this so derived FK nodes are born with
+   * `resolvedReferencedNamespace: ''` — matching what flat introspection
+   * produces — instead of the constructor's default (the contract namespace
+   * id). Namespaced targets (Postgres) omit it and resolve the real DDL schema
+   * downstream. See {@link convertForeignKey}. Target-agnostic: it describes
+   * single-schema-ness, not a specific target.
+   */
+  readonly flattenReferencedNamespace?: boolean;
 }
 
 /**
@@ -439,6 +464,7 @@ export function contractNamespaceToSchemaIR(
       options.expandNativeType,
       options.renderDefault,
       storage,
+      options.flattenReferencedNamespace ?? false,
     );
   }
   return new SqlSchemaIR({ tables });
@@ -475,6 +501,7 @@ export function contractToSchemaIR(
         options.expandNativeType,
         options.renderDefault,
         storage,
+        options.flattenReferencedNamespace ?? false,
       );
     }
   }
