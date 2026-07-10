@@ -42,12 +42,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
-import { computeStorageHash } from '@prisma-next/contract/hashing';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import supabasePack from '@prisma-next/extension-supabase/pack';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
-import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import type { PostgresSchema } from '@prisma-next/target-postgres/types';
@@ -56,6 +54,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import { createDb } from '../src/prisma/db';
+import type { Contract as NoPolicyContract } from './fixtures/no-policy/contract';
+import noPolicyContractJson from './fixtures/no-policy/contract.json' with { type: 'json' };
+import type { Contract as RenamedPolicyContract } from './fixtures/renamed-policy/contract';
+import renamedPolicyContractJson from './fixtures/renamed-policy/contract.json' with {
+  type: 'json',
+};
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
 // Derive the policy wire name from the deserialized contract rather than pinning a literal.
@@ -541,22 +545,9 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
     timeouts.spinUpPpgDev * 4,
   );
 
-  // Deep-clones the committed contract JSON, applies `mutate` to the clone,
-  // and recomputes the storage hash so markers/ledger/verify stay
-  // self-consistent for the mutated variant.
-  function contractVariant(mutate: (clone: typeof contractJson) => void): unknown {
-    const clone = structuredClone(contractJson);
-    mutate(clone);
-    const { storageHash: _priorHash, ...storageWithoutHash } = clone.storage;
-    const nextHash = computeStorageHash({
-      target: clone.target,
-      targetFamily: clone.targetFamily,
-      storage: storageWithoutHash,
-      ...sqlContractCanonicalizationHooks,
-    });
-    (clone.storage as { storageHash: string }).storageHash = String(nextHash);
-    return clone;
-  }
+  // Variant contract states are committed fixtures emitted by the real
+  // pipeline from variant PSL sources (see test/fixtures/*.config.ts and
+  // this package's `emit` script) — never mutated contract data.
 
   async function seedProfilesAndGrant(connectionString: string, ownerA: string, ownerB: string) {
     await withClient(connectionString, async (pgClient) => {
@@ -610,10 +601,9 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
         { username: 'alice' },
       ]);
 
-      // Drop the last policy from the contract; keep the rls marker.
-      const noPolicyContract = contractVariant((clone) => {
-        (clone.storage.namespaces.public.entries as { policy: unknown }).policy = {};
-      });
+      // The committed no-policy fixture: the schema minus its policy_select
+      // block, @@rls kept.
+      const noPolicyContract = noPolicyContractJson;
 
       // Plan: exactly the policy drop — no enablement change anywhere.
       const planResult = await client.dbUpdate({
@@ -639,8 +629,8 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
       }
 
       // Verify clean against the policy-less (still marked) contract.
-      const deserialized = new PostgresContractSerializer().deserializeContract(
-        noPolicyContract as Parameters<PostgresContractSerializer['deserializeContract']>[0],
+      const deserialized = new PostgresContractSerializer().deserializeContract<NoPolicyContract>(
+        noPolicyContractJson,
       );
       const verifyResult = await client.dbVerify({
         contract: deserialized,
@@ -676,25 +666,14 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
       const ownerB = '22222222-2222-2222-2222-222222222222';
       await seedProfilesAndGrant(connectionString, ownerA, ownerB);
 
-      const hashSuffix = POLICY_WIRE_NAME.slice(POLICY_WIRE_NAME.lastIndexOf('_') + 1);
-      const renamedWireName = `profile_owner_read_v2_${hashSuffix}`;
-
-      const renamedContract = contractVariant((clone) => {
-        // The entries key is the PSL block name (the prefix); the wire name
-        // lives on the entity's own `name` field.
-        const entries = clone.storage.namespaces.public.entries as {
-          policy: Record<string, { name: string; prefix: string }>;
-        };
-        const existing = Object.values(entries.policy)[0];
-        if (existing === undefined) throw new Error('expected the committed policy entry');
-        entries.policy = {
-          profile_owner_read_v2: {
-            ...existing,
-            name: renamedWireName,
-            prefix: 'profile_owner_read_v2',
-          },
-        };
-      });
+      // The committed renamed-policy fixture: the same policy body under the
+      // prefix profile_owner_read_v2 — same content hash, new wire name.
+      const renamedContract = renamedPolicyContractJson;
+      const renamedWireName =
+        Object.values(renamedContract.storage.namespaces.public.entries.policy)[0]?.name ?? '';
+      expect(renamedWireName).toBe(
+        `profile_owner_read_v2_${POLICY_WIRE_NAME.slice(POLICY_WIRE_NAME.lastIndexOf('_') + 1)}`,
+      );
 
       // Plan: exactly one rename — no drop, no create, no enablement change.
       const planResult = await client.dbUpdate({
@@ -718,9 +697,10 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
       }
 
       // Verify clean against the renamed contract.
-      const deserialized = new PostgresContractSerializer().deserializeContract(
-        renamedContract as Parameters<PostgresContractSerializer['deserializeContract']>[0],
-      );
+      const deserialized =
+        new PostgresContractSerializer().deserializeContract<RenamedPolicyContract>(
+          renamedPolicyContractJson,
+        );
       const verifyResult = await client.dbVerify({
         contract: deserialized,
         migrationsDir,
