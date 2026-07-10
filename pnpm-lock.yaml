@@ -4821,6 +4821,9 @@ importers:
       '@prisma-next/extension-arktype-json':
         specifier: workspace:0.14.0
         version: link:../../packages/3-extensions/arktype-json
+      '@prisma-next/extension-better-auth':
+        specifier: workspace:0.14.0
+        version: link:../../packages/3-extensions/better-auth
       '@prisma-next/extension-paradedb':
         specifier: workspace:0.14.0
         version: link:../../packages/3-extensions/paradedb
