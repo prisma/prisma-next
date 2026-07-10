@@ -84,7 +84,7 @@ retains the original DoD order; AC2 is retired._
 
 ### Implement M1: Provider union + capability seam
 
-**Status:** ► In progress — slice 01 delivered, PR open (D1 `19113b122`, D2 `e08581e78`; complete on merge)
+**Status:** ✓ Complete — merged to main as PR #939 (2026-07-10)
 
 _Outcomes_
 `ContractSourceProvider` is a `sourceFormat`-keyed union (`Psl…`/`TypeScript…`/`Opaque…`
@@ -115,7 +115,7 @@ gate separating old from new behavior.
 
 ### Implement M2: ControlStack exposes extension contracts
 
-**Status:** ☐ Not started
+**Status:** ► In progress — slice 02, branch `tml-2984-slice-02-extension-contracts`
 
 _Outcomes_
 `ControlStack` carries `extensionContracts: ReadonlyMap<string, Contract>`, built by
