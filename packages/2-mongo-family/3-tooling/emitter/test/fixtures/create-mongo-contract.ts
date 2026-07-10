@@ -2,6 +2,7 @@ import {
   type Contract,
   type ContractModelBase,
   type ContractValueObject,
+  coreHash,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -12,7 +13,7 @@ export function namespacedMongoStorageFromCollections(
   storageHash = 'sha256:test',
 ) {
   return {
-    storageHash,
+    storageHash: coreHash(storageHash),
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
