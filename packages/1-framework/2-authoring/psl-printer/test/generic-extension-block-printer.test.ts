@@ -481,6 +481,33 @@ describe('generic extension-block printer (P2)', () => {
       expect(output).toContain('native_enum Status {\n  draft = "draft"\n  done = "done"\n}');
       expect(output).not.toContain('@@');
     });
+
+    it('renders a variadic member named like an Object.prototype key', () => {
+      const block: PslExtensionBlock = {
+        kind: 'native_enum',
+        name: 'Reserved',
+        parameters: {
+          toString: valueParam('"toString"'),
+          constructor: valueParam('"constructor"'),
+          plain: valueParam('"plain"'),
+        },
+        blockAttributes: [],
+        span: STUB_SPAN,
+      };
+
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [makeNs([], [block])],
+        span: STUB_SPAN,
+      };
+
+      const output = printPslFromAst(ast, { pslBlockDescriptors: variadicDescriptors });
+
+      expect(output).toContain('toString = "toString"');
+      expect(output).toContain('constructor = "constructor"');
+      expect(output).toContain('plain = "plain"');
+    });
   });
 
   describe('block with unregistered discriminator', () => {

@@ -134,7 +134,7 @@ function serializeExtensionBlock(
   }
   if (descriptor.variadicParameters) {
     for (const [paramName, paramValue] of Object.entries(extensionBlock.parameters)) {
-      if (paramName in descriptor.parameters) {
+      if (Object.hasOwn(descriptor.parameters, paramName)) {
         continue;
       }
       lines.push(`${PSL_INDENT_UNIT}${renderVariadicParam(paramName, paramValue)}`);

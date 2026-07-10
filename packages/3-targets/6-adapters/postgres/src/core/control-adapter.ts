@@ -1250,7 +1250,7 @@ export function parsePgNameArray(value: unknown): string[] {
   };
   let i = 0;
   while (i < inner.length) {
-    const char = inner[i] as string;
+    const char = inner.charAt(i);
     if (inQuotes) {
       if (char === '\\') {
         current += inner[i + 1] ?? '';
@@ -1279,6 +1279,11 @@ export function parsePgNameArray(value: unknown): string[] {
     }
     current += char;
     i++;
+  }
+  // A still-open quote means the literal was malformed (e.g. `{"unterminated}`);
+  // reject rather than emit the partial value.
+  if (inQuotes) {
+    return [];
   }
   pushCurrent();
   return elements;

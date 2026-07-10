@@ -1725,6 +1725,10 @@ describe('PostgresControlAdapter', () => {
     it('does not trim significant leading/trailing whitespace inside quotes', () => {
       expect(parsePgNameArray('{" padded "}')).toEqual([' padded ']);
     });
+
+    it('rejects an unterminated quoted element', () => {
+      expect(parsePgNameArray('{"unterminated}')).toEqual([]);
+    });
   });
 
   describe('readMarker', () => {

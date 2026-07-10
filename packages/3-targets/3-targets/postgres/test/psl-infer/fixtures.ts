@@ -71,11 +71,13 @@ function readNativeEnums(
   annotations: SqlSchemaIR['annotations'],
 ): readonly PostgresNativeEnumIntrospection[] {
   const entries = readPgAnnotationArray(annotations, 'nativeEnums') ?? [];
-  return entries.filter(
-    (entry): entry is PostgresNativeEnumIntrospection =>
-      typeof entry === 'object' &&
-      entry !== null &&
-      typeof (entry as { typeName?: unknown }).typeName === 'string' &&
-      Array.isArray((entry as { values?: unknown }).values),
-  );
+  return entries.filter((entry): entry is PostgresNativeEnumIntrospection => {
+    if (typeof entry !== 'object' || entry === null) return false;
+    const { typeName, values } = entry as { typeName?: unknown; values?: unknown };
+    return (
+      typeof typeName === 'string' &&
+      Array.isArray(values) &&
+      values.every((v): v is string => typeof v === 'string')
+    );
+  });
 }
