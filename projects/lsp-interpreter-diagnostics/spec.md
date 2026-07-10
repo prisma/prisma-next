@@ -146,8 +146,11 @@ graph TD
   `PslInterpretInput` as cheap future-proofing even though neither consumes it today
   (symbols embed their AST nodes).
 - **CLI emit path** (`packages/1-framework/3-tooling/cli/src/control-api/operations/contract-emit.ts`
-  lines 196–225): the only place that assembles a `ContractSourceContext` today
-  (control stack + `toExtensionInputs`-derived `composedExtensionContracts`). Rather
+  lines 196–225): assembles a `ContractSourceContext` (control stack +
+  `toExtensionInputs`-derived `composedExtensionContracts`). _Corrected during slice
+  02 (falsified assumption, 2026-07-10): this was **not** the only assembly site — a
+  byte-identical twin lived in the CLI's `client.ts` (`ControlClient.emit`); both
+  were collapsed._ Rather
   than extracting that assembly into a shared helper, the root cause is fixed:
   `ControlStack` exposes `extensionContracts: ReadonlyMap<string, Contract>`, built
   inside `createControlStack` beside its existing structural read of
