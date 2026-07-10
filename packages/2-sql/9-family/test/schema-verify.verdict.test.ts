@@ -125,7 +125,6 @@ function runVerdict(options: {
 
   const expected = contractToSchemaIR(options.contract, {
     annotationNamespace: 'pg',
-    flattenReferencedNamespace: true,
   });
   const actual = stampLikeIntrospection(options.schema);
   const issues = diffSchemas(expected, actual);

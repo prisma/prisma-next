@@ -252,27 +252,26 @@ function convertIndex(index: Index): SqlIndexIRInput {
 }
 
 /**
- * `flattenReferencedNamespace` stamps the FK's `resolvedReferencedNamespace`
- * to the empty segment — the value single-schema (flat) introspection
- * produces. Single-schema targets (SQLite) pass it so the derived expected FK
- * node pairs (by diff-node id) with its introspected counterpart, without a
- * pre-diff FK-neutralization pass. Namespaced targets (Postgres) omit it and
- * resolve the real DDL schema downstream, so the family default (which the
- * constructor derives from `referencedSchema`) is never observed there.
+ * The FK's referenced-namespace identity comes from the target's namespace
+ * node, not the raw namespace-id string. An unbound target namespace stamps
+ * no `referencedSchema` at all — the FK node's id renders the absence as the
+ * empty segment, which is what flat (single-schema) introspection produces,
+ * so both diff sides' FK ids meet by construction. A bound namespace (or a
+ * cross-space target whose namespace lives in another contract's storage)
+ * stamps its coordinate verbatim; namespaced targets (Postgres) resolve the
+ * real DDL schema downstream.
  */
-function convertForeignKey(
-  fk: ForeignKey,
-  flattenReferencedNamespace: boolean,
-): SqlForeignKeyIRInput {
+function convertForeignKey(fk: ForeignKey, storage: SqlStorage): SqlForeignKeyIRInput {
+  const targetNamespace = storage.namespaces[fk.target.namespaceId];
+  const targetIsUnbound = targetNamespace?.isUnbound === true;
   return {
     columns: fk.source.columns,
     referencedTable: fk.target.tableName,
-    referencedSchema: fk.target.namespaceId,
+    ...(targetIsUnbound ? {} : { referencedSchema: fk.target.namespaceId }),
     referencedColumns: fk.target.columns,
     ...ifDefined('name', fk.name),
     ...ifDefined('onDelete', fk.onDelete),
     ...ifDefined('onUpdate', fk.onUpdate),
-    ...(flattenReferencedNamespace ? { resolvedReferencedNamespace: '' } : {}),
   };
 }
 
@@ -283,7 +282,6 @@ function convertTable(
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
   storage: SqlStorage,
-  flattenReferencedNamespace: boolean,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIRInput> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
@@ -325,7 +323,7 @@ function convertTable(
     ...ifDefined('primaryKey', table.primaryKey),
     foreignKeys: table.foreignKeys
       .filter((fk) => fk.constraint !== false)
-      .map((fk) => convertForeignKey(fk, flattenReferencedNamespace)),
+      .map((fk) => convertForeignKey(fk, storage)),
     uniques: table.uniques.map(convertUnique),
     indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
     ...ifDefined('checks', checks),
@@ -402,15 +400,6 @@ export interface ContractToSchemaIROptions {
    * schema-scoped enum storage (SQLite) omit it; enums are absent there.
    */
   readonly resolveEnumNamespaceSchema?: EnumNamespaceSchemaResolver;
-  /**
-   * Single-schema (flat) targets set this so derived FK nodes are born with
-   * `resolvedReferencedNamespace: ''` — matching what flat introspection
-   * produces — instead of the constructor's default (the contract namespace
-   * id). Namespaced targets (Postgres) omit it and resolve the real DDL schema
-   * downstream. See {@link convertForeignKey}. Target-agnostic: it describes
-   * single-schema-ness, not a specific target.
-   */
-  readonly flattenReferencedNamespace?: boolean;
 }
 
 /**
@@ -464,7 +453,6 @@ export function contractNamespaceToSchemaIR(
       options.expandNativeType,
       options.renderDefault,
       storage,
-      options.flattenReferencedNamespace ?? false,
     );
   }
   return new SqlSchemaIR({ tables });
@@ -501,7 +489,6 @@ export function contractToSchemaIR(
         options.expandNativeType,
         options.renderDefault,
         storage,
-        options.flattenReferencedNamespace ?? false,
       );
     }
   }

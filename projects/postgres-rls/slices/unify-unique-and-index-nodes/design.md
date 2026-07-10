@@ -35,7 +35,7 @@ A unique constraint owns a private backing index in `pg_index`. We do **not** mo
 - `StorageTable.uniques` (`@@unique`, field `@unique`) → `SqlUniqueIR`.
 - `StorageTable.indexes` (`@@index`) → `SqlIndexIR{unique:false}`.
 - FK-backing indexes → `SqlIndexIR{unique:false}` (unchanged).
-- **FK schema segment resolved at derivation.** For flat/single-schema targets the expected tree is born with the FK `resolvedReferencedNamespace` that matches introspection, via a target-agnostic option on `contractToSchemaIR` — so there is no pre-diff FK-neutralization pass. (This is the one genuinely-good change carried over from the abandoned attempt.)
+- **FK referenced-namespace identity comes from the namespace node, not a string sentinel or a flag.** The contract IR answers "which namespace?" with a node — the unbound-namespace **singleton** for flat targets (`SqliteUnboundDatabase.instance`) — precisely so nothing downstream compares sentinel strings or branches on "does this database have namespaces". Derivation honors that: `convertForeignKey` resolves the FK target's namespace **node** and asks it; an **unbound** namespace stamps *no* referenced-namespace onto the FK node (absent), a bound one stamps its identity as today. Flat introspection also stamps nothing, so the two sides' FK ids meet **by construction**. There is **no `flattenReferencedNamespace` option, no caller-side flatten flag, and no `__unbound__` string ever entering schema-IR** — a flag or sentinel comparison here is papering over the model, and is forbidden. Unbound-ness is node behavior (a property/override answered by the unbound singleton class), not an id-string comparison at the consumer.
 - **No fail-loud rule** for `@@unique` + `@@index` on the same columns — they are distinct nodes with distinct ids and coexist.
 
 ## Introspection (database → schema IR)
@@ -81,7 +81,7 @@ Deleting the reconciliation flips exactly the satisfaction cases to drift (the i
 1. Delete `resolveSemanticSatisfaction`, `normalizeFlatActualForDiff`, the `SemanticSatisfaction*` types, and their call sites in both `diff-database-schema.ts`.
 2. Delete the caller-less `isUniqueConstraintSatisfied` / `isIndexSatisfied` (confirm no callers first).
 3. Make `SqlIndexIR.isEqualTo` symmetric on `unique` (drop `(!this.unique || node.unique)`).
-4. Fold `neutralizeFlatExpectedFkSchemas` into `contractToSchemaIR` (target-agnostic flatten option); delete the pre-diff pass and its file.
+4. FK referenced-namespace resolved at derivation **from the namespace node** (unbound singleton ⇒ absent); the pre-diff FK pass, its file, and any flatten flag/option are gone.
 5. Leave `SqlUniqueIR`, `SqlIndexIR` (otherwise), the node tree, and both planners as they are on `main`.
 6. Rewrite the verdict/planner tests that pinned satisfaction to the structural behaviour above.
 

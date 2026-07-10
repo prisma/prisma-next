@@ -600,7 +600,6 @@ describe('contractToSchemaIR', () => {
       new SqlForeignKeyIR({
         columns: ['authorId'],
         referencedTable: 'User',
-        referencedSchema: UNBOUND_NAMESPACE_ID,
         referencedColumns: ['id'],
         name: 'Post_authorId_fkey',
         onDelete: 'cascade',
@@ -673,7 +672,6 @@ describe('contractToSchemaIR', () => {
       new SqlForeignKeyIR({
         columns: ['workflowId', 'teamId'],
         referencedTable: 'Workflow',
-        referencedSchema: UNBOUND_NAMESPACE_ID,
         referencedColumns: ['id', 'teamId'],
         name: 'workflow_state_workflow_team_fkey',
         onDelete: 'cascade',
@@ -858,7 +856,6 @@ describe('contractToSchemaIR', () => {
       new SqlForeignKeyIR({
         columns: ['authorId'],
         referencedTable: 'User',
-        referencedSchema: UNBOUND_NAMESPACE_ID,
         referencedColumns: ['id'],
       }),
     );
@@ -1006,57 +1003,82 @@ describe('contractToSchemaIR', () => {
   });
 });
 
-describe('contractToSchemaIR — flattenReferencedNamespace', () => {
-  function fkStorage(): SqlStorage {
-    return new SqlStorage({
+describe('contractToSchemaIR — FK referenced-namespace identity', () => {
+  function postTable(targetNamespaceId: string): StorageTable {
+    return table({
+      columns: { authorId: col({ nativeType: 'text' }) },
+      foreignKeys: [
+        {
+          source: {
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+            tableName: 'Post',
+            columns: ['authorId'],
+          },
+          target: {
+            namespaceId: asNamespaceId(targetNamespaceId),
+            tableName: 'User',
+            columns: ['id'],
+          },
+          name: 'Post_authorId_fkey',
+          constraint: true,
+          index: false,
+        },
+      ],
+    });
+  }
+
+  it('an FK targeting the unbound namespace derives with an absent referenced namespace', () => {
+    const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
-          entries: {
-            table: {
-              Post: table({
-                columns: { authorId: col({ nativeType: 'text' }) },
-                foreignKeys: [
-                  {
-                    source: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'Post',
-                      columns: ['authorId'],
-                    },
-                    target: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'User',
-                      columns: ['id'],
-                    },
-                    name: 'Post_authorId_fkey',
-                    constraint: true,
-                    index: false,
-                  },
-                ],
-              }),
-            },
-          },
+          entries: { table: { Post: postTable(UNBOUND_NAMESPACE_ID) } },
         }),
       },
     });
-  }
 
-  it('defaults the FK resolved namespace to the referenced schema', () => {
-    const result = contractToSchemaIR(wrap(fkStorage()), { renderDefault: testRenderer });
-    const fk = result.tables['Post']!.foreignKeys[0]!;
-    expect(fk.resolvedReferencedNamespace).toBe(UNBOUND_NAMESPACE_ID);
-    expect(fk.id).toContain(UNBOUND_NAMESPACE_ID);
+    const fk = contractToSchemaIR(wrap(storage)).tables['Post']!.foreignKeys[0]!;
+    expect(fk.referencedSchema).toBeUndefined();
+    expect(fk.resolvedReferencedNamespace).toBeUndefined();
+    expect(fk.id).toBe('foreign-key:authorId->.User(id)');
   });
 
-  it('flattens the FK resolved namespace to the empty namespace when requested', () => {
-    const result = contractToSchemaIR(wrap(fkStorage()), {
-      renderDefault: testRenderer,
-      flattenReferencedNamespace: true,
+  it('an FK targeting a bound namespace derives its identity as before', () => {
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: { table: { Post: postTable('accounting') } },
+        }),
+        accounting: createTestSqlNamespace({
+          id: 'accounting',
+          entries: { table: { User: table({ columns: { id: col({ nativeType: 'text' }) } }) } },
+        }),
+      },
     });
-    const fk = result.tables['Post']!.foreignKeys[0]!;
-    expect(fk.resolvedReferencedNamespace).toBe('');
-    expect(fk.id).not.toContain(UNBOUND_NAMESPACE_ID);
+
+    const fk = contractToSchemaIR(wrap(storage)).tables['Post']!.foreignKeys[0]!;
+    expect(fk.referencedSchema).toBe('accounting');
+    expect(fk.resolvedReferencedNamespace).toBe('accounting');
+    expect(fk.id).toBe('foreign-key:authorId->accounting.User(id)');
+  });
+
+  it('an FK targeting a namespace absent from storage keeps its coordinate (cross-space)', () => {
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: { table: { Post: postTable('other_contract_ns') } },
+        }),
+      },
+    });
+
+    const fk = contractToSchemaIR(wrap(storage)).tables['Post']!.foreignKeys[0]!;
+    expect(fk.referencedSchema).toBe('other_contract_ns');
+    expect(fk.resolvedReferencedNamespace).toBe('other_contract_ns');
   });
 });
 

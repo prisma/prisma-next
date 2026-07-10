@@ -55,13 +55,13 @@ export function sqliteContractToSchema(
     readonly expandNativeType?: NativeTypeExpander;
   },
 ): SqlSchemaIR {
-  // SQLite is single-schema: FK nodes are born with the flat empty
-  // `resolvedReferencedNamespace` introspection produces, so the derived
-  // expected FK pairs with its introspected counterpart — no pre-diff pass.
+  // SQLite is single-schema: every contract FK targets the unbound namespace
+  // node, so derivation stamps no referenced namespace — the same absence
+  // flat introspection produces — and the derived expected FK pairs with its
+  // introspected counterpart by construction. No pre-diff pass, no flag.
   return contractToSchemaIR(contract, {
     annotationNamespace: 'sqlite',
     renderDefault: sqliteRenderDefault,
-    flattenReferencedNamespace: true,
     ...ifDefined('expandNativeType', extras?.expandNativeType),
   });
 }
