@@ -259,6 +259,7 @@ describe('inferPostgresPslContract', () => {
             uniques: [],
             indexes: [],
             policies: [],
+            rlsEnabled: false,
           }),
         },
         nativeEnumTypeNames: [],

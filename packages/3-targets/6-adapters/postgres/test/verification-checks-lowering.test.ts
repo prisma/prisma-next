@@ -8,6 +8,8 @@ import {
   extensionExistsAst,
   indexExistsAst,
   noNullValuesAst,
+  rlsEnabledAst,
+  rlsPolicyExistsAst,
   tableExistsAst,
   tableIsEmptyAst,
   tablePrimaryKeyAst,
@@ -89,6 +91,49 @@ describe('constraintExistsAst lowering — pg_constraint EXISTS checks', () => {
         ') AS "result"',
     );
     expect(result.params).toEqual(['user_pkey']);
+  });
+});
+
+describe('RLS check builders — policy/table names bind as parameters (injection safety)', () => {
+  // The recording-lowerer op tests (rls-ops / rls-disable-rename-ops) can only
+  // pin WHICH check AST an op lowers; the real safety property — that the
+  // policy name reaches SQL as a bound parameter, never interpolated — lives
+  // here, rendered through the real adapter lowerer.
+  const dangerousName = "read'; DROP POLICY x; --";
+
+  it('rlsPolicyExistsAst.policyPresent binds schema, table, and policy name', async () => {
+    const ast = rlsPolicyExistsAst({
+      schema: 'public',
+      table: 'profiles',
+      policyName: dangerousName,
+    }).policyPresent();
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
+    expect(result.sql).toBe(
+      'SELECT EXISTS (SELECT 1 AS "one" FROM "pg_policies" WHERE ' +
+        '("schemaname" = $1 AND "tablename" = $2 AND "policyname" = $3)) AS "result"',
+    );
+    expect(result.params).toEqual(['public', 'profiles', dangerousName]);
+    // The name is a bound param — it never appears in the SQL text.
+    expect(result.sql).not.toContain(dangerousName);
+  });
+
+  it('rlsPolicyExistsAst.policyAbsent binds the policy name too', async () => {
+    const ast = rlsPolicyExistsAst({
+      schema: 'public',
+      table: 'profiles',
+      policyName: dangerousName,
+    }).policyAbsent();
+    const result = await adapter.lowerToExecuteRequest(ast, ctx);
+    expect(result.params).toEqual(['public', 'profiles', dangerousName]);
+    expect(result.sql).not.toContain(dangerousName);
+  });
+
+  it('rlsEnabledAst binds schema and table as parameters', async () => {
+    const result = await adapter.lowerToExecuteRequest(
+      rlsEnabledAst('public', 'profiles').rlsEnabled(),
+      ctx,
+    );
+    expect(result.params).toEqual(['public', 'profiles']);
   });
 });
 

@@ -149,6 +149,7 @@ function contractToSchemaIR(
         ...(t.primaryKey !== undefined ? { primaryKey: t.primaryKey } : {}),
         ...(t.annotations !== undefined ? { annotations: t.annotations } : {}),
         ...(t.checks !== undefined ? { checks: t.checks } : {}),
+        rlsEnabled: false,
       }),
     ]),
   );

@@ -24,7 +24,17 @@ export function treeFromFlat(schemaIR: SqlSchemaIR): PostgresDatabaseSchemaNode 
     explicitTypeNames.length > 0 ? explicitTypeNames : nativeEnums.map((e) => e.typeName);
   const tables: Record<string, PostgresTableSchemaNode> = {};
   for (const [name, table] of Object.entries(schemaIR.tables)) {
-    tables[name] = new PostgresTableSchemaNode(table);
+    tables[name] = new PostgresTableSchemaNode({
+      name: table.name,
+      columns: table.columns,
+      foreignKeys: table.foreignKeys,
+      uniques: table.uniques,
+      indexes: table.indexes,
+      ...(table.primaryKey !== undefined ? { primaryKey: table.primaryKey } : {}),
+      ...(table.annotations !== undefined ? { annotations: table.annotations } : {}),
+      ...(table.checks !== undefined ? { checks: table.checks } : {}),
+      rlsEnabled: false,
+    });
   }
   return new PostgresDatabaseSchemaNode({
     namespaces: {

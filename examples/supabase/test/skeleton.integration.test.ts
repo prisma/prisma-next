@@ -54,6 +54,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import { createDb } from '../src/prisma/db';
+import type { Contract as NoPolicyContract } from './fixtures/no-policy/contract';
+import noPolicyContractJson from './fixtures/no-policy/contract.json' with { type: 'json' };
+import type { Contract as RenamedPolicyContract } from './fixtures/renamed-policy/contract';
+import renamedPolicyContractJson from './fixtures/renamed-policy/contract.json' with {
+  type: 'json',
+};
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
 // Derive the policy wire name from the deserialized contract rather than pinning a literal.
@@ -460,9 +466,10 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
       // level, is_local=false so it persists across statement boundaries), then
       // switch to the authenticated role for the actual query.
       await withClient(connectionString, async (pgClient) => {
-        await pgClient.query(
-          `SELECT set_config('request.jwt.claims', '{"sub":"${ownerA}"}', false)`,
-        );
+        await pgClient.query('SELECT set_config($1, $2, false)', [
+          'request.jwt.claims',
+          JSON.stringify({ sub: ownerA }),
+        ]);
         await pgClient.query('SET ROLE authenticated');
 
         const result = await pgClient.query<{
@@ -535,6 +542,191 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
         ).toBeDefined();
         expect(policyIssue?.reason).toBe('not-found');
       }
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  // Variant contract states are committed fixtures emitted by the real
+  // pipeline from variant PSL sources (see test/fixtures/*.config.ts and
+  // this package's `emit` script) — never mutated contract data.
+
+  async function seedProfilesAndGrant(connectionString: string, ownerA: string, ownerB: string) {
+    await withClient(connectionString, async (pgClient) => {
+      const now = new Date().toISOString();
+      await pgClient.query(
+        'INSERT INTO auth.users (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3), ($4, $5, $3, $3)',
+        [ownerA, 'alice@example.com', now, ownerB, 'bob@example.com'],
+      );
+      await pgClient.query(
+        'INSERT INTO public.profile (id, username, "userId") VALUES ($1, $2, $3), ($4, $5, $6)',
+        [
+          'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          'alice',
+          ownerA,
+          'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          'bob',
+          ownerB,
+        ],
+      );
+      await pgClient.query('GRANT SELECT ON public.profile TO authenticated');
+    });
+  }
+
+  async function rowsVisibleToAuthenticated(
+    connectionString: string,
+    ownerSub: string,
+  ): Promise<readonly { username: string }[]> {
+    return withClient(connectionString, async (pgClient) => {
+      await pgClient.query('SELECT set_config($1, $2, false)', [
+        'request.jwt.claims',
+        JSON.stringify({ sub: ownerSub }),
+      ]);
+      await pgClient.query('SET ROLE authenticated');
+      const result = await pgClient.query<{ username: string }>(
+        'SELECT username FROM public.profile',
+      );
+      await pgClient.query('RESET ROLE');
+      return result.rows;
+    });
+  }
+
+  it(
+    'C — fail-closed: removing the last policy keeps RLS on and denies all rows',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+      await seedProfilesAndGrant(connectionString, ownerA, ownerB);
+
+      // The policy filters before the change (sanity: alice sees her row).
+      expect(await rowsVisibleToAuthenticated(connectionString, ownerA)).toEqual([
+        { username: 'alice' },
+      ]);
+
+      // The committed no-policy fixture: the schema minus its policy_select
+      // block, @@rls kept.
+      const noPolicyContract = noPolicyContractJson;
+
+      // Plan: exactly the policy drop — no enablement change anywhere.
+      const planResult = await client.dbUpdate({
+        contract: noPolicyContract,
+        mode: 'plan',
+        migrationsDir,
+        acceptDataLoss: true,
+      });
+      if (!planResult.ok) {
+        throw new Error(`db update plan failed: ${JSON.stringify(planResult.failure, null, 2)}`);
+      }
+      const planIds = planResult.value.plan.operations.map((op) => op.id);
+      expect(planIds).toEqual([`rlsPolicy.public.profile.${POLICY_WIRE_NAME}.drop`]);
+
+      const applyResult = await client.dbUpdate({
+        contract: noPolicyContract,
+        mode: 'apply',
+        migrationsDir,
+        acceptDataLoss: true,
+      });
+      if (!applyResult.ok) {
+        throw new Error(`db update apply failed: ${JSON.stringify(applyResult.failure, null, 2)}`);
+      }
+
+      // Verify clean against the policy-less (still marked) contract.
+      const deserialized = new PostgresContractSerializer().deserializeContract<NoPolicyContract>(
+        noPolicyContractJson,
+      );
+      const verifyResult = await client.dbVerify({
+        contract: deserialized,
+        migrationsDir,
+        strict: false,
+        skipSchema: false,
+        skipMarker: false,
+      });
+      expect(
+        verifyResult.ok,
+        `dbVerify failed: ${!verifyResult.ok ? JSON.stringify(verifyResult.failure) : ''}`,
+      ).toBe(true);
+      if (verifyResult.ok) {
+        for (const [spaceId, schemaResult] of verifyResult.value.schemaResults) {
+          expect(
+            schemaResult.ok,
+            `space "${spaceId}" failed: ${JSON.stringify(schemaResult.schema?.issues)}`,
+          ).toBe(true);
+        }
+      }
+
+      // Behavioral proof: RLS is still enabled with zero policies — deny-all.
+      expect(await rowsVisibleToAuthenticated(connectionString, ownerA)).toEqual([]);
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'D — prefix-only policy rename plans exactly one ALTER POLICY … RENAME TO and keeps filtering',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+      await seedProfilesAndGrant(connectionString, ownerA, ownerB);
+
+      // The committed renamed-policy fixture: the same policy body under the
+      // prefix profile_owner_read_v2 — same content hash, new wire name.
+      const renamedContract = renamedPolicyContractJson;
+      const renamedWireName =
+        Object.values(renamedContract.storage.namespaces.public.entries.policy)[0]?.name ?? '';
+      expect(renamedWireName).toBe(
+        `profile_owner_read_v2_${POLICY_WIRE_NAME.slice(POLICY_WIRE_NAME.lastIndexOf('_') + 1)}`,
+      );
+
+      // Plan: exactly one rename — no drop, no create, no enablement change.
+      const planResult = await client.dbUpdate({
+        contract: renamedContract,
+        mode: 'plan',
+        migrationsDir,
+      });
+      if (!planResult.ok) {
+        throw new Error(`db update plan failed: ${JSON.stringify(planResult.failure, null, 2)}`);
+      }
+      const planIds = planResult.value.plan.operations.map((op) => op.id);
+      expect(planIds).toEqual([`rlsPolicy.public.profile.${POLICY_WIRE_NAME}.rename`]);
+
+      const applyResult = await client.dbUpdate({
+        contract: renamedContract,
+        mode: 'apply',
+        migrationsDir,
+      });
+      if (!applyResult.ok) {
+        throw new Error(`db update apply failed: ${JSON.stringify(applyResult.failure, null, 2)}`);
+      }
+
+      // Verify clean against the renamed contract.
+      const deserialized =
+        new PostgresContractSerializer().deserializeContract<RenamedPolicyContract>(
+          renamedPolicyContractJson,
+        );
+      const verifyResult = await client.dbVerify({
+        contract: deserialized,
+        migrationsDir,
+        strict: false,
+        skipSchema: false,
+        skipMarker: false,
+      });
+      expect(
+        verifyResult.ok,
+        `dbVerify failed: ${!verifyResult.ok ? JSON.stringify(verifyResult.failure) : ''}`,
+      ).toBe(true);
+      if (verifyResult.ok) {
+        for (const [spaceId, schemaResult] of verifyResult.value.schemaResults) {
+          expect(
+            schemaResult.ok,
+            `space "${spaceId}" failed: ${JSON.stringify(schemaResult.schema?.issues)}`,
+          ).toBe(true);
+        }
+      }
+
+      // The renamed policy still filters rows.
+      expect(await rowsVisibleToAuthenticated(connectionString, ownerA)).toEqual([
+        { username: 'alice' },
+      ]);
     },
     timeouts.spinUpPpgDev * 4,
   );

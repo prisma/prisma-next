@@ -16,12 +16,17 @@ import type {
   AuthoringEntityContext,
   AuthoringEntityTypeDescriptor,
   AuthoringEntityTypeNamespace,
+  AuthoringModelAttributeContext,
+  AuthoringModelAttributeDescriptor,
+  AuthoringModelAttributeDescriptorNamespace,
+  AuthoringModelAttributeLoweringOutput,
   AuthoringPslBlockDescriptorNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import {
   instantiateAuthoringEntityType,
   isAuthoringEntityTypeDescriptor,
+  isAuthoringModelAttributeDescriptor,
   isAuthoringPslBlockDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -36,9 +41,11 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import {
+  type AttributeSpec,
   type BlockSymbol,
   type CompositeTypeSymbol,
   type FieldSymbol,
+  findBlockDescriptor,
   keywordPslSpan,
   type ModelSymbol,
   type NamespaceSymbol,
@@ -310,6 +317,93 @@ function buildEntityTypesByDiscriminator(
 }
 
 /**
+ * The `PSL_DUPLICATE_ATTRIBUTE` diagnostic for a model attribute declared
+ * more than once on one model. Shared by the built-in `@@control` path and
+ * the contributed-model-attribute path so the code and wording stay in one
+ * place. `name` is the bare attribute name (`control`, `rls`, …).
+ */
+function duplicateModelAttributeDiagnostic(input: {
+  readonly name: string;
+  readonly modelName: string;
+  readonly sourceId: string;
+  readonly span: ContractSourceDiagnostic['span'];
+}): ContractSourceDiagnostic {
+  return {
+    code: 'PSL_DUPLICATE_ATTRIBUTE',
+    message: `\`@@${input.name}\` declared more than once on model "${input.modelName}".`,
+    sourceId: input.sourceId,
+    ...ifDefined('span', input.span),
+  };
+}
+
+/**
+ * Enforces `AuthoringPslBlockDescriptor.requiresModelAttribute` over one
+ * scope (the top level or one namespace): every block whose descriptor
+ * declares the requirement must name a model that carries the required
+ * bare `@@` attribute. Runs on the parsed symbol table, so it is
+ * independent of block/model declaration order and of lowering order. A
+ * missing parameter or an unresolvable model is skipped — the
+ * missing-required-parameter and unresolved-ref diagnostics own those
+ * failure modes.
+ */
+function validateBlockModelAttributeRequirements(input: {
+  readonly scopes: readonly {
+    readonly models: Readonly<Record<string, ModelSymbol>>;
+    readonly blocks: Readonly<Record<string, BlockSymbol>>;
+  }[];
+  readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): void {
+  for (const scope of input.scopes) {
+    for (const blockSymbol of Object.values(scope.blocks)) {
+      const descriptor = findBlockDescriptor(input.pslBlockDescriptors, blockSymbol.keyword);
+      const requirement = descriptor?.requiresModelAttribute;
+      if (requirement === undefined) continue;
+      const captured = blockSymbol.block.parameters[requirement.parameter];
+      if (captured?.kind !== 'ref') continue;
+      const model = scope.models[captured.identifier];
+      if (model === undefined) continue;
+      if (model.attributes.some((attribute) => attribute.name === requirement.attribute)) {
+        continue;
+      }
+      input.diagnostics.push({
+        code: 'PSL_EXTENSION_TARGET_MODEL_MISSING_ATTRIBUTE',
+        message: `\`${blockSymbol.keyword}\` block "${blockSymbol.block.name}" targets model "${captured.identifier}", which does not declare \`@@${requirement.attribute}\`. Add \`@@${requirement.attribute}\` to model "${captured.identifier}".`,
+        sourceId: input.sourceId,
+        span: captured.span,
+      });
+    }
+  }
+}
+
+/**
+ * Walks the flat `modelAttributes` namespace tree in `authoringContributions`
+ * and returns a map from bare `@@` attribute name to the matching
+ * descriptor. The model-attribute loop in `buildModelNodeFromPsl` uses this
+ * to dispatch a contributed attribute without naming any specific attribute.
+ */
+function buildModelAttributesByName(
+  contributions: AuthoringContributions | undefined,
+): ReadonlyMap<string, AuthoringModelAttributeDescriptor> {
+  const result = new Map<string, AuthoringModelAttributeDescriptor>();
+  const namespace = contributions?.modelAttributes;
+  if (namespace === undefined) return result;
+
+  const walk = (node: AuthoringModelAttributeDescriptorNamespace): void => {
+    for (const value of Object.values(node)) {
+      if (isAuthoringModelAttributeDescriptor(value)) {
+        result.set(value.attribute, value);
+      } else if (typeof value === 'object' && value !== null) {
+        walk(value);
+      }
+    }
+  };
+  walk(namespace);
+  return result;
+}
+
+/**
  * For a single PSL namespace, lowers all extension blocks (parsed by
  * `namespacePslExtensionBlocks`) into IR entities via the registered
  * factory for each block's discriminator. Groups results by discriminator
@@ -481,6 +575,10 @@ interface BuildModelNodeInput {
   >;
   /** Codec-id-keyed descriptor lookup — forwarded to `collectResolvedFields` for entity-ref type-constructor resolution (e.g. `pg.enum(Ref)`). */
   readonly codecLookup?: CodecLookup;
+  /** Contributed model-attribute descriptors keyed by bare `@@` attribute name (the exact shape `buildModelAttributesByName` produces). */
+  readonly modelAttributesByName: ReadonlyMap<string, AuthoringModelAttributeDescriptor>;
+  /** The target's default namespace id — the lowering context's `namespaceId` fallback for a model with no explicit PSL namespace. */
+  readonly defaultNamespaceId: string;
 }
 
 interface BuildModelNodeResult {
@@ -490,6 +588,8 @@ interface BuildModelNodeResult {
   readonly resolvedFields: readonly ResolvedField[];
   /** Cross-contract-space relation nodes that bypass the local back-relation matching. */
   readonly crossSpaceRelations: RelationNode[];
+  /** Entities lowered by contributed model attributes, keyed by attribute name then entity key (`entries[attribute][key]`). */
+  readonly modelAttributeEntities: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
 function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult {
@@ -545,6 +645,8 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   let blockPrimaryKeyDeclared = false;
   let controlPolicyDeclared = false;
   let controlPolicy: ControlPolicy | undefined;
+  const declaredContributedModelAttributes = new Set<string>();
+  const modelAttributeEntities: Record<string, Record<string, unknown>> = {};
 
   const resultBackrelationCandidates: ModelBackrelationCandidate[] = [];
   for (const field of Object.values(model.fields)) {
@@ -635,12 +737,14 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     }
     if (modelAttribute.name === 'control') {
       if (controlPolicyDeclared) {
-        diagnostics.push({
-          code: 'PSL_DUPLICATE_ATTRIBUTE',
-          message: `\`@@control\` declared more than once on model "${model.name}".`,
-          sourceId,
-          span: modelAttribute.span,
-        });
+        diagnostics.push(
+          duplicateModelAttributeDiagnostic({
+            name: 'control',
+            modelName: model.name,
+            sourceId,
+            span: modelAttribute.span,
+          }),
+        );
         continue;
       }
       controlPolicyDeclared = true;
@@ -795,6 +899,69 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         ...ifDefined('type', parsed.type),
         ...ifDefined('options', parsed.options),
       });
+      continue;
+    }
+    const contributedModelAttribute = input.modelAttributesByName.get(modelAttribute.name);
+    if (contributedModelAttribute !== undefined) {
+      if (declaredContributedModelAttributes.has(modelAttribute.name)) {
+        diagnostics.push(
+          duplicateModelAttributeDiagnostic({
+            name: modelAttribute.name,
+            modelName: model.name,
+            sourceId,
+            span: modelAttribute.span,
+          }),
+        );
+        continue;
+      }
+      declaredContributedModelAttributes.add(modelAttribute.name);
+      const node = modelAttributeNodes[attributeIndex];
+      if (node === undefined) {
+        continue;
+      }
+      const spec = blindCast<
+        AttributeSpec<unknown>,
+        'contributed model-attribute descriptors carry an ADR-231 attribute-spec-kit spec by construction'
+      >(contributedModelAttribute.spec);
+      const parsed = interpretModelAttribute({
+        node,
+        spec,
+        model,
+        sourceFile: input.sourceFile,
+        sourceId,
+        diagnostics,
+      });
+      if (parsed === undefined) {
+        continue;
+      }
+      const lower = blindCast<
+        (
+          parsed: unknown,
+          ctx: AuthoringModelAttributeContext,
+        ) => AuthoringModelAttributeLoweringOutput | undefined,
+        "lowering is called with the exact value interpretModelAttribute parsed against this descriptor's own spec"
+      >(contributedModelAttribute.lower);
+      const lowered = lower(parsed, {
+        family: input.familyId,
+        target: input.targetId,
+        modelName: model.name,
+        storageName: tableName,
+        namespaceId: modelNamespaceId ?? input.defaultNamespaceId,
+        sourceId,
+        diagnostics: {
+          push: (d) => {
+            diagnostics.push(
+              blindCast<ContractSourceDiagnostic, 'sink diagnostics are span-compatible'>(d),
+            );
+          },
+        },
+      });
+      if (lowered === undefined) {
+        continue;
+      }
+      const slot = modelAttributeEntities[contributedModelAttribute.attribute] ?? {};
+      modelAttributeEntities[contributedModelAttribute.attribute] = slot;
+      slot[lowered.key] = lowered.entity;
       continue;
     }
     const uncomposedNamespace = checkUncomposedNamespace(
@@ -1158,6 +1325,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     crossSpaceRelations: resultCrossSpaceRelations,
     backrelationCandidates: resultBackrelationCandidates,
     resolvedFields,
+    modelAttributeEntities,
   };
 }
 
@@ -1710,6 +1878,12 @@ export function interpretPslDocumentToSqlContract(
     sourceFile,
     diagnostics,
   });
+  validateBlockModelAttributeRequirements({
+    scopes: [topLevel, ...namespaceSymbols],
+    pslBlockDescriptors: input.authoringContributions?.pslBlockDescriptors ?? {},
+    sourceId,
+    diagnostics,
+  });
   const models: ModelSymbol[] = [];
   const modelEntries: ModelNamespaceEntry[] = [];
   const modelNamespaceIds = new Map<string, string>();
@@ -1841,6 +2015,7 @@ export function interpretPslDocumentToSqlContract(
   // already-lowered extension entity — see `namespaceExtensionEntities`
   // threaded into `collectResolvedFields` below.
   const entityTypesByDiscriminator = buildEntityTypesByDiscriminator(input.authoringContributions);
+  const modelAttributesByName = buildModelAttributesByName(input.authoringContributions);
   const extensionEntityContext: AuthoringEntityContext = {
     family: input.target.familyId,
     target: input.target.targetId,
@@ -1942,6 +2117,13 @@ export function interpretPslDocumentToSqlContract(
   // Cross-space relation nodes keyed by declaring model name — merged into
   // modelRelations after local back-relation matching so they bypass that step.
   const crossSpaceRelationsByModel = new Map<string, RelationNode[]>();
+  // Entities lowered by contributed model attributes, keyed by namespace id
+  // then attribute name then entity key — merged into `entries` alongside
+  // `namespaceExtensionEntities` once every model has been processed.
+  const modelAttributeEntitiesByNamespace = new Map<
+    string,
+    Record<string, Record<string, unknown>>
+  >();
 
   for (const { model, namespaceId } of modelEntries) {
     const coordinate = modelCoordinateKey(namespaceId ?? defaultNamespaceId, model.name);
@@ -1975,6 +2157,8 @@ export function interpretPslDocumentToSqlContract(
       capabilities: input.capabilities,
       ...(namespaceExtensionEntities.size > 0 ? { namespaceExtensionEntities } : {}),
       ...ifDefined('codecLookup', input.codecLookup),
+      modelAttributesByName,
+      defaultNamespaceId,
     });
     modelNodes.push(
       namespaceId !== undefined ? { ...result.modelNode, namespaceId } : result.modelNode,
@@ -1985,6 +2169,14 @@ export function interpretPslDocumentToSqlContract(
     if (result.crossSpaceRelations.length > 0) {
       const existing = crossSpaceRelationsByModel.get(model.name) ?? [];
       crossSpaceRelationsByModel.set(model.name, [...existing, ...result.crossSpaceRelations]);
+    }
+    if (Object.keys(result.modelAttributeEntities).length > 0) {
+      const nsKey = namespaceId ?? defaultNamespaceId;
+      const existingByAttribute = modelAttributeEntitiesByNamespace.get(nsKey) ?? {};
+      for (const [attribute, keyed] of Object.entries(result.modelAttributeEntities)) {
+        existingByAttribute[attribute] = { ...(existingByAttribute[attribute] ?? {}), ...keyed };
+      }
+      modelAttributeEntitiesByNamespace.set(nsKey, existingByAttribute);
     }
   }
 
@@ -2073,15 +2265,32 @@ export function interpretPslDocumentToSqlContract(
   const { createNamespace } = input;
   const createNamespaceWithExtensions = (nsInput: SqlNamespaceInput) => {
     const entities = namespaceExtensionEntities.get(nsInput.id);
-    if (entities === undefined) {
+    const attributeEntities = modelAttributeEntitiesByNamespace.get(nsInput.id);
+    if (entities === undefined && attributeEntities === undefined) {
       return createNamespace(nsInput);
     }
-    const mergedValueSet = { ...nsInput.entries['valueSet'], ...entities['valueSet'] };
+    // A model-attribute entries slot must not collide with a base slot
+    // (`table`, `valueSet`) or a block-produced slot — the merge below spreads
+    // `...attributeEntities` last and would otherwise silently shallow-replace
+    // it. Fail loud so a pack that files a model attribute under an
+    // already-claimed kind name is caught at composition rather than losing
+    // data. (`rls` vs `policy`/`role`/`valueSet`/`table` is disjoint today.)
+    if (attributeEntities !== undefined) {
+      for (const slot of Object.keys(attributeEntities)) {
+        if (Object.hasOwn(nsInput.entries, slot) || (entities !== undefined && slot in entities)) {
+          throw new Error(
+            `entries slot "${slot}" in namespace "${nsInput.id}" is contributed by both a model attribute and a block/base entry kind. A model-attribute entries key must be unique across the namespace's entry kinds.`,
+          );
+        }
+      }
+    }
+    const mergedValueSet = { ...nsInput.entries['valueSet'], ...entities?.['valueSet'] };
     const extended: SqlNamespaceInput = {
       ...nsInput,
       entries: {
         ...nsInput.entries,
         ...entities,
+        ...attributeEntities,
         ...(Object.keys(mergedValueSet).length > 0 ? { valueSet: mergedValueSet } : {}),
       },
     };

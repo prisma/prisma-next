@@ -19,6 +19,12 @@ export const PostgresRlsPolicySchema = type({
   permissive: 'boolean',
 });
 
+export const PostgresRlsEnablementSchema = type({
+  kind: "'rls'",
+  tableName: 'string',
+  namespaceId: 'string',
+});
+
 export const PostgresNativeEnumSchema = type({
   kind: "'postgres-enum'",
   typeName: 'string',

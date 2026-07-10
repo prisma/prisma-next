@@ -70,6 +70,7 @@ export function normalizePostgresActualForDiff(
         ...ifDefined('annotations', actualTable.annotations),
         ...ifDefined('checks', actualTable.checks),
         policies: [...actualTable.policies],
+        rlsEnabled: actualTable.rlsEnabled,
       });
     }
     namespaces[nsId] = new PostgresNamespaceSchemaNode({

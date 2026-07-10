@@ -117,6 +117,9 @@ export function contractToPostgresDatabaseSchemaNode(
         ...ifDefined('annotations', sqlTable.annotations),
         ...ifDefined('checks', sqlTable.checks),
         policies: policiesByTable.get(tableName) ?? [],
+        // Marker-driven, never derived from the policy set: the `rls` entry
+        // is the single authored source of enablement.
+        rlsEnabled: Object.hasOwn(ns.rls, tableName),
       });
     }
 
@@ -125,6 +128,12 @@ export function contractToPostgresDatabaseSchemaNode(
         const policyName = tablePolicies[0]?.name ?? '(unknown)';
         throw new Error(
           `contract-to-postgres-database-schema-node: policy "${policyName}" references table "${tableName}" not present in namespace "${ddlSchema}"`,
+        );
+      }
+      if (!Object.hasOwn(ns.rls, tableName)) {
+        const policyPrefix = tablePolicies[0]?.prefix ?? '(unknown)';
+        throw new Error(
+          `contract-to-postgres-database-schema-node: policy "${policyPrefix}" targets table "${tableName}" in namespace "${ddlSchema}", which is not RLS-controlled. Mark the model with @@rls (entries.rls["${tableName}"]) or remove the policy.`,
         );
       }
     }

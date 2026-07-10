@@ -7,6 +7,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { isPostgresSchema } from '../postgres-schema';
 import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
+import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
 import { issueColumnName } from './issue-planner';
@@ -163,9 +164,37 @@ const POSTGRES_NODE_CREATION_FACTORY: Readonly<Record<string, string>> = Object.
   [PostgresSchemaNodeKind.table]: 'createTable',
 });
 
+/**
+ * A table `not-equal` issue whose `rlsEnabled` flips OFF→ON (expected on,
+ * actual off) is enablement toward `ENABLE ROW LEVEL SECURITY` —
+ * creation-class per `OBJECT_CREATION_FACTORIES` ('enableRowLevelSecurity'
+ * is a member): enabling RLS establishes the fail-closed guard the declared
+ * policy set attaches to, the same grant `tolerated` extends to creating the
+ * policies themselves. The opposite direction (`DISABLE`) is a modification
+ * and stays managed-only. Keying on the actual delta (not just the expected
+ * bit) keeps this correct if a second table attribute ever joins
+ * `isEqualTo`: a not-equal with no `rlsEnabled` delta is not enablement, so
+ * it is not admitted as creation-class here.
+ */
+function isEnablementCreationIssue(issue: SchemaDiffIssue<SqlSchemaDiffNode>): boolean {
+  if (issue.reason !== 'not-equal') return false;
+  const { expected, actual } = issue;
+  return (
+    expected !== undefined &&
+    actual !== undefined &&
+    PostgresTableSchemaNode.is(expected) &&
+    PostgresTableSchemaNode.is(actual) &&
+    expected.rlsEnabled === true &&
+    actual.rlsEnabled === false
+  );
+}
+
 export function resolvePostgresNodeIssueCreationFactoryName(
   issue: SchemaDiffIssue<SqlSchemaDiffNode>,
 ): string | undefined {
+  if (isEnablementCreationIssue(issue)) {
+    return 'enableRowLevelSecurity';
+  }
   if (issue.reason !== 'not-found') return undefined;
   const node = issue.expected ?? issue.actual;
   if (node === undefined) return undefined;
@@ -215,7 +244,8 @@ export function resolvePostgresNodeIssueControlPolicySubject(
     entityName: tableName,
   });
   const createsNewObject =
-    node.nodeKind === PostgresSchemaNodeKind.table && issue.reason === 'not-found';
+    (node.nodeKind === PostgresSchemaNodeKind.table && issue.reason === 'not-found') ||
+    isEnablementCreationIssue(issue);
 
   return {
     namespaceId,

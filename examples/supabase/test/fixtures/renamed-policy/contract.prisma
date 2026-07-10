@@ -1,0 +1,20 @@
+types {
+  Uuid = String @db.Uuid
+}
+
+namespace public {
+  model Profile {
+    id       Uuid   @id @default(uuid())
+    username String
+    userId   Uuid   @unique
+    user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+    @@map("profile")
+    @@rls
+  }
+
+  policy_select profile_owner_read_v2 {
+    target = Profile
+    roles  = [authenticated]
+    using  = "\"userId\"::uuid = auth.uid()"
+  }
+}

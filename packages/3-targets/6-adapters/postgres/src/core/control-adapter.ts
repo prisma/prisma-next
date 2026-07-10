@@ -44,16 +44,19 @@ import type {
   AddColumnAction,
   AlterTableActionVisitor,
   DropDefaultAction,
+  PostgresAlterPolicyRename,
   PostgresAlterTable,
   PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
   PostgresDdlNode,
+  PostgresDisableRowLevelSecurity,
   PostgresDropPolicy,
   RlsPolicyOperation,
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
+import { parseRlsPolicyWireName } from '@prisma-next/target-postgres/rls-canonicalize';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
   PostgresDatabaseSchemaNode,
@@ -1162,8 +1165,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase())),
       ].sort();
       const permissive = row.permissive.toUpperCase() === 'PERMISSIVE';
-      const hashSuffixMatch = /^(.+)_([0-9a-f]{8})$/.exec(row.policyname);
-      const prefix = hashSuffixMatch?.[1] ?? row.policyname;
+      const prefix = parseRlsPolicyWireName(row.policyname)?.prefix ?? row.policyname;
       const policy = new PostgresPolicySchemaNode({
         name: row.policyname,
         prefix,
@@ -1180,11 +1182,42 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       policiesByTable.set(row.tablename, list);
     }
 
+    // RLS enablement is a table attribute (`pg_class.relrowsecurity`), not a
+    // function of the policy set — a table can have RLS on with zero
+    // policies (deny-all) or policies present with RLS off. relkind covers
+    // both plain ('r') and partitioned ('p') tables: the table listing above
+    // (`information_schema.tables`, BASE TABLE) includes partitioned parents,
+    // and Postgres supports RLS on them.
+    //
+    // Kept as a SEPARATE query from the table listing on purpose. Folding
+    // relrowsecurity into the listing would mean replacing
+    // `information_schema.tables` (which filters by the connection role's
+    // grants) with a raw `pg_class` scan (which does not), changing WHICH
+    // tables the introspection returns — a real behavior shift, not a
+    // cleanup, and one the offline golden-diff can't catch (introspection is
+    // live-only). The only cost of two queries is the concurrent-DDL window:
+    // a table listed but missed by this scan defaults (`?? false`) to
+    // RLS-off. That default is fail-safe — the worst case downstream is a
+    // spurious ENABLE (idempotent), never a spurious DISABLE.
+    const rlsEnabledResult = await driver.query<{ tablename: string; rls_enabled: boolean }>(
+      `SELECT c.relname AS tablename, c.relrowsecurity AS rls_enabled
+         FROM pg_catalog.pg_class c
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = $1
+           AND c.relkind IN ('r', 'p')
+         ORDER BY c.relname`,
+      [schema],
+    );
+    const rlsEnabledByTable = new Map<string, boolean>(
+      rlsEnabledResult.rows.map((row) => [row.tablename, row.rls_enabled]),
+    );
+
     const tables: Record<string, PostgresTableSchemaNode> = {};
     for (const [tableName, input] of Object.entries(tableInputs)) {
       tables[tableName] = new PostgresTableSchemaNode({
         ...input,
         policies: policiesByTable.get(tableName) ?? [],
+        rlsEnabled: rlsEnabledByTable.get(tableName) ?? false,
       });
     }
 
@@ -1779,6 +1812,22 @@ function pgRenderDropPolicy(node: PostgresDropPolicy): SqlExecuteRequest {
   };
 }
 
+function pgRenderAlterPolicyRename(node: PostgresAlterPolicyRename): SqlExecuteRequest {
+  const tableRef = `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`;
+  return {
+    sql: `ALTER POLICY ${quoteIdentifier(node.name)} ON ${tableRef} RENAME TO ${quoteIdentifier(node.newName)}`,
+    params: [],
+  };
+}
+
+function pgRenderDisableRowLevelSecurity(node: PostgresDisableRowLevelSecurity): SqlExecuteRequest {
+  const tableRef = `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`;
+  return {
+    sql: `ALTER TABLE ${tableRef} DISABLE ROW LEVEL SECURITY`,
+    params: [],
+  };
+}
+
 async function pgRenderDdlExecuteRequest(
   ast: PostgresDdlNode,
   codecLookup: CodecLookup,
@@ -1789,6 +1838,10 @@ async function pgRenderDdlExecuteRequest(
     alterTable: (node: PostgresAlterTable) => pgRenderAlterTable(node, codecLookup),
     createPolicy: (node: PostgresCreatePolicy) => Promise.resolve(pgRenderCreatePolicy(node)),
     dropPolicy: (node: PostgresDropPolicy) => Promise.resolve(pgRenderDropPolicy(node)),
+    alterPolicyRename: (node: PostgresAlterPolicyRename) =>
+      Promise.resolve(pgRenderAlterPolicyRename(node)),
+    disableRowLevelSecurity: (node: PostgresDisableRowLevelSecurity) =>
+      Promise.resolve(pgRenderDisableRowLevelSecurity(node)),
   };
   return ast.accept(visitor);
 }

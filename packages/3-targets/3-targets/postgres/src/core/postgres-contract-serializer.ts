@@ -19,7 +19,12 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
 import { PG_INT_CODEC_ID, PG_TEXT_CODEC_ID } from './codec-ids';
-import { nativeEnumEntityKind, policyEntityKind, roleEntityKind } from './entity-kinds';
+import {
+  nativeEnumEntityKind,
+  policyEntityKind,
+  rlsEnablementEntityKind,
+  roleEntityKind,
+} from './entity-kinds';
 import { PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
@@ -73,6 +78,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     super(storageTypesHydrators, [
       policyEntityKind,
       roleEntityKind,
+      rlsEnablementEntityKind,
       nativeEnumEntityKind,
       ...extraPackEntityKinds,
     ]);

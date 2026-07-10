@@ -9,6 +9,7 @@ namespace public {
     userId   Uuid   @unique
     user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
     @@map("profile")
+    @@rls
   }
 
   policy_select profile_owner_read {

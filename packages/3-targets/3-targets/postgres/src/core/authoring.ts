@@ -4,21 +4,27 @@ import type {
   AuthoringEntityTypeFactoryOutput,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
+  AuthoringModelAttributeContext,
+  AuthoringModelAttributeDescriptorNamespace,
   AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
+import { modelAttribute } from '@prisma-next/psl-parser';
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { PostgresNativeEnum } from './postgres-native-enum';
+import { PostgresRlsEnablement, type PostgresRlsEnablementInput } from './postgres-rls-enablement';
 import { PostgresRlsPolicy } from './postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './postgres-role';
 import {
   PostgresNativeEnumSchema,
+  PostgresRlsEnablementSchema,
   PostgresRlsPolicySchema,
   PostgresRoleSchema,
 } from './postgres-validators';
 import { computeContentHash, normalizePredicate } from './rls/canonicalize';
+import { formatRlsPolicyWireName } from './rls/wire-name';
 
 /**
  * `pg.enum(<ref>)` registers as an ordinary type constructor whose sole
@@ -109,7 +115,7 @@ function lowerRlsPolicyFromBlock(
     operation: 'select',
     permissive: true,
   });
-  const wireName = `${prefix}_${wireHash}`;
+  const wireName = formatRlsPolicyWireName(prefix, wireHash);
 
   return new PostgresRlsPolicy({
     name: wireName,
@@ -253,6 +259,15 @@ export const postgresAuthoringEntityTypes = {
       factory: (input: PostgresRoleInput): PostgresRole => new PostgresRole(input),
     },
   },
+  rls: {
+    kind: 'entity',
+    discriminator: 'rls',
+    validatorSchema: PostgresRlsEnablementSchema,
+    output: {
+      factory: (input: PostgresRlsEnablementInput): PostgresRlsEnablement =>
+        new PostgresRlsEnablement(input),
+    },
+  },
   policy: {
     kind: 'entity',
     discriminator: 'policy',
@@ -312,6 +327,10 @@ export const postgresAuthoringPslBlockDescriptors = {
       },
       using: { kind: 'value', codecId: 'pg/text@1', required: true },
     },
+    // A policy may only target an RLS-controlled model: the model named by
+    // `target` must declare `@@rls`, or the load fails with a diagnostic
+    // naming the model and the policy prefix.
+    requiresModelAttribute: { parameter: 'target', attribute: 'rls' },
   },
   /**
    * PSL block descriptor for `native_enum`.
@@ -332,6 +351,30 @@ export const postgresAuthoringPslBlockDescriptors = {
     variadicParameters: true,
   },
 } as const satisfies AuthoringPslBlockDescriptorNamespace;
+
+/**
+ * `@@` model attributes contributed by the Postgres target pack.
+ *
+ * `@@rls` is argument-less: presence marks the model's table
+ * RLS-controlled. It lowers to a {@link PostgresRlsEnablement} marker in
+ * the namespace's `entries.rls`, keyed by the model's table name — the
+ * marker (never the policy set) is what drives
+ * `ENABLE`/`DISABLE ROW LEVEL SECURITY` planning.
+ */
+export const postgresAuthoringModelAttributes = {
+  rls: {
+    kind: 'modelAttribute',
+    attribute: 'rls',
+    spec: modelAttribute('rls', {}),
+    lower: (_parsed: Record<never, never>, ctx: AuthoringModelAttributeContext) => ({
+      key: ctx.storageName,
+      entity: new PostgresRlsEnablement({
+        tableName: ctx.storageName,
+        namespaceId: ctx.namespaceId,
+      }),
+    }),
+  },
+} as const satisfies AuthoringModelAttributeDescriptorNamespace;
 
 export const postgresAuthoringFieldPresets = {
   text: {

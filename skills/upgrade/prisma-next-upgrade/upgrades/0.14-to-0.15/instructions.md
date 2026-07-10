@@ -22,6 +22,23 @@ changes:
         - ".outcome === 'extra'"
         - ".outcome === 'mismatch'"
       anyMatch: true
+  - id: policy-target-models-require-rls-attribute
+    summary: |
+      RLS enablement is now an explicit, authored table attribute: a `policy_select` block's
+      `target` model must declare `@@rls`, or `prisma-next contract emit` fails with
+      `PSL_EXTENSION_TARGET_MODEL_MISSING_ATTRIBUTE` naming the model and the policy. Add
+      `@@rls` to every policy-bearing model and re-run `prisma-next contract emit`; the
+      re-emitted `contract.json` gains an `rls` marker entity and a new storage hash. Plan
+      semantics follow the marker, not the policy set: a marked table with RLS off plans
+      `ENABLE ROW LEVEL SECURITY` (even with policies in sync), removing every policy keeps
+      RLS enabled (fail-closed deny-all), removing `@@rls` itself plans
+      `DISABLE ROW LEVEL SECURITY` (requires the destructive allowance), and changing only a
+      policy's name prefix plans a single `ALTER POLICY ... RENAME TO` instead of drop+create.
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "policy_select"
+      anyMatch: true
 ---
 
 <!--
