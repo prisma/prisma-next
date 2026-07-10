@@ -16,9 +16,10 @@
  *    in the contract domain.
  *
  * 3. Handle↔contract consistency: each handle agrees with the shipped
- *    `contract.json` on model name, namespace, table name, and column
- *    names — so drift between handles and the emitted space is caught
- *    at test time.
+ *    `contract.json` on model name, namespace, table name, and the
+ *    per-column codec ids — so drift between handles and the emitted
+ *    space (including a column whose codec disagrees) is caught at
+ *    test time.
  */
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { TargetFieldRef } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -147,22 +148,58 @@ describe('lowering smoke test — FK + relation onto User via betterAuthPack', (
 type ContractJsonDomain = {
   namespaces: Record<
     string,
-    { models: Record<string, { storage: { table: string; fields: Record<string, unknown> } }> }
+    {
+      models: Record<
+        string,
+        {
+          fields: Record<string, { type: { codecId?: string } }>;
+          storage: { table: string; fields: Record<string, unknown> };
+        }
+      >;
+    }
   >;
 };
+
+/** Per-column codec-id map from a handle's field builders. */
+function handleCodecIds(handle: (typeof HANDLES)[number]['handle']): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(handle.stageOne.fields).map(([name, builder]) => {
+      const codecId = builder.build().descriptor?.codecId;
+      if (codecId === undefined) {
+        throw new Error(`handle field "${name}" carries no column descriptor codecId`);
+      }
+      return [name, codecId];
+    }),
+  );
+}
+
+/** Per-column codec-id map from the shipped contract.json domain model. */
+function contractCodecIds(
+  jsonModel: ContractJsonDomain['namespaces'][string]['models'][string],
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(jsonModel.fields).map(([name, fieldDef]) => {
+      const codecId = fieldDef.type.codecId;
+      if (codecId === undefined) {
+        throw new Error(`contract.json field "${name}" carries no codecId`);
+      }
+      return [name, codecId];
+    }),
+  );
+}
 
 describe('handle↔contract.json consistency', () => {
   const domain = contractJson.domain as unknown as ContractJsonDomain;
 
   for (const { handle, modelName } of HANDLES) {
-    it(`${modelName} agrees with contract.json on namespace, table, and columns`, () => {
+    it(`${modelName} agrees with contract.json on namespace, table, and column codecs`, () => {
       const jsonModel = domain.namespaces['public']?.models[modelName];
       expect(jsonModel).toBeDefined();
       expect(handle.stageOne.modelName).toBe(modelName);
       expect(handle.tableName).toBe(jsonModel!.storage.table);
-      const jsonColumns = Object.keys(jsonModel!.storage.fields);
-      const handleColumns = Object.keys(handle.stageOne.fields);
-      expect(handleColumns.sort()).toEqual(jsonColumns.sort());
+      // Whole-map equality: catches missing columns, extra columns, and
+      // per-column codec drift in one assertion.
+      expect(handleCodecIds(handle)).toEqual(contractCodecIds(jsonModel!));
     });
   }
 });
