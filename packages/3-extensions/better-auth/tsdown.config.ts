@@ -1,0 +1,10 @@
+import { defineConfig } from '@prisma-next/tsdown';
+
+export default defineConfig({
+  entry: {
+    pack: 'src/exports/pack.ts',
+    contract: 'src/exports/contract.ts',
+  },
+  // Keep manual exports to preserve stable subpath mapping.
+  exports: { enabled: false },
+});

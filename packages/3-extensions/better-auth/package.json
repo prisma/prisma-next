@@ -1,0 +1,67 @@
+{
+  "name": "@prisma-next/extension-better-auth",
+  "version": "0.14.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "build:contract-space": "prisma-next contract emit",
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
+  },
+  "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:0.14.0",
+    "@prisma-next/contract": "workspace:0.14.0",
+    "@prisma-next/family-sql": "workspace:0.14.0",
+    "@prisma-next/framework-components": "workspace:0.14.0",
+    "@prisma-next/migration-tools": "workspace:0.14.0",
+    "@prisma-next/sql-contract": "workspace:0.14.0",
+    "@prisma-next/target-postgres": "workspace:0.14.0"
+  },
+  "devDependencies": {
+    "@prisma-next/cli": "workspace:0.14.0",
+    "@prisma-next/postgres": "workspace:0.14.0",
+    "@prisma-next/sql-contract-psl": "workspace:0.14.0",
+    "@prisma-next/test-utils": "workspace:0.14.0",
+    "@prisma-next/tsconfig": "workspace:0.14.0",
+    "@prisma-next/tsdown": "workspace:0.14.0",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.9"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "migrations"
+  ],
+  "exports": {
+    "./pack": "./dist/pack.mjs",
+    "./contract": {
+      "types": "./dist/contract.d.mts",
+      "import": "./dist/contract.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prisma/prisma-next.git",
+    "directory": "packages/3-extensions/better-auth"
+  }
+}
