@@ -1498,6 +1498,10 @@ export class DisableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
 
 export class RenamePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
   readonly factoryName = 'renameRlsPolicy' as const;
+  // `widening` is chosen so the rename plans under every allowance set except
+  // additive-only init — a rename is neither additive-creation nor
+  // destructive, and the class vocabulary has no neutral middle class. It is
+  // NOT that a rename widens anything; this is the accepted typology tradeoff.
   readonly operationClass = 'widening' as const;
   readonly schemaName: string;
   readonly tableName: string;

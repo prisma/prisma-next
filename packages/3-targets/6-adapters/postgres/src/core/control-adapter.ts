@@ -1182,6 +1182,17 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     // both plain ('r') and partitioned ('p') tables: the table listing above
     // (`information_schema.tables`, BASE TABLE) includes partitioned parents,
     // and Postgres supports RLS on them.
+    //
+    // Kept as a SEPARATE query from the table listing on purpose. Folding
+    // relrowsecurity into the listing would mean replacing
+    // `information_schema.tables` (which filters by the connection role's
+    // grants) with a raw `pg_class` scan (which does not), changing WHICH
+    // tables the introspection returns — a real behavior shift, not a
+    // cleanup, and one the offline golden-diff can't catch (introspection is
+    // live-only). The only cost of two queries is the concurrent-DDL window:
+    // a table listed but missed by this scan defaults (`?? false`) to
+    // RLS-off. That default is fail-safe — the worst case downstream is a
+    // spurious ENABLE (idempotent), never a spurious DISABLE.
     const rlsEnabledResult = await driver.query<{ tablename: string; rls_enabled: boolean }>(
       `SELECT c.relname AS tablename, c.relrowsecurity AS rls_enabled
          FROM pg_catalog.pg_class c
