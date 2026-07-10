@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:31cf0e2bc6efafc1d3c6c55148f6665700205dba671b16a5d6d5f6db693d97f6'>;
+  StorageHashBase<'sha256:01edbb5adbbc0711bed516ea61b0585de2aa906f9aebacedbead613eff89f194'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
