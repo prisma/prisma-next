@@ -627,12 +627,12 @@ export interface ScalarTypeConstructorOutput {
 
 /**
  * Derives the scalar view of an assembled authoring type namespace: every
- * **top-level** zero-arg type constructor with an explicit literal
- * `nativeType`. A bare type name `T` in a schema is semantically the
- * zero-arg instantiation `T()`, so these entries are exactly the base
- * scalars a target registers. Namespaced constructors (`sql.String`),
- * constructors declaring args, and entity-ref constructors (`pg.enum`) are
- * not scalars and are excluded.
+ * **top-level** zero-arg type constructor whose output declares an explicit
+ * literal storage type name. A bare type name `T` in a schema is
+ * semantically the zero-arg instantiation `T()`, so these entries are
+ * exactly the base scalars a target registers. Constructors registered
+ * under a namespace segment, constructors declaring args, and entity-ref
+ * constructors are not scalars and are excluded.
  */
 export function collectScalarTypeConstructors(
   namespace: AuthoringTypeNamespace,
