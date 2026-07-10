@@ -19,30 +19,44 @@ import type { PrinterField, PrinterNamedType } from './types';
  */
 const PSL_INDENT_UNIT = '  ';
 
-type PslBlockDispatchMap = ReadonlyMap<string, AuthoringPslBlockDescriptor>;
+/**
+ * Dispatch index built from the assembled `pslBlockDescriptors` namespace.
+ * `byKeyword` resolves the exact descriptor for a block (its parameter set
+ * and, historically, its keyword) — keyed by keyword because that is the
+ * printer's real 1:1 dispatch key: several keywords may share one
+ * `discriminator` (kind), but each keyword claims exactly one descriptor.
+ * `discriminators` is only the set of registered kinds, used to sanity-check
+ * that a block's `kind` is one the assembled descriptors actually produce.
+ */
+interface PslBlockDispatchMap {
+  readonly byKeyword: ReadonlyMap<string, AuthoringPslBlockDescriptor>;
+  readonly discriminators: ReadonlySet<string>;
+}
 
 function buildPslBlockDispatchMap(
   namespace: AuthoringPslBlockDescriptorNamespace | undefined,
 ): PslBlockDispatchMap {
-  const entries = new Map<string, AuthoringPslBlockDescriptor>();
-  if (!namespace) {
-    return entries;
+  const byKeyword = new Map<string, AuthoringPslBlockDescriptor>();
+  const discriminators = new Set<string>();
+  if (namespace) {
+    collectBlockDescriptors(namespace, byKeyword, discriminators);
   }
-  collectBlockDescriptors(namespace, entries);
-  return entries;
+  return { byKeyword, discriminators };
 }
 
 function collectBlockDescriptors(
   namespace: AuthoringPslBlockDescriptorNamespace,
-  out: Map<string, AuthoringPslBlockDescriptor>,
+  byKeyword: Map<string, AuthoringPslBlockDescriptor>,
+  discriminators: Set<string>,
 ): void {
   for (const value of Object.values(namespace)) {
     if (isAuthoringPslBlockDescriptor(value)) {
-      out.set(value.discriminator, value);
+      byKeyword.set(value.keyword, value);
+      discriminators.add(value.discriminator);
       continue;
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      collectBlockDescriptors(value, out);
+      collectBlockDescriptors(value, byKeyword, discriminators);
     }
   }
 }
@@ -117,13 +131,13 @@ function serializeExtensionBlock(
   blockDispatchMap: PslBlockDispatchMap,
   codecLookup: CodecLookup | undefined,
 ): string {
-  const descriptor = blockDispatchMap.get(extensionBlock.kind);
-  if (!descriptor) {
+  const descriptor = blockDispatchMap.byKeyword.get(extensionBlock.keyword);
+  if (!descriptor || !blockDispatchMap.discriminators.has(extensionBlock.kind)) {
     throw new Error(
       `No pslBlockDescriptors contribution registered for extension-contributed block discriminator "${extensionBlock.kind}". Provide a matching pslBlockDescriptors contribution to serializePrintDocument, or remove the block from the input AST.`,
     );
   }
-  const lines: string[] = [`${descriptor.keyword} ${extensionBlock.name} {`];
+  const lines: string[] = [`${extensionBlock.keyword} ${extensionBlock.name} {`];
   for (const [paramName, paramDescriptor] of Object.entries(descriptor.parameters)) {
     const paramValue = extensionBlock.parameters[paramName];
     if (paramValue === undefined) {

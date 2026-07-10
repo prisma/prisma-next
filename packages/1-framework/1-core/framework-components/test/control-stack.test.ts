@@ -261,10 +261,13 @@ describe('assembleAuthoringContributions', () => {
     expect(Object.keys(result.entityTypes)).toEqual(['enum', 'demo']);
   });
 
-  function makeDeclarativePslBlockDescriptor(discriminator: string) {
+  function makeDeclarativePslBlockDescriptor(
+    discriminator: string,
+    keyword: string = discriminator,
+  ) {
     return {
       kind: 'pslBlock' as const,
-      keyword: 'policy_select',
+      keyword,
       discriminator,
       name: { required: true },
       parameters: {},
@@ -415,7 +418,7 @@ describe('assembleAuthoringContributions', () => {
     ).not.toThrow();
   });
 
-  it('rejects two pslBlockDescriptors contributions sharing a discriminator', () => {
+  it('rejects two pslBlockDescriptors contributions sharing a keyword', () => {
     expect(() =>
       assembleAuthoringContributions([
         createDescriptor({
@@ -433,13 +436,37 @@ describe('assembleAuthoringContributions', () => {
               },
             },
             pslBlockDescriptors: {
-              policyA: makeDeclarativePslBlockDescriptor('shared-disc'),
-              policyB: makeDeclarativePslBlockDescriptor('shared-disc'),
+              // Different discriminators — that alone is fine (N:1 below) —
+              // but the same keyword, which is the parser's real dispatch key.
+              policyA: makeDeclarativePslBlockDescriptor('shared-disc', 'shared_keyword'),
+              policyB: makeDeclarativePslBlockDescriptor('shared-disc-b', 'shared_keyword'),
             },
           },
         }),
       ]),
-    ).toThrow(/Duplicate pslBlock discriminator "shared-disc".*"policyA".*"policyB"/);
+    ).toThrow(/Duplicate pslBlock keyword "shared_keyword".*"policyA".*"policyB"/);
+  });
+
+  it('allows two pslBlockDescriptors contributions sharing a discriminator when their keywords differ (N:1)', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              shapeEntity: {
+                kind: 'entity',
+                discriminator: 'shape',
+                output: { factory: () => ({}) },
+              },
+            },
+            pslBlockDescriptors: {
+              shapeCircle: makeDeclarativePslBlockDescriptor('shape', 'shape_circle'),
+              shapeSquare: makeDeclarativePslBlockDescriptor('shape', 'shape_square'),
+            },
+          },
+        }),
+      ]),
+    ).not.toThrow();
   });
 
   it('rejects two entityTypes contributions sharing a discriminator', () => {

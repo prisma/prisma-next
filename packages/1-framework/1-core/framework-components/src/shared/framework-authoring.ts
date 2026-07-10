@@ -795,29 +795,40 @@ function collectDescriptorEntries<D extends { readonly discriminator: string }>(
 }
 
 /**
- * Throws when two or more entries in the same namespace share a discriminator.
- * Duplicate discriminators within a namespace make dispatch ambiguous — the
- * lowering factory lookup dispatches by discriminator, so one would silently
- * shadow the other. Catch duplicates before building any dispatch map.
+ * Throws when two or more entries in the same namespace share a key.
+ * `keyLabel` names what the key semantically is for the error text
+ * (`'discriminator'` by default; pslBlock uniqueness passes `'keyword'`
+ * since that is its real dispatch key — see {@link assertPslBlocksHaveFactories}).
+ * A duplicate key makes dispatch ambiguous — the caller's lookup dispatches
+ * by this key, so one entry would silently shadow the other. Catch
+ * duplicates before building any dispatch map.
  */
-function assertUniqueDiscriminators(entries: readonly DescriptorEntry[], label: string): void {
+function assertUniqueDiscriminators(
+  entries: readonly DescriptorEntry[],
+  label: string,
+  keyLabel = 'discriminator',
+): void {
   const seen = new Map<string, string>();
-  for (const { path, discriminator } of entries) {
-    const existing = seen.get(discriminator);
+  for (const { path, discriminator: key } of entries) {
+    const existing = seen.get(key);
     if (existing !== undefined) {
       throw new Error(
-        `Duplicate ${label} discriminator "${discriminator}" registered at both "${existing}" and "${path}". Each ${label} contribution must use a unique discriminator.`,
+        `Duplicate ${label} ${keyLabel} "${key}" registered at both "${existing}" and "${path}". Each ${label} contribution must use a unique ${keyLabel}.`,
       );
     }
-    seen.set(discriminator, path);
+    seen.set(key, path);
   }
+}
+
+interface PslBlockDescriptorEntry extends DescriptorEntry {
+  readonly keyword: string;
 }
 
 function collectPslBlockDescriptorEntries(
   namespace: AuthoringPslBlockDescriptorNamespace,
   path: readonly string[] = [],
-): DescriptorEntry[] {
-  const entries: DescriptorEntry[] = [];
+): PslBlockDescriptorEntry[] {
+  const entries: PslBlockDescriptorEntry[] = [];
   for (const [key, value] of Object.entries(namespace)) {
     const currentPath = [...path, key];
     if (isAuthoringPslBlockDescriptor(value)) {
@@ -831,6 +842,7 @@ function collectPslBlockDescriptorEntries(
       entries.push({
         path: currentPath.join('.'),
         discriminator: value.discriminator,
+        keyword: value.keyword,
       });
       continue;
     }
@@ -857,6 +869,13 @@ function collectPslBlockDescriptorEntries(
  * Every `pslBlockDescriptors` entry requires a matching `entityTypes` factory
  * with the same discriminator. An `entityTypes` factory may stand alone (e.g.
  * `enum`, reachable from the TypeScript builder without any PSL block).
+ *
+ * Uniqueness for pslBlock entries is keyed on **keyword**, not discriminator:
+ * several keywords (e.g. `policy_select`/`policy_insert`) may legitimately
+ * share one discriminator, routing to the same `entityTypes` factory and the
+ * same `entries[discriminator]` slot — that N:1 shape is exactly what lets
+ * one entity kind be authored through several PSL keywords. What must stay
+ * unique is the keyword itself, since that's what the parser dispatches on.
  */
 function assertPslBlocksHaveFactories(
   entityTypeNamespace: AuthoringEntityTypeNamespace,
@@ -870,7 +889,11 @@ function assertPslBlocksHaveFactories(
     'entityType',
   );
 
-  assertUniqueDiscriminators(blockEntries, 'pslBlock');
+  assertUniqueDiscriminators(
+    blockEntries.map((entry) => ({ path: entry.path, discriminator: entry.keyword })),
+    'pslBlock',
+    'keyword',
+  );
   assertUniqueDiscriminators(entityEntries, 'entityType');
 
   const entityDiscriminators = new Set(entityEntries.map((entry) => entry.discriminator));
