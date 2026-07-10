@@ -272,6 +272,25 @@ changes:
         - "pg.enum("
         - "nativeEnum("
       anyMatch: true
+  - id: schema-ir-fk-unbound-referenced-schema-absent
+    summary: |
+      The family's `contractToSchemaIR` (from `@prisma-next/family-sql/control`) no longer stamps
+      `referencedSchema` on a derived `SqlForeignKeyIR` whose target is the unbound namespace — the
+      field is now absent for that case (it previously carried the `__unbound__` sentinel). Namespace
+      identity is answered by the namespace node's new `isUnbound` getter (on `NamespaceBase` /
+      `SqlNamespace`), never by comparing an id against the sentinel. If your extension rebuilds a
+      target schema-IR tree from a `contractToSchemaIR`-derived one and reconstructs each
+      `SqlForeignKeyIR` (as the Postgres target does in `contractToPostgresDatabaseSchemaNode`),
+      default the absent value back to the target's own coordinate for the unbound slot:
+      `referencedSchema: fk.referencedSchema ?? UNBOUND_NAMESPACE_ID`. Extensions that read
+      `referencedSchema` only for bound (named-schema) FK targets need no change — absence already
+      meant "unbound" downstream.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "SqlForeignKeyIR"
+        - "referencedSchema"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in

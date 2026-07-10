@@ -1,15 +1,15 @@
 /**
- * Differ verdict suite: for every scenario class the retired relational
- * walk used to grade (basic drift, constraints, checks, defaults,
- * referential actions, semantic satisfaction, strict extras, control
- * policies, storage types), the generic-differ verify flow must produce
- * the pinned VERDICT in both strict and lenient modes, with the drift
- * keyed on reason + node.
+ * Differ verdict suite: for every scenario class the verify flow grades
+ * (basic drift, constraints, checks, defaults, referential actions, uniques
+ * and indexes under structural equality, strict extras, control policies,
+ * storage types), the generic-differ verify flow must produce the pinned
+ * VERDICT in both strict and lenient modes, with the drift keyed on reason +
+ * node.
  *
  * Each scenario builds: contract→flat expected tree (resolved leaf values
  * stamped) vs the actual tree stamped the way introspection stamps it,
- * normalized for semantic satisfaction, diffed by `diffSchemas`, graded by
- * `computeSqlDiffVerdict` + `computeStorageTypeVerdict`.
+ * diffed by `diffSchemas` over the trees as derived (no pre-diff pass),
+ * graded by `computeSqlDiffVerdict` + `computeStorageTypeVerdict`.
  */
 
 import type { ColumnDefault, Contract, ControlPolicy } from '@prisma-next/contract/types';
@@ -26,10 +26,6 @@ import {
 } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { extractCodecControlHooks } from '../src/core/assembly';
-import {
-  neutralizeFlatExpectedFkSchemas,
-  normalizeFlatActualForDiff,
-} from '../src/core/diff/diff-tree-normalization';
 import { computeSqlDiffVerdict, computeStorageTypeVerdict } from '../src/core/diff/schema-verify';
 import type { DefaultNormalizer, NativeTypeNormalizer } from '../src/core/diff/sql-schema-diff';
 import { contractToSchemaIR } from '../src/core/migrations/contract-to-schema-ir';
@@ -127,10 +123,10 @@ function runVerdict(options: {
 }): VerdictRun {
   const frameworkComponents = options.frameworkComponents ?? [];
 
-  const expected = neutralizeFlatExpectedFkSchemas(
-    contractToSchemaIR(options.contract, { annotationNamespace: 'pg' }),
-  );
-  const actual = normalizeFlatActualForDiff(expected, stampLikeIntrospection(options.schema));
+  const expected = contractToSchemaIR(options.contract, {
+    annotationNamespace: 'pg',
+  });
+  const actual = stampLikeIntrospection(options.schema);
   const issues = diffSchemas(expected, actual);
   const diffVerdict = computeSqlDiffVerdict({
     issues,
@@ -563,8 +559,27 @@ describe('differ verdict — foreign keys', () => {
   });
 });
 
-describe('differ verdict — uniques, indexes, semantic satisfaction', () => {
-  it('unique satisfied by a live unique INDEX passes both modes with no extras', () => {
+describe('differ verdict — uniques and indexes (structural equality)', () => {
+  it('contract @@unique matched by a live unique CONSTRAINT is clean (the round-trip)', () => {
+    const contract = createTestContract({
+      user: createContractTable(
+        { email: { nativeType: 'text', nullable: false } },
+        { uniques: [{ columns: ['email'] }] },
+      ),
+    });
+    const schema = createTestSchemaIR({
+      user: createSchemaTable(
+        'user',
+        { email: { nativeType: 'text', nullable: false } },
+        { uniques: [{ columns: ['email'], name: 'user_email_key' }] },
+      ),
+    });
+    const { strict, lenient } = runBothModes({ contract, schema });
+    expect(strict.ok).toBe(true);
+    expect(lenient.ok).toBe(true);
+  });
+
+  it('contract @@unique vs a live unique INDEX fails both modes (constraint missing + index extra)', () => {
     const contract = createTestContract({
       user: createContractTable(
         { email: { nativeType: 'text', nullable: false } },
@@ -578,11 +593,16 @@ describe('differ verdict — uniques, indexes, semantic satisfaction', () => {
         { indexes: [{ columns: ['email'], unique: true, name: 'user_email_key' }] },
       ),
     });
-    const { strict } = runBothModes({ contract, schema });
-    expect(strict.ok).toBe(true);
+    const { strict, lenient } = runBothModes({ contract, schema });
+    // The unique constraint is missing (fails both modes); the undeclared
+    // unique index is an ordinary extra (strict-only).
+    expect(lenient.ok).toBe(false);
+    expect(strict.ok).toBe(false);
+    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-unique', 'not-found']);
+    expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-index', 'not-expected']);
   });
 
-  it('contract index satisfied by a live unique CONSTRAINT: lenient passes, strict flags the undeclared unique', () => {
+  it('contract @@index vs a live unique CONSTRAINT fails both modes (index missing + constraint extra)', () => {
     const contract = createTestContract({
       user: createContractTable(
         { email: { nativeType: 'text', nullable: false } },
@@ -597,12 +617,13 @@ describe('differ verdict — uniques, indexes, semantic satisfaction', () => {
       ),
     });
     const { strict, lenient } = runBothModes({ contract, schema });
-    expect(lenient.ok).toBe(true);
+    expect(lenient.ok).toBe(false);
     expect(strict.ok).toBe(false);
+    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-index', 'not-found']);
     expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-unique', 'not-expected']);
   });
 
-  it('a contract index demanding a type is NOT satisfied by a unique constraint', () => {
+  it('contract @@index (with a type) vs a live unique constraint fails both modes', () => {
     const contract = createTestContract({
       user: createContractTable(
         { email: { nativeType: 'text', nullable: false } },
@@ -620,7 +641,7 @@ describe('differ verdict — uniques, indexes, semantic satisfaction', () => {
     expect(lenient.ok).toBe(false);
   });
 
-  it('a stray live unique INDEX is never an extra (legacy invisibility)', () => {
+  it('a stray live unique INDEX is an ordinary extra: strict-fails / lenient-passes', () => {
     const contract = createTestContract({
       user: createContractTable({ email: { nativeType: 'text', nullable: false } }),
     });
@@ -632,8 +653,9 @@ describe('differ verdict — uniques, indexes, semantic satisfaction', () => {
       ),
     });
     const { strict, lenient } = runBothModes({ contract, schema });
-    expect(strict.ok).toBe(true);
+    expect(strict.ok).toBe(false);
     expect(lenient.ok).toBe(true);
+    expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-index', 'not-expected']);
   });
 
   it('a stray live non-unique index is an extra in strict only', () => {

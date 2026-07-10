@@ -1,11 +1,7 @@
 import type { ColumnDefault, Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { NativeTypeExpander, SqlSchemaDiffResult } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander, contractToSchemaIR } from '@prisma-next/family-sql/control';
-import {
-  neutralizeFlatExpectedFkSchemas,
-  normalizeFlatActualForDiff,
-  verifySqlSchemaByDiff,
-} from '@prisma-next/family-sql/diff';
+import { verifySqlSchemaByDiff } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   SchemaDiffIssue,
@@ -59,6 +55,10 @@ export function sqliteContractToSchema(
     readonly expandNativeType?: NativeTypeExpander;
   },
 ): SqlSchemaIR {
+  // SQLite is single-schema: every contract FK targets the unbound namespace
+  // node, so derivation stamps no referenced namespace — the same absence
+  // flat introspection produces — and the derived expected FK pairs with its
+  // introspected counterpart by construction. No pre-diff pass, no flag.
   return contractToSchemaIR(contract, {
     annotationNamespace: 'sqlite',
     renderDefault: sqliteRenderDefault,
@@ -112,12 +112,11 @@ function resolveControlPolicy(
 /**
  * The SQLite full-tree node diff for the family verify verdict: derive the
  * expected flat tree with resolved leaf values (expander threaded so
- * parameterized types compare expanded), neutralize the FK schema segment
- * (single-schema target — introspection stamps none), normalize the actual
- * tree for semantic satisfaction, and run the generic differ. Flat targets
- * need no ownership scoping. The codec `verifyType` hooks run once per
- * contract namespace with tables, each against the sole flat actual root —
- * exactly the legacy per-namespace pairing.
+ * parameterized types compare expanded; FK nodes born with the flat empty
+ * `resolvedReferencedNamespace`), and run the generic differ over the trees
+ * as derived. Flat targets need no ownership scoping. The codec `verifyType`
+ * hooks run once per contract namespace with tables, each against the sole
+ * flat actual root — exactly the legacy per-namespace pairing.
  */
 export function diffSqliteSchema(input: {
   readonly contract: Contract<SqlStorage>;
@@ -125,13 +124,9 @@ export function diffSqliteSchema(input: {
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }): SqlSchemaDiffResult {
   const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
-  const expected = neutralizeFlatExpectedFkSchemas(
-    contractToSchemaIR(input.contract, {
-      annotationNamespace: 'sqlite',
-      renderDefault: sqliteRenderDefault,
-      ...ifDefined('expandNativeType', expandNativeType),
-    }),
-  );
+  const expected = sqliteContractToSchema(input.contract, {
+    ...ifDefined('expandNativeType', expandNativeType),
+  });
   const actual =
     input.schema instanceof SqlSchemaIR
       ? input.schema
@@ -139,8 +134,7 @@ export function diffSqliteSchema(input: {
           SqlSchemaIR,
           'the SQLite introspection adapter always produces a flat SqlSchemaIR root'
         >(input.schema);
-  const normalizedActual = normalizeFlatActualForDiff(expected, actual);
-  const issues = diffSchemas(expected, normalizedActual);
+  const issues = diffSchemas(expected, actual);
   const namespacesWithTables = Object.values(input.contract.storage.namespaces).filter(
     (ns) => Object.keys(ns.entries.table ?? {}).length > 0,
   );
@@ -154,18 +148,17 @@ export function diffSqliteSchema(input: {
 export interface SqlitePlanDiff {
   /** The desired ("end") tree — resolved leaf values, incl. `codecRef`, on every column. */
   readonly expected: SqlSchemaIR;
-  /** The live ("start") tree, normalized for semantic satisfaction against `expected`. */
+  /** The live ("start") tree. */
   readonly actual: SqlSchemaIR;
   readonly issues: readonly SchemaDiffIssue[];
 }
 
 /**
  * The SQLite planner's diff input: the same tree-building
- * `diffSqliteSchema` uses (expander threaded, FK schema segment
- * neutralized, actual tree normalized for semantic satisfaction). One differ
- * drives both verify and plan; this is the plan-side derivation — column DDL
- * resolves from each expected column's `codecRef` at plan time
- * (`column-ddl-rendering.ts`), so no separate render stamping happens here.
+ * `diffSqliteSchema` uses (expander threaded, FK nodes born flat). One differ
+ * drives both verify and plan over the trees as derived; this is the plan-side
+ * derivation — column DDL resolves from each expected column's `codecRef` at
+ * plan time (`column-ddl-rendering.ts`), so no separate render stamping happens here.
  */
 export function buildSqlitePlanDiff(input: {
   readonly contract: Contract<SqlStorage>;
@@ -173,19 +166,16 @@ export function buildSqlitePlanDiff(input: {
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }): SqlitePlanDiff {
   const expandNativeType = buildNativeTypeExpander(input.frameworkComponents);
-  const expected = neutralizeFlatExpectedFkSchemas(
-    sqliteContractToSchema(input.contract, {
-      ...ifDefined('expandNativeType', expandNativeType),
-    }),
-  );
+  const expected = sqliteContractToSchema(input.contract, {
+    ...ifDefined('expandNativeType', expandNativeType),
+  });
   // The differ dispatches polymorphically (`.isEqualTo()` / `.children()`), so
   // the actual tree must be genuine `SqlSchemaIR`/`SqlTableIR`/`SqlColumnIR`
   // instances, not plain data shaped like them. `new SqlSchemaIR(...)`
   // normalizes either input uniformly (an already-real tree passes through
   // untouched — its nested values are already instances) and is a no-op
   // rebuild in the common (real-instance) case, so this is always safe to run.
-  const actualRaw = new SqlSchemaIR(withRecordKeyNames(input.actualSchema));
-  const actual = normalizeFlatActualForDiff(expected, actualRaw);
+  const actual = new SqlSchemaIR(withRecordKeyNames(input.actualSchema));
   const issues = diffSchemas(expected, actual);
   return { expected, actual, issues };
 }

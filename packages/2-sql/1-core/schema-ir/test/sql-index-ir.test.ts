@@ -31,16 +31,11 @@ describe('SqlIndexIR', () => {
       expect(a.isEqualTo(b)).toBe(true);
     });
 
-    it('an expected unique index is not satisfied by a non-unique actual', () => {
-      const a = new SqlIndexIR({ columns: ['email'], unique: true });
-      const b = new SqlIndexIR({ columns: ['email'], unique: false });
-      expect(a.isEqualTo(b)).toBe(false);
-    });
-
-    it('a unique actual index satisfies a non-unique expected index (stronger satisfies weaker)', () => {
-      const expected = new SqlIndexIR({ columns: ['email'], unique: false });
-      const actual = new SqlIndexIR({ columns: ['email'], unique: true });
-      expect(expected.isEqualTo(actual)).toBe(true);
+    it('a unique index and a non-unique index are not equal (symmetric — neither direction satisfies)', () => {
+      const uniqueIdx = new SqlIndexIR({ columns: ['email'], unique: true });
+      const plainIdx = new SqlIndexIR({ columns: ['email'], unique: false });
+      expect(uniqueIdx.isEqualTo(plainIdx)).toBe(false);
+      expect(plainIdx.isEqualTo(uniqueIdx)).toBe(false);
     });
 
     it('false when type differs', () => {
