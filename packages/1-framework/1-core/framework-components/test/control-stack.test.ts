@@ -1214,3 +1214,85 @@ describe('buildExtensionLoadOrder', () => {
     expect(extIds.indexOf('dep')).toBeLessThan(extIds.indexOf('consumer'));
   });
 });
+
+describe('createControlStack extensionContracts', () => {
+  it('maps each contract-space extension id to its contractJson, in extensionPacks order', () => {
+    const depContract = { targetFamily: 'sql', space: 'dep' };
+    const consumerContract = {
+      targetFamily: 'sql',
+      space: 'consumer',
+      extensionPacks: { dep: {} },
+    };
+    const dep = {
+      ...createDescriptor({ kind: 'extension' as const, id: 'dep' }),
+      contractSpace: { contractJson: depContract },
+    };
+    const consumer = {
+      ...createDescriptor({ kind: 'extension' as const, id: 'consumer' }),
+      contractSpace: { contractJson: consumerContract },
+    };
+    const stack = createControlStack(
+      stubInput({
+        family: createDescriptor({ kind: 'family', id: 'sql' }),
+        target: createDescriptor({ kind: 'target', id: 'postgres' }),
+        extensionPacks: [consumer, dep],
+      }),
+    );
+
+    expect([...stack.extensionContracts.keys()]).toEqual(stack.extensionPacks.map((e) => e.id));
+    expect(stack.extensionContracts.get('dep')).toBe(depContract);
+    expect(stack.extensionContracts.get('consumer')).toBe(consumerContract);
+  });
+
+  it('omits extensions without a contract space', () => {
+    const withSpaceContract = { targetFamily: 'sql', space: 'with-space' };
+    const withSpace = {
+      ...createDescriptor({ kind: 'extension' as const, id: 'with-space' }),
+      contractSpace: { contractJson: withSpaceContract },
+    };
+    const plain = createDescriptor({ kind: 'extension' as const, id: 'plain' });
+    const stack = createControlStack(
+      stubInput({
+        family: createDescriptor({ kind: 'family', id: 'sql' }),
+        target: createDescriptor({ kind: 'target', id: 'postgres' }),
+        extensionPacks: [withSpace, plain],
+      }),
+    );
+
+    expect(stack.extensionContracts.has('plain')).toBe(false);
+    expect([...stack.extensionContracts.keys()]).toEqual(['with-space']);
+  });
+
+  it('is empty without extensions', () => {
+    const stack = createControlStack(
+      stubInput({
+        family: createDescriptor({ kind: 'family', id: 'sql' }),
+        target: createDescriptor({ kind: 'target', id: 'postgres' }),
+      }),
+    );
+
+    expect(stack.extensionContracts.size).toBe(0);
+  });
+
+  it('extensionIds prefixes component ids and is not the extensionPacks id list', () => {
+    // Pins the difference so consumers deriving pack ids map over extensionPacks
+    // instead of reusing extensionIds.
+    const ext = {
+      ...createDescriptor({ kind: 'extension' as const, id: 'ext1' }),
+      contractSpace: { contractJson: {} },
+    };
+    const stack = createControlStack(
+      stubInput({
+        family: createDescriptor({ kind: 'family', id: 'fam' }),
+        target: createDescriptor({ kind: 'target', id: 'tgt' }),
+        adapter: createDescriptor({ kind: 'adapter', id: 'adp' }),
+        extensionPacks: [ext],
+      }),
+    );
+
+    const packIds = stack.extensionPacks.map((e) => e.id);
+    expect(packIds).toEqual(['ext1']);
+    expect(stack.extensionIds).toEqual(['fam', 'tgt', 'adp', 'ext1']);
+    expect(stack.extensionIds).not.toEqual(packIds);
+  });
+});
