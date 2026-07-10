@@ -23,9 +23,13 @@
     "@prisma-next/migration-tools": "workspace:0.14.0",
     "@prisma-next/sql-contract": "workspace:0.14.0",
     "@prisma-next/sql-contract-ts": "workspace:0.14.0",
-    "@prisma-next/target-postgres": "workspace:0.14.0"
+    "@prisma-next/sql-orm-client": "workspace:0.14.0",
+    "@prisma-next/sql-relational-core": "workspace:0.14.0",
+    "@prisma-next/target-postgres": "workspace:0.14.0",
+    "@prisma-next/utils": "workspace:0.14.0"
   },
   "devDependencies": {
+    "better-auth": "^1.6.0",
     "@prisma-next/cli": "workspace:0.14.0",
     "@prisma-next/postgres": "workspace:0.14.0",
     "@prisma-next/sql-contract-psl": "workspace:0.14.0",
@@ -37,6 +41,7 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
+    "better-auth": "^1.5.0",
     "typescript": ">=5.9"
   },
   "peerDependenciesMeta": {
@@ -54,6 +59,10 @@
     "./contract": {
       "types": "./dist/contract.d.mts",
       "import": "./dist/contract.mjs"
+    },
+    "./adapter": {
+      "types": "./dist/adapter.d.mts",
+      "import": "./dist/adapter.mjs"
     },
     "./package.json": "./package.json"
   },
