@@ -146,7 +146,6 @@ function padActualNamespaces(
       namespaces[schemaName] = new PostgresNamespaceSchemaNode({
         schemaName,
         tables: {},
-        nativeEnumTypeNames: [],
       });
       padded = true;
     }

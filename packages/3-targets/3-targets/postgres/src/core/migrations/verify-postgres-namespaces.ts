@@ -91,7 +91,6 @@ export function verifyPostgresNamespacePresence(input: {
     const namespace = new PostgresNamespaceSchemaNode({
       schemaName: ddlName,
       tables: {},
-      nativeEnumTypeNames: [],
     });
     issues.push({
       path: ['database', ddlName],

@@ -82,7 +82,6 @@ function publicNamespace(options?: { readonly idNullable?: boolean }): PostgresN
   return new PostgresNamespaceSchemaNode({
     schemaName: 'public',
     tables: { profiles: profilesTable(options) },
-    nativeEnumTypeNames: [],
   });
 }
 

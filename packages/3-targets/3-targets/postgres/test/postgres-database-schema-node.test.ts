@@ -23,13 +23,11 @@ const tableA = new PostgresTableSchemaNode({
 const nsPublic = new PostgresNamespaceSchemaNode({
   schemaName: 'public',
   tables: { profiles: tableA },
-  nativeEnumTypeNames: [],
 });
 
 const nsApp = new PostgresNamespaceSchemaNode({
   schemaName: 'app',
   tables: {},
-  nativeEnumTypeNames: [],
 });
 
 const role = new PostgresRoleSchemaNode({

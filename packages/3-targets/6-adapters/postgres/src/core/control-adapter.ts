@@ -1143,7 +1143,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       typeName: r.typname,
       values: parsePgNameArray(r.enumvalues),
     }));
-    const nativeEnumTypeNames = nativeEnums.map((e) => e.typeName);
     const policiesResult = await driver.query<{
       schemaname: string;
       tablename: string;
@@ -1226,7 +1225,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const namespace = new PostgresNamespaceSchemaNode({
       schemaName: schema,
       tables,
-      nativeEnumTypeNames,
       nativeEnums,
     });
     return { namespace, pgVersion: await this.getPostgresVersion(driver) };

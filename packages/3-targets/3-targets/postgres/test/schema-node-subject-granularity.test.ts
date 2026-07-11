@@ -60,7 +60,6 @@ describe('Postgres schema nodes carry no role/granularity of their own', () => {
       new PostgresNamespaceSchemaNode({
         schemaName: 'public',
         tables: {},
-        nativeEnumTypeNames: [],
       }),
     ],
     [

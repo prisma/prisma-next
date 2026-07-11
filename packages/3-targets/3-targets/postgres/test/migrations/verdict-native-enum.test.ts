@@ -100,7 +100,6 @@ function actualTree(nativeEnums: readonly PostgresNativeEnumIntrospection[]) {
       public: new PostgresNamespaceSchemaNode({
         schemaName: 'public',
         tables: { orders: ordersTable() },
-        nativeEnumTypeNames: nativeEnums.map((e) => e.typeName),
         nativeEnums,
       }),
     },
