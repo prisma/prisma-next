@@ -116,15 +116,3 @@ export function postgresDiffSubjectEntityKind(nodeKind: string): string | undefi
     ? postgresNodeEntityKind(nodeKind)
     : relationalNodeEntityKind(nodeKind);
 }
-
-/**
- * Whether a paired `not-equal` diff issue on this Postgres node kind
- * describes value-set drift (the `valueDrift` verifier category) rather than
- * declared-shape incompatibility. A native enum's only pairable divergence
- * is its ordered member values — the same semantics the check-constraint
- * value-set carries at the relational layer — so `external` suppresses the
- * drift while `managed` fails it.
- */
-export function postgresValueDriftNodeKind(nodeKind: string): boolean {
-  return nodeKind === PostgresSchemaNodeKind.nativeEnum;
-}

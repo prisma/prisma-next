@@ -11,17 +11,18 @@ import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-da
 import type { PostgresNativeEnumIntrospection } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
-import {
-  postgresDiffSubjectGranularity,
-  postgresValueDriftNodeKind,
-} from '../../src/core/schema-ir/schema-node-kinds';
+import { postgresDiffSubjectGranularity } from '../../src/core/schema-ir/schema-node-kinds';
 
 /**
  * Enum drift visibility end-to-end: the expected projection turns
  * `entries.native_enum` into diff-tree nodes, introspected `nativeEnums`
  * become the actual-side nodes, the unified differ reports missing / extra /
- * value-mismatch, and the control-policy disposition grades them — `managed`
- * fails verify, `external` suppresses drift/extras, `observed` warns.
+ * value-mismatch, and the control-policy disposition grades them by the
+ * DEFAULT reason→category path — with NO enum-specific classification. A
+ * drifted enum is a `not-equal` → `declaredIncompatible` → strict fail under
+ * both `managed` and `external`, warn under `observed`; a missing enum is
+ * `not-found` → `declaredMissing` → fail; an undeclared live enum is a
+ * `not-expected` extra (strict-gated) that `external` still suppresses.
  */
 
 const MEMBERS = ['draft', 'review', 'done'] as const;
@@ -134,7 +135,6 @@ function verify(
     frameworkComponents: [],
     diffSchema: diffPostgresSchema,
     granularityOf: postgresDiffSubjectGranularity,
-    isValueDriftNode: postgresValueDriftNodeKind,
   });
 }
 
@@ -209,10 +209,16 @@ describe('db verify grades enum drift by control policy', () => {
     expect(verify(managed, actualTree(MATCHING), false).ok).toBe(true);
   });
 
-  it('external: value-mismatch is suppressed (value drift on an unmanaged type)', () => {
+  it('external: value-mismatch FAILS (strict — no valueDrift forgiveness for enums)', () => {
+    // A drifted enum is a plain `not-equal` → `declaredIncompatible`, which
+    // `external` does NOT suppress (it only forgives EXTRA objects). Strict
+    // verify: a member-drifted enum fails regardless of grade.
     const result = verify(external, actualTree(REORDERED), true);
-    expect(result.ok).toBe(true);
-    expect(result.schema.warnings?.issues).toEqual([]);
+    expect(result.ok).toBe(false);
+    const mismatch = result.schema.issues.filter(
+      (i) => i.reason === 'not-equal' && i.path.some((p) => p.includes('order_status')),
+    );
+    expect(mismatch.length).toBeGreaterThan(0);
   });
 
   it('external: extra live enum is suppressed in both modes', () => {
@@ -235,12 +241,12 @@ describe('db verify grades enum drift by control policy', () => {
     ]);
   });
 
-  it('a per-entity external grade suppresses drift under a managed default', () => {
+  it('a per-entity external grade does NOT forgive member drift (strict verify)', () => {
     const mixedContract = makeContract({
       defaultControlPolicy: 'managed',
       enumControl: 'external',
     });
-    expect(verify(mixedContract, actualTree(REORDERED), false).ok).toBe(true);
+    expect(verify(mixedContract, actualTree(REORDERED), false).ok).toBe(false);
   });
 
   it('an enum-free contract against an enum-free database is unaffected (regression pin)', () => {

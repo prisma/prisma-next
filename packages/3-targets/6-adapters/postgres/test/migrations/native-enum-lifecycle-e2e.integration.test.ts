@@ -489,10 +489,13 @@ describe.sequential('external native enum stays untouched (R5)', () => {
   );
 
   it(
-    'verify reports no enum drift for an external enum whose members differ from the DB',
+    'verify FAILS on external enum member drift (strict — no valueDrift forgiveness)',
     async () => {
-      // Live DB has the type with REORDERED members; under `external` this is
-      // value drift that must be suppressed (no failure, no warning).
+      // Live DB has the type with REORDERED members. Post-#949 the enum rides
+      // the DEFAULT reason→category path: a member-drifted enum is a plain
+      // `not-equal` → `declaredIncompatible`, which `external` does NOT forgive
+      // (it only suppresses EXTRA objects). Strict verify: a drifted enum
+      // fails regardless of grade.
       await driver!.query(`CREATE TYPE order_status AS ENUM ('review', 'draft', 'done')`);
       await driver!
         .query(`ALTER TABLE "public"."orders" ADD COLUMN status order_status`)
@@ -510,11 +513,11 @@ describe.sequential('external native enum stays untouched (R5)', () => {
         frameworkComponents,
       });
 
-      const enumIssues = [
-        ...verify.schema.issues,
-        ...(verify.schema.warnings?.issues ?? []),
-      ].filter((i) => i.path.some((p) => p.includes('order_status')));
-      expect(enumIssues).toEqual([]);
+      expect(verify.ok).toBe(false);
+      const mismatch = verify.schema.issues.filter(
+        (i) => i.reason === 'not-equal' && i.path.some((p) => p.includes('order_status')),
+      );
+      expect(mismatch.length).toBeGreaterThan(0);
     },
     testTimeout,
   );
