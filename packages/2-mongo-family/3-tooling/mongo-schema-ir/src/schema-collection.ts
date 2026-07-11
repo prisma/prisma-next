@@ -14,6 +14,7 @@ export interface MongoSchemaCollectionCtorOptions {
 
 export class MongoSchemaCollection extends MongoSchemaIRNode {
   readonly kind = 'collection' as const;
+  readonly nodeKind = 'collection' as const;
   readonly id: string;
   readonly name: string;
   readonly indexes: ReadonlyArray<MongoSchemaIndex>;

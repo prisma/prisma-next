@@ -273,6 +273,6 @@ describe.sequential('RLS verify extension issues', () => {
 
     expect(result.ok).toBe(false);
     const rlsIssues = result.schema.issues.filter((i) => i.reason === 'not-found');
-    expect(rlsIssues[0]?.message).toContain(policy.name);
+    expect(rlsIssues[0]?.path.join('/')).toContain(policy.name);
   });
 });

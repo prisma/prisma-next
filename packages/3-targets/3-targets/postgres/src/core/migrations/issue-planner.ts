@@ -682,7 +682,7 @@ function mapPrimaryKeyNodeIssue(
       new DropConstraintCall(schemaName, tableName, pk.name ?? `${tableName}_pkey`, 'primaryKey'),
     ]);
   }
-  return notOk(nodeConflict('indexIncompatible', issue.message));
+  return notOk(nodeConflict('indexIncompatible', issue.path.join('/')));
 }
 
 function mapForeignKeyNodeIssue(
@@ -705,7 +705,7 @@ function mapForeignKeyNodeIssue(
     const name = fk.name ?? `${tableName}_${fk.columns.join('_')}_fkey`;
     return ok([new DropConstraintCall(schemaName, tableName, name, 'foreignKey')]);
   }
-  return notOk(nodeConflict('foreignKeyConflict', issue.message));
+  return notOk(nodeConflict('foreignKeyConflict', issue.path.join('/')));
 }
 
 function mapUniqueNodeIssue(
@@ -729,7 +729,7 @@ function mapUniqueNodeIssue(
     const name = unique.name ?? `${tableName}_${unique.columns.join('_')}_key`;
     return ok([new DropConstraintCall(schemaName, tableName, name, 'unique')]);
   }
-  return notOk(nodeConflict('indexIncompatible', issue.message));
+  return notOk(nodeConflict('indexIncompatible', issue.path.join('/')));
 }
 
 function mapIndexNodeIssue(
@@ -756,7 +756,7 @@ function mapIndexNodeIssue(
     const indexName = index.name ?? defaultIndexName(tableName, index.columns);
     return ok([new DropIndexCall(schemaName, tableName, indexName)]);
   }
-  return notOk(nodeConflict('indexIncompatible', issue.message));
+  return notOk(nodeConflict('indexIncompatible', issue.path.join('/')));
 }
 
 function mapCheckNodeIssue(
@@ -778,7 +778,7 @@ function mapCheckNodeIssue(
   return notOk(
     nodeConflict(
       'unsupportedOperation',
-      `Check constraint drift on "${tableName}" — handled by checkConstraintPlanCallStrategy: ${issue.message}`,
+      `Check constraint drift on "${tableName}" — handled by checkConstraintPlanCallStrategy: ${issue.path.join('/')}`,
     ),
   );
 }
@@ -797,14 +797,14 @@ export function mapNodeIssueToCall(
     return notOk(
       nodeConflict(
         'unsupportedOperation',
-        `Issue carries neither an expected nor an actual node: ${issue.message}`,
+        `Issue carries neither an expected nor an actual node: ${issue.path.join('/')}`,
       ),
     );
   }
   if (node.nodeKind === PostgresSchemaNodeKind.namespace) {
     if (issue.reason !== 'not-found') {
       return notOk(
-        nodeConflict('unsupportedOperation', `Unexpected namespace drift: ${issue.message}`),
+        nodeConflict('unsupportedOperation', `Unexpected namespace drift: ${issue.path.join('/')}`),
       );
     }
     const namespace = blindCast<
@@ -820,7 +820,7 @@ export function mapNodeIssueToCall(
     return notOk(
       nodeConflict(
         'unsupportedOperation',
-        `Issue has no schema/table in its path: ${issue.message}`,
+        `Issue has no schema/table in its path: ${issue.path.join('/')}`,
       ),
     );
   }
@@ -837,7 +837,7 @@ export function mapNodeIssueToCall(
         return notOk(
           nodeConflict(
             'unsupportedOperation',
-            `Default issue has no column in its path: ${issue.message}`,
+            `Default issue has no column in its path: ${issue.path.join('/')}`,
           ),
         );
       }

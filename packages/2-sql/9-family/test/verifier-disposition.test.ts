@@ -6,7 +6,7 @@ import {
 } from '../src/core/diff/verifier-disposition';
 
 function issue(reason: SchemaDiffIssue['reason']): SchemaDiffIssue {
-  return { path: ['user_status'], reason, message: 'test' };
+  return { path: ['user_status'], reason };
 }
 
 describe('classifyStorageTypeDiffIssue', () => {

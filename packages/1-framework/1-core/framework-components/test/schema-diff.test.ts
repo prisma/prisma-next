@@ -6,6 +6,7 @@ import { diffSchemas, SchemaDiff } from '../src/control/schema-diff';
 function rootOf(nodes: readonly DiffableNode[]): DiffableNode {
   return {
     id: 'root',
+    nodeKind: 'root',
     isEqualTo(): boolean {
       return true;
     },
@@ -19,14 +20,20 @@ function makeNode(
   nodeId: string,
   body = '',
   childNodes: readonly DiffableNode[] = [],
+  nodeKind = 'widget',
 ): DiffableNode {
   return {
     id: nodeId,
+    nodeKind,
     children(): readonly DiffableNode[] {
       return childNodes;
     },
     isEqualTo(other: DiffableNode): boolean {
-      return nodeId === other.id && body === (other as typeof this & { _body?: string })._body;
+      return (
+        nodeId === other.id &&
+        nodeKind === other.nodeKind &&
+        body === (other as typeof this & { _body?: string })._body
+      );
     },
     _body: body,
   } as DiffableNode & { _body: string };
@@ -105,10 +112,9 @@ describe('diffSchemas', () => {
     expect(issues).toHaveLength(2);
   });
 
-  it('message field is a non-empty string', () => {
+  it('issues do not carry a message field', () => {
     const issues = diffSchemas(rootOf([makeNode('ns/x/y')]), rootOf([]));
-    expect(typeof issues[0]?.message).toBe('string');
-    expect((issues[0]?.message.length ?? 0) > 0).toBe(true);
+    expect(issues[0]).not.toHaveProperty('message');
   });
 
   it('missing issue carries expected node ref but no actual', () => {
@@ -160,6 +166,47 @@ describe('diffSchemas', () => {
     expect(() => diffSchemas(rootOf([]), rootOf([a, b]))).toThrow(
       'diffSchemas: duplicate id among siblings',
     );
+  });
+
+  it('throws when two siblings share the same id AND the same nodeKind (genuine duplicate)', () => {
+    const a = makeNode('public', 'a', [], 'role');
+    const b = makeNode('public', 'b', [], 'role');
+    expect(() => diffSchemas(rootOf([a, b]), rootOf([]))).toThrow(
+      'diffSchemas: duplicate id among siblings',
+    );
+  });
+
+  it('a same-id sibling pair with different nodeKind does not throw and pairs independently (role "public" vs namespace "public")', () => {
+    const role = makeNode('public', 'role-body', [], 'role');
+    const namespace = makeNode('public', 'namespace-body', [], 'namespace');
+    const expected = [role, namespace];
+    const actual = [
+      makeNode('public', 'role-body', [], 'role'),
+      makeNode('public', 'namespace-body-v2', [], 'namespace'),
+    ];
+
+    const issues = diffSchemas(rootOf(expected), rootOf(actual));
+
+    // The role pairs cleanly (equal bodies); the namespace pairs and mismatches.
+    // Neither is reported as missing/extra — proof the two same-id, different-kind
+    // siblings were never conflated into one map slot.
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ reason: 'not-equal', path: ['root', 'public'] });
+    expect((issues[0]?.expected as DiffableNode | undefined)?.nodeKind).toBe('namespace');
+  });
+
+  it('a nodeKind-only-different sibling pair reports missing+extra when one side lacks the counterpart kind', () => {
+    // Expected has only a role named "public"; actual has only a namespace named
+    // "public". Same id, different nodeKind on each side — they must not pair
+    // against each other; each is reported independently.
+    const expected = [makeNode('public', 'role-body', [], 'role')];
+    const actual = [makeNode('public', 'namespace-body', [], 'namespace')];
+
+    const issues = diffSchemas(rootOf(expected), rootOf(actual));
+
+    expect(issues).toHaveLength(2);
+    const reasons = new Set(issues.map((i) => i.reason));
+    expect(reasons).toEqual(new Set(['not-found', 'not-expected']));
   });
 
   it('descends into a matched pair and reports one issue at the child path (AC-2)', () => {
@@ -242,7 +289,7 @@ describe('diffSchemas', () => {
 });
 
 function makeSchemaDiffIssue(path: readonly string[]): SchemaDiffIssue {
-  return { path, reason: 'not-expected', message: `extra: ${path.join('/')}` };
+  return { path, reason: 'not-expected' };
 }
 
 describe('SchemaDiff', () => {

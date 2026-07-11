@@ -335,7 +335,6 @@ describe('formatSchemaVerifyOutput', () => {
   const missingTableIssue: SchemaDiffIssue = {
     path: ['post'],
     reason: 'not-found',
-    message: 'post',
   };
 
   const createResult = (): VerifyDatabaseSchemaResult => ({
@@ -377,7 +376,6 @@ describe('formatSchemaVerifyOutput', () => {
     const diffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_abc'],
       reason: 'not-found',
-      message: 'public/profiles/policy_abc',
     };
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
@@ -390,8 +388,10 @@ describe('formatSchemaVerifyOutput', () => {
     const output = formatSchemaVerifyOutput(result, flags);
     const lines = output.split('\n').map(stripAnsi);
 
-    const issueLineIndex = lines.findIndex((line) => line.includes(missingTableIssue.message));
-    const diffLineIndex = lines.findIndex((line) => line.includes(diffIssue.message));
+    const issueLineIndex = lines.findIndex((line) =>
+      line.includes(missingTableIssue.path.join('/')),
+    );
+    const diffLineIndex = lines.findIndex((line) => line.includes(diffIssue.path.join('/')));
 
     expect(issueLineIndex).toBeGreaterThanOrEqual(0);
     expect(diffLineIndex).toBeGreaterThan(issueLineIndex);
@@ -427,7 +427,6 @@ describe('formatSchemaVerifyOutput', () => {
             {
               path: ['database', 'public', 'legacy_jobs'],
               reason: 'not-found',
-              message: 'database/public/legacy_jobs',
             },
           ],
         },
@@ -562,7 +561,6 @@ describe('formatSchemaVerifyOutput', () => {
           {
             path: ['public', 'profiles', policyWireName],
             reason: 'not-found',
-            message: `RLS policy "${policyWireName}" on table "profiles" is missing from the database`,
           },
         ],
       },
@@ -695,12 +693,10 @@ describe('formatSchemaVerifyJson', () => {
           {
             path: ['post'],
             reason: 'not-found',
-            message: 'Table "post" is missing',
           },
           {
             path: ['public', 'profiles', 'policy_abc'],
             reason: 'not-found',
-            message: 'RLS policy "policy_abc" is missing from the database',
           },
         ],
       },

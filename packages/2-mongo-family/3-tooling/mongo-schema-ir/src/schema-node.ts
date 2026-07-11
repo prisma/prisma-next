@@ -18,6 +18,8 @@ import type { MongoSchemaVisitor } from './visitor';
  */
 export abstract class MongoSchemaIRNode extends IRNodeBase implements DiffableNode {
   abstract readonly id: string;
+  /** Per-node discriminant `DiffableNode` requires. Mirrors the concrete node's `kind` — collection / index / validator / collectionOptions / schema. */
+  abstract readonly nodeKind: string;
   abstract accept<R>(visitor: MongoSchemaVisitor<R>): R;
 
   isEqualTo(other: DiffableNode): boolean {

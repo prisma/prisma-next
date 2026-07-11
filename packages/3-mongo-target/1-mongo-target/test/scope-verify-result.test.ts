@@ -55,8 +55,8 @@ describe('scopeVerifyResultToSpace', () => {
     const result = makeResult({
       ok: false,
       issues: [
-        { path: ['cipher_state'], reason: 'not-expected', message: 'extra' },
-        { path: ['junk'], reason: 'not-expected', message: 'extra' },
+        { path: ['cipher_state'], reason: 'not-expected' },
+        { path: ['junk'], reason: 'not-expected' },
       ],
     });
 
@@ -74,7 +74,7 @@ describe('scopeVerifyResultToSpace', () => {
   it('flips ok to true when the only failures were sibling collections', () => {
     const result = makeResult({
       ok: false,
-      issues: [{ path: ['cipher_state'], reason: 'not-expected', message: 'extra' }],
+      issues: [{ path: ['cipher_state'], reason: 'not-expected' }],
     });
 
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
@@ -91,7 +91,7 @@ describe('scopeVerifyResultToSpace', () => {
     // still fails on its own drift.
     const result = makeResult({
       ok: false,
-      issues: [{ path: ['cipher_state', 'column:ssn'], reason: 'not-found', message: 'missing' }],
+      issues: [{ path: ['cipher_state', 'column:ssn'], reason: 'not-found' }],
     });
 
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
@@ -110,8 +110,8 @@ describe('scopeVerifyResultToSpace', () => {
     const result = makeResult({
       ok: false,
       issues: [
-        { path: ['cipher_state', 'index:secret:1'], reason: 'not-expected', message: 'extra' },
-        { path: ['user', 'column:email'], reason: 'not-found', message: 'missing' },
+        { path: ['cipher_state', 'index:secret:1'], reason: 'not-expected' },
+        { path: ['user', 'column:email'], reason: 'not-found' },
       ],
     });
 

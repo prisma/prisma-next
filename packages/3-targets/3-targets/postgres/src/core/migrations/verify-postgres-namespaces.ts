@@ -96,7 +96,6 @@ export function verifyPostgresNamespacePresence(input: {
     issues.push({
       path: ['database', ddlName],
       reason: 'not-found',
-      message: `Schema "${ddlName}" is missing from database`,
       expected: namespace,
     });
   }
