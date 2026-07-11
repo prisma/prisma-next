@@ -89,6 +89,7 @@ function ordersTable(): PostgresTableSchemaNode {
     uniques: [],
     indexes: [],
     policies: [],
+    rlsEnabled: false,
   });
 }
 

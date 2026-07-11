@@ -119,6 +119,7 @@ function ordersTableNode(options: { readonly withStatusColumn: boolean }) {
     uniques: [],
     indexes: [],
     policies: [],
+    rlsEnabled: false,
   });
 }
 
@@ -215,6 +216,7 @@ function legacyTable() {
     uniques: [],
     indexes: [],
     policies: [],
+    rlsEnabled: false,
   });
 }
 
@@ -427,6 +429,7 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
               uniques: [],
               indexes: [],
               policies: [],
+              rlsEnabled: false,
             }),
           },
           nativeEnumTypeNames: nativeEnums.map((e) => e.typeName),
