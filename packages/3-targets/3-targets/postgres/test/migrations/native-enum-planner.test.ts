@@ -29,7 +29,7 @@ import {
   DropNativeEnumTypeCall,
 } from '../../src/core/migrations/op-factory-call';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
-import { PostgresSchema } from '../../src/core/postgres-schema';
+import { isPostgresSchema, PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
 import type { PostgresNativeEnumIntrospection } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
@@ -164,6 +164,34 @@ function callsFor(contract: Contract<SqlStorage>, actual: PostgresDatabaseSchema
   const result = planResultFor(contract, actual);
   if (!result.ok) throw new Error(`expected ok, got conflicts: ${JSON.stringify(result.failure)}`);
   return result.value.calls;
+}
+
+type AggregateOwnershipStub = SchemaOwnership & {
+  spaces(): readonly { contract(): { readonly storage: SqlStorage } }[];
+};
+
+// A two-space composition ownership oracle shaped like the real
+// `ContractSpaceAggregate`: `declaresEntity` matches only handle coordinates
+// (so it fails the physical-type-name query, exactly as the real aggregate
+// does), while `spaces()` exposes every space's contract for the target's
+// physical-identity resolution — the same mechanism used at runtime.
+function twoSpaceOwnership(...storages: readonly SqlStorage[]): AggregateOwnershipStub {
+  const handleCoordinates = new Set<string>();
+  for (const storage of storages) {
+    for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
+      const enums = isPostgresSchema(ns) ? (ns.entries.native_enum ?? {}) : {};
+      for (const handle of Object.keys(enums)) {
+        handleCoordinates.add(
+          coordinateKey({ namespaceId, entityKind: 'native_enum', entityName: handle }),
+        );
+      }
+    }
+  }
+  const spaces = storages.map((storage) => ({ contract: () => ({ storage }) }));
+  return {
+    declaresEntity: (coordinate) => handleCoordinates.has(coordinateKey(coordinate)),
+    spaces: () => spaces,
+  };
 }
 
 describe('managed enum create lowering + ordering', () => {
@@ -305,8 +333,9 @@ describe('planner ownership + policy for enum extras', () => {
 
   it('never drops a live enum a sibling space declares (by physical type name)', async () => {
     // A sibling space declares `order_status` in `sales`; ownership resolves
-    // by physical type name over the space's storage (`compositionStorages`),
-    // not the handle coordinate — so the app plan leaves it untouched.
+    // by physical type name over the space's contract (the aggregate's
+    // `spaces()`), not the handle coordinate — so the app plan leaves it
+    // untouched.
     const siblingStorage = new SqlStorage({
       storageHash: coreHash('sha256:sibling-owns-order-status'),
       namespaces: {
@@ -325,10 +354,7 @@ describe('planner ownership + policy for enum extras', () => {
         }),
       },
     });
-    const result = planLive({
-      declaresEntity: () => false,
-      compositionStorages: () => [siblingStorage],
-    });
+    const result = planLive(twoSpaceOwnership(siblingStorage));
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
     const ops = await Promise.all(result.plan.operations);
@@ -440,28 +466,6 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
       existingSchemas: ['public'],
       pgVersion: 'unknown',
     });
-  }
-
-  // A two-space composition ownership oracle: `declaresEntity` matches only
-  // handle coordinates (so it fails the physical-type-name query, exactly as
-  // the real aggregate does), while `compositionStorages` exposes every
-  // space's storage for the target's physical-identity resolution.
-  function twoSpaceOwnership(...storages: readonly SqlStorage[]): SchemaOwnership {
-    const handleCoordinates = new Set<string>();
-    for (const storage of storages) {
-      for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-        const enums = (ns as PostgresSchema).entries.native_enum ?? {};
-        for (const handle of Object.keys(enums)) {
-          handleCoordinates.add(
-            coordinateKey({ namespaceId, entityKind: 'native_enum', entityName: handle }),
-          );
-        }
-      }
-    }
-    return {
-      declaresEntity: (coordinate) => handleCoordinates.has(coordinateKey(coordinate)),
-      compositionStorages: () => storages,
-    };
   }
 
   it('does NOT drop a pack-owned @@map-renamed enum under a full migrate op set', async () => {

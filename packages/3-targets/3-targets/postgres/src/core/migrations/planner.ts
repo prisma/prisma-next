@@ -22,6 +22,7 @@ import type {
   SchemaOwnership,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import type { ContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -550,15 +551,16 @@ function retainUnownedExtras(
       // DDL schema. The generic entity coordinate cannot express this: its
       // `entityName` is the authoring handle (the `entries.native_enum` key),
       // which an `@@map`-renamed enum diverges from — so ownership resolves
-      // by type name over each space's storage (`compositionStorages`),
-      // mirroring `contract infer`'s `describedNativeEnumOwnersByTypeName`.
+      // by type name over each space's storage, walking the existing
+      // `ContractSpaceAggregate` threaded in as the oracle, mirroring
+      // `contract infer`'s `describedNativeEnumOwnersByTypeName`.
       const enumTypeName = blindCast<
         PostgresNativeEnumSchemaNode,
         'a postgres-native-enum diff node is always a PostgresNativeEnumSchemaNode'
       >(node).typeName;
       const ddlSchemaName = issueSchemaName(issue);
       if (ddlSchemaName === undefined) return true;
-      return !ownedEnumsByDdlSchema.has(`${ddlSchemaName} ${enumTypeName}`);
+      return !ownedEnumsByDdlSchema.has(`${ddlSchemaName} ${enumTypeName}`);
     }
     if (node.nodeKind !== PostgresSchemaNodeKind.table) return true;
     const ddlSchemaName = issueSchemaName(issue);
@@ -571,32 +573,46 @@ function retainUnownedExtras(
 
 /**
  * Indexes every native enum type declared by any space in the composition by
- * its PHYSICAL identity `${ddlSchema} ${typeName}` — the coordinate the
- * live introspected type carries. `compositionStorages` hands over the raw
- * space storages (the framework stays blind to enum type names); each
+ * its PHYSICAL identity `${ddlSchema} ${typeName}` — the coordinate the
+ * live introspected type carries. The ownership oracle is the passive
+ * {@link ContractSpaceAggregate} already threaded in at runtime; it exposes
+ * every space's contract via `spaces()`, so no new framework method is needed
+ * (the framework stays blind to enum type names — this target reads them off
+ * the aggregate's storages); each
  * namespace resolves to its DDL schema so a type in one schema never claims a
  * same-named type in another. Empty when the oracle omits the accessor (a
  * bare test oracle), so ownership falls back to keeping every extra.
  */
 function collectOwnedEnumTypeNames(ownership: SchemaOwnership): ReadonlySet<string> {
   const owned = new Set<string>();
-  const storages = ownership.compositionStorages?.() ?? [];
-  for (const rawStorage of storages) {
+  if (!isContractSpaceAggregate(ownership)) return owned;
+  for (const space of ownership.spaces()) {
     const storage = blindCast<
       SqlStorage,
-      'compositionStorages in a SQL plan yields SqlStorage values (SQL-target contract spaces)'
-    >(rawStorage);
+      'a SQL plan composes SQL-target contract spaces, so each space contract storage is a SqlStorage'
+    >(space.contract().storage);
     for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
       if (!isPostgresSchema(ns)) continue;
       const enums = ns.entries.native_enum;
       if (enums === undefined) continue;
       const ddlSchema = resolveDdlSchemaForNamespaceStorage(storage, namespaceId);
       for (const entity of Object.values(enums)) {
-        owned.add(`${ddlSchema} ${entity.typeName}`);
+        owned.add(`${ddlSchema} ${entity.typeName}`);
       }
     }
   }
   return owned;
+}
+
+/**
+ * Type-guards a {@link SchemaOwnership} oracle as the full
+ * {@link ContractSpaceAggregate} when it is one — the real plan path always
+ * threads the aggregate, but a unit test may pass a bare `{ declaresEntity }`
+ * stub with no `spaces()`. Duck-typed on the `spaces` method rather than
+ * `instanceof` (the aggregate is a plain object literal).
+ */
+function isContractSpaceAggregate(ownership: SchemaOwnership): ownership is ContractSpaceAggregate {
+  return 'spaces' in ownership && typeof ownership.spaces === 'function';
 }
 
 /**

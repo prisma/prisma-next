@@ -90,9 +90,9 @@ export function postgresDiffSubjectGranularity(nodeKind: string): DiffSubjectGra
  * so a coordinate mapping would misreport pack-owned enum types as unclaimed.
  * Enum ownership is instead resolved by PHYSICAL type name where the consumer
  * can reach the entity's `typeName` field: the planner's `retainUnownedExtras`
- * indexes every space's `native_enum` entities by `${ddlSchema} ${typeName}`
- * (via the ownership oracle's `compositionStorages`), mirroring infer's
- * `describedNativeEnumOwnersByTypeName`.
+ * indexes every space's `native_enum` entities by their DDL-schema-qualified
+ * type name, walking the existing `ContractSpaceAggregate` oracle's `spaces()`,
+ * mirroring infer's `describedNativeEnumOwnersByTypeName`.
  */
 const POSTGRES_NODE_ENTITY_KIND: Partial<Readonly<Record<PostgresSchemaNodeKind, string>>> = {
   [PostgresSchemaNodeKind.table]: 'table',
