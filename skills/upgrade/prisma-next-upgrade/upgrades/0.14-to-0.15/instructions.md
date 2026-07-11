@@ -42,6 +42,26 @@ changes:
 ---
 
 <!--
+TML-2870 (Postgres RLS slice 4: all policy operations + roles): additive. The
+PSL RLS surface gains the non-select policy keywords `policy_insert`,
+`policy_update`, `policy_delete`, and `policy_all`, each with an optional
+`withCheck` predicate (per-operation predicate matrix enforced at load time),
+alongside the existing `policy_select`. Postgres database roles also enter
+`db verify`: a role a contract declares but the live cluster lacks fails verify
+under every control policy, while an undeclared live role is tolerated
+unconditionally (the framework references but does not own the cluster's role
+list). Both are opt-in and additive — existing schemas that use only
+`policy_select` (or no `policy_*` blocks) emit and verify byte-identically, and
+no contract declares a role today unless authored to. The only `examples/`
+touch is the `examples/supabase` walking skeleton: `Profile` gains an `anon`
+public-read policy and an `authenticated` UPDATE-own policy (`using` +
+`withCheck`), its `contract.json`/`contract.d.ts` regenerate, and the
+integration tests extend to prove WITH CHECK enforcement under `SET ROLE` and
+role verify. No user upgrade action — a re-emit picks up any contract shape.
+Incidental substrate diff only.
+-->
+
+<!--
 Postgres-RLS slice 2.5 (one-differ-two-ir-planner), final unit: retires the
 coordinate-based issue vocabulary (`BaseSchemaIssue` / `SchemaIssue` /
 `EnumValuesChangedIssue` / the legacy `outcome` field) now that the migration
