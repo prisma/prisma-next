@@ -28,10 +28,10 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { parseRlsPolicyWireName } from '../rls/wire-name';
+import { postgresNodeStorageCoordinate } from '../schema-ir/node-storage-coordinate';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
-import { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
-import { PostgresSchemaNodeKind, type SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
+import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import {
   formatPostgresControlPolicySubjectLabel,
   resolveNamespaceIdForDdlSchema,
@@ -40,13 +40,7 @@ import {
   resolvePostgresNodeIssueCreationFactoryName,
 } from './control-policy';
 import { buildPostgresPlanDiff } from './diff-database-schema';
-import {
-  coalesceSubtreeIssues,
-  issueNode,
-  issueSchemaName,
-  issueTableName,
-  planIssues,
-} from './issue-planner';
+import { coalesceSubtreeIssues, issueNode, issueSchemaName, planIssues } from './issue-planner';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import {
   CreatePostgresRlsPolicyCall,
@@ -496,42 +490,14 @@ function isPolicyDiffIssue(issue: SchemaDiffIssue<SqlSchemaDiffNode>): boolean {
 }
 
 /**
- * Drops a `not-expected` issue when it is a whole extra TABLE or native enum
- * TYPE that some contract space owns, asking the ownership oracle per node.
- *
- * The consultation applies ONLY to a whole live entity this space's contract
- * lacks, identified by asking the issue's own node (`table` or `native_enum`),
- * never by counting path segments. `declaresEntity` answers over the whole
- * composition (self included), keyed on the schema-IR entity coordinate so a
- * genuine orphan in one namespace is never conflated with a same-named entity
- * a sibling space declares in another, or with a same-named entity of a
- * different kind a sibling declares in the SAME namespace: a positive answer
- * means another space owns THIS entity in THIS namespace (an entity this space
- * owned would be in its expected tree, never an extra) — leave it. A negative
- * answer means no space owns it — a genuine orphan to drop.
- *
- * The coordinate `entityName` is the entity's storage key — a table's name, a
- * native enum's PHYSICAL type name (its `@@map`, the `entries.native_enum` key
- * since ADR 221) — which is exactly what `elementCoordinates` yields and what
- * the live introspected node's own name field carries. `entityKind` is the
- * storage-`entries` spelling (`'table'`, `'native_enum'`), distinct from the
- * diff node's `nodeKind` vocabulary (`'postgres-table'`, `'postgres-native-enum'`).
- *
- * The issue path carries the *resolved DDL schema* (e.g. `public`), but a
- * contract space's own declared namespace id can be the unbound sentinel
- * (`__unbound__`) that resolves to that schema — the two spellings would
- * never string-match. `resolveNamespaceIdForDdlSchema` recovers the raw
- * namespace id THIS space's own contract would use for that DDL schema, so
- * an entity this space's own unbound namespace declares (and any sibling
- * whose own unbound namespace resolves the same way) is compared on the
- * same coordinate the aggregate's `elementCoordinates` walk yields.
- *
- * A DEEPER extra (an extra column/constraint on a table this space DOES own —
- * only the child drifted, so the table is in the expected tree) is this
- * space's own drift and is always kept for dropping; asking the oracle there
- * would wrongly suppress it, because the owned table answers `true`. Shallower
- * issues (namespace/root) are never ownership-scoped here. No oracle ⇒ every
- * extra is kept (single-space plan).
+ * Drops a `not-expected` issue when it is a whole extra storage entity (a table
+ * or a native enum) that some space in the composition owns. Each such node
+ * yields its own storage coordinate (see {@link postgresNodeStorageCoordinate}),
+ * so `declaresEntity` answers over the whole composition on one uniform
+ * coordinate: a positive answer means a sibling owns this entity here — leave
+ * it; a negative answer means a genuine orphan — drop it. A node with no storage
+ * coordinate (a namespace, or a deeper column/constraint drift on an owned
+ * table) is this space's own and is always kept. No oracle ⇒ keep everything.
  */
 function retainUnownedExtras(
   issues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
@@ -543,20 +509,12 @@ function retainUnownedExtras(
     if (issue.reason !== 'not-expected') return true;
     const node = issueNode(issue);
     if (node === undefined) return true;
+    const coordinate = postgresNodeStorageCoordinate(node);
+    if (coordinate === undefined) return true;
     const ddlSchemaName = issueSchemaName(issue);
     if (ddlSchemaName === undefined) return true;
     const namespaceId = resolveNamespaceIdForDdlSchema(contract, ddlSchemaName);
-    if (PostgresNativeEnumSchemaNode.is(node)) {
-      return !ownership.declaresEntity({
-        namespaceId,
-        entityKind: 'native_enum',
-        entityName: node.typeName,
-      });
-    }
-    if (node.nodeKind !== PostgresSchemaNodeKind.table) return true;
-    const tableName = issueTableName(issue);
-    if (tableName === undefined) return true;
-    return !ownership.declaresEntity({ namespaceId, entityKind: 'table', entityName: tableName });
+    return !ownership.declaresEntity({ namespaceId, ...coordinate });
   });
 }
 
