@@ -75,8 +75,6 @@ _None blocking; the extra-object/ownership disposition follows the table precede
 
 ## Known limitation discovered in D1 (pre-existing, not in-slice)
 
-## Known limitation discovered in D1 (pre-existing, not in-slice)
-
 `pruneTableLessNamespaces` drops expected namespaces containing zero tables before diffing (pinned legacy behavior, `verdict-table-less-namespace.test.ts`) — so a contract namespace containing **only** enums is invisible to verify/plan. Managed enums in table-bearing namespaces (this slice's DoD shape) are fully covered; an enums-only managed schema needs that prune revisited — follow-up, likely alongside Slice B.
 
 ## References
