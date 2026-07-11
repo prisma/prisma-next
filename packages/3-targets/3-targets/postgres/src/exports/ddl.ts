@@ -9,9 +9,11 @@ export {
   PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
+  PostgresCreateType,
   PostgresDdlNode,
   type PostgresDdlVisitor,
   PostgresDisableRowLevelSecurity,
   PostgresDropPolicy,
+  PostgresDropType,
   type RlsPolicyOperation,
 } from '../core/ddl/nodes';

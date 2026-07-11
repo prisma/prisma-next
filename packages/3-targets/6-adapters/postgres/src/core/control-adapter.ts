@@ -49,9 +49,11 @@ import type {
   PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
+  PostgresCreateType,
   PostgresDdlNode,
   PostgresDisableRowLevelSecurity,
   PostgresDropPolicy,
+  PostgresDropType,
   RlsPolicyOperation,
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
@@ -1758,6 +1760,27 @@ function pgRenderCreateSchema(node: PostgresCreateSchema): SqlExecuteRequest {
   };
 }
 
+function pgRenderCreateType(node: PostgresCreateType): SqlExecuteRequest {
+  const typeRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.name)}`
+    : quoteIdentifier(node.name);
+  const values = node.values.map((value) => `'${escapeLiteral(value)}'`).join(', ');
+  return {
+    sql: `CREATE TYPE ${typeRef} AS ENUM (${values})`,
+    params: [],
+  };
+}
+
+function pgRenderDropType(node: PostgresDropType): SqlExecuteRequest {
+  const typeRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.name)}`
+    : quoteIdentifier(node.name);
+  return {
+    sql: `DROP TYPE ${typeRef}`,
+    params: [],
+  };
+}
+
 async function pgRenderAlterTable(
   node: PostgresAlterTable,
   codecLookup: CodecLookup,
@@ -1835,6 +1858,8 @@ async function pgRenderDdlExecuteRequest(
   const visitor = {
     createTable: (node: PostgresCreateTable) => pgRenderCreateTable(node, codecLookup),
     createSchema: (node: PostgresCreateSchema) => Promise.resolve(pgRenderCreateSchema(node)),
+    createType: (node: PostgresCreateType) => Promise.resolve(pgRenderCreateType(node)),
+    dropType: (node: PostgresDropType) => Promise.resolve(pgRenderDropType(node)),
     alterTable: (node: PostgresAlterTable) => pgRenderAlterTable(node, codecLookup),
     createPolicy: (node: PostgresCreatePolicy) => Promise.resolve(pgRenderCreatePolicy(node)),
     dropPolicy: (node: PostgresDropPolicy) => Promise.resolve(pgRenderDropPolicy(node)),

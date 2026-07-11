@@ -1340,8 +1340,13 @@ export class CreateNativeEnumTypeCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
-    return createNativeEnumType(this.schemaName, this.typeName, this.members);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `CreateNativeEnumTypeCall.toOp: a DDL lowerer is required on the Postgres planner path (type "${this.typeName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return createNativeEnumType(this.schemaName, this.typeName, this.members, lowerer);
   }
 
   renderTypeScript(): string {
@@ -1373,8 +1378,13 @@ export class DropNativeEnumTypeCall extends PostgresOpFactoryCallNode {
     this.freeze();
   }
 
-  toOp(): Op {
-    return dropNativeEnumType(this.schemaName, this.typeName);
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `DropNativeEnumTypeCall.toOp: a DDL lowerer is required on the Postgres planner path (type "${this.typeName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return dropNativeEnumType(this.schemaName, this.typeName, lowerer);
   }
 
   renderTypeScript(): string {

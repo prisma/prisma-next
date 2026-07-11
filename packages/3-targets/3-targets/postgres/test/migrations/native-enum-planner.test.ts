@@ -34,6 +34,7 @@ import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-da
 import type { PostgresNativeEnumIntrospection } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
+import { PostgresCreateType, PostgresDropType } from '../../src/exports/ddl';
 
 const MEMBERS = ['draft', 'review', 'done'] as const;
 
@@ -45,6 +46,25 @@ const stubLowerer: ExecuteRequestLowerer = {
     return { sql: 'stub', params: [] };
   },
 };
+
+// Captures the DDL nodes an op lowers so a test can assert the node it built
+// (the node → SQL rendering is verified in the adapter's ddl-create-type test).
+function recordingLowerer(): { lowerer: ExecuteRequestLowerer; received: unknown[] } {
+  const received: unknown[] = [];
+  return {
+    received,
+    lowerer: {
+      lower(ast, _ctx) {
+        received.push(ast);
+        return { sql: 'stub', params: [] };
+      },
+      async lowerToExecuteRequest(ast, _ctx) {
+        received.push(ast);
+        return { sql: 'stub', params: [] };
+      },
+    },
+  };
+}
 
 const DB_UPDATE_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -275,29 +295,37 @@ describe('member-value mismatch is a named unsupported diagnostic', () => {
   });
 });
 
-describe('op rendering (SQL)', () => {
-  it('CREATE TYPE is schema-qualified, quoted, declaration-ordered, and single-quote-escaped', () => {
+describe('op building (typed DDL node)', () => {
+  it('CREATE builds a PostgresCreateType carrying schema, type name, and declaration-ordered members', async () => {
+    const { lowerer, received } = recordingLowerer();
     const call = new CreateNativeEnumTypeCall('sales', 'order status', [
       'draft',
       "it's reviewed",
       'done',
     ]);
-    const op = call.toOp();
-    expect(op.execute[0]?.sql).toBe(
-      `CREATE TYPE "sales"."order status" AS ENUM ('draft', 'it''s reviewed', 'done')`,
-    );
+    const op = await call.toOp(lowerer);
+    const node = received.find((n): n is PostgresCreateType => n instanceof PostgresCreateType);
+    expect(node?.schema).toBe('sales');
+    expect(node?.name).toBe('order status');
+    expect(node?.values).toEqual(['draft', "it's reviewed", 'done']);
     expect(op.operationClass).toBe('additive');
   });
 
-  it('DROP TYPE is schema-qualified and quoted', () => {
-    const op = new DropNativeEnumTypeCall('sales', 'order_status').toOp();
-    expect(op.execute[0]?.sql).toBe(`DROP TYPE "sales"."order_status"`);
+  it('DROP builds a PostgresDropType carrying schema and type name', async () => {
+    const { lowerer, received } = recordingLowerer();
+    const op = await new DropNativeEnumTypeCall('sales', 'order_status').toOp(lowerer);
+    const node = received.find((n): n is PostgresDropType => n instanceof PostgresDropType);
+    expect(node?.schema).toBe('sales');
+    expect(node?.name).toBe('order_status');
     expect(op.operationClass).toBe('destructive');
   });
 
-  it('an unbound-namespace create renders unqualified so search_path resolves it', () => {
-    const op = new CreateNativeEnumTypeCall('__unbound__', 'mood', ['happy']).toOp();
-    expect(op.execute[0]?.sql).toBe(`CREATE TYPE "mood" AS ENUM ('happy')`);
+  it('an unbound-namespace create builds a node with no schema so search_path resolves it', async () => {
+    const { lowerer, received } = recordingLowerer();
+    await new CreateNativeEnumTypeCall('__unbound__', 'mood', ['happy']).toOp(lowerer);
+    const node = received.find((n): n is PostgresCreateType => n instanceof PostgresCreateType);
+    expect(node?.schema).toBeUndefined();
+    expect(node?.name).toBe('mood');
   });
 });
 

@@ -67,6 +67,8 @@ export type AnyAlterTableAction = AddColumnAction | DropDefaultAction;
 export interface PostgresDdlVisitor<R> {
   createTable(node: PostgresCreateTable): R;
   createSchema(node: PostgresCreateSchema): R;
+  createType(node: PostgresCreateType): R;
+  dropType(node: PostgresDropType): R;
   alterTable(node: PostgresAlterTable): R;
   createPolicy(node: PostgresCreatePolicy): R;
   dropPolicy(node: PostgresDropPolicy): R;
@@ -131,6 +133,46 @@ export class PostgresCreateSchema extends PostgresDdlNode {
 
   override accept<R>(visitor: PostgresDdlVisitor<R>): R {
     return visitor.createSchema(this);
+  }
+}
+
+export class PostgresCreateType extends PostgresDdlNode {
+  readonly kind = 'create-type' as const;
+  readonly schema: string | undefined;
+  readonly name: string;
+  readonly values: ReadonlyArray<string>;
+
+  constructor(options: {
+    readonly schema?: string;
+    readonly name: string;
+    readonly values: readonly string[];
+  }) {
+    super();
+    this.schema = options.schema;
+    this.name = options.name;
+    this.values = Object.freeze([...options.values]);
+    this.freeze();
+  }
+
+  override accept<R>(visitor: PostgresDdlVisitor<R>): R {
+    return visitor.createType(this);
+  }
+}
+
+export class PostgresDropType extends PostgresDdlNode {
+  readonly kind = 'drop-type' as const;
+  readonly schema: string | undefined;
+  readonly name: string;
+
+  constructor(options: { readonly schema?: string; readonly name: string }) {
+    super();
+    this.schema = options.schema;
+    this.name = options.name;
+    this.freeze();
+  }
+
+  override accept<R>(visitor: PostgresDdlVisitor<R>): R {
+    return visitor.dropType(this);
   }
 }
 
@@ -262,6 +304,8 @@ export class PostgresDisableRowLevelSecurity extends PostgresDdlNode {
 export type AnyPostgresDdlNode =
   | PostgresCreateTable
   | PostgresCreateSchema
+  | PostgresCreateType
+  | PostgresDropType
   | PostgresAlterTable
   | PostgresCreatePolicy
   | PostgresDropPolicy
