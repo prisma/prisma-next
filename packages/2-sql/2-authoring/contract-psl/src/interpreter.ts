@@ -451,12 +451,6 @@ function lowerExtensionBlocksForNamespace(
     const entriesKey = descriptor.discriminator;
     const slot = result[entriesKey] ?? {};
     result[entriesKey] = slot;
-    // Keyed by the block handle throughout the family/authoring layer (role,
-    // policy, native_enum alike). A target that keys a storage entry by a
-    // different physical name (Postgres `native_enum` by its type name, ADR 221)
-    // re-keys in its own namespace concretion (`PostgresSchema`), not here — so
-    // this map stays the handle-keyed reference structure a pack field resolver
-    // (`pg.enum(Ref)`) resolves `Ref` against.
     slot[block.name] = entity;
 
     const derivedValueSet = deriveValueSetFromEntity(descriptor.output, entity);

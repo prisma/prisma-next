@@ -1080,11 +1080,6 @@ export function buildSqlContractFromDefinition(
       assertNoManagedPackEntityKinds(id, packEntitiesForNs);
 
       const enumValueSetEntries = storageValueSetsByNs[id];
-      // Derive value-sets from the handle-keyed pack entities (the value-set is
-      // the general typing reference, keyed by handle). Pack entities stay
-      // handle-keyed here; a target that keys a storage entry by a physical name
-      // (Postgres `native_enum` by its type name, ADR 221) re-keys in its own
-      // namespace concretion (`PostgresSchema`), reached via `createNamespace`.
       const packValueSetEntries = derivePackEntityValueSets(
         packEntitiesForNs,
         entityTypesByDiscriminator,
