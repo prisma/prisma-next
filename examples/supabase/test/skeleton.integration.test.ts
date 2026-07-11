@@ -42,13 +42,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
+import { coreHash, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import supabasePack from '@prisma-next/extension-supabase/pack';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
-import type { PostgresSchema } from '@prisma-next/target-postgres/types';
+import { PostgresRole, PostgresSchema } from '@prisma-next/target-postgres/types';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract';
@@ -835,32 +837,48 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
   it(
     'G — a role the contract declares but the database lacks fails db verify, naming the role',
     async () => {
-      // Inject a role entity the live database does not have into the app
-      // contract's wire JSON, then verify. Roles cannot be authored in PSL yet,
-      // so this exercises the role entity kind directly — the same path a
-      // TypeScript-authored role declaration would take.
-      const withRoleJson = JSON.parse(JSON.stringify(contractJson)) as {
-        storage: {
-          namespaces: Record<string, { entries: Record<string, Record<string, unknown>> }>;
-        };
-      };
-      withRoleJson.storage.namespaces['public']!.entries['role'] = {
-        missing_app_role: {
-          kind: 'role',
-          name: 'missing_app_role',
-          namespaceId: '__unbound__',
+      // Build a contract that declares a role the live database lacks, through
+      // the real construction surface (`new PostgresRole` → `new PostgresSchema`
+      // → `new SqlStorage`) — not by patching contract wire JSON. Roles cannot
+      // be authored in PSL yet, so this is the same path a TypeScript-authored
+      // role declaration lands on: a `role` entity in the namespace's entries.
+      const base = new PostgresContractSerializer().deserializeContract<Contract>(contractJson);
+      // The deserialized namespace is a PostgresSchema at runtime; the structural
+      // contract type and the class intersect to `never`, so read it through the
+      // same narrowing the module header uses.
+      const basePublicNs = base.storage.namespaces['public'] as unknown as PostgresSchema;
+      const publicWithRole = new PostgresSchema({
+        id: basePublicNs.id,
+        entries: {
+          ...basePublicNs.entries,
+          role: {
+            missing_app_role: new PostgresRole({
+              name: 'missing_app_role',
+              namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
+            }),
+          },
         },
+      });
+      const contractWithRole = {
+        ...base,
+        storage: new SqlStorage({
+          // A freshly constructed test contract carries a test storage hash;
+          // the marker check is skipped below because this test verifies the
+          // schema (the missing role), not migration-marker identity.
+          storageHash: coreHash('sha256:supabase-missing-role'),
+          // Carry the base storage's named types (e.g. `Uuid`) forward — the
+          // profile columns reference them.
+          ...(base.storage.types !== undefined ? { types: base.storage.types } : {}),
+          namespaces: { ...base.storage.namespaces, public: publicWithRole },
+        }),
       };
 
-      const deserialized = new PostgresContractSerializer().deserializeContract<Contract>(
-        withRoleJson as unknown as Parameters<PostgresContractSerializer['deserializeContract']>[0],
-      );
       const verifyResult = await client.dbVerify({
-        contract: deserialized,
+        contract: contractWithRole,
         migrationsDir,
         strict: false,
         skipSchema: false,
-        skipMarker: false,
+        skipMarker: true,
       });
 
       expect(
