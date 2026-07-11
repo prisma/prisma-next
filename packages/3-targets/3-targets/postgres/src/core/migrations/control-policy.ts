@@ -1,13 +1,14 @@
-import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { ControlPolicySubject } from '@prisma-next/family-sql/control';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { entityAt, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { PostgresNativeEnum } from '../postgres-native-enum';
 import { isPostgresSchema } from '../postgres-schema';
 import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
-import type { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
+import { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
 import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
@@ -106,27 +107,6 @@ export function formatPostgresControlPolicySubjectLabel(
   return factoryName;
 }
 
-/**
- * The declared control grade of the native enum entity whose PHYSICAL type
- * name matches, in the given namespace. `entries.native_enum` is keyed by
- * handle name while calls carry the type name, so `entityAt` cannot address
- * the entity — this walks the kind map matching on the entity's `typeName`
- * field, the same type-name matching `contract infer`'s pack subtraction
- * uses.
- */
-function nativeEnumControlByTypeName(
-  contract: Contract<SqlStorage>,
-  namespaceId: string,
-  typeName: string,
-): ControlPolicy | undefined {
-  const namespace = contract.storage.namespaces[namespaceId];
-  if (!isPostgresSchema(namespace)) return undefined;
-  for (const entity of Object.values(namespace.entries.native_enum ?? {})) {
-    if (entity.typeName === typeName) return entity.control;
-  }
-  return undefined;
-}
-
 export function resolvePostgresCallControlPolicySubject(
   call: PostgresOpFactoryCall,
   contract: Contract<SqlStorage>,
@@ -147,12 +127,14 @@ export function resolvePostgresCallControlPolicySubject(
     'schemaName' in call
   ) {
     const namespaceId = resolveNamespaceIdForDdlSchema(contract, call.schemaName);
+    const enumControl = entityAt<PostgresNativeEnum>(contract.storage, {
+      namespaceId,
+      entityKind: 'native_enum',
+      entityName: call.typeName,
+    })?.control;
     return {
       namespaceId,
-      ...ifDefined(
-        'explicitNodeControlPolicy',
-        nativeEnumControlByTypeName(contract, namespaceId, call.typeName),
-      ),
+      ...ifDefined('explicitNodeControlPolicy', enumControl),
       typeName: call.typeName,
       createsNewObject,
     };
@@ -275,27 +257,22 @@ export function resolvePostgresNodeIssueControlPolicySubject(
     };
   }
 
-  if (node.nodeKind === PostgresSchemaNodeKind.nativeEnum) {
-    const enumNode = blindCast<
-      PostgresNativeEnumSchemaNode,
-      'a postgres-native-enum diff node is always a PostgresNativeEnumSchemaNode'
-    >(node);
-    // The entity's grade rides on the expected-side node (entries.native_enum
-    // is keyed by handle name while the node only knows the Postgres type
-    // name, so `entityAt` cannot address the entity). A `not-expected` enum
-    // has no expected node and no contract entity — the grade falls back to
-    // the contract default, like an undeclared live table.
-    const expectedControl =
-      issue.expected !== undefined
-        ? blindCast<
-            PostgresNativeEnumSchemaNode,
-            'the expected side of a postgres-native-enum issue is the projected enum node'
-          >(issue.expected).control
-        : undefined;
+  if (PostgresNativeEnumSchemaNode.is(node)) {
+    // The enum entity keys under its PHYSICAL type name (`entries.native_enum`
+    // key since ADR 221), so `entityAt` addresses it directly on the node's
+    // `typeName` — the same coordinate the table branch below uses. A
+    // `not-expected` extra enum this contract lacks resolves to no entity, so
+    // the grade falls back to the contract default, like an undeclared table.
+    const namespaceId = resolveNamespaceIdForDdlSchema(contract, issue.path[1] ?? node.namespaceId);
+    const enumControl = entityAt<PostgresNativeEnum>(contract.storage, {
+      namespaceId,
+      entityKind: 'native_enum',
+      entityName: node.typeName,
+    })?.control;
     return {
-      namespaceId: resolveNamespaceIdForDdlSchema(contract, issue.path[1] ?? enumNode.namespaceId),
-      ...ifDefined('explicitNodeControlPolicy', expectedControl),
-      typeName: enumNode.typeName,
+      namespaceId,
+      ...ifDefined('explicitNodeControlPolicy', enumControl),
+      typeName: node.typeName,
       createsNewObject: issue.reason === 'not-found',
     };
   }

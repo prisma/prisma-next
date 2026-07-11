@@ -71,7 +71,7 @@ function makeContract(options: { readonly withEnum: boolean }): Contract<SqlStor
       ...(options.withEnum
         ? {
             native_enum: {
-              OrderStatus: {
+              order_status: {
                 kind: 'postgres-enum',
                 typeName: 'order_status',
                 members: [...MEMBERS],
@@ -166,31 +166,26 @@ function callsFor(contract: Contract<SqlStorage>, actual: PostgresDatabaseSchema
   return result.value.calls;
 }
 
-type AggregateOwnershipStub = SchemaOwnership & {
-  spaces(): readonly { contract(): { readonly storage: SqlStorage } }[];
-};
-
 // A two-space composition ownership oracle shaped like the real
-// `ContractSpaceAggregate`: `declaresEntity` matches only handle coordinates
-// (so it fails the physical-type-name query, exactly as the real aggregate
-// does), while `spaces()` exposes every space's contract for the target's
-// physical-identity resolution — the same mechanism used at runtime.
-function twoSpaceOwnership(...storages: readonly SqlStorage[]): AggregateOwnershipStub {
-  const handleCoordinates = new Set<string>();
+// `ContractSpaceAggregate`: `declaresEntity` answers over every space's
+// `native_enum` entities on the storage-`entries` coordinate. The entry key is
+// the enum's PHYSICAL type name (ADR 221), so the query
+// `declaresEntity({… entityKind: 'native_enum', entityName: '<type>'})` matches
+// directly — the same coordinate walk the real aggregate performs.
+function twoSpaceOwnership(...storages: readonly SqlStorage[]): SchemaOwnership {
+  const ownedCoordinates = new Set<string>();
   for (const storage of storages) {
     for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
       const enums = isPostgresSchema(ns) ? (ns.entries.native_enum ?? {}) : {};
-      for (const handle of Object.keys(enums)) {
-        handleCoordinates.add(
-          coordinateKey({ namespaceId, entityKind: 'native_enum', entityName: handle }),
+      for (const typeName of Object.keys(enums)) {
+        ownedCoordinates.add(
+          coordinateKey({ namespaceId, entityKind: 'native_enum', entityName: typeName }),
         );
       }
     }
   }
-  const spaces = storages.map((storage) => ({ contract: () => ({ storage }) }));
   return {
-    declaresEntity: (coordinate) => handleCoordinates.has(coordinateKey(coordinate)),
-    spaces: () => spaces,
+    declaresEntity: (coordinate) => ownedCoordinates.has(coordinateKey(coordinate)),
   };
 }
 
@@ -332,10 +327,9 @@ describe('planner ownership + policy for enum extras', () => {
   }
 
   it('never drops a live enum a sibling space declares (by physical type name)', async () => {
-    // A sibling space declares `order_status` in `sales`; ownership resolves
-    // by physical type name over the space's contract (the aggregate's
-    // `spaces()`), not the handle coordinate — so the app plan leaves it
-    // untouched.
+    // A sibling space declares `order_status` in `sales`; the entity keys under
+    // its physical type name in `entries.native_enum`, so `declaresEntity`
+    // matches the coordinate and the app plan leaves it untouched.
     const siblingStorage = new SqlStorage({
       storageHash: coreHash('sha256:sibling-owns-order-status'),
       namespaces: {
@@ -344,7 +338,7 @@ describe('planner ownership + policy for enum extras', () => {
           entries: {
             table: {},
             native_enum: {
-              OrderStatus: {
+              order_status: {
                 kind: 'postgres-enum',
                 typeName: 'order_status',
                 members: [...MEMBERS],
@@ -380,11 +374,10 @@ describe('planner ownership + policy for enum extras', () => {
 
 describe('D2-F1: enum drop-safety resolves ownership by physical type name', () => {
   // A pack declares `native_enum Status { … @@map("order_status") }` in the
-  // shared `public` schema: the entries key is the author HANDLE (`Status`),
-  // the physical type name is `order_status`. The generic coordinate matcher
-  // keys on the handle, so `declaresEntity({… entityName: 'order_status'})`
-  // returns false — the pre-fix planner wrongly dropped the pack's type. The
-  // fix resolves ownership by physical type name over every space's storage.
+  // shared `public` schema. The entity keys under its physical type name
+  // (`order_status`, the ADR 221 `entries.native_enum` key), so
+  // `declaresEntity({… entityName: 'order_status'})` matches — the app plan must
+  // not drop a type a sibling space owns in the same schema.
   function packStorageDeclaringRenamedEnum(): SqlStorage {
     return new SqlStorage({
       storageHash: coreHash('sha256:pack-renamed-enum'),
@@ -394,8 +387,7 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
           entries: {
             table: {},
             native_enum: {
-              // handle `Status` != physical type name `order_status`
-              Status: {
+              order_status: {
                 kind: 'postgres-enum',
                 typeName: 'order_status',
                 members: [...MEMBERS],

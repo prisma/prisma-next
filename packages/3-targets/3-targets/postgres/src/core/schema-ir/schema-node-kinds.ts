@@ -77,25 +77,22 @@ export function postgresDiffSubjectGranularity(nodeKind: string): DiffSubjectGra
 }
 
 /**
- * The one real map from a Postgres-specific `nodeKind` to its storage
- * `entityKind` — the same vocabulary the contract storage's `entries`
- * dictionary keys use. Only the whole-table kind has an entity of its own;
+ * The map from a Postgres-specific `nodeKind` to its storage `entityKind` — the
+ * same vocabulary the contract storage's `entries` dictionary keys use. The
+ * whole-table and native-enum kinds each have an entity of their own;
  * database/namespace/policy/role nodes map to nothing here (a namespace is
  * addressed by id, not by an `entries` kind; policies and roles are
  * structural, never a sibling space's unclaimed entity).
  *
- * The native-enum node kind is DELIBERATELY absent: the generic entity
- * coordinate's `entityName` is the authoring handle (the `entries.native_enum`
- * key), which an `@@map`-renamed enum diverges from its physical type name —
- * so a coordinate mapping would misreport pack-owned enum types as unclaimed.
- * Enum ownership is instead resolved by PHYSICAL type name where the consumer
- * can reach the entity's `typeName` field: the planner's `retainUnownedExtras`
- * indexes every space's `native_enum` entities by their DDL-schema-qualified
- * type name, walking the existing `ContractSpaceAggregate` oracle's `spaces()`,
- * mirroring infer's `describedNativeEnumOwnersByTypeName`.
+ * The native enum keys under its PHYSICAL type name in `entries.native_enum`
+ * (ADR 221), so its diff node's `typeName` addresses the entity on the generic
+ * coordinate directly — no by-type-name walk needed. This lets the framework's
+ * unclaimed-elements sweep classify enum ownership the same coordinate way it
+ * classifies tables.
  */
 const POSTGRES_NODE_ENTITY_KIND: Partial<Readonly<Record<PostgresSchemaNodeKind, string>>> = {
   [PostgresSchemaNodeKind.table]: 'table',
+  [PostgresSchemaNodeKind.nativeEnum]: 'native_enum',
 };
 
 /** Looks up the storage entityKind for a Postgres-specific `nodeKind`. */

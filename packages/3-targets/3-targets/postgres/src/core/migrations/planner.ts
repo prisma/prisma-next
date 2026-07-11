@@ -22,16 +22,14 @@ import type {
   SchemaOwnership,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { ContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
-import { isPostgresSchema } from '../postgres-schema';
 import { parseRlsPolicyWireName } from '../rls/wire-name';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
-import type { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
+import { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
 import { PostgresSchemaNodeKind, type SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import {
@@ -498,32 +496,33 @@ function isPolicyDiffIssue(issue: SchemaDiffIssue<SqlSchemaDiffNode>): boolean {
 }
 
 /**
- * Drops a `not-expected` issue when it is a whole extra TABLE that some
- * contract space owns, asking the ownership oracle per node.
+ * Drops a `not-expected` issue when it is a whole extra TABLE or native enum
+ * TYPE that some contract space owns, asking the ownership oracle per node.
  *
- * The consultation applies ONLY to table-level extras — a live table this
- * space's contract lacks — identified by asking the issue's own node
- * (`nodeKind === table`), never by counting path segments. `declaresEntity`
- * answers over the whole composition (self included), keyed on the schema-IR
- * entity coordinate so a genuine orphan in one namespace is never conflated
- * with a same-named table a sibling space declares in another, or with a
- * same-named non-table entity (an enum, an RLS policy) a sibling declares in
- * the SAME namespace: a positive answer means another space owns THIS table
- * in THIS namespace (a table this space owned would be in its expected tree,
- * never an extra) — leave it. A negative answer means no space owns it — a
- * genuine orphan to drop. `entityKind` is the literal `'table'` here: this
- * function only ever asks about a node already confirmed to be
- * `PostgresSchemaNodeKind.table` (checked just above), and the diff tree's
- * `nodeKind` vocabulary (`'postgres-table'`) is distinct from the storage
- * `entries` vocabulary `elementCoordinates` walks (`'table'`) — the literal
- * is that storage-entries spelling, not the node kind.
+ * The consultation applies ONLY to a whole live entity this space's contract
+ * lacks, identified by asking the issue's own node (`table` or `native_enum`),
+ * never by counting path segments. `declaresEntity` answers over the whole
+ * composition (self included), keyed on the schema-IR entity coordinate so a
+ * genuine orphan in one namespace is never conflated with a same-named entity
+ * a sibling space declares in another, or with a same-named entity of a
+ * different kind a sibling declares in the SAME namespace: a positive answer
+ * means another space owns THIS entity in THIS namespace (an entity this space
+ * owned would be in its expected tree, never an extra) — leave it. A negative
+ * answer means no space owns it — a genuine orphan to drop.
+ *
+ * The coordinate `entityName` is the entity's storage key — a table's name, a
+ * native enum's PHYSICAL type name (its `@@map`, the `entries.native_enum` key
+ * since ADR 221) — which is exactly what `elementCoordinates` yields and what
+ * the live introspected node's own name field carries. `entityKind` is the
+ * storage-`entries` spelling (`'table'`, `'native_enum'`), distinct from the
+ * diff node's `nodeKind` vocabulary (`'postgres-table'`, `'postgres-native-enum'`).
  *
  * The issue path carries the *resolved DDL schema* (e.g. `public`), but a
  * contract space's own declared namespace id can be the unbound sentinel
  * (`__unbound__`) that resolves to that schema — the two spellings would
  * never string-match. `resolveNamespaceIdForDdlSchema` recovers the raw
  * namespace id THIS space's own contract would use for that DDL schema, so
- * a table this space's own unbound namespace declares (and any sibling
+ * an entity this space's own unbound namespace declares (and any sibling
  * whose own unbound namespace resolves the same way) is compared on the
  * same coordinate the aggregate's `elementCoordinates` walk yields.
  *
@@ -540,79 +539,25 @@ function retainUnownedExtras(
   contract: Contract<SqlStorage>,
 ): readonly SchemaDiffIssue<SqlSchemaDiffNode>[] {
   if (ownership === undefined) return issues;
-  const ownedEnumsByDdlSchema = collectOwnedEnumTypeNames(ownership);
   return issues.filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
     const node = issueNode(issue);
     if (node === undefined) return true;
-    if (node.nodeKind === PostgresSchemaNodeKind.nativeEnum) {
-      // A whole extra native enum TYPE is owned when some space in the
-      // composition declares one with the same PHYSICAL type name in the same
-      // DDL schema. The generic entity coordinate cannot express this: its
-      // `entityName` is the authoring handle (the `entries.native_enum` key),
-      // which an `@@map`-renamed enum diverges from — so ownership resolves
-      // by type name over each space's storage, walking the existing
-      // `ContractSpaceAggregate` threaded in as the oracle, mirroring
-      // `contract infer`'s `describedNativeEnumOwnersByTypeName`.
-      const enumTypeName = blindCast<
-        PostgresNativeEnumSchemaNode,
-        'a postgres-native-enum diff node is always a PostgresNativeEnumSchemaNode'
-      >(node).typeName;
-      const ddlSchemaName = issueSchemaName(issue);
-      if (ddlSchemaName === undefined) return true;
-      return !ownedEnumsByDdlSchema.has(`${ddlSchemaName} ${enumTypeName}`);
+    const ddlSchemaName = issueSchemaName(issue);
+    if (ddlSchemaName === undefined) return true;
+    const namespaceId = resolveNamespaceIdForDdlSchema(contract, ddlSchemaName);
+    if (PostgresNativeEnumSchemaNode.is(node)) {
+      return !ownership.declaresEntity({
+        namespaceId,
+        entityKind: 'native_enum',
+        entityName: node.typeName,
+      });
     }
     if (node.nodeKind !== PostgresSchemaNodeKind.table) return true;
-    const ddlSchemaName = issueSchemaName(issue);
     const tableName = issueTableName(issue);
-    if (ddlSchemaName === undefined || tableName === undefined) return true;
-    const namespaceId = resolveNamespaceIdForDdlSchema(contract, ddlSchemaName);
+    if (tableName === undefined) return true;
     return !ownership.declaresEntity({ namespaceId, entityKind: 'table', entityName: tableName });
   });
-}
-
-/**
- * Indexes every native enum type declared by any space in the composition by
- * its PHYSICAL identity `${ddlSchema} ${typeName}` — the coordinate the
- * live introspected type carries. The ownership oracle is the passive
- * {@link ContractSpaceAggregate} already threaded in at runtime; it exposes
- * every space's contract via `spaces()`, so no new framework method is needed
- * (the framework stays blind to enum type names — this target reads them off
- * the aggregate's storages); each
- * namespace resolves to its DDL schema so a type in one schema never claims a
- * same-named type in another. Empty when the oracle omits the accessor (a
- * bare test oracle), so ownership falls back to keeping every extra.
- */
-function collectOwnedEnumTypeNames(ownership: SchemaOwnership): ReadonlySet<string> {
-  const owned = new Set<string>();
-  if (!isContractSpaceAggregate(ownership)) return owned;
-  for (const space of ownership.spaces()) {
-    const storage = blindCast<
-      SqlStorage,
-      'a SQL plan composes SQL-target contract spaces, so each space contract storage is a SqlStorage'
-    >(space.contract().storage);
-    for (const [namespaceId, ns] of Object.entries(storage.namespaces)) {
-      if (!isPostgresSchema(ns)) continue;
-      const enums = ns.entries.native_enum;
-      if (enums === undefined) continue;
-      const ddlSchema = resolveDdlSchemaForNamespaceStorage(storage, namespaceId);
-      for (const entity of Object.values(enums)) {
-        owned.add(`${ddlSchema} ${entity.typeName}`);
-      }
-    }
-  }
-  return owned;
-}
-
-/**
- * Type-guards a {@link SchemaOwnership} oracle as the full
- * {@link ContractSpaceAggregate} when it is one — the real plan path always
- * threads the aggregate, but a unit test may pass a bare `{ declaresEntity }`
- * stub with no `spaces()`. Duck-typed on the `spaces` method rather than
- * `instanceof` (the aggregate is a plain object literal).
- */
-function isContractSpaceAggregate(ownership: SchemaOwnership): ownership is ContractSpaceAggregate {
-  return 'spaces' in ownership && typeof ownership.spaces === 'function';
 }
 
 /**
