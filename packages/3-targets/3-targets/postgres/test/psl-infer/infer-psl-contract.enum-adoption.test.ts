@@ -451,7 +451,7 @@ describe('pack-owned enum subtraction from a serialized+hydrated described contr
 
   it('the hydrated contract exposes the native_enum entity as a PostgresNativeEnum (subtraction precondition)', () => {
     const authNs = hydratedPack.contract.storage.namespaces['auth'] as PostgresSchema;
-    const entity = authNs.entries.native_enum?.['AalLevel'];
+    const entity = authNs.entries.native_enum?.['aal_level'];
     expect(entity).toBeInstanceOf(PostgresNativeEnum);
     expect(entity?.typeName).toBe('aal_level');
   });

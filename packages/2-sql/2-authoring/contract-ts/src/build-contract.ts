@@ -32,7 +32,6 @@ import type { CodecLookup, ColumnTypeDescriptor } from '@prisma-next/framework-c
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { tableEntityKind, valueSetEntityKind } from '@prisma-next/sql-contract/entity-kinds';
-import { resolveEntityStorageKey } from '@prisma-next/sql-contract/entity-storage-key-hook';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -578,35 +577,6 @@ function derivePackEntityValueSets(
 }
 
 /**
- * Re-keys each namespace pack-entity kind by its descriptor's `storageKey`
- * (the entity's physical name — ADR 221 coordinate `entityName`) when the
- * descriptor derives one, else leaves it keyed by the author handle. Mirrors
- * how a table keys `entries.table` by its `@@map` name, not the model handle;
- * the PSL path does the same at the extension-block lowering. The value-set
- * (derived separately, above) stays keyed by the handle.
- */
-function rekeyPackEntitiesByStorageKey(
-  packEntitiesForNs: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
-  entityTypesByDiscriminator: ReadonlyMap<string, AuthoringEntityTypeDescriptor>,
-): Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined {
-  if (packEntitiesForNs === undefined) return undefined;
-  const result: Record<string, Record<string, unknown>> = {};
-  for (const [kind, entitiesByName] of Object.entries(packEntitiesForNs)) {
-    const descriptor = entityTypesByDiscriminator.get(kind);
-    const rekeyed: Record<string, unknown> = {};
-    for (const [name, entity] of Object.entries(entitiesByName)) {
-      const storageKey =
-        descriptor !== undefined
-          ? (resolveEntityStorageKey(descriptor.output, entity) ?? name)
-          : name;
-      rekeyed[storageKey] = entity;
-    }
-    result[kind] = rekeyed;
-  }
-  return result;
-}
-
-/**
  * Merges a namespace's `enumType()`-derived value-sets with its pack-entity-
  * derived value-sets. Both land in the same `entries.valueSet[name]` slot —
  * which drives value-set → codec typing and the domain-enum CHECK — so a
@@ -1110,14 +1080,12 @@ export function buildSqlContractFromDefinition(
       assertNoManagedPackEntityKinds(id, packEntitiesForNs);
 
       const enumValueSetEntries = storageValueSetsByNs[id];
-      // Derive value-sets from the HANDLE-keyed pack entities (the value-set is
-      // the general typing reference, keyed by handle), then re-key the entity
-      // entries themselves by their physical storage key for `entries.<kind>`.
+      // Derive value-sets from the handle-keyed pack entities (the value-set is
+      // the general typing reference, keyed by handle). Pack entities stay
+      // handle-keyed here; a target that keys a storage entry by a physical name
+      // (Postgres `native_enum` by its type name, ADR 221) re-keys in its own
+      // namespace concretion (`PostgresSchema`), reached via `createNamespace`.
       const packValueSetEntries = derivePackEntityValueSets(
-        packEntitiesForNs,
-        entityTypesByDiscriminator,
-      );
-      const rekeyedPackEntities = rekeyPackEntitiesByStorageKey(
         packEntitiesForNs,
         entityTypesByDiscriminator,
       );
@@ -1130,7 +1098,7 @@ export function buildSqlContractFromDefinition(
         id,
         entries: {
           table: tablesByNamespace[id] ?? {},
-          ...rekeyedPackEntities,
+          ...packEntitiesForNs,
           ...(valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0
             ? { valueSet: valueSetEntries }
             : {}),

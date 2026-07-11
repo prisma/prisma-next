@@ -102,7 +102,7 @@ describe('PostgresSchema native_enum slot', () => {
         native_enum: { AalLevel: aalLevelInput },
       },
     });
-    const node = schema.entries.native_enum?.['AalLevel'];
+    const node = schema.entries.native_enum?.['aal_level'];
     expect(node).toBeInstanceOf(PostgresNativeEnum);
     expect(node?.typeName).toBe('aal_level');
     expect(node?.members).toHaveLength(3);

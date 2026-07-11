@@ -56,7 +56,6 @@ import {
   type TypeAliasSymbol,
 } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
-import { resolveEntityStorageKey } from '@prisma-next/sql-contract/entity-storage-key-hook';
 import type {
   SqlModelStorage,
   SqlNamespaceBase,
@@ -452,11 +451,12 @@ function lowerExtensionBlocksForNamespace(
     const entriesKey = descriptor.discriminator;
     const slot = result[entriesKey] ?? {};
     result[entriesKey] = slot;
-    // Keyed by the block handle: this map is the authoring-time reference
-    // structure a pack field resolver (`pg.enum(Ref)`) resolves `Ref` against.
-    // The physical-name storage key (ADR 221 coordinate `entityName`) is
-    // applied later, when these entities are merged into the namespace's
-    // storage `entries` (see `rekeyEntitiesForStorage`).
+    // Keyed by the block handle throughout the family/authoring layer (role,
+    // policy, native_enum alike). A target that keys a storage entry by a
+    // different physical name (Postgres `native_enum` by its type name, ADR 221)
+    // re-keys in its own namespace concretion (`PostgresSchema`), not here — so
+    // this map stays the handle-keyed reference structure a pack field resolver
+    // (`pg.enum(Ref)`) resolves `Ref` against.
     slot[block.name] = entity;
 
     const derivedValueSet = deriveValueSetFromEntity(descriptor.output, entity);
@@ -467,32 +467,6 @@ function lowerExtensionBlocksForNamespace(
     }
   }
 
-  return result;
-}
-
-/**
- * Re-key lowered extension entities from their authoring handles to their
- * storage keys (physical names — ADR 221 coordinate `entityName`) for the
- * namespace's storage `entries`. A slot whose descriptor derives a storage key
- * (Postgres `native_enum` → its `@@map`/type name) is re-keyed; every other
- * slot — including the handle-keyed `valueSet` typing references and entity
- * kinds without the hook (role, policy) — passes through unchanged.
- */
-function rekeyEntitiesForStorage(
-  entities: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
-  entityTypesByDiscriminator: ReadonlyMap<string, AuthoringEntityTypeDescriptor>,
-): Readonly<Record<string, Readonly<Record<string, unknown>>>> {
-  const result: Record<string, Record<string, unknown>> = {};
-  for (const [slotKey, entriesForSlot] of Object.entries(entities)) {
-    const output = entityTypesByDiscriminator.get(slotKey)?.output;
-    const rekeyed: Record<string, unknown> = {};
-    for (const [handle, entity] of Object.entries(entriesForSlot)) {
-      const storageKey =
-        (output !== undefined ? resolveEntityStorageKey(output, entity) : undefined) ?? handle;
-      rekeyed[storageKey] = entity;
-    }
-    result[slotKey] = rekeyed;
-  }
   return result;
 }
 
@@ -2296,11 +2270,7 @@ export function interpretPslDocumentToSqlContract(
   // must survive (name collisions are already rejected above).
   const { createNamespace } = input;
   const createNamespaceWithExtensions = (nsInput: SqlNamespaceInput) => {
-    const rawEntities = namespaceExtensionEntities.get(nsInput.id);
-    const entities =
-      rawEntities === undefined
-        ? undefined
-        : rekeyEntitiesForStorage(rawEntities, entityTypesByDiscriminator);
+    const entities = namespaceExtensionEntities.get(nsInput.id);
     const attributeEntities = modelAttributeEntitiesByNamespace.get(nsInput.id);
     if (entities === undefined && attributeEntities === undefined) {
       return createNamespace(nsInput);

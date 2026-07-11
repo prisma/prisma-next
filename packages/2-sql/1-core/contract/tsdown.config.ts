@@ -14,6 +14,5 @@ export default defineConfig({
     'src/exports/index-type-validation.ts',
     'src/exports/canonicalization-hooks.ts',
     'src/exports/value-set-derivation-hook.ts',
-    'src/exports/entity-storage-key-hook.ts',
   ],
 });

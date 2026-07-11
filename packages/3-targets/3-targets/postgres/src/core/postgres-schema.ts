@@ -25,7 +25,7 @@ import {
   rlsEnablementEntityKind,
   roleEntityKind,
 } from './entity-kinds';
-import type { PostgresNativeEnum } from './postgres-native-enum';
+import { PostgresNativeEnum } from './postgres-native-enum';
 import type { PostgresRlsEnablement } from './postgres-rls-enablement';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
@@ -87,6 +87,24 @@ export class PostgresSchema extends SqlNamespaceBase {
       ]),
       'carry',
     );
+
+    // A native enum keys under its PHYSICAL type name in storage `entries`
+    // (ADR 221 coordinate `entityName`). The family/authoring layer keys every
+    // block by its author handle, so re-key the `native_enum` slot by each
+    // entity's `typeName` here — target-local Postgres code that already knows
+    // this entity kind. This runs at both authoring and hydration; a serialized
+    // contract's key already equals the `typeName`, so the re-key is idempotent.
+    const nativeEnumSlot = dispatched['native_enum'];
+    if (nativeEnumSlot !== undefined) {
+      dispatched['native_enum'] = Object.freeze(
+        Object.fromEntries(
+          Object.entries(nativeEnumSlot).map(([handle, entity]) => [
+            PostgresNativeEnum.is(entity) ? entity.typeName : handle,
+            entity,
+          ]),
+        ),
+      );
+    }
 
     // Drop an empty valueSet so presence signals non-emptiness.
     const valueSetRaw = dispatched['valueSet'];
