@@ -151,7 +151,7 @@ function lowerRlsPolicyFromBlock(
   const rejectPredicate = (predicate: 'using' | 'withCheck'): undefined => {
     ctx.diagnostics?.push({
       code: 'PSL_RLS_PREDICATE_NOT_FOR_OPERATION',
-      message: `\`${block.keyword}\` policy "${block.name}" does not take a \`${predicate}\` predicate; a ${operation.toUpperCase()} policy uses ${support.using ? '`using`' : '`withCheck`'}${support.using && support.withCheck ? ' and `withCheck`' : ' only'}.`,
+      message: `\`${block.keyword}\` policy "${block.name}" does not take a \`${predicate}\` predicate; the ${operation.toUpperCase()} operation uses ${support.using ? '`using`' : '`withCheck`'}${support.using && support.withCheck ? ' and `withCheck`' : ' only'}.`,
       sourceId: ctx.sourceId ?? 'unknown',
       span: block.parameters[predicate]?.span ?? block.span,
     });
