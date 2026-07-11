@@ -73,7 +73,13 @@ const _publicNsDeserialized = _deserializedForConsts.storage.namespaces['public'
 // reduces to `never` in TypeScript because both define `kind` with incompatible literals
 // ('schema' vs 'postgres-schema'). We cast through unknown to break the intersection.
 const _publicNsAsSchema = _publicNsDeserialized as unknown as PostgresSchema;
-const POLICY_WIRE_NAME: string = Object.values(_publicNsAsSchema.policy)[0]?.name ?? '';
+const _allPolicies = Object.values(_publicNsAsSchema.policy);
+// The base contract now carries three policies (authenticated SELECT-own,
+// anon SELECT-all, authenticated UPDATE-own). `POLICY_WIRE_NAME` is the
+// authenticated owner-read SELECT policy — the one tests B/D target.
+const POLICY_WIRE_NAME: string =
+  _allPolicies.find((p) => p.prefix === 'profile_owner_read')?.name ?? '';
+const ALL_POLICY_WIRE_NAMES: readonly string[] = _allPolicies.map((p) => p.name);
 
 // Active in CI (test:examples). This asserts the M1 walking-skeleton behaviour only —
 // external-contract migrate/verify + the public.profile round-trip — which is green and
@@ -603,11 +609,11 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
         { username: 'alice' },
       ]);
 
-      // The committed no-policy fixture: the schema minus its policy_select
-      // block, @@rls kept.
+      // The committed no-policy fixture: the schema minus ALL policy blocks,
+      // @@rls kept.
       const noPolicyContract = noPolicyContractJson;
 
-      // Plan: exactly the policy drop — no enablement change anywhere.
+      // Plan: exactly one drop per policy — no enablement change anywhere.
       const planResult = await client.dbUpdate({
         contract: noPolicyContract,
         mode: 'plan',
@@ -618,7 +624,9 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
         throw new Error(`db update plan failed: ${JSON.stringify(planResult.failure, null, 2)}`);
       }
       const planIds = planResult.value.plan.operations.map((op) => op.id);
-      expect(planIds).toEqual([`rlsPolicy.public.profile.${POLICY_WIRE_NAME}.drop`]);
+      expect([...planIds].sort()).toEqual(
+        [...ALL_POLICY_WIRE_NAMES.map((n) => `rlsPolicy.public.profile.${n}.drop`)].sort(),
+      );
 
       const applyResult = await client.dbUpdate({
         contract: noPolicyContract,
@@ -727,6 +735,149 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
       expect(await rowsVisibleToAuthenticated(connectionString, ownerA)).toEqual([
         { username: 'alice' },
       ]);
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  // Grants a role write access to the dev-harness WAL-capture schema. Under
+  // `SET ROLE`, an INSERT/UPDATE fires `_prisma_dev_wal.capture_event()`, which
+  // writes to `_prisma_dev_wal.events`; without these grants the role-scoped
+  // write fails with `permission denied for schema _prisma_dev_wal` before RLS
+  // is ever evaluated. This is the accommodation that lets us prove WITH CHECK
+  // enforcement under a role (not just reads).
+  async function grantWalAccess(connectionString: string, role: string): Promise<void> {
+    await withClient(connectionString, async (pg) => {
+      await pg.query(`GRANT USAGE ON SCHEMA _prisma_dev_wal TO ${role}`);
+      await pg.query(`GRANT ALL ON ALL TABLES IN SCHEMA _prisma_dev_wal TO ${role}`);
+      await pg.query(`GRANT ALL ON ALL SEQUENCES IN SCHEMA _prisma_dev_wal TO ${role}`);
+      await pg.query(`GRANT EXECUTE ON FUNCTION _prisma_dev_wal.capture_event() TO ${role}`);
+    });
+  }
+
+  it(
+    'E — anon SELECT policy: under SET ROLE anon, every profile is visible (public read)',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+      await seedProfilesAndGrant(connectionString, ownerA, ownerB);
+      await withClient(connectionString, async (pg) => {
+        await pg.query('GRANT SELECT ON public.profile TO anon');
+      });
+
+      // anon has no jwt; the `profile_public_read` policy (using = true) shows all.
+      const rows = await withClient(connectionString, async (pg) => {
+        await pg.query('SET ROLE anon');
+        const r = await pg.query<{ username: string }>(
+          'SELECT username FROM public.profile ORDER BY username',
+        );
+        await pg.query('RESET ROLE');
+        return r.rows;
+      });
+      expect(rows.map((r) => r.username)).toEqual(['alice', 'bob']);
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'F — authenticated UPDATE-own: WITH CHECK enforces — a compliant update succeeds, an ownership change is rejected',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+      const aliceId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+      await seedProfilesAndGrant(connectionString, ownerA, ownerB);
+      await withClient(connectionString, async (pg) => {
+        await pg.query('GRANT UPDATE ON public.profile TO authenticated');
+      });
+      // Role-scoped writes fire the dev WAL trigger — grant the role access.
+      await grantWalAccess(connectionString, 'authenticated');
+
+      await withClient(connectionString, async (pg) => {
+        await pg.query('SELECT set_config($1, $2, false)', [
+          'request.jwt.claims',
+          JSON.stringify({ sub: ownerA }),
+        ]);
+        await pg.query('SET ROLE authenticated');
+
+        // Compliant: rename own profile. USING matches (own row); WITH CHECK
+        // holds (userId unchanged, still = auth.uid()).
+        const compliant = await pg.query('UPDATE public.profile SET username = $1 WHERE id = $2', [
+          'alice_renamed',
+          aliceId,
+        ]);
+        expect(compliant.rowCount).toBe(1);
+
+        // Violating: reassign own row to another owner. WITH CHECK rejects — the
+        // new row's userId (ownerB) is not auth.uid() (ownerA).
+        await expect(
+          pg.query('UPDATE public.profile SET "userId" = $1 WHERE id = $2', [ownerB, aliceId]),
+        ).rejects.toThrow(/row-level security|policy|with check/i);
+
+        await pg.query('RESET ROLE');
+      });
+
+      // Final state: the compliant rename landed; ownership is unchanged (the
+      // violating update was rejected in full).
+      const final = await withClient(connectionString, async (pg) => {
+        const r = await pg.query<{ username: string; userId: string }>(
+          'SELECT username, "userId" FROM public.profile WHERE id = $1',
+          [aliceId],
+        );
+        return r.rows[0];
+      });
+      expect(final?.username).toBe('alice_renamed');
+      expect(final?.userId).toBe(ownerA);
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'G — a role the contract declares but the database lacks fails db verify, naming the role',
+    async () => {
+      // Inject a role entity the live database does not have into the app
+      // contract's wire JSON, then verify. Roles cannot be authored in PSL yet,
+      // so this exercises the role entity kind directly — the same path a
+      // TypeScript-authored role declaration would take.
+      const withRoleJson = JSON.parse(JSON.stringify(contractJson)) as {
+        storage: {
+          namespaces: Record<string, { entries: Record<string, Record<string, unknown>> }>;
+        };
+      };
+      withRoleJson.storage.namespaces['public']!.entries['role'] = {
+        missing_app_role: {
+          kind: 'role',
+          name: 'missing_app_role',
+          namespaceId: '__unbound__',
+        },
+      };
+
+      const deserialized = new PostgresContractSerializer().deserializeContract<Contract>(
+        withRoleJson as unknown as Parameters<PostgresContractSerializer['deserializeContract']>[0],
+      );
+      const verifyResult = await client.dbVerify({
+        contract: deserialized,
+        migrationsDir,
+        strict: false,
+        skipSchema: false,
+        skipMarker: false,
+      });
+
+      expect(
+        verifyResult.ok,
+        `dbVerify operation failed unexpectedly: ${!verifyResult.ok ? JSON.stringify(verifyResult.failure) : ''}`,
+      ).toBe(true);
+      if (verifyResult.ok) {
+        const appSchemaResult = verifyResult.value.schemaResults.get('app');
+        expect(appSchemaResult?.ok).toBe(false);
+        const roleIssue = appSchemaResult?.schema.issues.find(
+          (issue) => issue.reason === 'not-found' && issue.message.includes('missing_app_role'),
+        );
+        expect(
+          roleIssue,
+          `Expected a not-found issue naming 'missing_app_role'; got: ${JSON.stringify(appSchemaResult?.schema.issues)}`,
+        ).toBeDefined();
+      }
     },
     timeouts.spinUpPpgDev * 4,
   );
