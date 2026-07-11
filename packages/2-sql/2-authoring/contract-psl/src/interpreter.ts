@@ -452,11 +452,12 @@ function lowerExtensionBlocksForNamespace(
     const entriesKey = descriptor.discriminator;
     const slot = result[entriesKey] ?? {};
     result[entriesKey] = slot;
-    // The entity's own storage key (physical name — ADR 221 coordinate
-    // `entityName`) when the descriptor derives one, else the block handle.
-    // The value-set below stays keyed by the handle (the typing reference).
-    const storageKey = resolveEntityStorageKey(descriptor.output, entity) ?? block.name;
-    slot[storageKey] = entity;
+    // Keyed by the block handle: this map is the authoring-time reference
+    // structure a pack field resolver (`pg.enum(Ref)`) resolves `Ref` against.
+    // The physical-name storage key (ADR 221 coordinate `entityName`) is
+    // applied later, when these entities are merged into the namespace's
+    // storage `entries` (see `rekeyEntitiesForStorage`).
+    slot[block.name] = entity;
 
     const derivedValueSet = deriveValueSetFromEntity(descriptor.output, entity);
     if (derivedValueSet !== undefined) {
@@ -466,6 +467,32 @@ function lowerExtensionBlocksForNamespace(
     }
   }
 
+  return result;
+}
+
+/**
+ * Re-key lowered extension entities from their authoring handles to their
+ * storage keys (physical names — ADR 221 coordinate `entityName`) for the
+ * namespace's storage `entries`. A slot whose descriptor derives a storage key
+ * (Postgres `native_enum` → its `@@map`/type name) is re-keyed; every other
+ * slot — including the handle-keyed `valueSet` typing references and entity
+ * kinds without the hook (role, policy) — passes through unchanged.
+ */
+function rekeyEntitiesForStorage(
+  entities: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+  entityTypesByDiscriminator: ReadonlyMap<string, AuthoringEntityTypeDescriptor>,
+): Readonly<Record<string, Readonly<Record<string, unknown>>>> {
+  const result: Record<string, Record<string, unknown>> = {};
+  for (const [slotKey, entriesForSlot] of Object.entries(entities)) {
+    const output = entityTypesByDiscriminator.get(slotKey)?.output;
+    const rekeyed: Record<string, unknown> = {};
+    for (const [handle, entity] of Object.entries(entriesForSlot)) {
+      const storageKey =
+        (output !== undefined ? resolveEntityStorageKey(output, entity) : undefined) ?? handle;
+      rekeyed[storageKey] = entity;
+    }
+    result[slotKey] = rekeyed;
+  }
   return result;
 }
 
@@ -2269,7 +2296,11 @@ export function interpretPslDocumentToSqlContract(
   // must survive (name collisions are already rejected above).
   const { createNamespace } = input;
   const createNamespaceWithExtensions = (nsInput: SqlNamespaceInput) => {
-    const entities = namespaceExtensionEntities.get(nsInput.id);
+    const rawEntities = namespaceExtensionEntities.get(nsInput.id);
+    const entities =
+      rawEntities === undefined
+        ? undefined
+        : rekeyEntitiesForStorage(rawEntities, entityTypesByDiscriminator);
     const attributeEntities = modelAttributeEntitiesByNamespace.get(nsInput.id);
     if (entities === undefined && attributeEntities === undefined) {
       return createNamespace(nsInput);
