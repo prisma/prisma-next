@@ -56,6 +56,7 @@ import {
   type TypeAliasSymbol,
 } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
+import { resolveEntityStorageKey } from '@prisma-next/sql-contract/entity-storage-key-hook';
 import type {
   SqlModelStorage,
   SqlNamespaceBase,
@@ -451,7 +452,11 @@ function lowerExtensionBlocksForNamespace(
     const entriesKey = descriptor.discriminator;
     const slot = result[entriesKey] ?? {};
     result[entriesKey] = slot;
-    slot[block.name] = entity;
+    // The entity's own storage key (physical name — ADR 221 coordinate
+    // `entityName`) when the descriptor derives one, else the block handle.
+    // The value-set below stays keyed by the handle (the typing reference).
+    const storageKey = resolveEntityStorageKey(descriptor.output, entity) ?? block.name;
+    slot[storageKey] = entity;
 
     const derivedValueSet = deriveValueSetFromEntity(descriptor.output, entity);
     if (derivedValueSet !== undefined) {

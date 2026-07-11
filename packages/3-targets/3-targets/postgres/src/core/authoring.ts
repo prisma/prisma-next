@@ -11,6 +11,7 @@ import type {
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import { modelAttribute } from '@prisma-next/psl-parser';
+import type { SqlStorageKeyDerivingEntityTypeOutput } from '@prisma-next/sql-contract/entity-storage-key-hook';
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { PostgresNativeEnum } from './postgres-native-enum';
@@ -247,8 +248,14 @@ const nativeEnumEntityTypeOutput = {
     kind: 'valueSet' as const,
     values: [...entity.members],
   }),
+  // Per ADR 221 the storage entry keys by the enum's PHYSICAL type name (the
+  // coordinate `entityName`), not the authoring handle — the same handle→
+  // physical resolution a table's `@@map` does. `deriveValueSet` above still
+  // keys the value-set by the handle (the general typing-reference mechanism).
+  storageKey: (entity: PostgresNativeEnum) => entity.typeName,
 } satisfies AuthoringEntityTypeFactoryOutput<PslExtensionBlock, PostgresNativeEnum | undefined> &
-  SqlValueSetDerivingEntityTypeOutput;
+  SqlValueSetDerivingEntityTypeOutput &
+  SqlStorageKeyDerivingEntityTypeOutput;
 
 export const postgresAuthoringEntityTypes = {
   role: {
