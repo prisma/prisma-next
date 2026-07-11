@@ -1,9 +1,25 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { PG_ENUM_CODEC_ID } from '../codec-ids';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
+
+/**
+ * Quotes a possibly schema-qualified native type name segment-by-segment:
+ * `order_status` -> `"order_status"`, `auth.aal_level` -> `"auth"."aal_level"`.
+ * A native enum's `nativeType` is the enum type's (optionally schema-qualified)
+ * name, so it must be quoted as an identifier — never emitted bare (breaks on
+ * mixed-case / reserved names) nor whole-string-quoted (`"auth.aal_level"` is a
+ * single wrong identifier).
+ */
+function quoteQualifiedTypeName(nativeType: string): string {
+  return nativeType
+    .split('.')
+    .map((segment) => quoteIdentifier(segment))
+    .join('.');
+}
 
 /**
  * Pattern for safe PostgreSQL type names.
@@ -63,6 +79,15 @@ export function buildColumnTypeSql(
         return 'SMALLSERIAL';
       }
     }
+  }
+
+  // A native enum column's type is a named database type, not a parameterized
+  // builtin: render it as its quoted (schema-qualified) type-name identifier.
+  // DDL-render only — the verify comparison value (`resolvedNativeType`) stays
+  // the bare name the family expander produces, matching introspection.
+  if (resolved.codecId === PG_ENUM_CODEC_ID) {
+    const quoted = quoteQualifiedTypeName(resolved.nativeType);
+    return column.many ? `${quoted}[]` : quoted;
   }
 
   const expanded = expandParameterizedTypeSql(resolved, codecHooks);
