@@ -107,9 +107,13 @@ export function diffPostgresSchema(input: {
   const structuralOwned = ownedSchemaNames(fullExpected);
   const issues = diffSchemas(expected, actual).filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
+    const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
+    // A `reference` subject (a role) is a root-level sibling of namespaces, so
+    // its path carries no namespace segment to own-scope against — let it
+    // through to the verdict, which tolerates a reference extra unconditionally.
+    if (granularity === 'reference') return true;
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;
-    const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
     const owned = granularity === 'structural' ? structuralOwned : relationalOwned;
     return owned.has(namespaceSegment);
   });
@@ -207,9 +211,13 @@ export function buildPostgresPlanDiff(input: {
     'both trees are PostgresDatabaseSchemaNodes, so every diff-issue node is a SqlSchemaDiffNode'
   >(diffSchemas(expected, paddedActual)).filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
+    const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
+    // A `reference` subject (a role) is a root-level sibling of namespaces, so
+    // its path carries no namespace segment to own-scope against — let it
+    // through to the verdict, which tolerates a reference extra unconditionally.
+    if (granularity === 'reference') return true;
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;
-    const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
     const owned = granularity === 'structural' ? structuralOwned : relationalOwned;
     return owned.has(namespaceSegment);
   });

@@ -1,3 +1,4 @@
+import { diffSchemas } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -56,17 +57,54 @@ describe('PostgresDatabaseSchemaNode', () => {
     expect(a.isEqualTo(b)).toBe(true);
   });
 
-  it('children() returns namespace nodes only (R4)', () => {
+  it('children() yields namespace nodes followed by role nodes', () => {
     const node = new PostgresDatabaseSchemaNode(baseInput);
-    expect(node.children()).toEqual([nsPublic, nsApp]);
+    expect(node.children()).toEqual([nsPublic, nsApp, role]);
   });
 
-  it('children() does not include roles (roles not diffed yet)', () => {
+  it('children() includes role nodes (roles now enter the diff)', () => {
     const node = new PostgresDatabaseSchemaNode(baseInput);
-    const children = node.children();
-    for (const child of children) {
-      expect(PostgresRoleSchemaNode.is(child as SqlSchemaDiffNode)).toBe(false);
-    }
+    const roleChildren = node
+      .children()
+      .filter((child) => PostgresRoleSchemaNode.is(child as SqlSchemaDiffNode));
+    expect(roleChildren).toEqual([role]);
+  });
+
+  it('a role id is namespaced away from schema ids so a role and a same-named schema never collide', () => {
+    // The differ keys a parent's children into one flat id→node map and throws
+    // on a duplicate id. A role and a schema may share a name (`public`), so
+    // the role id must carry a sigil that no namespace id can equal.
+    const publicRole = new PostgresRoleSchemaNode({
+      name: 'public',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+    });
+    expect(publicRole.id).not.toBe(nsPublic.id);
+    expect(publicRole.id).not.toBe('public');
+    expect(publicRole.id.endsWith('public')).toBe(true);
+  });
+
+  it('diffs a role alongside a same-named schema without the duplicate-id throw', () => {
+    // Root with a schema named `public` AND a role named `public`. Before the
+    // sigil, both children would key to `public` and the differ would throw.
+    const collidingRole = new PostgresRoleSchemaNode({
+      name: 'public',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+    });
+    const expected = new PostgresDatabaseSchemaNode({
+      namespaces: { public: nsPublic },
+      roles: [collidingRole],
+      existingSchemas: ['public'],
+      pgVersion: '15.2',
+    });
+    const actual = new PostgresDatabaseSchemaNode({
+      namespaces: { public: nsPublic },
+      roles: [collidingRole],
+      existingSchemas: ['public'],
+      pgVersion: '15.2',
+    });
+    // No throw, and identical trees produce no issues.
+    expect(() => diffSchemas(expected, actual)).not.toThrow();
+    expect(diffSchemas(expected, actual)).toEqual([]);
   });
 
   it('carries namespaces keyed by schema name', () => {

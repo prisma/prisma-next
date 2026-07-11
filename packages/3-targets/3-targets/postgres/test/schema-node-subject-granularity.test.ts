@@ -15,10 +15,12 @@ import {
  * The subject granularity a Postgres diff node's issues carry is resolved
  * from the node's `nodeKind` by the family/target map — NEVER stamped on the
  * node. Namespace/table nodes carry the granularities their extras classify
- * under (extraTopLevelObject, strict-gated); policy and role nodes are
- * `structural` — the structural diff was never strict-gated, so its extras
- * fail in both modes. These tests pin the map and prove the node itself
- * carries no role/granularity of its own.
+ * under (extraTopLevelObject, strict-gated); a policy node is `structural`
+ * (the managed table owns its policy set, so its extras fail in both modes),
+ * while a role node is `reference` (the contract references but does not own
+ * the cluster's role list, so an extra role is tolerated unconditionally).
+ * These tests pin the map and prove the node itself carries no
+ * role/granularity of its own.
  */
 describe('postgresNodeGranularity map', () => {
   it.each([
@@ -26,7 +28,7 @@ describe('postgresNodeGranularity map', () => {
     [PostgresSchemaNodeKind.namespace, 'namespace'],
     [PostgresSchemaNodeKind.table, 'entity'],
     [PostgresSchemaNodeKind.policy, 'structural'],
-    [PostgresSchemaNodeKind.role, 'structural'],
+    [PostgresSchemaNodeKind.role, 'reference'],
   ] as const)('maps %s to %s', (nodeKind, granularity) => {
     expect(postgresNodeGranularity(nodeKind)).toBe(granularity);
   });

@@ -79,11 +79,23 @@ export function hasOperationPreview<TFamilyId extends string, TSchemaIR>(
  * - `entity`: a whole top-level entity (the thing a namespace contains).
  * - `field`: a field of an entity.
  * - `auxiliary`: a secondary part of an entity (an index, a default, a key).
- * - `structural`: a cross-cutting object (an access policy, a role, a tree
- *   root) that is the owning space's own concern, never a sibling's
- *   unclaimed entity.
+ * - `structural`: a cross-cutting object (an access policy, a tree root) that
+ *   is the owning space's own concern, never a sibling's unclaimed entity —
+ *   its extras fail verify in both modes.
+ * - `reference`: a cross-cutting object the contract *references* but does not
+ *   *own* (a database role — the framework names it in an access policy but
+ *   never owns the cluster's role list). A declared-but-missing `reference`
+ *   still fails (the reference is unsatisfiable), but an undeclared live one is
+ *   tolerated unconditionally — never a failure, never a drop, under any
+ *   control policy.
  */
-export type DiffSubjectGranularity = 'namespace' | 'entity' | 'field' | 'auxiliary' | 'structural';
+export type DiffSubjectGranularity =
+  | 'namespace'
+  | 'entity'
+  | 'field'
+  | 'auxiliary'
+  | 'structural'
+  | 'reference';
 
 /**
  * Capability declaring that a family can classify a {@link SchemaDiffIssue}'s

@@ -45,8 +45,13 @@ const POSTGRES_NODE_GRANULARITY: Readonly<Record<PostgresSchemaNodeKind, DiffSub
     [PostgresSchemaNodeKind.database]: 'structural',
     [PostgresSchemaNodeKind.namespace]: 'namespace',
     [PostgresSchemaNodeKind.table]: 'entity',
+    // A policy set is owned by the managed table it attaches to — its extras
+    // fail verify. A role is only *referenced* by the contract (the framework
+    // names it in a policy but never owns the cluster's role list), so it is
+    // `reference`: a missing declared role fails, an undeclared live role is
+    // tolerated unconditionally.
     [PostgresSchemaNodeKind.policy]: 'structural',
-    [PostgresSchemaNodeKind.role]: 'structural',
+    [PostgresSchemaNodeKind.role]: 'reference',
   };
 
 function isPostgresSchemaNodeKind(nodeKind: string): nodeKind is PostgresSchemaNodeKind {
