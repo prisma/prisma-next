@@ -4766,6 +4766,9 @@ importers:
       '@prisma-next/extension-pgvector':
         specifier: workspace:0.14.0
         version: link:../../packages/3-extensions/pgvector
+      '@prisma-next/extension-supabase':
+        specifier: workspace:0.14.0
+        version: link:../../packages/3-extensions/supabase
       '@prisma-next/family-mongo':
         specifier: workspace:0.14.0
         version: link:../../packages/2-mongo-family/9-family
