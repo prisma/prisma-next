@@ -11,6 +11,7 @@ import { PostgresRole } from '../../src/core/postgres-role';
 import { type PostgresContract, PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresRoleSchemaNode } from '../../src/core/schema-ir/postgres-role-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 import type { SqlSchemaDiffNode } from '../../src/core/schema-ir/schema-node-kinds';
 import { postgresRenderDefault } from '../../src/exports/control';
@@ -168,15 +169,22 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
     expect(root.existingSchemas).toEqual([SCHEMA_NAME]);
   });
 
-  it('puts roles on the root, not in children()', () => {
+  it('puts roles on the root and yields them as role children of the root', () => {
     const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
     const root = contractToPostgresDatabaseSchemaNode(
       makeContract({ roles: [role] }),
       projectionOptions,
     );
     expect(root.roles).toContainEqual(expect.objectContaining({ name: 'app_user' }));
+    const roleChildren = root
+      .children()
+      .filter((child) => PostgresRoleSchemaNode.is(child as SqlSchemaDiffNode));
+    expect(roleChildren).toContainEqual(expect.objectContaining({ name: 'app_user' }));
+    // Every non-role child is a namespace node.
     for (const child of root.children()) {
-      expect(PostgresNamespaceSchemaNode.is(child as SqlSchemaDiffNode)).toBe(true);
+      const isRole = PostgresRoleSchemaNode.is(child as SqlSchemaDiffNode);
+      const isNamespace = PostgresNamespaceSchemaNode.is(child as SqlSchemaDiffNode);
+      expect(isRole || isNamespace).toBe(true);
     }
   });
 

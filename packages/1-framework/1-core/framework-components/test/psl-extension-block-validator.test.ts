@@ -117,6 +117,7 @@ const policySelectDescriptor: AuthoringPslBlockDescriptor = {
 function validNode(): PslExtensionBlock {
   return {
     kind: 'test-policy-select',
+    keyword: 'policy_select',
     name: 'ReadPosts',
     span: stubSpan(),
     parameters: {
@@ -503,6 +504,7 @@ describe('validateExtensionBlock', () => {
 
         const node: PslExtensionBlock = {
           kind: 'test-block',
+          keyword: 'test_block',
           name: 'MyBlock',
           span: stubSpan(),
           parameters: {
@@ -541,6 +543,7 @@ describe('validateExtensionBlock', () => {
 
         const node: PslExtensionBlock = {
           kind: 'test-block',
+          keyword: 'test_block',
           name: 'MyBlock',
           span: stubSpan(),
           parameters: {
@@ -619,6 +622,7 @@ describe('validateExtensionBlock', () => {
 
       const node: PslExtensionBlock = {
         kind: 'test-list',
+        keyword: 'test_list',
         name: 'MyBlock',
         span: stubSpan(),
         parameters: {
@@ -670,6 +674,7 @@ describe('validateExtensionBlock', () => {
       // path to confirm the codes are actual strings the union covers.
       const node: PslExtensionBlock = {
         kind: 'test-policy-select',
+        keyword: 'policy_select',
         name: 'BadBlock',
         span: stubSpan(),
         parameters: {

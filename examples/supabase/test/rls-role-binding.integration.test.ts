@@ -5,7 +5,7 @@
  *
  *   1. `asUser(jwt)` with a valid HS256 JWT for user A returns exactly user A's profile row
  *      through the ORM, filtered by the `profile_owner_select` RLS policy.
- *   2. `asAnon()` returns zero rows — RLS default-deny with no anon policy.
+ *   2. `asAnon()` returns every row — the `profile_public_read` anon policy (using = true).
  *   3. `asServiceRole()` returns both profiles — BYPASSRLS skips all policies.
  *   4. The recording middleware captures only typed ORM queries, never `set_config` calls
  *      (proving `set_config` runs below the user middleware chain).
@@ -137,7 +137,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
   }, timeouts.spinUpPpgDev);
 
   it(
-    'asUser returns only owner row; asAnon returns 0; asServiceRole returns all; set_config invisible to middleware',
+    'asUser returns only owner row; asAnon returns all (public-read policy); asServiceRole returns all; set_config invisible to middleware',
     async () => {
       const { connectionString } = database;
 
@@ -181,14 +181,18 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
 
         expect(userARows).toEqual([{ id: profileAId, username: 'alice', userId: userAId }]);
 
-        // --- asAnon: no policy → zero rows ---
+        // --- asAnon: public-read policy (using = true) → every row ---
         const anonRows = await db
           .asAnon()
           .orm.public.Profile.select('id', 'username', 'userId')
           .all()
           .toArray();
 
-        expect(anonRows).toEqual([]);
+        const sortedAnonRows = [...anonRows].sort((a, b) => a.username.localeCompare(b.username));
+        expect(sortedAnonRows).toEqual([
+          { id: profileAId, username: 'alice', userId: userAId },
+          { id: profileBId, username: 'bob', userId: userBId },
+        ]);
 
         // --- asServiceRole: BYPASSRLS → both rows ---
         const serviceRows = await db

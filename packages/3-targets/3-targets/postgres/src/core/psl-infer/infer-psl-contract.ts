@@ -663,6 +663,7 @@ function buildNativeEnumBlock(
 
   return {
     kind: 'native_enum',
+    keyword: 'native_enum',
     name,
     parameters,
     blockAttributes:

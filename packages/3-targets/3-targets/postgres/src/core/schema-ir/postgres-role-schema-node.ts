@@ -20,8 +20,10 @@ export interface PostgresRoleSchemaNodeInput {
  * Built by project-from-contract and project-from-database from their respective
  * `PostgresRole` contract entities / introspected rows.
  *
- * Roles are cluster-scoped, so `id` is the role name alone. `isEqualTo` compares
- * names — name-equality is role-equality for cluster-scoped objects.
+ * Roles are cluster-scoped, so `id` is the bare role name. The differ pairs
+ * siblings by `(nodeKind, id)`, so a role and a namespace may share a name
+ * (role `public`, schema `public`) without colliding. `isEqualTo` compares
+ * ids — name-equality is role-equality for cluster-scoped objects.
  */
 export class PostgresRoleSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.role;

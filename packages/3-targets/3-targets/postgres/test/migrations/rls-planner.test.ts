@@ -23,10 +23,12 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 import { PostgresRlsEnablement } from '../../src/core/postgres-rls-enablement';
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
+import { PostgresRole } from '../../src/core/postgres-role';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresPolicySchemaNode } from '../../src/core/schema-ir/postgres-policy-schema-node';
+import { PostgresRoleSchemaNode } from '../../src/core/schema-ir/postgres-role-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 import { PostgresCreatePolicy } from '../../src/exports/ddl';
 
@@ -75,7 +77,10 @@ function buildContractWithPolicy(
   return buildContractWith([policy]);
 }
 
-function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<SqlStorage> {
+function buildContractWith(
+  policies: readonly PostgresRlsPolicy[],
+  roleNames: readonly string[] = [],
+): Contract<SqlStorage> {
   const policyEntries: Record<string, PostgresRlsPolicy> = {};
   for (const p of policies) {
     policyEntries[p.name] = p;
@@ -86,6 +91,10 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
       tableName: p.tableName,
       namespaceId: p.namespaceId,
     });
+  }
+  const roleEntries: Record<string, PostgresRole> = {};
+  for (const name of roleNames) {
+    roleEntries[name] = new PostgresRole({ name, namespaceId: UNBOUND_NAMESPACE_ID });
   }
 
   const schema = new PostgresSchema({
@@ -105,6 +114,7 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
       },
       policy: policyEntries,
       rls: rlsEntries,
+      role: roleEntries,
     },
   });
 
@@ -143,7 +153,7 @@ function policyNode(policy: PostgresRlsPolicy): PostgresPolicySchemaNode {
 // enablement-drift matrix lives in rls-enablement-planner.test.ts.
 function schemaWith(
   policies: readonly PostgresRlsPolicy[],
-  options?: { readonly rlsEnabled?: boolean },
+  options?: { readonly rlsEnabled?: boolean; readonly roleNames?: readonly string[] },
 ): PostgresDatabaseSchemaNode {
   return new PostgresDatabaseSchemaNode({
     namespaces: {
@@ -166,7 +176,9 @@ function schemaWith(
         nativeEnumTypeNames: [],
       }),
     },
-    roles: [],
+    roles: (options?.roleNames ?? []).map(
+      (name) => new PostgresRoleSchemaNode({ name, namespaceId: UNBOUND_NAMESPACE_ID }),
+    ),
     existingSchemas: ['public'],
     pgVersion: 'unknown',
   });
@@ -369,6 +381,73 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
     const opIds = ops.map((op) => op.id);
     expect(opIds).toContain(`rlsPolicy.public.${TABLE_NAME}.p_read_11111111`);
     expect(opIds).not.toContain(`rlsPolicy.public.${TABLE_NAME}.p_read_00000000.drop`);
+  });
+});
+
+describe('RLS planner roles produce zero ops (AC-6)', () => {
+  // Roles are existence-verify only (provisioning is a project non-goal), so a
+  // role diff issue must add NO migration op — never CREATE/DROP ROLE, and
+  // never the unsupported-operation fail-loud in mapNodeIssueToCall. Proven by
+  // comparing each role-present plan against a role-free baseline: the role
+  // difference must leave the op set byte-identical.
+
+  async function plan(contract: Contract<SqlStorage>, schema: PostgresDatabaseSchemaNode) {
+    const planner = createPostgresMigrationPlanner(stubLowerer);
+    const result = planner.plan({
+      contract,
+      schema,
+      policy: DB_UPDATE_POLICY,
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+    });
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') throw new Error('expected a successful plan');
+    return result;
+  }
+
+  async function planOpIds(
+    contract: Contract<SqlStorage>,
+    schema: PostgresDatabaseSchemaNode,
+  ): Promise<readonly string[]> {
+    const result = await plan(contract, schema);
+    const ops = await Promise.all(result.plan.operations);
+    return ops.map((op) => op.id);
+  }
+
+  it('a declared role missing from the live schema adds zero ops (vs a role-free baseline) and no role op', async () => {
+    const baseline = await planOpIds(buildContractWith([]), schemaWith([]));
+    // Contract now declares role `app_user`; live schema still has no role →
+    // a not-found role diff issue, which must add nothing to the plan.
+    const withMissingRole = await planOpIds(buildContractWith([], ['app_user']), schemaWith([]));
+
+    expect(withMissingRole).toEqual(baseline);
+    expect(withMissingRole.some((id) => /role/i.test(id))).toBe(false);
+  });
+
+  it('an extra live role the contract does not declare adds zero ops and no drop, even under a destructive policy', async () => {
+    const baseline = await planOpIds(buildContractWith([]), schemaWith([]));
+    // Live schema carries an undeclared `legacy` role → a not-expected role
+    // diff issue; under a destructive policy it must still plan nothing (the
+    // framework never drops an undeclared role).
+    const withExtraRole = await planOpIds(
+      buildContractWith([]),
+      schemaWith([], { roleNames: ['legacy'] }),
+    );
+
+    expect(withExtraRole).toEqual(baseline);
+    // No op references the undeclared role — in particular, no drop.
+    expect(withExtraRole.some((id) => /legacy/i.test(id))).toBe(false);
+  });
+
+  it('a missing declared role is now surfaced as a controlPolicySuppressedCall warning', async () => {
+    const result = await plan(buildContractWith([], ['app_user']), schemaWith([]));
+    expect(result.warnings?.some((w) => w.kind === 'controlPolicySuppressedCall')).toBe(true);
+  });
+
+  it('an extra live role is now surfaced as a controlPolicySuppressedCall warning', async () => {
+    const result = await plan(buildContractWith([]), schemaWith([], { roleNames: ['legacy'] }));
+    expect(result.warnings?.some((w) => w.kind === 'controlPolicySuppressedCall')).toBe(true);
   });
 });
 
