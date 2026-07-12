@@ -333,6 +333,60 @@ describe('load-time diagnostics name the prefix', () => {
     ).toThrow(/policy "p_read" targets model "Profile".*rlsEnabled/);
   });
 
+  it('rejects a policy targeting a cross-space model, naming the prefix', () => {
+    const AuthUser = extensionModel(
+      'AuthUser',
+      { namespace: 'auth', fields: { id: field.column(textColumn).id() }, table: 'users' },
+      'supabase',
+    );
+    const Profile = makeProfile();
+
+    expect(() =>
+      defineContract({
+        models: { Profile },
+        entities: [
+          rlsEnabled(Profile),
+          policySelect(AuthUser, { name: 'p_cross', roles: [anon], using: 'true' }),
+        ],
+      }),
+    ).toThrow(/policy "p_cross" targets model "AuthUser", which lives in another contract space/);
+  });
+
+  it('rejects an rlsEnabled entry targeting a cross-space model', () => {
+    const AuthUser = extensionModel(
+      'AuthUser',
+      { namespace: 'auth', fields: { id: field.column(textColumn).id() }, table: 'users' },
+      'supabase',
+    );
+
+    expect(() => defineContract({ entities: [rlsEnabled(AuthUser)] })).toThrow(
+      /rlsEnabled entry targets model "AuthUser", which lives in another contract space/,
+    );
+  });
+
+  it('a ref() that does not resolve names the policy prefix', () => {
+    const Profile = makeProfile();
+    const Unknown = model('Unknown', {
+      fields: { id: field.column(intColumn).id() },
+    }).sql({ table: 'unknowns' });
+
+    expect(() =>
+      defineContract({
+        models: { Profile },
+        entities: [
+          rlsEnabled(Profile),
+          policySelect(Profile, {
+            name: 'p_ref_miss',
+            roles: [anon],
+            using: ({ ref }) => `${ref(Unknown)}.id > 0`,
+          }),
+        ],
+      }),
+    ).toThrow(
+      /policy "p_ref_miss".*targets model "Unknown", which is not in the contract's models/,
+    );
+  });
+
   it('rejects a duplicate role-name declaration', () => {
     const Profile = makeProfile();
     expect(() =>
