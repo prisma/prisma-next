@@ -291,6 +291,28 @@ changes:
         - "pg.enum("
         - "nativeEnum("
       anyMatch: true
+  - id: scalar-field-state-descriptor-generic
+    summary: |
+      `ScalarFieldState` (from `@prisma-next/sql-contract-ts/contract-builder`) changes its first
+      type parameter from the codec-id string (`CodecId extends string = string`) to the full column
+      descriptor type (`Descriptor extends ColumnTypeDescriptor = ColumnTypeDescriptor`), so field
+      states preserve the whole descriptor type — including a native-enum entity's member literal
+      tuple — instead of only the codec id. If your extension names `ScalarFieldState<...>` with
+      positional generics, wrap the codec id in the descriptor type: `ScalarFieldState<'pg/text@1',
+      ...>` becomes `ScalarFieldState<ColumnTypeDescriptor<'pg/text@1'>, ...>` (import
+      `ColumnTypeDescriptor` from `@prisma-next/framework-components/codec`); the remaining six
+      parameters are unchanged. Two narrowing ride-alongs can surface in exact-type test assertions:
+      built contract types now keep a descriptor's literal `nativeType`/`typeParams` (previously
+      widened to `string`), and `pg.enum(handle)` (from `@prisma-next/postgres`) returns a descriptor
+      whose `entityRef` is non-optional and whose `entityRef.entity` is `PostgresNativeEnum<Members>`
+      instead of `unknown`. Both remain assignable everywhere the old types were accepted — update
+      `expectTypeOf`-style equality assertions to the narrowed types; do not re-widen production
+      types to satisfy them.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "ScalarFieldState"
+      anyMatch: true
   - id: schema-ir-fk-unbound-referenced-schema-absent
     summary: |
       The family's `contractToSchemaIR` (from `@prisma-next/family-sql/control`) no longer stamps
@@ -528,6 +550,22 @@ deferred column descriptor resolved at contract-build time). The module exports
 `@prisma-next/emitter` and `@prisma-next/sql-contract-emitter` devDependencies for the
 new test's `.d.ts` emission assertion. All net-new exports — nothing existing was
 changed or removed. No extension-author action required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2960 (no-emit native-enum column typing): a `field.column(pg.enum(handle))`
+column now types as its member-value literal union in `typeof contract` (the
+no-emit path), matching what the emit path already produced. The
+`packages/3-extensions/` diff is the feature itself plus its type test:
+`postgres/src/contract/native-enum.ts` makes `pg.enum()` generic over the
+handle's members (returning a descriptor whose `entityRef.entity` is
+`PostgresNativeEnum<Members>`), and
+`postgres/test/contract-builder/native-enum-typeof.test-d.ts` pins the
+resulting `typeof contract` types. Runtime values and emitted
+`contract.{json,d.ts}` are byte-identical. The extension-author-facing type
+reshape this rides on (`ScalarFieldState`'s first generic) is recorded in the
+`scalar-field-state-descriptor-generic` entry above; beyond that, no
+extension-author action. Incidental substrate diff only.
 -->
 
 <!--
