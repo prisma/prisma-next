@@ -42,7 +42,7 @@ function siblingKey(node: DiffableNode): string {
 function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
   const key = siblingKey(node);
   if (map.has(key)) {
-    throw new Error(`diffSchemas: duplicate id among siblings: ${key}`);
+    throw new Error(`diffSchemas: duplicate id among siblings: ${node.nodeKind}/${node.id}`);
   }
   map.set(key, node);
 }
