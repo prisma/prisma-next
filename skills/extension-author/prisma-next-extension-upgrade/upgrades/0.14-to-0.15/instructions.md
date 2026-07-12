@@ -543,3 +543,21 @@ EXISTS. Purely additive to the ORM client's query surface; no extension-author S
 (`@prisma-next/contract`, `@prisma-next/framework-components`, …) changed. No
 extension-author action required. Incidental substrate diff only.
 -->
+
+<!--
+TML-2883 (rls-ts-authoring): Postgres RLS is now authorable in the TypeScript DSL,
+producing contracts wire-name-identical to the PSL `policy_*` / `@@rls` equivalents.
+The `packages/3-extensions/` diff is additive: `@prisma-next/postgres` gains
+`src/contract/rls.ts` (frozen branded handles from `policySelect` / `policyInsert` /
+`policyUpdate` / `policyDelete` / `policyAll` / `rlsEnabled(model)` / `role(name)`)
+and `src/contract/rls-lowering.ts`; its `defineContract` gains an optional
+`entities?: readonly RlsEntityHandle[]` input lowered into the existing generic
+`packEntities` channel. `@prisma-next/extension-supabase` gains `anon` /
+`authenticated` role-handle exports from `/contract`. Supporting additive exports
+only elsewhere: `buildContractDefinition` + `PackEntitiesInput` from
+`@prisma-next/sql-contract-ts/contract-builder`, `formatRlsPolicyWireName` from
+`@prisma-next/target-postgres/rls-canonicalize`, and a generic optional
+`resolveModelStorageName` field on `AuthoringEntityContext`. All net-new surface —
+nothing existing was changed or removed. No extension-author action required.
+Incidental substrate diff only.
+-->
