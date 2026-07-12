@@ -12,7 +12,6 @@ import type {
 } from '@prisma-next/framework-components/authoring';
 import { modelAttribute } from '@prisma-next/psl-parser';
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
-import { assertDefined } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { PostgresNativeEnum } from './postgres-native-enum';
@@ -137,15 +136,20 @@ function lowerRlsPolicyFromBlock(
   const prefix = block.name;
   const operation = POLICY_KEYWORD_OPERATION[block.keyword] ?? 'select';
   const targetModelName = readRefParam(block, 'target') ?? '';
-  // `target` is a required same-namespace model ref, so by the time this
-  // factory runs it has already been validated to resolve; a lookup miss
-  // here would mean the ref-resolution invariant broke upstream, not a
-  // user-authoring mistake to diagnose.
+  // The generic ref-existence validator is not wired into the SQL-family
+  // interpreter (same gap as the predicate matrix below), so a misspelled
+  // or undeclared `target` reaches this factory. A resolution miss is an
+  // ordinary authoring error: report it as a load-time diagnostic.
   const tableName = ctx.resolveModelStorageName?.(targetModelName);
-  assertDefined(
-    tableName,
-    `RLS policy "${block.name}" target model "${targetModelName}" did not resolve to a declared storage name.`,
-  );
+  if (tableName === undefined) {
+    ctx.diagnostics?.push({
+      code: 'PSL_RLS_POLICY_TARGET_UNRESOLVED',
+      message: `\`${block.keyword}\` policy "${block.name}" targets model "${targetModelName}", which is not declared in the same namespace. Declare the model or fix the \`target\` reference.`,
+      sourceId: ctx.sourceId ?? 'unknown',
+      span: block.parameters['target']?.span ?? block.span,
+    });
+    return undefined;
+  }
   const roles = [...readListRefParams(block, 'roles')].sort();
 
   const usingRaw = readValueParam(block, 'using');

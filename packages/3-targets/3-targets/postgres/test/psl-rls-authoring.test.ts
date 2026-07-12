@@ -291,6 +291,37 @@ namespace public {
   });
 });
 
+describe('a policy whose target does not resolve to a declared model', () => {
+  it('emits PSL_RLS_POLICY_TARGET_UNRESOLVED naming the prefix and the model, without throwing', () => {
+    const result = interpret(`
+namespace public {
+  model profile {
+    id Int @id
+
+    @@rls
+  }
+
+  policy_select p_read {
+    target = porfile
+    roles  = [app_user]
+    using  = "true"
+  }
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const diagnostic = result.failure.diagnostics.find(
+      (d) => d.code === 'PSL_RLS_POLICY_TARGET_UNRESOLVED',
+    );
+    expect(diagnostic).toMatchObject({
+      code: 'PSL_RLS_POLICY_TARGET_UNRESOLVED',
+      message: expect.stringContaining('"p_read"'),
+    });
+    expect(diagnostic?.message).toContain('"porfile"');
+    expect(diagnostic?.message).not.toMatch(/p_read_[0-9a-f]{8}/);
+  });
+});
+
 describe("a policy's tableName resolves to the target model's declared storage name", () => {
   it('keys the policy by the @@map storage name, agreeing with the rls marker', () => {
     const result = interpret(`
