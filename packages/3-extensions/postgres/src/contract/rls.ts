@@ -105,6 +105,26 @@ function assertNonEmptyName(helper: string, name: string): void {
   }
 }
 
+/**
+ * Which predicate each operation admits, mirroring Postgres and the PSL
+ * lowering's matrix (`PSL_RLS_PREDICATE_NOT_FOR_OPERATION`): SELECT and
+ * DELETE take `using` only; INSERT takes `withCheck` only; UPDATE and ALL
+ * take either or both. The descriptor types enforce this statically; the
+ * runtime check here is the backstop for untyped (plain-JS) callers.
+ */
+const POLICY_OPERATION_PREDICATES: Readonly<
+  Record<
+    RlsPolicyOperation,
+    { readonly helper: string; readonly using: boolean; readonly withCheck: boolean }
+  >
+> = {
+  select: { helper: 'policySelect', using: true, withCheck: false },
+  insert: { helper: 'policyInsert', using: false, withCheck: true },
+  update: { helper: 'policyUpdate', using: true, withCheck: true },
+  delete: { helper: 'policyDelete', using: true, withCheck: false },
+  all: { helper: 'policyAll', using: true, withCheck: true },
+};
+
 function buildPolicyHandle<Operation extends RlsPolicyOperation>(
   operation: Operation,
   model: RlsTargetModel,
@@ -113,7 +133,28 @@ function buildPolicyHandle<Operation extends RlsPolicyOperation>(
     readonly withCheck?: RlsPredicate;
   },
 ): RlsPolicyHandle<Operation> {
-  assertNonEmptyName(`policy ${operation}("${descriptor.name}")`, descriptor.name);
+  const support = POLICY_OPERATION_PREDICATES[operation];
+  assertNonEmptyName(`${support.helper}("${descriptor.name}")`, descriptor.name);
+
+  const supported =
+    support.using && support.withCheck
+      ? '`using` and `withCheck`'
+      : support.using
+        ? '`using` only'
+        : '`withCheck` only';
+  const rejectPredicate = (predicate: 'using' | 'withCheck'): never => {
+    throw new Error(
+      `${support.helper}: policy "${descriptor.name}" does not take a \`${predicate}\` predicate; the ${operation.toUpperCase()} operation uses ${supported}.`,
+    );
+  };
+  if (descriptor.using !== undefined && !support.using) rejectPredicate('using');
+  if (descriptor.withCheck !== undefined && !support.withCheck) rejectPredicate('withCheck');
+  if (descriptor.using === undefined && descriptor.withCheck === undefined) {
+    throw new Error(
+      `${support.helper}: policy "${descriptor.name}" requires at least one predicate; the ${operation.toUpperCase()} operation uses ${supported}.`,
+    );
+  }
+
   return Object.freeze({
     entityKind: 'policy' as const,
     operation,

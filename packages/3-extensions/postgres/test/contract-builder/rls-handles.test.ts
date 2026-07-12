@@ -223,6 +223,66 @@ describe('policy helpers capture inputs faithfully', () => {
   });
 });
 
+describe('runtime predicate-matrix backstop for untyped callers', () => {
+  type UntypedPolicyHelper = (model: unknown, descriptor: unknown) => unknown;
+
+  it('rejects withCheck on select', () => {
+    const untypedPolicySelect = policySelect as UntypedPolicyHelper;
+    expect(() =>
+      untypedPolicySelect(Profile, {
+        name: 'p_read',
+        roles: [anon],
+        using: 'true',
+        withCheck: 'true',
+      }),
+    ).toThrow(
+      /policySelect: policy "p_read" does not take a `withCheck` predicate; the SELECT operation uses `using` only/,
+    );
+  });
+
+  it('rejects withCheck on delete', () => {
+    const untypedPolicyDelete = policyDelete as UntypedPolicyHelper;
+    expect(() =>
+      untypedPolicyDelete(Profile, {
+        name: 'p_delete',
+        roles: [anon],
+        using: 'true',
+        withCheck: 'true',
+      }),
+    ).toThrow(
+      /policyDelete: policy "p_delete" does not take a `withCheck` predicate; the DELETE operation uses `using` only/,
+    );
+  });
+
+  it('rejects using on insert', () => {
+    const untypedPolicyInsert = policyInsert as UntypedPolicyHelper;
+    expect(() =>
+      untypedPolicyInsert(Profile, {
+        name: 'p_insert',
+        roles: [anon],
+        using: 'true',
+        withCheck: 'true',
+      }),
+    ).toThrow(
+      /policyInsert: policy "p_insert" does not take a `using` predicate; the INSERT operation uses `withCheck` only/,
+    );
+  });
+
+  it('rejects a zero-predicate update', () => {
+    const untypedPolicyUpdate = policyUpdate as UntypedPolicyHelper;
+    expect(() => untypedPolicyUpdate(Profile, { name: 'p_write', roles: [anon] })).toThrow(
+      /policyUpdate: policy "p_write" requires at least one predicate; the UPDATE operation uses `using` and `withCheck`/,
+    );
+  });
+
+  it('rejects a zero-predicate all', () => {
+    const untypedPolicyAll = policyAll as UntypedPolicyHelper;
+    expect(() => untypedPolicyAll(Profile, { name: 'p_all', roles: [anon] })).toThrow(
+      /policyAll: policy "p_all" requires at least one predicate; the ALL operation uses `using` and `withCheck`/,
+    );
+  });
+});
+
 describe('handles are inert and reusable', () => {
   it('one role handle is safely shared across two policies', () => {
     const first = policySelect(Profile, { name: 'p_read', roles: [anon], using: 'true' });
