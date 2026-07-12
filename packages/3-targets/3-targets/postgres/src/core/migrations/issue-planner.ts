@@ -554,7 +554,7 @@ function mapNativeEnumNodeIssue(
     return notOk(
       nodeConflict(
         'unsupportedOperation',
-        `Enum issue has no schema in its path: ${issue.message}`,
+        `Enum issue has no schema in its path: ${issue.path.join('/')}`,
       ),
     );
   }
