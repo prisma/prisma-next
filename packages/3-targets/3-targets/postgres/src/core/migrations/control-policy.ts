@@ -1,5 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { ControlPolicySubject } from '@prisma-next/family-sql/control';
+import type {
+  ControlPolicySubject,
+  SqlPlannerConflict,
+  SuppressionRecord,
+} from '@prisma-next/family-sql/control';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { entityAt, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
@@ -95,16 +99,74 @@ function postgresCallFields(call: PostgresOpFactoryCall): PostgresCallFields {
   };
 }
 
-export function formatPostgresControlPolicySubjectLabel(
+function formatPostgresControlPolicySubjectLabel(
   factoryName: string,
   subject: ControlPolicySubject | undefined,
   contract: Contract<SqlStorage>,
 ): string {
-  if (subject?.table) {
+  if (subject?.entityKind === 'table' && subject.entityName !== undefined) {
     const ddlSchema = ddlSchemaNameForNamespace(contract, subject.namespaceId);
-    return `${factoryName}(${ddlSchema}.${subject.table})`;
+    return `${factoryName}(${ddlSchema}.${subject.entityName})`;
   }
   return factoryName;
+}
+
+/**
+ * The verb a suppressed *modification* subject renders when it produced no
+ * concrete DDL call (the family carries `factoryName: undefined` there — it does
+ * not invent verbs). Target-owned because the vocabulary (table vs enum) is the
+ * target's; a schema-only subject falls back to `alterSchema`.
+ */
+function postgresModificationFactoryName(subject: ControlPolicySubject | undefined): string {
+  if (subject?.entityKind === 'table') return 'alterTable';
+  if (subject?.entityKind === 'native_enum') return 'alterType';
+  return 'alterSchema';
+}
+
+function postgresSuppressionSummary(
+  subjectLabel: string,
+  subject: ControlPolicySubject | undefined,
+  policy: string,
+): string {
+  const namespace = subject?.namespaceId ?? 'unknown';
+  const declared = subject?.explicitNodeControlPolicy;
+  if (policy === 'external' && declared === 'managed') {
+    return `control policy suppressed: ${subjectLabel} — namespace '${namespace}' has effective control 'external' but table declared 'managed'`;
+  }
+  const declaredSuffix = declared ? ` but table declared '${declared}'` : '';
+  return `control policy suppressed: ${subjectLabel} — namespace '${namespace}' has effective control '${policy}'${declaredSuffix}`;
+}
+
+/**
+ * Render one family {@link SuppressionRecord} into a target `SqlPlannerConflict`.
+ * The family decides *that* a subject is suppressed and hands over the raw
+ * coordinate + policy; the label, message, location, and any modification verb
+ * are rendered here — the target owns the table-vs-enum vocabulary.
+ */
+export function renderPostgresSuppression(
+  record: SuppressionRecord,
+  contract: Contract<SqlStorage>,
+): SqlPlannerConflict {
+  const subject = record.subject;
+  const factoryName =
+    record.factoryName ??
+    (subject !== undefined ? postgresModificationFactoryName(subject) : 'unknown');
+  const subjectLabel = formatPostgresControlPolicySubjectLabel(factoryName, subject, contract);
+  return {
+    kind: 'controlPolicySuppressedCall',
+    summary: postgresSuppressionSummary(subjectLabel, subject, record.policy),
+    location: {
+      ...ifDefined('namespace', subject?.namespaceId),
+      ...ifDefined('table', subject?.entityKind === 'table' ? subject.entityName : undefined),
+      ...ifDefined('column', subject?.column),
+      ...ifDefined('type', subject?.entityKind === 'native_enum' ? subject.entityName : undefined),
+    },
+    meta: {
+      controlPolicy: record.policy,
+      factoryName,
+      ...ifDefined('declaredControlPolicy', subject?.explicitNodeControlPolicy),
+    },
+  };
 }
 
 export function resolvePostgresCallControlPolicySubject(
@@ -134,8 +196,9 @@ export function resolvePostgresCallControlPolicySubject(
     })?.control;
     return {
       namespaceId,
+      entityKind: 'native_enum',
+      entityName: call.typeName,
       ...ifDefined('explicitNodeControlPolicy', enumControl),
-      typeName: call.typeName,
       createsNewObject,
     };
   }
@@ -153,9 +216,10 @@ export function resolvePostgresCallControlPolicySubject(
     })?.control;
     return {
       namespaceId,
-      ...ifDefined('explicitNodeControlPolicy', tableControlPolicy),
-      table: callFields.tableName,
+      entityKind: 'table',
+      entityName: callFields.tableName,
       ...ifDefined('column', callFields.columnName),
+      ...ifDefined('explicitNodeControlPolicy', tableControlPolicy),
       createsNewObject,
     };
   }
@@ -260,9 +324,9 @@ export function resolvePostgresNodeIssueControlPolicySubject(
   if (PostgresNativeEnumSchemaNode.is(node)) {
     // The enum entity keys under its PHYSICAL type name (`entries.native_enum`
     // key since ADR 221), so `entityAt` addresses it directly on the node's
-    // `typeName` — the same coordinate the table branch below uses. A
-    // `not-expected` extra enum this contract lacks resolves to no entity, so
-    // the grade falls back to the contract default, like an undeclared table.
+    // `typeName`. A `not-expected` extra enum this contract lacks resolves to no
+    // entity, so the grade falls back to the contract default, like an
+    // undeclared table.
     const namespaceId = resolveNamespaceIdForDdlSchema(contract, issue.path[1] ?? node.namespaceId);
     const enumControl = entityAt<PostgresNativeEnum>(contract.storage, {
       namespaceId,
@@ -271,8 +335,9 @@ export function resolvePostgresNodeIssueControlPolicySubject(
     })?.control;
     return {
       namespaceId,
+      entityKind: 'native_enum',
+      entityName: node.typeName,
       ...ifDefined('explicitNodeControlPolicy', enumControl),
-      typeName: node.typeName,
       createsNewObject: issue.reason === 'not-found',
     };
   }
@@ -292,9 +357,10 @@ export function resolvePostgresNodeIssueControlPolicySubject(
 
   return {
     namespaceId,
-    ...ifDefined('explicitNodeControlPolicy', table?.control),
-    table: tableName,
+    entityKind: 'table',
+    entityName: tableName,
     ...ifDefined('column', issueColumnName(issue)),
+    ...ifDefined('explicitNodeControlPolicy', table?.control),
     createsNewObject,
   };
 }

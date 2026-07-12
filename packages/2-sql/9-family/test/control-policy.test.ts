@@ -52,7 +52,8 @@ function tableSubject(
 ): ControlPolicySubject {
   return {
     namespaceId: UNBOUND_NAMESPACE_ID,
-    table: 'users',
+    entityKind: 'table',
+    entityName: 'users',
     createsNewObject,
     ...(policy !== undefined ? { explicitNodeControlPolicy: policy } : {}),
   };
@@ -61,50 +62,43 @@ function tableSubject(
 const tableInput: StorageTableInput = { columns: {}, uniques: [], indexes: [], foreignKeys: [] };
 
 describe('partitionCallsByControlPolicy', () => {
-  it('surfaces a controlPolicySuppressedCall warning for managed override under external default', () => {
+  it('returns a structured SuppressionRecord for a managed override under external default', () => {
     const externalDefault = makeContract(
       { users: { control: 'managed', ...tableInput } },
       'external',
     );
-    const { kept, warnings } = partitionCallsByControlPolicy({
+    const { kept, suppressions } = partitionCallsByControlPolicy({
       calls: [call('createTable', tableSubject('managed', true))],
       contract: externalDefault,
       resolveControlPolicySubject: (c) => c.subject,
       resolveFactoryName: (c) => c.name,
     });
     expect(kept).toHaveLength(0);
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]?.kind).toBe('controlPolicySuppressedCall');
-    expect(warnings[0]?.location).toMatchObject({
-      namespace: UNBOUND_NAMESPACE_ID,
-      table: 'users',
-    });
-    expect(warnings[0]?.meta).toMatchObject({
-      controlPolicy: 'external',
+    expect(suppressions).toHaveLength(1);
+    // Raw structured data only — no rendered strings or table/type vocabulary.
+    expect(suppressions[0]).toEqual({
+      subject: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        entityKind: 'table',
+        entityName: 'users',
+        explicitNodeControlPolicy: 'managed',
+        createsNewObject: true,
+      },
+      policy: 'external',
       factoryName: 'createTable',
-      declaredControlPolicy: 'managed',
+      createsNewObject: true,
     });
-    expect(warnings[0]?.summary).toContain(
-      "namespace '__unbound__' has effective control 'external' but table declared 'managed'",
-    );
   });
 });
 
 // Mirror of the call-side `partitionCallsByControlPolicy` test surface, but
-// exercising the input-side issue-partitioning entry point that the SQL
-// family planner pipeline now uses. The shapes are intentionally analogous —
-// the post-condition each test pins is "this subject's issues never reach
-// the planner; this many warnings are emitted instead".
+// exercising the input-side issue-partitioning entry point the SQL family
+// planner pipeline uses. Each test pins "this subject's issues never reach the
+// planner; this SuppressionRecord is emitted instead".
 interface FakeIssue {
   readonly kind: 'missing_table' | 'extra_table' | 'type_mismatch' | 'missing_column';
   readonly subject: ControlPolicySubject | undefined;
-  /**
-   * `'createTable'` for `missing_table`-style issues; `undefined` for the
-   * non-creation kinds. The Postgres adapter encodes the same mapping in
-   * `resolvePostgresIssueCreationFactoryName` based on the real
-   * the real diff issue's node kind; these fakes call it out directly so the helper test
-   * doesn't depend on adapter wiring.
-   */
+  /** `'createTable'` for `missing_table`-style issues; `undefined` otherwise. */
   readonly creationFactoryName: string | undefined;
 }
 
@@ -130,7 +124,7 @@ describe('partitionIssuesByControlPolicy', () => {
     const contract = makeContract({ users: { control: 'managed', ...tableInput } });
 
     it('routes every issue into the plannable partition, creation or modification', () => {
-      const { plannable, warnings } = partitionFake(
+      const { plannable, suppressions } = partitionFake(
         [
           issue('missing_table', tableSubject('managed', true), 'createTable'),
           issue('extra_table', tableSubject('managed', false), undefined),
@@ -139,7 +133,7 @@ describe('partitionIssuesByControlPolicy', () => {
         contract,
       );
       expect(plannable).toHaveLength(3);
-      expect(warnings).toHaveLength(0);
+      expect(suppressions).toHaveLength(0);
     });
   });
 
@@ -147,16 +141,16 @@ describe('partitionIssuesByControlPolicy', () => {
     const contract = makeContract({ users: { control: 'tolerated', ...tableInput } });
 
     it('routes a whole-object creation into the plannable partition', () => {
-      const { plannable, warnings } = partitionFake(
+      const { plannable, suppressions } = partitionFake(
         [issue('missing_table', tableSubject('tolerated', true), 'createTable')],
         contract,
       );
       expect(plannable.map((i) => i.kind)).toEqual(['missing_table']);
-      expect(warnings).toHaveLength(0);
+      expect(suppressions).toHaveLength(0);
     });
 
-    it('suppresses non-creation issues and consolidates to one warning per subject', () => {
-      const { plannable, warnings } = partitionFake(
+    it('suppresses non-creation issues and consolidates to one record per subject with no verb', () => {
+      const { plannable, suppressions } = partitionFake(
         [
           issue('missing_column', tableSubject('tolerated', false), undefined),
           issue('type_mismatch', tableSubject('tolerated', false), undefined),
@@ -164,21 +158,19 @@ describe('partitionIssuesByControlPolicy', () => {
         contract,
       );
       expect(plannable).toHaveLength(0);
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]?.kind).toBe('controlPolicySuppressedCall');
-      expect(warnings[0]?.meta).toMatchObject({
-        controlPolicy: 'tolerated',
-        factoryName: 'alterTable',
-        declaredControlPolicy: 'tolerated',
-      });
+      expect(suppressions).toHaveLength(1);
+      expect(suppressions[0]?.policy).toBe('tolerated');
+      // No creation issue → the family invents no modification verb.
+      expect(suppressions[0]?.factoryName).toBeUndefined();
+      expect(suppressions[0]?.subject).toMatchObject({ entityKind: 'table', entityName: 'users' });
     });
   });
 
   describe('external and observed subjects never reach the planner', () => {
-    it('drops every issue for an external or observed node and emits one warning per subject', () => {
+    it('drops every issue for an external or observed node and emits one record per subject', () => {
       for (const policy of ['external', 'observed'] as const) {
         const contract = makeContract({ users: { control: policy, ...tableInput } });
-        const { plannable, warnings } = partitionFake(
+        const { plannable, suppressions } = partitionFake(
           [
             issue('missing_table', tableSubject(policy, true), 'createTable'),
             issue('extra_table', tableSubject(policy, false), undefined),
@@ -187,26 +179,22 @@ describe('partitionIssuesByControlPolicy', () => {
           contract,
         );
         expect(plannable).toHaveLength(0);
-        expect(warnings).toHaveLength(1);
-        expect(warnings[0]?.meta).toMatchObject({
-          controlPolicy: policy,
-          // creation issue won the race; the warning takes the creation factoryName
-          factoryName: 'createTable',
-        });
+        expect(suppressions).toHaveLength(1);
+        expect(suppressions[0]?.policy).toBe(policy);
+        // A creation issue won the race, so the record carries the creation factory.
+        expect(suppressions[0]?.factoryName).toBe('createTable');
       }
     });
 
-    it('falls back to alterTable when no creation issue is present', () => {
+    it('carries an undefined factoryName when no creation issue is present', () => {
       const contract = makeContract({ users: { control: 'external', ...tableInput } });
-      const { warnings } = partitionFake(
+      const { suppressions } = partitionFake(
         [issue('type_mismatch', tableSubject('external', false), undefined)],
         contract,
       );
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]?.meta).toMatchObject({
-        controlPolicy: 'external',
-        factoryName: 'alterTable',
-      });
+      expect(suppressions).toHaveLength(1);
+      expect(suppressions[0]?.policy).toBe('external');
+      expect(suppressions[0]?.factoryName).toBeUndefined();
     });
   });
 
@@ -216,26 +204,25 @@ describe('partitionIssuesByControlPolicy', () => {
       'external',
     );
 
-    it('drops a managed-override missing-table issue and surfaces a suppressed-call warning', () => {
-      const { plannable, warnings } = partitionFake(
+    it('drops a managed-override missing-table issue and surfaces a suppression record', () => {
+      const { plannable, suppressions } = partitionFake(
         [issue('missing_table', tableSubject('managed', true), 'createTable')],
         externalDefault,
       );
       expect(plannable).toHaveLength(0);
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]?.kind).toBe('controlPolicySuppressedCall');
-      expect(warnings[0]?.location).toMatchObject({
-        namespace: UNBOUND_NAMESPACE_ID,
-        table: 'users',
-      });
-      expect(warnings[0]?.meta).toMatchObject({
-        controlPolicy: 'external',
+      expect(suppressions).toHaveLength(1);
+      expect(suppressions[0]).toEqual({
+        subject: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          entityKind: 'table',
+          entityName: 'users',
+          explicitNodeControlPolicy: 'managed',
+          createsNewObject: true,
+        },
+        policy: 'external',
         factoryName: 'createTable',
-        declaredControlPolicy: 'managed',
+        createsNewObject: true,
       });
-      expect(warnings[0]?.summary).toContain(
-        "namespace '__unbound__' has effective control 'external' but table declared 'managed'",
-      );
     });
   });
 });

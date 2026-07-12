@@ -33,7 +33,7 @@ import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schem
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
 import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import {
-  formatPostgresControlPolicySubjectLabel,
+  renderPostgresSuppression,
   resolveNamespaceIdForDdlSchema,
   resolvePostgresCallControlPolicySubject,
   resolvePostgresNodeIssueControlPolicySubject,
@@ -245,8 +245,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       resolveControlPolicySubject: (issue) =>
         resolvePostgresNodeIssueControlPolicySubject(issue, options.contract),
       resolveCreationFactoryName: resolvePostgresNodeIssueCreationFactoryName,
-      formatSubjectLabel: (factoryName, subject) =>
-        formatPostgresControlPolicySubjectLabel(factoryName, subject, options.contract),
     });
 
     const result = planIssues({
@@ -278,8 +276,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       resolveControlPolicySubject: (call) =>
         resolvePostgresCallControlPolicySubject(call, options.contract),
       resolveFactoryName: (call) => call.factoryName,
-      formatSubjectLabel: (factoryName, subject) =>
-        formatPostgresControlPolicySubjectLabel(factoryName, subject, options.contract),
     });
 
     // Inline `onFieldEvent`-emitted ops after structural DDL. The fixed
@@ -304,15 +300,13 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       resolveControlPolicySubject: (call) =>
         resolvePostgresCallControlPolicySubject(call, options.contract),
       resolveFactoryName: (call) => call.factoryName,
-      formatSubjectLabel: (factoryName, subject) =>
-        formatPostgresControlPolicySubjectLabel(factoryName, subject, options.contract),
     });
     const calls = [...result.value.calls, ...schemaDiffPartition.kept, ...fieldEventPartition.kept];
     const warnings: SqlPlannerConflict[] = [
-      ...issuePartition.warnings,
-      ...schemaDiffPartition.warnings,
-      ...fieldEventPartition.warnings,
-    ];
+      ...issuePartition.suppressions,
+      ...schemaDiffPartition.suppressions,
+      ...fieldEventPartition.suppressions,
+    ].map((record) => renderPostgresSuppression(record, options.contract));
 
     return Object.freeze({
       kind: 'success' as const,

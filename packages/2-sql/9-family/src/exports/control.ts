@@ -31,7 +31,7 @@ export {
   detectDestructiveChanges,
   resolveValueSetValues,
 } from '../core/migrations/contract-to-schema-ir';
-export type { ControlPolicySubject } from '../core/migrations/control-policy';
+export type { ControlPolicySubject, SuppressionRecord } from '../core/migrations/control-policy';
 export {
   controlPolicyForCall,
   partitionCallsByControlPolicy,
