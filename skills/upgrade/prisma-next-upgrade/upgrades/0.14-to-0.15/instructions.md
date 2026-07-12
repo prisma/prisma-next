@@ -42,6 +42,16 @@ changes:
 ---
 
 <!--
+TML-2501 (extension-supabase slice B close-out, this PR): test-only. The only
+`examples/` touch is `examples/supabase/test/rls-role-binding.integration.test.ts`:
+the acceptance test's fixture no longer hand-applies `ENABLE ROW LEVEL SECURITY` /
+`CREATE POLICY` SQL — the test now exercises exactly the policies `dbInit` applies
+from `contract.prisma`, and gains a WITH CHECK assertion (reassigning an owned row
+to another owner is rejected). No framework surface, contract shape, or emitted
+artefact changes. No user action required. Incidental substrate diff only.
+-->
+
+<!--
 TML-2870 (Postgres RLS slice 4: all policy operations + roles): additive. The
 PSL RLS surface gains the non-select policy keywords `policy_insert`,
 `policy_update`, `policy_delete`, and `policy_all`, each with an optional
