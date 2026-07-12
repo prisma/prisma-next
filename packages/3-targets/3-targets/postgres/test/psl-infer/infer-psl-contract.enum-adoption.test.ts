@@ -120,7 +120,6 @@ function sessionsNamespace(schemaName: string) {
 
 function describedContractWithNativeEnum(input: {
   readonly namespaceId: string;
-  readonly handleName: string;
   readonly typeName: string;
   readonly members: readonly string[];
   readonly tables?: readonly string[];
@@ -142,7 +141,7 @@ function describedContractWithNativeEnum(input: {
               ]),
             ),
             native_enum: {
-              [input.handleName]: new PostgresNativeEnum({
+              [input.typeName]: new PostgresNativeEnum({
                 typeName: input.typeName,
                 members: input.members,
               }),
@@ -352,7 +351,6 @@ describe('single-namespace stopgap guard', () => {
 describe('pack-owned enum subtraction (by type name)', () => {
   const pack = describedContractWithNativeEnum({
     namespaceId: 'auth',
-    handleName: 'AalLevel',
     typeName: 'aal_level',
     members: ['aal1', 'aal2', 'aal3'],
     tables: ['sessions'],
@@ -381,7 +379,6 @@ describe('pack-owned enum subtraction (by type name)', () => {
   it('matching is namespace-scoped: a pack owning the type elsewhere does not subtract', () => {
     const otherPack = describedContractWithNativeEnum({
       namespaceId: 'other',
-      handleName: 'AalLevel',
       typeName: 'aal_level',
       members: ['aal1'],
     });
@@ -440,7 +437,6 @@ describe('pack-owned enum subtraction from a serialized+hydrated described contr
   const hydratedPack = throughSerializedForm(
     describedContractWithNativeEnum({
       namespaceId: 'auth',
-      handleName: 'AalLevel',
       typeName: 'aal_level',
       members: ['aal1', 'aal2', 'aal3'],
       tables: ['sessions'],
