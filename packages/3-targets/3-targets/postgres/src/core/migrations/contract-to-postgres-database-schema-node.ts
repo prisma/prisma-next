@@ -141,9 +141,6 @@ export function contractToPostgresDatabaseSchemaNode(
       }
     }
 
-    // Project every native enum entity to a diff node regardless of grade —
-    // suppression is the disposition layer's job, exactly like tables/roles.
-    // Skipping external enums here would break extra-in-DB pairing.
     const enums = Object.values(ns.entries.native_enum ?? {}).map(
       (entity) =>
         new PostgresNativeEnumSchemaNode({
