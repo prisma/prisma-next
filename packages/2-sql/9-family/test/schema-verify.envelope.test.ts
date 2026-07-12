@@ -28,7 +28,6 @@ function stubDiff(control: 'observed' | 'managed'): SqlSchemaDiffFn {
       {
         path: ['database', 'user', 'column:email'],
         reason: 'not-found',
-        message: 'missing: database/user/column:email',
         expected: new SqlColumnIR({ name: 'email', nativeType: 'text', nullable: false }),
       },
     ],
@@ -53,7 +52,7 @@ describe('verifySqlSchemaByDiff surfaces warnings without failing', () => {
     expect(result.ok).toBe(true);
     expect(result.schema.issues).toEqual([]);
     expect(result.schema.warnings?.issues).toHaveLength(1);
-    expect(result.schema.warnings?.issues[0]?.message).toContain('column:email');
+    expect(result.schema.warnings?.issues[0]?.path.join('/')).toContain('column:email');
   });
 
   it('a managed subject drifts: it fails, and the failure is not double-counted as a warning', () => {

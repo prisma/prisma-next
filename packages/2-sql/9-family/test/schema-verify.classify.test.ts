@@ -29,7 +29,6 @@ function issueOf(reason: 'not-expected' | 'not-found' | 'not-equal', node: Diffa
   return {
     path: ['database', node.id],
     reason,
-    message: `${reason}: ${node.id}`,
     ...(reason === 'not-expected' ? { actual: node } : { expected: node, actual: node }),
   };
 }

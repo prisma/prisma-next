@@ -68,7 +68,6 @@ describe('verifyPostgresNamespacePresence', () => {
       reason: 'not-found',
       expected: { nodeKind: 'postgres-namespace', schemaName: 'auth' },
     });
-    expect(issues[0]?.message).toContain('auth');
   });
 
   it('does not emit missing_schema when the introspected list already contains the namespace', () => {

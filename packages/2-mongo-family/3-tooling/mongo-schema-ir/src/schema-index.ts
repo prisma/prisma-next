@@ -18,7 +18,7 @@ export interface MongoSchemaIndexOptions {
 }
 
 export class MongoSchemaIndex extends MongoSchemaIRNode {
-  readonly kind = 'index' as const;
+  readonly nodeKind = 'index' as const;
   readonly id: string;
   readonly keys: ReadonlyArray<MongoIndexKey>;
   readonly unique: boolean;

@@ -117,12 +117,10 @@ describe('MongoSchemaVerifierBase', () => {
       const nsIssue: SchemaDiffIssue = {
         path: ['users'],
         reason: 'not-found',
-        message: 'collection users missing',
       };
       const targetIssue: SchemaDiffIssue = {
         path: ['audit_log'],
         reason: 'not-expected',
-        message: 'unexpected target-only collection',
       };
 
       const verifier = new RecordingVerifier({ __unbound__: [nsIssue] }, [targetIssue]);

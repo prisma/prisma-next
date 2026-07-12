@@ -285,7 +285,6 @@ describe('ControlClient progress emission', () => {
             {
               path: ['root'],
               reason: 'not-found',
-              message: 'Schema mismatch',
             },
           ],
         },
