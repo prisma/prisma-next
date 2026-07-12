@@ -118,28 +118,16 @@ function postgresCallFields(call: PostgresOpFactoryCall): PostgresCallFields {
   };
 }
 
-function formatPostgresControlPolicySubjectLabel(
-  factoryName: string,
+function formatSuppressionSubjectLabel(
   subject: ControlPolicySubject | undefined,
   contract: Contract<SqlStorage>,
 ): string {
-  if (subject?.entityKind === 'table' && subject.entityName !== undefined) {
-    const ddlSchema = ddlSchemaNameForNamespace(contract, subject.namespaceId);
-    return `${factoryName}(${ddlSchema}.${subject.entityName})`;
+  if (subject === undefined) return 'unknown';
+  const ddlSchema = ddlSchemaNameForNamespace(contract, subject.namespaceId);
+  if (subject.entityKind !== undefined && subject.entityName !== undefined) {
+    return `${subject.entityKind} "${ddlSchema}.${subject.entityName}"`;
   }
-  return factoryName;
-}
-
-/**
- * The verb a suppressed *modification* subject renders when it produced no
- * concrete DDL call (the family carries `factoryName: undefined` there — it does
- * not invent verbs). Target-owned because the vocabulary (table vs enum) is the
- * target's; a schema-only subject falls back to `alterSchema`.
- */
-function postgresModificationFactoryName(subject: ControlPolicySubject | undefined): string {
-  if (subject?.entityKind === 'table') return 'alterTable';
-  if (subject?.entityKind === 'native_enum') return 'alterType';
-  return 'alterSchema';
+  return `namespace "${ddlSchema}"`;
 }
 
 function postgresSuppressionSummary(
@@ -150,27 +138,25 @@ function postgresSuppressionSummary(
   const namespace = subject?.namespaceId ?? 'unknown';
   const declared = subject?.explicitNodeControlPolicy;
   if (policy === 'external' && declared === 'managed') {
-    return `control policy suppressed: ${subjectLabel} — namespace '${namespace}' has effective control 'external' but table declared 'managed'`;
+    return `control policy suppressed: ${subjectLabel} — namespace '${namespace}' has effective control 'external' but declared 'managed'`;
   }
-  const declaredSuffix = declared ? ` but table declared '${declared}'` : '';
+  const declaredSuffix = declared ? ` but declared '${declared}'` : '';
   return `control policy suppressed: ${subjectLabel} — namespace '${namespace}' has effective control '${policy}'${declaredSuffix}`;
 }
 
 /**
  * Render one family {@link SuppressionRecord} into a target `SqlPlannerConflict`.
  * The family decides *that* a subject is suppressed and hands over the raw
- * coordinate + policy; the label, message, location, and any modification verb
- * are rendered here — the target owns the table-vs-enum vocabulary.
+ * coordinate + policy; the label, message, and location are rendered here,
+ * driven entirely by the subject's own `(entityKind, entityName)` coordinate
+ * — no target-owned table-vs-enum vocabulary.
  */
 export function renderPostgresSuppression(
   record: SuppressionRecord,
   contract: Contract<SqlStorage>,
 ): SqlPlannerConflict {
   const subject = record.subject;
-  const factoryName =
-    record.factoryName ??
-    (subject !== undefined ? postgresModificationFactoryName(subject) : 'unknown');
-  const subjectLabel = formatPostgresControlPolicySubjectLabel(factoryName, subject, contract);
+  const subjectLabel = formatSuppressionSubjectLabel(subject, contract);
   return {
     kind: 'controlPolicySuppressedCall',
     summary: postgresSuppressionSummary(subjectLabel, subject, record.policy),
@@ -182,7 +168,7 @@ export function renderPostgresSuppression(
     },
     meta: {
       controlPolicy: record.policy,
-      factoryName,
+      ...ifDefined('factoryName', record.factoryName),
       ...ifDefined('declaredControlPolicy', subject?.explicitNodeControlPolicy),
     },
   };

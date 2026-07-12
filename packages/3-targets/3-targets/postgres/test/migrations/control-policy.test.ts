@@ -1,10 +1,14 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { ControlPolicySubject, SuppressionRecord } from '@prisma-next/family-sql/control';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { resolvePostgresNodeIssueControlPolicySubject } from '../../src/core/migrations/control-policy';
+import {
+  renderPostgresSuppression,
+  resolvePostgresNodeIssueControlPolicySubject,
+} from '../../src/core/migrations/control-policy';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresNativeEnumSchemaNode } from '../../src/core/schema-ir/postgres-native-enum-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
@@ -134,5 +138,91 @@ describe('resolvePostgresNodeIssueControlPolicySubject — generic entity coordi
       entityName: 'orphan',
       createsNewObject: false,
     });
+  });
+});
+
+/**
+ * `renderPostgresSuppression` renders the label purely off the subject's own
+ * `(entityKind, entityName)` coordinate — there is no target-owned
+ * table-vs-enum vocabulary and no `factoryName`-derived label.
+ */
+describe('renderPostgresSuppression', () => {
+  const contract = makeContract();
+
+  const tableSubject: ControlPolicySubject = {
+    namespaceId: 'sales',
+    entityKind: 'table',
+    entityName: 'orders',
+    createsNewObject: true,
+  };
+
+  const enumSubject: ControlPolicySubject = {
+    namespaceId: 'sales',
+    entityKind: 'native_enum',
+    entityName: 'order_status',
+    createsNewObject: true,
+  };
+
+  it('a suppressed table creation names the table by coordinate and carries the creation factoryName', () => {
+    const record: SuppressionRecord = {
+      subject: tableSubject,
+      policy: 'observed',
+      factoryName: 'createTable',
+      createsNewObject: true,
+    };
+
+    const conflict = renderPostgresSuppression(record, contract);
+
+    expect({ summary: conflict.summary, factoryName: conflict.meta?.['factoryName'] }).toEqual({
+      summary:
+        "control policy suppressed: table \"sales.orders\" — namespace 'sales' has effective control 'observed'",
+      factoryName: 'createTable',
+    });
+  });
+
+  it('a suppressed native-enum creation names the enum type, not a table', () => {
+    const record: SuppressionRecord = {
+      subject: enumSubject,
+      policy: 'observed',
+      factoryName: 'createNativeEnumType',
+      createsNewObject: true,
+    };
+
+    const conflict = renderPostgresSuppression(record, contract);
+
+    expect({ summary: conflict.summary, factoryName: conflict.meta?.['factoryName'] }).toEqual({
+      summary:
+        "control policy suppressed: native_enum \"sales.order_status\" — namespace 'sales' has effective control 'observed'",
+      factoryName: 'createNativeEnumType',
+    });
+  });
+
+  it('a suppressed modification describes the subject by coordinate with no invented alter verb', () => {
+    const record: SuppressionRecord = {
+      subject: { ...enumSubject, createsNewObject: false },
+      policy: 'tolerated',
+      factoryName: undefined,
+      createsNewObject: false,
+    };
+
+    const conflict = renderPostgresSuppression(record, contract);
+
+    expect(conflict.summary).toContain('native_enum "sales.order_status"');
+    expect(conflict.summary).not.toMatch(/alterTable|alterType|alterSchema/);
+    expect('factoryName' in (conflict.meta ?? {})).toBe(false);
+  });
+
+  it('an external namespace overriding a declared managed policy reports the declaration generically', () => {
+    const record: SuppressionRecord = {
+      subject: { ...enumSubject, explicitNodeControlPolicy: 'managed' },
+      policy: 'external',
+      factoryName: 'createNativeEnumType',
+      createsNewObject: true,
+    };
+
+    const conflict = renderPostgresSuppression(record, contract);
+
+    expect(conflict.summary.endsWith("but declared 'managed'")).toBe(true);
+    expect(conflict.summary).not.toContain('table');
   });
 });
