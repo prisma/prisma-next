@@ -376,7 +376,7 @@ withTempDir(({ createTempDir }) => {
           await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const dryRunOutput = stripAnsi(consoleOutput.join('\n'));
           expect(dryRunOutput).toContain('Warnings:');
-          expect(dryRunOutput).toContain('control policy suppressed: createTable(auth.sessions)');
+          expect(dryRunOutput).toContain('control policy suppressed: table "auth.sessions"');
 
           consoleOutput.length = 0;
           const applyStartIndex = consoleOutput.length;
@@ -387,7 +387,7 @@ withTempDir(({ createTempDir }) => {
           ]);
           const applyOutput = stripAnsi(consoleOutput.slice(applyStartIndex).join('\n'));
           expect(applyOutput).toContain('Warnings:');
-          expect(applyOutput).toContain('control policy suppressed: createTable(auth.sessions)');
+          expect(applyOutput).toContain('control policy suppressed: table "auth.sessions"');
           expect(applyExitCode).not.toBe(0);
           expect(await tableExists(connectionString, 'auth', 'sessions')).toBe(false);
         });

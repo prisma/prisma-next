@@ -17,6 +17,7 @@ import {
   AlterColumnTypeCall,
   type AlterColumnTypeOptions,
   CreateIndexCall,
+  CreateNativeEnumTypeCall,
   CreateSchemaCall,
   CreateTableCall,
   DropCheckConstraintCall,
@@ -24,6 +25,7 @@ import {
   DropConstraintCall,
   DropDefaultCall,
   DropIndexCall,
+  DropNativeEnumTypeCall,
   DropNotNullCall,
   DropTableCall,
   SetDefaultCall,
@@ -169,6 +171,35 @@ export abstract class PostgresMigration<
     readonly ifNotExists?: boolean;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     return new CreateSchemaCall(options.schema).toOp(this.controlAdapterFor('createSchema'));
+  }
+
+  /**
+   * Emit a `CREATE TYPE ... AS ENUM (...)` migration operation for a managed
+   * native enum. Builds a typed DDL node and lowers it through the stored
+   * control adapter (members render in declaration order). Throws if no adapter
+   * is present.
+   */
+  protected createNativeEnumType(options: {
+    readonly schema: string;
+    readonly typeName: string;
+    readonly members: readonly string[];
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    return new CreateNativeEnumTypeCall(options.schema, options.typeName, options.members).toOp(
+      this.controlAdapterFor('createNativeEnumType'),
+    );
+  }
+
+  /**
+   * Emit a `DROP TYPE` migration operation for a managed native enum, lowered
+   * through the stored control adapter. Throws if no adapter is present.
+   */
+  protected dropNativeEnumType(options: {
+    readonly schema: string;
+    readonly typeName: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    return new DropNativeEnumTypeCall(options.schema, options.typeName).toOp(
+      this.controlAdapterFor('dropNativeEnumType'),
+    );
   }
 
   protected addColumn(options: {

@@ -15,6 +15,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 
 import { type CfExpr, cfExpr } from '@prisma-next/sql-relational-core/contract-free';
+import { invariant } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresTableSource } from './ast/table-source';
@@ -25,7 +26,7 @@ import {
   rlsEnablementEntityKind,
   roleEntityKind,
 } from './entity-kinds';
-import type { PostgresNativeEnum } from './postgres-native-enum';
+import { PostgresNativeEnum } from './postgres-native-enum';
 import type { PostgresRlsEnablement } from './postgres-rls-enablement';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
@@ -87,6 +88,26 @@ export class PostgresSchema extends SqlNamespaceBase {
       ]),
       'carry',
     );
+
+    // A native enum keys under its PHYSICAL type name in storage `entries`
+    // (ADR 221 coordinate `entityName`). The family/authoring layer keys every
+    // block by its author handle, so re-key the `native_enum` slot by each
+    // entity's `typeName` here — target-local Postgres code that already knows
+    // this entity kind. This runs at both authoring and hydration; a serialized
+    // contract's key already equals the `typeName`, so the re-key is idempotent.
+    const nativeEnumSlot = dispatched['native_enum'];
+    if (nativeEnumSlot !== undefined) {
+      const rekeyed: Record<string, unknown> = {};
+      for (const [handle, entity] of Object.entries(nativeEnumSlot)) {
+        const physicalName = PostgresNativeEnum.is(entity) ? entity.typeName : handle;
+        invariant(
+          !Object.hasOwn(rekeyed, physicalName),
+          `PostgresSchema "${input.id}": two native_enum entities resolve to the same physical type name "${physicalName}". Give them distinct @@map type names.`,
+        );
+        rekeyed[physicalName] = entity;
+      }
+      dispatched['native_enum'] = Object.freeze(rekeyed);
+    }
 
     // Drop an empty valueSet so presence signals non-emptiness.
     const valueSetRaw = dispatched['valueSet'];

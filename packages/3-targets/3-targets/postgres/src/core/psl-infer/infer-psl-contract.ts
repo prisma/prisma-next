@@ -300,10 +300,10 @@ export function inferPostgresPslContract(
   const owners = describedContractOwners(describedContracts ?? []);
   const enumOwners = describedNativeEnumOwnersByTypeName(describedContracts ?? []);
 
-  // Native enum adoption: each namespace's introspected `{ typeName, values }`
-  // entries become `native_enum` blocks + `pg.enum(<Name>)` columns, minus the
-  // types a described pack contract already declares (matched by TYPE NAME —
-  // see describedNativeEnumOwnersByTypeName). Transitional grade gap: an
+  // Native enum adoption: each namespace's introspected `enums` nodes become
+  // `native_enum` blocks + `pg.enum(<Name>)` columns, minus the types a
+  // described pack contract already declares (matched by TYPE NAME — see
+  // describedNativeEnumOwnersByTypeName). Transitional grade gap: an
   // inferred block carries no explicit `control` and inherits the contract's
   // `defaultControl`; under `defaultControl: 'managed'` the planner does not
   // yet enforce the native enum lifecycle (CREATE TYPE / DROP TYPE / ADD
@@ -313,17 +313,7 @@ export function inferPostgresPslContract(
   const packOwnedEnumTypesByNamespace = new Map<string, Map<string, string>>();
   const enumNamespaceNames = new Set<string>();
   for (const namespace of namespaces) {
-    const definitionsForNamespace = new Set(namespace.nativeEnums.map((e) => e.typeName));
-    for (const typeName of namespace.nativeEnumTypeNames) {
-      if (!definitionsForNamespace.has(typeName)) {
-        throw new Error(
-          `contract infer: introspection reported native enum type "${typeName}" in schema ` +
-            `"${namespace.schemaName}" without member values — the introspected tree's ` +
-            '`nativeEnumTypeNames` and `nativeEnums` are out of sync (internal invariant).',
-        );
-      }
-    }
-    for (const { typeName, values } of namespace.nativeEnums) {
+    for (const { typeName, members } of namespace.nativeEnums) {
       const owner = enumOwners.get(
         coordinateKey({
           namespaceId: namespace.schemaName,
@@ -341,7 +331,7 @@ export function inferPostgresPslContract(
         packOwnedEnumTypesByNamespace.set(namespace.schemaName, owned);
         continue;
       }
-      enumDefinitions.set(typeName, values);
+      enumDefinitions.set(typeName, members);
       enumNamespaceNames.add(namespace.schemaName);
     }
   }

@@ -3,6 +3,7 @@ import {
   escapeLiteral,
   qualifyName,
   quoteIdentifier,
+  quoteQualifiedName,
   SqlEscapeError,
   validateEnumValueLength,
 } from '../src/core/sql-utils';
@@ -119,6 +120,24 @@ describe('qualifyName', () => {
   });
 });
 
+describe('quoteQualifiedName', () => {
+  it('quotes an unqualified name as a single identifier', () => {
+    expect(quoteQualifiedName('order_status')).toBe('"order_status"');
+  });
+
+  it('quotes each segment of a dot-qualified name', () => {
+    expect(quoteQualifiedName('auth.aal_level')).toBe('"auth"."aal_level"');
+  });
+
+  it('round-trips a single segment to exactly quoteIdentifier', () => {
+    expect(quoteQualifiedName('Status_v2')).toBe(quoteIdentifier('Status_v2'));
+  });
+
+  it('escapes embedded double quotes per segment', () => {
+    expect(quoteQualifiedName('sch"ema.ta"ble')).toBe('"sch""ema"."ta""ble"');
+  });
+});
+
 describe('enum value security scenarios', () => {
   it('handles enum values with quotes safely', () => {
     const values = ["it's", "don't", "can't"];
@@ -167,5 +186,19 @@ describe('validateEnumValueLength', () => {
   it('throws when value exceeds the limit', () => {
     const longValue = 'a'.repeat(64);
     expect(() => validateEnumValueLength(longValue, 'Status')).toThrow(SqlEscapeError);
+  });
+
+  it('measures the limit in UTF-8 bytes, not characters — a 63-byte multibyte label passes', () => {
+    // '€' (U+20AC) is 3 UTF-8 bytes: 21 chars = 63 bytes, exactly at the limit.
+    const label = '€'.repeat(21);
+    expect(label.length).toBe(21);
+    expect(() => validateEnumValueLength(label, 'Status')).not.toThrow();
+  });
+
+  it('throws for a multibyte label whose byte length exceeds 63 despite a short character count', () => {
+    // 22 chars = 66 UTF-8 bytes — under the 63-CHARACTER count, over the 63-BYTE limit.
+    const label = '€'.repeat(22);
+    expect(label.length).toBe(22);
+    expect(() => validateEnumValueLength(label, 'Status')).toThrow(SqlEscapeError);
   });
 });

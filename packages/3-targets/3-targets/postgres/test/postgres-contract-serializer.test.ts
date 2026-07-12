@@ -665,7 +665,7 @@ describe('native_enum + valueSet round-trip', () => {
     const ns = contract.storage.namespaces['auth'] as PostgresSchema;
     expect(ns).toBeInstanceOf(PostgresSchema);
 
-    const nativeEnum = ns.entries.native_enum?.['AalLevel'];
+    const nativeEnum = ns.entries.native_enum?.['aal_level'];
     expect(nativeEnum).toBeInstanceOf(PostgresNativeEnum);
     expect(nativeEnum?.typeName).toBe('aal_level');
     expect(nativeEnum?.members).toEqual(['aal1', 'aal2', 'aal3']);
@@ -687,7 +687,7 @@ describe('native_enum + valueSet round-trip', () => {
     const ns = roundTripped.storage.namespaces['auth'] as PostgresSchema;
     expect(ns).toBeInstanceOf(PostgresSchema);
 
-    const nativeEnum = ns.entries.native_enum?.['AalLevel'];
+    const nativeEnum = ns.entries.native_enum?.['aal_level'];
     expect(nativeEnum).toBeInstanceOf(PostgresNativeEnum);
     expect(nativeEnum?.typeName).toBe('aal_level');
     expect(nativeEnum?.members).toEqual(['aal1', 'aal2', 'aal3']);
@@ -706,7 +706,7 @@ describe('native_enum + valueSet round-trip', () => {
     const reparsed = JSON.parse(JSON.stringify(json));
 
     const ns = reparsed.storage.namespaces['auth'];
-    expect(ns.entries.native_enum.AalLevel).toEqual({
+    expect(ns.entries.native_enum.aal_level).toEqual({
       kind: 'postgres-enum',
       typeName: 'aal_level',
       members: ['aal1', 'aal2', 'aal3'],

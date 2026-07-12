@@ -138,7 +138,7 @@ namespace auth {
     expect(ns).toBeInstanceOf(PostgresSchema);
     expect(Object.keys(ns.entries.native_enum ?? {})).toHaveLength(1);
 
-    const nativeEnum = ns.entries.native_enum?.['AalLevel'];
+    const nativeEnum = ns.entries.native_enum?.['aal_level'];
     expect(nativeEnum).toBeInstanceOf(PostgresNativeEnum);
     expect(nativeEnum?.typeName).toBe('aal_level');
     expect(nativeEnum?.members).toEqual(['aal1', 'aal2', 'aal3']);
@@ -166,7 +166,7 @@ namespace auth {
     if (!result.ok) return;
 
     const ns = result.value.storage.namespaces['auth'] as PostgresSchema;
-    const nativeEnum = ns.entries.native_enum?.['Weird'];
+    const nativeEnum = ns.entries.native_enum?.['back\\slash "quoted"'];
     expect(nativeEnum?.typeName).toBe('back\\slash "quoted"');
   });
 
@@ -189,7 +189,7 @@ namespace auth {
     if (!result.ok) return;
 
     const ns = result.value.storage.namespaces['auth'] as PostgresSchema;
-    const nativeEnum = ns.entries.native_enum?.['AalLevel'];
+    const nativeEnum = ns.entries.native_enum?.['aal_level'];
     expect(Object.hasOwn(nativeEnum!, 'control')).toBe(false);
   });
 
@@ -471,7 +471,7 @@ namespace public {
     const ns = result.value.storage.namespaces['public'] as PostgresSchema;
     expect(ns.valueSet?.['Priority']).toMatchObject({ values: ['low', 'high'] });
     expect(ns.valueSet?.['AalLevel']).toMatchObject({ values: ['aal1', 'aal2'] });
-    expect(ns.entries.native_enum?.['AalLevel']).toBeInstanceOf(PostgresNativeEnum);
+    expect(ns.entries.native_enum?.['aal_level']).toBeInstanceOf(PostgresNativeEnum);
   });
 
   it('a native_enum and a domain enum sharing a name in one namespace is rejected, not silently merged', () => {

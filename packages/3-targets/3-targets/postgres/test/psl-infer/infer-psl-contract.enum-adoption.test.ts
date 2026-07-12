@@ -1,7 +1,7 @@
 /**
  * Native-enum ADOPTION at the `contract infer` entry: instead of throwing,
  * `inferPostgresPslContract` emits `native_enum` blocks + `pg.enum(<Name>)`
- * columns from the introspected tree's `nativeEnums`, wraps enum-bearing
+ * columns from the introspected tree's `enums`, wraps enum-bearing
  * output in an explicit `namespace <schemaName> { … }` block (the pinned
  * design — a top-level `native_enum` never lowers), subtracts pack-owned
  * enum types by TYPE NAME, and leaves enum-free output flat and byte-identical.
@@ -31,13 +31,18 @@ import { PostgresNativeEnum } from '../../src/core/postgres-native-enum';
 import { PostgresSchema, postgresCreateNamespace } from '../../src/core/postgres-schema';
 import { inferPostgresPslContract } from '../../src/core/psl-infer/infer-psl-contract';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
-import type { PostgresNativeEnumIntrospection } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresNativeEnumSchemaNode } from '../../src/core/schema-ir/postgres-native-enum-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 
 // ---------------------------------------------------------------------------
 // Tree fixtures
 // ---------------------------------------------------------------------------
+
+interface FlatNativeEnumEntry {
+  readonly typeName: string;
+  readonly values: readonly string[];
+}
 
 function table(name: string, columns: Record<string, SqlColumnIRInput>) {
   return new PostgresTableSchemaNode({
@@ -55,13 +60,19 @@ function table(name: string, columns: Record<string, SqlColumnIRInput>) {
 function namespaceNode(
   schemaName: string,
   tables: Record<string, PostgresTableSchemaNode>,
-  nativeEnums: readonly PostgresNativeEnumIntrospection[] = [],
+  nativeEnums: readonly FlatNativeEnumEntry[] = [],
 ) {
   return new PostgresNamespaceSchemaNode({
     schemaName,
     tables,
-    nativeEnumTypeNames: nativeEnums.map((e) => e.typeName),
-    nativeEnums,
+    nativeEnums: nativeEnums.map(
+      (entry) =>
+        new PostgresNativeEnumSchemaNode({
+          typeName: entry.typeName,
+          namespaceId: schemaName,
+          members: entry.values,
+        }),
+    ),
   });
 }
 
@@ -85,7 +96,7 @@ function inferAndPrint(
 
 const idColumn: SqlColumnIRInput = { name: 'id', nativeType: 'int4', nullable: false };
 
-const AAL_LEVEL: PostgresNativeEnumIntrospection = {
+const AAL_LEVEL: FlatNativeEnumEntry = {
   typeName: 'aal_level',
   values: ['aal1', 'aal2', 'aal3'],
 };
@@ -336,19 +347,6 @@ describe('single-namespace stopgap guard', () => {
       /native enum adoption.*multiple schemas|multiple schemas.*native enum/i,
     );
   });
-
-  it('throws when an introspected enum type name carries no member values', () => {
-    const broken = tree({
-      public: new PostgresNamespaceSchemaNode({
-        schemaName: 'public',
-        tables: {},
-        nativeEnumTypeNames: ['ghost_enum'],
-        nativeEnums: [],
-      }),
-    });
-
-    expect(() => inferPostgresPslContract(broken)).toThrow(/ghost_enum.*member values/i);
-  });
 });
 
 describe('pack-owned enum subtraction (by type name)', () => {
@@ -431,7 +429,7 @@ describe('pack-owned enum subtraction (by type name)', () => {
 });
 
 describe('pack-owned enum subtraction from a serialized+hydrated described contract', () => {
-  const FACTOR_TYPE: PostgresNativeEnumIntrospection = {
+  const FACTOR_TYPE: FlatNativeEnumEntry = {
     typeName: 'factor_type',
     values: ['totp', 'webauthn'],
   };
@@ -451,7 +449,7 @@ describe('pack-owned enum subtraction from a serialized+hydrated described contr
 
   it('the hydrated contract exposes the native_enum entity as a PostgresNativeEnum (subtraction precondition)', () => {
     const authNs = hydratedPack.contract.storage.namespaces['auth'] as PostgresSchema;
-    const entity = authNs.entries.native_enum?.['AalLevel'];
+    const entity = authNs.entries.native_enum?.['aal_level'];
     expect(entity).toBeInstanceOf(PostgresNativeEnum);
     expect(entity?.typeName).toBe('aal_level');
   });

@@ -8,6 +8,7 @@ import type { PostgresContract } from '../postgres-schema';
 import { isPostgresSchema } from '../postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
+import { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
 import { PostgresRoleSchemaNode } from '../schema-ir/postgres-role-schema-node';
 import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
@@ -140,10 +141,20 @@ export function contractToPostgresDatabaseSchemaNode(
       }
     }
 
+    const nativeEnums = Object.values(ns.entries.native_enum ?? {}).map(
+      (entity) =>
+        new PostgresNativeEnumSchemaNode({
+          typeName: entity.typeName,
+          namespaceId: ddlSchema,
+          members: entity.members,
+          ...ifDefined('control', entity.control),
+        }),
+    );
+
     namespaces[ddlSchema] = new PostgresNamespaceSchemaNode({
       schemaName: ddlSchema,
       tables,
-      nativeEnumTypeNames: [],
+      nativeEnums,
     });
 
     for (const role of Object.values(ns.role)) {

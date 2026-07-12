@@ -125,7 +125,6 @@ function actualSchema(options: {
             ),
           }),
         },
-        nativeEnumTypeNames: [],
       }),
     },
     roles: [],

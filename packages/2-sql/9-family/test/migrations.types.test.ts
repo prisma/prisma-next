@@ -178,24 +178,24 @@ describe('planner helpers', () => {
     const conflict = {
       kind: 'typeMismatch',
       summary: 'Column "user"."email" has mismatched type',
-      location: { table: 'user', column: 'email' },
+      location: { entityKind: 'table', entityName: 'user', column: 'email' },
       meta: { hint: 'only additive operations allowed' },
     } satisfies SqlPlannerConflict;
     const failure = plannerFailure([conflict]);
-    conflict.location!.table = 'mutated';
+    conflict.location!.entityName = 'mutated';
 
     expect(failure).toMatchObject({
       kind: 'failure',
       conflicts: [
         {
           kind: 'typeMismatch',
-          location: { table: 'user', column: 'email' },
+          location: { entityKind: 'table', entityName: 'user', column: 'email' },
           meta: { hint: 'only additive operations allowed' },
         },
       ],
     });
     expect(Object.isFrozen(failure.conflicts)).toBe(true);
     expect(Object.isFrozen(failure.conflicts[0]!)).toBe(true);
-    expect(failure.conflicts[0]?.location?.table).toBe('user');
+    expect(failure.conflicts[0]?.location?.entityName).toBe('user');
   });
 });
