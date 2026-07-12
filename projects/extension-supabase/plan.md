@@ -34,24 +34,26 @@ Ungated. Reconciles spec.md, plan.md, and `decisions.md` (C5) to as-built realit
 `@prisma-next/extension-supabase` package with real `/pack`, `/contract` (model handles), and `/runtime` subpaths. PSL-authored Supabase contract (`defaultControl: 'external'`). `examples/supabase` walking skeleton: proves `external` migrate/verify claim, `Profile → auth.AuthUser` FK cascade, and RLS enforcement through the runtime.
 
 Current state of the example:
-- RLS policies are hand-authored raw SQL in `applyRlsFixture` (a test fixture). The `TODO(TML-2501)` marks role literals as hardcoded. Both are remaining work.
+- RLS policies now author in `contract.prisma` and apply via `dbInit` (Slice B). The `TODO(TML-2501)` marks role literals as hardcoded — that's Slice C.
 
 ### ✅ Runtime facade — done (ADR 230)
 
 `SupabaseRuntimeImpl`, the async `supabase<TContract>()` factory, `asUser` (async) / `asAnon()` / `asServiceRole()`, `SupabaseDb`/`RoleBoundDb`, JWT validation (`InvalidJwtError`), and session-coupled connection role binding (`set_config(role/claims)` + `RESET ALL` on release). See [ADR 230](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md).
 
-### Slice B — RLS through the framework authoring surface
+### Slice B — RLS through the framework authoring surface ✅ done
 
 **Gate:** postgres-rls #771 (SELECT policy) + the UPDATE-own vertical landed.
 
 **Goal:** swap `examples/supabase`'s `applyRlsFixture` raw SQL onto the framework authoring surface. The `Profile` model's RLS policies are declared via `.rls(...)` in TS or `policy_select`/`policy_update` blocks in PSL, emitted through the framework, applied by `dbInit` — no hand-authored `CREATE POLICY` in the test fixture.
 
 **DoD tasks:**
-- [ ] Express the `profile_owner_select` policy and the `profile_owner_update`-own-with-check policy through the framework authoring surface (TS `.rls(...)` or PSL `policy` blocks).
-- [ ] Remove `applyRlsFixture`'s hand-authored `CREATE POLICY` / `ENABLE ROW LEVEL SECURITY` SQL. The framework migration handles it.
-- [ ] Keep the RLS enforcement integration tests green.
+- [x] Express the `profile_owner_select` policy and the `profile_owner_update`-own-with-check policy through the framework authoring surface (TS `.rls(...)` or PSL `policy` blocks).
+- [x] Remove `applyRlsFixture`'s hand-authored `CREATE POLICY` / `ENABLE ROW LEVEL SECURITY` SQL. The framework migration handles it.
+- [x] Keep the RLS enforcement integration tests green.
 
 **Note:** B and C may merge into one postgres-rls-integration slice if the `PostgresRole` IR and the `.rls(...)` authoring surface land together — check when postgres-rls closes out.
+
+**As-built:** policies author in `examples/supabase/src/contract.prisma` (PSL `policy_select`/`policy_update` blocks) and apply via `dbInit`; the test fixture retains only grants (`applyGrantsFixture`) — no hand-authored `CREATE POLICY`/`ENABLE ROW LEVEL SECURITY` remains under `examples/supabase/`.
 
 ### Slice C — Roles first-class
 
