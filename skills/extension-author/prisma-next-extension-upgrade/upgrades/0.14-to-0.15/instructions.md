@@ -272,6 +272,25 @@ changes:
         - "pg.enum("
         - "nativeEnum("
       anyMatch: true
+  - id: native-enum-entry-keyed-by-physical-type-name
+    summary: |
+      A serialized `native_enum` entry is now keyed by its physical Postgres type name — the `@@map`
+      value, or the declared type name when unmapped — not the TS-facing PascalCase name it previously
+      used (`entries.native_enum.aal_level`, not `entries.native_enum.AalLevel`). This aligns the
+      `native_enum` key with every other storage entry (a table keys by its physical name) per ADR 221.
+      If your extension declares native Postgres enums, re-emit your bundled contract
+      (`prisma-next contract emit`) and commit the result so the re-keyed `entries.native_enum` map and
+      the recomputed `storageHash` land in your checked-in `contract.{json,d.ts}`. If your extension code
+      addresses a `native_enum` entry by key
+      (`contract.storage.namespaces[<ns>].entries.native_enum[<name>]`), switch that key from the
+      PascalCase type name to the physical type name.
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "native_enum"
+        - "pg.enum("
+        - "nativeEnum("
+      anyMatch: true
   - id: schema-ir-fk-unbound-referenced-schema-absent
     summary: |
       The family's `contractToSchemaIR` (from `@prisma-next/family-sql/control`) no longer stamps
