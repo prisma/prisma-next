@@ -201,15 +201,14 @@ export async function recreateTable(
  * issues that triggered it. Lives next to `recreateTable` so the planner
  * (which has the issues) can produce the same description the factory
  * used to build inline. Keeping the formatting target-side keeps
- * `RecreateTableCall` issue-free at the IR layer. Each `SchemaDiffIssue`
- * already carries a differ-generated `message`, so this is a plain join
- * rather than a per-kind message builder.
+ * `RecreateTableCall` issue-free at the IR layer. `SchemaDiffIssue` carries
+ * no rendered message, so this renders one from each issue's path.
  */
 export function buildRecreateSummary(
   tableName: string,
   issues: readonly SchemaDiffIssue[],
 ): string {
-  const messages = issues.map((i) => i.message).join('; ');
+  const messages = issues.map((i) => i.path.join('/')).join('; ');
   return `Recreates table ${tableName} to apply schema changes: ${messages}`;
 }
 

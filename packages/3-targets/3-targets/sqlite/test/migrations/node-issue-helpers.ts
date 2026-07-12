@@ -152,12 +152,10 @@ export function issue(input: {
   readonly reason: ExpectationFailureReason;
   readonly expected?: unknown;
   readonly actual?: unknown;
-  readonly message?: string;
 }): SchemaDiffIssue {
   return {
     path: input.path,
     reason: input.reason,
-    message: input.message ?? `${input.reason}: ${input.path.join('/')}`,
     ...(input.expected !== undefined ? { expected: input.expected } : {}),
     ...(input.actual !== undefined ? { actual: input.actual } : {}),
   } as SchemaDiffIssue;

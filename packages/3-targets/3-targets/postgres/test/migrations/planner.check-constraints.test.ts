@@ -177,7 +177,6 @@ function checkIssue(options: {
   return {
     path,
     reason: options.reason,
-    message: `check drift on "${TABLE_NAME}"`,
     ...(expected !== undefined ? { expected } : {}),
     ...(actual !== undefined ? { actual } : {}),
   };

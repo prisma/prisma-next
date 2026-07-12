@@ -290,7 +290,9 @@ function mapTableIssue(
   }
   // Unreachable: SqlTableIR.isEqualTo is identity, so a paired table can
   // never mismatch — kept for exhaustiveness against a future node change.
-  return notOk(issueConflict('unsupportedOperation', `Unexpected table drift: ${issue.message}`));
+  return notOk(
+    issueConflict('unsupportedOperation', `Unexpected table drift: ${issue.path.join('/')}`),
+  );
 }
 
 function mapColumnIssue(
@@ -302,7 +304,7 @@ function mapColumnIssue(
     return notOk(
       issueConflict(
         'unsupportedOperation',
-        `Column issue has no table in its path: ${issue.message}`,
+        `Column issue has no table in its path: ${issue.path.join('/')}`,
       ),
     );
   }
@@ -338,7 +340,7 @@ function mapColumnIssue(
     'a not-equal column issue always carries the actual column node'
   >(issue.actual);
   const kind = columnTypeChanged(expected, actual) ? 'typeMismatch' : 'nullabilityConflict';
-  return notOk(issueConflict(kind, issue.message, issueLocation(tableName, expected.name)));
+  return notOk(issueConflict(kind, issue.path.join('/'), issueLocation(tableName, expected.name)));
 }
 
 function mapIndexIssue(
@@ -349,7 +351,7 @@ function mapIndexIssue(
     return notOk(
       issueConflict(
         'unsupportedOperation',
-        `Index issue has no table in its path: ${issue.message}`,
+        `Index issue has no table in its path: ${issue.path.join('/')}`,
       ),
     );
   }
@@ -372,7 +374,7 @@ function mapIndexIssue(
   // not-equal: index type/options/uniqueness drift. SQLite can't ALTER an
   // index in place and the legacy planner never absorbed this into a
   // recreate either — surfaces as a conflict, matching `index_mismatch`.
-  return notOk(issueConflict('indexIncompatible', issue.message, issueLocation(tableName)));
+  return notOk(issueConflict('indexIncompatible', issue.path.join('/'), issueLocation(tableName)));
 }
 
 export function mapNodeIssueToCall(
@@ -384,7 +386,7 @@ export function mapNodeIssueToCall(
     return notOk(
       issueConflict(
         'unsupportedOperation',
-        `Issue carries neither an expected nor an actual node: ${issue.message}`,
+        `Issue carries neither an expected nor an actual node: ${issue.path.join('/')}`,
       ),
     );
   }
@@ -399,12 +401,12 @@ export function mapNodeIssueToCall(
     case RelationalSchemaNodeKind.primaryKey:
     case RelationalSchemaNodeKind.foreignKey:
     case RelationalSchemaNodeKind.unique:
-      return notOk(issueConflict(absorbedConflictKind(node.nodeKind), issue.message));
+      return notOk(issueConflict(absorbedConflictKind(node.nodeKind), issue.path.join('/')));
     case RelationalSchemaNodeKind.check:
       return notOk(
         issueConflict(
           'unsupportedOperation',
-          `SQLite does not support CHECK constraint DDL: ${issue.message}`,
+          `SQLite does not support CHECK constraint DDL: ${issue.path.join('/')}`,
         ),
       );
     default:
