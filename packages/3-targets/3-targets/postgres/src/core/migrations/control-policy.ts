@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type {
   ControlPolicySubject,
   SqlPlannerConflict,
@@ -11,8 +11,8 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresNativeEnum } from '../postgres-native-enum';
 import { isPostgresSchema } from '../postgres-schema';
+import { postgresNodeStorageCoordinate } from '../schema-ir/node-storage-coordinate';
 import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
-import { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
 import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
@@ -47,18 +47,25 @@ function ddlSchemaNameForNamespace(contract: Contract<SqlStorage>, namespaceId: 
   return isPostgresSchema(namespace) ? namespace.ddlSchemaName(contract.storage) : namespaceId;
 }
 
-function resolveNamespaceIdForTable(
+/**
+ * Resolve the namespace a declared storage entity lives in by walking every
+ * namespace for one whose `entries` map actually contains the coordinate —
+ * a table by its name, a native enum by its physical type name (see
+ * {@link postgresNodeStorageCoordinate}). When `ddlSchemaName` is given, the
+ * match must also land in that DDL schema (disambiguates same-named entities
+ * declared under different namespaces); when omitted, the first namespace
+ * that declares the entity wins. Falls back to {@link UNBOUND_NAMESPACE_ID}
+ * when no namespace declares it — e.g. an extra/dropped entity the contract
+ * doesn't claim at all.
+ */
+function resolveNamespaceIdForEntity(
   contract: Contract<SqlStorage>,
-  tableName: string,
+  coordinate: { readonly entityKind: string; readonly entityName: string },
   ddlSchemaName: string | undefined,
 ): string {
   for (const namespaceId of Object.keys(contract.storage.namespaces)) {
-    const table = entityAt<StorageTable>(contract.storage, {
-      namespaceId,
-      entityKind: 'table',
-      entityName: tableName,
-    });
-    if (!table) continue;
+    const entity = entityAt(contract.storage, { namespaceId, ...coordinate });
+    if (!entity) continue;
     if (
       ddlSchemaName === undefined ||
       ddlSchemaNameForNamespace(contract, namespaceId) === ddlSchemaName
@@ -67,6 +74,18 @@ function resolveNamespaceIdForTable(
     }
   }
   return UNBOUND_NAMESPACE_ID;
+}
+
+function resolveNamespaceIdForTable(
+  contract: Contract<SqlStorage>,
+  tableName: string,
+  ddlSchemaName: string | undefined,
+): string {
+  return resolveNamespaceIdForEntity(
+    contract,
+    { entityKind: 'table', entityName: tableName },
+    ddlSchemaName,
+  );
 }
 
 export function resolveNamespaceIdForDdlSchema(
@@ -293,15 +312,25 @@ export function resolvePostgresNodeIssueCreationFactoryName(
  * {@link SchemaDiffIssue}. Mirrors the resolution
  * `resolvePostgresCallControlPolicySubject` performs for a generated DDL
  * call, but works *off the issue* — so the planner can partition issues by
- * effective policy before the diff engine runs. `createsNewObject` is
- * derived from the node kind + reason: a `not-found` schema/table describes
- * a brand-new top-level object; everything else touches an existing object.
+ * effective policy before the diff engine runs.
  *
- * A `not-expected` table carries no contract namespace coordinate (the live
- * table isn't claimed by any contract namespace), so the subject's
- * `namespaceId` falls back to {@link UNBOUND_NAMESPACE_ID} via
- * `resolveNamespaceIdForTable`'s own fallback — the call-side resolver does
- * the same for the `DropTableCall` it produces.
+ * A whole storage entity (table or native enum) resolves generically off
+ * {@link postgresNodeStorageCoordinate} — the node self-describes its
+ * `(entityKind, entityName)`, so table and enum issues share one code path
+ * with no per-kind branch. A sub-entity issue (a column/constraint drift
+ * inside an owned table) carries no such coordinate on its own node, so it
+ * falls back to reading the enclosing table name off the issue path.
+ *
+ * `createsNewObject` is delegated to {@link resolvePostgresNodeIssueCreationFactoryName}
+ * in every branch below — that function already encodes exactly which
+ * node-kind/reason combinations describe a brand-new top-level object
+ * (a `not-found` table/enum, or an RLS-enablement `not-equal`).
+ *
+ * A `not-expected` (extra/dropped) entity carries no contract namespace
+ * coordinate — the live object isn't claimed by any contract namespace — so
+ * the subject's `namespaceId` falls back to {@link UNBOUND_NAMESPACE_ID} via
+ * `resolveNamespaceIdForEntity`'s own fallback, matching how the call-side
+ * resolver treats the `DropTableCall`/`DropNativeEnumTypeCall` it produces.
  */
 export function resolvePostgresNodeIssueControlPolicySubject(
   issue: SchemaDiffIssue<SqlSchemaDiffNode>,
@@ -321,24 +350,19 @@ export function resolvePostgresNodeIssueControlPolicySubject(
     };
   }
 
-  if (PostgresNativeEnumSchemaNode.is(node)) {
-    // The enum entity keys under its PHYSICAL type name (`entries.native_enum`
-    // key since ADR 221), so `entityAt` addresses it directly on the node's
-    // `typeName`. A `not-expected` extra enum this contract lacks resolves to no
-    // entity, so the grade falls back to the contract default, like an
-    // undeclared table.
-    const namespaceId = resolveNamespaceIdForDdlSchema(contract, issue.path[1] ?? node.namespaceId);
-    const enumControl = entityAt<PostgresNativeEnum>(contract.storage, {
+  const coordinate = postgresNodeStorageCoordinate(node);
+  if (coordinate !== undefined) {
+    const namespaceId = resolveNamespaceIdForEntity(contract, coordinate, issue.path[1]);
+    const entityControl = entityAt<{ readonly control?: ControlPolicy }>(contract.storage, {
       namespaceId,
-      entityKind: 'native_enum',
-      entityName: node.typeName,
+      ...coordinate,
     })?.control;
     return {
       namespaceId,
-      entityKind: 'native_enum',
-      entityName: node.typeName,
-      ...ifDefined('explicitNodeControlPolicy', enumControl),
-      createsNewObject: issue.reason === 'not-found',
+      ...coordinate,
+      ...ifDefined('column', issueColumnName(issue)),
+      ...ifDefined('explicitNodeControlPolicy', entityControl),
+      createsNewObject: resolvePostgresNodeIssueCreationFactoryName(issue) !== undefined,
     };
   }
 
@@ -351,9 +375,6 @@ export function resolvePostgresNodeIssueControlPolicySubject(
     entityKind: 'table',
     entityName: tableName,
   });
-  const createsNewObject =
-    (node.nodeKind === PostgresSchemaNodeKind.table && issue.reason === 'not-found') ||
-    isEnablementCreationIssue(issue);
 
   return {
     namespaceId,
@@ -361,6 +382,6 @@ export function resolvePostgresNodeIssueControlPolicySubject(
     entityName: tableName,
     ...ifDefined('column', issueColumnName(issue)),
     ...ifDefined('explicitNodeControlPolicy', table?.control),
-    createsNewObject,
+    createsNewObject: resolvePostgresNodeIssueCreationFactoryName(issue) !== undefined,
   };
 }
