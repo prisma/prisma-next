@@ -184,11 +184,8 @@ export abstract class PostgresMigration<
     readonly typeName: string;
     readonly members: readonly string[];
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new CreateNativeEnumTypeCall(options.schema, options.typeName, options.members).toOp(
-      this.controlAdapter,
+      this.controlAdapterFor('createNativeEnumType'),
     );
   }
 
@@ -200,10 +197,9 @@ export abstract class PostgresMigration<
     readonly schema: string;
     readonly typeName: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
-    return new DropNativeEnumTypeCall(options.schema, options.typeName).toOp(this.controlAdapter);
+    return new DropNativeEnumTypeCall(options.schema, options.typeName).toOp(
+      this.controlAdapterFor('dropNativeEnumType'),
+    );
   }
 
   protected addColumn(options: {
