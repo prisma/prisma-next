@@ -291,6 +291,37 @@ namespace public {
   });
 });
 
+describe("a policy's tableName resolves to the target model's declared storage name", () => {
+  it('keys the policy by the @@map storage name, agreeing with the rls marker', () => {
+    const result = interpret(`
+namespace public {
+  model Profile {
+    id       Int @id
+    owner_id Int
+
+    @@map("profile_rows")
+    @@rls
+  }
+
+  policy_select p_read {
+    target = Profile
+    roles  = [app_user]
+    using  = "owner_id = current_setting('app.uid')::int"
+  }
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const ns = result.value.storage.namespaces['public'] as PostgresSchema;
+    expect(Object.keys(ns.rls)).toEqual(['profile_rows']);
+    const [policyKey] = Object.keys(ns.policy);
+    const policy = ns.policy[policyKey!]!;
+    expect(policy.tableName).toBe('profile_rows');
+    expect(policy.tableName).toBe(Object.keys(ns.rls)[0]);
+  });
+});
+
 describe('PostgresContractSerializer rls round-trip survives serialize → deserialize', () => {
   function makeContractWithAllThreeKinds() {
     const base = createSqlContract({

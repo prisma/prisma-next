@@ -12,6 +12,7 @@ import type {
 } from '@prisma-next/framework-components/authoring';
 import { modelAttribute } from '@prisma-next/psl-parser';
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
+import { assertDefined } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { PostgresNativeEnum } from './postgres-native-enum';
@@ -136,7 +137,15 @@ function lowerRlsPolicyFromBlock(
   const prefix = block.name;
   const operation = POLICY_KEYWORD_OPERATION[block.keyword] ?? 'select';
   const targetModelName = readRefParam(block, 'target') ?? '';
-  const tableName = targetModelName.charAt(0).toLowerCase() + targetModelName.slice(1);
+  // `target` is a required same-namespace model ref, so by the time this
+  // factory runs it has already been validated to resolve; a lookup miss
+  // here would mean the ref-resolution invariant broke upstream, not a
+  // user-authoring mistake to diagnose.
+  const tableName = ctx.resolveModelStorageName?.(targetModelName);
+  assertDefined(
+    tableName,
+    `RLS policy "${block.name}" target model "${targetModelName}" did not resolve to a declared storage name.`,
+  );
   const roles = [...readListRefParams(block, 'roles')].sort();
 
   const usingRaw = readValueParam(block, 'using');

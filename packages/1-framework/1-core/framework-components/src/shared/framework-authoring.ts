@@ -175,6 +175,17 @@ export interface AuthoringEntityContext {
    * populates this so `@@type` omission can be inferred consistently.
    */
   readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
+  /**
+   * Resolves a model's declared storage name (its `@@map` value, or the
+   * target's default naming when `@@map` is absent) from the model's bare
+   * name. Populated by the family interpreter from the parsed document,
+   * scoped to the namespace the calling block belongs to. A factory that
+   * needs the storage name of a model it references (by ref parameter) must
+   * read it here rather than deriving one from the model name itself, which
+   * would silently ignore `@@map`. Returns `undefined` when the name does
+   * not resolve to a model in scope.
+   */
+  readonly resolveModelStorageName?: (modelName: string) => string | undefined;
 }
 
 /**

@@ -2030,6 +2030,21 @@ export function interpretPslDocumentToSqlContract(
       },
     },
   };
+  // Diagnostics-free resolution of every model's declared storage name,
+  // used only to populate `resolveModelStorageName` on the entity context
+  // below so an extension-block factory can resolve a referenced model's
+  // storage name without guessing from its bare name. The authoritative
+  // resolution (which reports a malformed `@@map`) still runs at its usual
+  // point in the pass ordering, via `modelMappingsByCoordinate` further
+  // down; this call discards its own diagnostics so nothing is reported
+  // twice.
+  const earlyModelMappingsByCoordinate = buildModelMappings(
+    modelEntries,
+    defaultNamespaceId,
+    [],
+    sourceId,
+    sourceFile,
+  );
   const namespaceExtensionEntities = new Map<
     string,
     Readonly<Record<string, Readonly<Record<string, unknown>>>>
@@ -2041,12 +2056,11 @@ export function interpretPslDocumentToSqlContract(
       targetId: input.target.targetId,
     });
     if (nsId === undefined) continue;
-    const entities = lowerExtensionBlocksForNamespace(
-      ns,
-      nsId,
-      entityTypesByDiscriminator,
-      extensionEntityContext,
-    );
+    const entities = lowerExtensionBlocksForNamespace(ns, nsId, entityTypesByDiscriminator, {
+      ...extensionEntityContext,
+      resolveModelStorageName: (modelName: string) =>
+        earlyModelMappingsByCoordinate.get(modelCoordinateKey(nsId, modelName))?.tableName,
+    });
     if (Object.keys(entities).length > 0) {
       namespaceExtensionEntities.set(nsId, entities);
     }
