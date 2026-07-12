@@ -445,7 +445,7 @@ describe('assembleAuthoringContributions', () => {
           },
         }),
       ]),
-    ).toThrow(/Duplicate pslBlock keyword "shared_keyword".*"policyA".*"policyB"/);
+    ).toThrow(/Duplicate pslBlock key "shared_keyword".*"policyA".*"policyB"/);
   });
 
   it('raises a structured runtime error for a duplicate pslBlock keyword', () => {
@@ -482,7 +482,6 @@ describe('assembleAuthoringContributions', () => {
       expect(caught.category).toBe('RUNTIME');
       expect(caught.details).toEqual({
         label: 'pslBlock',
-        keyLabel: 'keyword',
         key: 'shared_keyword',
         existingPath: 'policyA',
         path: 'policyB',
@@ -532,7 +531,7 @@ describe('assembleAuthoringContributions', () => {
           },
         }),
       ]),
-    ).toThrow(/Duplicate entityType discriminator "shared-entity-disc".*"enumA".*"enumB"/);
+    ).toThrow(/Duplicate entityType key "shared-entity-disc".*"enumA".*"enumB"/);
   });
 
   it('accepts entityTypes-only contributions without a matching pslBlockDescriptors entry (standalone factory is allowed)', () => {

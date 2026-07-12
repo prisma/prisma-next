@@ -796,27 +796,27 @@ function collectDescriptorEntries<D extends { readonly discriminator: string }>(
 }
 
 /**
- * Throws when two or more entries in the same namespace share a key.
- * `keyLabel` names what the key semantically is for the error text
- * (`'discriminator'` by default; pslBlock uniqueness passes `'keyword'`
- * since that is its real dispatch key — see {@link assertPslBlocksHaveFactories}).
- * A duplicate key makes dispatch ambiguous — the caller's lookup dispatches
- * by this key, so one entry would silently shadow the other. Catch
- * duplicates before building any dispatch map.
+ * Throws when two or more entries in the same namespace share a key. A
+ * duplicate key makes dispatch ambiguous — the caller's lookup dispatches by
+ * this key, so one entry would silently shadow the other. Catch duplicates
+ * before building any dispatch map.
+ *
+ * `label` (e.g. `'pslBlock'`, `'entityType'`) names which namespace the
+ * duplicate was found in and is carried in the structured error metadata;
+ * the key itself is always called `key` in both the message and the
+ * metadata, since what it semantically represents (a discriminator for
+ * `entityType`, the parser's dispatch keyword for `pslBlock`) is the
+ * caller's concern, not this function's.
  */
-function assertUniqueDiscriminators(
-  entries: readonly DescriptorEntry[],
-  label: string,
-  keyLabel = 'discriminator',
-): void {
+function assertUniqueDiscriminators(entries: readonly DescriptorEntry[], label: string): void {
   const seen = new Map<string, string>();
   for (const { path, discriminator: key } of entries) {
     const existing = seen.get(key);
     if (existing !== undefined) {
       throw runtimeError(
         'RUNTIME.DUPLICATE_AUTHORING_DISCRIMINATOR',
-        `Duplicate ${label} ${keyLabel} "${key}" registered at both "${existing}" and "${path}". Each ${label} contribution must use a unique ${keyLabel}.`,
-        { label, keyLabel, key, existingPath: existing, path },
+        `Duplicate ${label} key "${key}" registered at both "${existing}" and "${path}". Each ${label} contribution must use a unique key.`,
+        { label, key, existingPath: existing, path },
       );
     }
     seen.set(key, path);
@@ -895,7 +895,6 @@ function assertPslBlocksHaveFactories(
   assertUniqueDiscriminators(
     blockEntries.map((entry) => ({ path: entry.path, discriminator: entry.keyword })),
     'pslBlock',
-    'keyword',
   );
   assertUniqueDiscriminators(entityEntries, 'entityType');
 
