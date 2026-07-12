@@ -9,7 +9,6 @@ import { entityAt, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-component
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { PostgresNativeEnum } from '../postgres-native-enum';
 import { isPostgresSchema } from '../postgres-schema';
 import { postgresNodeStorageCoordinate } from '../schema-ir/node-storage-coordinate';
 import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
@@ -29,14 +28,16 @@ import type { PostgresOpFactoryCall } from './op-factory-call';
  * and is fail-closed. Any call not listed here — including future or
  * extension-contributed factories — is treated as NOT object-creation, so it
  * is suppressed under `tolerated` rather than permissively emitted.
+ *
+ * Lists the creation factories that actually reach the call-side resolver
+ * (`resolvePostgresCallControlPolicySubject`) — today only RLS policy
+ * creation, from `planPostgresSchemaDiff`. Every other whole-object create
+ * (table, schema, native enum, and RLS enablement) is constructed inside
+ * `planIssues` and graded on the node side by
+ * `resolvePostgresNodeIssueCreationFactoryName`, so none of them are listed
+ * here.
  */
-const OBJECT_CREATION_FACTORIES: ReadonlySet<string> = new Set<string>([
-  'createTable',
-  'createSchema',
-  'createNativeEnumType',
-  'createRlsPolicy',
-  'enableRowLevelSecurity',
-]);
+const OBJECT_CREATION_FACTORIES: ReadonlySet<string> = new Set<string>(['createRlsPolicy']);
 
 function createsNewTopLevelObject(call: PostgresOpFactoryCall): boolean {
   return OBJECT_CREATION_FACTORIES.has(call.factoryName);
@@ -188,26 +189,6 @@ export function resolvePostgresCallControlPolicySubject(
     };
   }
 
-  if (
-    (call.factoryName === 'createNativeEnumType' || call.factoryName === 'dropNativeEnumType') &&
-    'typeName' in call &&
-    'schemaName' in call
-  ) {
-    const namespaceId = resolveNamespaceIdForDdlSchema(contract, call.schemaName);
-    const enumControl = entityAt<PostgresNativeEnum>(contract.storage, {
-      namespaceId,
-      entityKind: 'native_enum',
-      entityName: call.typeName,
-    })?.control;
-    return {
-      namespaceId,
-      entityKind: 'native_enum',
-      entityName: call.typeName,
-      ...ifDefined('explicitNodeControlPolicy', enumControl),
-      createsNewObject,
-    };
-  }
-
   if (callFields.tableName) {
     const namespaceId = resolveNamespaceIdForTable(
       contract,
@@ -240,10 +221,10 @@ export function resolvePostgresCallControlPolicySubject(
 }
 
 /**
- * Node kinds that describe the absence of a whole, top-level Postgres
- * object — the same objects `createsNewTopLevelObject` recognises for calls.
- * Used by {@link resolvePostgresNodeIssueCreationFactoryName} to decide
- * whether a `tolerated` subject permits the issue to flow into the planner
+ * Node kinds whose *absence* is the creation of a whole, top-level Postgres
+ * object: a namespace, a table, or a native enum. Used by
+ * {@link resolvePostgresNodeIssueCreationFactoryName} to decide whether a
+ * `tolerated` subject permits the issue to flow into the planner
  * (create-if-absent) and to seed the suppressed-subject warning's
  * `factoryName` when the planner is skipped. RLS policy creation is not
  * listed here — policy issues never reach this issue-based partition (they
@@ -258,9 +239,10 @@ const POSTGRES_NODE_CREATION_FACTORY: Readonly<Record<string, string>> = Object.
 
 /**
  * A table `not-equal` issue whose `rlsEnabled` flips OFF→ON (expected on,
- * actual off) is enablement toward `ENABLE ROW LEVEL SECURITY` —
- * creation-class per `OBJECT_CREATION_FACTORIES` ('enableRowLevelSecurity'
- * is a member): enabling RLS establishes the fail-closed guard the declared
+ * actual off) is enablement toward `ENABLE ROW LEVEL SECURITY`. It is
+ * creation-class on the node side because `isEnablementCreationIssue` and
+ * {@link resolvePostgresNodeIssueCreationFactoryName} treat this OFF→ON delta
+ * as a creation: enabling RLS establishes the fail-closed guard the declared
  * policy set attaches to, the same grant `tolerated` extends to creating the
  * policies themselves. The opposite direction (`DISABLE`) is a modification
  * and stays managed-only. Keying on the actual delta (not just the expected
