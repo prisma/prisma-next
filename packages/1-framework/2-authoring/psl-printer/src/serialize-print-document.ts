@@ -20,11 +20,9 @@ import type { PrinterField, PrinterNamedType } from './types';
 const PSL_INDENT_UNIT = '  ';
 
 /**
- * Dispatch index built from the assembled `pslBlockDescriptors` namespace.
- * `byKeyword` resolves the exact descriptor for a block (its parameter set
- * and, historically, its keyword) — keyed by keyword because that is the
- * printer's real 1:1 dispatch key: several keywords may share one
- * `discriminator` (kind), but each keyword claims exactly one descriptor.
+ * Maps each block keyword to its descriptor, keyed by keyword rather than
+ * discriminator because several keywords can share one discriminator but
+ * each keyword resolves to exactly one descriptor.
  */
 interface PslBlockDispatchMap {
   readonly byKeyword: ReadonlyMap<string, AuthoringPslBlockDescriptor>;
