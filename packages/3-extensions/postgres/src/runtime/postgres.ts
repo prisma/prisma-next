@@ -1,16 +1,28 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import type { NamespacedEnums } from '@prisma-next/contract/enum-accessor';
+import { buildNamespacedEnums, type NamespacedEnums } from '@prisma-next/contract/enum-accessor';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
-import type { Db } from '@prisma-next/sql-builder/types';
+import type {
+  Db,
+  QueryContext,
+  Scope,
+  ScopeField,
+  SelectQuery,
+} from '@prisma-next/sql-builder/types';
 import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
-import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
+import {
+  INTERNAL_TO_TEMP_TABLE_QUERY_SOURCE,
+  orm as ormBuilder,
+} from '@prisma-next/sql-orm-client';
+import { RawSqlExpr, type SelectAst, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { CodecTypesBase, RawSqlTag } from '@prisma-next/sql-relational-core/expression';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { createRawSql } from '@prisma-next/sql-relational-core/expression';
+import { planFromAst, type SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   BindSiteParams,
+  ConnectionContext,
   Declaration,
   ExecutionContext,
   ParamsFromDeclaration,
@@ -18,6 +30,7 @@ import type {
   Runtime,
   SqlExecutionStackWithDriver,
   SqlMiddleware,
+  SqlRuntimeAdapterInstance,
   SqlRuntimeExtensionDescriptor,
   TransactionContext,
   VerifyMarkerOption,
@@ -25,44 +38,93 @@ import type {
 import {
   createExecutionContext,
   createSqlExecutionStack,
+  withConnection,
   withTransaction,
 } from '@prisma-next/sql-runtime';
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Client, Pool } from 'pg';
-import { buildPostgresStaticContext } from '../static/postgres-static';
 import {
   type PostgresBinding,
   type PostgresBindingInput,
   resolveOptionalPostgresBinding,
   resolvePostgresBinding,
 } from './binding';
-import type { NamespacedNativeEnums } from './native-enums';
 import { PostgresRuntimeImpl } from './postgres-runtime';
 
 export type PostgresTargetId = 'postgres';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
+
+export interface TempTableColumnDef {
+  readonly name: string;
+  readonly type: string;
+}
+
+type TempTableJoinSource<Row extends Record<string, ScopeField>> = ReturnType<
+  SelectQuery<QueryContext, Scope, Row>['as']
+>;
+
+type TempTableQuerySource<Row extends Record<string, ScopeField>> = {
+  buildAst(): SelectAst;
+  getRowFields(): Row;
+};
+
+type TempTableSubqueryConvertible<Row extends Record<string, ScopeField>> = {
+  [INTERNAL_TO_TEMP_TABLE_QUERY_SOURCE](): TempTableQuerySource<Row>;
+};
+
+type TempTableAsInput<Row extends Record<string, ScopeField>> =
+  | TempTableQuerySource<Row>
+  | TempTableSubqueryConvertible<Row>;
+
+export type TempTableHandle<Row extends Record<string, ScopeField> = Record<string, ScopeField>> =
+  TempTableJoinSource<Row> & {
+    readonly name: string;
+    readonly fields: Row;
+    append(input: TempTableAppendInput<Row>): Promise<void>;
+    drop(): Promise<void>;
+    [Symbol.asyncDispose](): Promise<void>;
+  };
+
+export type TempTableAppendInput<
+  Row extends Record<string, ScopeField> = Record<string, ScopeField>,
+> = TempTableAsInput<Row> | readonly (readonly (string | number | boolean | null)[])[];
+
+export interface TempTableBuilder {
+  as<Row extends Record<string, ScopeField>>(
+    query: TempTableAsInput<Row>,
+  ): Promise<TempTableHandle<Row>>;
+  from(columns: readonly TempTableColumnDef[]): Promise<TempTableHandle>;
+}
 
 export interface PostgresTransactionContext<TContract extends Contract<SqlStorage>>
   extends TransactionContext {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
   readonly enums: NamespacedEnums<TContract>;
-  readonly nativeEnums: NamespacedNativeEnums<TContract>;
+  tempTable(): TempTableBuilder;
+}
+
+export interface PostgresConnectionContext<TContract extends Contract<SqlStorage>>
+  extends ConnectionContext {
+  readonly sql: Db<TContract>;
+  readonly orm: OrmClient<TContract>;
+  readonly enums: NamespacedEnums<TContract>;
+  tempTable(): TempTableBuilder;
 }
 
 export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
   readonly enums: NamespacedEnums<TContract>;
-  readonly nativeEnums: NamespacedNativeEnums<TContract>;
   readonly raw: RawSqlTag;
   readonly context: ExecutionContext<TContract>;
-  readonly contract: TContract;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
   connect(bindingInput?: PostgresBindingInput): Promise<Runtime>;
   runtime(): Runtime;
   transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R>;
+  connection<R>(fn: (conn: PostgresConnectionContext<TContract>) => PromiseLike<R>): Promise<R>;
   prepare<
     D extends Declaration<CT>,
     Row,
@@ -121,10 +183,8 @@ const contractSerializer = new PostgresContractSerializer();
 function resolveContract<TContract extends Contract<SqlStorage>>(
   options: PostgresOptions<TContract>,
 ): TContract {
-  const contractJson = hasContractJson(options)
-    ? options.contractJson
-    : contractSerializer.serializeContract(options.contract);
-  return contractSerializer.deserializeContract(contractJson) as TContract;
+  const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
+  return contractSerializer.deserializeContract(contractInput) as TContract;
 }
 
 function toRuntimeBinding<TContract extends Contract<SqlStorage>>(
@@ -145,6 +205,226 @@ function toRuntimeBinding<TContract extends Contract<SqlStorage>>(
   } as const;
 }
 
+function quoteIdentifier(name: string): string {
+  return `"${name.replaceAll('"', '""')}"`;
+}
+
+function toSqlLiteral(value: string | number | boolean | null): string {
+  if (value === null) return 'NULL';
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error(`Cannot use non-finite number as SQL literal: ${value}`);
+    }
+    return String(value);
+  }
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+function resolveTempTableName(): string {
+  const suffix = crypto.randomUUID().replaceAll('-', '').slice(0, 20);
+  return `pn_temp_${suffix}`;
+}
+
+function createTempTableBuilder(
+  execCtx: Pick<TransactionContext, 'execute'>,
+  registerCleanupHook: (hook: () => Promise<void>) => void,
+  contract: Contract<SqlStorage>,
+  adapter: SqlRuntimeAdapterInstance<PostgresTargetId>,
+  onCommitDrop = true,
+): TempTableBuilder {
+  const normalizeQuerySource = <Row extends Record<string, ScopeField>>(
+    query: TempTableAsInput<Row>,
+  ): TempTableQuerySource<Row> => {
+    if ('buildAst' in query && 'getRowFields' in query) {
+      return query;
+    }
+    return query[INTERNAL_TO_TEMP_TABLE_QUERY_SOURCE]();
+  };
+
+  const asJoinSource = <Row extends Record<string, ScopeField>>(
+    tableName: string,
+    alias: string,
+    rowFields: Row,
+  ): TempTableJoinSource<Row> => {
+    const source = {
+      getJoinOuterScope: () => ({
+        topLevel: rowFields,
+        namespaces: { [alias]: rowFields } as Record<string, Row>,
+      }),
+      buildAst: () => TableSource.named(tableName, alias),
+    };
+    return blindCast<TempTableJoinSource<Row>, 'source implements TempTableJoinSource duck-type'>(
+      source,
+    );
+  };
+
+  const createAppend =
+    (quotedName: string) =>
+    async (input: TempTableAppendInput<Record<string, ScopeField>>): Promise<void> => {
+      if (Array.isArray(input)) {
+        const rows = blindCast<
+          readonly (readonly (string | number | boolean | null)[])[],
+          'Array.isArray true — input is a raw rows array'
+        >(input);
+        if (rows.length === 0) return;
+        const valueRows = rows.map((row) => `(${row.map(toSqlLiteral).join(', ')})`).join(', ');
+        const insertSql = `INSERT INTO ${quotedName} VALUES ${valueRows}`;
+        const insertAst = RawSqlExpr.of([insertSql], []);
+        const insertQueryPlan = planFromAst(insertAst, contract, 'raw.temp-table');
+        await execCtx
+          .execute(
+            Object.freeze({
+              sql: insertAst.fragments[0] ?? '',
+              params: [] as unknown[],
+              ast: insertAst,
+              meta: insertQueryPlan.meta,
+            }),
+          )
+          .toArray();
+      } else {
+        const source = normalizeQuerySource(
+          blindCast<
+            TempTableAsInput<Record<string, ScopeField>>,
+            'Array.isArray false — input is a query source'
+          >(input),
+        );
+        const queryPlan = planFromAst(source.buildAst(), contract, 'dsl');
+        const lowered = adapter.lower(queryPlan.ast, { contract, params: queryPlan.params });
+        const params = lowered.params.map((slot) => {
+          if (slot.kind === 'literal') return slot.value;
+          throw new Error('tempTable.append(...) does not accept bind-site parameters.');
+        });
+        const insertSql = `INSERT INTO ${quotedName} ${lowered.sql}`;
+        const insertAst = RawSqlExpr.of([insertSql], []);
+        const insertQueryPlan = planFromAst(insertAst, contract, 'raw.temp-table');
+        await execCtx
+          .execute(
+            Object.freeze({
+              sql: insertAst.fragments[0] ?? '',
+              params,
+              ast: insertAst,
+              meta: insertQueryPlan.meta,
+            }),
+          )
+          .toArray();
+      }
+    };
+
+  return {
+    async as<Row extends Record<string, ScopeField>>(
+      query: TempTableAsInput<Row>,
+    ): Promise<TempTableHandle<Row>> {
+      const source = normalizeQuerySource(query);
+      const tableName = resolveTempTableName();
+      const quotedTableName = quoteIdentifier(tableName);
+      const queryPlan = planFromAst(source.buildAst(), contract, 'dsl');
+      const lowered = adapter.lower(queryPlan.ast, {
+        contract,
+        params: queryPlan.params,
+      });
+      const params = lowered.params.map((slot) => {
+        if (slot.kind === 'literal') return slot.value;
+        throw new Error('tempTable.as(...) does not accept bind-site parameters.');
+      });
+
+      const createAst = RawSqlExpr.of(
+        [
+          `CREATE TEMP TABLE ${quotedTableName}${onCommitDrop ? ' ON COMMIT DROP' : ''} AS ${lowered.sql}`,
+        ],
+        [],
+      );
+      const createQueryPlan = planFromAst(createAst, contract, 'raw.temp-table');
+      const createPlan = Object.freeze({
+        sql: createAst.fragments[0] ?? '',
+        params,
+        ast: createAst,
+        meta: createQueryPlan.meta,
+      });
+      await execCtx.execute(createPlan).toArray();
+
+      const dropPlan = Object.freeze({
+        sql: `DROP TABLE IF EXISTS ${quotedTableName}`,
+        params: [],
+        ast: queryPlan.ast,
+        meta: queryPlan.meta,
+      });
+      let dropped = false;
+      const drop = async (): Promise<void> => {
+        if (dropped) return;
+        dropped = true;
+        await execCtx.execute(dropPlan).toArray();
+      };
+      if (!onCommitDrop) {
+        registerCleanupHook(drop);
+      }
+
+      const rowFields = blindCast<Row, 'subquery row fields align with Subquery<Row> generic'>(
+        source.getRowFields(),
+      );
+      const defaultJoin = asJoinSource(tableName, tableName, rowFields);
+
+      return blindCast<
+        TempTableHandle<Row>,
+        'temp table handle created from Subquery<Row> preserves the same row field shape'
+      >({
+        ...defaultJoin,
+        name: tableName,
+        fields: rowFields,
+        append: createAppend(quotedTableName),
+        drop,
+        [Symbol.asyncDispose]: drop,
+      });
+    },
+
+    async from(columns: readonly TempTableColumnDef[]): Promise<TempTableHandle> {
+      const tableName = resolveTempTableName();
+      const quotedTableName = quoteIdentifier(tableName);
+
+      const colDefs = columns.map((c) => `${quoteIdentifier(c.name)} ${c.type}`).join(', ');
+      const createSql = `CREATE TEMP TABLE ${quotedTableName} (${colDefs})${onCommitDrop ? ' ON COMMIT DROP' : ''}`;
+      const createAst = RawSqlExpr.of([createSql], []);
+      const createQueryPlan = planFromAst(createAst, contract, 'raw.temp-table');
+      const createPlan = Object.freeze({
+        sql: createAst.fragments[0] ?? '',
+        params: [] as unknown[],
+        ast: createAst,
+        meta: createQueryPlan.meta,
+      });
+      await execCtx.execute(createPlan).toArray();
+
+      const dropAst = RawSqlExpr.of([`DROP TABLE IF EXISTS ${quotedTableName}`], []);
+      const dropQueryPlan = planFromAst(dropAst, contract, 'raw.temp-table');
+      const dropPlan = Object.freeze({
+        sql: dropAst.fragments[0] ?? '',
+        params: [] as unknown[],
+        ast: dropAst,
+        meta: dropQueryPlan.meta,
+      });
+      let dropped = false;
+      const drop = async (): Promise<void> => {
+        if (dropped) return;
+        dropped = true;
+        await execCtx.execute(dropPlan).toArray();
+      };
+      if (!onCommitDrop) {
+        registerCleanupHook(drop);
+      }
+
+      const emptyFields = {} as Record<string, ScopeField>;
+      const defaultJoin = asJoinSource(tableName, tableName, emptyFields);
+      return blindCast<TempTableHandle, 'from() handle has no typed row fields'>({
+        ...defaultJoin,
+        name: tableName,
+        fields: emptyFields,
+        append: createAppend(quotedTableName),
+        drop,
+        [Symbol.asyncDispose]: drop,
+      });
+    },
+  };
+}
+
 /**
  * Creates a lazy Postgres client from either `contractJson` or a TypeScript-authored `contract`.
  * Static query surfaces are available immediately, while `runtime()` instantiates the driver/pool on first call.
@@ -163,25 +443,21 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 ): PostgresClient<TContract> {
   const contract = resolveContract(options);
   let binding = resolveOptionalPostgresBinding(options);
-
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,
     extensionPacks: options.extensions ?? [],
   });
+  const stackInstance = instantiateExecutionStack(stack);
 
-  const context = createExecutionContext<TContract, PostgresTargetId>({
+  const context = createExecutionContext({
     contract,
     stack,
-    driver: postgresDriver,
   });
-  const {
-    sql,
-    raw: rawSqlTag,
-    enums,
-    nativeEnums,
-  } = buildPostgresStaticContext<TContract>(context, stack.adapter.rawCodecInferer);
+
+  const rawCodecInferer = stack.adapter.rawCodecInferer;
+  const rawSqlTag: RawSqlTag = createRawSql(rawCodecInferer);
 
   let runtimeInstance: Runtime | undefined;
   let runtimeDriver: { connect(binding: unknown): Promise<void> } | undefined;
@@ -218,7 +494,6 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       });
     return connectPromise;
   };
-
   const getRuntime = (): Runtime => {
     if (closed) {
       throw new Error('Postgres client is closed');
@@ -232,7 +507,6 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       return runtimeInstance;
     }
 
-    const stackInstance = instantiateExecutionStack(stack);
     const driverDescriptor = stack.driver;
     if (!driverDescriptor) {
       throw new Error('Driver descriptor missing from execution stack');
@@ -256,7 +530,6 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 
     return runtimeInstance;
   };
-
   const orm: OrmClient<TContract> = ormBuilder({
     runtime: {
       execute(plan) {
@@ -269,14 +542,19 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     context,
   });
 
+  const sql: Db<TContract> = sqlBuilder<TContract>({ context, rawCodecInferer });
+
+  const enums = blindCast<
+    NamespacedEnums<TContract>,
+    'buildNamespacedEnums returns the namespace-keyed accessor map this contract types'
+  >(Object.freeze(buildNamespacedEnums(contract.domain)));
+
   return {
     sql,
     orm,
     enums,
-    nativeEnums,
     raw: rawSqlTag,
     context,
-    contract,
     stack,
 
     async connect(bindingInput) {
@@ -324,7 +602,6 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 
     transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R> {
       return withTransaction(getRuntime(), (txCtx) => {
-        const rawCodecInferer = stack.adapter.rawCodecInferer;
         const txSql: Db<TContract> = sqlBuilder<TContract>({
           context,
           rawCodecInferer,
@@ -345,10 +622,61 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
         // Spreading would evaluate the getter once and freeze its value.
         const tx: PostgresTransactionContext<TContract> = Object.assign(
           Object.create(txCtx) as TransactionContext,
-          { sql: txSql, orm: txOrm, enums, nativeEnums },
+          {
+            sql: txSql,
+            orm: txOrm,
+            enums,
+            tempTable(): TempTableBuilder {
+              return createTempTableBuilder(
+                txCtx,
+                (hook) => txCtx.registerPreCommitHook(hook),
+                context.contract,
+                stackInstance.adapter,
+                true,
+              );
+            },
+          },
         );
 
         return fn(tx);
+      });
+    },
+
+    connection<R>(fn: (conn: PostgresConnectionContext<TContract>) => PromiseLike<R>): Promise<R> {
+      return withConnection(getRuntime(), (connCtx) => {
+        const connSql: Db<TContract> = sqlBuilder<TContract>({
+          context,
+          rawCodecInferer,
+        });
+
+        const connOrm: OrmClient<TContract> = ormBuilder({
+          runtime: {
+            execute(plan) {
+              return connCtx.execute(plan);
+            },
+          },
+          context,
+        });
+
+        const conn: PostgresConnectionContext<TContract> = Object.assign(
+          Object.create(connCtx) as ConnectionContext,
+          {
+            sql: connSql,
+            orm: connOrm,
+            enums,
+            tempTable(): TempTableBuilder {
+              return createTempTableBuilder(
+                connCtx,
+                (hook) => connCtx.registerReleaseHook(hook),
+                context.contract,
+                stackInstance.adapter,
+                false,
+              );
+            },
+          },
+        );
+
+        return fn(conn);
       });
     },
 
