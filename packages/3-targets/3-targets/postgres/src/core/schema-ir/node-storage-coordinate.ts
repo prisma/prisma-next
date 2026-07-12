@@ -1,12 +1,8 @@
+import type { EntityCoordinate } from '@prisma-next/framework-components/ir';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { PostgresNativeEnumSchemaNode } from './postgres-native-enum-schema-node';
 import { PostgresTableSchemaNode } from './postgres-table-schema-node';
 import { postgresNodeEntityKind } from './schema-node-kinds';
-
-interface StorageCoordinate {
-  readonly entityKind: string;
-  readonly entityName: string;
-}
 
 /**
  * The storage-`entries` coordinate `(entityKind, entityName)` a Postgres diff
@@ -17,7 +13,7 @@ interface StorageCoordinate {
  */
 export function postgresNodeStorageCoordinate(
   node: SqlSchemaIRNode,
-): StorageCoordinate | undefined {
+): Pick<EntityCoordinate, 'entityKind' | 'entityName'> | undefined {
   if (PostgresTableSchemaNode.is(node)) {
     const entityKind = postgresNodeEntityKind(node.nodeKind);
     return entityKind === undefined ? undefined : { entityKind, entityName: node.name };
