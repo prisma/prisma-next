@@ -15,6 +15,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 
 import { type CfExpr, cfExpr } from '@prisma-next/sql-relational-core/contract-free';
+import { invariant } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresTableSource } from './ast/table-source';
@@ -96,14 +97,16 @@ export class PostgresSchema extends SqlNamespaceBase {
     // contract's key already equals the `typeName`, so the re-key is idempotent.
     const nativeEnumSlot = dispatched['native_enum'];
     if (nativeEnumSlot !== undefined) {
-      dispatched['native_enum'] = Object.freeze(
-        Object.fromEntries(
-          Object.entries(nativeEnumSlot).map(([handle, entity]) => [
-            PostgresNativeEnum.is(entity) ? entity.typeName : handle,
-            entity,
-          ]),
-        ),
-      );
+      const rekeyed: Record<string, unknown> = {};
+      for (const [handle, entity] of Object.entries(nativeEnumSlot)) {
+        const physicalName = PostgresNativeEnum.is(entity) ? entity.typeName : handle;
+        invariant(
+          !Object.hasOwn(rekeyed, physicalName),
+          `PostgresSchema "${input.id}": two native_enum entities resolve to the same physical type name "${physicalName}". Give them distinct @@map type names.`,
+        );
+        rekeyed[physicalName] = entity;
+      }
+      dispatched['native_enum'] = Object.freeze(rekeyed);
     }
 
     // Drop an empty valueSet so presence signals non-emptiness.

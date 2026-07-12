@@ -314,6 +314,19 @@ describe('PostgresSchema — native_enum entries', () => {
     const schema = new PostgresSchema({ id: 'auth', entries: { table: {} } });
     expect(schema.entries.native_enum).toBeUndefined();
   });
+
+  it('rejects two native enums that resolve to the same physical type name', () => {
+    // Two distinct handles, same `@@map` type name — no upstream validation
+    // stops this, and the physical-name re-key would otherwise silently drop one
+    // enum's members. Fail loud instead.
+    const collidingInput = {
+      RoleA: { kind: 'postgres-enum', typeName: 'app_role', members: ['a'] },
+      RoleB: { kind: 'postgres-enum', typeName: 'app_role', members: ['b'] },
+    };
+    expect(
+      () => new PostgresSchema({ id: 'auth', entries: { table: {}, native_enum: collidingInput } }),
+    ).toThrow(/app_role.*auth|auth.*app_role/);
+  });
 });
 
 describe('PostgresSchema — native_enum affects storageHash', () => {
