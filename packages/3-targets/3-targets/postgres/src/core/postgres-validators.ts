@@ -4,7 +4,7 @@ export const PostgresRoleSchema = type({
   kind: "'role'",
   name: 'string',
   namespaceId: 'string',
-  'control?': "'managed' | 'tolerated' | 'external' | 'observed'",
+  'control?': "'external'",
 });
 
 export const PostgresRlsPolicySchema = type({

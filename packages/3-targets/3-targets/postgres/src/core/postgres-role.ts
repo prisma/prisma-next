@@ -1,4 +1,3 @@
-import type { ControlPolicy } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
 
@@ -6,10 +5,10 @@ import { SqlNode } from '@prisma-next/sql-contract/types';
  * Roles are referenced by the contract but never owned — the framework
  * issues no `CREATE`/`DROP ROLE`, so a role's effective governance is always
  * `external`: a missing declared role fails verify, an extra live role is
- * tolerated, and the planner emits zero role DDL. There is no authoring
- * surface yet that can set a role's control to anything else.
+ * tolerated, and the planner emits zero role DDL. `external` is the only
+ * value a role's control can ever carry.
  */
-export const ROLE_DEFAULT_CONTROL_POLICY: ControlPolicy = 'external';
+export const ROLE_DEFAULT_CONTROL_POLICY = 'external';
 
 export interface PostgresRoleInput {
   readonly name: string;
@@ -19,10 +18,10 @@ export interface PostgresRoleInput {
    */
   readonly namespaceId: string;
   /**
-   * Defaults to {@link ROLE_DEFAULT_CONTROL_POLICY} when omitted — no
-   * authoring surface sets this to anything else today.
+   * Defaults to {@link ROLE_DEFAULT_CONTROL_POLICY} when omitted. Roles are
+   * referenced but never owned, so `'external'` is the only allowed value.
    */
-  readonly control?: ControlPolicy;
+  readonly control?: 'external';
 }
 
 /**
@@ -48,7 +47,7 @@ export class PostgresRole extends SqlNode {
   override readonly kind = 'role' as const;
   readonly name: string;
   readonly namespaceId: string;
-  readonly control: ControlPolicy;
+  readonly control: 'external';
 
   constructor(input: PostgresRoleInput) {
     super();
