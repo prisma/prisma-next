@@ -73,8 +73,8 @@ export abstract class PostgresMigration<
   /**
    * Materialized Postgres control adapter, created once per migration
    * instance from the injected stack. `undefined` only when the migration
-   * was instantiated without a stack (test fixtures); `dataTransform`
-   * throws in that case to surface the misuse.
+   * was instantiated without a stack (test fixtures); `controlAdapterFor`
+   * throws a PN-MIG-2007 in that case to surface the misuse.
    */
   protected readonly controlAdapter: SqlControlAdapter<'postgres'> | undefined;
 
@@ -97,6 +97,18 @@ export abstract class PostgresMigration<
     this.controlAdapter = stack?.adapter
       ? (stack.adapter.create(stack) as SqlControlAdapter<'postgres'>)
       : undefined;
+  }
+
+  /**
+   * Returns the materialized control adapter, or throws a PN-MIG-2007 naming
+   * `operation` when the migration was constructed without a `ControlStack`.
+   * Single home for the null-check that every DDL/DML method shares.
+   */
+  private controlAdapterFor(operation: string): SqlControlAdapter<'postgres'> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing(operation);
+    }
+    return this.controlAdapter;
   }
 
   /**
@@ -126,10 +138,7 @@ export abstract class PostgresMigration<
     name: string,
     options: DataTransformOptions,
   ): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
-    return dataTransform(contract, name, options, this.controlAdapter);
+    return dataTransform(contract, name, options, this.controlAdapterFor('dataTransform'));
   }
 
   /**
@@ -144,15 +153,12 @@ export abstract class PostgresMigration<
     readonly columns: readonly DdlColumn[];
     readonly constraints?: readonly DdlTableConstraint[];
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new CreateTableCall(
       options.schema,
       options.table,
       options.columns,
       options.constraints,
-    ).toOp(this.controlAdapter);
+    ).toOp(this.controlAdapterFor('createTable'));
   }
 
   /**
@@ -164,10 +170,7 @@ export abstract class PostgresMigration<
     readonly schema: string;
     readonly ifNotExists?: boolean;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
-    return new CreateSchemaCall(options.schema).toOp(this.controlAdapter);
+    return new CreateSchemaCall(options.schema).toOp(this.controlAdapterFor('createSchema'));
   }
 
   /**
@@ -208,11 +211,8 @@ export abstract class PostgresMigration<
     readonly table: string;
     readonly column: DdlColumn;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new AddColumnCall(options.schema, options.table, options.column).toOp(
-      this.controlAdapter,
+      this.controlAdapterFor('addColumn'),
     );
   }
 
@@ -222,15 +222,12 @@ export abstract class PostgresMigration<
     readonly constraint: string;
     readonly columns: readonly string[];
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new AddPrimaryKeyCall(
       options.schema,
       options.table,
       options.constraint,
       options.columns,
-    ).toOp(this.controlAdapter);
+    ).toOp(this.controlAdapterFor('addPrimaryKey'));
   }
 
   protected addUnique(options: {
@@ -239,15 +236,12 @@ export abstract class PostgresMigration<
     readonly constraint: string;
     readonly columns: readonly string[];
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new AddUniqueCall(
       options.schema,
       options.table,
       options.constraint,
       options.columns,
-    ).toOp(this.controlAdapter);
+    ).toOp(this.controlAdapterFor('addUnique'));
   }
 
   protected addForeignKey(options: {
@@ -255,11 +249,8 @@ export abstract class PostgresMigration<
     readonly table: string;
     readonly foreignKey: ForeignKeySpec;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new AddForeignKeyCall(options.schema, options.table, options.foreignKey).toOp(
-      this.controlAdapter,
+      this.controlAdapterFor('addForeignKey'),
     );
   }
 
@@ -270,16 +261,13 @@ export abstract class PostgresMigration<
     readonly column: string;
     readonly values: readonly string[];
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new AddCheckConstraintCall(
       options.schema,
       options.table,
       options.constraint,
       options.column,
       options.values,
-    ).toOp(this.controlAdapter);
+    ).toOp(this.controlAdapterFor('addCheckConstraint'));
   }
 
   protected dropCheckConstraint(options: {
@@ -287,11 +275,8 @@ export abstract class PostgresMigration<
     readonly table: string;
     readonly constraint: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new DropCheckConstraintCall(options.schema, options.table, options.constraint).toOp(
-      this.controlAdapter,
+      this.controlAdapterFor('dropCheckConstraint'),
     );
   }
 
@@ -301,25 +286,21 @@ export abstract class PostgresMigration<
     readonly constraint: string;
     readonly kind?: 'foreignKey' | 'unique' | 'primaryKey';
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new DropConstraintCall(
       options.schema,
       options.table,
       options.constraint,
       options.kind ?? 'unique',
-    ).toOp(this.controlAdapter);
+    ).toOp(this.controlAdapterFor('dropConstraint'));
   }
 
   protected dropTable(options: {
     readonly schema: string;
     readonly table: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
-    return new DropTableCall(options.schema, options.table).toOp(this.controlAdapter);
+    return new DropTableCall(options.schema, options.table).toOp(
+      this.controlAdapterFor('dropTable'),
+    );
   }
 
   protected dropColumn(options: {
@@ -327,11 +308,8 @@ export abstract class PostgresMigration<
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new DropColumnCall(options.schema, options.table, options.column).toOp(
-      this.controlAdapter,
+      this.controlAdapterFor('dropColumn'),
     );
   }
 
@@ -341,15 +319,12 @@ export abstract class PostgresMigration<
     readonly column: string;
     readonly options: AlterColumnTypeOptions;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new AlterColumnTypeCall(
       options.schema,
       options.table,
       options.column,
       options.options,
-    ).toOp(this.controlAdapter);
+    ).toOp(this.controlAdapterFor('alterColumnType'));
   }
 
   protected setNotNull(options: {
@@ -357,11 +332,8 @@ export abstract class PostgresMigration<
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new SetNotNullCall(options.schema, options.table, options.column).toOp(
-      this.controlAdapter,
+      this.controlAdapterFor('setNotNull'),
     );
   }
 
@@ -370,11 +342,8 @@ export abstract class PostgresMigration<
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new DropNotNullCall(options.schema, options.table, options.column).toOp(
-      this.controlAdapter,
+      this.controlAdapterFor('dropNotNull'),
     );
   }
 
@@ -385,16 +354,13 @@ export abstract class PostgresMigration<
     readonly defaultSql: string;
     readonly operationClass?: 'additive' | 'widening';
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new SetDefaultCall(
       options.schema,
       options.table,
       options.column,
       options.defaultSql,
       options.operationClass,
-    ).toOp(this.controlAdapter);
+    ).toOp(this.controlAdapterFor('setDefault'));
   }
 
   protected dropDefault(options: {
@@ -402,11 +368,8 @@ export abstract class PostgresMigration<
     readonly table: string;
     readonly column: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new DropDefaultCall(options.schema, options.table, options.column).toOp(
-      this.controlAdapter,
+      this.controlAdapterFor('dropDefault'),
     );
   }
 
@@ -417,16 +380,13 @@ export abstract class PostgresMigration<
     readonly columns: readonly string[];
     readonly extras?: CreateIndexExtras;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new CreateIndexCall(
       options.schema,
       options.table,
       options.index,
       options.columns,
       options.extras,
-    ).toOp(this.controlAdapter);
+    ).toOp(this.controlAdapterFor('createIndex'));
   }
 
   protected dropIndex(options: {
@@ -434,11 +394,8 @@ export abstract class PostgresMigration<
     readonly table: string;
     readonly index: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
     return new DropIndexCall(options.schema, options.table, options.index).toOp(
-      this.controlAdapter,
+      this.controlAdapterFor('dropIndex'),
     );
   }
 
@@ -448,9 +405,6 @@ export abstract class PostgresMigration<
     readonly id: string;
     readonly label?: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-    if (!this.controlAdapter) {
-      throw errorPostgresMigrationStackMissing();
-    }
-    return installExtension(options, this.controlAdapter);
+    return installExtension(options, this.controlAdapterFor('installExtension'));
   }
 }
