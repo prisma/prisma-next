@@ -889,7 +889,7 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
         const appSchemaResult = verifyResult.value.schemaResults.get('app');
         expect(appSchemaResult?.ok).toBe(false);
         const roleIssue = appSchemaResult?.schema.issues.find(
-          (issue) => issue.reason === 'not-found' && issue.message.includes('missing_app_role'),
+          (issue) => issue.reason === 'not-found' && issue.path.includes('missing_app_role'),
         );
         expect(
           roleIssue,

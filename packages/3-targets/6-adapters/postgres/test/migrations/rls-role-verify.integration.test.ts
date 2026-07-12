@@ -169,11 +169,9 @@ describe.sequential('roles enter verify — existence-only, asymmetric', () => {
       });
       expect(result.ok).toBe(false);
       const roleFailure = result.schema.issues.find(
-        (i) => i.reason === 'not-found' && i.message.includes('app_role'),
+        (i) => i.reason === 'not-found' && i.path.includes('app_role'),
       );
       expect(roleFailure).toBeDefined();
-      // The collision-safe `role:` id sigil must not leak into the message.
-      expect(roleFailure?.message).not.toContain('role:app_role');
     }
   });
 
@@ -202,9 +200,9 @@ describe.sequential('roles enter verify — existence-only, asymmetric', () => {
       // A `reference` extra is suppressed unconditionally — before the
       // `observed → warn` disposition — so the undeclared role is neither a
       // failure nor a warning under ANY control policy, and verify passes.
-      expect(result.schema.issues.some((i) => i.message.includes('legacy_role'))).toBe(false);
+      expect(result.schema.issues.some((i) => i.path.includes('legacy_role'))).toBe(false);
       expect(
-        (result.schema.warnings?.issues ?? []).some((i) => i.message.includes('legacy_role')),
+        (result.schema.warnings?.issues ?? []).some((i) => i.path.includes('legacy_role')),
       ).toBe(false);
       expect(result.ok).toBe(true);
     }

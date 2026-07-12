@@ -18,9 +18,9 @@ export interface PostgresDatabaseSchemaNodeInput {
  * `id` is the fixed sentinel `'database'` — the root has no siblings and
  * the value is never emitted into migration paths. `isEqualTo` is identity
  * (roots always share the `'database'` id). `children()` yields the namespace
- * nodes followed by the role nodes — both are root-level diff subjects. Role
- * ids carry a `role:` sigil so they never collide with a same-named namespace
- * in the differ's flat sibling map.
+ * nodes followed by the role nodes — both are root-level diff subjects. The
+ * differ pairs siblings by `(nodeKind, id)`, so a role and a namespace may
+ * share a name without colliding.
  */
 export class PostgresDatabaseSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.database;

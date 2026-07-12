@@ -70,22 +70,20 @@ describe('PostgresDatabaseSchemaNode', () => {
     expect(roleChildren).toEqual([role]);
   });
 
-  it('a role id is namespaced away from schema ids so a role and a same-named schema never collide', () => {
-    // The differ keys a parent's children into one flat id→node map and throws
-    // on a duplicate id. A role and a schema may share a name (`public`), so
-    // the role id must carry a sigil that no namespace id can equal.
+  it('a role id may equal a same-named schema id — the differ pairs by (nodeKind, id), not id alone', () => {
     const publicRole = new PostgresRoleSchemaNode({
       name: 'public',
       namespaceId: UNBOUND_NAMESPACE_ID,
     });
-    expect(publicRole.id).not.toBe(nsPublic.id);
-    expect(publicRole.id).not.toBe('public');
-    expect(publicRole.id.endsWith('public')).toBe(true);
+    expect(publicRole.id).toBe(nsPublic.id);
+    expect(publicRole.id).toBe('public');
+    expect(publicRole.nodeKind).not.toBe(nsPublic.nodeKind);
   });
 
   it('diffs a role alongside a same-named schema without the duplicate-id throw', () => {
-    // Root with a schema named `public` AND a role named `public`. Before the
-    // sigil, both children would key to `public` and the differ would throw.
+    // Root with a schema named `public` AND a role named `public`. The differ
+    // pairs siblings by (nodeKind, id), so the shared bare id `public` does
+    // not collide — role and namespace are different nodeKinds.
     const collidingRole = new PostgresRoleSchemaNode({
       name: 'public',
       namespaceId: UNBOUND_NAMESPACE_ID,
