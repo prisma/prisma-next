@@ -1,0 +1,213 @@
+/**
+ * RLS authoring handles (`policySelect`/`policyInsert`/`policyUpdate`/
+ * `policyDelete`/`policyAll`, `rlsEnabled`, `role`) are inert branded values:
+ *
+ *  1. Each helper captures its inputs faithfully — name, roles, predicates,
+ *     and the model handle by reference. Nothing is resolved, hashed, or
+ *     registered at construction time; a function-form predicate is stored
+ *     un-invoked.
+ *  2. Handles are frozen plain values, safely reusable across arrays and
+ *     helper calls.
+ *  3. Empty names are rejected at construction.
+ */
+
+import { extensionModel } from '@prisma-next/sql-contract-ts/contract-builder';
+import { describe, expect, it, vi } from 'vitest';
+import type { RlsRoleHandle } from '../../src/exports/contract-builder';
+import {
+  field,
+  model,
+  policyAll,
+  policyDelete,
+  policyInsert,
+  policySelect,
+  policyUpdate,
+  rlsEnabled,
+  role,
+} from '../../src/exports/contract-builder';
+
+const intColumn = { codecId: 'pg/int4@1', nativeType: 'int4' } as const;
+const textColumn = { codecId: 'pg/text@1', nativeType: 'text' } as const;
+
+const Profile = model('Profile', {
+  fields: {
+    id: field.column(intColumn).id(),
+    userId: field.column(textColumn),
+  },
+}).sql({ table: 'profile' });
+
+const anon = role('anon');
+const authenticated = role('authenticated');
+
+describe('role', () => {
+  it('captures the name on a frozen branded handle', () => {
+    expect(anon).toEqual({ entityKind: 'role', name: 'anon' });
+    expect(Object.isFrozen(anon)).toBe(true);
+  });
+
+  it('preserves the literal name type at runtime and rejects an empty name', () => {
+    expect(role('app_user').name).toBe('app_user');
+    expect(() => role('')).toThrow(/name must be a non-empty string/);
+    expect(() => role('   ')).toThrow(/name must be a non-empty string/);
+  });
+});
+
+describe('rlsEnabled', () => {
+  it('captures the model handle by reference on a frozen branded handle', () => {
+    const handle = rlsEnabled(Profile);
+    expect(handle).toEqual({ entityKind: 'rls', model: Profile });
+    expect(handle.model).toBe(Profile);
+    expect(Object.isFrozen(handle)).toBe(true);
+  });
+
+  it('accepts a cross-space extensionModel handle', () => {
+    const AuthUser = extensionModel(
+      'AuthUser',
+      { namespace: 'auth', fields: { id: field.column(textColumn).id() }, table: 'users' },
+      'supabase',
+    );
+    const handle = rlsEnabled(AuthUser);
+    expect(handle.model).toBe(AuthUser);
+  });
+});
+
+describe('policy helpers capture inputs faithfully', () => {
+  it('policySelect: name, roles, string using, model by reference', () => {
+    const handle = policySelect(Profile, {
+      name: 'profile_owner_read',
+      roles: [authenticated],
+      using: '"userId"::uuid = auth.uid()',
+    });
+
+    expect(handle).toEqual({
+      entityKind: 'policy',
+      operation: 'select',
+      name: 'profile_owner_read',
+      model: Profile,
+      roles: [authenticated],
+      using: '"userId"::uuid = auth.uid()',
+    });
+    expect(handle.model).toBe(Profile);
+    expect(handle.roles[0]).toBe(authenticated);
+    expect(Object.isFrozen(handle)).toBe(true);
+    expect(Object.isFrozen(handle.roles)).toBe(true);
+  });
+
+  it('policyDelete: using only', () => {
+    const handle = policyDelete(Profile, {
+      name: 'profile_owner_delete',
+      roles: [authenticated],
+      using: 'true',
+    });
+
+    expect(handle).toEqual({
+      entityKind: 'policy',
+      operation: 'delete',
+      name: 'profile_owner_delete',
+      model: Profile,
+      roles: [authenticated],
+      using: 'true',
+    });
+  });
+
+  it('policyInsert: withCheck only', () => {
+    const handle = policyInsert(Profile, {
+      name: 'profile_owner_insert',
+      roles: [authenticated],
+      withCheck: '"userId"::uuid = auth.uid()',
+    });
+
+    expect(handle).toEqual({
+      entityKind: 'policy',
+      operation: 'insert',
+      name: 'profile_owner_insert',
+      model: Profile,
+      roles: [authenticated],
+      withCheck: '"userId"::uuid = auth.uid()',
+    });
+  });
+
+  it('policyUpdate: using and withCheck', () => {
+    const handle = policyUpdate(Profile, {
+      name: 'profile_owner_write',
+      roles: [authenticated],
+      using: '"userId"::uuid = auth.uid()',
+      withCheck: '"userId"::uuid = auth.uid()',
+    });
+
+    expect(handle).toEqual({
+      entityKind: 'policy',
+      operation: 'update',
+      name: 'profile_owner_write',
+      model: Profile,
+      roles: [authenticated],
+      using: '"userId"::uuid = auth.uid()',
+      withCheck: '"userId"::uuid = auth.uid()',
+    });
+  });
+
+  it('policyAll: using and withCheck', () => {
+    const handle = policyAll(Profile, {
+      name: 'profile_owner_all',
+      roles: [anon, authenticated],
+      using: 'true',
+      withCheck: 'true',
+    });
+
+    expect(handle).toEqual({
+      entityKind: 'policy',
+      operation: 'all',
+      name: 'profile_owner_all',
+      model: Profile,
+      roles: [anon, authenticated],
+      using: 'true',
+      withCheck: 'true',
+    });
+  });
+
+  it('stores a function-form predicate without invoking it', () => {
+    const usingFn = vi.fn(() => 'true');
+    const handle = policySelect(Profile, {
+      name: 'profile_fn_read',
+      roles: [anon],
+      using: usingFn,
+    });
+
+    expect(handle.using).toBe(usingFn);
+    expect(usingFn).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty policy name', () => {
+    expect(() => policySelect(Profile, { name: '', roles: [anon], using: 'true' })).toThrow(
+      /name must be a non-empty string/,
+    );
+    expect(() => policySelect(Profile, { name: '  ', roles: [anon], using: 'true' })).toThrow(
+      /name must be a non-empty string/,
+    );
+  });
+});
+
+describe('handles are inert and reusable', () => {
+  it('one role handle is safely shared across two policies', () => {
+    const first = policySelect(Profile, { name: 'p_read', roles: [anon], using: 'true' });
+    const second = policyDelete(Profile, { name: 'p_delete', roles: [anon], using: 'true' });
+
+    expect(first.roles[0]).toBe(anon);
+    expect(second.roles[0]).toBe(anon);
+    expect(anon).toEqual({ entityKind: 'role', name: 'anon' });
+  });
+
+  it("mutating the caller's roles array after construction does not change the handle", () => {
+    const roles: RlsRoleHandle[] = [anon];
+    const handle = policySelect(Profile, { name: 'p_read', roles, using: 'true' });
+    roles.push(authenticated);
+    expect(handle.roles).toEqual([anon]);
+  });
+
+  it('construction has no side effects: two identical calls produce equal, distinct handles', () => {
+    const a = policySelect(Profile, { name: 'p_read', roles: [anon], using: 'true' });
+    const b = policySelect(Profile, { name: 'p_read', roles: [anon], using: 'true' });
+    expect(a).toEqual(b);
+    expect(a).not.toBe(b);
+  });
+});
