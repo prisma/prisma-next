@@ -354,7 +354,7 @@ describe('family instance introspect', () => {
           PostgresDatabaseSchemaNode.assert(schemaIR);
           const ns = schemaIR.namespaces['public']!;
 
-          expect(Array.isArray(ns.enums)).toBe(true);
+          expect(Array.isArray(ns.nativeEnums)).toBe(true);
         } finally {
           await driver.close();
         }

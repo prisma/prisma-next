@@ -196,7 +196,7 @@ describe('family instance introspect', () => {
       async () => {
         await withIntrospection(connectionString!, (schemaIR) => {
           const ns = schemaIR.namespaces['public']!;
-          expect(Array.isArray(ns.enums)).toBe(true);
+          expect(Array.isArray(ns.nativeEnums)).toBe(true);
         });
       },
       timeouts.spinUpPpgDev,
