@@ -255,17 +255,22 @@ function locationForCall(call: PostgresOpFactoryCall): SqlPlannerConflict['locat
     typeName?: string;
   };
   const location: {
-    table?: string;
+    entityKind?: string;
+    entityName?: string;
     column?: string;
     index?: string;
     constraint?: string;
-    type?: string;
   } = {};
-  if (anyCall.tableName) location.table = anyCall.tableName;
+  if (anyCall.tableName) {
+    location.entityKind = 'table';
+    location.entityName = anyCall.tableName;
+  } else if (anyCall.typeName) {
+    location.entityKind = 'native_enum';
+    location.entityName = anyCall.typeName;
+  }
   if (anyCall.columnName) location.column = anyCall.columnName;
   if (anyCall.indexName) location.index = anyCall.indexName;
   if (anyCall.constraintName) location.constraint = anyCall.constraintName;
-  if (anyCall.typeName) location.type = anyCall.typeName;
   return Object.keys(location).length > 0 ? (location as SqlPlannerConflictLocation) : undefined;
 }
 

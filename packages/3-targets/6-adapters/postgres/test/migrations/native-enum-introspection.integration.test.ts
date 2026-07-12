@@ -50,7 +50,7 @@ describe.sequential('Postgres native-enum introspection — ordered member value
     PostgresDatabaseSchemaNode.assert(result);
     const ns = result.namespaces['public']!;
 
-    expect(ns.enums.map((e) => ({ typeName: e.typeName, members: e.members }))).toEqual([
+    expect(ns.nativeEnums.map((e) => ({ typeName: e.typeName, members: e.members }))).toEqual([
       { typeName: 'status', members: ['draft', 'review', 'done'] },
     ]);
   });
@@ -65,7 +65,7 @@ describe.sequential('Postgres native-enum introspection — ordered member value
     PostgresDatabaseSchemaNode.assert(result);
     const ns = result.namespaces['public']!;
 
-    expect(ns.enums.map((e) => ({ typeName: e.typeName, members: e.members }))).toEqual([
+    expect(ns.nativeEnums.map((e) => ({ typeName: e.typeName, members: e.members }))).toEqual([
       { typeName: 'priority', members: ['low', 'high', 'medium'] },
       { typeName: 'status', members: ['draft', 'review', 'done'] },
     ]);
@@ -80,6 +80,6 @@ describe.sequential('Postgres native-enum introspection — ordered member value
     PostgresDatabaseSchemaNode.assert(result);
     const ns = result.namespaces['public']!;
 
-    expect(ns.enums).toEqual([]);
+    expect(ns.nativeEnums).toEqual([]);
   });
 });

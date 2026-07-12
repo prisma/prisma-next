@@ -153,7 +153,7 @@ function liveTree(options: {
       sales: new PostgresNamespaceSchemaNode({
         schemaName: 'sales',
         tables: options.tables,
-        enums: nativeEnums.map(
+        nativeEnums: nativeEnums.map(
           (entry) =>
             new PostgresNativeEnumSchemaNode({
               typeName: entry.typeName,
@@ -484,7 +484,7 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
               rlsEnabled: false,
             }),
           },
-          enums: nativeEnums.map(
+          nativeEnums: nativeEnums.map(
             (entry) =>
               new PostgresNativeEnumSchemaNode({
                 typeName: entry.typeName,

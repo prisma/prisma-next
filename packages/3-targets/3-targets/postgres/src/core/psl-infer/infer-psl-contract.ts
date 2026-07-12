@@ -313,7 +313,7 @@ export function inferPostgresPslContract(
   const packOwnedEnumTypesByNamespace = new Map<string, Map<string, string>>();
   const enumNamespaceNames = new Set<string>();
   for (const namespace of namespaces) {
-    for (const { typeName, members } of namespace.enums) {
+    for (const { typeName, members } of namespace.nativeEnums) {
       const owner = enumOwners.get(
         coordinateKey({
           namespaceId: namespace.schemaName,

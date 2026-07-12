@@ -187,7 +187,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       conflicts: [
         expect.objectContaining({
           kind: 'typeMismatch',
-          location: { table: 'user', column: 'email' },
+          location: { entityKind: 'table', entityName: 'user', column: 'email' },
         }),
       ],
     });

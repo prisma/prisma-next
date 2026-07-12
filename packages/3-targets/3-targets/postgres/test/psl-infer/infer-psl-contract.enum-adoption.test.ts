@@ -65,7 +65,7 @@ function namespaceNode(
   return new PostgresNamespaceSchemaNode({
     schemaName,
     tables,
-    enums: nativeEnums.map(
+    nativeEnums: nativeEnums.map(
       (entry) =>
         new PostgresNativeEnumSchemaNode({
           typeName: entry.typeName,

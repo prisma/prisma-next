@@ -1230,7 +1230,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const namespace = new PostgresNamespaceSchemaNode({
       schemaName: schema,
       tables,
-      enums,
+      nativeEnums: enums,
     });
     return { namespace, pgVersion: await this.getPostgresVersion(driver) };
   }

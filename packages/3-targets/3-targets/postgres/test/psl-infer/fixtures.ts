@@ -12,9 +12,9 @@ import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table
  * Wraps a flat `{ tables, annotations? }` introspection fixture into the
  * `PostgresDatabaseSchemaNode` tree the target's inference walks. The flat
  * `annotations.pg.nativeEnums` (`{ typeName, values }` entries) becomes the
- * namespace's `enums` (one `PostgresNativeEnumSchemaNode` per entry). All
- * fixture tables live under the single `public` namespace (`contract infer`
- * introspects one live schema).
+ * namespace's `nativeEnums` (one `PostgresNativeEnumSchemaNode` per entry).
+ * All fixture tables live under the single `public` namespace (`contract
+ * infer` introspects one live schema).
  */
 export function treeFromFlat(schemaIR: SqlSchemaIR): PostgresDatabaseSchemaNode {
   const enums = readNativeEnums(schemaIR.annotations).map(
@@ -44,7 +44,7 @@ export function treeFromFlat(schemaIR: SqlSchemaIR): PostgresDatabaseSchemaNode 
       public: new PostgresNamespaceSchemaNode({
         schemaName: 'public',
         tables,
-        enums,
+        nativeEnums: enums,
       }),
     },
     roles: [],

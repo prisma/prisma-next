@@ -14,7 +14,7 @@ export interface PostgresNamespaceSchemaNodeInput {
    * (contract-projected) side attaches each node's `control` (the contract
    * entity's grade); introspection builds nodes with no `control`.
    */
-  readonly enums?: readonly PostgresNativeEnumSchemaNode[];
+  readonly nativeEnums?: readonly PostgresNativeEnumSchemaNode[];
 }
 
 /**
@@ -26,11 +26,11 @@ export interface PostgresNamespaceSchemaNodeInput {
  * (`postgres-namespace`), distinct from `SqlSchemaIR`'s own (`sql-schema`).
  *
  * `id` is the schema name; `isEqualTo` is identity on it; `children()` returns
- * the table nodes plus `enums`.
+ * the table nodes plus `nativeEnums`.
  *
- * `enums` is the diff-tree representation of native enum types the differ
- * pairs — the sole enum carrier, built directly by both sides: the expected
- * (contract-projected) side and introspection alike hand in
+ * `nativeEnums` is the diff-tree representation of native enum types the
+ * differ pairs — the sole enum carrier, built directly by both sides: the
+ * expected (contract-projected) side and introspection alike hand in
  * `PostgresNativeEnumSchemaNode`s.
  */
 export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements DiffableNode {
@@ -38,13 +38,13 @@ export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements Diff
 
   readonly schemaName: string;
   readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
-  readonly enums: readonly PostgresNativeEnumSchemaNode[];
+  readonly nativeEnums: readonly PostgresNativeEnumSchemaNode[];
 
   constructor(input: PostgresNamespaceSchemaNodeInput) {
     super();
     this.schemaName = input.schemaName;
     this.tables = Object.freeze({ ...input.tables });
-    this.enums = Object.freeze([...(input.enums ?? [])]);
+    this.nativeEnums = Object.freeze([...(input.nativeEnums ?? [])]);
     freezeNode(this);
   }
 
@@ -57,7 +57,7 @@ export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements Diff
   }
 
   children(): readonly DiffableNode[] {
-    return [...Object.values(this.tables), ...this.enums];
+    return [...Object.values(this.tables), ...this.nativeEnums];
   }
 
   static is(node: SqlSchemaIRNode): node is PostgresNamespaceSchemaNode {

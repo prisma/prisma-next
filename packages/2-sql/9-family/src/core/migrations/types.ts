@@ -104,8 +104,8 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
    * `SqlSchemaIR` class) because the actual value handed in is whatever
    * per-namespace node the calling target's tree shape produces — a flat
    * `SqlSchemaIR` for SQLite, a `PostgresNamespaceSchemaNode` for Postgres —
-   * read structurally for its `tables`/`enums` fields. Hooks that need the
-   * concrete Postgres shape narrow via `PostgresNamespaceSchemaNode.is(schema)`.
+   * read structurally for its `tables`/`nativeEnums` fields. Hooks that need
+   * the concrete Postgres shape narrow via `PostgresNamespaceSchemaNode.is(schema)`.
    */
   planTypeOperations?: (options: {
     readonly typeName: string;
@@ -282,12 +282,12 @@ export type SqlPlannerConflictKind =
   | 'controlPolicySuppressedCall';
 
 export interface SqlPlannerConflictLocation {
-  readonly namespace?: string;
-  readonly table?: string;
+  readonly namespaceId?: string;
+  readonly entityKind?: string;
+  readonly entityName?: string;
   readonly column?: string;
   readonly index?: string;
   readonly constraint?: string;
-  readonly type?: string;
 }
 
 export interface SqlPlannerConflict extends MigrationPlannerConflict {

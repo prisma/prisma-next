@@ -99,7 +99,7 @@ function createTestContract(
   };
 }
 
-// Carry the contract's enum native-type names as `enums` nodes (the
+// Carry the contract's enum native-type names as `nativeEnums` nodes (the
 // `PostgresNamespaceSchemaNode` field that records which enum types already
 // exist — the signal the enum `planTypeOperations` hook reads to decide
 // whether to emit a `CREATE TYPE`). Member values are irrelevant to that
@@ -167,7 +167,7 @@ function contractToSchemaIR(
       public: new PostgresNamespaceSchemaNode({
         schemaName: 'public',
         tables,
-        enums,
+        nativeEnums: enums,
       }),
     },
     roles: [],
@@ -759,12 +759,12 @@ function createAdapterHooksComponent(): TargetBoundComponentDescriptor<'sql', st
       const values = typeInstance.typeParams?.['values'] as string[] | undefined;
       if (!values || values.length === 0) return { operations: [] };
 
-      // The "enum already exists" signal lives in `enums` on the per-schema
-      // `PostgresNamespaceSchemaNode`. The strategy layer hands the hook that
-      // namespace node (the per-schema `SqlSchemaIR` shape), so read the
-      // field directly off it.
+      // The "enum already exists" signal lives in `nativeEnums` on the
+      // per-schema `PostgresNamespaceSchemaNode`. The strategy layer hands
+      // the hook that namespace node (the per-schema `SqlSchemaIR` shape),
+      // so read the field directly off it.
       const existingEnumTypes = PostgresNamespaceSchemaNode.is(schema)
-        ? schema.enums.map((e) => e.typeName)
+        ? schema.nativeEnums.map((e) => e.typeName)
         : [];
 
       if (existingEnumTypes.includes(typeInstance.nativeType)) {

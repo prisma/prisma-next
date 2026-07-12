@@ -162,10 +162,10 @@ export function renderPostgresSuppression(
     kind: 'controlPolicySuppressedCall',
     summary: postgresSuppressionSummary(subjectLabel, subject, record.policy),
     location: {
-      ...ifDefined('namespace', subject?.namespaceId),
-      ...ifDefined('table', subject?.entityKind === 'table' ? subject.entityName : undefined),
+      ...ifDefined('namespaceId', subject?.namespaceId),
+      ...ifDefined('entityKind', subject?.entityKind),
+      ...ifDefined('entityName', subject?.entityName),
       ...ifDefined('column', subject?.column),
-      ...ifDefined('type', subject?.entityKind === 'native_enum' ? subject.entityName : undefined),
     },
     meta: {
       controlPolicy: record.policy,

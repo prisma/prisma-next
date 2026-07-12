@@ -100,7 +100,7 @@ function actualTree(entries: readonly { typeName: string; values: readonly strin
       public: new PostgresNamespaceSchemaNode({
         schemaName: 'public',
         tables: { orders: ordersTable() },
-        enums: entries.map(
+        nativeEnums: entries.map(
           (entry) =>
             new PostgresNativeEnumSchemaNode({
               typeName: entry.typeName,

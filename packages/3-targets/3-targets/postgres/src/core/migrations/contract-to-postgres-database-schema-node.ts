@@ -141,7 +141,7 @@ export function contractToPostgresDatabaseSchemaNode(
       }
     }
 
-    const enums = Object.values(ns.entries.native_enum ?? {}).map(
+    const nativeEnums = Object.values(ns.entries.native_enum ?? {}).map(
       (entity) =>
         new PostgresNativeEnumSchemaNode({
           typeName: entity.typeName,
@@ -154,7 +154,7 @@ export function contractToPostgresDatabaseSchemaNode(
     namespaces[ddlSchema] = new PostgresNamespaceSchemaNode({
       schemaName: ddlSchema,
       tables,
-      enums,
+      nativeEnums,
     });
 
     for (const role of Object.values(ns.role)) {

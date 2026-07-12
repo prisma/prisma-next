@@ -216,7 +216,9 @@ function issueConflict(
 }
 
 function issueLocation(tableName: string, columnName?: string): SqlPlannerConflictLocation {
-  return columnName !== undefined ? { table: tableName, column: columnName } : { table: tableName };
+  return columnName !== undefined
+    ? { entityKind: 'table', entityName: tableName, column: columnName }
+    : { entityKind: 'table', entityName: tableName };
 }
 
 /**
@@ -599,8 +601,12 @@ function conflictKindForCall(call: SqliteOpFactoryCall): SqlPlannerConflict['kin
 }
 
 function locationForCall(call: SqliteOpFactoryCall): SqlPlannerConflictLocation | undefined {
-  const location: { table?: string; column?: string; index?: string } = {};
-  if ('tableName' in call) location.table = call.tableName;
+  const location: { entityKind?: string; entityName?: string; column?: string; index?: string } =
+    {};
+  if ('tableName' in call) {
+    location.entityKind = 'table';
+    location.entityName = call.tableName;
+  }
   if ('columnName' in call) location.column = call.columnName;
   if ('indexName' in call) location.index = call.indexName;
   return Object.keys(location).length > 0 ? (location as SqlPlannerConflictLocation) : undefined;

@@ -100,18 +100,18 @@ describe('PostgresNamespaceSchemaNode', () => {
       const node = new PostgresNamespaceSchemaNode({
         schemaName: 'auth',
         tables: {},
-        enums: [enumNode],
+        nativeEnums: [enumNode],
       });
-      expect(node.enums).toEqual([enumNode]);
+      expect(node.nativeEnums).toEqual([enumNode]);
       expect(node.children()).toEqual([enumNode]);
     });
 
-    it('defaults to empty when enums is omitted', () => {
+    it('defaults to empty when nativeEnums is omitted', () => {
       const node = new PostgresNamespaceSchemaNode(baseInput);
-      expect(node.enums).toEqual([]);
+      expect(node.nativeEnums).toEqual([]);
     });
 
-    it('freezes the enums list', () => {
+    it('freezes the nativeEnums list', () => {
       const enumNode = new PostgresNativeEnumSchemaNode({
         typeName: 'status_enum',
         namespaceId: 'public',
@@ -119,9 +119,9 @@ describe('PostgresNamespaceSchemaNode', () => {
       });
       const node = new PostgresNamespaceSchemaNode({
         ...baseInput,
-        enums: [enumNode],
+        nativeEnums: [enumNode],
       });
-      expect(Object.isFrozen(node.enums)).toBe(true);
+      expect(Object.isFrozen(node.nativeEnums)).toBe(true);
     });
 
     it('exposes one enum diff node per entry through children()', () => {
@@ -133,7 +133,7 @@ describe('PostgresNamespaceSchemaNode', () => {
       const node = new PostgresNamespaceSchemaNode({
         schemaName: 'auth',
         tables: { profiles: tableA },
-        enums: [enumNode],
+        nativeEnums: [enumNode],
       });
       const enumChildren = node.children().filter((child) => child.id.startsWith('native_enum:'));
       expect(enumChildren).toEqual([
@@ -157,7 +157,7 @@ describe('PostgresNamespaceSchemaNode', () => {
       const node = new PostgresNamespaceSchemaNode({
         schemaName: 'auth',
         tables: {},
-        enums: [enumNode],
+        nativeEnums: [enumNode],
       });
       expect(node.children()[0]).toMatchObject({ control: 'external' });
     });

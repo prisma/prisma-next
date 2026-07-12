@@ -170,7 +170,8 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
         expect.objectContaining({
           kind: 'typeMismatch',
           location: {
-            table: 'user',
+            entityKind: 'table',
+            entityName: 'user',
             column: 'email',
           },
         }),
