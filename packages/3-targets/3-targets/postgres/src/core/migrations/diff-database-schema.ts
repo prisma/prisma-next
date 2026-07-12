@@ -13,11 +13,26 @@ import type { PostgresContract } from '../postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
 import {
+  PostgresSchemaNodeKind,
   postgresDiffSubjectGranularity,
   type SqlSchemaDiffNode,
 } from '../schema-ir/schema-node-kinds';
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
 import { resolvePostgresNodeIssueControlPolicySubject } from './control-policy';
+
+/**
+ * Whether a diff issue's subject node is a database role. Roles are
+ * root-level siblings of namespaces, so a role issue's path carries no
+ * namespace segment to own-scope against — the ownership filter must bypass
+ * it rather than test namespace membership. Roles resolve their control
+ * policy to `external` unconditionally (see {@link resolveControlPolicy}),
+ * which is what makes a missing declared role fail while an undeclared live
+ * one is tolerated.
+ */
+function isRoleDiffIssue(issue: SchemaDiffIssue): boolean {
+  const node = issue.expected ?? issue.actual;
+  return node?.nodeKind === PostgresSchemaNodeKind.role;
+}
 
 function ownedSchemaNames(expected: PostgresDatabaseSchemaNode): ReadonlySet<string> {
   const policyNamespaces = Object.values(expected.namespaces).flatMap((ns) =>
@@ -57,11 +72,18 @@ function pruneTableLessNamespaces(
  * directly from the contract, by delegating to the same node-typed resolver
  * ({@link resolvePostgresNodeIssueControlPolicySubject}) the planner uses to
  * gate DDL calls. `undefined` when the issue resolves to no contract table.
+ *
+ * A role issue resolves to `external` unconditionally, regardless of the
+ * contract's own default/table policy: a role is referenced by the contract
+ * but not owned, and `external`'s existing semantics — a missing declared
+ * subject still fails, every extra is suppressed — are exactly the wanted
+ * asymmetric grading for a cluster object the framework does not own.
  */
 function resolveControlPolicy(
   issue: SchemaDiffIssue,
   contract: Contract<SqlStorage>,
 ): ControlPolicy | undefined {
+  if (isRoleDiffIssue(issue)) return 'external';
   const nodeIssue = blindCast<
     SchemaDiffIssue<SqlSchemaDiffNode>,
     'every node in a Postgres schema diff tree is a SqlSchemaDiffNode'
@@ -107,11 +129,8 @@ export function diffPostgresSchema(input: {
   const structuralOwned = ownedSchemaNames(fullExpected);
   const issues = diffSchemas(expected, actual).filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
+    if (isRoleDiffIssue(issue)) return true;
     const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
-    // A `reference` subject (a role) is a root-level sibling of namespaces, so
-    // its path carries no namespace segment to own-scope against — let it
-    // through to the verdict, which tolerates a reference extra unconditionally.
-    if (granularity === 'reference') return true;
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;
     const owned = granularity === 'structural' ? structuralOwned : relationalOwned;
@@ -211,11 +230,8 @@ export function buildPostgresPlanDiff(input: {
     'both trees are PostgresDatabaseSchemaNodes, so every diff-issue node is a SqlSchemaDiffNode'
   >(diffSchemas(expected, paddedActual)).filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
+    if (isRoleDiffIssue(issue)) return true;
     const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
-    // A `reference` subject (a role) is a root-level sibling of namespaces, so
-    // its path carries no namespace segment to own-scope against — let it
-    // through to the verdict, which tolerates a reference extra unconditionally.
-    if (granularity === 'reference') return true;
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;
     const owned = granularity === 'structural' ? structuralOwned : relationalOwned;

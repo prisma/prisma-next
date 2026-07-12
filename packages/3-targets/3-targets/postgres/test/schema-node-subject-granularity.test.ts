@@ -15,12 +15,13 @@ import {
  * The subject granularity a Postgres diff node's issues carry is resolved
  * from the node's `nodeKind` by the family/target map — NEVER stamped on the
  * node. Namespace/table nodes carry the granularities their extras classify
- * under (extraTopLevelObject, strict-gated); a policy node is `structural`
- * (the managed table owns its policy set, so its extras fail in both modes),
- * while a role node is `reference` (the contract references but does not own
- * the cluster's role list, so an extra role is tolerated unconditionally).
- * These tests pin the map and prove the node itself carries no
- * role/granularity of its own.
+ * under (extraTopLevelObject, strict-gated); a policy node and a role node
+ * are both `structural` (a policy set is owned by its managed table; a role
+ * is referenced by the contract but not owned). The asymmetric grading for a
+ * role — a missing declared one fails, an undeclared live one is tolerated
+ * unconditionally — comes from roles resolving to the `external` control
+ * policy, not from the granularity. These tests pin the map and prove the
+ * node itself carries no role/granularity of its own.
  */
 describe('postgresNodeGranularity map', () => {
   it.each([
@@ -28,7 +29,7 @@ describe('postgresNodeGranularity map', () => {
     [PostgresSchemaNodeKind.namespace, 'namespace'],
     [PostgresSchemaNodeKind.table, 'entity'],
     [PostgresSchemaNodeKind.policy, 'structural'],
-    [PostgresSchemaNodeKind.role, 'reference'],
+    [PostgresSchemaNodeKind.role, 'structural'],
   ] as const)('maps %s to %s', (nodeKind, granularity) => {
     expect(postgresNodeGranularity(nodeKind)).toBe(granularity);
   });

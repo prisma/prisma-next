@@ -171,19 +171,6 @@ export function computeSqlDiffVerdict(input: SqlDiffVerdictInput): SqlDiffVerdic
   const failures: SchemaDiffIssue[] = [];
   const warnings: SchemaDiffIssue[] = [];
   for (const issue of input.issues) {
-    // A `reference`-granularity extra (a live object the contract references
-    // but does not own, e.g. a Postgres role) is tolerated unconditionally —
-    // never a failure, never a warning, under any control policy including
-    // `managed`. The framework does not own the cluster's role list, so an
-    // undeclared live role is out of its jurisdiction. (A *missing* declared
-    // reference is a different issue — `not-found` → `declaredMissing` → fails
-    // generically below.)
-    if (
-      issue.reason === 'not-expected' &&
-      classifyDiffSubjectGranularity(issue, input.granularityOf) === 'reference'
-    ) {
-      continue;
-    }
     if (
       !input.strict &&
       issue.reason === 'not-expected' &&

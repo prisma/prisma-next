@@ -45,13 +45,15 @@ const POSTGRES_NODE_GRANULARITY: Readonly<Record<PostgresSchemaNodeKind, DiffSub
     [PostgresSchemaNodeKind.database]: 'structural',
     [PostgresSchemaNodeKind.namespace]: 'namespace',
     [PostgresSchemaNodeKind.table]: 'entity',
-    // A policy set is owned by the managed table it attaches to — its extras
-    // fail verify. A role is only *referenced* by the contract (the framework
-    // names it in a policy but never owns the cluster's role list), so it is
-    // `reference`: a missing declared role fails, an undeclared live role is
-    // tolerated unconditionally.
+    // A policy set is owned by the managed table it attaches to; a role is
+    // referenced by the contract but not owned (the framework names it in a
+    // policy but never owns the cluster's role list). Both classify as
+    // `structural`. The asymmetry for roles — a missing declared one fails, an
+    // undeclared live one is tolerated unconditionally — comes from the
+    // control policy the diff resolves a role issue against (`external`),
+    // not from the granularity.
     [PostgresSchemaNodeKind.policy]: 'structural',
-    [PostgresSchemaNodeKind.role]: 'reference',
+    [PostgresSchemaNodeKind.role]: 'structural',
   };
 
 function isPostgresSchemaNodeKind(nodeKind: string): nodeKind is PostgresSchemaNodeKind {
