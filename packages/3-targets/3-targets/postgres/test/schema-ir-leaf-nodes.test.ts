@@ -94,12 +94,15 @@ describe('PostgresPolicySchemaNode', () => {
 });
 
 describe('PostgresRoleSchemaNode', () => {
-  it('id returns the role name', () => {
+  it('id returns the bare role name', () => {
     const node = new PostgresRoleSchemaNode({
       name: 'app_user',
       namespaceId: UNBOUND_NAMESPACE_ID,
     });
+    // The differ pairs siblings by (nodeKind, id), so a role never collides
+    // with a same-named schema even though both use the bare name as id.
     expect(node.id).toBe('app_user');
+    expect(node.name).toBe('app_user');
   });
 
   it('children() returns empty array (leaf)', () => {

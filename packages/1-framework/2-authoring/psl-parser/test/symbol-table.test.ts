@@ -656,3 +656,44 @@ describe('buildSymbolTable() — resolved block (BlockSymbol.block)', () => {
     ).toEqual([]);
   });
 });
+
+describe('buildSymbolTable() — N:1 keywords sharing one discriminator', () => {
+  // A fake extension contributing two keywords, `shape_circle` and
+  // `shape_square`, that both lower to the shared `shape` discriminator —
+  // proving the parser dispatches by keyword while grouping by kind.
+  const SHAPE_DESCRIPTORS: AuthoringPslBlockDescriptorNamespace = {
+    shape_circle: {
+      kind: 'pslBlock',
+      keyword: 'shape_circle',
+      discriminator: 'shape',
+      name: { required: true },
+      parameters: {},
+    },
+    shape_square: {
+      kind: 'pslBlock',
+      keyword: 'shape_square',
+      discriminator: 'shape',
+      name: { required: true },
+      parameters: {},
+    },
+  };
+
+  it('parses each keyword to its own block, both sharing kind "shape"', () => {
+    const result = build(
+      ['shape_circle Round {', '}', 'shape_square Boxy {', '}'].join('\n'),
+      SCALAR_TYPES,
+      SHAPE_DESCRIPTORS,
+    );
+
+    expect(result.diagnostics).toEqual([]);
+    const round = result.table.topLevel.blocks['Round'];
+    const boxy = result.table.topLevel.blocks['Boxy'];
+
+    expect(round?.keyword).toBe('shape_circle');
+    expect(boxy?.keyword).toBe('shape_square');
+    expect(round?.block.kind).toBe('shape');
+    expect(boxy?.block.kind).toBe('shape');
+    expect(round?.block.keyword).toBe('shape_circle');
+    expect(boxy?.block.keyword).toBe('shape_square');
+  });
+});

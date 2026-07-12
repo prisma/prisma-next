@@ -12,10 +12,11 @@ import type {
 } from '@prisma-next/framework-components/authoring';
 import { modelAttribute } from '@prisma-next/psl-parser';
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { PostgresNativeEnum } from './postgres-native-enum';
 import { PostgresRlsEnablement, type PostgresRlsEnablementInput } from './postgres-rls-enablement';
-import { PostgresRlsPolicy } from './postgres-rls-policy';
+import { PostgresRlsPolicy, type RlsPolicyOperation } from './postgres-rls-policy';
 import { PostgresRole, type PostgresRoleInput } from './postgres-role';
 import {
   PostgresNativeEnumSchema,
@@ -49,6 +50,35 @@ export const postgresAuthoringTypes = {
 export interface RlsPolicyExtensionBlock extends PslExtensionBlock {
   readonly namespaceId: string;
 }
+
+/**
+ * Maps a `policy_<op>` keyword to the RLS operation it authors. The keyword
+ * IS the operation (per the project's rejection of a `policy { operation = … }`
+ * conditional block).
+ */
+const POLICY_KEYWORD_OPERATION: Readonly<Record<string, RlsPolicyOperation>> = {
+  policy_select: 'select',
+  policy_insert: 'insert',
+  policy_update: 'update',
+  policy_delete: 'delete',
+  policy_all: 'all',
+};
+
+/**
+ * Which predicate each RLS operation admits, mirroring Postgres: SELECT and
+ * DELETE decide row visibility/eligibility with `USING` only; INSERT validates
+ * the new row with `WITH CHECK` only; UPDATE and ALL take both. A predicate
+ * outside this set is a load-time error (see {@link lowerRlsPolicyFromBlock}).
+ */
+const POLICY_OPERATION_PREDICATES: Readonly<
+  Record<RlsPolicyOperation, { readonly using: boolean; readonly withCheck: boolean }>
+> = {
+  select: { using: true, withCheck: false },
+  insert: { using: false, withCheck: true },
+  update: { using: true, withCheck: true },
+  delete: { using: true, withCheck: false },
+  all: { using: true, withCheck: true },
+};
 
 function readRefParam(block: PslExtensionBlock, key: string): string | undefined {
   const param = block.parameters[key];
@@ -101,18 +131,43 @@ function unwrapQuotedString(raw: string): string {
 
 function lowerRlsPolicyFromBlock(
   block: RlsPolicyExtensionBlock,
-  _ctx: AuthoringEntityContext,
-): PostgresRlsPolicy {
+  ctx: AuthoringEntityContext,
+): PostgresRlsPolicy | undefined {
   const prefix = block.name;
+  const operation = POLICY_KEYWORD_OPERATION[block.keyword] ?? 'select';
   const targetModelName = readRefParam(block, 'target') ?? '';
   const tableName = targetModelName.charAt(0).toLowerCase() + targetModelName.slice(1);
   const roles = [...readListRefParams(block, 'roles')].sort();
-  const using = unwrapQuotedString(readValueParam(block, 'using') ?? '');
+
+  const usingRaw = readValueParam(block, 'using');
+  const withCheckRaw = readValueParam(block, 'withCheck');
+
+  // Reject a predicate the operation does not take (e.g. `using` on INSERT, or
+  // `withCheck` on SELECT/DELETE). The descriptor's param set already omits it,
+  // but the generic descriptor validator is not wired into the SQL-family
+  // interpreter, so the lowering enforces the per-operation predicate matrix
+  // directly — a wrong predicate is a load-time diagnostic, not a silent drop.
+  const support = POLICY_OPERATION_PREDICATES[operation];
+  const rejectPredicate = (predicate: 'using' | 'withCheck'): undefined => {
+    ctx.diagnostics?.push({
+      code: 'PSL_RLS_PREDICATE_NOT_FOR_OPERATION',
+      message: `\`${block.keyword}\` policy "${block.name}" does not take a \`${predicate}\` predicate; the ${operation.toUpperCase()} operation uses ${support.using ? '`using`' : '`withCheck`'}${support.using && support.withCheck ? ' and `withCheck`' : ' only'}.`,
+      sourceId: ctx.sourceId ?? 'unknown',
+      span: block.parameters[predicate]?.span ?? block.span,
+    });
+    return undefined;
+  };
+  if (usingRaw !== undefined && !support.using) return rejectPredicate('using');
+  if (withCheckRaw !== undefined && !support.withCheck) return rejectPredicate('withCheck');
+
+  const using = usingRaw !== undefined ? unwrapQuotedString(usingRaw) : undefined;
+  const withCheck = withCheckRaw !== undefined ? unwrapQuotedString(withCheckRaw) : undefined;
 
   const wireHash = computeContentHash({
-    using: normalizePredicate(using),
+    ...ifDefined('using', using !== undefined ? normalizePredicate(using) : undefined),
+    ...ifDefined('withCheck', withCheck !== undefined ? normalizePredicate(withCheck) : undefined),
     roles,
-    operation: 'select',
+    operation,
     permissive: true,
   });
   const wireName = formatRlsPolicyWireName(prefix, wireHash);
@@ -122,9 +177,10 @@ function lowerRlsPolicyFromBlock(
     prefix,
     tableName,
     namespaceId: block.namespaceId,
-    operation: 'select',
+    operation,
     roles,
-    using,
+    ...ifDefined('using', using),
+    ...ifDefined('withCheck', withCheck),
     permissive: true,
   });
 }
@@ -298,13 +354,10 @@ export const postgresAuthoringEntityTypes = {
  * the family pack instead.
  */
 /**
- * PSL block descriptor for `policy_select`.
- *
- * The parser learns the block shape from this descriptor; lowering from
- * `PslExtensionBlock` to `PostgresRlsPolicy` is wired in the PSL
- * interpreter (a later dispatch). The `discriminator` matches
- * `PostgresRlsPolicy.kind` so the parsed block node carries the same
- * discriminant as the IR class it will lower to.
+ * Shared parameter descriptors for the five `policy_<op>` PSL block
+ * keywords. All five share the `policy` discriminator — the parser
+ * dispatches by keyword (see the framework's PSL-block SPI), and every
+ * keyword's factory lowers to `PostgresRlsPolicy` via `lowerRlsPolicyFromBlock`.
  *
  * The `roles` list uses `scope:'cross-space'` because same-namespace
  * role ref resolution requires PSL namespace entries keyed by `refKind`
@@ -313,24 +366,82 @@ export const postgresAuthoringEntityTypes = {
  * slice 4 (cross-space roles). Until then cross-space passes validation
  * unconditionally and the authored role names flow through unchanged.
  */
+const policyTargetParam = {
+  kind: 'ref',
+  refKind: 'model',
+  scope: 'same-namespace',
+  required: true,
+} as const;
+const policyRolesParam = {
+  kind: 'list',
+  of: { kind: 'ref', refKind: 'role', scope: 'cross-space' },
+} as const;
+const policyPredicateParam = { kind: 'value', codecId: 'pg/text@1', required: true } as const;
+// A policy may only target an RLS-controlled model: the model named by
+// `target` must declare `@@rls`, or the load fails with a diagnostic naming
+// the model and the policy prefix.
+const policyRequiresRls = { parameter: 'target', attribute: 'rls' } as const;
+
 export const postgresAuthoringPslBlockDescriptors = {
+  // The predicate param set per keyword mirrors Postgres: SELECT/DELETE take
+  // USING only; INSERT takes WITH CHECK only; UPDATE/ALL take both. The
+  // per-operation predicate matrix is enforced in `lowerRlsPolicyFromBlock`
+  // (a wrong predicate for the operation is a load-time diagnostic there),
+  // since the generic descriptor validator is not wired into the SQL-family
+  // interpreter.
   policy_select: {
     kind: 'pslBlock',
     keyword: 'policy_select',
     discriminator: 'policy',
     name: { required: true },
+    parameters: { target: policyTargetParam, roles: policyRolesParam, using: policyPredicateParam },
+    requiresModelAttribute: policyRequiresRls,
+  },
+  policy_delete: {
+    kind: 'pslBlock',
+    keyword: 'policy_delete',
+    discriminator: 'policy',
+    name: { required: true },
+    parameters: { target: policyTargetParam, roles: policyRolesParam, using: policyPredicateParam },
+    requiresModelAttribute: policyRequiresRls,
+  },
+  policy_insert: {
+    kind: 'pslBlock',
+    keyword: 'policy_insert',
+    discriminator: 'policy',
+    name: { required: true },
     parameters: {
-      target: { kind: 'ref', refKind: 'model', scope: 'same-namespace', required: true },
-      roles: {
-        kind: 'list',
-        of: { kind: 'ref', refKind: 'role', scope: 'cross-space' },
-      },
-      using: { kind: 'value', codecId: 'pg/text@1', required: true },
+      target: policyTargetParam,
+      roles: policyRolesParam,
+      withCheck: policyPredicateParam,
     },
-    // A policy may only target an RLS-controlled model: the model named by
-    // `target` must declare `@@rls`, or the load fails with a diagnostic
-    // naming the model and the policy prefix.
-    requiresModelAttribute: { parameter: 'target', attribute: 'rls' },
+    requiresModelAttribute: policyRequiresRls,
+  },
+  policy_update: {
+    kind: 'pslBlock',
+    keyword: 'policy_update',
+    discriminator: 'policy',
+    name: { required: true },
+    parameters: {
+      target: policyTargetParam,
+      roles: policyRolesParam,
+      using: policyPredicateParam,
+      withCheck: policyPredicateParam,
+    },
+    requiresModelAttribute: policyRequiresRls,
+  },
+  policy_all: {
+    kind: 'pslBlock',
+    keyword: 'policy_all',
+    discriminator: 'policy',
+    name: { required: true },
+    parameters: {
+      target: policyTargetParam,
+      roles: policyRolesParam,
+      using: policyPredicateParam,
+      withCheck: policyPredicateParam,
+    },
+    requiresModelAttribute: policyRequiresRls,
   },
   /**
    * PSL block descriptor for `native_enum`.

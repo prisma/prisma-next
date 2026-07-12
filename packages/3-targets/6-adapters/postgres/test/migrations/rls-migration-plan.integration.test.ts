@@ -44,6 +44,26 @@ namespace public {
 }
 `;
 
+// A `policy_update` with both predicates — proves the contract → plan → render
+// path threads `withCheck` through for a non-select operation.
+const PSL_UPDATE = `
+namespace public {
+  model profile {
+    id       Int @id
+    owner_id Int
+
+    @@rls
+  }
+
+  policy_update p_write {
+    target    = profile
+    roles     = [app_user]
+    using     = "owner_id = current_setting('app.uid')::int"
+    withCheck = "owner_id = current_setting('app.uid')::int"
+  }
+}
+`;
+
 function buildScalarTypeDescriptors(): ReadonlyMap<
   string,
   { codecId: string; nativeType: string }
@@ -60,11 +80,11 @@ function buildScalarTypeDescriptors(): ReadonlyMap<
   return result;
 }
 
-function buildPslContract() {
+function buildPslContract(psl: string = PSL) {
   const assembled = assembleAuthoringContributions([postgresTargetDescriptor]);
   const scalarTypeDescriptors = buildScalarTypeDescriptors();
 
-  const { document, sourceFile } = parse(PSL);
+  const { document, sourceFile } = parse(psl);
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
@@ -135,5 +155,44 @@ describe('migration plan emits RLS (offline, no live database)', () => {
 
     expect(allSql.some((s) => s.includes('ENABLE ROW LEVEL SECURITY'))).toBe(true);
     expect(allSql.some((s) => s.includes('CREATE POLICY'))).toBe(true);
+  });
+
+  it('plans FOR UPDATE with both USING and WITH CHECK for a policy_update contract', async () => {
+    const result = buildPslContract(PSL_UPDATE);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const contract = result.value as Contract<SqlStorage>;
+    const fromSchema = postgresTargetDescriptor.migrations.contractToSchema(
+      null,
+      frameworkComponents,
+    ) as SqlSchemaIRNode;
+    PostgresDatabaseSchemaNode.assert(fromSchema);
+
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+    const planResult = planner.plan({
+      contract,
+      schema: fromSchema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+
+    expect(planResult.kind).toBe('success');
+    if (planResult.kind !== 'success') return;
+
+    const ops = await Promise.all(planResult.plan.operations);
+    const createPolicySql = ops
+      .flatMap((op) => op.execute)
+      .map((step) => step.sql)
+      .find((s) => s.includes('CREATE POLICY'));
+
+    expect(createPolicySql).toBeDefined();
+    expect(createPolicySql).toContain('FOR UPDATE');
+    expect(createPolicySql).toContain("USING (owner_id = current_setting('app.uid')::int)");
+    expect(createPolicySql).toContain("WITH CHECK (owner_id = current_setting('app.uid')::int)");
+    // USING must precede WITH CHECK.
+    expect(createPolicySql!.indexOf('USING')).toBeLessThan(createPolicySql!.indexOf('WITH CHECK'));
   });
 });

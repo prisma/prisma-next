@@ -181,6 +181,11 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       frameworkComponents: options.frameworkComponents,
     });
     const policyDiffIssues = rawIssues.filter((issue) => isPolicyDiffIssue(issue));
+    // Role diff issues resolve to the `external` control policy (see
+    // `resolvePostgresNodeIssueControlPolicySubject`'s role branch), so the
+    // control-policy partition below suppresses them to zero ops on its own,
+    // before `mapNodeIssueToCall` ever sees them — no separate exclusion
+    // needed here.
     const relationalDiffIssues = rawIssues.filter((issue) => !isPolicyDiffIssue(issue));
 
     // The generic differ is total and un-gated: strict-mode extras filtering

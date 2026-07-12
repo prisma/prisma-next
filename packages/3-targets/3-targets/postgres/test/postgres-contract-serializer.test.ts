@@ -393,6 +393,7 @@ describe('role + policy round-trip', () => {
     expect(role).toBeInstanceOf(PostgresRole);
     expect(role?.name).toBe('app_user');
     expect(role?.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
+    expect(role?.control).toBe('external');
 
     // RLS policies preserved with prefix + full name both distinct
     expect(Object.keys(ns.policy)).toHaveLength(2);
@@ -504,6 +505,49 @@ describe('role + policy round-trip', () => {
     });
 
     expect(() => serializer.deserializeContract(input)).toThrow();
+  });
+
+  it('rejects a malformed role entry (non-external control)', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {},
+              role: {
+                app_user: {
+                  kind: 'role',
+                  name: 'app_user',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  control: 'managed', // invalid — roles are external-only
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(() => serializer.deserializeContract(input)).toThrow();
+  });
+
+  it('serialized role carries its control policy, defaulted to external', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = makeContractWithRolesAndPolicies();
+
+    const contract = serializer.deserializeContract(input);
+    const json = serializer.serializeContract(contract);
+    const reparsed = JSON.parse(JSON.stringify(json));
+
+    const role = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].entries.role['app_user'];
+    expect(role).toEqual({
+      kind: 'role',
+      name: 'app_user',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      control: 'external',
+    });
   });
 
   it('serialized policy matches expected shape', () => {

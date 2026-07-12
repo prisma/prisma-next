@@ -9,6 +9,7 @@ import { entityAt, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-component
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { type PostgresRole, ROLE_DEFAULT_CONTROL_POLICY } from '../postgres-role';
 import { isPostgresSchema } from '../postgres-schema';
 import { postgresNodeStorageCoordinate } from '../schema-ir/node-storage-coordinate';
 import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
@@ -299,6 +300,17 @@ export function resolvePostgresNodeIssueCreationFactoryName(
  * the subject's `namespaceId` falls back to {@link UNBOUND_NAMESPACE_ID} via
  * `resolveNamespaceIdForEntity`'s own fallback, matching how the call-side
  * resolver treats the `DropTableCall`/`DropNativeEnumTypeCall` it produces.
+ *
+ * A role node resolves against the `PostgresRole` contract entity at that
+ * role's name (roles are root-level diff subjects, so the name is the
+ * second path segment after the tree root). A `not-found` role is declared,
+ * so the entity is always found and its `control` read directly — which is
+ * always {@link ROLE_DEFAULT_CONTROL_POLICY} today, since no authoring
+ * surface sets it otherwise. A `not-expected` role has no contract entity
+ * (an undeclared live role, by definition), so the subject falls back to
+ * the same default — roles are referenced but never owned, so an
+ * undeclared role gets exactly the same governance as a declared one.
+ * Never creates a new object: role provisioning is a non-goal.
  */
 export function resolvePostgresNodeIssueControlPolicySubject(
   issue: SchemaDiffIssue<SqlSchemaDiffNode>,
@@ -315,6 +327,23 @@ export function resolvePostgresNodeIssueControlPolicySubject(
     return {
       namespaceId: resolveNamespaceIdForDdlSchema(contract, namespaceNode.schemaName),
       createsNewObject: issue.reason === 'not-found',
+    };
+  }
+
+  if (node.nodeKind === PostgresSchemaNodeKind.role) {
+    const roleName = issue.path[1];
+    const roleEntity =
+      roleName === undefined
+        ? undefined
+        : entityAt<PostgresRole>(contract.storage, {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            entityKind: 'role',
+            entityName: roleName,
+          });
+    return {
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      explicitNodeControlPolicy: roleEntity?.control ?? ROLE_DEFAULT_CONTROL_POLICY,
+      createsNewObject: false,
     };
   }
 
