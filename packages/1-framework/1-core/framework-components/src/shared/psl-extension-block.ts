@@ -272,6 +272,12 @@ export interface PslExtensionBlockAttribute {
  */
 export interface PslExtensionBlock {
   readonly kind: string;
+  /**
+   * The block's parse identity — the source PSL keyword it was declared
+   * with. `kind`/`discriminator` is its storage identity; several keywords
+   * can share one. E.g. the five `policy_*` keywords all lower to the
+   * `policy` entity kind.
+   */
   readonly keyword: string;
   readonly name: string;
   readonly parameters: Record<string, PslExtensionBlockParamValue>;
