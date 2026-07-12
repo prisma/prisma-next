@@ -168,4 +168,18 @@ describe('validateEnumValueLength', () => {
     const longValue = 'a'.repeat(64);
     expect(() => validateEnumValueLength(longValue, 'Status')).toThrow(SqlEscapeError);
   });
+
+  it('measures the limit in UTF-8 bytes, not characters — a 63-byte multibyte label passes', () => {
+    // '€' (U+20AC) is 3 UTF-8 bytes: 21 chars = 63 bytes, exactly at the limit.
+    const label = '€'.repeat(21);
+    expect(label.length).toBe(21);
+    expect(() => validateEnumValueLength(label, 'Status')).not.toThrow();
+  });
+
+  it('throws for a multibyte label whose byte length exceeds 63 despite a short character count', () => {
+    // 22 chars = 66 UTF-8 bytes — under the 63-CHARACTER count, over the 63-BYTE limit.
+    const label = '€'.repeat(22);
+    expect(label.length).toBe(22);
+    expect(() => validateEnumValueLength(label, 'Status')).toThrow(SqlEscapeError);
+  });
 });

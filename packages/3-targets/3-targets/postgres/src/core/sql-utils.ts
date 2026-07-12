@@ -93,10 +93,10 @@ export function qualifyName(schemaName: string, objectName: string): string {
  * @throws {SqlEscapeError} If the value exceeds the maximum length
  */
 export function validateEnumValueLength(value: string, enumTypeName: string): void {
-  if (value.length > MAX_IDENTIFIER_LENGTH) {
+  if (new TextEncoder().encode(value).length > MAX_IDENTIFIER_LENGTH) {
     throw new SqlEscapeError(
       `Enum value "${value.slice(0, 20)}..." for type "${enumTypeName}" exceeds PostgreSQL's ` +
-        `${MAX_IDENTIFIER_LENGTH}-character label limit`,
+        `${MAX_IDENTIFIER_LENGTH}-byte label limit`,
       value,
       'literal',
     );
