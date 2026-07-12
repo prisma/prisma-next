@@ -3,8 +3,9 @@ import type { SqlSchemaDiffResult } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
 import { classifyDiffSubjectGranularity } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { diffSchemas } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -12,13 +13,37 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresContract } from '../postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
-import { isRoleDiffIssue } from '../schema-ir/postgres-role-schema-node';
 import {
   postgresDiffSubjectGranularity,
   type SqlSchemaDiffNode,
 } from '../schema-ir/schema-node-kinds';
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
 import { resolvePostgresNodeIssueControlPolicySubject } from './control-policy';
+
+/**
+ * Whether a diff issue's subject node is cluster-scoped — it carries its own
+ * `namespaceId` field (only role and policy diff nodes do) and that
+ * coordinate is the unbound sentinel, meaning the node is not owned by any
+ * schema/namespace. A role node is always cluster-scoped (roles are
+ * cluster-level objects); a policy node's `namespaceId` is always its
+ * table's resolved DDL schema, never the sentinel. Namespace-ownership
+ * scoping (which compares `issue.path[1]` against the set of DDL schemas
+ * the contract owns) makes no sense for a cluster-scoped subject — its path
+ * segment at that index is the object's own name, not a schema name — so
+ * such an issue bypasses that scoping entirely.
+ */
+function isClusterScopedIssue(issue: SchemaDiffIssue): boolean {
+  const node = issue.expected ?? issue.actual;
+  return node !== undefined && nodeNamespaceId(node) === UNBOUND_NAMESPACE_ID;
+}
+
+function nodeNamespaceId(node: DiffableNode): string | undefined {
+  if (!Object.hasOwn(node, 'namespaceId')) return undefined;
+  return blindCast<
+    { namespaceId: string },
+    'presence of an own namespaceId field was just checked via Object.hasOwn'
+  >(node).namespaceId;
+}
 
 function ownedSchemaNames(expected: PostgresDatabaseSchemaNode): ReadonlySet<string> {
   const policyNamespaces = Object.values(expected.namespaces).flatMap((ns) =>
@@ -54,22 +79,22 @@ function pruneTableLessNamespaces(
 }
 
 /**
- * Resolves a verdict-diff issue's subject table's declared control policy
- * directly from the contract, by delegating to the same node-typed resolver
+ * Resolves a verdict-diff issue's subject's declared control policy directly
+ * from the contract, by delegating to the same node-typed resolver
  * ({@link resolvePostgresNodeIssueControlPolicySubject}) the planner uses to
- * gate DDL calls. `undefined` when the issue resolves to no contract table.
+ * gate DDL calls. `undefined` when the issue resolves to no contract subject.
  *
- * A role issue resolves to `external` unconditionally, regardless of the
- * contract's own default/table policy: a role is referenced by the contract
- * but not owned, and `external`'s existing semantics — a missing declared
- * subject still fails, every extra is suppressed — are exactly the wanted
- * asymmetric grading for a cluster object the framework does not own.
+ * A role issue resolves through that same resolver to `external`
+ * unconditionally (see its role branch), regardless of the contract's own
+ * default policy: a role is referenced by the contract but not owned, and
+ * `external`'s existing semantics — a missing declared subject still fails,
+ * every extra is suppressed — are exactly the wanted asymmetric grading for
+ * a cluster object the framework does not own.
  */
 function resolveControlPolicy(
   issue: SchemaDiffIssue,
   contract: Contract<SqlStorage>,
 ): ControlPolicy | undefined {
-  if (isRoleDiffIssue(issue)) return 'external';
   const nodeIssue = blindCast<
     SchemaDiffIssue<SqlSchemaDiffNode>,
     'every node in a Postgres schema diff tree is a SqlSchemaDiffNode'
@@ -83,8 +108,9 @@ function resolveControlPolicy(
  * the expected tree (resolved leaf values, expander threaded, FK schemas
  * resolved, table-less namespaces pruned), run the generic
  * differ over the trees as derived, and scope out `not-expected` findings under namespaces the
- * contract does not own. Ownership is role-aware, mirroring the legacy
- * decomposition: relational extras check the PRUNED owned set (the legacy
+ * contract does not own. Ownership scoping bypasses cluster-scoped subjects
+ * (roles today), mirroring the legacy decomposition: relational extras check
+ * the PRUNED owned set (the legacy
  * per-namespace walk never visited a table-less namespace, so its live
  * relational contents are invisible), while `structural` extras (RLS
  * policies) check the FULL owned set (the legacy policy diff governed
@@ -115,7 +141,7 @@ export function diffPostgresSchema(input: {
   const structuralOwned = ownedSchemaNames(fullExpected);
   const issues = diffSchemas(expected, actual).filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
-    if (isRoleDiffIssue(issue)) return true;
+    if (isClusterScopedIssue(issue)) return true;
     const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;
@@ -174,15 +200,15 @@ export interface PostgresPlanDiff {
   readonly expected: PostgresDatabaseSchemaNode;
   /** The live ("start") tree, padded with empty namespaces so a missing schema's tables pair. */
   readonly actual: PostgresDatabaseSchemaNode;
-  /** The one node diff over the two trees: relational + policy drift, role-aware ownership filtered. */
+  /** The one node diff over the two trees: relational + policy drift, cluster-scope-aware ownership filtered. */
   readonly issues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[];
 }
 
 /**
  * The Postgres planner's diff input: the SAME tree-building
  * `diffPostgresSchema` uses (expander threaded, FK schemas resolved,
- * table-less namespaces pruned, role-aware ownership filter) plus actual
- * namespace padding (so a missing
+ * table-less namespaces pruned, cluster-scope-aware ownership filter) plus
+ * actual namespace padding (so a missing
  * schema's tables surface as `not-found` instead of a swallowed namespace
  * `not-found`). One differ drives both verify and plan; this is the
  * plan-side derivation. The single issue list covers tables / columns /
@@ -216,7 +242,7 @@ export function buildPostgresPlanDiff(input: {
     'both trees are PostgresDatabaseSchemaNodes, so every diff-issue node is a SqlSchemaDiffNode'
   >(diffSchemas(expected, paddedActual)).filter((issue) => {
     if (issue.reason !== 'not-expected') return true;
-    if (isRoleDiffIssue(issue)) return true;
+    if (isClusterScopedIssue(issue)) return true;
     const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;

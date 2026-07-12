@@ -391,10 +391,7 @@ describe('RLS planner roles produce zero ops (AC-6)', () => {
   // comparing each role-present plan against a role-free baseline: the role
   // difference must leave the op set byte-identical.
 
-  async function planOpIds(
-    contract: Contract<SqlStorage>,
-    schema: PostgresDatabaseSchemaNode,
-  ): Promise<readonly string[]> {
+  async function plan(contract: Contract<SqlStorage>, schema: PostgresDatabaseSchemaNode) {
     const planner = createPostgresMigrationPlanner(stubLowerer);
     const result = planner.plan({
       contract,
@@ -405,7 +402,15 @@ describe('RLS planner roles produce zero ops (AC-6)', () => {
       spaceId: APP_SPACE_ID,
     });
     expect(result.kind).toBe('success');
-    if (result.kind !== 'success') return [];
+    if (result.kind !== 'success') throw new Error('expected a successful plan');
+    return result;
+  }
+
+  async function planOpIds(
+    contract: Contract<SqlStorage>,
+    schema: PostgresDatabaseSchemaNode,
+  ): Promise<readonly string[]> {
+    const result = await plan(contract, schema);
     const ops = await Promise.all(result.plan.operations);
     return ops.map((op) => op.id);
   }
@@ -433,6 +438,16 @@ describe('RLS planner roles produce zero ops (AC-6)', () => {
     expect(withExtraRole).toEqual(baseline);
     // No op references the undeclared role — in particular, no drop.
     expect(withExtraRole.some((id) => /legacy/i.test(id))).toBe(false);
+  });
+
+  it('a missing declared role is now surfaced as a controlPolicySuppressedCall warning', async () => {
+    const result = await plan(buildContractWith([], ['app_user']), schemaWith([]));
+    expect(result.warnings?.some((w) => w.kind === 'controlPolicySuppressedCall')).toBe(true);
+  });
+
+  it('an extra live role is now surfaced as a controlPolicySuppressedCall warning', async () => {
+    const result = await plan(buildContractWith([]), schemaWith([], { roleNames: ['legacy'] }));
+    expect(result.warnings?.some((w) => w.kind === 'controlPolicySuppressedCall')).toBe(true);
   });
 });
 

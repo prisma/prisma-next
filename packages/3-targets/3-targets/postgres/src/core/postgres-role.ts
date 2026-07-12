@@ -1,5 +1,15 @@
+import type { ControlPolicy } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
+
+/**
+ * Roles are referenced by the contract but never owned — the framework
+ * issues no `CREATE`/`DROP ROLE`, so a role's effective governance is always
+ * `external`: a missing declared role fails verify, an extra live role is
+ * tolerated, and the planner emits zero role DDL. There is no authoring
+ * surface yet that can set a role's control to anything else.
+ */
+export const ROLE_DEFAULT_CONTROL_POLICY: ControlPolicy = 'external';
 
 export interface PostgresRoleInput {
   readonly name: string;
@@ -8,6 +18,11 @@ export interface PostgresRoleInput {
    * from `@prisma-next/framework-components/ir`.
    */
   readonly namespaceId: string;
+  /**
+   * Defaults to {@link ROLE_DEFAULT_CONTROL_POLICY} when omitted — no
+   * authoring surface sets this to anything else today.
+   */
+  readonly control?: ControlPolicy;
 }
 
 /**
@@ -22,16 +37,24 @@ export interface PostgresRoleInput {
  * Extends `SqlNode` directly, frozen at construction via `freezeNode(this)`.
  * The `kind: 'role'` discriminant is enumerable so it survives JSON.
  * Matches the entries key (one-string rule).
+ *
+ * `control` always carries a value (never omitted): it defaults to
+ * {@link ROLE_DEFAULT_CONTROL_POLICY} in the constructor, so both a
+ * freshly-authored role and one hydrated from an older `contract.json`
+ * lacking the field resolve the same way — the control-policy resolver
+ * reads it directly off the entity instead of special-casing role issues.
  */
 export class PostgresRole extends SqlNode {
   override readonly kind = 'role' as const;
   readonly name: string;
   readonly namespaceId: string;
+  readonly control: ControlPolicy;
 
   constructor(input: PostgresRoleInput) {
     super();
     this.name = input.name;
     this.namespaceId = input.namespaceId;
+    this.control = input.control ?? ROLE_DEFAULT_CONTROL_POLICY;
     freezeNode(this);
   }
 }

@@ -30,7 +30,6 @@ import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { parseRlsPolicyWireName } from '../rls/wire-name';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
-import { isRoleDiffIssue } from '../schema-ir/postgres-role-schema-node';
 import { PostgresSchemaNodeKind, type SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import {
   formatPostgresControlPolicySubjectLabel,
@@ -187,14 +186,12 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       frameworkComponents: options.frameworkComponents,
     });
     const policyDiffIssues = rawIssues.filter((issue) => isPolicyDiffIssue(issue));
-    // Role diff issues are a third partition that maps to ZERO ops: role
-    // provisioning is a project non-goal (existence verify only), so a
-    // not-found or not-expected role must never reach `mapNodeIssueToCall`
-    // (whose default is the unsupported-operation fail-loud). Excluding them
-    // from the relational partition drops them from planning entirely.
-    const relationalDiffIssues = rawIssues.filter(
-      (issue) => !isPolicyDiffIssue(issue) && !isRoleDiffIssue(issue),
-    );
+    // Role diff issues resolve to the `external` control policy (see
+    // `resolvePostgresNodeIssueControlPolicySubject`'s role branch), so the
+    // control-policy partition below suppresses them to zero ops on its own,
+    // before `mapNodeIssueToCall` ever sees them — no separate exclusion
+    // needed here.
+    const relationalDiffIssues = rawIssues.filter((issue) => !isPolicyDiffIssue(issue));
 
     // The generic differ is total and un-gated: strict-mode extras filtering
     // (dropping `not-expected` findings outside strict mode, mirroring the
