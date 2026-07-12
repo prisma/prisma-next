@@ -82,6 +82,19 @@ export function qualifyName(schemaName: string, objectName: string): string {
 }
 
 /**
+ * Quotes a possibly dot-qualified name segment-by-segment:
+ * `order_status` -> `"order_status"`, `auth.aal_level` -> `"auth"."aal_level"`.
+ * A single-segment name round-trips to exactly {@link quoteIdentifier}; whole-
+ * string quoting (`"auth.aal_level"`) would be one wrong identifier.
+ */
+export function quoteQualifiedName(name: string): string {
+  return name
+    .split('.')
+    .map((segment) => quoteIdentifier(segment))
+    .join('.');
+}
+
+/**
  * Validates that an enum value doesn't exceed PostgreSQL's label length limit.
  *
  * PostgreSQL enum labels have a maximum length of NAMEDATALEN-1 (63 bytes by default).

@@ -3,6 +3,7 @@ import {
   escapeLiteral,
   qualifyName,
   quoteIdentifier,
+  quoteQualifiedName,
   SqlEscapeError,
   validateEnumValueLength,
 } from '../src/core/sql-utils';
@@ -116,6 +117,24 @@ describe('qualifyName', () => {
   it('propagates null byte errors', () => {
     expect(() => qualifyName('schema\0name', 'table')).toThrow(SqlEscapeError);
     expect(() => qualifyName('schema', 'table\0name')).toThrow(SqlEscapeError);
+  });
+});
+
+describe('quoteQualifiedName', () => {
+  it('quotes an unqualified name as a single identifier', () => {
+    expect(quoteQualifiedName('order_status')).toBe('"order_status"');
+  });
+
+  it('quotes each segment of a dot-qualified name', () => {
+    expect(quoteQualifiedName('auth.aal_level')).toBe('"auth"."aal_level"');
+  });
+
+  it('round-trips a single segment to exactly quoteIdentifier', () => {
+    expect(quoteQualifiedName('Status_v2')).toBe(quoteIdentifier('Status_v2'));
+  });
+
+  it('escapes embedded double quotes per segment', () => {
+    expect(quoteQualifiedName('sch"ema.ta"ble')).toBe('"sch""ema"."ta""ble"');
   });
 });
 
