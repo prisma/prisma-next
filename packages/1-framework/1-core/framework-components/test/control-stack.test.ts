@@ -18,6 +18,7 @@ import type { Codec } from '../src/shared/codec';
 import type { AnyCodecDescriptor } from '../src/shared/codec-descriptor';
 import type { CodecLookup } from '../src/shared/codec-types';
 import type { ComponentDescriptor } from '../src/shared/framework-components';
+import { isRuntimeError } from '../src/shared/runtime-error';
 
 function createDescriptor<K extends string = 'target'>(
   overrides: Partial<ComponentDescriptor<string>> & { kind?: K } = {} as Partial<
@@ -445,6 +446,48 @@ describe('assembleAuthoringContributions', () => {
         }),
       ]),
     ).toThrow(/Duplicate pslBlock keyword "shared_keyword".*"policyA".*"policyB"/);
+  });
+
+  it('raises a structured runtime error for a duplicate pslBlock keyword', () => {
+    let caught: unknown;
+    try {
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              policyA: {
+                kind: 'entity',
+                discriminator: 'shared-disc',
+                output: { factory: () => ({}) },
+              },
+              policyB: {
+                kind: 'entity',
+                discriminator: 'shared-disc-b',
+                output: { factory: () => ({}) },
+              },
+            },
+            pslBlockDescriptors: {
+              policyA: makeDeclarativePslBlockDescriptor('shared-disc', 'shared_keyword'),
+              policyB: makeDeclarativePslBlockDescriptor('shared-disc-b', 'shared_keyword'),
+            },
+          },
+        }),
+      ]);
+    } catch (error) {
+      caught = error;
+    }
+    expect(isRuntimeError(caught)).toBe(true);
+    if (isRuntimeError(caught)) {
+      expect(caught.code).toBe('RUNTIME.DUPLICATE_AUTHORING_DISCRIMINATOR');
+      expect(caught.category).toBe('RUNTIME');
+      expect(caught.details).toEqual({
+        label: 'pslBlock',
+        keyLabel: 'keyword',
+        key: 'shared_keyword',
+        existingPath: 'policyA',
+        path: 'policyB',
+      });
+    }
   });
 
   it('allows two pslBlockDescriptors contributions sharing a discriminator when their keywords differ (N:1)', () => {

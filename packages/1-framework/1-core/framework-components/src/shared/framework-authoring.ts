@@ -12,6 +12,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type { CodecLookup } from './codec-types';
 import type { PslBlockParam, PslExtensionBlock, PslSpan } from './psl-extension-block';
+import { runtimeError } from './runtime-error';
 
 export type EnumInferredMemberType = 'text' | 'int';
 
@@ -812,8 +813,10 @@ function assertUniqueDiscriminators(
   for (const { path, discriminator: key } of entries) {
     const existing = seen.get(key);
     if (existing !== undefined) {
-      throw new Error(
+      throw runtimeError(
+        'RUNTIME.DUPLICATE_AUTHORING_DISCRIMINATOR',
         `Duplicate ${label} ${keyLabel} "${key}" registered at both "${existing}" and "${path}". Each ${label} contribution must use a unique ${keyLabel}.`,
+        { label, keyLabel, key, existingPath: existing, path },
       );
     }
     seen.set(key, path);
