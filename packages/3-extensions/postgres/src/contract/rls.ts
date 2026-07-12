@@ -75,11 +75,22 @@ export interface RlsWithCheckPolicyDescriptor extends RlsPolicyDescriptorBase {
   readonly withCheck: RlsPredicate;
 }
 
-/** Descriptor for the operations taking both predicates: UPDATE and ALL. */
-export interface RlsUsingWithCheckPolicyDescriptor extends RlsPolicyDescriptorBase {
-  readonly using: RlsPredicate;
-  readonly withCheck: RlsPredicate;
-}
+/**
+ * Descriptor for the operations taking both predicates: UPDATE and ALL. At
+ * least one of `using`/`withCheck` is required; zero predicates is a compile
+ * error. Both stay individually optional because PSL's lowering accepts
+ * either alone, and the handle carries only what was authored — an omitted
+ * predicate is omitted from the content hash, byte-identical to PSL.
+ */
+export type RlsUsingWithCheckPolicyDescriptor =
+  | (RlsPolicyDescriptorBase & {
+      readonly using: RlsPredicate;
+      readonly withCheck?: RlsPredicate;
+    })
+  | (RlsPolicyDescriptorBase & {
+      readonly using?: RlsPredicate;
+      readonly withCheck: RlsPredicate;
+    });
 
 function assertNonEmptyName(helper: string, name: string): void {
   if (name.trim().length === 0) {

@@ -1,7 +1,8 @@
 /**
  * Static predicate matrix for the RLS policy helpers, mirroring Postgres:
  * SELECT/DELETE take `using` only; INSERT takes `withCheck` only; UPDATE/ALL
- * take both (required). `permissive` is not authorable on any of them.
+ * take either or both (at least one). `permissive` is not authorable on any
+ * of them.
  */
 
 import { expectTypeOf } from 'vitest';
@@ -60,15 +61,27 @@ policyDelete(Profile, { name: 'p', roles: [anon], using: 'true', withCheck: 'tru
 // @ts-expect-error — policyInsert rejects a using predicate
 policyInsert(Profile, { name: 'p', roles: [anon], withCheck: 'true', using: 'true' });
 
-// UPDATE requires both predicates.
-// @ts-expect-error — policyUpdate requires withCheck
-policyUpdate(Profile, { name: 'p', roles: [anon], using: 'true' });
-// @ts-expect-error — policyUpdate requires using
-policyUpdate(Profile, { name: 'p', roles: [anon], withCheck: 'true' });
+// UPDATE takes using, withCheck, or both — each single-predicate form compiles.
+expectTypeOf(policyUpdate(Profile, { name: 'p', roles: [anon], using: 'true' })).toExtend<
+  RlsPolicyHandle<'update'>
+>();
+expectTypeOf(policyUpdate(Profile, { name: 'p', roles: [anon], withCheck: 'true' })).toExtend<
+  RlsPolicyHandle<'update'>
+>();
 
-// ALL requires both predicates.
-// @ts-expect-error — policyAll requires withCheck
-policyAll(Profile, { name: 'p', roles: [anon], using: 'true' });
+// ALL takes using, withCheck, or both — each single-predicate form compiles.
+expectTypeOf(policyAll(Profile, { name: 'p', roles: [anon], using: 'true' })).toExtend<
+  RlsPolicyHandle<'all'>
+>();
+expectTypeOf(policyAll(Profile, { name: 'p', roles: [anon], withCheck: 'true' })).toExtend<
+  RlsPolicyHandle<'all'>
+>();
+
+// Zero predicates on UPDATE/ALL is a compile error.
+// @ts-expect-error — policyUpdate requires at least one predicate
+policyUpdate(Profile, { name: 'p', roles: [anon] });
+// @ts-expect-error — policyAll requires at least one predicate
+policyAll(Profile, { name: 'p', roles: [anon] });
 
 // `permissive` is not authorable on any helper.
 // @ts-expect-error — permissive is not an authoring input

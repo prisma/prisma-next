@@ -146,6 +146,42 @@ describe('policy helpers capture inputs faithfully', () => {
     });
   });
 
+  it('policyUpdate with only using: the handle carries exactly the authored predicate', () => {
+    const handle = policyUpdate(Profile, {
+      name: 'profile_owner_write',
+      roles: [authenticated],
+      using: '"userId"::uuid = auth.uid()',
+    });
+
+    expect(handle).toEqual({
+      entityKind: 'policy',
+      operation: 'update',
+      name: 'profile_owner_write',
+      model: Profile,
+      roles: [authenticated],
+      using: '"userId"::uuid = auth.uid()',
+    });
+    expect(Object.keys(handle)).not.toContain('withCheck');
+  });
+
+  it('policyAll with only withCheck: the handle carries exactly the authored predicate', () => {
+    const handle = policyAll(Profile, {
+      name: 'profile_check_all',
+      roles: [authenticated],
+      withCheck: 'true',
+    });
+
+    expect(handle).toEqual({
+      entityKind: 'policy',
+      operation: 'all',
+      name: 'profile_check_all',
+      model: Profile,
+      roles: [authenticated],
+      withCheck: 'true',
+    });
+    expect(Object.keys(handle)).not.toContain('using');
+  });
+
   it('policyAll: using and withCheck', () => {
     const handle = policyAll(Profile, {
       name: 'profile_owner_all',
