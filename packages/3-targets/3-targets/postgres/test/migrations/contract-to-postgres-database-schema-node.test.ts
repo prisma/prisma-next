@@ -349,6 +349,84 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespac
   });
 });
 
+describe('contractToPostgresDatabaseSchemaNode — unbound-slot projection', () => {
+  function contractWithNamespaces(namespaces: Record<string, PostgresSchema>): PostgresContract {
+    return {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:unbound-slot-projection-test'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:unbound-slot-projection-test'),
+        namespaces,
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+  }
+
+  it('a roles-only unbound slot alongside named namespaces contributes no "public" node', () => {
+    const role = new PostgresRole({ name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID });
+    const unboundSchema = new PostgresSchema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: {}, role: { anon: role } },
+    });
+    const authSchema = new PostgresSchema({
+      id: 'auth',
+      entries: { table: { [TABLE_NAME]: profilesTable() } },
+    });
+    const root = contractToPostgresDatabaseSchemaNode(
+      contractWithNamespaces({ [UNBOUND_NAMESPACE_ID]: unboundSchema, auth: authSchema }),
+      projectionOptions,
+    );
+
+    expect(Object.keys(root.namespaces)).toEqual(['auth']);
+    expect(root.namespaces['public']).toBeUndefined();
+    expect(root.existingSchemas).toEqual(['auth']);
+    expect(root.roles).toContainEqual(expect.objectContaining({ name: 'anon' }));
+  });
+
+  it('a single-namespace unbound contract with tables and roles keeps its "public" node with tables (unchanged)', () => {
+    const role = new PostgresRole({ name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID });
+    const unboundSchema = new PostgresSchema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: { [TABLE_NAME]: profilesTable() }, role: { anon: role } },
+    });
+    const root = contractToPostgresDatabaseSchemaNode(
+      contractWithNamespaces({ [UNBOUND_NAMESPACE_ID]: unboundSchema }),
+      projectionOptions,
+    );
+
+    expect(Object.keys(root.namespaces)).toEqual(['public']);
+    expect(Object.keys(root.namespaces['public']!.tables)).toEqual([TABLE_NAME]);
+    expect(root.existingSchemas).toEqual(['public']);
+    expect(root.roles).toContainEqual(expect.objectContaining({ name: 'anon' }));
+  });
+
+  it('a bound "public" namespace with tables plus a roles-only unbound slot keeps the public tables (no clobber)', () => {
+    const role = new PostgresRole({ name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID });
+    const unboundSchema = new PostgresSchema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: {}, role: { anon: role } },
+    });
+    const publicSchema = new PostgresSchema({
+      id: 'public',
+      entries: { table: { [TABLE_NAME]: profilesTable() } },
+    });
+    const root = contractToPostgresDatabaseSchemaNode(
+      contractWithNamespaces({ [UNBOUND_NAMESPACE_ID]: unboundSchema, public: publicSchema }),
+      projectionOptions,
+    );
+
+    expect(Object.keys(root.namespaces)).toEqual(['public']);
+    expect(Object.keys(root.namespaces['public']!.tables)).toEqual([TABLE_NAME]);
+    expect(root.existingSchemas).toEqual(['public']);
+    expect(root.roles).toContainEqual(expect.objectContaining({ name: 'anon' }));
+  });
+});
+
 describe('contractToPostgresDatabaseSchemaNode — native_enum projection', () => {
   function contractWithEnum(): PostgresContract {
     const schema = new PostgresSchema({

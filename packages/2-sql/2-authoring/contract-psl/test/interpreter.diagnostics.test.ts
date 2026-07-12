@@ -1157,7 +1157,7 @@ model User {
       expect(unsupported?.span).toBeDefined();
     });
 
-    it('Postgres rejects `namespace unbound { … }` alongside a sibling named namespace', () => {
+    it('Postgres rejects a model-carrying `namespace unbound { … }` alongside a sibling named namespace', () => {
       const document = symbolTableInputFromParseArgs({
         schema: `namespace unbound {
   model Tenant {
@@ -1192,6 +1192,103 @@ namespace auth {
       // `ifDefined('span', unboundBlock?.span)` shape would silently
       // regress this without an explicit assertion.
       expect(reserved?.span).toBeDefined();
+    });
+
+    it('Postgres rejects the raw sentinel spelling `namespace __unbound__ { … }` with models alongside a sibling named namespace', () => {
+      const document = symbolTableInputFromParseArgs({
+        schema: `namespace __unbound__ {
+  model Tenant {
+    id Int @id
+  }
+}
+
+namespace auth {
+  model User {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        ...baseInput,
+        ...document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const reserved = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_RESERVED_NAMESPACE_NAME',
+      );
+      expect(reserved).toBeDefined();
+      expect(reserved?.span).toBeDefined();
+    });
+
+    it('Postgres rejects a model-carrying unbound alias even when a blocks-only unbound alias under the other spelling is declared first', () => {
+      const rolePslBlockDescriptors = {
+        role: {
+          kind: 'pslBlock' as const,
+          keyword: 'role',
+          discriminator: 'role-like',
+          name: { required: true },
+          parameters: {},
+        },
+      };
+      const roleAuthoringContributions = {
+        entityTypes: {
+          role: {
+            kind: 'entity' as const,
+            discriminator: 'role-like',
+            output: { factory: (raw: unknown) => raw },
+          },
+        },
+        pslBlockDescriptors: rolePslBlockDescriptors,
+      };
+
+      const document = symbolTableInputFromParseArgs({
+        schema: `namespace unbound {
+  role a {
+  }
+}
+
+namespace __unbound__ {
+  model M {
+    id Int @id
+  }
+}
+
+namespace auth {
+  model X {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: rolePslBlockDescriptors,
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        ...baseInput,
+        ...document,
+        authoringContributions: roleAuthoringContributions,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const reserved = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_RESERVED_NAMESPACE_NAME',
+      );
+      expect(reserved).toBeDefined();
+      // The blocks-only `namespace unbound { role a {} }` alias is declared
+      // first; the diagnostic must still point at the model-carrying
+      // `namespace __unbound__ { model M {} }` alias, not the first block
+      // that happens to resolve to the unbound id.
+      expect(reserved?.span).toEqual(
+        expect.objectContaining({ start: expect.objectContaining({ line: 6 }) }),
+      );
     });
 
     it('Postgres accepts `namespace unbound { … }` when it is the only named namespace', () => {

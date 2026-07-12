@@ -277,40 +277,12 @@ export function resolvePostgresNodeIssueCreationFactoryName(
 }
 
 /**
- * Resolve the control-policy subject coordinate for a single node-typed
- * {@link SchemaDiffIssue}. Mirrors the resolution
- * `resolvePostgresCallControlPolicySubject` performs for a generated DDL
- * call, but works *off the issue* — so the planner can partition issues by
- * effective policy before the diff engine runs.
- *
- * A whole storage entity (table or native enum) resolves generically off
- * {@link postgresNodeStorageCoordinate} — the node self-describes its
- * `(entityKind, entityName)`, so table and enum issues share one code path
- * with no per-kind branch. A sub-entity issue (a column/constraint drift
- * inside an owned table) carries no such coordinate on its own node, so it
- * falls back to reading the enclosing table name off the issue path.
- *
- * `createsNewObject` is delegated to {@link resolvePostgresNodeIssueCreationFactoryName}
- * in every branch below — that function already encodes exactly which
- * node-kind/reason combinations describe a brand-new top-level object
- * (a `not-found` table/enum, or an RLS-enablement `not-equal`).
- *
- * A `not-expected` (extra/dropped) entity carries no contract namespace
- * coordinate — the live object isn't claimed by any contract namespace — so
- * the subject's `namespaceId` falls back to {@link UNBOUND_NAMESPACE_ID} via
- * `resolveNamespaceIdForEntity`'s own fallback, matching how the call-side
- * resolver treats the `DropTableCall`/`DropNativeEnumTypeCall` it produces.
- *
- * A role node resolves against the `PostgresRole` contract entity at that
- * role's name (roles are root-level diff subjects, so the name is the
- * second path segment after the tree root). A `not-found` role is declared,
- * so the entity is always found and its `control` read directly — which is
- * always {@link ROLE_DEFAULT_CONTROL_POLICY} today, since no authoring
- * surface sets it otherwise. A `not-expected` role has no contract entity
- * (an undeclared live role, by definition), so the subject falls back to
- * the same default — roles are referenced but never owned, so an
- * undeclared role gets exactly the same governance as a declared one.
- * Never creates a new object: role provisioning is a non-goal.
+ * Resolves the control-policy subject for a node-typed {@link SchemaDiffIssue}
+ * (the issue-side mirror of `resolvePostgresCallControlPolicySubject`).
+ * Storage entities resolve off their node coordinate; a sub-entity issue
+ * resolves off the enclosing table read from the issue path; an unclaimed
+ * extra falls back to the unbound coordinate. A role always resolves
+ * `'external'` — roles are referenced, never owned.
  */
 export function resolvePostgresNodeIssueControlPolicySubject(
   issue: SchemaDiffIssue<SqlSchemaDiffNode>,
