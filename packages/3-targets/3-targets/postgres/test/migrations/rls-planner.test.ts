@@ -163,7 +163,6 @@ function schemaWith(
             rlsEnabled: options?.rlsEnabled ?? true,
           }),
         },
-        nativeEnumTypeNames: [],
       }),
     },
     roles: [],

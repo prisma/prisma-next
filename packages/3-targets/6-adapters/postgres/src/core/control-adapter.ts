@@ -63,6 +63,7 @@ import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql
 import {
   PostgresDatabaseSchemaNode,
   PostgresNamespaceSchemaNode,
+  PostgresNativeEnumSchemaNode,
   PostgresPolicySchemaNode,
   PostgresRoleSchemaNode,
   PostgresTableSchemaNode,
@@ -1139,10 +1140,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          ORDER BY t.typname`,
       [schema],
     );
-    const nativeEnums = nativeEnumResult.rows.map((r) => ({
-      typeName: r.typname,
-      values: parsePgNameArray(r.enumvalues),
-    }));
+    const enums = nativeEnumResult.rows.map(
+      (r) =>
+        new PostgresNativeEnumSchemaNode({
+          typeName: r.typname,
+          namespaceId: schema,
+          members: parsePgNameArray(r.enumvalues),
+        }),
+    );
     const policiesResult = await driver.query<{
       schemaname: string;
       tablename: string;
@@ -1225,7 +1230,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const namespace = new PostgresNamespaceSchemaNode({
       schemaName: schema,
       tables,
-      nativeEnums,
+      enums,
     });
     return { namespace, pgVersion: await this.getPostgresVersion(driver) };
   }

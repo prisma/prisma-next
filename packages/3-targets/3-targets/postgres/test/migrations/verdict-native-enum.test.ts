@@ -8,14 +8,14 @@ import { describe, expect, it } from 'vitest';
 import { diffPostgresSchema } from '../../src/core/migrations/diff-database-schema';
 import { PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
-import type { PostgresNativeEnumIntrospection } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresNativeEnumSchemaNode } from '../../src/core/schema-ir/postgres-native-enum-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 import { postgresDiffSubjectGranularity } from '../../src/core/schema-ir/schema-node-kinds';
 
 /**
  * Enum drift visibility end-to-end: the expected projection turns
- * `entries.native_enum` into diff-tree nodes, introspected `nativeEnums`
+ * `entries.native_enum` into diff-tree nodes, introspected enum nodes
  * become the actual-side nodes, the unified differ reports missing / extra /
  * value-mismatch, and the control-policy disposition grades them by the
  * DEFAULT reason→category path — with NO enum-specific classification. A
@@ -94,13 +94,20 @@ function ordersTable(): PostgresTableSchemaNode {
   });
 }
 
-function actualTree(nativeEnums: readonly PostgresNativeEnumIntrospection[]) {
+function actualTree(entries: readonly { typeName: string; values: readonly string[] }[]) {
   return new PostgresDatabaseSchemaNode({
     namespaces: {
       public: new PostgresNamespaceSchemaNode({
         schemaName: 'public',
         tables: { orders: ordersTable() },
-        nativeEnums,
+        enums: entries.map(
+          (entry) =>
+            new PostgresNativeEnumSchemaNode({
+              typeName: entry.typeName,
+              namespaceId: 'public',
+              members: entry.values,
+            }),
+        ),
       }),
     },
     roles: [],

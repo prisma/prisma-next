@@ -54,7 +54,6 @@ describe('PostgresMigrationPlanner authoring surface', () => {
           public: new PostgresNamespaceSchemaNode({
             schemaName: 'public',
             tables: {},
-            nativeEnumTypeNames: [],
           }),
         },
         pgVersion: '',

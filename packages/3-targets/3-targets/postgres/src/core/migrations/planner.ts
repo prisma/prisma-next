@@ -525,9 +525,9 @@ function retainUnownedExtras(
  * Returns the real `PostgresNamespaceSchemaNode` reference rather than a
  * projection: `storageTypePlanCallStrategy` hands this same value to codec
  * `planTypeOperations` hooks as `schema`, and hooks read the Postgres-specific
- * `nativeEnumTypeNames` field off it (via `PostgresNamespaceSchemaNode.is`) to
- * decide whether a native enum type already exists — a projection that only
- * copies `tables` would silently drop that signal. `StrategyContext.schema`'s
+ * `enums` field off it (via `PostgresNamespaceSchemaNode.is`) to decide
+ * whether a native enum type already exists — a projection that only copies
+ * `tables` would silently drop that signal. `StrategyContext.schema`'s
  * declared type (`SqlSchemaIR`, shared with SQLite's flat shape) doesn't
  * capture this, so the return is `blindCast` the same way `namespaceSchemaNodes`
  * in the family's relational walk already treats a namespace node as a
@@ -543,7 +543,7 @@ function relationalNamespaceNode(
   if (namespaceNode === undefined) return undefined;
   return blindCast<
     SqlSchemaIR,
-    'PostgresNamespaceSchemaNode carries tables (+ nativeEnumTypeNames, read by codec hooks via PostgresNamespaceSchemaNode.is) structurally compatible with the SqlSchemaIR shape the strategy layer declares'
+    'PostgresNamespaceSchemaNode carries tables (+ enums, read by codec hooks via PostgresNamespaceSchemaNode.is) structurally compatible with the SqlSchemaIR shape the strategy layer declares'
   >(namespaceNode);
 }
 

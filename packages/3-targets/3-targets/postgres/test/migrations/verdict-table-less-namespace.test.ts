@@ -108,7 +108,6 @@ function enumsNamespaceWithStrayTable(
         rlsEnabled: false,
       }),
     },
-    nativeEnumTypeNames: [],
   });
 }
 

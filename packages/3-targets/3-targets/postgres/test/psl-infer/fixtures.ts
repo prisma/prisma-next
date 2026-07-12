@@ -4,24 +4,27 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { postgresAuthoringPslBlockDescriptors } from '../../src/core/authoring';
 import { inferPostgresPslContract } from '../../src/core/psl-infer/infer-psl-contract';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
-import type { PostgresNativeEnumIntrospection } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresNativeEnumSchemaNode } from '../../src/core/schema-ir/postgres-native-enum-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 
 /**
  * Wraps a flat `{ tables, annotations? }` introspection fixture into the
  * `PostgresDatabaseSchemaNode` tree the target's inference walks. The flat
  * `annotations.pg.nativeEnums` (`{ typeName, values }` entries) becomes the
- * namespace's `nativeEnums`, with `nativeEnumTypeNames` derived from it unless
- * `annotations.pg.nativeEnumTypeNames` is given explicitly. All fixture tables
- * live under the single `public` namespace (`contract infer` introspects one
- * live schema).
+ * namespace's `enums` (one `PostgresNativeEnumSchemaNode` per entry). All
+ * fixture tables live under the single `public` namespace (`contract infer`
+ * introspects one live schema).
  */
 export function treeFromFlat(schemaIR: SqlSchemaIR): PostgresDatabaseSchemaNode {
-  const nativeEnums = readNativeEnums(schemaIR.annotations);
-  const explicitTypeNames = readNativeEnumTypeNames(schemaIR.annotations);
-  const nativeEnumTypeNames =
-    explicitTypeNames.length > 0 ? explicitTypeNames : nativeEnums.map((e) => e.typeName);
+  const enums = readNativeEnums(schemaIR.annotations).map(
+    (entry) =>
+      new PostgresNativeEnumSchemaNode({
+        typeName: entry.typeName,
+        namespaceId: 'public',
+        members: entry.values,
+      }),
+  );
   const tables: Record<string, PostgresTableSchemaNode> = {};
   for (const [name, table] of Object.entries(schemaIR.tables)) {
     tables[name] = new PostgresTableSchemaNode({
@@ -41,8 +44,7 @@ export function treeFromFlat(schemaIR: SqlSchemaIR): PostgresDatabaseSchemaNode 
       public: new PostgresNamespaceSchemaNode({
         schemaName: 'public',
         tables,
-        nativeEnumTypeNames,
-        nativeEnums,
+        enums,
       }),
     },
     roles: [],
@@ -72,16 +74,14 @@ function readPgAnnotationArray(
   return Array.isArray(value) ? value : undefined;
 }
 
-function readNativeEnumTypeNames(annotations: SqlSchemaIR['annotations']): readonly string[] {
-  const names = readPgAnnotationArray(annotations, 'nativeEnumTypeNames') ?? [];
-  return names.filter((name): name is string => typeof name === 'string');
+interface FlatNativeEnumEntry {
+  readonly typeName: string;
+  readonly values: readonly string[];
 }
 
-function readNativeEnums(
-  annotations: SqlSchemaIR['annotations'],
-): readonly PostgresNativeEnumIntrospection[] {
+function readNativeEnums(annotations: SqlSchemaIR['annotations']): readonly FlatNativeEnumEntry[] {
   const entries = readPgAnnotationArray(annotations, 'nativeEnums') ?? [];
-  return entries.filter((entry): entry is PostgresNativeEnumIntrospection => {
+  return entries.filter((entry): entry is FlatNativeEnumEntry => {
     if (typeof entry !== 'object' || entry === null) return false;
     const { typeName, values } = entry as { typeName?: unknown; values?: unknown };
     return (

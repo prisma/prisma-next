@@ -262,7 +262,6 @@ describe('inferPostgresPslContract', () => {
             rlsEnabled: false,
           }),
         },
-        nativeEnumTypeNames: [],
       });
     const tree = new PostgresDatabaseSchemaNode({
       namespaces: { public: thingNode('public'), auth: thingNode('auth') },

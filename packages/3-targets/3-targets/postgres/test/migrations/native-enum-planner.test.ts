@@ -31,8 +31,8 @@ import {
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 import { isPostgresSchema, PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
-import type { PostgresNativeEnumIntrospection } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresNativeEnumSchemaNode } from '../../src/core/schema-ir/postgres-native-enum-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 import { PostgresCreateType, PostgresDropType } from '../../src/exports/ddl';
 
@@ -145,7 +145,7 @@ function ordersTableNode(options: { readonly withStatusColumn: boolean }) {
 
 function liveTree(options: {
   readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
-  readonly nativeEnums?: readonly PostgresNativeEnumIntrospection[];
+  readonly nativeEnums?: readonly { typeName: string; values: readonly string[] }[];
 }): PostgresDatabaseSchemaNode {
   const nativeEnums = options.nativeEnums ?? [];
   return new PostgresDatabaseSchemaNode({
@@ -153,8 +153,14 @@ function liveTree(options: {
       sales: new PostgresNamespaceSchemaNode({
         schemaName: 'sales',
         tables: options.tables,
-        nativeEnumTypeNames: nativeEnums.map((e) => e.typeName),
-        nativeEnums,
+        enums: nativeEnums.map(
+          (entry) =>
+            new PostgresNativeEnumSchemaNode({
+              typeName: entry.typeName,
+              namespaceId: 'sales',
+              members: entry.values,
+            }),
+        ),
       }),
     },
     roles: [],
@@ -461,7 +467,7 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
     };
   }
 
-  function liveInPublic(nativeEnums: readonly PostgresNativeEnumIntrospection[]) {
+  function liveInPublic(nativeEnums: readonly { typeName: string; values: readonly string[] }[]) {
     return new PostgresDatabaseSchemaNode({
       namespaces: {
         public: new PostgresNamespaceSchemaNode({
@@ -478,8 +484,14 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
               rlsEnabled: false,
             }),
           },
-          nativeEnumTypeNames: nativeEnums.map((e) => e.typeName),
-          nativeEnums,
+          enums: nativeEnums.map(
+            (entry) =>
+              new PostgresNativeEnumSchemaNode({
+                typeName: entry.typeName,
+                namespaceId: 'public',
+                members: entry.values,
+              }),
+          ),
         }),
       },
       roles: [],

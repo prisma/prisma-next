@@ -84,7 +84,7 @@ function resolveControlPolicy(
  * shrink because a namespace declares no tables). The codec `verifyType`
  * hooks run once per contract namespace with tables against that
  * namespace's paired actual node (the hooks read namespace-scoped state
- * such as `nativeEnumTypeNames`).
+ * such as `enums`).
  */
 export function diffPostgresSchema(input: {
   readonly contract: Contract<SqlStorage>;

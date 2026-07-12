@@ -129,7 +129,6 @@ function actualSchema(policies: readonly PostgresRlsPolicy[]): PostgresDatabaseS
             ),
           }),
         },
-        nativeEnumTypeNames: [],
       }),
     },
     roles: [],

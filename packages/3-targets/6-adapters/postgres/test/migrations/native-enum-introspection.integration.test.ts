@@ -50,8 +50,9 @@ describe.sequential('Postgres native-enum introspection — ordered member value
     PostgresDatabaseSchemaNode.assert(result);
     const ns = result.namespaces['public']!;
 
-    expect(ns.nativeEnums).toEqual([{ typeName: 'status', values: ['draft', 'review', 'done'] }]);
-    expect(ns.nativeEnumTypeNames).toEqual(['status']);
+    expect(ns.enums.map((e) => ({ typeName: e.typeName, members: e.members }))).toEqual([
+      { typeName: 'status', members: ['draft', 'review', 'done'] },
+    ]);
   });
 
   it('reports ordered values for each of multiple enum types', {
@@ -64,9 +65,9 @@ describe.sequential('Postgres native-enum introspection — ordered member value
     PostgresDatabaseSchemaNode.assert(result);
     const ns = result.namespaces['public']!;
 
-    expect(ns.nativeEnums).toEqual([
-      { typeName: 'priority', values: ['low', 'high', 'medium'] },
-      { typeName: 'status', values: ['draft', 'review', 'done'] },
+    expect(ns.enums.map((e) => ({ typeName: e.typeName, members: e.members }))).toEqual([
+      { typeName: 'priority', members: ['low', 'high', 'medium'] },
+      { typeName: 'status', members: ['draft', 'review', 'done'] },
     ]);
   });
 
@@ -79,7 +80,6 @@ describe.sequential('Postgres native-enum introspection — ordered member value
     PostgresDatabaseSchemaNode.assert(result);
     const ns = result.namespaces['public']!;
 
-    expect(ns.nativeEnums).toEqual([]);
-    expect(ns.nativeEnumTypeNames).toEqual([]);
+    expect(ns.enums).toEqual([]);
   });
 });

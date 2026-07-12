@@ -23,7 +23,6 @@ export {
 export {
   PostgresNamespaceSchemaNode,
   type PostgresNamespaceSchemaNodeInput,
-  type PostgresNativeEnumIntrospection,
 } from '../core/schema-ir/postgres-namespace-schema-node';
 export {
   PostgresNativeEnumSchemaNode,

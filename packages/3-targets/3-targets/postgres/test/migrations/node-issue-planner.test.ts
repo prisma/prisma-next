@@ -68,7 +68,6 @@ function rootOf(tables: Record<string, PostgresTableSchemaNode>): PostgresDataba
       public: new PostgresNamespaceSchemaNode({
         schemaName: 'public',
         tables,
-        nativeEnumTypeNames: [],
       }),
     },
     roles: [],
@@ -282,7 +281,6 @@ describe('mapNodeIssueToCall — synthesized namespace issue', () => {
     const namespace = new PostgresNamespaceSchemaNode({
       schemaName: 'auth',
       tables: {},
-      nativeEnumTypeNames: [],
     });
     const issue: SchemaDiffIssue = {
       path: ['database', 'auth'],

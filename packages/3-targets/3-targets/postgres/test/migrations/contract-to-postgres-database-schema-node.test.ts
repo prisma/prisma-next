@@ -402,8 +402,7 @@ describe('contractToPostgresDatabaseSchemaNode — native_enum projection', () =
   it('an enum-free contract projects no enum children and empty plain fields (regression pin)', () => {
     const root = contractToPostgresDatabaseSchemaNode(makeContract({}), projectionOptions);
     const ns = root.namespaces[SCHEMA_NAME];
-    expect(ns?.nativeEnumTypeNames).toEqual([]);
-    expect(ns?.nativeEnums).toEqual([]);
+    expect(ns?.enums).toEqual([]);
     expect(ns?.children().every((child) => !child.id.startsWith('native_enum:'))).toBe(true);
   });
 });
