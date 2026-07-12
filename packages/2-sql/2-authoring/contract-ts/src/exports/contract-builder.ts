@@ -21,11 +21,13 @@ export type {
   ForeignKeyNode,
   IndexNode,
   ModelNode,
+  PackEntitiesInput,
   PrimaryKeyNode,
   RelationNode,
   UniqueConstraintNode,
 } from '../contract-definition';
 export type { TargetFieldRef } from '../contract-dsl';
+export { buildContractDefinition } from '../contract-lowering';
 export type { ExtractCodecTypesFromPack } from '../contract-types';
 export type {
   BoundEnumType,

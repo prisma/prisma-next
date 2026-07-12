@@ -10,6 +10,7 @@ import type { RlsPolicyOperation } from '@prisma-next/target-postgres/types';
 export interface RlsTargetModel {
   readonly stageOne: {
     readonly modelName?: string;
+    readonly namespace?: string;
     readonly fields: Record<string, ScalarFieldBuilder>;
   };
 }
@@ -58,6 +59,12 @@ export interface RlsPolicyHandle<Operation extends RlsPolicyOperation = RlsPolic
   readonly using?: RlsPredicate;
   readonly withCheck?: RlsPredicate;
 }
+
+/**
+ * The handle vocabulary `defineContract({ entities })` accepts: policies,
+ * role declarations, and RLS enablement markers.
+ */
+export type RlsEntityHandle = RlsPolicyHandle | RlsRoleHandle | RlsEnablementHandle;
 
 interface RlsPolicyDescriptorBase {
   /** The policy name prefix (PSL's block name); the wire name appends a content hash. */

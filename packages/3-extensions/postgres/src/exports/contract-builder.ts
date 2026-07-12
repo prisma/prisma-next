@@ -31,6 +31,7 @@ export {
   policySelect,
   policyUpdate,
   type RlsEnablementHandle,
+  type RlsEntityHandle,
   type RlsPolicyHandle,
   type RlsPredicate,
   type RlsPredicateContext,
