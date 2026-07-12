@@ -658,8 +658,8 @@ describe('generic extension-block printer (P2)', () => {
     });
   });
 
-  describe('block with unregistered discriminator', () => {
-    it('throws naming the unrecognised discriminator', () => {
+  describe('block with unregistered keyword', () => {
+    it('throws naming the unrecognised keyword', () => {
       const block: PslExtensionBlock = {
         kind: 'no-such-discriminator',
         keyword: 'no_such_keyword',
@@ -681,7 +681,51 @@ describe('generic extension-block printer (P2)', () => {
           pslBlockDescriptors: assembled.pslBlockDescriptors,
           codecLookup,
         }),
-      ).toThrow('no-such-discriminator');
+      ).toThrow('no_such_keyword');
+    });
+  });
+
+  describe('block whose keyword resolves to a descriptor owning a different discriminator', () => {
+    const shapeDescriptors = {
+      shape_circle: {
+        kind: 'pslBlock' as const,
+        keyword: 'shape_circle',
+        discriminator: 'circle',
+        name: { required: true },
+        parameters: {},
+      },
+      shape_square: {
+        kind: 'pslBlock' as const,
+        keyword: 'shape_square',
+        discriminator: 'square',
+        name: { required: true },
+        parameters: {},
+      },
+    };
+
+    it('throws naming the keyword and the mismatched kind, not the unregistered-keyword message', () => {
+      const block: PslExtensionBlock = {
+        // The "shape_circle" keyword resolves to the descriptor that owns
+        // discriminator "circle" — but this block carries kind "square",
+        // which is registered too, just under a different descriptor.
+        kind: 'square',
+        keyword: 'shape_circle',
+        name: 'Mismatched',
+        parameters: {},
+        blockAttributes: [],
+        span: STUB_SPAN,
+      };
+
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [makeNs([], [block])],
+        span: STUB_SPAN,
+      };
+
+      expect(() => printPslFromAst(ast, { pslBlockDescriptors: shapeDescriptors })).toThrow(
+        /shape_circle.*circle.*square/s,
+      );
     });
   });
 

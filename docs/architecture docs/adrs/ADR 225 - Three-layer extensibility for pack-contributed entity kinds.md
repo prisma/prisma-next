@@ -22,7 +22,7 @@ A contribution provides all three under the same discriminator:
 2. **An `entityTypes` factory** carrying the `discriminator` and an `output.factory: (input, ctx) => IRNode` that constructs the IR instance from the lowering input.
 3. **A `pslBlockDescriptors` entry** — an `AuthoringPslBlockDescriptor` carrying the same `discriminator`, describing the PSL block as data ([ADR 126](ADR%20126%20-%20PSL%20top-level%20block%20SPI.md)).
 
-The discriminator is the routing key in both directions. Parsing sets `PslExtensionBlock.kind = descriptor.discriminator`, and the lowering machinery looks up the factory by that key; printing looks up the descriptor by the block's own `keyword` (several keywords may share one discriminator — see [ADR 126](ADR%20126%20-%20PSL%20top-level%20block%20SPI.md)) to reconstruct PSL from the IR node. Convention: `<target-or-family>-<kind>`, e.g. `postgres-policy-select`.
+Parsing and lowering route by discriminator; printing routes by keyword. Parsing sets `PslExtensionBlock.kind = descriptor.discriminator`, and the lowering machinery looks up the factory by that key; printing looks up the descriptor by the block's own `keyword` (several keywords may share one discriminator — see [ADR 126](ADR%20126%20-%20PSL%20top-level%20block%20SPI.md)) to reconstruct PSL from the IR node. Convention: `<target-or-family>-<kind>`, e.g. `postgres-policy-select`.
 
 ## Why three layers, one key
 

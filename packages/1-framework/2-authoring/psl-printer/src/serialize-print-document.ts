@@ -25,38 +25,32 @@ const PSL_INDENT_UNIT = '  ';
  * and, historically, its keyword) — keyed by keyword because that is the
  * printer's real 1:1 dispatch key: several keywords may share one
  * `discriminator` (kind), but each keyword claims exactly one descriptor.
- * `discriminators` is only the set of registered kinds, used to sanity-check
- * that a block's `kind` is one the assembled descriptors actually produce.
  */
 interface PslBlockDispatchMap {
   readonly byKeyword: ReadonlyMap<string, AuthoringPslBlockDescriptor>;
-  readonly discriminators: ReadonlySet<string>;
 }
 
 function buildPslBlockDispatchMap(
   namespace: AuthoringPslBlockDescriptorNamespace | undefined,
 ): PslBlockDispatchMap {
   const byKeyword = new Map<string, AuthoringPslBlockDescriptor>();
-  const discriminators = new Set<string>();
   if (namespace) {
-    collectBlockDescriptors(namespace, byKeyword, discriminators);
+    collectBlockDescriptors(namespace, byKeyword);
   }
-  return { byKeyword, discriminators };
+  return { byKeyword };
 }
 
 function collectBlockDescriptors(
   namespace: AuthoringPslBlockDescriptorNamespace,
   byKeyword: Map<string, AuthoringPslBlockDescriptor>,
-  discriminators: Set<string>,
 ): void {
   for (const value of Object.values(namespace)) {
     if (isAuthoringPslBlockDescriptor(value)) {
       byKeyword.set(value.keyword, value);
-      discriminators.add(value.discriminator);
       continue;
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      collectBlockDescriptors(value, byKeyword, discriminators);
+      collectBlockDescriptors(value, byKeyword);
     }
   }
 }
@@ -132,9 +126,14 @@ function serializeExtensionBlock(
   codecLookup: CodecLookup | undefined,
 ): string {
   const descriptor = blockDispatchMap.byKeyword.get(extensionBlock.keyword);
-  if (!descriptor || !blockDispatchMap.discriminators.has(extensionBlock.kind)) {
+  if (!descriptor) {
     throw new Error(
-      `No pslBlockDescriptors contribution registered for extension-contributed block discriminator "${extensionBlock.kind}". Provide a matching pslBlockDescriptors contribution to serializePrintDocument, or remove the block from the input AST.`,
+      `No pslBlockDescriptors contribution registered for extension-contributed block keyword "${extensionBlock.keyword}". Provide a matching pslBlockDescriptors contribution to serializePrintDocument, or remove the block from the input AST.`,
+    );
+  }
+  if (descriptor.discriminator !== extensionBlock.kind) {
+    throw new Error(
+      `The pslBlockDescriptors contribution for keyword "${extensionBlock.keyword}" owns discriminator "${descriptor.discriminator}", but the block carries kind "${extensionBlock.kind}". Provide a matching pslBlockDescriptors contribution to serializePrintDocument, or remove the block from the input AST.`,
     );
   }
   const lines: string[] = [`${extensionBlock.keyword} ${extensionBlock.name} {`];
