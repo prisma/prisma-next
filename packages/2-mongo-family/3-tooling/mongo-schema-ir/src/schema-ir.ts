@@ -4,7 +4,6 @@ import { MongoSchemaIRNode } from './schema-node';
 import type { MongoSchemaVisitor } from './visitor';
 
 export class MongoSchemaIR extends MongoSchemaIRNode {
-  readonly kind = 'schema' as const;
   readonly nodeKind = 'schema' as const;
   /** Fixed sentinel: the schema is always the diff tree's single root. */
   readonly id = 'schema';

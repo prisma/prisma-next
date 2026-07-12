@@ -9,7 +9,6 @@ export interface MongoSchemaValidatorOptions {
 }
 
 export class MongoSchemaValidator extends MongoSchemaIRNode {
-  readonly kind = 'validator' as const;
   readonly nodeKind = 'validator' as const;
   /** Fixed sentinel: at most one validator exists per collection. */
   readonly id = 'validator';

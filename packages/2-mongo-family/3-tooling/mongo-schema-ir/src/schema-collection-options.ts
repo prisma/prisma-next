@@ -16,7 +16,6 @@ export interface MongoSchemaCollectionOptionsInput {
 }
 
 export class MongoSchemaCollectionOptions extends MongoSchemaIRNode {
-  readonly kind = 'collectionOptions' as const;
   readonly nodeKind = 'collectionOptions' as const;
   /** Fixed sentinel: at most one options node exists per collection. */
   readonly id = 'options';

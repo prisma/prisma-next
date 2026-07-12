@@ -13,7 +13,7 @@ describe('MongoSchemaIndex', () => {
     const index = new MongoSchemaIndex({
       keys: [{ field: 'email', direction: 1 }],
     });
-    expect(index.kind).toBe('index');
+    expect(index.nodeKind).toBe('index');
     expect(index.keys).toEqual([{ field: 'email', direction: 1 }]);
     expect(index.unique).toBe(false);
     expect(index.sparse).toBeUndefined();
@@ -82,7 +82,7 @@ describe('MongoSchemaIndex', () => {
 describe('MongoSchemaCollection', () => {
   it('constructs with name only', () => {
     const coll = new MongoSchemaCollection({ name: 'users' });
-    expect(coll.kind).toBe('collection');
+    expect(coll.nodeKind).toBe('collection');
     expect(coll.name).toBe('users');
     expect(coll.indexes).toEqual([]);
   });
@@ -125,7 +125,7 @@ describe('MongoSchemaValidator', () => {
       validationLevel: 'strict',
       validationAction: 'error',
     });
-    expect(v.kind).toBe('validator');
+    expect(v.nodeKind).toBe('validator');
     expect(v.jsonSchema).toEqual({
       bsonType: 'object',
       properties: { name: { bsonType: 'string' } },
@@ -163,7 +163,7 @@ describe('MongoSchemaValidator', () => {
 describe('MongoSchemaCollectionOptions', () => {
   it('constructs with no options', () => {
     const opts = new MongoSchemaCollectionOptions({});
-    expect(opts.kind).toBe('collectionOptions');
+    expect(opts.nodeKind).toBe('collectionOptions');
     expect(opts.capped).toBeUndefined();
     expect(opts.timeseries).toBeUndefined();
     expect(opts.collation).toBeUndefined();
@@ -467,7 +467,7 @@ describe('indexesEquivalent', () => {
 describe('MongoSchemaIR', () => {
   it('constructs with empty collections', () => {
     const ir = new MongoSchemaIR([]);
-    expect(ir.kind).toBe('schema');
+    expect(ir.nodeKind).toBe('schema');
     expect(ir.collections).toEqual([]);
   });
 
