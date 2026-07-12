@@ -144,7 +144,7 @@ describe.sequential('roles enter verify — existence-only, asymmetric', () => {
       throw new Error(`Runner failed:\n${formatRunnerFailure(executeResult.failure)}`);
   }
 
-  it('AC-4: a declared role missing from the database fails verify under external AND managed, naming the role', {
+  it('AC-4: a declared role missing from the database fails verify under external, managed, AND observed, naming the role', {
     timeout: testTimeout,
   }, async () => {
     // Apply a role-free contract so only the table is created (the runner's own
@@ -155,7 +155,10 @@ describe.sequential('roles enter verify — existence-only, asymmetric', () => {
 
     const schema = await familyInstance.introspect({ driver: driver!, contract: applied });
 
-    for (const controlPolicy of ['external', 'managed'] as const) {
+    // Roles resolve unconditionally to the `external` control policy, so a
+    // missing declared role fails even under `observed` — deviating from
+    // the usual observed→warn convention for other node kinds.
+    for (const controlPolicy of ['external', 'managed', 'observed'] as const) {
       const contract = buildContract({
         roleNames: ['app_role'],
         defaultControlPolicy: controlPolicy,
@@ -197,9 +200,10 @@ describe.sequential('roles enter verify — existence-only, asymmetric', () => {
         strict: false,
         frameworkComponents,
       });
-      // A `reference` extra is suppressed unconditionally — before the
-      // `observed → warn` disposition — so the undeclared role is neither a
-      // failure nor a warning under ANY control policy, and verify passes.
+      // A role issue always resolves to the `external` control policy, whose
+      // disposition suppresses every extra — so the undeclared role is
+      // neither a failure nor a warning under ANY control policy, and
+      // verify passes.
       expect(result.schema.issues.some((i) => i.path.includes('legacy_role'))).toBe(false);
       expect(
         (result.schema.warnings?.issues ?? []).some((i) => i.path.includes('legacy_role')),

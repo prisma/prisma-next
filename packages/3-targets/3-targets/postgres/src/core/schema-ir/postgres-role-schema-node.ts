@@ -1,4 +1,4 @@
-import type { DiffableNode } from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { assertNode, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -62,4 +62,17 @@ export class PostgresRoleSchemaNode extends SqlSchemaIRNode implements DiffableN
   static assert(node: SqlSchemaIRNode): asserts node is PostgresRoleSchemaNode {
     assertNode(node, 'PostgresRoleSchemaNode', PostgresRoleSchemaNode.is);
   }
+}
+
+/**
+ * Whether a diff issue's subject node is a database role. Roles are
+ * root-level siblings of namespaces, so a role issue's path carries no
+ * namespace segment to own-scope against — the ownership filter must bypass
+ * it rather than test namespace membership. Roles resolve their control
+ * policy to `external` unconditionally, which is what makes a missing
+ * declared role fail while an undeclared live one is tolerated.
+ */
+export function isRoleDiffIssue(issue: SchemaDiffIssue): boolean {
+  const node = issue.expected ?? issue.actual;
+  return node?.nodeKind === PostgresSchemaNodeKind.role;
 }

@@ -30,7 +30,7 @@ import { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { parseRlsPolicyWireName } from '../rls/wire-name';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
-import { PostgresRoleSchemaNode } from '../schema-ir/postgres-role-schema-node';
+import { isRoleDiffIssue } from '../schema-ir/postgres-role-schema-node';
 import { PostgresSchemaNodeKind, type SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 import {
   formatPostgresControlPolicySubjectLabel,
@@ -500,17 +500,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 function isPolicyDiffIssue(issue: SchemaDiffIssue<SqlSchemaDiffNode>): boolean {
   const node = issue.expected ?? issue.actual;
   return node !== undefined && PostgresPolicySchemaNode.is(node);
-}
-
-/**
- * A diff issue whose node is a database role. Roles are existence-verify only
- * (a project non-goal to provision), so their issues produce no migration ops
- * — the planner drops them from the relational partition (see the plan loop)
- * rather than letting them reach `mapNodeIssueToCall`.
- */
-function isRoleDiffIssue(issue: SchemaDiffIssue<SqlSchemaDiffNode>): boolean {
-  const node = issue.expected ?? issue.actual;
-  return node !== undefined && PostgresRoleSchemaNode.is(node);
 }
 
 /**

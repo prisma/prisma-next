@@ -12,27 +12,13 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresContract } from '../postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
+import { isRoleDiffIssue } from '../schema-ir/postgres-role-schema-node';
 import {
-  PostgresSchemaNodeKind,
   postgresDiffSubjectGranularity,
   type SqlSchemaDiffNode,
 } from '../schema-ir/schema-node-kinds';
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
 import { resolvePostgresNodeIssueControlPolicySubject } from './control-policy';
-
-/**
- * Whether a diff issue's subject node is a database role. Roles are
- * root-level siblings of namespaces, so a role issue's path carries no
- * namespace segment to own-scope against — the ownership filter must bypass
- * it rather than test namespace membership. Roles resolve their control
- * policy to `external` unconditionally (see {@link resolveControlPolicy}),
- * which is what makes a missing declared role fail while an undeclared live
- * one is tolerated.
- */
-function isRoleDiffIssue(issue: SchemaDiffIssue): boolean {
-  const node = issue.expected ?? issue.actual;
-  return node?.nodeKind === PostgresSchemaNodeKind.role;
-}
 
 function ownedSchemaNames(expected: PostgresDatabaseSchemaNode): ReadonlySet<string> {
   const policyNamespaces = Object.values(expected.namespaces).flatMap((ns) =>
