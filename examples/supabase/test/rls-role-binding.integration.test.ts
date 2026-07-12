@@ -1,15 +1,18 @@
 /**
  * RLS-through-ORM acceptance test — role-bound Supabase runtime proven in the walking skeleton.
  *
- * Proves that the `supabase()` factory correctly enforces Postgres RLS via role bindings:
+ * Proves that the `supabase()` factory correctly enforces Postgres RLS via role bindings.
+ * All policies are authored in `contract.prisma` and applied by `dbInit` — none are
+ * hand-authored in this test.
  *
  *   1. `asUser(jwt)` with a valid HS256 JWT for user A returns exactly user A's profile row
- *      through the ORM, filtered by the `profile_owner_select` RLS policy.
+ *      through the ORM, filtered by the `profile_owner_read` RLS policy.
  *   2. `asAnon()` returns every row — the `profile_public_read` anon policy (using = true).
  *   3. `asServiceRole()` returns both profiles — BYPASSRLS skips all policies.
  *   4. The recording middleware captures only typed ORM queries, never `set_config` calls
  *      (proving `set_config` runs below the user middleware chain).
  *   5. An expired JWT → `InvalidJwtError`.
+ *   6. `profile_owner_write`'s WITH CHECK rejects reassigning a row to another owner.
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -84,9 +87,9 @@ async function runDbInit(connectionString: string, migrationsDir: string): Promi
   }
 }
 
-async function applyRlsFixture(connectionString: string): Promise<void> {
+async function applyGrantsFixture(connectionString: string): Promise<void> {
   await withClient(connectionString, async (pg) => {
-    // Explicit per-table grants for RLS policies (roles created by bootstrapSupabaseShim).
+    // Explicit per-table grants for the RLS policies dbInit applies (roles created by bootstrapSupabaseShim).
     await pg.query('GRANT SELECT ON public.profile TO anon, authenticated');
     await pg.query('GRANT ALL ON public.profile TO service_role');
     await pg.query('GRANT INSERT ON public.profile TO service_role');
@@ -108,17 +111,6 @@ async function applyRlsFixture(connectionString: string): Promise<void> {
     await pg.query(
       'GRANT EXECUTE ON FUNCTION _prisma_dev_wal.capture_event() TO anon, authenticated, service_role',
     );
-
-    // RLS
-    await pg.query('ALTER TABLE public.profile ENABLE ROW LEVEL SECURITY');
-    await pg.query(`
-      CREATE POLICY profile_owner_select ON public.profile FOR SELECT TO authenticated
-        USING ("userId" = (current_setting('request.jwt.claims', true)::json->>'sub')::uuid)
-    `);
-    await pg.query(`
-      CREATE POLICY profile_owner_update ON public.profile FOR UPDATE TO authenticated
-        USING ("userId" = (current_setting('request.jwt.claims', true)::json->>'sub')::uuid)
-    `);
   });
 }
 
@@ -146,7 +138,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
         await bootstrapSupabaseShim(pg);
       });
       await runDbInit(connectionString, migrationsDir);
-      await applyRlsFixture(connectionString);
+      await applyGrantsFixture(connectionString);
 
       // Seed two auth users + two profiles via raw SQL (service_role write path proven later).
       const userAId = crypto.randomUUID();
@@ -227,7 +219,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
   );
 
   it(
-    'asServiceRole ORM create succeeds; asUser ORM update scoped to own row; update against other row affects 0',
+    'asServiceRole ORM create succeeds; asUser ORM update scoped to own row; update against other row affects 0; withCheck rejects reassignment to another owner',
     async () => {
       const { connectionString } = database;
 
@@ -235,7 +227,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
         await bootstrapSupabaseShim(pg);
       });
       await runDbInit(connectionString, migrationsDir);
-      await applyRlsFixture(connectionString);
+      await applyGrantsFixture(connectionString);
 
       const userAId = crypto.randomUUID();
       const userBId = crypto.randomUUID();
@@ -292,6 +284,11 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
           .all()
           .toArray();
         expect(bobRows).toEqual([{ username: 'bob', userId: userBId }]);
+
+        // profile_owner_write WITH CHECK rejects reassigning the row to another owner
+        await expect(
+          userADb.orm.public.Profile.where({ userId: userAId }).updateCount({ userId: userBId }),
+        ).rejects.toThrow(/row-level security/);
       } finally {
         await db.close();
       }
