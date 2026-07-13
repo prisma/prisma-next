@@ -41,6 +41,7 @@ export { leafDiagnostic } from '../attribute-spec/combinators/diagnostic';
 export { entityRef } from '../attribute-spec/combinators/entity-ref';
 export type { FieldRefArgType, FieldRefScope } from '../attribute-spec/combinators/field-ref';
 export { fieldRef } from '../attribute-spec/combinators/field-ref';
+export type { FuncCallSig, TypedFuncCall } from '../attribute-spec/combinators/func-call';
 export { funcCall } from '../attribute-spec/combinators/func-call';
 export { identifier } from '../attribute-spec/combinators/identifier';
 export { int } from '../attribute-spec/combinators/int';
@@ -51,7 +52,8 @@ export { oneOf } from '../attribute-spec/combinators/one-of';
 export { record } from '../attribute-spec/combinators/record';
 export { str } from '../attribute-spec/combinators/str';
 export { fieldAttribute } from '../attribute-spec/field-attribute';
-export { interpretAttribute } from '../attribute-spec/interpret';
+export type { ArgBindingSpec } from '../attribute-spec/interpret';
+export { interpretArgs, interpretAttribute } from '../attribute-spec/interpret';
 export { modelAttribute } from '../attribute-spec/model-attribute';
 export { optional } from '../attribute-spec/optional';
 export type {

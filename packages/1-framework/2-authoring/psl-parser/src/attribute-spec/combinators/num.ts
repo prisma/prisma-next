@@ -5,17 +5,22 @@ import type { ArgType } from '../types';
 import { leafDiagnostic } from './diagnostic';
 
 // A general number literal — any number, including floats — reduced to its numeric value.
-// Use `int()` when only integer literals are allowed.
-export function num(): ArgType<number> {
+// Passing `value` pins the combinator to that single literal (`num(4)` matches only `4`),
+// mirroring how `identifier(name)` pins a bare identifier. Use `int()` when only integer
+// literals are allowed.
+export function num(): ArgType<number>;
+export function num(value: number): ArgType<number>;
+export function num(value?: number): ArgType<number> {
   return {
     kind: 'num',
-    label: 'number',
+    label: value === undefined ? 'number' : String(value),
     parse: (arg, ctx): Result<number, readonly PslDiagnostic[]> => {
       if (arg instanceof NumberLiteralExprAst) {
-        const value = arg.value();
-        if (value !== undefined) return ok(value);
+        const parsed = arg.value();
+        if (parsed !== undefined && (value === undefined || parsed === value)) return ok(parsed);
       }
-      return notOk([leafDiagnostic(ctx, arg, 'Expected a number literal')]);
+      const message = value === undefined ? 'Expected a number literal' : `Expected ${value}`;
+      return notOk([leafDiagnostic(ctx, arg, message)]);
     },
   };
 }

@@ -15,6 +15,7 @@ import {
   nodePslSpan,
   num,
   oneOf,
+  optional,
   record,
   str,
 } from '../src/exports';
@@ -155,6 +156,48 @@ describe('int', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
   });
+
+  it('accepts an integer within the declared bounds', () => {
+    const { expr, ctx } = argOf('16');
+
+    const result = int({ min: 2, max: 255 }).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(16);
+  });
+
+  it('rejects an integer below the minimum with a range message', () => {
+    const { expr, ctx } = argOf('1');
+
+    const result = int({ min: 2, max: 255 }).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.message).toBe('Expected an integer between 2 and 255');
+    }
+  });
+
+  it('rejects an integer above the maximum with a range message', () => {
+    const { expr, ctx } = argOf('300');
+
+    const result = int({ min: 2, max: 255 }).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.message).toBe('Expected an integer between 2 and 255');
+    }
+  });
+
+  it('still rejects a non-integer even within the bounds', () => {
+    const { expr, ctx } = argOf('1.5');
+
+    const result = int({ min: 0, max: 5 }).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure[0]?.message).toBe('Expected an integer literal');
+  });
 });
 
 describe('num', () => {
@@ -201,6 +244,36 @@ describe('num', () => {
     const { expr, ctx } = argOf('Cascade');
 
     const result = num().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('matches only the pinned number literal', () => {
+    const { expr, ctx } = argOf('4');
+
+    const result = num(4).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(4);
+  });
+
+  it('rejects a number literal other than the pinned value', () => {
+    const { expr, ctx } = argOf('7');
+
+    const result = num(4).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a string literal carrying the pinned digits', () => {
+    const { expr, ctx } = argOf('"4"');
+
+    const result = num(4).parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
@@ -609,6 +682,57 @@ describe('funcCall', () => {
     const { expr, ctx } = argOf('foo.now()');
 
     const result = funcCall('now').parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('funcCall with a signature', () => {
+  const nanoid = () =>
+    funcCall('nanoid', {
+      positional: [{ key: 'size', type: optional(int({ min: 2, max: 255 })) }],
+    });
+
+  it('binds a positional argument through the signature into the typed record', () => {
+    const { expr, ctx } = argOf('nanoid(16)');
+
+    const result = nanoid().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ fn: 'nanoid', size: 16 });
+  });
+
+  it('omits an absent optional argument, keeping the fn discriminant', () => {
+    const { expr, ctx } = argOf('nanoid()');
+
+    const result = nanoid().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ fn: 'nanoid' });
+  });
+
+  it('rejects an out-of-range argument', () => {
+    const { expr, ctx } = argOf('nanoid(1)');
+
+    const result = nanoid().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('rejects excess positional arguments', () => {
+    const { expr, ctx } = argOf('nanoid(16, 2)');
+
+    const result = nanoid().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('still rejects a callee that differs from the pinned name', () => {
+    const { expr, ctx } = argOf('cuid(16)');
+
+    const result = nanoid().parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);

@@ -2,35 +2,47 @@ import type { ParsedDefaultFunctionCall } from '@prisma-next/framework-component
 import type { PslDiagnostic } from '@prisma-next/framework-components/psl-ast';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { nodePslSpan } from '../../resolve';
+import type { ExpressionAst } from '../../syntax/ast/expressions';
 import { FunctionCallAst } from '../../syntax/ast/expressions';
 import { printSyntax } from '../../syntax/ast-helpers';
-import type { ArgType } from '../types';
+import { interpretArgs } from '../interpret';
+import type { ArgType, InterpretCtx, Param, PositionalParam } from '../types';
 import { leafDiagnostic } from './diagnostic';
 
-// A name-pinned function-call argument (`funcCall('now')` matches `now()`) parsed into the
-// framework `ParsedDefaultFunctionCall` shape. The callee must be an unqualified identifier
-// equal to `name`; each argument is captured as verbatim source text — the downstream default
-// registry re-parses those strings (`dbgenerated` needs the quotes preserved).
-export function funcCall(name: string): ArgType<ParsedDefaultFunctionCall> {
+// The argument signature of a pinned function call. Each positional slot / named param is a
+// combinator, exactly as an attribute spec declares its args; omitted groups default to
+// empty so a nullary call needs neither key.
+export interface FuncCallSig {
+  readonly positional?: readonly PositionalParam<unknown>[];
+  readonly named?: Readonly<Record<string, Param<unknown>>>;
+}
+
+// The typed record a signed call binds to: the `fn` discriminant plus the parsed arguments.
+export type TypedFuncCall = { readonly fn: string } & Record<string, unknown>;
+
+// A name-pinned function-call argument (`funcCall('now')` matches `now()`). Without a signature
+// the call is captured into the framework `ParsedDefaultFunctionCall` shape — each argument kept
+// as verbatim source text for the downstream default registry to re-parse (`dbgenerated` needs
+// the quotes preserved). With a signature, the call's arguments are parsed through it and bound
+// into a typed `{ fn, ...args }` record.
+export function funcCall(name: string): ArgType<ParsedDefaultFunctionCall>;
+export function funcCall(name: string, sig: FuncCallSig): ArgType<TypedFuncCall>;
+export function funcCall(
+  name: string,
+  sig?: FuncCallSig,
+): ArgType<ParsedDefaultFunctionCall> | ArgType<TypedFuncCall> {
+  return sig === undefined ? rawFuncCall(name) : typedFuncCall(name, sig);
+}
+
+function rawFuncCall(name: string): ArgType<ParsedDefaultFunctionCall> {
   return {
     kind: 'funcCall',
     label: 'function call',
     parse: (arg, ctx): Result<ParsedDefaultFunctionCall, readonly PslDiagnostic[]> => {
-      if (!(arg instanceof FunctionCallAst)) {
-        return notOk([leafDiagnostic(ctx, arg, 'Expected a function call')]);
-      }
-      const qname = arg.name();
-      if (qname === undefined || qname.dot() !== undefined || qname.colon() !== undefined) {
-        return notOk([leafDiagnostic(ctx, arg, 'Expected a function call')]);
-      }
-      const calleeName = qname.identifier()?.token()?.text;
-      if (calleeName === undefined) {
-        return notOk([leafDiagnostic(ctx, arg, 'Expected a function call')]);
-      }
-      if (calleeName !== name) {
-        return notOk([leafDiagnostic(ctx, arg, `Expected ${name}()`)]);
-      }
-      const args = Array.from(arg.args(), (argument) => {
+      const guard = matchCallee(arg, name, ctx);
+      if (!guard.ok) return guard;
+      const call = guard.value;
+      const args = Array.from(call.args(), (argument) => {
         const node = argument.value() ?? argument;
         return {
           raw: printSyntax(node.syntax).trim(),
@@ -38,11 +50,52 @@ export function funcCall(name: string): ArgType<ParsedDefaultFunctionCall> {
         };
       });
       return ok({
-        name: calleeName,
-        raw: printSyntax(arg.syntax).trim(),
+        name,
+        raw: printSyntax(call.syntax).trim(),
         args,
-        span: nodePslSpan(arg.syntax, ctx.sourceFile),
+        span: nodePslSpan(call.syntax, ctx.sourceFile),
       });
     },
   };
+}
+
+function typedFuncCall(name: string, sig: FuncCallSig): ArgType<TypedFuncCall> {
+  return {
+    kind: 'funcCall',
+    label: 'function call',
+    parse: (arg, ctx): Result<TypedFuncCall, readonly PslDiagnostic[]> => {
+      const guard = matchCallee(arg, name, ctx);
+      if (!guard.ok) return guard;
+      const bound = interpretArgs(
+        guard.value.args(),
+        { name, positional: sig.positional ?? [], named: sig.named ?? {} },
+        ctx,
+        nodePslSpan(guard.value.syntax, ctx.sourceFile),
+      );
+      if (!bound.ok) return notOk<readonly PslDiagnostic[]>(bound.failure);
+      return ok({ ...bound.value, fn: name });
+    },
+  };
+}
+
+function matchCallee(
+  arg: ExpressionAst,
+  name: string,
+  ctx: InterpretCtx,
+): Result<FunctionCallAst, readonly PslDiagnostic[]> {
+  if (!(arg instanceof FunctionCallAst)) {
+    return notOk([leafDiagnostic(ctx, arg, 'Expected a function call')]);
+  }
+  const qname = arg.name();
+  if (qname === undefined || qname.dot() !== undefined || qname.colon() !== undefined) {
+    return notOk([leafDiagnostic(ctx, arg, 'Expected a function call')]);
+  }
+  const calleeName = qname.identifier()?.token()?.text;
+  if (calleeName === undefined) {
+    return notOk([leafDiagnostic(ctx, arg, 'Expected a function call')]);
+  }
+  if (calleeName !== name) {
+    return notOk([leafDiagnostic(ctx, arg, `Expected ${name}()`)]);
+  }
+  return ok(arg);
 }
