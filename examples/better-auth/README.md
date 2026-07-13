@@ -59,13 +59,13 @@ Take the `set-cookie` value from the response, then make an authenticated reques
 curl http://localhost:3000/api/me -H 'cookie: <set-cookie value>'
 ```
 
-The response carries the session (read through BetterAuth over the contract-typed adapter) and the profile with its user (read through the ORM). The `profile` row itself is created by your app code — see the integration test for the full sign-up → profile → authenticated-read flow.
+The response carries the session (read through BetterAuth over the contract-typed adapter) and `profile: null` on a fresh sign-up — the `profile` row is created by your app code, not by BetterAuth. Once your app has created one (see the integration test for the full sign-up → profile → authenticated-read flow), the response carries the profile with its user (read through the ORM).
 
 ## Two typed views over one database
 
 `src/prisma/db.ts` constructs two clients over a **shared connection pool**:
 
-- `db` — over the emitted **aggregate contract**, for the app's own models (`Profile`). The aggregate records the pack requirement, so construction passes the pack's runtime descriptor: `postgres<Contract>({ contractJson, pg, extensions: [betterAuthRuntimeDescriptor] })`. Without it, `postgres()` rejects the contract ("Contract requires extension pack 'better-auth'").
+- `db` — over the emitted **aggregate contract**, for the app's own models (`Profile`). The aggregate records the pack requirement, so construction passes the pack's runtime descriptor: `postgres<Contract>({ contractJson, pg, extensions: [betterAuthRuntimeDescriptor] })`. Without it, `postgres()` rejects the contract ("Contract requires extension pack(s) 'better-auth', but runtime descriptors do not provide matching component(s).").
 - `authDb` — over the pack's **contract-space contract**, which types the four auth models for `prismaNextAdapter`. Marker verification stays on `db` (the marker names the aggregate; this is a partial view of the same database).
 
 Two views are needed because the aggregate contract records the pack's models as cross-space *references*, not as navigable domain models — `db.orm.public.User` does not exist on the aggregate, and the `Profile.user` relation is not `include()`-able across spaces in the current framework. The FK is still a real database constraint (the test proves the cascade), and the server follows it explicitly with one extra typed query.

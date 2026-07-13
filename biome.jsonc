@@ -18,7 +18,12 @@
       "!**/migrations/*/*/migration.json",
       "!**/migrations/*/*/ops.json",
       "!**/migrations/*/*/end-contract.json",
-      "!**/migrations/*/*/start-contract.json"
+      "!**/migrations/*/*/start-contract.json",
+      // Space-mirror head refs in consuming apps (migrations/<space>/refs/head.json)
+      // are rewritten by `migration plan` in minified form; keep the committed
+      // bytes identical to what the rewrite path emits so plan-at-head is a
+      // clean no-op on the tree.
+      "!**/migrations/*/refs/head.json"
     ]
   },
   "formatter": {

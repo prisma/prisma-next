@@ -2,9 +2,10 @@
  * End-to-end proof of the README's story against a dev database:
  *
  * 1. README step fidelity — `contract emit` reproduces the committed
- *    aggregate byte-for-byte (drift tripwire), the committed migrations
- *    (app space + seeded better-auth space) pass offline integrity, and
- *    `db init` walks both spaces on a fresh database.
+ *    aggregate byte-for-byte (drift tripwire), `migration plan` at head
+ *    leaves the committed space mirrors byte-identical, the committed
+ *    migrations (app space + seeded better-auth space) pass offline
+ *    integrity, and `db init` walks both spaces on a fresh database.
  * 2. Cross-space FK — `db init` created `profile` with a real cascading
  *    FK onto `"public"."user"(id)`.
  * 3. The consumer flow — sign-up through the real HTTP server, an
@@ -44,6 +45,14 @@ async function runCli(args: readonly string[]): Promise<void> {
   });
 }
 
+// `migration plan` at head rewrites the pinned space mirrors even when it
+// plans nothing; the committed bytes must equal what the rewrite path
+// emits or README step 2 dirties a fresh clone's tree.
+const SPACE_MIRROR_PATHS = [
+  join(EXAMPLE_ROOT, 'migrations', 'better-auth', 'contract.json'),
+  join(EXAMPLE_ROOT, 'migrations', 'better-auth', 'refs', 'head.json'),
+];
+
 beforeAll(async () => {
   database = await createDevDatabase();
 
@@ -55,10 +64,19 @@ beforeAll(async () => {
     committedContract,
   );
 
+  // README step 2 — `migration plan` at head plans nothing and leaves the
+  // committed space mirrors byte-identical (it always rewrites them).
+  const committedMirrors = SPACE_MIRROR_PATHS.map((path) => readFileSync(path, 'utf-8'));
+  await runCli(['migration', 'plan', '--name', 'init']);
+  SPACE_MIRROR_PATHS.forEach((path, i) => {
+    expect(
+      readFileSync(path, 'utf-8'),
+      `plan at head leaves ${path.slice(EXAMPLE_ROOT.length)} byte-identical`,
+    ).toBe(committedMirrors[i]);
+  });
+
   // README step 3 — `db init` walks the app space and the seeded
-  // better-auth space to head on a fresh database. (Step 2, `migration
-  // plan`, produced the committed migrations; its output is validated
-  // offline below rather than re-run, since planning at head is a no-op.)
+  // better-auth space to head on a fresh database.
   await runCli(['db', 'init']);
 
   appDb = createAppDb(database.connectionString);

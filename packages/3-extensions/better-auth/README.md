@@ -25,7 +25,8 @@ const pool = new Pool({ connectionString: url });
 // App view: the aggregate contract (your models). The aggregate records
 // the pack requirement, so the runtime descriptor must be passed —
 // without it, postgres() rejects the contract with "Contract requires
-// extension pack 'better-auth'".
+// extension pack(s) 'better-auth', but runtime descriptors do not
+// provide matching component(s)."
 const db = postgres<Contract>({
   contractJson, // your emitted aggregate
   pg: pool,
@@ -47,7 +48,7 @@ const authDb = postgres<BetterAuthSpaceContract>({
 
 | Subpath | What it exports |
 | --- | --- |
-| `/pack` | The control-plane extension descriptor (default export `betterAuthPack`) carrying the managed contract space: contract JSON, one baseline migration, head ref. List it in `prisma-next.config.ts` `extensionPacks`. |
+| `/pack` | The control-plane extension descriptor (default export `betterAuthPack`) carrying the managed contract space: contract JSON, one baseline migration, head ref. List it in `prisma-next.config.ts` — `extensions: [betterAuthPack]` with `defineConfig` from `@prisma-next/postgres/config` (as the example does), or `extensionPacks:` with the core `defineConfig`. |
 | `/contract` | The space's `Contract` type and the four branded model handles (`User`, `Session`, `Account`, `Verification`). `User.refs.id` is a cross-space `TargetFieldRef` usable in app contracts: `rel.belongsTo(User, …)` + `constraints.foreignKey(cols.userId, User.refs.id, { onDelete: 'cascade' })`. |
 | `/adapter` | `prismaNextAdapter(db)` — the BetterAuth database adapter — plus `PrismaNextAdapterError` and the model map. The only subpath that imports `better-auth` (a peer dependency), so apps that don't use the adapter never pull it in. |
 | `/runtime` | `betterAuthRuntimeDescriptor` — the runtime-side pack component for `postgres({ extensions })`. Descriptor only (`codecs: () => []`); there is no wrapped client facade. |
@@ -61,9 +62,9 @@ The space is **managed**: the framework owns these tables' DDL through the pack'
 ### Schema flow in a consuming app
 
 ```bash
-prisma-next contract emit           # 1. aggregate contract (your models + the pack's)
-prisma-next migration plan --name … # 2. plans your migrations, seeds migrations/better-auth/
-prisma-next db init                 # 3. walks BOTH spaces to head — auth tables + yours
+pnpm exec prisma-next contract emit            # 1. aggregate contract (your models + the pack's)
+pnpm exec prisma-next migration plan --name …  # 2. plans your migrations, seeds migrations/better-auth/
+pnpm exec prisma-next db init                  # 3. walks BOTH spaces to head — auth tables + yours
 ```
 
 ## The adapter

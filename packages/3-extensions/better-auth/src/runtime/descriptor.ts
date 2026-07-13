@@ -5,11 +5,11 @@ import packageJson from '../../package.json' with { type: 'json' };
  * Tells the runtime that the better-auth pack's runtime component is
  * available.
  *
- * An app whose aggregate contract lists the better-auth pack (via
- * `extensionPacks: [betterAuthPack]` in its config) cannot construct a
- * `postgres()` client without a matching runtime descriptor — the
- * requirement check rejects the contract with "Contract requires
- * extension pack 'better-auth'". Pass this descriptor through the
+ * An app whose aggregate contract lists the better-auth pack cannot
+ * construct a `postgres()` client without a matching runtime descriptor
+ * — the requirement check rejects the contract with "Contract requires
+ * extension pack(s) 'better-auth', but runtime descriptors do not
+ * provide matching component(s)." Pass this descriptor through the
  * client's public `extensions` option:
  *
  * ```ts

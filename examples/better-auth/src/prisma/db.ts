@@ -27,13 +27,21 @@ export interface AppDb {
  *   aggregate records the better-auth pack requirement, so the pack's
  *   `/runtime` descriptor is passed through the public `extensions`
  *   option — without it, `postgres()` rejects the contract with
- *   "Contract requires extension pack 'better-auth'".
+ *   "Contract requires extension pack(s) 'better-auth', but runtime
+ *   descriptors do not provide matching component(s)."
  * - `authDb` is constructed over the pack's shipped contract-space
  *   contract, which types the four BetterAuth core models for
  *   `prismaNextAdapter`.
  */
 export function createAppDb(url: string): AppDb {
   const pool = new Pool({ connectionString: url });
+  // pg emits 'error' on idle-client disconnects (pgbouncer restarts,
+  // serverless Postgres reaping idle connections, network blips). Without
+  // a listener the event crashes the whole Node process; the pool itself
+  // replaces the dead client on the next checkout. Log and move on.
+  pool.on('error', (err) => {
+    console.error('pg pool error (idle client):', err.message);
+  });
 
   const db = postgres<Contract>({
     contractJson,
