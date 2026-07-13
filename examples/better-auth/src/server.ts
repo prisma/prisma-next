@@ -9,20 +9,14 @@ import type { AppDb } from './prisma/db';
  * - `/api/auth/*` — BetterAuth's own handler (sign-up, sign-in, session,
  *   sign-out, …).
  * - `GET /api/me` — an authenticated endpoint demonstrating both
- *   directions of the integration: the session is read through
- *   BetterAuth (backed by the contract-typed adapter), and the app's
- *   `Profile` row is traversed to the pack's `User` model.
- *
- * The `profile → user` traversal reads each side through its typed view
- * (`db` for the app's `Profile`, `authDb` for the space's `User`) over
- * the shared pool. Cross-space relations are not navigable via the ORM's
- * `include()` in the current framework — the aggregate contract types
- * them `never` — so the app follows the FK explicitly; the FK itself is
- * real and enforced in the database (see the example test's cascade
- * assertion).
+ *   directions of the integration: the session (and its user) is read
+ *   through BetterAuth — whose adapter runs on the app's shared pool —
+ *   and the app's own `Profile` row is read through the ORM. The
+ *   `profile.userId` column is a real cross-space FK onto
+ *   `"public"."user"(id)` (see the example test's cascade assertion).
  */
 export function createAppServer(auth: Auth, appDb: AppDb): Server {
-  const { db, authDb } = appDb;
+  const { db } = appDb;
   const authHandler = toNodeHandler(auth);
 
   return createServer(async (req, res) => {
@@ -42,15 +36,13 @@ export function createAppServer(auth: Auth, appDb: AppDb): Server {
       }
 
       const profile = await db.orm.public.Profile.where({ userId: session.user.id }).first();
-      const user = profile
-        ? await authDb.orm.public.User.where({ id: profile.userId }).first()
-        : null;
 
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(
         JSON.stringify({
           session: { userId: session.session.userId, expiresAt: session.session.expiresAt },
-          profile: profile ? { ...profile, user } : null,
+          user: { id: session.user.id, name: session.user.name, email: session.user.email },
+          profile,
         }),
       );
       return;

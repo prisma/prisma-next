@@ -25,7 +25,6 @@
     "@prisma-next/adapter-postgres": "workspace:0.14.0",
     "@prisma-next/cli": "workspace:0.14.0",
     "@prisma-next/migration-tools": "workspace:0.14.0",
-    "@prisma-next/sql-contract-ts": "workspace:0.14.0",
     "@prisma-next/target-postgres": "workspace:0.14.0",
     "@prisma-next/test-utils": "workspace:0.14.0",
     "@prisma-next/tsconfig": "workspace:0.14.0",

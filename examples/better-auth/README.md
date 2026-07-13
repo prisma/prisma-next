@@ -3,27 +3,27 @@
 A minimal app proving the `@prisma-next/extension-better-auth` consumer story end-to-end:
 
 - The **better-auth extension pack** in `prisma-next.config.ts` brings the four BetterAuth core models (`User`, `Session`, `Account`, `Verification`) into the app as a managed contract space — the framework owns their DDL through the pack's shipped migrations.
-- The app's own `Profile` model carries a **cross-space foreign key** onto the pack's `User`, authored with the branded handle from `@prisma-next/extension-better-auth/contract` and created as a real `ON DELETE CASCADE` constraint in the database.
-- `betterAuth()` runs over **`prismaNextAdapter`**, so every auth read/write goes through contract-typed collections against the same database as the app — no separate auth store, no schema drift.
-- A minimal HTTP server exposes BetterAuth's handler plus one authenticated endpoint that reads the session **and** traverses `Profile → user`.
+- The app's own `Profile` model declares a **cross-space foreign key** onto the pack's `User` in PSL (`better-auth:public.User`), created as a real `ON DELETE CASCADE` constraint in the database.
+- `betterAuth()` runs over **`prismaNextAdapter({ pg })`**: hand the adapter the app's shared connection pool and it builds its space-scoped client view internally — auth data lives in the same database as the app, with **one client and one pool** in app code.
+- A minimal HTTP server exposes BetterAuth's handler plus one authenticated endpoint combining a session read (BetterAuth) with a `Profile` read (the ORM).
 
 ## Layout
 
 | Path | What it is |
 | --- | --- |
 | `prisma-next.config.ts` | App config: postgres target, `extensions: [betterAuthPack]` |
-| `src/prisma/contract.ts` | App contract: `Profile` with `rel.belongsTo(User, …)` + cross-space FK via `User.refs.id` |
+| `src/prisma/contract.prisma` | App contract in PSL: `Profile` with the cross-space FK `user better-auth:public.User @relation(…, onDelete: Cascade)` |
 | `src/prisma/contract.json` / `.d.ts` | Emitted aggregate contract (step 1 output, committed) |
 | `migrations/app/…` | Planned app migration: `profile` table + FK (step 2 output, committed) |
 | `migrations/better-auth/…` | The pack's contract space, seeded by step 2 (committed) |
-| `src/prisma/db.ts` | Client construction — see "Two typed views" below |
-| `src/auth.ts` | `betterAuth()` over `prismaNextAdapter` |
+| `src/prisma/db.ts` | One client over the aggregate contract, on an app-owned pool |
+| `src/auth.ts` | `betterAuth()` over `prismaNextAdapter({ pg: pool })` |
 | `src/server.ts` | HTTP server: `/api/auth/*` + authenticated `GET /api/me` |
 | `test/example.integration.test.ts` | CI surface automating everything below against a dev database |
 
 ## Schema flow (three steps)
 
-The committed artifacts are the outputs of these steps — re-running them is a no-op (the example test asserts this for step 1 and validates the committed migrations offline for step 2).
+The committed artifacts are the outputs of these steps — re-running them is a no-op (the example test asserts this byte-for-byte for steps 1 and 2, and validates the committed migrations offline).
 
 ```bash
 # 1. Emit the aggregate contract (app Profile + the pack's four models)
@@ -59,13 +59,12 @@ Take the `set-cookie` value from the response, then make an authenticated reques
 curl http://localhost:3000/api/me -H 'cookie: <set-cookie value>'
 ```
 
-The response carries the session (read through BetterAuth over the contract-typed adapter) and `profile: null` on a fresh sign-up — the `profile` row is created by your app code, not by BetterAuth. Once your app has created one (see the integration test for the full sign-up → profile → authenticated-read flow), the response carries the profile with its user (read through the ORM).
+The response carries the session and its user (read through BetterAuth over the contract-typed adapter) and `profile: null` on a fresh sign-up — the `profile` row is created by your app code, not by BetterAuth. Once your app has created one (see the integration test for the full sign-up → profile → authenticated-read flow), the response carries the profile as well (read through the ORM).
 
-## Two typed views over one database
+## One client, one pool
 
-`src/prisma/db.ts` constructs two clients over a **shared connection pool**:
+`src/prisma/db.ts` constructs a single `postgres()` client over the app's emitted **aggregate contract**, on an app-owned `pg.Pool`:
 
-- `db` — over the emitted **aggregate contract**, for the app's own models (`Profile`). The aggregate records the pack requirement, so construction passes the pack's runtime descriptor: `postgres<Contract>({ contractJson, pg, extensions: [betterAuthRuntimeDescriptor] })`. Without it, `postgres()` rejects the contract ("Contract requires extension pack(s) 'better-auth', but runtime descriptors do not provide matching component(s).").
-- `authDb` — over the pack's **contract-space contract**, which types the four auth models for `prismaNextAdapter`. Marker verification stays on `db` (the marker names the aggregate; this is a partial view of the same database).
-
-Two views are needed because the aggregate contract records the pack's models as cross-space *references*, not as navigable domain models — `db.orm.public.User` does not exist on the aggregate, and the `Profile.user` relation is not `include()`-able across spaces in the current framework. The FK is still a real database constraint (the test proves the cascade), and the server follows it explicitly with one extra typed query.
+- The aggregate records the pack requirement, so construction passes the pack's runtime descriptor: `postgres<Contract>({ contractJson, pg: pool, extensions: [betterAuthRuntimeDescriptor] })`. Without it, `postgres()` rejects the contract ("Contract requires extension pack(s) 'better-auth', but runtime descriptors do not provide matching component(s).").
+- `src/auth.ts` hands the **same pool** to the adapter — `prismaNextAdapter({ pg: pool })` — which internally constructs its own view over the pack's contract space (the aggregate records pack models as cross-space references, not navigable domain models, so `db.orm.public.User` deliberately does not exist on the app's client). App code never sees that view; auth models are reached through BetterAuth's API.
+- The pool carries an `'error'` handler: pg emits `'error'` on idle-client disconnects (pgbouncer restarts, serverless Postgres reaping idle connections), and without a listener that event crashes the Node process.

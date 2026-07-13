@@ -4,26 +4,21 @@
 
 Worked example: [`examples/better-auth`](../../../examples/better-auth/) — config, contract, server, and an integration test automating the whole story.
 
-## The two-views consumer architecture (read this first)
+## Consuming it (read this first)
 
-An app that lists the pack in `extensionPacks` gets an **aggregate contract** that records the pack's models as *cross-space references* — it does **not** fold them in as domain models. Concretely:
-
-- `db.orm.public.User` does not exist on a client constructed over the aggregate contract; only the app's own models are collections there.
-- A cross-space relation (e.g. an app `Profile.user` pointing at the pack's `User`) is typed `never` in the emitted `contract.d.ts` — it is not `include()`-able. The FK it declares is still a real, enforced database constraint (cascade included); the type-level `never` is the framework telling you traversal across spaces is not part of the current query model.
-
-A consuming app therefore constructs **two typed views over one database** (sharing a single `pg.Pool` via the public `pg:` option):
+One client, one pool. The app constructs its `postgres()` client over its own emitted aggregate contract and hands the **same pool** to the adapter, which builds its space-scoped view internally:
 
 ```ts
-import type { Contract as BetterAuthSpaceContract } from '@prisma-next/extension-better-auth/contract';
-import betterAuthPack from '@prisma-next/extension-better-auth/pack';
+import { prismaNextAdapter } from '@prisma-next/extension-better-auth/adapter';
 import betterAuthRuntimeDescriptor from '@prisma-next/extension-better-auth/runtime';
 import postgres from '@prisma-next/postgres/runtime';
+import { betterAuth } from 'better-auth';
 import { Pool } from 'pg';
 
 const pool = new Pool({ connectionString: url });
 
-// App view: the aggregate contract (your models). The aggregate records
-// the pack requirement, so the runtime descriptor must be passed —
+// The app's client: the aggregate contract (your models). The aggregate
+// records the pack requirement, so the runtime descriptor must be passed —
 // without it, postgres() rejects the contract with "Contract requires
 // extension pack(s) 'better-auth', but runtime descriptors do not
 // provide matching component(s)."
@@ -33,16 +28,23 @@ const db = postgres<Contract>({
   extensions: [betterAuthRuntimeDescriptor],
 });
 
-// Auth view: the pack's contract space (User / Session / Account /
-// Verification collections) for the adapter. Marker verification stays
-// on the aggregate client — the database marker names the aggregate,
-// and this is a partial view of the same database.
-const authDb = postgres<BetterAuthSpaceContract>({
-  contractJson: betterAuthPack.contractSpace?.contractJson,
-  pg: pool,
-  verifyMarker: false,
+// BetterAuth: the adapter takes the shared pool and constructs its own
+// view over the pack's contract space internally. Pool only — the pool
+// owner (your app) manages lifecycle.
+const auth = betterAuth({
+  database: prismaNextAdapter({ pg: pool }),
+  emailAndPassword: { enabled: true },
 });
 ```
+
+### Why the adapter builds an internal view (background)
+
+An app that lists the pack in its config gets an **aggregate contract** that records the pack's models as *cross-space references* — it does **not** fold them in as domain models:
+
+- `db.orm.public.User` deliberately does not exist on the app's client; only the app's own models are collections there. Auth models are reached through BetterAuth's API.
+- A cross-space relation (e.g. an app `Profile.user` pointing at the pack's `User`) is typed `never` in the emitted `contract.d.ts` — it is not `include()`-able. The FK it declares is still a real, enforced database constraint (cascade included); the type-level `never` is the framework telling you traversal across spaces is not part of the current query model.
+
+The adapter therefore constructs a client over the pack's own space contract (typed collections for `User` / `Session` / `Account` / `Verification`) on your pool, with marker verification left to the app's client — the database marker names the aggregate, and the space view is a partial view of the same database. The structural `prismaNextAdapter(db)` form remains public for tests and advanced injection of a pre-built space client.
 
 ## Package surfaces
 
@@ -50,7 +52,7 @@ const authDb = postgres<BetterAuthSpaceContract>({
 | --- | --- |
 | `/pack` | The control-plane extension descriptor (default export `betterAuthPack`) carrying the managed contract space: contract JSON, one baseline migration, head ref. List it in `prisma-next.config.ts` — `extensions: [betterAuthPack]` with `defineConfig` from `@prisma-next/postgres/config` (as the example does), or `extensionPacks:` with the core `defineConfig`. |
 | `/contract` | The space's `Contract` type and the four branded model handles (`User`, `Session`, `Account`, `Verification`). `User.refs.id` is a cross-space `TargetFieldRef` usable in app contracts: `rel.belongsTo(User, …)` + `constraints.foreignKey(cols.userId, User.refs.id, { onDelete: 'cascade' })`. |
-| `/adapter` | `prismaNextAdapter(db)` — the BetterAuth database adapter — plus `PrismaNextAdapterError` and the model map. The only subpath that imports `better-auth` (a peer dependency), so apps that don't use the adapter never pull it in. |
+| `/adapter` | `prismaNextAdapter({ pg })` (shared-pool form) / `prismaNextAdapter(db)` (structural form) — the BetterAuth database adapter — plus `PrismaNextAdapterError` and the model map. The only subpath that imports `better-auth` (a peer dependency), so apps that don't use the adapter never pull it in. |
 | `/runtime` | `betterAuthRuntimeDescriptor` — the runtime-side pack component for `postgres({ extensions })`. Descriptor only (`codecs: () => []`); there is no wrapped client facade. |
 
 ## The contract space

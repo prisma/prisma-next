@@ -1,0 +1,17 @@
+// use prisma-next
+
+// The app's own model. `userId` references the better-auth space's `User`
+// through the cross-space reference grammar (`better-auth:public.User`):
+// the relation gives the app a navigable coordinate and the FK lowers to a
+// real cross-space constraint onto "public"."user"(id) — created by
+// `db init` alongside the pack's own tables.
+
+model Profile {
+  id     String @id
+  bio    String
+  userId String @unique
+
+  user better-auth:public.User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profile")
+}

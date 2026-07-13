@@ -45,35 +45,47 @@ export async function setupBetterAuthTestApp(): Promise<BetterAuthTestApp> {
   const database = await createDevDatabase({ databaseIdleTimeoutMillis: 600_000 });
   const tempRoot = mkdtempSync(join(fixtureAppDir, 'better-auth-harness-'));
 
-  const testSetup = setupTestDirectoryFromFixtures(
-    () => tempRoot,
-    'better-auth-lifecycle',
-    'prisma-next.config.with-db.ts',
-    { '{{DB_URL}}': database.connectionString },
-  );
-  const ctx: JourneyContext = {
-    testDir: testSetup.testDir,
-    configPath: testSetup.configPath,
-    outputDir: testSetup.outputDir,
-  };
+  let ctx: JourneyContext;
+  try {
+    const testSetup = setupTestDirectoryFromFixtures(
+      () => tempRoot,
+      'better-auth-lifecycle',
+      'prisma-next.config.with-db.ts',
+      { '{{DB_URL}}': database.connectionString },
+    );
+    ctx = {
+      testDir: testSetup.testDir,
+      configPath: testSetup.configPath,
+      outputDir: testSetup.outputDir,
+    };
 
-  const emit = await runContractEmit(ctx);
-  if (emit.exitCode !== 0) {
-    throw new Error(`contract emit failed:\n${emit.stdout}\n${emit.stderr}`);
-  }
-  const plan = await runMigrationPlan(ctx, ['--name', 'app_init']);
-  if (plan.exitCode !== 0) {
-    throw new Error(`migration plan failed:\n${plan.stdout}\n${plan.stderr}`);
-  }
+    const emit = await runContractEmit(ctx);
+    if (emit.exitCode !== 0) {
+      throw new Error(`contract emit failed:\n${emit.stdout}\n${emit.stderr}`);
+    }
+    const plan = await runMigrationPlan(ctx, ['--name', 'app_init']);
+    if (plan.exitCode !== 0) {
+      throw new Error(`migration plan failed:\n${plan.stdout}\n${plan.stderr}`);
+    }
 
-  // `db init` walks the managed space to head once, up front (module scope —
-  // in-process CLI mocks cannot run inside a vitest test body). The schema is
-  // fixed, so the harness's repeated `runMigrations` calls are no-ops at
-  // head, exactly like a real re-run of `db init` (proven by the lifecycle
-  // integration test).
-  const init = await runDbInit(ctx);
-  if (init.exitCode !== 0) {
-    throw new Error(`db init failed:\n${init.stdout}\n${init.stderr}`);
+    // `db init` walks the managed space to head once, up front (module scope —
+    // in-process CLI mocks cannot run inside a vitest test body). The schema is
+    // fixed, so the harness's repeated `runMigrations` calls are no-ops at
+    // head, exactly like a real re-run of `db init` (proven by the lifecycle
+    // integration test).
+    const init = await runDbInit(ctx);
+    if (init.exitCode !== 0) {
+      throw new Error(`db init failed:\n${init.stdout}\n${init.stderr}`);
+    }
+  } catch (error) {
+    // Setup failed mid-way: release the dev database and the temp dir
+    // before rethrowing so a red beforeAll leaks neither.
+    await Promise.race([
+      database.close(),
+      new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+    ]).catch(() => {});
+    rmSync(tempRoot, { recursive: true, force: true });
+    throw error;
   }
   const runMigrations = async (): Promise<void> => {};
 
@@ -92,21 +104,24 @@ export async function setupBetterAuthTestApp(): Promise<BetterAuthTestApp> {
     ctx,
     runMigrations,
     async teardown() {
-      await client.close();
-      // After the full conformance run's connection churn (hundreds of
-      // pool acquisitions across 200+ tests), the dev server's close()
-      // never resolves — the same teardown returns promptly after the
-      // small betterauth-e2e run, so the leak scales with connection
-      // volume inside @prisma/dev's socket server, not with anything the
-      // harness holds open (the adapter client is already closed above).
-      // Bound the wait: the per-file vitest worker exits right after
-      // teardown, taking the in-memory PGlite with it. Tracked as
-      // TML-3017.
-      await Promise.race([
-        database.close(),
-        new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
-      ]);
-      rmSync(tempRoot, { recursive: true, force: true });
+      try {
+        await client.close();
+        // After the full conformance run's connection churn (hundreds of
+        // pool acquisitions across 200+ tests), the dev server's close()
+        // never resolves — the same teardown returns promptly after the
+        // small betterauth-e2e run, so the leak scales with connection
+        // volume inside @prisma/dev's socket server, not with anything the
+        // harness holds open (the adapter client is already closed above).
+        // Bound the wait (non-rejecting): the per-file vitest worker exits
+        // right after teardown, taking the in-memory PGlite with it.
+        // Tracked as TML-3017.
+        await Promise.race([
+          database.close(),
+          new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+        ]).catch(() => {});
+      } finally {
+        rmSync(tempRoot, { recursive: true, force: true });
+      }
     },
   };
 }

@@ -10,7 +10,7 @@ if (!url) {
 
 const port = Number(process.env['PORT'] ?? 3000);
 const appDb = createAppDb(url);
-const auth = createAuth(appDb.authDb, { baseURL: `http://localhost:${port}` });
+const auth = createAuth(appDb.pool, { baseURL: `http://localhost:${port}` });
 const server = createAppServer(auth, appDb);
 
 server.listen(port, () => {

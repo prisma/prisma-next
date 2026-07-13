@@ -9,9 +9,10 @@
  * 2. Cross-space FK — `db init` created `profile` with a real cascading
  *    FK onto `"public"."user"(id)`.
  * 3. The consumer flow — sign-up through the real HTTP server, an
- *    authenticated request reading the session via BetterAuth, and the
- *    `Profile → user` FK traversed explicitly across the two typed
- *    views (aggregate client for `Profile`, space view for `User`).
+ *    authenticated request reading the session and its user via
+ *    BetterAuth (whose adapter rides the app's shared pool) and the
+ *    `Profile` row through the app's ORM client, plus the cross-space
+ *    FK's cascade observed at the database level.
  */
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -80,7 +81,7 @@ beforeAll(async () => {
   await runCli(['db', 'init']);
 
   appDb = createAppDb(database.connectionString);
-  const auth = createAuth(appDb.authDb, { baseURL: 'http://localhost' });
+  const auth = createAuth(appDb.pool, { baseURL: 'http://localhost' });
   server = createAppServer(auth, appDb);
   await new Promise<void>((resolve) => server.listen(0, resolve));
   const port = (server.address() as AddressInfo).port;
@@ -136,7 +137,7 @@ describe('authenticated flow over the HTTP server', () => {
     expect(response.status).toBe(401);
   });
 
-  it('signs up, reads the session, and traverses Profile → user across the two views', {
+  it('signs up, reads the session and its user, and reads the Profile through the ORM', {
     timeout: timeouts.databaseOperation,
   }, async () => {
     // Sign-up through BetterAuth's own HTTP handler.
@@ -162,27 +163,24 @@ describe('authenticated flow over the HTTP server', () => {
       userId,
     });
 
-    // Authenticated request: session via BetterAuth, Profile → user
-    // traversed explicitly across the two typed views.
+    // Authenticated request: session + user via BetterAuth (whose adapter
+    // rides the app's shared pool), Profile via the app's ORM client.
     const me = await fetch(`${baseUrl}/api/me`, {
       headers: { cookie: cookie ?? '' },
     });
     expect(me.status).toBe(200);
     const body = (await me.json()) as {
       session: { userId: string };
-      profile: {
-        id: string;
-        bio: string;
-        userId: string;
-        user: { id: string; name: string; email: string };
-      };
+      user: { id: string; name: string; email: string };
+      profile: { id: string; bio: string; userId: string };
     };
     expect(body.session.userId).toBe(userId);
+    expect(body.user.id).toBe(userId);
+    expect(body.user.name).toBe('Ada Lovelace');
+    expect(body.user.email).toBe('ada@example.com');
     expect(body.profile.id).toBe('profile-ada');
     expect(body.profile.bio).toBe('first programmer');
-    expect(body.profile.user.id).toBe(userId);
-    expect(body.profile.user.name).toBe('Ada Lovelace');
-    expect(body.profile.user.email).toBe('ada@example.com');
+    expect(body.profile.userId).toBe(userId);
   });
 
   it('cascades profile deletion when the user is deleted', {
@@ -191,7 +189,9 @@ describe('authenticated flow over the HTTP server', () => {
     const before = await appDb.db.orm.public.Profile.where({ id: 'profile-ada' }).first();
     expect(before).not.toBeNull();
 
-    await appDb.authDb.orm.public.User.where({ email: 'ada@example.com' }).delete();
+    // Delete the user at the database level: the cross-space FK's
+    // ON DELETE CASCADE removes the dependent profile row.
+    await appDb.pool.query('DELETE FROM "public"."user" WHERE email = $1', ['ada@example.com']);
 
     const after = await appDb.db.orm.public.Profile.where({ id: 'profile-ada' }).first();
     expect(after).toBeNull();

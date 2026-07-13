@@ -44,7 +44,9 @@ beforeEach(async () => {
 });
 
 describe('prismaNextAdapter({ pg }) over a shared pool', () => {
-  it('serves CRUD through the internally-built space view', async () => {
+  it('serves CRUD through the internally-built space view', {
+    timeout: timeouts.databaseOperation,
+  }, async () => {
     const created = await adapter.create<Record<string, unknown>>({
       model: 'user',
       data: {
@@ -66,7 +68,9 @@ describe('prismaNextAdapter({ pg }) over a shared pool', () => {
     expect(found?.['name']).toBe('Pool User');
   });
 
-  it('transaction rolls back through the shared pool', async () => {
+  it('transaction rolls back through the shared pool', {
+    timeout: timeouts.databaseOperation,
+  }, async () => {
     await expect(
       adapter.transaction(async (tx) => {
         await tx.create({
@@ -87,7 +91,9 @@ describe('prismaNextAdapter({ pg }) over a shared pool', () => {
     expect(await adapter.count({ model: 'user' })).toBe(0);
   });
 
-  it('shares the pool with the caller (no second connection universe)', async () => {
+  it('shares the pool with the caller (no second connection universe)', {
+    timeout: timeouts.databaseOperation,
+  }, async () => {
     await adapter.create({
       model: 'user',
       data: {
