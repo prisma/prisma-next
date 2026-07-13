@@ -19,6 +19,7 @@
  *   over the space's navigable relations; a join target the contract
  *   cannot express is a typed error, never a silent degradation.
  */
+import postgres from '@prisma-next/postgres/runtime';
 import { blindCast } from '@prisma-next/utils/casts';
 import {
   type AdapterFactory,
@@ -29,6 +30,9 @@ import {
   type JoinConfig,
 } from 'better-auth/adapters';
 import type { BetterAuthOptions } from 'better-auth/types';
+import type { Pool } from 'pg';
+import type { Contract } from '../contract/contract.d';
+import contractJson from '../contract/contract.json' with { type: 'json' };
 import type {
   AdapterCollection,
   AdapterIncludeRefinement,
@@ -272,7 +276,34 @@ const ADAPTER_CONFIG_BASE = {
   supportsJSON: true,
 } as const satisfies Partial<AdapterFactoryConfig>;
 
-export function prismaNextAdapter(db: BetterAuthDb): AdapterFactory<BetterAuthOptions> {
+/**
+ * Shared-pool form: the app hands over the `pg.Pool` its own client runs
+ * on, and the adapter constructs its space-scoped client view internally.
+ * Pool only — no `url` — so the adapter never owns an uncloseable pool;
+ * the pool owner manages lifecycle.
+ */
+export interface PrismaNextAdapterPoolOptions {
+  readonly pg: Pool;
+}
+
+function isPoolOptions(
+  input: BetterAuthDb | PrismaNextAdapterPoolOptions,
+): input is PrismaNextAdapterPoolOptions {
+  return 'pg' in input && !('orm' in input);
+}
+
+function buildSpaceView(pool: Pool): BetterAuthDb {
+  // The database marker names the consuming app's aggregate contract;
+  // this client is the adapter's partial view over the same database
+  // (the pack's four tables), so marker verification belongs to the
+  // app's own client, not here.
+  return postgres<Contract>({ contractJson, pg: pool, verifyMarker: false });
+}
+
+export function prismaNextAdapter(
+  input: BetterAuthDb | PrismaNextAdapterPoolOptions,
+): AdapterFactory<BetterAuthOptions> {
+  const db = isPoolOptions(input) ? buildSpaceView(input.pg) : input;
   // The transaction config rebinds the adapter to the transaction scope's
   // collections via a nested factory instance (reference-adapter pattern),
   // which needs the auth options the outer factory was created with.

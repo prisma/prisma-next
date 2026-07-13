@@ -3386,6 +3386,9 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:0.14.0
         version: link:../../1-framework/3-tooling/migration
+      '@prisma-next/postgres':
+        specifier: workspace:0.14.0
+        version: link:../postgres
       '@prisma-next/sql-contract':
         specifier: workspace:0.14.0
         version: link:../../2-sql/1-core/contract
@@ -3407,13 +3410,13 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:0.14.0
         version: link:../../1-framework/0-foundation/utils
+      pg:
+        specifier: 'catalog:'
+        version: 8.21.0
     devDependencies:
       '@prisma-next/cli':
         specifier: workspace:0.14.0
         version: link:../../1-framework/3-tooling/cli
-      '@prisma-next/postgres':
-        specifier: workspace:0.14.0
-        version: link:../postgres
       '@prisma-next/sql-contract-psl':
         specifier: workspace:0.14.0
         version: link:../../2-sql/2-authoring/contract-psl
@@ -3426,6 +3429,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:0.14.0
         version: link:../../0-config/tsdown
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.20.0
       better-auth:
         specifier: ^1.6.0
         version: 1.6.23(@cloudflare/workers-types@4.20260515.1)(mongodb@7.2.0(socks@2.8.9))(next@16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(pg@8.21.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.8(@types/node@25.9.2)(@vitest/coverage-v8@4.1.6(vitest@4.1.8))(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.4)))
