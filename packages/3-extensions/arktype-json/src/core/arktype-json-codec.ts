@@ -3,7 +3,7 @@
  *
  * Spec § Case 3: method-level generic over `S extends Type<unknown>`. The schema's TypeScript-level inferred type `S['infer']` is only available at the column-author site (where the user passes their typed schema), not at the descriptor's factory site (where only the serialized IR is available). This drives the shape:
  *
- * 1. {@link ArktypeJsonCodecClass} extends {@link CodecImpl} and is generic over `TInferred` — the application-level JS type the schema validates to. The constructor takes both the descriptor (for `id` proxy) and the rehydrated arktype `Type` (closure-captured so encode/decode/encodeJson/decodeJson can validate through it). 2. {@link ArktypeJsonDescriptor} extends {@link CodecDescriptorImpl} over {@link
+ * 1. {@link ArktypeJsonCodecClass} extends {@link SqlCodecImpl} and is generic over `TInferred` — the application-level JS type the schema validates to. The constructor takes both the descriptor (for `id` proxy) and the rehydrated arktype `Type` (closure-captured so encode/decode/encodeJson/decodeJson can validate through it). 2. {@link ArktypeJsonDescriptor} extends {@link CodecDescriptorImpl} over {@link
  * ArktypeJsonTypeParams}. Factory rehydrates the schema from `params.jsonIr` and returns `(ctx) => new ArktypeJsonCodecClass<unknown>(this, schema)` — `S` is erased to `unknown` because the descriptor only sees IR. The runtime path through `descriptor.factory(params)` always exists (e.g. for `family.deserializeContract` re-materialization); it just loses the typed inferred shape. 3. {@link arktypeJsonColumn} is the column-author
  * surface with the method-level generic over `S extends Type<unknown>`. It bypasses `descriptor.factory` because `S` is only available here, instead constructing the typed codec directly so `S['infer']` flows through `codecFactory`'s return into the column site's resolved output type. Eager serialization at this call site captures `expression` (for the emit-path renderer) and `jsonIr` (for runtime rehydration).
  *
@@ -13,16 +13,15 @@
 
 import type { JsonValue } from '@prisma-next/contract/types';
 import {
-  type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
-  CodecImpl,
   type CodecInstanceContext,
   type ColumnHelperFor,
   type ColumnSpec,
   column,
 } from '@prisma-next/framework-components/codec';
 import { isRuntimeError, runtimeError } from '@prisma-next/framework-components/runtime';
+import { type AnyCodecDescriptor, SqlCodecImpl } from '@prisma-next/sql-relational-core/ast';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { ArkErrors, ark, type Type, type } from 'arktype';
 
@@ -156,7 +155,7 @@ function renderArktypeJsonOutputType(params: ArktypeJsonTypeParams): string {
   return expression.length > 0 ? expression : 'unknown';
 }
 
-export class ArktypeJsonCodecClass<TInferred> extends CodecImpl<
+export class ArktypeJsonCodecClass<TInferred> extends SqlCodecImpl<
   typeof ARKTYPE_JSON_CODEC_ID,
   readonly ['equality'],
   string | JsonValue,

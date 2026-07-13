@@ -2,6 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { Collection } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { withReturningCapability } from './collection-fixtures';
 import { getTestContext, getTestContract, type TestContract } from './helpers';
@@ -53,10 +54,15 @@ export async function withCollectionRuntime(
   // fixture) when a test drives that contract: the runtime validates each
   // plan's storageHash against the contract it was built with.
   contractOverride?: Contract<SqlStorage>,
+  additionalExtensionPacks: readonly SqlRuntimeExtensionDescriptor<'postgres'>[] = [],
 ): Promise<void> {
   await withDevDatabase(
     async ({ connectionString }) => {
-      const runtime = await createPgIntegrationRuntime(connectionString, contractOverride);
+      const runtime = await createPgIntegrationRuntime(
+        connectionString,
+        contractOverride,
+        additionalExtensionPacks,
+      );
 
       try {
         await setupTestSchema(runtime);

@@ -26,12 +26,14 @@ export function defineTestCodec<
     targetTypes?: readonly string[];
     encode: (value: TInput, ctx: SqlCodecCallContext) => TWire | Promise<TWire>;
     decode: (wire: TWire, ctx: SqlCodecCallContext) => TInput | Promise<TInput>;
+    decodeFromJson?: (value: unknown, ctx: SqlCodecCallContext) => TInput | Promise<TInput>;
     traits?: TTraits;
   } & JsonRoundTripConfig<TInput>,
 ): Codec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
   const userEncode = config.encode;
   const userDecode = config.decode;
+  const userDecodeFromJson = config.decodeFromJson;
   const widenedConfig = config as {
     encodeJson?: (value: TInput) => JsonValue;
     decodeJson?: (json: JsonValue) => TInput;
@@ -48,6 +50,15 @@ export function defineTestCodec<
     decode: (wire, ctx) => {
       try {
         return Promise.resolve(userDecode(wire, ctx));
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    },
+    decodeFromJson: (value, ctx) => {
+      try {
+        return Promise.resolve(
+          userDecodeFromJson ? userDecodeFromJson(value, ctx) : userDecode(value as TWire, ctx),
+        );
       } catch (error) {
         return Promise.reject(error);
       }

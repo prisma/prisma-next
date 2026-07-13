@@ -1,10 +1,13 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
+import type {
+  Codec,
+  CodecDescriptor,
+  SqlCodecInstanceContext,
+} from '@prisma-next/sql-relational-core/ast';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
@@ -20,6 +23,7 @@ describe('createExecutionContext — column codec integrity', () => {
       id: 'whatever',
       encode: (v: unknown) => Promise.resolve(v),
       decode: (w: unknown) => Promise.resolve(w),
+      decodeFromJson: (value: unknown) => Promise.resolve(value),
       encodeJson: (v) => v as never,
       decodeJson: (j) => j as never,
     };

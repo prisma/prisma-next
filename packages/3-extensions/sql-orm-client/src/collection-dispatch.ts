@@ -425,7 +425,6 @@ async function decodeIncludedStorageRow(
       ref.column,
     );
     decoded[key] = await decodeIncludedColumnValue(
-      context,
       ref,
       codecRef?.codecId ?? ref.storageColumn.codecId,
       codec,
@@ -490,7 +489,6 @@ function resolveStorageColumn(
 }
 
 async function decodeIncludedColumnValue(
-  context: CodecExecutionContext,
   ref: IncludedColumnRef,
   codecId: string,
   codec: Codec,
@@ -519,8 +517,7 @@ async function decodeIncludedColumnValue(
         continue;
       }
       try {
-        const wire = normalizeIncludedSqlJsonValue(context, ref, codecId, element);
-        decoded.push(await codec.decode(wire, cellCtx));
+        decoded.push(await codec.decodeFromJson(element, cellCtx));
       } catch (error) {
         if (isRuntimeError(error)) throw error;
         wrapIncludedDecodeFailure(error, ref, codecId, element);
@@ -530,71 +527,11 @@ async function decodeIncludedColumnValue(
   }
 
   try {
-    const wire = normalizeIncludedSqlJsonValue(context, ref, codecId, value);
-    return await codec.decode(wire, cellCtx);
+    return await codec.decodeFromJson(value, cellCtx);
   } catch (error) {
     if (isRuntimeError(error)) throw error;
     wrapIncludedDecodeFailure(error, ref, codecId, value);
   }
-}
-
-function normalizeIncludedSqlJsonValue(
-  context: CodecExecutionContext,
-  ref: IncludedColumnRef,
-  codecId: string,
-  value: unknown,
-): unknown {
-  const nativeType = (
-    postgresNativeTypeFromMeta(context.codecDescriptors.descriptorFor(codecId)?.meta) ??
-    ref.storageColumn.nativeType
-  ).toLowerCase();
-
-  if (nativeType === 'bytea' && typeof value === 'string') {
-    return decodePostgresByteaJsonText(value);
-  }
-
-  return value;
-}
-
-function postgresNativeTypeFromMeta(meta: unknown): string | undefined {
-  if (!isPlainObjectEnvelope(meta)) {
-    return undefined;
-  }
-  const db = meta['db'];
-  if (!isPlainObjectEnvelope(db)) {
-    return undefined;
-  }
-  const sql = db['sql'];
-  if (!isPlainObjectEnvelope(sql)) {
-    return undefined;
-  }
-  const postgres = sql['postgres'];
-  if (!isPlainObjectEnvelope(postgres)) {
-    return undefined;
-  }
-  const nativeType = postgres['nativeType'];
-  return typeof nativeType === 'string' ? nativeType : undefined;
-}
-
-function decodePostgresByteaJsonText(value: string): Uint8Array {
-  if (!value.startsWith('\\x')) {
-    throw new Error(`Expected Postgres bytea hex text to start with "\\x"`);
-  }
-
-  const hex = value.slice(2);
-  if (hex.length % 2 !== 0) {
-    throw new Error(`Invalid Postgres bytea hex text length: ${hex.length}`);
-  }
-
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let offset = 0; offset < hex.length; offset += 2) {
-    const pair = hex.slice(offset, offset + 2);
-    if (!/^[0-9a-fA-F]{2}$/.test(pair)) {
-      throw new Error(`Invalid Postgres bytea hex pair "${pair}" at offset ${offset}`);
-    }
-    bytes[offset / 2] = Number.parseInt(pair, 16);
-  }
-  return bytes;
 }
 
 function previewWireValue(wireValue: unknown): string {

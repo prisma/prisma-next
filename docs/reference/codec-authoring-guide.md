@@ -1,12 +1,12 @@
 # Codec authoring guide
 
-This guide describes the canonical authoring shape for codecs in Prisma Next: **class-based codecs and descriptors** (`CodecImpl`, `CodecDescriptorImpl`), per-codec column helpers, and `satisfies` for compile-time wiring. The design rationale and the broader codec model live in [ADR 208 — Higher-order codecs for parameterized types](../architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md); this document is the practical "how to write a codec" reference for contributors.
+This guide describes the canonical authoring shape for codecs in Prisma Next: **class-based codecs and descriptors** (`CodecImpl` / `SqlCodecImpl`, `CodecDescriptorImpl`), per-codec column helpers, and `satisfies` for compile-time wiring. The design rationale and the broader codec model live in [ADR 208 — Higher-order codecs for parameterized types](../architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md); this document is the practical "how to write a codec" reference for contributors.
 
 ## At a glance
 
 A codec is **three artifacts**:
 
-1. A **codec class** that extends `CodecImpl<Id, TTraits, TWire, TInput>` and implements `encode` / `decode` (and `encodeJson` / `decodeJson` when the wire is not already JSON-safe).
+1. A **codec class** that extends its family authoring base (`SqlCodecImpl<Id, TTraits, TWire, TInput>` for SQL) and implements `encode` / `decode` (and `encodeJson` / `decodeJson` when the input is not already JSON-safe).
 2. A **descriptor class** that extends `CodecDescriptorImpl<P>` and declares the codec id, traits, target types, params schema, and the curried factory that materializes codec instances.
 3. A **per-codec column helper function** that calls `descriptor.factory(...)` directly and packages the result into a `ColumnSpec` via the framework-supplied `column(...)` packager. The helper carries a `satisfies ColumnHelperFor<D>` clause that ties it to its descriptor at compile time.
 
@@ -19,6 +19,8 @@ The framework imports live at `@prisma-next/framework-components/codec`:
 - `voidParamsSchema` — Standard Schema validator for `P = void` (non-parameterized codecs).
 - `Codec<...>`, `CodecDescriptor<P>`, `AnyCodecDescriptor` — consumer-facing interfaces (consumers depend on these; authors extend the `*Impl` classes).
 
+SQL codec authors import `SqlCodecImpl`, `Codec`, `CodecDescriptor`, and `AnyCodecDescriptor` from `@prisma-next/sql-relational-core/ast`. `SqlCodecImpl` adds the query-time `decodeFromJson(value, ctx)` path used for scalar values embedded in SQL JSON results. Its default forwards the value to `decode`; override it when the database's JSON representation differs from the driver's ordinary wire representation.
+
 ## Three case studies
 
 The same three artifacts express the full spectrum: non-parameterized, parameterized with literal preservation, and parameterized with a typed schema.
@@ -29,14 +31,14 @@ The same three artifacts express the full spectrum: non-parameterized, parameter
 import {
   type CodecCallContext,
   type CodecInstanceContext,
-  CodecImpl,
   CodecDescriptorImpl,
   type ColumnHelperFor,
   column,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
+import { SqlCodecImpl } from '@prisma-next/sql-relational-core/ast';
 
-class PgTextCodec extends CodecImpl<
+class PgTextCodec extends SqlCodecImpl<
   'pg/text@1',
   readonly ['equality', 'order', 'textual'],
   string,
@@ -71,7 +73,7 @@ The factory is **constant**: every call returns the same shared codec instance. 
 ```ts
 import { type } from 'arktype';
 
-class VectorCodec<N extends number> extends CodecImpl<
+class VectorCodec<N extends number> extends SqlCodecImpl<
   'pg/vector@1',
   readonly ['equality'],
   string,
@@ -125,7 +127,7 @@ The schema's TypeScript-level inferred type `S['infer']` is only available at th
 import { type } from 'arktype';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 
-class ArktypeJsonCodecClass<TInferred> extends CodecImpl<
+class ArktypeJsonCodecClass<TInferred> extends SqlCodecImpl<
   'arktype/json@1',
   readonly ['equality'],
   string,
@@ -236,7 +238,7 @@ Per-codec helpers don't pass through the registry — they're imported directly 
 
 The class hierarchy isn't load-bearing for variance preservation (per-codec helpers' direct calls do that work). It's load-bearing for **structure**:
 
-1. **Codec instance ↔ descriptor reference is structural.** The abstract `CodecImpl` constructor takes a `descriptor: AnyCodecDescriptor`; concrete codec subclasses pass it via `super(descriptor)`. `codec.id` proxies through this reference. Aliases work for free: an alias descriptor produces a codec whose `descriptor` points to the alias, so `codec.id` reports the alias's `codecId` automatically.
+1. **Codec instance ↔ descriptor reference is structural.** The codec authoring base constructor takes a `descriptor: AnyCodecDescriptor`; concrete codec subclasses pass it via `super(descriptor)`. `codec.id` proxies through this reference. Aliases work for free: an alias descriptor produces a codec whose `descriptor` points to the alias, so `codec.id` reports the alias's `codecId` automatically.
 2. **Subclass-based authoring is uniform across the codec spectrum.** Non-parameterized, parameterized, schema-typed, alias — all four shapes are expressed as `class X extends CodecDescriptorImpl<...>` with overrides on the abstract members. The variance behavior is identical across all four: the per-codec helper handles literal preservation via direct calls; the descriptor class declares the shape.
 
 ## Reference implementations in the repo
@@ -252,7 +254,7 @@ The class hierarchy isn't load-bearing for variance preservation (per-codec help
 - **`override` discipline.** With `noImplicitOverride`, every concrete-subclass member that touches an inherited member must carry `override`. Forgetting it surfaces as a typecheck error.
 - **Don't widen the factory return at the descriptor.** Concrete descriptors should declare their factory's typed return (`(ctx) => VectorCodec<N>`, not `(ctx) => Codec<...>`). The widened return loses literal preservation at consumer sites.
 - **Don't extract codec types via `Parameters` / `ReturnType` of the descriptor's `factory`.** TypeScript widens method generics to their constraint in those forms. Use the per-codec helper's typed return (`ColumnSpec<R, P>`) and project with `R extends Codec<any, any, any, infer T> ? T : never`.
-- **Don't reach through the codec instance for metadata.** The runtime `Codec` instance is narrow (id + four conversion methods). Read traits / target types / meta from `descriptor` (e.g. `context.codecDescriptors.descriptorFor(codecId).traits`).
+- **Don't reach through the codec instance for metadata.** The runtime codec instance is narrow (id + value conversion methods). Read traits / target types / meta from `descriptor` (e.g. `context.codecDescriptors.descriptorFor(codecId).traits`).
 
 ## See also
 

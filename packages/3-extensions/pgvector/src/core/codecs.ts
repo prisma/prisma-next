@@ -3,7 +3,7 @@
  *
  * Mirrors the patterns in `postgres/codecs-class.ts` and `sqlite/codecs-class.ts` for the single `pg/vector@1` codec. Three artifacts:
  *
- * 1. `PgVectorCodec` extends {@link CodecImpl} with the runtime encode/decode/encodeJson/decodeJson conversions inline. Conversions are simple enough (PostgreSQL `[1,2,3]` text format) that no shared helper module is warranted; the class body is the source of truth.
+ * 1. `PgVectorCodec` extends {@link SqlCodecImpl} with the runtime encode/decode/encodeJson/decodeJson conversions inline. Conversions are simple enough (PostgreSQL `[1,2,3]` text format) that no shared helper module is warranted; the class body is the source of truth.
  * 2. `PgVectorDescriptor` extends {@link CodecDescriptorImpl} with the codec id, traits, target types, params schema (`{ length: number }`, validated against {@link VECTOR_MAX_DIM}), `meta` (postgres `nativeType: 'vector'`), and the emit-path `renderOutputType` producing `Vector<${length}>`.
  * 3. `pgVectorColumn(length)` per-codec column helper invoking `descriptor.factory({ length })` directly + passing the bare `nativeType: 'vector'`. The family-layer {@link expandNativeType} hook renders the parameterized form (`vector(1536)`) at emit/verify time from `nativeType` + `typeParams`.
  *
@@ -12,16 +12,18 @@
 
 import type { JsonValue } from '@prisma-next/contract/types';
 import {
-  type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
-  CodecImpl,
   type CodecInstanceContext,
   type ColumnHelperFor,
   type ColumnHelperForStrict,
   column,
 } from '@prisma-next/framework-components/codec';
-import type { ExtractCodecTypes } from '@prisma-next/sql-relational-core/ast';
+import {
+  type AnyCodecDescriptor,
+  type ExtractCodecTypes,
+  SqlCodecImpl,
+} from '@prisma-next/sql-relational-core/ast';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from './constants';
@@ -43,7 +45,7 @@ const vectorParamsSchema = arktype({
 
 const PG_VECTOR_META = { db: { sql: { postgres: { nativeType: 'vector' } } } } as const;
 
-export class PgVectorCodec extends CodecImpl<
+export class PgVectorCodec extends SqlCodecImpl<
   typeof VECTOR_CODEC_ID,
   readonly ['equality'],
   string,

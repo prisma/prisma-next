@@ -1,8 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { CodecDescriptor, CodecRef } from '@prisma-next/framework-components/codec';
+import type { CodecRef } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationRegistry } from '@prisma-next/sql-operations';
-import type { ContractCodecRegistry } from './ast/codec-types';
+import type { CodecDescriptor, ContractCodecRegistry } from './ast/codec-types';
 
 /**
  * Codec-id-keyed accessor for descriptor metadata. The unified read API for codec-id-keyed metadata (`traits`, `targetTypes`, `meta`) — non-branching for parameterized vs. non-parameterized codecs. Every codec ships natively as a `CodecDescriptor` through the unified `codecs:` contributor slot (see ADR 208).

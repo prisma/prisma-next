@@ -9,7 +9,8 @@
  * Negative coverage (`// @ts-expect-error`) proves that a regression in trait preservation or a missing codec id breaks the test compile.
  */
 
-import type { AnyCodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
+import type { CodecTrait } from '@prisma-next/framework-components/codec';
+import type { AnyCodecDescriptor } from '@prisma-next/sql-relational-core/ast';
 import { expectTypeOf, test } from 'vitest';
 import {
   codecDescriptors,

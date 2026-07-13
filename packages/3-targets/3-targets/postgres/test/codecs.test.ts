@@ -349,6 +349,7 @@ describe('adapter-postgres codecs', () => {
     const byteaCodec = codecForScalar('bytea') as {
       encode: (value: Uint8Array, ctx: SqlCodecCallContext) => Promise<Uint8Array>;
       decode: (wire: Uint8Array, ctx: SqlCodecCallContext) => Promise<Uint8Array>;
+      decodeFromJson: (value: unknown, ctx: SqlCodecCallContext) => Promise<Uint8Array>;
       encodeJson: (value: Uint8Array) => unknown;
       decodeJson: (json: unknown) => Uint8Array;
     };
@@ -374,6 +375,24 @@ describe('adapter-postgres codecs', () => {
       expect(decoded).toBeInstanceOf(Uint8Array);
       expect(decoded.constructor).toBe(Uint8Array);
       expect(Array.from(decoded)).toEqual([0x01, 0x02, 0x03]);
+    });
+
+    it('decodes Postgres JSON aggregate hex text', async () => {
+      await expect(byteaCodec.decodeFromJson('\\x0102feff', {})).resolves.toEqual(
+        new Uint8Array([0x01, 0x02, 0xfe, 0xff]),
+      );
+    });
+
+    it('rejects malformed Postgres JSON aggregate hex text', async () => {
+      await expect(byteaCodec.decodeFromJson('0102', {})).rejects.toThrow(
+        'Expected Postgres bytea hex text to start with "\\x"',
+      );
+      await expect(byteaCodec.decodeFromJson('\\x123', {})).rejects.toThrow(
+        'Invalid Postgres bytea hex text length: 3',
+      );
+      await expect(byteaCodec.decodeFromJson('\\x01zz', {})).rejects.toThrow(
+        'Invalid Postgres bytea hex pair "zz" at offset 2',
+      );
     });
 
     it('encodes Uint8Array to base64 in JSON form', () => {

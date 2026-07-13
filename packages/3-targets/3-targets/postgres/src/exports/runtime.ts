@@ -1,4 +1,3 @@
-import type { AnyCodecDescriptor } from '@prisma-next/framework-components/codec';
 import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
@@ -21,7 +20,7 @@ const postgresRuntimeTargetDescriptor: RuntimeTargetDescriptor<
   'postgres',
   PostgresRuntimeTargetInstance
 > & {
-  readonly codecs: () => readonly AnyCodecDescriptor[];
+  readonly codecs: () => readonly [];
 } = {
   ...postgresTargetDescriptorMetaRuntime,
   codecs: () => [],

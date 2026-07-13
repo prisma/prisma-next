@@ -109,6 +109,27 @@ export const pgIntervalDecode = (wire: string | Record<string, unknown>): string
   return JSON.stringify(wire);
 };
 
+export const pgByteaDecodeFromJson = (value: unknown): Uint8Array => {
+  if (typeof value !== 'string' || !value.startsWith('\\x')) {
+    throw new Error(`Expected Postgres bytea hex text to start with "\\x"`);
+  }
+
+  const hex = value.slice(2);
+  if (hex.length % 2 !== 0) {
+    throw new Error(`Invalid Postgres bytea hex text length: ${hex.length}`);
+  }
+
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let offset = 0; offset < hex.length; offset += 2) {
+    const pair = hex.slice(offset, offset + 2);
+    if (!/^[0-9a-fA-F]{2}$/.test(pair)) {
+      throw new Error(`Invalid Postgres bytea hex pair "${pair}" at offset ${offset}`);
+    }
+    bytes[offset / 2] = Number.parseInt(pair, 16);
+  }
+  return bytes;
+};
+
 export const pgJsonEncode = (value: string | JsonValue): string => JSON.stringify(value);
 export const pgJsonDecode = (wire: string | JsonValue): JsonValue =>
   typeof wire === 'string' ? JSON.parse(wire) : wire;

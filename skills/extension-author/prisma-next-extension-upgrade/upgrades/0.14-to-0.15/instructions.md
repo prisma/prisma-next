@@ -54,6 +54,24 @@ changes:
         - "renderValueTypeFor"
         - "renderOutputType"
       anyMatch: true
+  - id: sql-codec-json-result-decoding
+    summary: |
+      SQL codecs now own decoding for scalar values embedded in database-produced JSON results
+      through the required `SqlCodec.decodeFromJson(value, ctx)` method. Change SQL codec classes
+      from the framework `CodecImpl` base to `SqlCodecImpl` from
+      `@prisma-next/sql-relational-core/ast`; its default forwards JSON values to the ordinary
+      `decode` method. Override `decodeFromJson` when the database JSON representation differs from
+      the driver's normal wire representation. If a SQL codec descriptor list is explicitly typed
+      as `AnyCodecDescriptor[]` or `CodecDescriptor[]`, import those SQL-refined types from
+      `@prisma-next/sql-relational-core/ast` so the contributor's `codecs()` slot verifies that every
+      factory returns a SQL codec.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "extends CodecImpl"
+        - "AnyCodecDescriptor"
+        - "CodecDescriptor"
+      anyMatch: true
   - id: mongo-derive-json-schema-value-sets-param
     summary: |
       `deriveJsonSchema` / `derivePolymorphicJsonSchema` (from `@prisma-next/mongo-contract-psl`) now

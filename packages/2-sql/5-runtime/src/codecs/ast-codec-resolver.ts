@@ -6,6 +6,7 @@ import {
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
+import { blindCast } from '@prisma-next/utils/casts';
 
 /**
  * Per-`ExecutionContext` resolver that materialises the {@link Codec} for a {@link CodecRef} carried on an AST node.
@@ -46,7 +47,10 @@ export function createAstCodecResolver(
         'RUNTIME.CODEC_DESCRIPTOR_MISSING',
       );
       const ctx = instanceContextFor(ref);
-      const codec = materializeCodec(descriptor, ref, ctx);
+      const codec = blindCast<
+        Codec,
+        'SQL contributor descriptors require factories that return SQL codecs before metadata is stored in the family-agnostic registry'
+      >(materializeCodec(descriptor, ref, ctx));
 
       cache.set(key, codec);
       return codec;

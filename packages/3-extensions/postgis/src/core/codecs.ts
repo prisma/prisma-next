@@ -4,7 +4,7 @@
  * Mirrors the descriptor + class pattern used by other codec-shipping
  * packages (e.g. pgvector). Three artefacts:
  *
- * 1. `PostgisGeometryCodec` extends {@link CodecImpl} with the runtime
+ * 1. `PostgisGeometryCodec` extends {@link SqlCodecImpl} with the runtime
  *    encode/decode conversions. Wire formats:
  *    - encode: EWKT (`'SRID=4326;POINT(...)'`) — PostgreSQL parses
  *      this when cast to `::geometry`.
@@ -33,16 +33,18 @@
 
 import type { JsonValue } from '@prisma-next/contract/types';
 import {
-  type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
-  CodecImpl,
   type CodecInstanceContext,
   type ColumnHelperFor,
   type ColumnHelperForStrict,
   column,
 } from '@prisma-next/framework-components/codec';
-import type { ExtractCodecTypes } from '@prisma-next/sql-relational-core/ast';
+import {
+  type AnyCodecDescriptor,
+  type ExtractCodecTypes,
+  SqlCodecImpl,
+} from '@prisma-next/sql-relational-core/ast';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import { POSTGIS_GEOMETRY_CODEC_ID } from './constants';
@@ -92,7 +94,7 @@ function assertGeometry(value: unknown): asserts value is Geometry {
   }
 }
 
-export class PostgisGeometryCodec extends CodecImpl<
+export class PostgisGeometryCodec extends SqlCodecImpl<
   typeof POSTGIS_GEOMETRY_CODEC_ID,
   readonly ['equality'],
   string,
