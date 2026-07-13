@@ -25,6 +25,7 @@ import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-compon
 import type { TargetFieldRef } from '@prisma-next/sql-contract-ts/contract-builder';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../2-sql/1-core/contract/test/test-support';
 import contractJson from '../src/contract/contract.json' with { type: 'json' };
 import { Account, Session, User, Verification } from '../src/exports/contract';
 import betterAuthPack from '../src/exports/pack';
@@ -104,6 +105,7 @@ describe('lowering smoke test — FK + relation onto User via betterAuthPack', (
     return defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       extensionPacks: { 'better-auth': betterAuthPack },
       models: { Profile },
     });
