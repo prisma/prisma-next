@@ -46,6 +46,7 @@ const sqlPreserveEmptyPatterns = [
   ['storage', 'namespaces', '*', 'entries', 'table', '*'],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', ['uniques', 'indexes', 'foreignKeys']],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', 'foreignKeys', ['constraint', 'index']],
+  ['storage', 'namespaces', '*', 'entries', 'table', '*', 'columns', '*', 'default', 'value'],
 ] as const satisfies readonly PathPattern[];
 
 const sqlSortTargets = [
@@ -333,7 +334,7 @@ describe('default omission', () => {
     expect(idField).not.toHaveProperty('generated');
   });
 
-  it('preserves a literal false column default value', () => {
+  it('preserves a literal false column default value via the family hook', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: unboundStorage({
@@ -349,12 +350,13 @@ describe('default omission', () => {
           },
         }),
       }),
+      { shouldPreserveEmpty: sqlPreserveEmpty },
     );
     const done = drill(unboundTables(result), 'task', 'columns', 'done');
     expect(done['default']).toEqual({ kind: 'literal', value: false });
   });
 
-  it('preserves a literal empty-array column default value', () => {
+  it('preserves a literal empty-array column default value via the family hook', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: unboundStorage({
@@ -370,6 +372,7 @@ describe('default omission', () => {
           },
         }),
       }),
+      { shouldPreserveEmpty: sqlPreserveEmpty },
     );
     const labels = drill(unboundTables(result), 'task', 'columns', 'labels');
     expect(labels['default']).toEqual({ kind: 'literal', value: [] });

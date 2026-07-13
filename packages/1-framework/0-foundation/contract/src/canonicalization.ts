@@ -62,18 +62,6 @@ const STORAGE_NAMESPACE_ENTRIES_PATTERN = [
   '*',
   'entries',
 ] as const satisfies PathPattern;
-const STORAGE_COLUMN_DEFAULT_VALUE_PATTERN = [
-  'storage',
-  'namespaces',
-  '*',
-  'entries',
-  'table',
-  '*',
-  'columns',
-  '*',
-  'default',
-  'value',
-] as const satisfies PathPattern;
 
 const TOP_LEVEL_ORDER = [
   'schemaVersion',
@@ -159,14 +147,6 @@ function omitDefaults(
 
       const isNullableField = key === 'nullable';
 
-      // A column default's literal payload is data, not schema shape —
-      // `{ kind: 'literal', value: false }` (or `value: []`) must survive
-      // canonicalization or the emitted contract fails validation on read.
-      const isDefaultLiteralValue = matchesPathPattern(
-        currentPath,
-        STORAGE_COLUMN_DEFAULT_VALUE_PATTERN,
-      );
-
       const isFamilyPreserved = shouldPreserveEmpty?.(currentPath) ?? false;
 
       if (
@@ -184,7 +164,6 @@ function omitDefaults(
         !isModelRelations &&
         !isModelStorage &&
         !isNullableField &&
-        !isDefaultLiteralValue &&
         !isFamilyPreserved
       ) {
         continue;
