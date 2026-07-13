@@ -14,9 +14,10 @@ The decision: such an interface is implemented as an **adapter over the extensio
 
 ```ts
 // What the adapter does with it (worked example: @prisma-next/extension-better-auth/adapter):
-const spaceModel = resolveSpaceModel(model);          // 'user' → 'User', or typed UNKNOWN_MODEL error
-const collection = db.orm.public[spaceModel];         // contract-typed collection
-return collection.create(decodeInput(fields, data));  // codec boundary crossed once, centrally
+const spaceModel = resolveSpaceModel(model);   // 'user' → 'User', or typed UNKNOWN_MODEL error
+assertKnownFields(model, spaceModel, data);    // unknown field → typed UNKNOWN_FIELD error
+const collection = db.orm.public[spaceModel];  // contract-typed collection
+return collection.create(data);                // codecs cross inside the collection (obligation 2)
 ```
 
 ## The pattern's five obligations
