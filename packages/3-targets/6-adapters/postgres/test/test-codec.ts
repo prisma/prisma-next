@@ -32,6 +32,13 @@ export function defineTestCodec<
   const identity = (v: unknown) => v;
   const userEncode = config.encode;
   const userDecode = config.decode;
+  const decode = (wire: TWire, ctx: SqlCodecCallContext): Promise<TInput> => {
+    try {
+      return Promise.resolve(userDecode(wire, ctx));
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  };
   const widenedConfig = config as {
     encodeJson?: (value: TInput) => JsonValue;
     decodeJson?: (json: JsonValue) => TInput;
@@ -45,13 +52,8 @@ export function defineTestCodec<
         return Promise.reject(error);
       }
     },
-    decode: (wire, ctx) => {
-      try {
-        return Promise.resolve(userDecode(wire, ctx));
-      } catch (error) {
-        return Promise.reject(error);
-      }
-    },
+    decode,
+    decodeFromJson: (value, ctx) => decode(value as TWire, ctx),
     encodeJson: (widenedConfig.encodeJson ?? identity) as (value: TInput) => JsonValue,
     decodeJson: (widenedConfig.decodeJson ?? identity) as (json: JsonValue) => TInput,
   } as Codec<Id, TTraits, TWire, TInput>;

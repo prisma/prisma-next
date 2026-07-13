@@ -1,5 +1,5 @@
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { Codec, CodecLookup, CodecMeta } from '@prisma-next/framework-components/codec';
+import type { CodecLookup, CodecMeta } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { RuntimeExtensionDescriptor } from '@prisma-next/framework-components/execution';
 import {
@@ -39,7 +39,7 @@ function lookupOf(
   byId: Record<string, { codec: SqlCodec; metadata?: CodecMetadata }>,
 ): CodecLookup {
   return {
-    get: (id) => byId[id]?.codec as Codec | undefined,
+    get: (id) => byId[id]?.codec,
     targetTypesFor: (id) => byId[id]?.metadata?.targetTypes,
     metaFor: (id, typeParams) => {
       const metadata = byId[id]?.metadata;
@@ -119,7 +119,7 @@ function selectWithTypeParams(
 
 describe('renderLoweredSql cast policy', () => {
   it('emits $N::<nativeType> when the codec nativeType is outside the inferrable set', () => {
-    const fooCodec: Codec = defineTestCodec({
+    const fooCodec: SqlCodec = defineTestCodec({
       typeId: 'app/test-foo@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
@@ -141,7 +141,7 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('emits plain $N when the codec nativeType is inferrable', () => {
-    const integerCodec: Codec = defineTestCodec({
+    const integerCodec: SqlCodec = defineTestCodec({
       typeId: 'pg/int4@1',
       encode: (value: number): number => value,
       decode: (wire: number): number => wire,
@@ -163,7 +163,7 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('emits $N::<nativeType> for a native-enum column using the codec instance params-aware metaFor, not the codec static meta', () => {
-    const pgEnumCodec: Codec = defineTestCodec({
+    const pgEnumCodec: SqlCodec = defineTestCodec({
       typeId: 'pg/enum@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
@@ -191,7 +191,7 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('emits $N::<schema>.<nativeType> for a native-enum column in a non-public schema, using the schema-qualified typeName verbatim', () => {
-    const pgEnumCodec: Codec = defineTestCodec({
+    const pgEnumCodec: SqlCodec = defineTestCodec({
       typeId: 'pg/enum@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
@@ -225,7 +225,7 @@ describe('renderLoweredSql cast policy', () => {
     // nativeType: forwarding it once shadowed the codec's static, inferrable
     // meta ('integer') and produced a spurious $1::int4 cast on every
     // non-enum bind.
-    const integerCodec: Codec = defineTestCodec({
+    const integerCodec: SqlCodec = defineTestCodec({
       typeId: 'pg/int4@1',
       encode: (value: number): number => value,
       decode: (wire: number): number => wire,
@@ -254,7 +254,7 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('emits plain $N when the codec carries no nativeType metadata', () => {
-    const enumCodec: Codec = defineTestCodec({
+    const enumCodec: SqlCodec = defineTestCodec({
       typeId: 'app/test-opaque@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
@@ -331,7 +331,7 @@ describe('renderLoweredSql cast policy', () => {
 
 describe('renderLoweredSql cast policy via stack-derived lookup', () => {
   it('emits the extension-codec cast when the codec is contributed via stack.extensionPacks', () => {
-    const geographyCodec: Codec = defineTestCodec({
+    const geographyCodec: SqlCodec = defineTestCodec({
       typeId: 'app/geography@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,

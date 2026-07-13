@@ -2,10 +2,10 @@ import type { Contract } from '@prisma-next/contract/types';
 import { CliStructuredError } from '@prisma-next/errors/control';
 import { placeholder } from '@prisma-next/errors/migration';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import type { Codec, CodecRegistry } from '@prisma-next/framework-components/codec';
+import type { CodecRegistry } from '@prisma-next/framework-components/codec';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { Codec, ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { pgTable } from '@prisma-next/target-postgres/contract-free';
 import { dataTransform } from '@prisma-next/target-postgres/data-transform';
@@ -220,6 +220,7 @@ const transformingCodec: Codec = {
   id: TEST_CODEC_ID,
   encode: async (value: unknown) => `ENC:${String(value).toUpperCase()}`,
   decode: async (wire: unknown) => wire,
+  decodeFromJson: async (value: unknown) => value,
   encodeJson: (v) => v as never,
   decodeJson: (v) => v as never,
 };
