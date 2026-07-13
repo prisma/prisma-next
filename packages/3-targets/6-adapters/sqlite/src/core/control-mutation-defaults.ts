@@ -2,6 +2,8 @@ import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types'
 import { timestampNowControlDescriptor } from '@prisma-next/family-sql/control';
 import type {
   ControlMutationDefaultEntry,
+  DefaultFunctionLoweringContext,
+  LoweredDefaultResult,
   MutationDefaultGeneratorDescriptor,
   TypedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
@@ -11,10 +13,6 @@ import {
 } from '@prisma-next/ids';
 import type { FuncCallSig } from '@prisma-next/psl-parser';
 import { int, num, oneOf, optional, str } from '@prisma-next/psl-parser';
-import type {
-  DefaultFunctionLoweringContext,
-  DefaultFunctionLoweringHandler,
-} from '@prisma-next/sql-contract-psl';
 import {
   SQLITE_BIGINT_CODEC_ID,
   SQLITE_BLOB_CODEC_ID,
@@ -24,8 +22,6 @@ import {
   SQLITE_REAL_CODEC_ID,
   SQLITE_TEXT_CODEC_ID,
 } from '@prisma-next/target-sqlite/codec-ids';
-
-type LoweredDefaultResult = ReturnType<DefaultFunctionLoweringHandler>;
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;

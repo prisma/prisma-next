@@ -1,10 +1,8 @@
-import type { ParsedDefaultFunctionCall } from '@prisma-next/framework-components/control';
 import type { PslDiagnostic, PslSpan } from '@prisma-next/framework-components/psl-ast';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { nodePslSpan } from '../../resolve';
 import type { ExpressionAst } from '../../syntax/ast/expressions';
 import { FunctionCallAst } from '../../syntax/ast/expressions';
-import { printSyntax } from '../../syntax/ast-helpers';
 import { interpretArgs } from '../interpret';
 import type { ArgType, InterpretCtx, Param, PositionalParam } from '../types';
 import { leafDiagnostic } from './diagnostic';
@@ -25,46 +23,10 @@ export interface TypedFuncCall {
   readonly args: Readonly<Record<string, unknown>>;
 }
 
-// A name-pinned function-call argument (`funcCall('now')` matches `now()`). Without a signature
-// the call is captured into the framework `ParsedDefaultFunctionCall` shape — each argument kept
-// as verbatim source text for the downstream default registry to re-parse (`dbgenerated` needs
-// the quotes preserved). With a signature, the call's arguments are parsed through it and bound
-// into a typed `{ fn, ...args }` record.
-export function funcCall(name: string): ArgType<ParsedDefaultFunctionCall>;
-export function funcCall(name: string, sig: FuncCallSig): ArgType<TypedFuncCall>;
-export function funcCall(
-  name: string,
-  sig?: FuncCallSig,
-): ArgType<ParsedDefaultFunctionCall> | ArgType<TypedFuncCall> {
-  return sig === undefined ? rawFuncCall(name) : typedFuncCall(name, sig);
-}
-
-function rawFuncCall(name: string): ArgType<ParsedDefaultFunctionCall> {
-  return {
-    kind: 'funcCall',
-    label: 'function call',
-    parse: (arg, ctx): Result<ParsedDefaultFunctionCall, readonly PslDiagnostic[]> => {
-      const guard = matchCallee(arg, name, ctx);
-      if (!guard.ok) return guard;
-      const call = guard.value;
-      const args = Array.from(call.args(), (argument) => {
-        const node = argument.value() ?? argument;
-        return {
-          raw: printSyntax(node.syntax).trim(),
-          span: nodePslSpan(node.syntax, ctx.sourceFile),
-        };
-      });
-      return ok({
-        name,
-        raw: printSyntax(call.syntax).trim(),
-        args,
-        span: nodePslSpan(call.syntax, ctx.sourceFile),
-      });
-    },
-  };
-}
-
-function typedFuncCall(name: string, sig: FuncCallSig): ArgType<TypedFuncCall> {
+// A name-pinned function-call argument (`funcCall('now', {})` matches `now()`). Pins the callee
+// `name`, parses the call's arguments through `sig`, and binds them into a typed `{ fn, span, args }`
+// record.
+export function funcCall(name: string, sig: FuncCallSig): ArgType<TypedFuncCall> {
   return {
     kind: 'funcCall',
     label: 'function call',

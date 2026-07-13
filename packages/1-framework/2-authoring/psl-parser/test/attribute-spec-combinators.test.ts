@@ -600,20 +600,16 @@ describe('funcCall', () => {
   it('accepts a nullary call whose callee matches the pinned name', () => {
     const { expr, ctx } = argOf('now()');
 
-    const result = funcCall('now').parse(expr, ctx);
+    const result = funcCall('now', {}).parse(expr, ctx);
 
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.name).toBe('now');
-      expect(result.value.args).toEqual([]);
-      expect(result.value.raw).toBe('now()');
-    }
+    if (result.ok) expect(result.value).toMatchObject({ fn: 'now', args: {} });
   });
 
   it('rejects a call whose callee differs from the pinned name', () => {
     const { expr, ctx } = argOf('uuid()');
 
-    const result = funcCall('now').parse(expr, ctx);
+    const result = funcCall('now', {}).parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -622,36 +618,10 @@ describe('funcCall', () => {
     }
   });
 
-  it('captures each argument as its verbatim source text', () => {
-    const { expr, ctx } = argOf('dbgenerated("gen_random_uuid()")');
-
-    const result = funcCall('dbgenerated').parse(expr, ctx);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.name).toBe('dbgenerated');
-      expect(result.value.args).toHaveLength(1);
-      expect(result.value.args[0]?.raw).toBe('"gen_random_uuid()"');
-    }
-  });
-
-  it('preserves a numeric argument as source text', () => {
-    const { expr, ctx } = argOf('uuid(7)');
-
-    const result = funcCall('uuid').parse(expr, ctx);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.name).toBe('uuid');
-      expect(result.value.args).toHaveLength(1);
-      expect(result.value.args[0]?.raw).toBe('7');
-    }
-  });
-
   it('rejects a bare identifier', () => {
     const { expr, ctx } = argOf('now');
 
-    const result = funcCall('now').parse(expr, ctx);
+    const result = funcCall('now', {}).parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -663,7 +633,7 @@ describe('funcCall', () => {
   it('rejects a string literal', () => {
     const { expr, ctx } = argOf('"now"');
 
-    const result = funcCall('now').parse(expr, ctx);
+    const result = funcCall('now', {}).parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
@@ -672,7 +642,7 @@ describe('funcCall', () => {
   it('rejects an array literal', () => {
     const { expr, ctx } = argOf('[1]');
 
-    const result = funcCall('now').parse(expr, ctx);
+    const result = funcCall('now', {}).parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
@@ -681,7 +651,7 @@ describe('funcCall', () => {
   it('rejects a namespaced callee', () => {
     const { expr, ctx } = argOf('foo.now()');
 
-    const result = funcCall('now').parse(expr, ctx);
+    const result = funcCall('now', {}).parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
