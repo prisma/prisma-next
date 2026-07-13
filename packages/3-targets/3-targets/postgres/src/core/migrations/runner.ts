@@ -660,6 +660,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
           migrationName: edge.dirName,
           migrationHash: edge.migrationHash,
           operations: edgeOps,
+          ...ifDefined('destinationContractJson', edge.destinationContractJson),
         },
       });
     }

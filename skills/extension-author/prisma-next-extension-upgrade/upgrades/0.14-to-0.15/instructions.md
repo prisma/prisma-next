@@ -332,6 +332,43 @@ changes:
         - "SqlForeignKeyIR"
         - "referencedSchema"
       anyMatch: true
+  - id: psl-role-block
+    summary: |
+      PSL gains a standalone `role` block on the postgres target, authored inside the explicit
+      unbound namespace: `namespace unbound { role anon {} }` (name-only, no parameters) lowers to a
+      first-class `PostgresRole` entity in the contract's `__unbound__` storage slot
+      (`control: 'external'` — roles are referenced, never owned; the planner emits no role DDL and
+      `db verify` checks existence via `pg_roles`). The unbound namespace's purpose is late binding
+      (search_path-resolved tables); roles are declared there because they are cluster-scoped and
+      belong to no schema. To make this authorable, the "no `namespace unbound { }` alongside named
+      namespaces" restriction is narrowed to models: a blocks-only unbound namespace is legal next
+      to named namespaces, while one containing models next to named namespaces stays rejected
+      (`PSL_RESERVED_NAMESPACE_NAME`). A `role` block anywhere else — a named namespace or the
+      document top level — is rejected with `PSL_ROLE_BLOCK_OUTSIDE_UNBOUND_NAMESPACE`. Purely
+      additive for existing contracts.
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "role "
+        - "AuthoringPslBlockDescriptor"
+      anyMatch: true
+  - id: supabase-pack-contract-declares-roles
+    summary: |
+      The `@prisma-next/extension-supabase` shipped contract now declares Supabase's three standard
+      Postgres roles (`anon`, `authenticated`, `service_role`) as first-class `role` entities with
+      `control: 'external'`. `db verify` on a project composing the pack now fails with a `not-found`
+      schema issue naming each declared role the live database lacks. Real Supabase databases always
+      have these roles, so hosted projects need no change; a local or CI database that stands in for
+      Supabase must create them — `bootstrapSupabaseShim` from
+      `@prisma-next/extension-supabase/test/utils` already does. The public
+      `SupabaseRoleBinding['role']` type is unchanged (`'anon' | 'authenticated' | 'service_role'`);
+      it is now derived from the `SupabaseRole` Prisma Next enum handle's values; the contract declares the roles via the
+      new PSL `role` blocks inside `namespace unbound { }` (see the `psl-role-block` entry).
+    detection:
+      glob: "**/*.{ts,mts,cts,tsx,prisma,json}"
+      contains:
+        - "@prisma-next/extension-supabase"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
@@ -580,4 +617,11 @@ coordinates (variant table for MTI, base table for STI), and
 EXISTS. Purely additive to the ORM client's query surface; no extension-author SPI
 (`@prisma-next/contract`, `@prisma-next/framework-components`, …) changed. No
 extension-author action required. Incidental substrate diff only.
+-->
+
+<!--
+Dependabot runtime-deps group bump (PR #962): the packages/3-extensions/
+diff is package.json dependency version ranges only (arktype ^2.2.2 /
+~2.2.2). No extension-facing API, contract shape, or emitted artefact
+changes. No user action required. Incidental substrate diff only.
 -->
