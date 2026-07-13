@@ -36,7 +36,12 @@ export interface BetterAuthTestApp {
 }
 
 export async function setupBetterAuthTestApp(): Promise<BetterAuthTestApp> {
-  const database = await createDevDatabase();
+  // The dev server's 1s default idle timeout reaps pooled connections
+  // between tests of the long-running conformance suites, surfacing as
+  // async "Connection terminated unexpectedly" errors and a teardown
+  // `client.close()` that cannot drain its pool. Keep idle connections
+  // alive for the lifetime of the suite instead.
+  const database = await createDevDatabase({ databaseIdleTimeoutMillis: 600_000 });
   const tempRoot = mkdtempSync(join(fixtureAppDir, 'better-auth-harness-'));
 
   const testSetup = setupTestDirectoryFromFixtures(
@@ -87,7 +92,19 @@ export async function setupBetterAuthTestApp(): Promise<BetterAuthTestApp> {
     runMigrations,
     async teardown() {
       await client.close();
-      await database.close();
+      // After the full conformance run's connection churn (hundreds of
+      // pool acquisitions across 200+ tests), the dev server's close()
+      // never resolves — the same teardown returns promptly after the
+      // small betterauth-e2e run, so the leak scales with connection
+      // volume inside @prisma/dev's socket server, not with anything the
+      // harness holds open (the adapter client is already closed above).
+      // Bound the wait: the per-file vitest worker exits right after
+      // teardown, taking the in-memory PGlite with it. Tracked as a
+      // TML-2995 finding.
+      await Promise.race([
+        database.close(),
+        new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+      ]);
       rmSync(tempRoot, { recursive: true, force: true });
     },
   };
