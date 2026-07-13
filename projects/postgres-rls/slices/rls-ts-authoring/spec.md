@@ -75,7 +75,7 @@ Thrown from the wrapper lowering, naming the user's prefix only (never the hash)
 ## Behaviour contract
 
 - **Deliberate (new):** the at-a-glance contract builds and emits; TS/PSL parity pinned (identical IR, identical wire names, identical `entries` keys, `@@map` covered); the slice-1 scenario authored in TS behaves identically on live PGlite (filtered rows under `SET ROLE`, create/edit/rename/drop lifecycle, drift fails verify); D5 diagnostics fire; PSL `@@map`'d-model policies key to the real table.
-- **Unchanged (hard):** every existing PSL contract's emitted bytes (the D6 fix changes output only for `@@map`'d models with policies — previously broken, none exist in-tree); differ/planner/verify code untouched; SQLite + Mongo surfaces and suites untouched; layering invariant holds (no RLS vocabulary in `1-framework`/`2-sql`; vocabulary ratchet unchanged); `packEntities` semantics unchanged for existing users.
+- **Unchanged (hard):** every existing PSL contract's emitted bytes (the D6 fix changes output only for `@@map`'d models with policies — previously broken, none exist in-tree); differ/planner/verify code untouched; SQLite + Mongo surfaces and suites untouched; layering invariant holds (no RLS vocabulary in `1-framework`/`2-sql`; vocabulary ratchet unchanged); emitted contract bytes byte-identical (`entities` folds through the same internal carrier the removed public `packEntities` input used — the removal is author-surface only).
 
 ## Contract impact
 
