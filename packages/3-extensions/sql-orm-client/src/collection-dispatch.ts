@@ -14,7 +14,7 @@
  * `test/integration/codec-async.test.ts` and `test/codec-async.types.test-d.ts`.
  */
 
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
@@ -22,10 +22,12 @@ import {
   type AnyExpression,
   BinaryExpr,
   ColumnRef,
+  type ContractCodecRegistry,
   ListExpression,
   LiteralExpr,
   OrExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import {
   isToOneCardinality,
   resolvePolymorphismInfo,
@@ -55,6 +57,7 @@ import { bindWhereExpr } from './where-binding';
 
 export function dispatchCollectionRows<Row>(options: {
   contract: Contract<SqlStorage>;
+  contractCodecs: ContractCodecRegistry;
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
@@ -90,13 +93,14 @@ export function dispatchCollectionRows<Row>(options: {
 // into a single query; the read path has no multi-query fallback.
 function dispatchWithIncludes<Row>(options: {
   contract: Contract<SqlStorage>;
+  contractCodecs: ContractCodecRegistry;
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   state: CollectionState;
   tableName: string;
   modelName: string;
   namespaceId: string;
 }): AsyncIterableResult<Row> {
-  const { contract, runtime, state, tableName, modelName, namespaceId } = options;
+  const { contract, contractCodecs, runtime, state, tableName, modelName, namespaceId } = options;
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
@@ -136,6 +140,7 @@ function dispatchWithIncludes<Row>(options: {
         for (const include of state.includes) {
           parent.mapped[include.relationName] = decodeIncludePayload(
             contract,
+            contractCodecs,
             include,
             parent.raw[include.relationName],
           );
@@ -185,6 +190,7 @@ function dispatchWithIncludes<Row>(options: {
  */
 export function reloadMutationRowsByIdentities<Row>(options: {
   contract: Contract<SqlStorage>;
+  contractCodecs: ContractCodecRegistry;
   runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   tableName: string;
   modelName: string;
@@ -195,6 +201,7 @@ export function reloadMutationRowsByIdentities<Row>(options: {
 }): AsyncIterableResult<Row> {
   const {
     contract,
+    contractCodecs,
     runtime,
     tableName,
     modelName,
@@ -227,6 +234,7 @@ export function reloadMutationRowsByIdentities<Row>(options: {
 
   return dispatchCollectionRows<Row>({
     contract,
+    contractCodecs,
     runtime,
     state: {
       ...emptyState(),
@@ -307,6 +315,7 @@ function buildIdentityInFilter(
  */
 function decodeIncludePayload(
   contract: Contract<SqlStorage>,
+  contractCodecs: ContractCodecRegistry,
   include: IncludeExpr,
   raw: unknown,
 ): unknown {
@@ -314,7 +323,7 @@ function decodeIncludePayload(
     return decodeScalarIncludePayload(include, include.scalar, raw);
   }
   if (include.combine) {
-    return decodeCombineIncludePayload(contract, include, include.combine, raw);
+    return decodeCombineIncludePayload(contract, contractCodecs, include, include.combine, raw);
   }
   const rawChildren = parseIncludedRows(raw);
   const polyInfo = resolvePolymorphismInfo(
@@ -340,7 +349,8 @@ function decodeIncludePayload(
           childRow,
         );
   const mappedChildren = rawChildren.map((childRow) => {
-    const mapped = mapChildRow(childRow);
+    const decodedRow = decodeIncludeRowCells(contractCodecs, include, childRow);
+    const mapped = mapChildRow(decodedRow);
     // Source each nested-include payload from the RAW child row: it always
     // carries the payload under its relation alias. `mapChildRow` may be the
     // polymorphic mapper, which keeps only variant model-field columns and so
@@ -348,6 +358,7 @@ function decodeIncludePayload(
     for (const nestedInclude of include.nested.includes) {
       mapped[nestedInclude.relationName] = decodeIncludePayload(
         contract,
+        contractCodecs,
         nestedInclude,
         childRow[nestedInclude.relationName],
       );
@@ -355,6 +366,65 @@ function decodeIncludePayload(
     return mapped;
   });
   return coerceSingleQueryIncludeResult(mappedChildren, include.cardinality);
+}
+
+/**
+ * Decode the codec-typed cells of one JSON-transported include row.
+ *
+ * Values inside a correlated-subquery payload crossed a JSON boundary
+ * (`json_agg` / `json_build_object`), so they carry JSON-safe renderings
+ * (e.g. timestamptz as an ISO string) rather than the JS types the
+ * top-level decode path produces. Each cell that resolves to a column of
+ * the include's related table is run through its codec's `decodeJson` —
+ * the codec's designed JSON boundary — restoring type parity with
+ * top-level rows.
+ *
+ * Cells that do not resolve to a column pass through unchanged: nested
+ * include aliases (decoded by the recursive walk), polymorphism-prefixed
+ * variant columns, and combine envelopes all live under non-column keys.
+ */
+function decodeIncludeRowCells(
+  contractCodecs: ContractCodecRegistry,
+  include: IncludeExpr,
+  childRow: Record<string, unknown>,
+): Record<string, unknown> {
+  const decoded: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(childRow)) {
+    if (value === null || value === undefined) {
+      decoded[key] = value;
+      continue;
+    }
+    const codec = contractCodecs.forColumn(
+      include.relatedNamespaceId,
+      include.relatedTableName,
+      key,
+    );
+    if (!codec) {
+      decoded[key] = value;
+      continue;
+    }
+    try {
+      decoded[key] = codec.decodeJson(
+        blindCast<
+          JsonValue,
+          'include payload cells come out of a parsed JSON document, so every non-null cell is JSON-safe by construction'
+        >(value),
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // The codec's identity is not read off the instance here: codecs
+      // materialized through `materializeCodec` currently detach the
+      // descriptor factory from its receiver, leaving `codec.id` broken.
+      // The (namespace, table, column) coordinates identify the codec
+      // unambiguously through the contract.
+      const wrapped = new Error(
+        `Failed to decode include payload cell "${include.relatedNamespaceId}"."${include.relatedTableName}"."${key}" for relation "${include.relationName}": ${message}`,
+      );
+      wrapped.cause = error;
+      throw wrapped;
+    }
+  }
+  return decoded;
 }
 
 /**
@@ -382,6 +452,7 @@ function decodeIncludePayload(
  */
 function decodeCombineIncludePayload(
   contract: Contract<SqlStorage>,
+  contractCodecs: ContractCodecRegistry,
   include: IncludeExpr,
   branches: Readonly<Record<string, IncludeCombineBranch>>,
   raw: unknown,
@@ -397,7 +468,12 @@ function decodeCombineIncludePayload(
         scalar: undefined,
         combine: undefined,
       };
-      result[branchName] = decodeIncludePayload(contract, syntheticInclude, branchRaw);
+      result[branchName] = decodeIncludePayload(
+        contract,
+        contractCodecs,
+        syntheticInclude,
+        branchRaw,
+      );
     } else {
       result[branchName] = decodeScalarIncludePayload(include, branch.selector, branchRaw);
     }

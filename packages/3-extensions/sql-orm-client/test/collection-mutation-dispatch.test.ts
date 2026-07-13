@@ -11,7 +11,7 @@ import {
   dispatchSplitMutationRows,
   executeMutationReturningSingleRow,
 } from '../src/collection-mutation-dispatch';
-import { createMockRuntime, getTestContract } from './helpers';
+import { createMockRuntime, getTestContext, getTestContract } from './helpers';
 
 // These helpers own the no-include mutation read-back: execute the
 // `RETURNING` plan, map storage rows to model fields, and strip hidden
@@ -42,6 +42,7 @@ describe('collection-mutation-dispatch', () => {
 
     const rows = await dispatchMutationRows<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       compiled: makeCompiled('insert into users ... returning *'),
       tableName: 'users',
@@ -63,6 +64,7 @@ describe('collection-mutation-dispatch', () => {
 
     const result = await executeMutationReturningSingleRow<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       compiled: makeCompiled('delete from users returning *'),
       tableName: 'users',
@@ -85,6 +87,7 @@ describe('collection-mutation-dispatch', () => {
 
     const result = await executeMutationReturningSingleRow<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
       tableName: 'users',
@@ -111,6 +114,7 @@ describe('collection-mutation-dispatch', () => {
 
       const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
         contract,
+        contractCodecs: getTestContext().contractCodecs,
         runtime,
         plans: [makeCompiled('insert batch 1'), makeCompiled('insert batch 2')],
         tableName: 'users',
@@ -136,6 +140,7 @@ describe('collection-mutation-dispatch', () => {
 
       const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
         contract,
+        contractCodecs: getTestContext().contractCodecs,
         runtime,
         plans: [makeCompiled('insert ...')],
         tableName: 'users',
@@ -157,6 +162,7 @@ describe('collection-mutation-dispatch', () => {
 
       const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
         contract,
+        contractCodecs: getTestContext().contractCodecs,
         runtime,
         plans: [makeCompiled('insert batch 1'), makeCompiled('insert batch 2')],
         tableName: 'users',

@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { reloadMutationRowsByIdentities } from './collection-dispatch';
 import {
@@ -13,6 +14,7 @@ import type { CollectionContext, IncludeExpr } from './types';
 
 interface DispatchMutationRowsOptions<Row> {
   readonly contract: Contract<SqlStorage>;
+  readonly contractCodecs: ContractCodecRegistry;
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
   readonly tableName: string;
@@ -29,6 +31,7 @@ export function dispatchMutationRows<Row>(
 ): AsyncIterableResult<Row> {
   const {
     contract,
+    contractCodecs,
     runtime,
     compiled,
     tableName,
@@ -64,6 +67,7 @@ export function dispatchMutationRows<Row>(
     ).toArray();
     yield* reloadMutationRowsByIdentities<Row>({
       contract,
+      contractCodecs,
       runtime,
       tableName,
       modelName,
@@ -79,6 +83,7 @@ export function dispatchMutationRows<Row>(
 
 interface DispatchSplitMutationRowsOptions<Row> {
   readonly contract: Contract<SqlStorage>;
+  readonly contractCodecs: ContractCodecRegistry;
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly plans: ReadonlyArray<SqlQueryPlan<Record<string, unknown>>>;
   readonly tableName: string;
@@ -95,6 +100,7 @@ export function dispatchSplitMutationRows<Row>(
 ): AsyncIterableResult<Row> {
   const {
     contract,
+    contractCodecs,
     runtime,
     plans,
     tableName,
@@ -116,6 +122,7 @@ export function dispatchSplitMutationRows<Row>(
       }
       yield* reloadMutationRowsByIdentities<Row>({
         contract,
+        contractCodecs,
         runtime,
         tableName,
         modelName,
@@ -143,6 +150,7 @@ export function dispatchSplitMutationRows<Row>(
 
 interface ExecuteSingleMutationOptions<Row> {
   readonly contract: Contract<SqlStorage>;
+  readonly contractCodecs: ContractCodecRegistry;
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
   readonly tableName: string;
@@ -160,6 +168,7 @@ export async function executeMutationReturningSingleRow<Row>(
 ): Promise<Row | null> {
   const {
     contract,
+    contractCodecs,
     runtime,
     compiled,
     tableName,
@@ -195,6 +204,7 @@ export async function executeMutationReturningSingleRow<Row>(
   // to a single row, so the stream is advanced once rather than drained.
   for await (const row of reloadMutationRowsByIdentities<Row>({
     contract,
+    contractCodecs,
     runtime,
     tableName,
     modelName,

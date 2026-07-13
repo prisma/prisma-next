@@ -2,6 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   BinaryExpr,
+  ContractCodecRegistry,
   ListExpression,
   ParamRef,
   SelectAst,
@@ -65,6 +66,15 @@ const twoNamespaceContract = blindCast<Contract<SqlStorage>, 'hand-built multi-n
   },
 });
 
+// This test dispatches with `includes: []`, so the include-decode path never
+// consults the registry — an empty stub keeps the fixture self-contained.
+const stubContractCodecs: ContractCodecRegistry = {
+  forColumn: () => undefined,
+  forCodecRef: () => {
+    throw new Error('unexpected forCodecRef call in include-free read-back test');
+  },
+};
+
 async function readBackIdentityCodec(
   runtime: MockRuntime,
   namespaceId: string,
@@ -73,6 +83,7 @@ async function readBackIdentityCodec(
   runtime.setNextResults([[]]);
   await reloadMutationRowsByIdentities<Record<string, unknown>>({
     contract: twoNamespaceContract,
+    contractCodecs: stubContractCodecs,
     runtime,
     tableName: 'users',
     modelName: 'User',

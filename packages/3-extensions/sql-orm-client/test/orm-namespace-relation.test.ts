@@ -105,6 +105,9 @@ function setup(): { db: TwoNamespaceOrm; runtime: MockRuntime } {
         contract: twoNamespaceContract,
         applyMutationDefaults: () => [],
         codecDescriptors: { descriptorFor: () => ({ traits: ['equality'] }) },
+        // Unresolvable columns pass through undecoded, so a stub registry
+        // keeps this fixture's include payloads byte-identical.
+        contractCodecs: { forColumn: () => undefined },
       }),
     }),
   );

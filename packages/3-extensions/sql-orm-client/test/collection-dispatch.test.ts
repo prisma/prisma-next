@@ -10,6 +10,7 @@ import {
   buildMixedPolyContract,
   buildStiPolyContract,
   createMockRuntime,
+  getTestContext,
   getTestContract,
   withCapabilities,
 } from './helpers';
@@ -97,6 +98,7 @@ describe('collection-dispatch', () => {
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract: collection.ctx.context.contract,
+      contractCodecs: collection.ctx.context.contractCodecs,
       runtime,
       state: collection.state,
       tableName: collection.tableName,
@@ -121,6 +123,7 @@ describe('collection-dispatch', () => {
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
@@ -172,6 +175,7 @@ describe('collection-dispatch', () => {
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
@@ -224,6 +228,7 @@ describe('collection-dispatch', () => {
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
@@ -265,6 +270,7 @@ describe('collection-dispatch', () => {
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime: runtimeWithConnection,
       state: scoped.state,
       tableName: scoped.tableName,
@@ -307,6 +313,7 @@ describe('collection-dispatch', () => {
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
@@ -355,6 +362,7 @@ describe('collection-dispatch', () => {
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
@@ -399,6 +407,7 @@ describe('collection-dispatch', () => {
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       state,
       tableName: 'accounts',
@@ -440,6 +449,7 @@ describe('collection-dispatch', () => {
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       state,
       tableName: 'projects_tbl',
@@ -518,6 +528,7 @@ describe('collection-dispatch', () => {
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       state,
       tableName: 'projects_tbl',
@@ -574,6 +585,7 @@ describe('collection-dispatch', () => {
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
       contract,
+      contractCodecs: getTestContext().contractCodecs,
       runtime,
       state,
       tableName: 'projects_tbl',
