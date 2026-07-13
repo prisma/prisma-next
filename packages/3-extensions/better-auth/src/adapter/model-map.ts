@@ -1,7 +1,15 @@
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { Contract } from '../contract/contract.d';
 import contractJson from '../contract/contract.json' with { type: 'json' };
 import { unknownField, unknownModel } from './errors';
+
+// Type Parameter Pattern (AGENTS.md): the JSON import's static type is
+// trusted nowhere — the shipped contract is structurally validated at
+// module load and consumed through the emitted `Contract` type, so a
+// corrupted contract.json fails fast here rather than as a mis-shaped
+// query downstream.
+const contract = new PostgresContractSerializer().deserializeContract<Contract>(contractJson);
 
 /** Model names of the better-auth contract space (from the emitted contract types). */
 export type SpaceModelName = keyof Contract['domain']['namespaces']['public']['models'] & string;
@@ -49,7 +57,7 @@ export const KNOWN_BETTER_AUTH_MODELS: readonly string[] = [...spaceModelByBette
  * runtime validation and the emitted contract cannot drift.
  */
 const fieldsBySpaceModel: ReadonlyMap<string, ReadonlySet<string>> = new Map(
-  Object.entries(contractJson.domain.namespaces.public.models).map(([modelName, modelDef]) => [
+  Object.entries(contract.domain.namespaces.public.models).map(([modelName, modelDef]) => [
     modelName,
     new Set(Object.keys(modelDef.fields)),
   ]),
@@ -99,8 +107,23 @@ interface ContractDomainRelation {
   };
 }
 
+function singleField(
+  fields: readonly string[],
+  modelName: string,
+  relationName: string,
+  side: 'local' | 'target',
+): string {
+  const [field, ...rest] = fields;
+  if (field === undefined || rest.length > 0) {
+    throw new Error(
+      `better-auth space relation "${modelName}.${relationName}" declares ${fields.length} ${side} fields; the adapter's join mapping requires exactly one. The shipped contract should never produce this — it indicates a corrupted or hand-edited contract.json.`,
+    );
+  }
+  return field;
+}
+
 const relationsBySpaceModel: ReadonlyMap<string, readonly SpaceModelRelation[]> = new Map(
-  Object.entries(contractJson.domain.namespaces.public.models).map(([modelName, modelDef]) => {
+  Object.entries(contract.domain.namespaces.public.models).map(([modelName, modelDef]) => {
     const relations: Readonly<Record<string, ContractDomainRelation>> =
       'relations' in modelDef ? modelDef.relations : {};
     return [
@@ -108,8 +131,8 @@ const relationsBySpaceModel: ReadonlyMap<string, readonly SpaceModelRelation[]> 
       Object.entries(relations).map(([relationName, relation]) => ({
         relationName,
         toModel: relation.to.model,
-        localField: relation.on.localFields[0] ?? '',
-        targetField: relation.on.targetFields[0] ?? '',
+        localField: singleField(relation.on.localFields, modelName, relationName, 'local'),
+        targetField: singleField(relation.on.targetFields, modelName, relationName, 'target'),
       })),
     ];
   }),

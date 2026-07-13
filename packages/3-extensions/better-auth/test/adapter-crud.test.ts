@@ -1,5 +1,5 @@
 /**
- * Behavioural coverage for `prismaNextAdapter` over a real PGlite database:
+ * Behavioural coverage for `prismaNextAdapter` over a real database (the @prisma/dev PGlite-backed Postgres dev server, spoken to over the pg wire protocol):
  * every BetterAuth operation reaches the database through the contract-typed
  * ORM collections of the better-auth space, so values round-trip through
  * contract codecs (Dates as `timestamptz`, booleans as `bool`) and the

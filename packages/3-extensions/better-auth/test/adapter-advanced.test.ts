@@ -1,5 +1,5 @@
 /**
- * Behavioural coverage for the adapter's advanced surface over PGlite:
+ * Behavioural coverage for the adapter's advanced surface over the @prisma/dev Postgres dev server:
  *
  * - `consumeOne` is native on `Collection.delete()` — the atomic
  *   find-first + identity-narrowed `DELETE … RETURNING` — so concurrent

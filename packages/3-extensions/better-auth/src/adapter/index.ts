@@ -223,8 +223,9 @@ function buildCustomAdapter(db: BetterAuthDbCollections): CustomAdapter {
 
     async updateMany({ model, where, update }) {
       const resolved = resolveModel(model);
-      assertKnownFields(model, resolved.spaceModel, update);
-      return scopeToWhere(resolved, model, where).updateCount(update);
+      const data = asRecord(update, model);
+      assertKnownFields(model, resolved.spaceModel, data);
+      return scopeToWhere(resolved, model, where).updateCount(data);
     },
 
     async delete({ model, where }) {

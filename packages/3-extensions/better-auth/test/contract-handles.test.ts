@@ -24,7 +24,7 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { TargetFieldRef } from '@prisma-next/sql-contract-ts/contract-builder';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import { describe, expect, expectTypeOf, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../../2-sql/1-core/contract/test/test-support';
 import contractJson from '../src/contract/contract.json' with { type: 'json' };
 import { Account, Session, User, Verification } from '../src/exports/contract';
@@ -67,19 +67,32 @@ describe('handle brands and coordinates', () => {
     });
   }
 
-  it('User.refs.id is a cross-space TargetFieldRef branded "better-auth"', () => {
-    expectTypeOf(User.refs.id).toEqualTypeOf<TargetFieldRef<'User', 'id', 'better-auth'>>();
+  // `expectTypeOf(...).toEqualTypeOf` normalizes some phantom-brand slots,
+  // so an exact mutual-assignability check pins the brand coordinates
+  // without erasure: `Equal<A, B>` resolves to true only when the two
+  // types are identical under the checker's strictest comparison.
+  type Equal<A, B> =
+    (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+
+  it('refs.id carries the exact cross-space TargetFieldRef type for every handle', () => {
+    const userRef: Equal<typeof User.refs.id, TargetFieldRef<'User', 'id', 'better-auth'>> = true;
+    const sessionRef: Equal<
+      typeof Session.refs.id,
+      TargetFieldRef<'Session', 'id', 'better-auth'>
+    > = true;
+    const accountRef: Equal<
+      typeof Account.refs.id,
+      TargetFieldRef<'Account', 'id', 'better-auth'>
+    > = true;
+    const verificationRef: Equal<
+      typeof Verification.refs.id,
+      TargetFieldRef<'Verification', 'id', 'better-auth'>
+    > = true;
+    expect([userRef, sessionRef, accountRef, verificationRef]).toEqual([true, true, true, true]);
+
     expect(User.refs.id.spaceId).toBe('better-auth');
     expect(User.refs.id.namespaceId).toBe('public');
     expect(User.refs.id.tableName).toBe('user');
-  });
-
-  it('Session.refs.id and Account.refs.id carry the brand at the type level', () => {
-    expectTypeOf(Session.refs.id).toEqualTypeOf<TargetFieldRef<'Session', 'id', 'better-auth'>>();
-    expectTypeOf(Account.refs.id).toEqualTypeOf<TargetFieldRef<'Account', 'id', 'better-auth'>>();
-    expectTypeOf(Verification.refs.id).toEqualTypeOf<
-      TargetFieldRef<'Verification', 'id', 'better-auth'>
-    >();
   });
 });
 
@@ -154,7 +167,7 @@ type ContractJsonDomain = {
       models: Record<
         string,
         {
-          fields: Record<string, { type: { codecId?: string } }>;
+          fields: Record<string, { type: { codecId?: string }; nullable?: boolean }>;
           storage: { table: string; fields: Record<string, unknown> };
         }
       >;
@@ -172,6 +185,25 @@ function handleCodecIds(handle: (typeof HANDLES)[number]['handle']): Record<stri
       }
       return [name, codecId];
     }),
+  );
+}
+
+/** Per-column nullability map from a handle's field builders. */
+function handleNullability(handle: (typeof HANDLES)[number]['handle']): Record<string, boolean> {
+  return Object.fromEntries(
+    Object.entries(handle.stageOne.fields).map(([name, builder]) => [
+      name,
+      builder.build().nullable,
+    ]),
+  );
+}
+
+/** Per-column nullability map from the shipped contract.json domain model. */
+function contractNullability(
+  jsonModel: ContractJsonDomain['namespaces'][string]['models'][string],
+): Record<string, boolean> {
+  return Object.fromEntries(
+    Object.entries(jsonModel.fields).map(([name, fieldDef]) => [name, fieldDef.nullable === true]),
   );
 }
 
@@ -202,6 +234,9 @@ describe('handle↔contract.json consistency', () => {
       // Whole-map equality: catches missing columns, extra columns, and
       // per-column codec drift in one assertion.
       expect(handleCodecIds(handle)).toEqual(contractCodecIds(jsonModel!));
+      // Same style for nullability: a handle whose column optionality
+      // disagrees with the shipped contract drifts silently otherwise.
+      expect(handleNullability(handle)).toEqual(contractNullability(jsonModel!));
     });
   }
 });

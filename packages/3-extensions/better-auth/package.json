@@ -56,7 +56,10 @@
     "migrations"
   ],
   "exports": {
-    "./pack": "./dist/pack.mjs",
+    "./pack": {
+      "types": "./dist/pack.d.mts",
+      "import": "./dist/pack.mjs"
+    },
     "./contract": {
       "types": "./dist/contract.d.mts",
       "import": "./dist/contract.mjs"
