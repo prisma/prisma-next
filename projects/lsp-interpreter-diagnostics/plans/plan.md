@@ -149,7 +149,7 @@ stack-shaped objects surface via typecheck and gain the new property.
 
 ### Implement M2b: contractSpace declared on the core extension descriptor
 
-**Status:** ► In progress — slice 03, stacked on slice 02 (scope addition, operator-authorized 2026-07-10)
+**Status:** ► In progress — slice 03 delivered (`2c3c1de79`, SATISFIED 4/4 SDoD), stacked on slice 02; PR opens after #948 merges (scope addition, operator-authorized 2026-07-10)
 
 _Outcomes_
 Core `ControlExtensionDescriptor` carries `contractSpace?: ContractSpace`; sql + mongo
