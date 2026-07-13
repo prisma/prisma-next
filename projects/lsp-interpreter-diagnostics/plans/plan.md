@@ -117,7 +117,7 @@ gate separating old from new behavior.
 
 ### Implement M2: ControlStack exposes extension contracts
 
-**Status:** ► In progress — slice 02, branch `tml-2984-slice-02-extension-contracts`
+**Status:** ► In progress — slice 02 delivered; reviews as PR #948 (combined with M2b per operator, 2026-07-10)
 
 _Outcomes_
 `ControlStack` carries `extensionContracts: ReadonlyMap<string, Contract>`, built by
@@ -149,7 +149,7 @@ stack-shaped objects surface via typecheck and gain the new property.
 
 ### Implement M2b: contractSpace declared on the core extension descriptor
 
-**Status:** ► In progress — slice 03 delivered (`2c3c1de79`, SATISFIED 4/4 SDoD), stacked on slice 02; PR opens after #948 merges (scope addition, operator-authorized 2026-07-10)
+**Status:** ► In progress — slice 03 delivered (`2c3c1de79`, SATISFIED 4/4 SDoD); folded into PR #948 with M2 (operator-directed: the stack rewrote slice 02's internals, so one PR is the coherent reviewable unit; #967 closed). Scope addition, operator-authorized 2026-07-10
 
 _Outcomes_
 Core `ControlExtensionDescriptor` carries `contractSpace?: ContractSpace`; sql + mongo
