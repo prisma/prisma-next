@@ -33,13 +33,16 @@ rg 'tables:\s*\{\s*[a-z][A-Za-z_]+\s*:' packages/ -g '*.test.ts' -g '*.test-d.ts
 ## Contract-cast hygiene
 
 ```bash
-# Descriptor contractSpace.contractJson → Contract casts outside framework-components (forbidden):
-# ControlStack owns the one sanctioned narrowing (extensionContracts assembly in
-# control-stack.ts); consumers property-pick composed contracts from the stack
-# instead of re-deriving them from extension descriptors. -U catches multi-line casts.
+# Descriptor contractSpace.contractJson → Contract casts — forbidden anywhere:
+# ControlExtensionDescriptor declares contractSpace: ContractSpace (typed contractJson),
+# so every consumer — including ControlStack's extensionContracts assembly — property-picks;
+# no narrowing cast is sanctioned anymore. -U catches multi-line casts.
+# Form 1: reach-through (blindCast<...>(x.contractSpace.contractJson)):
+rg -U 'blindCast<[^(]*\([^)]*contractSpace!?\??\.contractJson' packages/
+# Form 2: picked-variable (const contractJson = ...; blindCast<...>(contractJson)):
+rg -U 'blindCast<[^(]*\(\s*contractJson\s*\)' packages/
 # (Casts of other contractJson values — e.g. a query-builder accepting user-supplied
 # contract JSON at its API boundary — are separate boundaries, not this anti-pattern.)
-rg -U 'blindCast<[^(]*\([^)]*contractSpace!?\??\.contractJson' packages/ -g '!**/1-core/framework-components/**'
 ```
 
 ## Cross-cutting anti-patterns
