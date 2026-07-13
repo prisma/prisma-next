@@ -22,7 +22,7 @@
     "@prisma-next/framework-components": "workspace:0.14.0",
     "@prisma-next/sql-contract": "workspace:0.14.0",
     "@prisma-next/utils": "workspace:0.14.0",
-    "arktype": "^2.2.0",
+    "arktype": "^2.2.2",
     "pathe": "^2.0.3",
     "ts-toolbelt": "^9.6.0"
   },
