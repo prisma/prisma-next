@@ -1,0 +1,4 @@
+# Database-state refs written by in-place `db init` runs (the example
+# test points them at an ephemeral dev database); only head pins and
+# migration packages are meaningful to commit.
+migrations/app/refs/db.*
