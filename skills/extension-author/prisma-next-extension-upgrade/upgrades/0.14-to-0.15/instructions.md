@@ -543,3 +543,10 @@ EXISTS. Purely additive to the ORM client's query surface; no extension-author S
 (`@prisma-next/contract`, `@prisma-next/framework-components`, …) changed. No
 extension-author action required. Incidental substrate diff only.
 -->
+
+<!--
+Dependabot runtime-deps group bump (PR #962): the packages/3-extensions/
+diff is package.json dependency version ranges only (arktype ^2.2.2 /
+~2.2.2). No extension-facing API, contract shape, or emitted artefact
+changes. No user action required. Incidental substrate diff only.
+-->
