@@ -372,10 +372,10 @@ function roleExtensionBlock(name: string): PslExtensionBlock {
 }
 
 /**
- * Roles are cluster-scoped: the `role` block descriptor's `entityScope:
- * 'cluster'` requires declaring them at the top level, outside any
- * `namespace { … }` block — so they belong in the parser's synthesised
- * `__unspecified__` bucket, not in `auth` or `storage`.
+ * Roles are cluster-scoped in Postgres: the `role` block factory stamps the
+ * unbound coordinate on every lowered entity, so the blocks must be declared
+ * at the top level, outside any `namespace { … }` block — they belong in the
+ * parser's synthesised `__unspecified__` bucket, not in `auth` or `storage`.
  */
 function roleNamespace(): PslNamespace {
   return makePslNamespace({
