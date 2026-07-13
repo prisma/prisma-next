@@ -13,7 +13,7 @@ Both migrate in this slice.
 
 ## Chosen design
 
-> **Design evolution (operator direction, in-PR).** D1–D4 first shipped two **static** specs with monolithic stand-ins (`scalarLiteral()`, a generic `funcCall()`, `bareIdentifier()`) plus interpreter post-validation. Per operator direction and the #938 review, the slice then evolves — **still within this PR** — to **dynamically composed** specs built per field. The dynamic design below is the slice's final shape; the static stand-ins are removed by the end (D7).
+> **Design evolution (operator direction, in-PR).** D1–D4 first shipped two **static** specs with monolithic stand-ins (`scalarLiteral()`, a generic `funcCall()`, `bareIdentifier()`) plus interpreter post-validation. Per operator direction and the #938 review, the slice then evolves — **still within this PR** — to **dynamically composed** specs built per field (D5–D7). Then, per operator direction ("funcCall still does not follow ADR spec — where are the specifications for the arguments?"), it evolves once more (**D8–D9, still within this PR**) so each default function's **arguments** are declared with combinators per ADR 231, replacing the raw-string capture + imperative re-parse. See the `## Typed funcCall (D8–D9)` section below; the dynamic design in this section is the shape D5–D7 reached, and the typed-funcCall section is the current head.
 
 The `@default` spec is **built per field** by `buildDefaultSpec(ctx)` / `buildEnumDefaultSpec(members)`, composed entirely from atomic combinators via `oneOf`, using the field's resolved context (the composed default-function registry, `isList`, and the enum's members). This lifts function-name and enum-member validity **into the grammar** — reducing post-validation — and makes each per-field spec a precise description a future language server can read for autocomplete.
 
@@ -43,6 +43,18 @@ oneOf(...enumMembers.map((m) => identifier(m.name)))       // e.g. Expected one 
 
 **What stays semantic (in the interpreter):** function **arg** validation (`PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT`, via the registry), generator applicability + codec matching + preset-only guard (`PSL_INVALID_DEFAULT_APPLICABILITY`), and literal↔codec type (codec `encodeJson`). **Moved into the grammar** (Open Question 1): unknown-function-name (`PSL_UNKNOWN_DEFAULT_FUNCTION`) and unknown-enum-member (`PSL_ENUM_UNKNOWN_DEFAULT_MEMBER`).
 
+## Typed funcCall (D8–D9)
+
+ADR 231 specifies a function call's **arguments** via the recursive positional/named combinator model. D8 shipped the kit foundation (`interpretArgs` extracted from `interpretAttribute`; `funcCall(name, sig)` overload; `num(value)`; `int({min,max})`). D9 wired it through end-to-end:
+
+- Each default function declares a **`FuncCallSig`** (`now`/`autoincrement`/`ulid` → `{}`; `uuid` → `optional(oneOf(num(4), num(7)))`; `cuid` → required `num(2)`; `nanoid` → `optional(int({min:2,max:255}))`; `dbgenerated` → `str()`). `buildDefaultSpec` builds `funcCall(name, signature)` per registered function.
+- `funcCall(name, sig)` parses to a typed `{ fn, span, args }`. Each registry `lower` reads **typed** args (`call.args.version`, `.size`, `.expression`) cast-free via `typeof`/literal comparisons; the imperative `parseIntegerArgument` / `parseStringLiteral` / `expectNoArgs` + count checks are **deleted** from both adapters and the sql-contract-psl test stub.
+- **Diagnostic shifts (operator: Option A).** Arg shape / arity / range are now grammar failures → `PSL_INVALID_ATTRIBUTE_SYNTAX`: `uuid(5)`, `uuid(4,7)`, `cuid()` (missing required — was `PSL_UNKNOWN_DEFAULT_FUNCTION` with the "use `cuid(2)`" guidance, now a generic grammar message), `cuid(3)`, `nanoid(1)`/`nanoid(300)`, `dbgenerated()`/`dbgenerated(123)`, args-on-nullary. **Coarse-diagnostic trade-off (ADR 231 § "Alternatives and function calls"):** because the funcCall arms sit inside the outer `oneOf(str(), num(), bool(), …funcCall)`, a callee-matched-but-arg-failed arm makes the outer `oneOf` backtrack and emit its own generic `Expected one of: …` message — the function-specific arg hint is lost. Accepted per the ADR. The **only** surviving semantic arg check is `dbgenerated` empty → `PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT`.
+- **Layering.** `FuncCallSig` is authoring-layer (`@prisma-next/psl-parser`); the core `ControlMutationDefaultEntry` cannot name it, so `signature` is typed `unknown` in core and narrowed with **one** justified `blindCast<FuncCallSig, …>` in `buildDefaultSpec`. The typed `{fn,span,args}` call shape is plain-structural and core-safe.
+- **⚠ Breaking change — extension-authoring contract.** `ControlMutationDefaultEntry.lower` now receives a typed `TypedDefaultFunctionCall` (was `ParsedDefaultFunctionCall`), and a contributed arg-bearing default function must declare a `signature` (a no-signature entry falls to the raw `funcCall(name)` path, whose value has no `.fn`, so it won't lower). Any extension contributing default functions must migrate. Surfaced by the `default-pack-slugid` parity fixture (migrated to `signature: {}` + typed `lower`). Records a downstream-upgrade need.
+- **Bundling fix.** `@prisma-next/psl-parser` was promoted from a **dev**- to a **runtime** dependency of `adapter-postgres` so tsdown externalises (rather than bundles) the combinators; a bundled copy gave `num()`/`str()` private AST classes, so `instanceof` failed against `sql-contract-psl`-parsed nodes and every valid argumented `@default` silently failed to parse — invisible to source-resolved unit tests, caught only by the dist-consuming real-pack parity suite.
+- **ADR 231 left untouched** (operator instruction); the `funcCallFrom` → `oneOf(funcCall(name, sig))` composition and the `matchingScalarLiteral` deferral remain recorded here as deviations.
+
 ## Coherence rationale
 
 One outcome — "`@default` is spec-driven on both paths; the default string-parsers (three non-enum + the enum inline regex checks) are deleted; the SQL family is now entirely spec-driven." Sized as its own PR because it introduces the kit's first structured-call combinator and preserves the most semantic diagnostic codes of any SQL attribute.
@@ -52,7 +64,7 @@ One outcome — "`@default` is spec-driven on both paths; the default string-par
 **In:** the non-enum `defaultSpec` + enum `enumDefaultSpec`; the interpret wiring in `lowerDefaultForField` + `lowerEnumDefaultForField`; the `scalarLiteral` + `funcCall` (D1) and `bareIdentifier` (D3) combinators with unit tests; reuse of `list()`; deletion of `parseDefaultLiteralValue`, `parseDefaultFunctionCall`, `parseListDefaultExpression` (+ `decodeLiteralElement`, the `ListDefaultParse` type) and the inline regex checks in `lowerEnumDefaultForField`.
 
 **Out:**
-- **The string-based registry internals** — `lowerDefaultFunctionWithRegistry` and its entries keep parsing `arg.raw`; `funcCall` feeds them the same `ParsedDefaultFunctionCall` shape.
+- ~~**The string-based registry internals**~~ — _superseded by D8–D9 (see `## Typed funcCall`): the registry internals are now typed; each `lower` reads combinator-parsed args and the imperative string parsers are deleted._
 - **The interpreter's semantic checks** — list-vs-scalar, registry lowering, applicability, codec matching, exactly-one-positional, and enum-member matching — all stay.
 - **Mongo `@default`** — slice 3 (family).
 
@@ -75,6 +87,7 @@ One outcome — "`@default` is spec-driven on both paths; the default string-par
 - [ ] `parseDefaultLiteralValue`, `parseDefaultFunctionCall`, `parseListDefaultExpression` deleted (`rg` each → zero); `lowerEnumDefaultForField`'s inline `isQuotedString`/`isFunctionCall` regex checks gone. Registry + `lowerDefaultFunctionWithRegistry` + `enumHandle` matching retained.
 - [ ] Semantic codes preserved: `PSL_UNKNOWN_DEFAULT_FUNCTION`, `PSL_INVALID_DEFAULT_APPLICABILITY`, `PSL_LIST_DEFAULT_NOT_ARRAY`, `PSL_ENUM_UNKNOWN_DEFAULT_MEMBER`. Shape-error codes (`PSL_INVALID_DEFAULT_VALUE`, `PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME`) shift to `PSL_INVALID_ATTRIBUTE_SYNTAX` (operator: Option A).
 - [ ] `pnpm fixtures:check` clean; `interpreter.defaults.test.ts` + the enum-default tests green; vocab green (bump threshold if kit growth moves it).
+- [x] **D9 typed funcCall (commit `d895e793b`):** framework-components 469 · psl-parser 623 · sql-contract-psl 333 · adapter-postgres 675 (coverage ≥ thresholds) · adapter-sqlite 220 · integration authoring parity 50 (incl. real-pack `instanceof` parity) · `fixtures:check` clean (no drift) · `lint:deps` 0 · vocab 836=836. Signatures declared for all 7 SQL default functions; imperative arg parsers removed; extension-authoring contract change recorded above.
 
 ## Open Questions
 
