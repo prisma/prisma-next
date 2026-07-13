@@ -625,3 +625,17 @@ diff is package.json dependency version ranges only (arktype ^2.2.2 /
 ~2.2.2). No extension-facing API, contract shape, or emitted artefact
 changes. No user action required. Incidental substrate diff only.
 -->
+
+<!--
+pg binding resolution by structure, not instanceof (PR #969): the
+`packages/3-extensions/` diff is a bug fix plus additive exports. The postgres
+extension (`@prisma-next/postgres`) gains two net-new `/runtime` exports —
+`isPgPool` / `isPgClient`, structural type guards that identify a `pg`
+Pool/Client by shape instead of `instanceof`. `resolvePostgresBinding` and the
+`@prisma-next/extension-supabase` `toPool` helper now use them, so a
+caller-supplied pool that came from a duplicated `pg` copy in an app bundle
+resolves correctly instead of throwing `Unable to determine pg binding type`
+at boot. The change only accepts inputs the old `instanceof` check rejected —
+nothing that resolved before resolves differently — and the two guards are
+additive. No extension-author action required. Incidental substrate diff only.
+-->
