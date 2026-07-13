@@ -46,7 +46,7 @@
     "@size-limit/file": "^12.1.0",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "mongodb-memory-server": "catalog:",
     "size-limit": "^12.1.0",
     "tsx": "catalog:",
