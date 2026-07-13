@@ -15,8 +15,10 @@ import type {
   EntityHandleLoweringInput,
   LoweredPackEntity,
   ResolvedEntityHandleRef,
+  ResolvedPslModelRefs,
 } from '@prisma-next/sql-contract/entity-handle-lowering-hook';
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
+import { assertDefined } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
@@ -59,6 +61,13 @@ export const postgresAuthoringTypes = {
 
 export interface RlsPolicyExtensionBlock extends PslExtensionBlock {
   readonly namespaceId: string;
+  /**
+   * Model refs the family interpreter resolved from the block's descriptor-
+   * declared `refKind: 'model'` parameters before invoking this factory
+   * (keyed by parameter name). An unresolved required ref is the
+   * interpreter's diagnostic; the factory is never called with one missing.
+   */
+  readonly resolvedModelRefs?: ResolvedPslModelRefs;
 }
 
 /**
@@ -73,11 +82,6 @@ const POLICY_KEYWORD_OPERATION: Readonly<Record<string, RlsPolicyOperation>> = {
   policy_delete: 'delete',
   policy_all: 'all',
 };
-
-function readRefParam(block: PslExtensionBlock, key: string): string | undefined {
-  const param = block.parameters[key];
-  return param?.kind === 'ref' ? param.identifier : undefined;
-}
 
 function readValueParam(block: PslExtensionBlock, key: string): string | undefined {
   const param = block.parameters[key];
@@ -169,21 +173,15 @@ function lowerRlsPolicyFromBlock(
 ): PostgresRlsPolicy | undefined {
   const prefix = block.name;
   const operation = POLICY_KEYWORD_OPERATION[block.keyword] ?? 'select';
-  const targetModelName = readRefParam(block, 'target') ?? '';
-  // The generic ref-existence validator is not wired into the SQL-family
-  // interpreter (same gap as the predicate matrix below), so a misspelled
-  // or undeclared `target` reaches this factory. A resolution miss is an
-  // ordinary authoring error: report it as a load-time diagnostic.
-  const tableName = ctx.resolveModelStorageName?.(targetModelName);
-  if (tableName === undefined) {
-    ctx.diagnostics?.push({
-      code: 'PSL_RLS_POLICY_TARGET_UNRESOLVED',
-      message: `\`${block.keyword}\` policy "${block.name}" targets model "${targetModelName}", which is not declared in the same namespace. Declare the model or fix the \`target\` reference.`,
-      sourceId: ctx.sourceId ?? 'unknown',
-      span: block.parameters['target']?.span ?? block.span,
-    });
-    return undefined;
-  }
+  // The interpreter resolves the descriptor-declared `target` model ref to
+  // its storage table name before invoking this factory (an unresolved or
+  // missing required ref is the interpreter's diagnostic), so a lookup miss
+  // here is structurally impossible.
+  const tableName = block.resolvedModelRefs?.['target']?.tableName;
+  assertDefined(
+    tableName,
+    `lowerRlsPolicyFromBlock: policy "${block.name}" reached the factory without a resolved \`target\` ref; the interpreter resolves same-namespace model refs before invoking entity factories.`,
+  );
   const roles = [...readListRefParams(block, 'roles')].sort();
 
   const usingRaw = readValueParam(block, 'using');

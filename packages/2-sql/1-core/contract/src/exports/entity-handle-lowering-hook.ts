@@ -5,5 +5,6 @@ export {
   providesEntityHandleLowering,
   type ResolvedEntityHandleRef,
   type ResolvedPackEntityHandle,
+  type ResolvedPslModelRefs,
   type SqlEntityHandleLoweringContribution,
 } from '../entity-handle-lowering-hook';

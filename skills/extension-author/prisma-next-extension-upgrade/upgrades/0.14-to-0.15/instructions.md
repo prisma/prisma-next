@@ -549,15 +549,18 @@ TML-2883 (rls-ts-authoring): Postgres RLS is now authorable in the TypeScript DS
 producing contracts wire-name-identical to the PSL `policy_*` / `@@rls` equivalents.
 The `packages/3-extensions/` diff is additive: `@prisma-next/postgres` gains
 `src/contract/rls.ts` (frozen branded handles from `policySelect` / `policyInsert` /
-`policyUpdate` / `policyDelete` / `policyAll` / `rlsEnabled(model)` / `role(name)`)
-and `src/contract/rls-lowering.ts`; its `defineContract` gains an optional
-`entities?: readonly RlsEntityHandle[]` input lowered into the existing generic
-`packEntities` channel. `@prisma-next/extension-supabase` gains `anon` /
+`policyUpdate` / `policyDelete` / `policyAll` / `rlsEnabled(model)` / `role(name)`;
+predicates are opaque strings); its `defineContract` accepts an optional
+`entities?: readonly RlsEntityHandle[]` input. The lowering is target-side: the
+generic contract build groups `entities` handles by the pack that registered each
+`entityKind` and calls the pack's batch hook (`lowerEntityHandles`, a SQL-family
+contributions extension exported from
+`@prisma-next/sql-contract/entity-handle-lowering-hook`), which target-postgres
+implements beside its PSL lowering. `@prisma-next/extension-supabase` gains `anon` /
 `authenticated` role-handle exports from `/contract`. Supporting additive exports
 only elsewhere: `buildContractDefinition` + `PackEntitiesInput` from
-`@prisma-next/sql-contract-ts/contract-builder`, `formatRlsPolicyWireName` from
-`@prisma-next/target-postgres/rls-canonicalize`, and a generic optional
-`resolveModelStorageName` field on `AuthoringEntityContext`. All net-new surface —
-nothing existing was changed or removed. No extension-author action required.
-Incidental substrate diff only.
+`@prisma-next/sql-contract-ts/contract-builder`; `formatRlsPolicyWireName` +
+`POLICY_OPERATION_PREDICATES` from `@prisma-next/target-postgres/rls-canonicalize`.
+All net-new surface — nothing existing was changed or removed. No extension-author
+action required. Incidental substrate diff only.
 -->

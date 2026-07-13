@@ -422,12 +422,22 @@ function buildModelAttributesByName(
  * The `namespaceId` is attached to the block before the factory call so the
  * factory can record the namespace coordinate without the interpreter
  * containing any target-specific knowledge about how namespace ids are used.
+ *
+ * Ref conversion is this pass's job, over typed data: each block-descriptor
+ * parameter declared `{ kind: 'ref', refKind: 'model' }` (same-namespace
+ * scope) is resolved to the referenced model's storage table name and
+ * attached to the block as `resolvedModelRefs` ({@link ResolvedPslModelRefs})
+ * before the factory runs — the factory consumes a resolved coordinate and
+ * never looks a model up itself. A required model ref that is missing or
+ * does not resolve is this pass's diagnostic; the factory is skipped.
  */
 function lowerExtensionBlocksForNamespace(
   ns: NamespaceSymbol,
   nsId: string,
   entityTypesByDiscriminator: ReadonlyMap<string, AuthoringEntityTypeDescriptor>,
   entityContext: AuthoringEntityContext,
+  pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace,
+  resolveModelTable: (modelName: string) => string | undefined,
 ): Readonly<Record<string, Readonly<Record<string, unknown>>>> {
   const blockSymbols = Object.values(ns.blocks);
   if (blockSymbols.length === 0) return {};
@@ -439,7 +449,50 @@ function lowerExtensionBlocksForNamespace(
     const descriptor = entityTypesByDiscriminator.get(block.kind);
     if (descriptor === undefined) continue;
 
-    const annotatedBlock = { ...block, namespaceId: nsId };
+    const blockDescriptor = findBlockDescriptor(pslBlockDescriptors, block.keyword);
+    let unresolvedRef = false;
+    let resolvedModelRefs: Record<string, { readonly tableName: string }> | undefined;
+    for (const [paramName, paramDecl] of Object.entries(blockDescriptor?.parameters ?? {})) {
+      if (
+        paramDecl.kind !== 'ref' ||
+        paramDecl.refKind !== 'model' ||
+        paramDecl.scope !== 'same-namespace'
+      ) {
+        continue;
+      }
+      const captured = block.parameters[paramName];
+      if (captured?.kind !== 'ref') {
+        if (paramDecl.required === true) {
+          entityContext.diagnostics?.push({
+            code: 'PSL_EXTENSION_MODEL_REF_UNRESOLVED',
+            message: `\`${block.keyword}\` block "${block.name}" is missing the required \`${paramName}\` model reference.`,
+            sourceId: entityContext.sourceId ?? 'unknown',
+            span: block.span,
+          });
+          unresolvedRef = true;
+        }
+        continue;
+      }
+      const tableName = resolveModelTable(captured.identifier);
+      if (tableName === undefined) {
+        entityContext.diagnostics?.push({
+          code: 'PSL_EXTENSION_MODEL_REF_UNRESOLVED',
+          message: `\`${block.keyword}\` block "${block.name}" references model "${captured.identifier}" in \`${paramName}\`, which is not declared in the same namespace. Declare the model or fix the reference.`,
+          sourceId: entityContext.sourceId ?? 'unknown',
+          span: captured.span,
+        });
+        unresolvedRef = true;
+        continue;
+      }
+      resolvedModelRefs = { ...(resolvedModelRefs ?? {}), [paramName]: { tableName } };
+    }
+    if (unresolvedRef) continue;
+
+    const annotatedBlock = {
+      ...block,
+      namespaceId: nsId,
+      ...(resolvedModelRefs !== undefined ? { resolvedModelRefs } : {}),
+    };
     const entity = instantiateAuthoringEntityType(
       descriptor.discriminator,
       descriptor,
@@ -2031,13 +2084,12 @@ export function interpretPslDocumentToSqlContract(
     },
   };
   // Diagnostics-free resolution of every model's declared storage name,
-  // used only to populate `resolveModelStorageName` on the entity context
-  // below so an extension-block factory can resolve a referenced model's
-  // storage name without guessing from its bare name. The authoritative
-  // resolution (which reports a malformed `@@map`) still runs at its usual
-  // point in the pass ordering, via `modelMappingsByCoordinate` further
-  // down; this call discards its own diagnostics so nothing is reported
-  // twice.
+  // feeding the extension-block pass's model-ref conversion (a block's
+  // declared `refKind: 'model'` params resolve to table names before the
+  // factory runs). The authoritative resolution (which reports a malformed
+  // `@@map`) still runs at its usual point in the pass ordering, via
+  // `modelMappingsByCoordinate` further down; this call discards its own
+  // diagnostics so nothing is reported twice.
   const earlyModelMappingsByCoordinate = buildModelMappings(
     modelEntries,
     defaultNamespaceId,
@@ -2045,6 +2097,7 @@ export function interpretPslDocumentToSqlContract(
     sourceId,
     sourceFile,
   );
+  const composedPslBlockDescriptors = input.authoringContributions?.pslBlockDescriptors ?? {};
   const namespaceExtensionEntities = new Map<
     string,
     Readonly<Record<string, Readonly<Record<string, unknown>>>>
@@ -2056,11 +2109,15 @@ export function interpretPslDocumentToSqlContract(
       targetId: input.target.targetId,
     });
     if (nsId === undefined) continue;
-    const entities = lowerExtensionBlocksForNamespace(ns, nsId, entityTypesByDiscriminator, {
-      ...extensionEntityContext,
-      resolveModelStorageName: (modelName: string) =>
+    const entities = lowerExtensionBlocksForNamespace(
+      ns,
+      nsId,
+      entityTypesByDiscriminator,
+      extensionEntityContext,
+      composedPslBlockDescriptors,
+      (modelName: string) =>
         earlyModelMappingsByCoordinate.get(modelCoordinateKey(nsId, modelName))?.tableName,
-    });
+    );
     if (Object.keys(entities).length > 0) {
       namespaceExtensionEntities.set(nsId, entities);
     }

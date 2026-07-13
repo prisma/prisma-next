@@ -89,10 +89,10 @@ describe('generic entities handle channel', () => {
     expect(calls[0]?.handles).toHaveLength(2);
 
     const publicNamespace = contract.storage.namespaces['public'];
-    expect(Object.keys(publicNamespace?.entries['gadget'] ?? {}).sort()).toEqual([
-      'gadget_0',
-      'gadget_1',
-    ]);
+    const entries: Readonly<Record<string, Readonly<Record<string, unknown>>>> = {
+      ...publicNamespace?.entries,
+    };
+    expect(Object.keys(entries['gadget'] ?? {}).sort()).toEqual(['gadget_0', 'gadget_1']);
   });
 
   it('resolves declared model refs to table coordinates: identity match, cross-space, unresolved', () => {

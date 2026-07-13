@@ -292,7 +292,7 @@ namespace public {
 });
 
 describe('a policy whose target does not resolve to a declared model', () => {
-  it('emits PSL_RLS_POLICY_TARGET_UNRESOLVED naming the prefix and the model, without throwing', () => {
+  it('emits PSL_EXTENSION_MODEL_REF_UNRESOLVED naming the prefix and the model, without throwing', () => {
     const result = interpret(`
 namespace public {
   model profile {
@@ -311,10 +311,10 @@ namespace public {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     const diagnostic = result.failure.diagnostics.find(
-      (d) => d.code === 'PSL_RLS_POLICY_TARGET_UNRESOLVED',
+      (d) => d.code === 'PSL_EXTENSION_MODEL_REF_UNRESOLVED',
     );
     expect(diagnostic).toMatchObject({
-      code: 'PSL_RLS_POLICY_TARGET_UNRESOLVED',
+      code: 'PSL_EXTENSION_MODEL_REF_UNRESOLVED',
       message: expect.stringContaining('"p_read"'),
     });
     expect(diagnostic?.message).toContain('"porfile"');
