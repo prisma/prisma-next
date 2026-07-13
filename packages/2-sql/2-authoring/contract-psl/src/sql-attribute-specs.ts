@@ -147,10 +147,10 @@ export const mapFieldSpec = fieldAttribute('map', { positional: [{ key: 'name', 
 
 type DefaultArgValue = string | number | boolean | (string | number | boolean)[] | TypedFuncCall;
 
-// Compose the non-enum `@default` value grammar for a single field. Literal arms stay flexible
-// (string/number/boolean); the list arm exists only for list fields; and one name-pinned
-// `funcCall(name)` arm is added per registered mutation-default function. Shape now maps to
-// field kind, so an array on a scalar field (or a scalar on a list field) fails as invalid syntax.
+// Compose the non-enum `@default` value grammar for a single field: flexible literal arms
+// (string/number/boolean), a list arm only for list fields, and one typed `funcCall(name, signature)`
+// arm per registered default function. Field kind maps to shape, so an array on a scalar field
+// (or a scalar on a list field) is invalid syntax.
 export function buildDefaultSpec(input: {
   readonly isList: boolean;
   readonly registry: ControlMutationDefaultRegistry;
@@ -171,9 +171,9 @@ export function buildDefaultSpec(input: {
   return fieldAttribute('default', { positional: [{ key: 'value', type: oneOf(...valueArms) }] });
 }
 
-// Compose the enum `@default` value grammar from the enum's own member names: one name-pinned
-// `identifier(member)` arm per member. Member-validity is thus a grammar concern — a non-member
-// identifier fails `oneOf` as invalid attribute syntax rather than a downstream semantic check.
+// Compose the enum `@default` value grammar from the enum's own member names: one
+// `identifier(member)` arm per member, so member-validity is a grammar concern — a non-member
+// identifier fails `oneOf` as invalid attribute syntax.
 export function buildEnumDefaultSpec(memberNames: readonly string[]) {
   const [first, ...rest] = memberNames.map((name) => identifier(name));
   // memberNames is non-empty for any real enum; guard defensively so typing stays total.

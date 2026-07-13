@@ -933,12 +933,8 @@ model UuidNativeBad {
     });
 
     it('rejects @default(temporal.updatedAt()) as invalid attribute syntax (AC5g)', () => {
-      // Namespaced calls inside @default(...) are not supported — the
-      // funcCall combinator only accepts a bare identifier callee, so a
-      // namespaced call fails the attribute spec before reaching the
-      // registry. The honest rejection is "this isn't valid @default(...)
-      // syntax", not "this generator isn't applicable". Locks in which
-      // diagnostic fires.
+      // A namespaced callee fails the funcCall spec before reaching the registry, so the rejection
+      // is a syntax error rather than a generator-applicability error.
       const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id

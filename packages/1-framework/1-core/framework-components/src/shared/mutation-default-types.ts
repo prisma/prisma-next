@@ -69,10 +69,8 @@ export interface MutationDefaultGeneratorDescriptor {
   readonly buildPhases?: (args?: Record<string, unknown>) => ExecutionMutationDefaultPhases;
 }
 
-// The typed form of a parsed default-function call: the `fn` discriminant, the call-site span
-// (for lowering diagnostics), and the argument record already parsed + validated by the
-// function's `funcCall(name, signature)` combinator. Replaces the raw `ParsedDefaultFunctionCall`
-// on the registry lowering path — the registry no longer re-parses argument source text.
+// A default-function call whose arguments the function's `funcCall` signature has already parsed
+// and validated, so the registry lowering reads them directly instead of re-parsing source text.
 export interface TypedDefaultFunctionCall {
   readonly fn: string;
   readonly span: SourceSpan;
@@ -80,10 +78,9 @@ export interface TypedDefaultFunctionCall {
 }
 
 export interface ControlMutationDefaultEntry {
-  // The function's argument signature (a `FuncCallSig` from `@prisma-next/psl-parser`), consumed by
-  // the registering family's `buildDefaultSpec` to build a typed `funcCall(name, signature)` arm.
-  // Typed `unknown` here because `FuncCallSig` lives in the authoring layer, which the core
-  // framework cannot import; the registering family owns the entries and narrows it back.
+  // The function's argument signature. Typed `unknown` because its concrete type (`FuncCallSig`)
+  // lives in the authoring layer, which the core framework cannot import; the family that
+  // registers the entry narrows it back.
   readonly signature?: unknown;
   readonly lower: (input: {
     readonly call: TypedDefaultFunctionCall;

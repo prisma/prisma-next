@@ -407,7 +407,6 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    // An extra positional argument fails the single-positional shape at the spec.
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );
@@ -426,7 +425,6 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    // The required positional `member` is missing, so the spec rejects the shape.
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );
@@ -913,8 +911,6 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    // The spec's `oneOf(identifier('Low'), identifier('High'))` has no arm for `Critical`, so an
-    // unknown member fails the grammar rather than a downstream semantic check.
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );
@@ -935,7 +931,6 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    // A quoted string fails the `oneOf(identifier(member))` positional shape at the spec.
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );
@@ -956,7 +951,6 @@ model Post {
 `);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    // A function call fails the `oneOf(identifier(member))` positional shape at the spec.
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' })]),
     );

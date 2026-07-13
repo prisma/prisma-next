@@ -14,9 +14,9 @@ import type {
   PositionalParam,
 } from './types';
 
-// The positional/named argument-binding shared by `interpretAttribute` and `funcCall`. `name`
-// labels the callee in binding diagnostics (`Attribute "<name>" …`); `span` anchors the
-// arity diagnostics (too-many / missing) that have no per-argument node to point at.
+// The positional/named argument-binding for an attribute or a function call. `name` labels the
+// callee in binding diagnostics (`Attribute "<name>" …`); `span` anchors the arity diagnostics
+// (too-many / missing) that have no per-argument node to point at.
 export interface ArgBindingSpec {
   readonly name: string;
   readonly positional: readonly PositionalParam<unknown>[];
