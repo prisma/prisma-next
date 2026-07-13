@@ -28,7 +28,9 @@ ALTER TYPE "public"."user_role" ADD VALUE 'guest';
 
 **1. Suffix-append classification, in the existing `not-equal` lowering.** `mapNativeEnumNodeIssue` ([`issue-planner.ts`](../../../../packages/3-targets/3-targets/postgres/src/core/migrations/issue-planner.ts) — the `not-equal` tail that today returns the named diagnostic) classifies the two ordered member lists the issue already carries: when the actual (DB) members are a **strict prefix** of the expected (contract) members, return one `AddNativeEnumValueCall` per appended value, in declaration order. Anything else — same length with any differing value (rename/reorder), shorter expected (removal), equal-length-prefix violations — returns the refusal conflict. The classification is pure list comparison on data the issue carries; no new diff machinery, no per-member child nodes (the node stays a leaf with positional `isEqualTo`, exactly as Slice A shipped it).
 
-**2. Refusal wording becomes permanent, not "yet".** The Slice-A diagnostic said "not auto-migrated **yet**". The replacement names the refused class and the settled policy (project non-goal — removal/reorder force a full-table rewrite; rename is indistinguishable from add+remove in an order-aware diff): `Native enum type "<schema>"."<name>" changed beyond a suffix-append (contract declares […], database has […]); renames, removals, and reorders are not auto-migrated. Author the change manually with \`migration new\`.` Same conflict kind (`unsupportedOperation`), same location coordinate.
+**2. Refusal wording states the policy in plain words, with a doc link.** The Slice-A diagnostic said "not auto-migrated yet" — jargon, and no longer true ("yet"). The replacement (operator wording ruling): `Native enum type "<schema>"."<name>" changed beyond appending new values (contract declares […], database has […]). Prisma Next does not modify a native enum's existing values (rename, removal, reorder) — see https://pris.ly/d/postgres-native-enums. Author the change manually with \`migration new\`.` Same conflict kind (`unsupportedOperation`), same location coordinate. The `pris.ly` short-link will point at the docs-site page; registering the slug and submitting the page to the docs site happen **independently of this PR** (operator ruling) — this slice only lands the page's markdown in-repo.
+
+**2a. The user-facing "why" page lands in-repo.** The explainer at [`../../specs/why-native-postgres-enums.md`](../../specs/why-native-postgres-enums.md) (written for users, already flagged "migrate to `docs/` at close-out") moves to `docs/reference/postgres-native-enums.md` now, since the diagnostic links to its published form; the `projects/` copy becomes a pointer to the new home. Docs-site submission is the independent step above, not in this PR.
 
 **3. One new op, through the standard machinery.** `AddNativeEnumValueCall` (factory name `addNativeEnumValue`) beside `CreateNativeEnumTypeCall`/`DropNativeEnumTypeCall` in `op-factory-call.ts`: renders `ALTER TYPE <qualified> ADD VALUE '<value>'` (qualified via `quoteQualifiedName`, value via `escapeLiteral` + `validateEnumValueLength`), lowered through the control adapter like every other call. Precheck: type exists and the value is absent; postcheck: the value is present. Each appended value is **its own op / its own statement** — never batched into one `ALTER`.
 
@@ -46,7 +48,7 @@ One reviewer sitting: a planner-lowering change confined to one function's tail,
 
 ## Scope
 
-**In:** the suffix-append classification + `AddNativeEnumValueCall` lowering; the permanent refusal diagnostic; the op class with prechecks/postchecks + caveat-bearing description; the `pruneTableLessNamespaces` widening (verify + plan call sites) + pinned-test update; the hand-authored `addNativeEnumValue`; unit + planner tests; a live PGlite integration proof (single + multi append, all three refusal classes, enums-only-namespace `db init` → `verify` round-trip, external append suppressed).
+**In:** the suffix-append classification + `AddNativeEnumValueCall` lowering; the plain-language refusal diagnostic with the `pris.ly` link; the `docs/reference/postgres-native-enums.md` page (content from the project explainer, `projects/` copy becomes a pointer); the op class with prechecks/postchecks + caveat-bearing description; the `pruneTableLessNamespaces` widening (verify + plan call sites) + pinned-test update; the hand-authored `addNativeEnumValue`; unit + planner tests; a live PGlite integration proof (single + multi append, all three refusal classes, enums-only-namespace `db init` → `verify` round-trip, external append suppressed).
 
 **Deliberately out:**
 
@@ -84,10 +86,4 @@ None — the design is fully settled by project spec §4/§Phase-2 and migration
 
 ## Dispatch plan
 
-Three foreground dispatches, sequential (shared planner surface):
-
-1. **Lowering + op.** The suffix-append classification in `mapNativeEnumNodeIssue`, the permanent refusal wording, `AddNativeEnumValueCall` (+ factory, prechecks/postchecks, caveat description, length/escape rules), the hand-authored `addNativeEnumValue`. Unit + planner tests, including all three refusal classes and the DB-ahead-of-contract case.
-2. **Namespace visibility.** Widen `pruneTableLessNamespaces` (+ `existingSchemas`), update the pinned verdict test to the new boundary, prove schema+type creation planning for an enums-only namespace and continued pruning of truly-empty namespaces.
-3. **Live proof.** PGlite integration: append single/multi + verify round-trip; refusal negative tests; enums-only `db init` → `verify`; external-append suppression; caveat visible in rendered plan output.
-
-Each dispatch runs the full package gate; the slice closes with the standard full-suite gate (build, typecheck, 13-step lint, fixtures, all three test suites) before PR-open.
+See [`plan.md`](plan.md).
