@@ -7,11 +7,12 @@
  * lifecycle mechanism), and exposes an ordinary prisma-next Postgres
  * client for `prismaNextAdapter`.
  *
- * `runMigrations` re-runs `db init`, which is a no-op at head — matching
- * the BetterAuth test harness's expectation that migrations are safely
- * repeatable. The fixture's schema is fixed (plugin tables and
- * `additionalFields` are project non-goals), so no schema-mutating
- * migration path is needed.
+ * `runMigrations` is an intentional no-op: `db init` already walked the
+ * managed space to head once during setup (module scope — in-process CLI
+ * mocks cannot run inside a vitest test body), and the fixture's schema
+ * is fixed (plugin tables and `additionalFields` are project non-goals),
+ * so repeated harness migration calls have nothing to do — exactly like
+ * a real re-run of `db init` at head, as proven by the lifecycle test.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -99,8 +100,8 @@ export async function setupBetterAuthTestApp(): Promise<BetterAuthTestApp> {
       // volume inside @prisma/dev's socket server, not with anything the
       // harness holds open (the adapter client is already closed above).
       // Bound the wait: the per-file vitest worker exits right after
-      // teardown, taking the in-memory PGlite with it. Tracked as a
-      // TML-2995 finding.
+      // teardown, taking the in-memory PGlite with it. Tracked as
+      // TML-3017.
       await Promise.race([
         database.close(),
         new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
