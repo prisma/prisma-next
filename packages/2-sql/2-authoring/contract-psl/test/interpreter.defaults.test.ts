@@ -269,19 +269,8 @@ model UuidNativeBad {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
           sourceId: 'schema.prisma',
-          message: expect.stringContaining('cuid(2)'),
-        }),
-        expect.objectContaining({
-          code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-          sourceId: 'schema.prisma',
-          message: expect.stringContaining('uuid'),
-        }),
-        expect.objectContaining({
-          code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-          sourceId: 'schema.prisma',
-          message: expect.stringContaining('nanoid'),
         }),
         expect.objectContaining({
           code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',

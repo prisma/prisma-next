@@ -4362,6 +4362,9 @@ importers:
       '@prisma-next/ids':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/2-authoring/ids
+      '@prisma-next/psl-parser':
+        specifier: workspace:0.14.0
+        version: link:../../../1-framework/2-authoring/psl-parser
       '@prisma-next/sql-contract':
         specifier: workspace:0.14.0
         version: link:../../../2-sql/1-core/contract
@@ -4402,9 +4405,6 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/3-tooling/migration
-      '@prisma-next/psl-parser':
-        specifier: workspace:0.14.0
-        version: link:../../../1-framework/2-authoring/psl-parser
       '@prisma-next/test-utils':
         specifier: workspace:0.14.0
         version: link:../../../../test/utils
@@ -4450,6 +4450,9 @@ importers:
       '@prisma-next/ids':
         specifier: workspace:0.14.0
         version: link:../../../1-framework/2-authoring/ids
+      '@prisma-next/psl-parser':
+        specifier: workspace:0.14.0
+        version: link:../../../1-framework/2-authoring/psl-parser
       '@prisma-next/sql-contract':
         specifier: workspace:0.14.0
         version: link:../../../2-sql/1-core/contract

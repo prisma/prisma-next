@@ -130,4 +130,5 @@ export type {
   ParsedDefaultFunctionCall,
   SourceDiagnostic,
   SourceSpan,
+  TypedDefaultFunctionCall,
 } from '../shared/mutation-default-types';

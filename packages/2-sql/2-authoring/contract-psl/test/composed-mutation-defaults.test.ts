@@ -1,6 +1,6 @@
 import type {
   DefaultFunctionLoweringContext,
-  ParsedDefaultFunctionCall,
+  TypedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
@@ -77,8 +77,9 @@ describe('composed mutation default registries', () => {
           [
             'slugid',
             {
+              signature: {},
               lower: (input: {
-                call: ParsedDefaultFunctionCall;
+                call: TypedDefaultFunctionCall;
                 context: DefaultFunctionLoweringContext;
               }) => {
                 void input;
@@ -134,6 +135,7 @@ describe('composed mutation default registries', () => {
           [
             'slugid',
             {
+              signature: {},
               lower: () => ({
                 ok: true as const,
                 value: {

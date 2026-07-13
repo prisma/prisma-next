@@ -2,7 +2,7 @@ import type {
   ControlMutationDefaultRegistry,
   DefaultFunctionLoweringContext,
   LoweredDefaultResult,
-  ParsedDefaultFunctionCall,
+  TypedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
 
 function formatSupportedFunctionList(registry: ControlMutationDefaultRegistry): string {
@@ -18,11 +18,11 @@ function formatSupportedFunctionList(registry: ControlMutationDefaultRegistry): 
 }
 
 export function lowerDefaultFunctionWithRegistry(input: {
-  readonly call: ParsedDefaultFunctionCall;
+  readonly call: TypedDefaultFunctionCall;
   readonly registry: ControlMutationDefaultRegistry;
   readonly context: DefaultFunctionLoweringContext;
 }): LoweredDefaultResult {
-  const entry = input.registry.get(input.call.name);
+  const entry = input.registry.get(input.call.fn);
   if (entry) {
     return entry.lower({ call: input.call, context: input.context });
   }
@@ -32,7 +32,7 @@ export function lowerDefaultFunctionWithRegistry(input: {
     ok: false,
     diagnostic: {
       code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-      message: `Default function "${input.call.name}" is not supported in SQL PSL provider v1. Supported functions: ${supportedFunctionList}.`,
+      message: `Default function "${input.call.fn}" is not supported in SQL PSL provider v1. Supported functions: ${supportedFunctionList}.`,
       sourceId: input.context.sourceId,
       span: input.call.span,
     },

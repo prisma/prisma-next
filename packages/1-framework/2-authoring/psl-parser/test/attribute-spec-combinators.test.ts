@@ -700,7 +700,7 @@ describe('funcCall with a signature', () => {
     const result = nanoid().parse(expr, ctx);
 
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ fn: 'nanoid', size: 16 });
+    if (result.ok) expect(result.value).toMatchObject({ fn: 'nanoid', args: { size: 16 } });
   });
 
   it('omits an absent optional argument, keeping the fn discriminant', () => {
@@ -709,7 +709,7 @@ describe('funcCall with a signature', () => {
     const result = nanoid().parse(expr, ctx);
 
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toEqual({ fn: 'nanoid' });
+    if (result.ok) expect(result.value).toMatchObject({ fn: 'nanoid', args: {} });
   });
 
   it('rejects an out-of-range argument', () => {

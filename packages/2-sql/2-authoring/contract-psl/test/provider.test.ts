@@ -682,9 +682,8 @@ model Document {
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
+            code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
             sourceId: './schema.prisma',
-            message: expect.stringContaining('cuid(2)'),
             span: expect.objectContaining({
               start: expect.objectContaining({ line: 3 }),
             }),

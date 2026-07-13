@@ -1,5 +1,5 @@
 import type { ParsedDefaultFunctionCall } from '@prisma-next/framework-components/control';
-import type { PslDiagnostic } from '@prisma-next/framework-components/psl-ast';
+import type { PslDiagnostic, PslSpan } from '@prisma-next/framework-components/psl-ast';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { nodePslSpan } from '../../resolve';
 import type { ExpressionAst } from '../../syntax/ast/expressions';
@@ -17,8 +17,13 @@ export interface FuncCallSig {
   readonly named?: Readonly<Record<string, Param<unknown>>>;
 }
 
-// The typed record a signed call binds to: the `fn` discriminant plus the parsed arguments.
-export type TypedFuncCall = { readonly fn: string } & Record<string, unknown>;
+// The typed record a signed call binds to: the `fn` discriminant, the call-site span, and the
+// parsed argument record produced by `interpretArgs`.
+export interface TypedFuncCall {
+  readonly fn: string;
+  readonly span: PslSpan;
+  readonly args: Readonly<Record<string, unknown>>;
+}
 
 // A name-pinned function-call argument (`funcCall('now')` matches `now()`). Without a signature
 // the call is captured into the framework `ParsedDefaultFunctionCall` shape — each argument kept
@@ -66,14 +71,15 @@ function typedFuncCall(name: string, sig: FuncCallSig): ArgType<TypedFuncCall> {
     parse: (arg, ctx): Result<TypedFuncCall, readonly PslDiagnostic[]> => {
       const guard = matchCallee(arg, name, ctx);
       if (!guard.ok) return guard;
+      const span = nodePslSpan(guard.value.syntax, ctx.sourceFile);
       const bound = interpretArgs(
         guard.value.args(),
         { name, positional: sig.positional ?? [], named: sig.named ?? {} },
         ctx,
-        nodePslSpan(guard.value.syntax, ctx.sourceFile),
+        span,
       );
       if (!bound.ok) return notOk<readonly PslDiagnostic[]>(bound.failure);
-      return ok({ ...bound.value, fn: name });
+      return ok({ fn: name, span, args: bound.value });
     },
   };
 }
