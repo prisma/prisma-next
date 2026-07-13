@@ -369,3 +369,40 @@ describe('all four collections are reachable', () => {
     expect(foundSession?.['userId']).toBe(user.id);
   });
 });
+
+describe('empty-where no-op contract (BetterAuth ≥1.6.17)', () => {
+  it('update with empty where returns null and modifies nothing', async () => {
+    const created = await adapter.create<UserRow>({ model: 'user', data: userData() });
+
+    const result = await adapter.update<UserRow>({
+      model: 'user',
+      where: [],
+      update: { name: 'Clobbered' },
+    });
+    expect(result).toBeNull();
+
+    const untouched = await adapter.findOne<UserRow>({
+      model: 'user',
+      where: [{ field: 'id', value: created.id }],
+    });
+    expect(untouched?.name).toBe(created.name);
+  });
+
+  it('delete with empty where deletes nothing', async () => {
+    await adapter.create<UserRow>({ model: 'user', data: userData() });
+    await adapter.create<UserRow>({ model: 'user', data: userData() });
+
+    await adapter.delete({ model: 'user', where: [] });
+
+    expect(await adapter.count({ model: 'user' })).toBe(2);
+  });
+
+  it('consumeOne with empty where consumes nothing and returns null', async () => {
+    await adapter.create<UserRow>({ model: 'user', data: userData() });
+
+    const consumed = await adapter.consumeOne<UserRow>({ model: 'user', where: [] });
+    expect(consumed).toBeNull();
+
+    expect(await adapter.count({ model: 'user' })).toBe(1);
+  });
+});

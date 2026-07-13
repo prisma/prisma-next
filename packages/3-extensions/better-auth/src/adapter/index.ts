@@ -149,6 +149,15 @@ function buildCustomAdapter(db: BetterAuthDbCollections): CustomAdapter {
     return joined;
   };
 
+  // BetterAuth ≥1.6.17 standardizes the singular write methods as no-ops
+  // when called with an empty/absent `where`: `update`/`consumeOne` return
+  // null, `delete` does nothing. The factory guards its own `update` path
+  // (v1.6.23) but forwards `delete`/`consumeOne` unguarded, and
+  // `scopeToWhere` would otherwise return the unscoped collection — an
+  // accidental whole-table write.
+  const isEmptyWhere = (where: readonly CleanedWhere[] | undefined): boolean =>
+    where === undefined || where.length === 0;
+
   return {
     async create({ model, data, select }) {
       const resolved = resolveModel(model);
@@ -199,6 +208,9 @@ function buildCustomAdapter(db: BetterAuthDbCollections): CustomAdapter {
     },
 
     async update({ model, where, update }) {
+      if (isEmptyWhere(where)) {
+        return null;
+      }
       const resolved = resolveModel(model);
       const data = asRecord(update, model);
       assertKnownFields(model, resolved.spaceModel, data);
@@ -216,6 +228,9 @@ function buildCustomAdapter(db: BetterAuthDbCollections): CustomAdapter {
     },
 
     async delete({ model, where }) {
+      if (isEmptyWhere(where)) {
+        return;
+      }
       const resolved = resolveModel(model);
       await scopeToWhere(resolved, model, where).delete();
     },
@@ -226,6 +241,9 @@ function buildCustomAdapter(db: BetterAuthDbCollections): CustomAdapter {
     },
 
     async consumeOne({ model, where }) {
+      if (isEmptyWhere(where)) {
+        return null;
+      }
       const resolved = resolveModel(model);
       const consumed = await scopeToWhere(resolved, model, where).delete();
       if (consumed === null) {
