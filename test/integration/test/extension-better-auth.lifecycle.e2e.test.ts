@@ -51,19 +51,25 @@ function requireContractSpace(): NonNullable<typeof betterAuthPack.contractSpace
 
 /**
  * Lists constraints of the given type on a `public`-schema table as
- * `{ columns, referencesTable }` records (read-only catalog introspection).
+ * `{ columns, referencesTable, onDelete }` records (read-only catalog
+ * introspection). `onDelete` carries pg_constraint's `confdeltype` action
+ * character for foreign keys ('c' = CASCADE, 'a' = NO ACTION) and null for
+ * other constraint types.
  */
 async function constraintsOf(
   connectionString: string,
   table: string,
   contype: 'u' | 'f',
-): Promise<ReadonlyArray<{ columns: string; referencesTable: string | null }>> {
+): Promise<
+  ReadonlyArray<{ columns: string; referencesTable: string | null; onDelete: string | null }>
+> {
   const result = await sql(
     connectionString,
     `SELECT array_to_string(
               array_agg(att.attname ORDER BY ord.ordinality), ','
             ) AS columns,
-            CASE WHEN con.contype = 'f' THEN confrel.relname ELSE NULL END AS references_table
+            CASE WHEN con.contype = 'f' THEN confrel.relname ELSE NULL END AS references_table,
+            CASE WHEN con.contype = 'f' THEN con.confdeltype::text ELSE NULL END AS on_delete
        FROM pg_constraint con
        JOIN pg_class rel ON rel.oid = con.conrelid
        JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
@@ -71,13 +77,14 @@ async function constraintsOf(
        JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS ord(attnum, ordinality) ON true
        JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ord.attnum
       WHERE nsp.nspname = 'public' AND rel.relname = $1 AND con.contype = $2
-      GROUP BY con.conname, con.contype, confrel.relname
+      GROUP BY con.conname, con.contype, confrel.relname, con.confdeltype
       ORDER BY 1`,
     [table, contype],
   );
   return result.rows.map((row) => ({
     columns: String(row['columns']),
     referencesTable: row['references_table'] === null ? null : String(row['references_table']),
+    onDelete: row['on_delete'] === null ? null : String(row['on_delete']),
   }));
 }
 
@@ -141,16 +148,18 @@ withTempDir(({ createTempDir }) => {
         }
 
         expect(await constraintsOf(db.connectionString, 'user', 'u')).toEqual([
-          { columns: 'email', referencesTable: null },
+          { columns: 'email', referencesTable: null, onDelete: null },
         ]);
         expect(await constraintsOf(db.connectionString, 'session', 'u')).toEqual([
-          { columns: 'token', referencesTable: null },
+          { columns: 'token', referencesTable: null, onDelete: null },
         ]);
+        // BetterAuth's canonical schema declares ON DELETE CASCADE on both
+        // user references ('c' in pg_constraint.confdeltype).
         expect(await constraintsOf(db.connectionString, 'session', 'f')).toEqual([
-          { columns: 'userId', referencesTable: 'user' },
+          { columns: 'userId', referencesTable: 'user', onDelete: 'c' },
         ]);
         expect(await constraintsOf(db.connectionString, 'account', 'f')).toEqual([
-          { columns: 'userId', referencesTable: 'user' },
+          { columns: 'userId', referencesTable: 'user', onDelete: 'c' },
         ]);
 
         // The space marker records the walk to head.

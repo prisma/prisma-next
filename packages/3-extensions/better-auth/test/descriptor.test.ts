@@ -84,13 +84,15 @@ describe('better-auth extension pack descriptor', () => {
     expect(tables['session']!.uniques).toEqual([{ columns: ['token'] }]);
   });
 
-  it('declares foreign keys session.userId → user.id and account.userId → user.id', () => {
+  it('declares cascading foreign keys session.userId → user.id and account.userId → user.id', () => {
     const tables = publicTables();
     for (const child of ['session', 'account'] as const) {
       expect(tables[child]!.foreignKeys).toEqual([
         expect.objectContaining({
           source: expect.objectContaining({ tableName: child, columns: ['userId'] }),
           target: expect.objectContaining({ tableName: 'user', columns: ['id'] }),
+          // BetterAuth's canonical schema cascades user deletions.
+          onDelete: 'cascade',
         }),
       ]);
     }

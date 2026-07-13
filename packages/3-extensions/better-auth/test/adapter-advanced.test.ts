@@ -15,7 +15,7 @@
 import postgres from '@prisma-next/postgres/runtime';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import baselineOps from '../migrations/20260710T1458_create_auth_tables/ops.json' with {
+import baselineOps from '../migrations/20260713T0717_create_auth_tables/ops.json' with {
   type: 'json',
 };
 import { resolveJoinRelations } from '../src/adapter/join';

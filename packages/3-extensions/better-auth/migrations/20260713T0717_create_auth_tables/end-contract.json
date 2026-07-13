@@ -333,7 +333,30 @@
                 }
               }
             },
-            "relations": {},
+            "relations": {
+              "account": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": ["id"],
+                  "targetFields": ["userId"]
+                },
+                "to": {
+                  "model": "Account",
+                  "namespace": "public"
+                }
+              },
+              "session": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": ["id"],
+                  "targetFields": ["userId"]
+                },
+                "to": {
+                  "model": "Session",
+                  "namespace": "public"
+                }
+              }
+            },
             "storage": {
               "fields": {
                 "createdAt": {
@@ -514,6 +537,7 @@
                 {
                   "constraint": true,
                   "index": true,
+                  "onDelete": "cascade",
                   "source": {
                     "columns": ["userId"],
                     "namespaceId": "public",
@@ -579,6 +603,7 @@
                 {
                   "constraint": true,
                   "index": true,
+                  "onDelete": "cascade",
                   "source": {
                     "columns": ["userId"],
                     "namespaceId": "public",
@@ -696,7 +721,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:38404b7e44d4835f7e1c082ad429637a033ea215d075e9e1c895591e5f5a2094"
+    "storageHash": "sha256:d7e1a9c1e6afff326dd24d80669e5167c6167326ebcc3f92ef0cd3f144adcd1c"
   },
   "capabilities": {
     "postgres": {

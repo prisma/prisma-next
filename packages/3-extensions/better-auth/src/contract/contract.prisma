@@ -34,7 +34,7 @@ model Session {
   createdAt DateTime
   updatedAt DateTime
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("session")
 }
@@ -54,7 +54,7 @@ model Account {
   createdAt             DateTime
   updatedAt             DateTime
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("account")
 }

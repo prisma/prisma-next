@@ -5,7 +5,7 @@ export default class M extends Migration {
   override describe() {
     return {
       from: null,
-      to: 'sha256:38404b7e44d4835f7e1c082ad429637a033ea215d075e9e1c895591e5f5a2094',
+      to: 'sha256:d7e1a9c1e6afff326dd24d80669e5167c6167326ebcc3f92ef0cd3f144adcd1c',
     };
   }
 
@@ -136,6 +136,7 @@ export default class M extends Migration {
           name: 'account_userId_fkey',
           columns: ['userId'],
           references: { schema: 'public', table: 'user', columns: ['id'] },
+          onDelete: 'cascade',
         },
       }),
       this.addForeignKey({
@@ -145,6 +146,7 @@ export default class M extends Migration {
           name: 'session_userId_fkey',
           columns: ['userId'],
           references: { schema: 'public', table: 'user', columns: ['id'] },
+          onDelete: 'cascade',
         },
       }),
     ];

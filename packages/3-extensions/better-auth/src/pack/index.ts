@@ -22,10 +22,10 @@
 
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
 import { contractSpaceFromJson } from '@prisma-next/migration-tools/spaces';
-import baselineMetadata from '../../migrations/20260710T1458_create_auth_tables/migration.json' with {
+import baselineMetadata from '../../migrations/20260713T0717_create_auth_tables/migration.json' with {
   type: 'json',
 };
-import baselineOps from '../../migrations/20260710T1458_create_auth_tables/ops.json' with {
+import baselineOps from '../../migrations/20260713T0717_create_auth_tables/ops.json' with {
   type: 'json',
 };
 import headRef from '../../migrations/refs/head.json' with { type: 'json' };
@@ -34,7 +34,7 @@ import type { Contract } from '../contract/contract.d';
 import contractJson from '../contract/contract.json' with { type: 'json' };
 
 const BETTER_AUTH_SPACE_ID = 'better-auth' as const;
-const BASELINE_DIR_NAME = '20260710T1458_create_auth_tables';
+const BASELINE_DIR_NAME = '20260713T0717_create_auth_tables';
 
 const betterAuthContractSpace = contractSpaceFromJson<Contract>({
   contractJson,
