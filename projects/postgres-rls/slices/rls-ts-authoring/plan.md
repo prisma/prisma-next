@@ -43,6 +43,13 @@ Per-dispatch gate (from [`drive/calibration/dod.md`](../../../../drive/calibrati
 4. **Type tests use `expectTypeOf` matchers** in place of `@ts-expect-error` negatives; the CodeRabbit `ifDefined` nitpick folds in.
 **Completed when:** parity fixtures + all wire names byte-identical; full gate green; PR comments each answered in-thread with the resolving commit.
 
+## W7 — Consolidate `packEntities` into `entities` (PR #959 review round 2)
+
+**Ruling (operator, 2026-07-13):** the public `packEntities` input has no real author — every reference outside the build machinery is a test; native enums enter via column refs into a separate internal accumulator, never the public field. `entities` (handles + pack hook) strictly subsumes it (the pack lowers; `packEntities` forced the author to hand-construct the entity + key). Collapse to one public channel.
+
+**Outcome:** the public `packEntities` field is removed from the contract input (all overloads); `entities` is the sole generic pack-entity attachment surface. The internal column-ref collection accumulator (`CollectedPackEntities` / `collectPackEntityFromColumn` / `mergeCollectedPackEntities`) stays — native enums depend on it — renamed so it no longer reads as a public mirror. The internal entries-fold is unchanged, so emitted contracts are byte-identical. Tests that authored the public `packEntities` map migrate to `entities` handles (or are deleted if they only exercised the removed field's own plumbing).
+**Completed when:** no `packEntities` on any public input type (`git grep` shows only the renamed internal accumulator); native-enum + RLS parity fixtures byte-identical; full gate green; the review comment answered in-thread.
+
 ## Sequencing & handoffs
 
 `W1 → W2 → W3 → W4 → W5`, strictly. W1 is independent (PSL-side) but first so W4's parity fixtures build on fixed PSL. W3 builds on W2's handles; W4 on W3's lowering; W5 on all.
