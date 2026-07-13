@@ -34,6 +34,15 @@ Per-dispatch gate (from [`drive/calibration/dod.md`](../../../../drive/calibrati
 **Outcome:** the slice-1 scenario authored in TS runs against live PGlite with identical observable behaviour to the PSL run (rows filtered under `SET ROLE`, create/edit-replaces/rename/drop lifecycle, drift → verify fails, missing declared role fails verify) — beside the existing journeys (`packages/3-targets/6-adapters/postgres/test/migrations/rls-walking-skeleton-psl.integration.test.ts`; place the TS variant there if dependency rules allow `@prisma-next/postgres` as a devDep, else in `test/integration`). `ref()` rename behaviour pinned (AC-3: rename referenced model's table → predicate + wire name change). Invisibility pinned structurally (AC-7: no policy helper reachable from SQLite/Mongo builders).
 **Completed when:** AC-2/3/4/7 green; full gate — build, forced typecheck, whole Lint job (ratchet unchanged), `fixtures:check`, `test:packages` + `test:integration` + `test:e2e`, multi-space guards, `check:upgrade-coverage --mode pr --prev $(git merge-base origin/main HEAD)`; slice-DoD walked; `origin/main` synced before final validation + push.
 
+## W6 — Operator-review restructure (PR #959 comments)
+
+**Outcome:** four operator rulings applied as one relocation round, with wire names, parity fixtures, and `entries` keys byte-identical throughout:
+1. **No `resolveModelStorageName` anywhere.** The framework `AuthoringEntityContext` field is deleted. PSL: the interpreter resolves the descriptor-declared `target` model ref to a storage table coordinate during lowering and hands the factory a resolved ref (unresolved ref = interpreter diagnostic, replacing `PSL_RLS_POLICY_TARGET_UNRESOLVED`'s factory-side emission if the site moves). TS: the generic walk pre-resolves handle-declared refs through the build's existing model→table maps (the relation-lowering representation).
+2. **Generic `entities` channel.** Kind-agnostic walk in `contract-ts` (group by owning pack via the `entityTypes` discriminator index; unclaimed kind errors); a SQL-family batch lowering hook on the contributions surface; the RLS lowering moves into target-postgres beside `lowerRlsPolicyFromBlock`, sharing matrix/hash/diagnostics; `rls-lowering.ts` in the extension is deleted; `defineContract` carries no entity-kind logic.
+3. **`ref()` vetoed.** Predicates are `string` only. The function-form predicate type, `ref` machinery, and their tests are deleted; spec D4/AC-3 and the project-DoD item are already struck.
+4. **Type tests use `expectTypeOf` matchers** in place of `@ts-expect-error` negatives; the CodeRabbit `ifDefined` nitpick folds in.
+**Completed when:** parity fixtures + all wire names byte-identical; full gate green; PR comments each answered in-thread with the resolving commit.
+
 ## Sequencing & handoffs
 
 `W1 → W2 → W3 → W4 → W5`, strictly. W1 is independent (PSL-side) but first so W4's parity fixtures build on fixed PSL. W3 builds on W2's handles; W4 on W3's lowering; W5 on all.
