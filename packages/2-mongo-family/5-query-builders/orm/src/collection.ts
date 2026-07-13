@@ -8,11 +8,11 @@ import {
 } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
+  AnyMongoTypeMaps,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoModelDefinition,
   MongoModelsMap,
-  MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import type {
   AnyMongoCommand,
@@ -59,7 +59,7 @@ type ModelFieldKeys<
 > = keyof MongoModelsMap<TContract>[ModelName]['fields'] & string;
 
 export interface MongoCollection<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
   TVariant extends string = never,
@@ -155,7 +155,7 @@ function resolveCollectionName(model: MongoModelDefinition, modelName: string): 
 }
 
 class MongoCollectionImpl<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
   TVariant extends string = never,
@@ -835,7 +835,7 @@ class MongoCollectionImpl<
 }
 
 export function createMongoCollection<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
 >(
   contract: TContract,

@@ -73,11 +73,13 @@ function renderTypedParam(
   index: number,
   codecId: string | undefined,
   codecLookup: CodecLookup,
+  many?: boolean,
+  typeParams?: JsonValue,
 ): string {
   if (codecId === undefined) {
     return `$${index}`;
   }
-  const meta = codecLookup.metaFor(codecId);
+  const meta = codecLookup.metaFor(codecId, typeParams);
   const isRegistered =
     codecLookup.get(codecId) !== undefined ||
     meta !== undefined ||
@@ -92,13 +94,25 @@ function renderTypedParam(
         "if it's a builtin.",
     );
   }
-  // The framework `CodecLookup.metaFor` returns the family-agnostic `CodecMeta` whose `db` is `Record<string, unknown>`. The SQL family populates a narrower shape with `db.sql.<dialect>.nativeType: string`; navigate that path defensively and string-check the leaf.
+  // `typeParams` above already resolved a parameterized codec's per-instance
+  // meta (e.g. a native enum's type name) ahead of its static fallback.
+  //
+  // The framework `CodecLookup.metaFor` returns the family-agnostic
+  // `CodecMeta`, whose `db` is `Record<string, unknown>`. The SQL family
+  // populates a narrower shape with `db.sql.<dialect>.nativeType: string`, so
+  // navigate that path defensively and string-check the leaf.
   const dbRecord = meta?.db;
   const sqlBlock = isRecord(dbRecord) ? dbRecord['sql'] : undefined;
   const dialectBlock = isRecord(sqlBlock) ? sqlBlock['postgres'] : undefined;
   const nativeType = isRecord(dialectBlock) ? dialectBlock['nativeType'] : undefined;
-  if (typeof nativeType === 'string' && !POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
-    return `$${index}::${nativeType}`;
+  if (typeof nativeType === 'string') {
+    const arraySuffix = many ? '[]' : '';
+    if (!POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
+      return `$${index}::${nativeType}${arraySuffix}`;
+    }
+    if (many) {
+      return `$${index}::${nativeType}${arraySuffix}`;
+    }
   }
   return `$${index}`;
 }
@@ -736,7 +750,13 @@ function renderParamRef(ref: AnyParamRef, pim: ParamIndexMap): string {
     throw new Error('ParamRef not found in index map');
   }
   if (ref.kind === 'prepared-param-ref') {
-    return renderTypedParam(index, ref.codec.codecId, pim.codecLookup);
+    return renderTypedParam(
+      index,
+      ref.codec.codecId,
+      pim.codecLookup,
+      ref.codec.many,
+      ref.codec.typeParams,
+    );
   }
   if (ref.codec === undefined) {
     throw runtimeError(
@@ -747,7 +767,13 @@ function renderParamRef(ref: AnyParamRef, pim: ParamIndexMap): string {
       { paramIndex: index, ...ifDefined('name', ref.name) },
     );
   }
-  return renderTypedParam(index, ref.codec.codecId, pim.codecLookup);
+  return renderTypedParam(
+    index,
+    ref.codec.codecId,
+    pim.codecLookup,
+    ref.codec.many,
+    ref.codec.typeParams,
+  );
 }
 
 function renderLiteral(expr: LiteralExpr): string {

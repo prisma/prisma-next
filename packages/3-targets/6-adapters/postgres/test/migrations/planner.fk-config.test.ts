@@ -1,10 +1,18 @@
 import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import { contractToSchemaIR, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  contractToPostgresDatabaseSchemaNode,
+  createPostgresMigrationPlanner,
+} from '@prisma-next/target-postgres/planner';
+import {
+  type PostgresContract,
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -22,7 +30,7 @@ function createFkTestContract(fkConfig: {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:contract'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {
@@ -75,9 +83,17 @@ function createFkTestContract(fkConfig: {
   };
 }
 
-const emptySchema: SqlSchemaIR = {
-  tables: {},
-};
+const emptySchema = new PostgresDatabaseSchemaNode({
+  namespaces: {
+    public: new PostgresNamespaceSchemaNode({
+      schemaName: 'public',
+      tables: {},
+    }),
+  },
+  pgVersion: '',
+  roles: [],
+  existingSchemas: [],
+});
 
 const MIGRATION_PLAN_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'],
@@ -225,7 +241,9 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       storageHash: coreHash('sha256:to'),
       includeStateColumn: true,
     });
-    const schema = contractToSchemaIR(fromContract, { annotationNamespace: 'pg' });
+    const schema = contractToPostgresDatabaseSchemaNode(fromContract, {
+      annotationNamespace: 'pg',
+    });
 
     const result = planner.plan({
       contract,
@@ -255,7 +273,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
 function createWorkflowStateContract(options: {
   storageHash: ReturnType<typeof coreHash>;
   includeStateColumn: boolean;
-}): Contract<SqlStorage> {
+}): PostgresContract {
   const workflowStateColumns = {
     workflow_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
     team_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -271,7 +289,7 @@ function createWorkflowStateContract(options: {
     storage: new SqlStorage({
       storageHash: options.storageHash,
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {

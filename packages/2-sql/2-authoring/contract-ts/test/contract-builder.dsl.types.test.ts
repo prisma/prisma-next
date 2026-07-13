@@ -1,5 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract, field, model } from '../src/contract-builder';
 import { modelsOf } from './contract-test-helpers';
 
@@ -28,6 +29,7 @@ describe('contract DSL type surface', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: {
@@ -49,6 +51,7 @@ describe('contract DSL type surface', () => {
       defineContract({
         family: bareFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         // @ts-expect-error invalid control policy literal
         defaultControlPolicy: 'bogus',
         models: {},
@@ -61,6 +64,7 @@ describe('contract DSL type surface', () => {
       defineContract({
         family: bareFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         models: {
           User: model('User', {
             fields: { id: field.column(int4Column).id() },

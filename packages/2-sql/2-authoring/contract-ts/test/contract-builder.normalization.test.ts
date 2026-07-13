@@ -1,5 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract, field, model } from '../src/contract-builder';
 import { modelsOf } from './contract-test-helpers';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -30,6 +31,7 @@ describe('contract builder normalization', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: {
@@ -46,6 +48,7 @@ describe('contract builder normalization', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: {
@@ -64,6 +67,7 @@ describe('contract builder normalization', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: {
@@ -81,6 +85,7 @@ describe('contract builder normalization', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: {
@@ -98,6 +103,7 @@ describe('contract builder normalization', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: {
@@ -115,6 +121,7 @@ describe('contract builder normalization', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: {
@@ -137,6 +144,7 @@ describe('contract builder normalization', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: {
@@ -181,6 +189,7 @@ describe('contract builder normalization', () => {
       {
         family: bareFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         extensionPacks: { testIndexes: testIndexPack },
       },
       ({ model, field }) => ({
@@ -218,6 +227,7 @@ describe('contract builder normalization', () => {
     const contract = defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: {
         User: model('User', {
           fields: {

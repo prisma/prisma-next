@@ -9,7 +9,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
-import { SqlContractSerializer } from '../src/core/ir/sql-contract-serializer';
+import { TestSqlContractSerializer as SqlContractSerializer } from './test-sql-contract-serializer';
 
 describe('cross-reference shape round-trip', () => {
   it('parses and round-trips through SQL family serializer hydration', () => {

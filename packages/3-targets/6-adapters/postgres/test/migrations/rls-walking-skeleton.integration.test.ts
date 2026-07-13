@@ -7,6 +7,7 @@ import {
   normalizePredicate,
 } from '@prisma-next/target-postgres/rls-canonicalize';
 import {
+  PostgresRlsEnablement,
   PostgresRlsPolicy,
   PostgresRole,
   PostgresSchema,
@@ -72,6 +73,9 @@ function buildRlsWalkingSkeletonContract(): Contract<SqlStorage> {
       },
       role: { [role.name]: role },
       policy: { [policy.name]: policy },
+      rls: {
+        [TABLE_NAME]: new PostgresRlsEnablement({ tableName: TABLE_NAME, namespaceId: 'public' }),
+      },
     },
   });
 
@@ -180,7 +184,7 @@ describe.sequential('RLS walking skeleton — author → plan → apply → filt
         frameworkComponents,
       });
 
-      expect(verifyResult.schema.schemaDiffIssues).toEqual([]);
+      expect(verifyResult.schema.issues).toEqual([]);
     },
     testTimeout,
   );

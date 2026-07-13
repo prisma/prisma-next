@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { findLocations } from '../../../src/data/locations';
-import { getDb } from '../../../src/db-singleton';
+import { getDb } from '../../../src/db';
 
 export async function GET() {
   const db = await getDb();

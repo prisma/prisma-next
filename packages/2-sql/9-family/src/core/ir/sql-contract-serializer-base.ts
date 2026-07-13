@@ -6,18 +6,15 @@ import {
   type AnyEntityKindDescriptor,
   hydrateNamespaceEntities,
   type Namespace,
-  NamespaceBase,
-  UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { composeSqlEntityKinds } from '@prisma-next/sql-contract/entity-kinds';
 import {
-  buildSqlNamespace,
-  type SqlNamespaceTablesInput,
+  isMaterializedSqlNamespace,
+  type SqlNamespaceInput,
   SqlStorage,
   type SqlStorageInput,
   type SqlStorageTypeEntry,
-  SqlUnboundNamespace,
 } from '@prisma-next/sql-contract/types';
 import {
   createSqlContractSchema,
@@ -25,7 +22,7 @@ import {
 } from '@prisma-next/sql-contract/validators';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { JsonObject } from '@prisma-next/utils/json';
+import type { JsonObject, JsonValue } from '@prisma-next/utils/json';
 import { type Type, type } from 'arktype';
 
 const NamespaceRawSchema = type({
@@ -120,77 +117,48 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
         'structural',
       );
     }
-    const hydratedNamespaces = this.hydrateSqlNamespaceMap(rawNamespaces);
-    // Compatibility shim: production code that addresses `__unbound__` for table
-    // metadata lookups (collection-contract, query-plan-mutations, model-accessor,
-    // query-plan-meta, where-binding) uses optional chaining and tolerates absence,
-    // but runtime-qualification (TML-2605) has not yet landed cross-namespace table
-    // routing. Injecting the empty singleton here keeps helpers that augment the
-    // deserialized JSON (e.g. buildMixedPolyContract) working by providing a slot to
-    // write into. Once runtime-qualification routes table lookups by namespace, this
-    // shim should be removed.
-    //
-    // TML-2916: the shim only fires when the target's default namespace IS unbound
-    // (SQLite, Mongo). On Postgres (`defaultNamespaceId === 'public'`) injecting an
-    // empty `__unbound__` slot violates ADR 223 — un-namespaced PG models belong in
-    // `public`, not `__unbound__`.
-    const withInjectedUnbound =
-      this.defaultNamespaceId === UNBOUND_NAMESPACE_ID
-        ? {
-            ...hydratedNamespaces,
-            [UNBOUND_NAMESPACE_ID]:
-              hydratedNamespaces[UNBOUND_NAMESPACE_ID] ?? SqlUnboundNamespace.instance,
-          }
-        : hydratedNamespaces;
+    const hydratedNamespaces = this.hydrateSqlNamespaceMap(
+      blindCast<
+        Readonly<Record<string, Record<string, unknown>>>,
+        'parseSqlContractStructure validated raw JSON; namespace entries are plain objects, not SqlNamespace instances.'
+      >(rawNamespaces),
+    );
 
     return {
       ...validated,
       storage: new SqlStorage({
         storageHash: validated.storage.storageHash,
         ...ifDefined('types', hydratedTypes),
-        // Cast narrows the result of hydrateSqlNamespaceMap from the wider
-        // framework `Namespace` to the SQL-family `SqlNamespace`.
         namespaces: blindCast<
           SqlStorageInput['namespaces'],
-          'hydrateSqlNamespaceMap builds each namespace through the SQL family concretions (SqlBoundNamespace / target schema), so every value is a SqlNamespace; the framework return type only promises the base Namespace.'
-        >(withInjectedUnbound),
+          'hydrateSqlNamespaceMap builds each namespace through the target serializer override, so every value is a SqlNamespace; the framework return type only promises the base Namespace.'
+        >(hydratedNamespaces),
       }),
     };
   }
 
-  protected abstract get defaultNamespaceId(): string;
-
   protected hydrateSqlNamespaceMap(
-    namespaces: Readonly<Record<string, Namespace | Record<string, unknown>>>,
+    namespaces: Readonly<Record<string, Record<string, unknown>>>,
   ): Readonly<Record<string, Namespace>> {
     return Object.fromEntries(
       Object.entries(namespaces).map(([nsId, namespaceEntryRaw]) => {
-        // Raw entries passed structural validation; hydrate materialises family IR class instances.
         const namespaceHydrated = this.hydrateSqlNamespaceEntry(nsId, namespaceEntryRaw);
-        const namespaceMaterialised =
-          namespaceHydrated instanceof NamespaceBase
-            ? namespaceHydrated
-            : buildSqlNamespace(
-                blindCast<
-                  SqlNamespaceTablesInput,
-                  'hydrateSqlNamespaceEntry returns SqlNamespaceTablesInput when raw is not a NamespaceBase'
-                >(namespaceHydrated),
-              );
-        return [nsId, namespaceMaterialised];
+        if (!isMaterializedSqlNamespace(namespaceHydrated)) {
+          throw new Error(
+            `Target serializer bug: hydrateSqlNamespaceEntry for namespace "${nsId}" returned a non-NamespaceBase value. Override hydrateSqlNamespaceEntry to produce a target namespace concretion.`,
+          );
+        }
+        return [nsId, namespaceHydrated];
       }),
     );
   }
 
   protected hydrateSqlNamespaceEntry(
     nsId: string,
-    raw: Namespace | Record<string, unknown>,
-  ): Namespace | SqlNamespaceTablesInput {
-    if (raw instanceof NamespaceBase) {
-      return raw;
-    }
-    const rawRecord = isPlainRecord(raw) ? raw : {};
-    const id = typeof rawRecord['id'] === 'string' ? rawRecord['id'] : nsId;
-    const parsed = NamespaceRawSchema({ ...rawRecord, id });
+    raw: Record<string, unknown>,
+  ): Namespace | SqlNamespaceInput {
+    const id = typeof raw['id'] === 'string' ? raw['id'] : nsId;
+    const parsed = NamespaceRawSchema({ ...raw, id });
     if (parsed instanceof type.errors) {
       const messages = parsed.map((p: { message: string }) => p.message).join('; ');
       throw new ContractValidationError(`Namespace hydration failed: ${messages}`, 'structural');
@@ -211,8 +179,8 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     }
 
     return blindCast<
-      SqlNamespaceTablesInput,
-      'entriesOutput holds the hydrated SQL entity-kind maps (table always present); this wraps them as the SqlNamespaceTablesInput the family createNamespace consumes.'
+      SqlNamespaceInput,
+      'entriesOutput holds the hydrated SQL entity-kind maps (table always present); this wraps them as the SqlNamespaceInput the target createNamespace consumes.'
     >({
       id,
       entries: entriesOutput,
@@ -239,5 +207,51 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
 
   protected constructTargetContract(hydrated: Contract<SqlStorage>): TContract {
     return hydrated as TContract;
+  }
+
+  /**
+   * Serializes a namespace's `entries` dict by walking every enumerable
+   * kind — no kind is named here, mirroring the generic hydrate walk in
+   * `hydrateSqlNamespaceEntry` above. `table` is the SQL family's one
+   * universal base kind (every namespace carries it), so it is always
+   * emitted, even when empty; every other kind — target- or
+   * pack-contributed — is emitted only when it holds at least one entry.
+   * A kind carried non-enumerable on `entries` is excluded here for free,
+   * since `Object.entries` honors enumerability.
+   */
+  protected serializeNamespaceEntries(
+    entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+  ): Record<string, Record<string, JsonObject>> {
+    const out: Record<string, Record<string, JsonObject>> = {
+      table: this.serializeEntries(entries['table'] ?? {}),
+    };
+    for (const [kind, record] of Object.entries(entries)) {
+      if (kind === 'table' || record == null || Object.keys(record).length === 0) {
+        continue;
+      }
+      out[kind] = this.serializeEntries(record);
+    }
+    return out;
+  }
+
+  private serializeEntries(entries: Readonly<Record<string, unknown>>): Record<string, JsonObject> {
+    const out: Record<string, JsonObject> = {};
+    for (const [name, entry] of Object.entries(entries)) {
+      out[name] = this.serializeJsonObject(entry);
+    }
+    return out;
+  }
+
+  protected serializeJsonObject(value: unknown): JsonObject {
+    return blindCast<
+      JsonObject,
+      'serializeJsonValue round-trips an IR node through JSON, yielding a JsonObject'
+    >(this.serializeJsonValue(value));
+  }
+
+  private serializeJsonValue(value: unknown): JsonValue {
+    return blindCast<JsonValue, 'JSON.parse(JSON.stringify(x)) yields a JsonValue'>(
+      JSON.parse(JSON.stringify(value)),
+    );
   }
 }

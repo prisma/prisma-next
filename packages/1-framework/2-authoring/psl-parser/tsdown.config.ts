@@ -6,5 +6,6 @@ export default defineConfig({
     'src/exports/tokenizer.ts',
     'src/exports/syntax.ts',
     'src/exports/format.ts',
+    'src/exports/interpret.ts',
   ],
 });

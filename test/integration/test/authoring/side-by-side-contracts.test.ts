@@ -50,6 +50,7 @@ const sqlSourceContext: ContractSourceContext = {
   codecLookup: sqlStack.codecLookup,
   controlMutationDefaults: sqlStack.controlMutationDefaults,
   resolvedInputs: [],
+  capabilities: sqlStack.capabilities,
 };
 
 const mongoSourceContext: ContractSourceContext = {
@@ -60,6 +61,7 @@ const mongoSourceContext: ContractSourceContext = {
   codecLookup: mongoStack.codecLookup,
   controlMutationDefaults: mongoStack.controlMutationDefaults,
   resolvedInputs: [],
+  capabilities: mongoStack.capabilities,
 };
 
 type FixtureName = 'postgres' | 'mongo';
@@ -175,11 +177,18 @@ describe('side-by-side contract examples', () => {
       const familyInstance = sql.create(sqlStack);
       const frameworkComponents = [postgres, postgresAdapter];
 
+      type PostgresSerializerInput = Parameters<
+        typeof postgres.contractSerializer.serializeContract
+      >[0];
       const normalizedTs = familyInstance.deserializeContract(
-        enrichContract(fixture.tsContract, frameworkComponents),
+        postgres.contractSerializer.serializeContract(
+          enrichContract(fixture.tsContract, frameworkComponents) as PostgresSerializerInput,
+        ),
       );
       const normalizedPsl = familyInstance.deserializeContract(
-        enrichContract(providerResult.value, frameworkComponents),
+        postgres.contractSerializer.serializeContract(
+          enrichContract(providerResult.value, frameworkComponents) as PostgresSerializerInput,
+        ),
       );
 
       expect(normalizedTs).toEqual(normalizedPsl);

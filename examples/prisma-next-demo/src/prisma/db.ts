@@ -4,6 +4,7 @@ import postgres from '@prisma-next/postgres/runtime';
 import { budgets, lints } from '@prisma-next/sql-runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
+import { slowQueryWarning } from './slow-query-warning';
 
 export const db = postgres<Contract>({
   contractJson,
@@ -21,5 +22,9 @@ export const db = postgres<Contract>({
       tableRows: { user: 10_000, post: 10_000 },
       maxLatencyMs: 1_000,
     }),
+    // Custom middleware (see `slow-query-warning.ts`): observes every
+    // execution's latency via `afterExecute` and logs a warning past the
+    // threshold. Cache hits flow through it too, with `source: 'middleware'`.
+    slowQueryWarning({ thresholdMs: 250 }),
   ],
 });

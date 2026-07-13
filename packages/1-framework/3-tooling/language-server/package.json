@@ -21,6 +21,7 @@
     "@prisma-next/framework-components": "workspace:0.14.0",
     "@prisma-next/psl-parser": "workspace:0.14.0",
     "@prisma-next/utils": "workspace:0.14.0",
+    "pathe": "^2.0.3",
     "vscode-languageserver": "catalog:",
     "vscode-languageserver-textdocument": "catalog:"
   },

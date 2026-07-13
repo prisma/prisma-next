@@ -10,8 +10,10 @@ export function unboundTables(storage: StorageLike): Readonly<Record<string, Sto
   for (const ns of Object.values(storage.namespaces)) {
     Object.assign(
       merged,
-      blindCast<SqlNamespace, 'runtime namespaces hold SqlNamespace concretions'>(ns).entries
-        .table ?? {},
+      blindCast<
+        SqlNamespace,
+        'runtime namespaces hold SqlNamespaceBase concretions that satisfy SqlNamespace'
+      >(ns).entries.table ?? {},
     );
   }
   return merged;

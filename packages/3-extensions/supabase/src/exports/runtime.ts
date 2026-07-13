@@ -2,9 +2,12 @@ import { supabaseRuntimeDescriptor } from '../runtime/descriptor';
 
 export default supabaseRuntimeDescriptor;
 
+export type { SupabaseExtensionContract } from '../runtime/ext-contract-type';
 export type {
   RoleBoundDb,
+  ServiceRoleDb,
   SupabaseDb,
+  SupabaseInternalDb,
   SupabaseOptions,
   SupabaseOptionsWithContract,
   SupabaseOptionsWithContractJson,

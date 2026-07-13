@@ -43,6 +43,7 @@
   ],
   "exports": {
     "./canonicalization-hooks": "./dist/canonicalization-hooks.mjs",
+    "./contract-view": "./dist/contract-view.mjs",
     "./entity-kinds": "./dist/entity-kinds.mjs",
     "./factories": "./dist/factories.mjs",
     "./index-type-validation": "./dist/index-type-validation.mjs",
@@ -52,6 +53,7 @@
     "./resolve-storage-table": "./dist/resolve-storage-table.mjs",
     "./types": "./dist/types.mjs",
     "./validators": "./dist/validators.mjs",
+    "./value-set-derivation-hook": "./dist/value-set-derivation-hook.mjs",
     "./package.json": "./package.json"
   },
   "engines": {

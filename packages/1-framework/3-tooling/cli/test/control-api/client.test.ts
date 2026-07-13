@@ -84,19 +84,6 @@ function createMockComponents() {
       target: { expected: 'postgres' },
       schema: {
         issues: [],
-        schemaDiffIssues: [],
-        root: {
-          status: 'pass' as const,
-          kind: 'root',
-          name: 'root',
-          contractPath: '',
-          code: 'OK',
-          message: 'OK',
-          expected: {},
-          actual: {},
-          children: [],
-        },
-        counts: { pass: 1, warn: 0, fail: 0, totalNodes: 1 },
       },
       timings: { total: 10 },
     }),
@@ -294,20 +281,12 @@ describe('ControlClient progress emission', () => {
         contract: { storageHash: 'test-hash' },
         target: { expected: 'postgres' },
         schema: {
-          issues: [],
-          schemaDiffIssues: [],
-          root: {
-            status: 'fail' as const,
-            kind: 'root',
-            name: 'root',
-            contractPath: '',
-            code: 'MISMATCH',
-            message: 'Schema mismatch',
-            expected: {},
-            actual: {},
-            children: [],
-          },
-          counts: { pass: 0, warn: 0, fail: 1, totalNodes: 1 },
+          issues: [
+            {
+              path: ['root'],
+              reason: 'not-found',
+            },
+          ],
         },
         timings: { total: 10 },
       });

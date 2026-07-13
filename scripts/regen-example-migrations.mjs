@@ -21,7 +21,14 @@
  *   4. Rewrites the `from:` and `to:` sha256 literals in `migration.ts` to
  *      the newly-emitted hashes so the migration re-emits correct metadata.
  *   5. Runs `tsx migration.ts` from the example package root to regenerate
- *      `ops.json` + `migration.json`.
+ *      `ops.json` + `migration.json`. NOTE: `migration.ts` carries its
+ *      operations as a static `override get operations()` getter; this step
+ *      SERIALIZES that getter — it does NOT call `MigrationPlanner.plan()`.
+ *      So this regen (and `fixtures:check`) does not re-derive or gate planner
+ *      output; a planner change is invisible here. Prove planner-op parity via
+ *      the planner suites + `migration plan` e2e + a golden diff of real
+ *      `plan()` output vs these committed ops. See
+ *      `docs/onboarding/fixtures-emit-and-check.md`.
  *   6. Biome-formats all touched JSON files via stdin (bypassing biome's
  *      `files.includes` exclusion globs — same technique as
  *      `regen-extension-migrations.mjs`; see that file's JSDoc for rationale).
@@ -136,11 +143,29 @@ function biomeFormatInPlace(filePath) {
  * `newFromHash` is null for baseline migrations (whose `from:` is `null`).
  * For non-baseline migrations both `from:` and `to:` are updated.
  *
+ * New-shape migrations (post TML-2892) carry no hash literals: they import the
+ * committed `end-contract.json` / `start-contract.json` and the `Migration` base
+ * derives `describe()`'s from/to from those JSONs' `storage.storageHash`. The
+ * regen pipeline re-emits those contract JSONs upstream of this call, so for the
+ * new shape there is nothing to rewrite here — the correct hashes already live
+ * in the regenerated JSON. Detect that shape (`endContractJson = endContract`
+ * with no `to: 'sha256:...'` literal) and skip the rewrite.
+ *
  * Returns true if the file was changed, false if the hashes were already
- * up-to-date.
+ * up-to-date (or the file is the new contract-JSON shape).
  */
 function rewriteMigrationHashes(migrationTsPath, newFromHash, newToHash) {
   const src = readFileSync(migrationTsPath, 'utf8');
+
+  const toPattern = /(to:\s*['"])sha256:[0-9a-f]+(['"])/g;
+  const isContractJsonShape =
+    src.includes('endContractJson = endContract') && [...src.matchAll(toPattern)].length === 0;
+  if (isContractJsonShape) {
+    // The from/to identity is derived by the base from the (already-regenerated)
+    // contract JSON; no literal to rewrite in migration.ts.
+    return false;
+  }
+
   let updated = src;
 
   if (newFromHash !== null) {
@@ -159,7 +184,6 @@ function rewriteMigrationHashes(migrationTsPath, newFromHash, newToHash) {
     updated = updated.replace(fromPattern, `$1${newFromHash}$2`);
   }
 
-  const toPattern = /(to:\s*['"])sha256:[0-9a-f]+(['"])/g;
   const toMatches = [...updated.matchAll(toPattern)];
   if (toMatches.length === 0) {
     throw new Error(`regen-example-migrations: no 'to: sha256:...' literal in ${migrationTsPath}`);

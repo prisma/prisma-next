@@ -57,8 +57,14 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpMongoMemorySer
       country: 'US',
     };
     await orm.users.createAll([
-      { name: 'Alice', email: 'alice@example.com', bio: 'Writer', address: aliceAddress },
-      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
+      {
+        name: 'Alice',
+        email: 'alice@example.com',
+        bio: 'Writer',
+        role: 'author',
+        address: aliceAddress,
+      },
+      { name: 'Bob', email: 'bob@example.com', bio: null, role: 'author', address: null },
     ]);
 
     const users = await orm.users.all();
@@ -85,6 +91,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpMongoMemorySer
       name: 'Alice',
       email: 'alice@example.com',
       bio: null,
+      role: 'author',
       address: null,
     });
     await orm.posts.createAll([
@@ -126,6 +133,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpMongoMemorySer
       name: 'Alice',
       email: 'alice@example.com',
       bio: 'Writer',
+      role: 'author',
       address: null,
     });
     await orm.posts.create({
@@ -153,9 +161,10 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpMongoMemorySer
         name: 'Alice',
         email: 'alice@example.com',
         bio: 'Writer',
+        role: 'author',
         address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
       },
-      { name: 'Bob', email: 'bob@example.com', bio: null, address: null },
+      { name: 'Bob', email: 'bob@example.com', bio: null, role: 'author', address: null },
     ]);
     const alice = createdUsers[0];
     const bob = createdUsers[1];
@@ -203,6 +212,7 @@ describe('mongo-demo blog integration', { timeout: timeouts.spinUpMongoMemorySer
       name: 'Alice',
       email: 'alice@example.com',
       bio: null,
+      role: 'author',
       address: null,
     });
 

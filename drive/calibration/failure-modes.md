@@ -494,6 +494,26 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-06-11, uuid slice (PR #810). After merging main (TML-2882 enum2), 11/14 `interpreter.enum2.test.ts` tests failed; the merge agent called them "in-progress TML-2882 work, not a regression". Running the file on a pristine-main worktree showed 14/14 green — the branch's `mergeAuthoringNamespaces` shallow-copy fix was dropping prototype getters (`blockAttributes`) off enum2's class-instance descriptors. Fixed by narrowing the copy to plain-prototype objects.
 
+### F26. Review comment point-fixed; the defect class re-ships in new places next round
+
+**Symptom.** A reviewer flags an instance of a structural defect ("this is SQL-specific, it cannot live in the framework domain"). The response fixes exactly the flagged line/type, and the next review round finds the same class elsewhere in the same diff — including in the fix itself. Each round costs a full human review; the reviewer has become the layering linter.
+
+**Detection signal.**
+
+- A review reply that says "fixed" without naming the class or stating what was swept.
+- The fix for a flagged instance introduces a sibling of the instance (e.g. a hook named after the banned vocabulary, placed one file over).
+- A "pre-existing surface also has this" justification applied to surface the PR itself authored.
+- The same reviewer comment text (or an ALL-CAPS escalation of it) appearing in two consecutive rounds.
+
+**Mitigation.**
+
+- Response protocol is class-first: name the class → sweep the entire PR diff for it (grep + reading, including fields added to pre-existing types) → fix every instance in one round → the reply states the sweep (searched what, fixed what, excluded what and why). See [`.agents/rules/fix-the-class-not-the-instance.mdc`](../../.agents/rules/fix-the-class-not-the-instance.mdc).
+- Grandfathering never covers new surface: a type/field/hook the PR authored must be clean even when its pre-existing neighbors are not.
+- Reviewer side: findings should name the class explicitly so the responder can sweep; review-pass briefs must not frame the design as settled (a comment invalidating a design decision invalidates every consequence of it — chase them).
+- Mechanical backstop where the class is vocabulary-shaped: `pnpm lint:framework-vocabulary` (committed high-water-mark threshold; PR #918).
+
+**Reference incident.** 2026-07-02→06, native-postgres-enums (PR #906). Round 1: `CodecRef.nativeType` flagged ("SQL-specific, cannot live in the framework domain") — fixed by moving the cast to a codec hook placed on the *framework* `CodecDescriptor`. Round 2: the hook flagged ("NATIVETYPE CANNOT BE REFERENCED IN THE FRAMEWORK DOMAIN") — relocated, but a new framework type (`AuthoringEntityRefResolution`) kept `nativeType` + a `valueSetEnforcement` strategy string-enum under a grandfathering argument. Round 3: both flagged, plus derivation logic (`deriveValueSet`) in framework core. Three rounds, one class. Operator intervention produced the class-sweep rule, the vocabulary ratchet, and this entry.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.

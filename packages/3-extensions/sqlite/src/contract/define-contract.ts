@@ -1,6 +1,10 @@
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
-import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type {
+  SqlNamespaceBase,
+  SqlNamespaceInput,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import type {
   ComposedAuthoringHelpers,
   ContractInput,
@@ -24,7 +28,12 @@ type SqliteResult<
   typeof buildBoundContract<
     SqlFamily,
     SqlitePack,
-    { readonly types?: Types; readonly models?: Models; readonly extensionPacks?: ExtensionPacks }
+    {
+      readonly types?: Types;
+      readonly models?: Models;
+      readonly extensionPacks?: ExtensionPacks;
+      readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
+    }
   >
 >;
 
@@ -32,7 +41,7 @@ type SqliteBaseScaffold<
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 > = Omit<
   ContractInput<SqlFamily, SqlitePack, Record<never, never>, Record<never, never>, ExtensionPacks>,
-  'family' | 'target' | 'types' | 'models'
+  'family' | 'target' | 'types' | 'models' | 'createNamespace'
 >;
 
 type SqliteDefinition<

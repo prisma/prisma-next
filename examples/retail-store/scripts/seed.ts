@@ -16,14 +16,14 @@ async function main() {
   const dbName = process.env['MONGODB_DB'] ?? 'retail-store';
 
   console.log('Connecting to MongoDB...');
-  const db = await createClient(url, dbName);
+  const db = createClient(url, dbName);
 
   try {
     console.log('Seeding data...');
     await seed(db);
     console.log('Seed complete.');
   } finally {
-    await db.runtime.close();
+    await db.close();
   }
 }
 

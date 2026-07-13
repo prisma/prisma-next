@@ -2,6 +2,7 @@ import { defineConfig } from '@prisma-next/tsdown';
 
 export default defineConfig({
   entry: [
+    'src/exports/contract-view.ts',
     'src/exports/entity-kinds.ts',
     'src/exports/referential-action-sql.ts',
     'src/exports/resolve-storage-table.ts',
@@ -12,5 +13,6 @@ export default defineConfig({
     'src/exports/index-types.ts',
     'src/exports/index-type-validation.ts',
     'src/exports/canonicalization-hooks.ts',
+    'src/exports/value-set-derivation-hook.ts',
   ],
 });

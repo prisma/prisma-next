@@ -12,6 +12,7 @@ import {
   member,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   controlAdapter,
@@ -54,7 +55,7 @@ function makeRoleContract(members: { name: string; value: string }[]): Contract<
   return buildBoundContract(
     sqlFamilyPack,
     postgresPack,
-    { enums: { Role } },
+    { enums: { Role }, createNamespace: postgresCreateNamespace },
     ({ field: f, model: m }) => ({
       models: {
         User: m('User', {
@@ -218,7 +219,9 @@ describe.sequential('enum check-constraint — end-to-end PGlite', () => {
 
     const verifyResult = await verifySchema(driver!, contract);
     expect(verifyResult.ok).toBe(true);
-    expect(verifyResult.schema.issues.filter((i) => i.kind.startsWith('check'))).toHaveLength(0);
+    expect(
+      verifyResult.schema.issues.filter((i) => i.path[i.path.length - 1]?.startsWith('check:')),
+    ).toHaveLength(0);
   });
 
   it('enforces the constraint: permitted value succeeds, non-member value is rejected', {
@@ -356,7 +359,9 @@ describe.sequential('enum check-constraint — end-to-end PGlite', () => {
     // Verify passes for v2 contract
     const verifyResult = await verifySchema(driver!, v2Contract);
     expect(verifyResult.ok).toBe(true);
-    expect(verifyResult.schema.issues.filter((i) => i.kind.startsWith('check'))).toHaveLength(0);
+    expect(
+      verifyResult.schema.issues.filter((i) => i.path[i.path.length - 1]?.startsWith('check:')),
+    ).toHaveLength(0);
 
     // New permitted value ('guest') must succeed
     await expect(

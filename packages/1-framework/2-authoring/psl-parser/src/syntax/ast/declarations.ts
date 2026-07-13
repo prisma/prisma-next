@@ -1,7 +1,6 @@
-import type { Token } from '../../tokenizer';
-import type { AstNode } from '../ast-helpers';
+import type { AstNode, BracedBlock } from '../ast-helpers';
 import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
-import { SyntaxNode } from '../red';
+import { SyntaxNode, type SyntaxToken } from '../red';
 import { FieldAttributeAst, ModelAttributeAst } from './attributes';
 import type { ExpressionAst } from './expressions';
 import { castExpression } from './expressions';
@@ -18,6 +17,11 @@ export type NamespaceMemberAst =
   | CompositeTypeDeclarationAst
   | GenericBlockDeclarationAst;
 
+export type DeclarationAst = NamespaceMemberAst | TypesBlockAst | NamespaceDeclarationAst;
+export type AttributeAst = FieldAttributeAst | ModelAttributeAst;
+export type BlockMemberAst = FieldDeclarationAst | ModelAttributeAst;
+export type GenericBlockMemberAst = KeyValuePairAst | ModelAttributeAst;
+
 function castNamespaceMember(node: SyntaxNode): NamespaceMemberAst | undefined {
   return (
     ModelDeclarationAst.cast(node) ??
@@ -33,7 +37,7 @@ export class DocumentAst implements AstNode {
     this.syntax = syntax;
   }
 
-  *declarations(): Iterable<NamespaceMemberAst | TypesBlockAst | NamespaceDeclarationAst> {
+  *declarations(): Iterable<DeclarationAst> {
     yield* filterChildren(
       this.syntax,
       (node) =>
@@ -46,14 +50,14 @@ export class DocumentAst implements AstNode {
   }
 }
 
-export class ModelDeclarationAst implements AstNode {
+export class ModelDeclarationAst implements BracedBlock {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {
     this.syntax = syntax;
   }
 
-  keyword(): Token | undefined {
+  keyword(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 
@@ -61,11 +65,11 @@ export class ModelDeclarationAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  lbrace(): Token | undefined {
+  lbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBrace');
   }
 
-  rbrace(): Token | undefined {
+  rbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBrace');
   }
 
@@ -75,6 +79,13 @@ export class ModelDeclarationAst implements AstNode {
 
   *attributes(): Iterable<ModelAttributeAst> {
     yield* filterChildren(this.syntax, ModelAttributeAst.cast);
+  }
+
+  *members(): Iterable<BlockMemberAst> {
+    yield* filterChildren(
+      this.syntax,
+      (node) => FieldDeclarationAst.cast(node) ?? ModelAttributeAst.cast(node),
+    );
   }
 
   static cast(node: SyntaxNode): ModelDeclarationAst | undefined {
@@ -82,14 +93,14 @@ export class ModelDeclarationAst implements AstNode {
   }
 }
 
-export class CompositeTypeDeclarationAst implements AstNode {
+export class CompositeTypeDeclarationAst implements BracedBlock {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {
     this.syntax = syntax;
   }
 
-  keyword(): Token | undefined {
+  keyword(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 
@@ -97,11 +108,11 @@ export class CompositeTypeDeclarationAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  lbrace(): Token | undefined {
+  lbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBrace');
   }
 
-  rbrace(): Token | undefined {
+  rbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBrace');
   }
 
@@ -111,6 +122,13 @@ export class CompositeTypeDeclarationAst implements AstNode {
 
   *attributes(): Iterable<ModelAttributeAst> {
     yield* filterChildren(this.syntax, ModelAttributeAst.cast);
+  }
+
+  *members(): Iterable<BlockMemberAst> {
+    yield* filterChildren(
+      this.syntax,
+      (node) => FieldDeclarationAst.cast(node) ?? ModelAttributeAst.cast(node),
+    );
   }
 
   static cast(node: SyntaxNode): CompositeTypeDeclarationAst | undefined {
@@ -120,14 +138,14 @@ export class CompositeTypeDeclarationAst implements AstNode {
   }
 }
 
-export class NamespaceDeclarationAst implements AstNode {
+export class NamespaceDeclarationAst implements BracedBlock {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {
     this.syntax = syntax;
   }
 
-  keyword(): Token | undefined {
+  keyword(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 
@@ -135,11 +153,11 @@ export class NamespaceDeclarationAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  lbrace(): Token | undefined {
+  lbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBrace');
   }
 
-  rbrace(): Token | undefined {
+  rbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBrace');
   }
 
@@ -152,22 +170,22 @@ export class NamespaceDeclarationAst implements AstNode {
   }
 }
 
-export class TypesBlockAst implements AstNode {
+export class TypesBlockAst implements BracedBlock {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {
     this.syntax = syntax;
   }
 
-  keyword(): Token | undefined {
+  keyword(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 
-  lbrace(): Token | undefined {
+  lbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBrace');
   }
 
-  rbrace(): Token | undefined {
+  rbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBrace');
   }
 
@@ -180,14 +198,14 @@ export class TypesBlockAst implements AstNode {
   }
 }
 
-export class GenericBlockDeclarationAst implements AstNode {
+export class GenericBlockDeclarationAst implements BracedBlock {
   readonly syntax: SyntaxNode;
 
   constructor(syntax: SyntaxNode) {
     this.syntax = syntax;
   }
 
-  keyword(): Token | undefined {
+  keyword(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Ident');
   }
 
@@ -195,11 +213,11 @@ export class GenericBlockDeclarationAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  lbrace(): Token | undefined {
+  lbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBrace');
   }
 
-  rbrace(): Token | undefined {
+  rbrace(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBrace');
   }
 
@@ -209,6 +227,13 @@ export class GenericBlockDeclarationAst implements AstNode {
 
   *attributes(): Iterable<ModelAttributeAst> {
     yield* filterChildren(this.syntax, ModelAttributeAst.cast);
+  }
+
+  *members(): Iterable<GenericBlockMemberAst> {
+    yield* filterChildren(
+      this.syntax,
+      (node) => KeyValuePairAst.cast(node) ?? ModelAttributeAst.cast(node),
+    );
   }
 
   static cast(node: SyntaxNode): GenericBlockDeclarationAst | undefined {
@@ -229,7 +254,7 @@ export class KeyValuePairAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  equals(): Token | undefined {
+  equals(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Equals');
   }
 
@@ -288,7 +313,7 @@ export class NamedTypeDeclarationAst implements AstNode {
     return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
-  equals(): Token | undefined {
+  equals(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Equals');
   }
 

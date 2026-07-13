@@ -9,6 +9,7 @@ import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { countSemanticLines } from '@prisma-next/test-utils/semantic-lines';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
@@ -303,6 +304,7 @@ function buildSqliteTimestampTsContract() {
     {
       family: bareSqlFamilyPack,
       target: sqliteTimestampTargetPack,
+      createNamespace: createTestSqlNamespace,
     },
     ({ field, model }) => ({
       models: {
@@ -324,6 +326,7 @@ function buildPostgresTimestampTsContract() {
     {
       family: bareSqlFamilyPack,
       target: postgresTimestampTargetPack,
+      createNamespace: createTestSqlNamespace,
     },
     ({ field, model }) => ({
       models: {
@@ -375,6 +378,8 @@ describe('TS and PSL authoring parity', () => {
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions: target.authoringContributions,
+      createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(interpreted.ok).toBe(true);
@@ -425,6 +430,8 @@ model Post {
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions,
+      createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(pslContract.ok).toBe(true);
@@ -457,6 +464,7 @@ model Post {
       target: portablePostgresTargetPack,
       namespaces: ['auth'],
       models: { User, Post },
+      createNamespace: createTestSqlNamespace,
     });
 
     const pslStorage = pslContract.value.storage as unknown as SqlStorage;

@@ -1,10 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { loadConfig } from '@prisma-next/config-loader';
 import type { Contract } from '@prisma-next/contract/types';
-import type {
-  VerifyDatabaseResult,
-  VerifyDatabaseSchemaResult,
-} from '@prisma-next/framework-components/control';
+import type { VerifyDatabaseResult } from '@prisma-next/framework-components/control';
 import {
   createControlStack,
   VERIFY_CODE_HASH_MISMATCH,
@@ -29,7 +26,7 @@ import {
   errorTargetMismatch,
   errorUnexpected,
 } from '../utils/cli-errors';
-import { combineSchemaResults } from '../utils/combine-schema-results';
+import { type CombinedVerifyResult, combineVerifyResults } from '../utils/combine-verify-results';
 import {
   addGlobalOptions,
   maskConnectionUrl,
@@ -103,7 +100,7 @@ function mapVerifyFailure(verifyResult: VerifyDatabaseResult): CliStructuredErro
   return errorRuntime(verifyResult.summary);
 }
 
-type DbVerifyFailure = CliStructuredError | VerifyDatabaseSchemaResult;
+type DbVerifyFailure = CliStructuredError | CombinedVerifyResult;
 
 function errorInvalidVerifyMode(options: {
   readonly why: string;
@@ -419,12 +416,13 @@ async function executeDbVerifyCommand(
       });
     }
 
-    const combined = combineSchemaResults(
+    const combined = combineVerifyResults(
       aggregateResult.value.schemaResults,
       aggregateResult.value.appSpaceId,
       options.strict ?? false,
+      aggregateResult.value.unclaimed,
     );
-    if (!combined.ok) {
+    if (!combined.result.ok) {
       return notOk(combined);
     }
 
@@ -438,10 +436,13 @@ async function executeDbVerifyCommand(
       ...ifDefined('missingCodecs', verifyResult.missingCodecs),
       ...ifDefined('codecCoverageSkipped', verifyResult.codecCoverageSkipped),
       schema: {
-        summary: combined.summary,
-        counts: combined.schema.counts,
-        strict: combined.meta?.strict ?? false,
+        summary: combined.result.summary,
+        strict: combined.result.meta?.strict ?? false,
+        warnings: (combined.result.schema.warnings?.issues ?? []).map((issue) =>
+          issue.path.join('/'),
+        ),
       },
+      unclaimed: combined.unclaimed,
       meta: {
         ...(verifyResult.meta ?? {}),
         schemaVerification: 'performed',
@@ -459,7 +460,7 @@ async function executeDbSchemaOnlyVerifyCommand(
   options: DbVerifyOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
-): Promise<Result<VerifyDatabaseSchemaResult, CliStructuredError>> {
+): Promise<Result<CombinedVerifyResult, CliStructuredError>> {
   const paths = await resolveVerifyPaths(options);
   renderVerifyHeader(paths, options, 'schema-only', flags, ui);
 
@@ -484,10 +485,11 @@ async function executeDbSchemaOnlyVerifyCommand(
     if (!aggregateResult.ok) return notOk(aggregateResult.failure);
 
     return ok(
-      combineSchemaResults(
+      combineVerifyResults(
         aggregateResult.value.schemaResults,
         aggregateResult.value.appSpaceId,
         options.strict ?? false,
+        aggregateResult.value.unclaimed,
       ),
     );
   } catch (error) {
@@ -542,18 +544,26 @@ export function createDbVerifyCommand(): Command {
 
       if (mode === 'schema-only') {
         const result = await executeDbSchemaOnlyVerifyCommand(options, flags, ui);
-        const exitCode = handleResult(result, flags, ui, (schemaVerifyResult) => {
+        const exitCode = handleResult(result, flags, ui, (combined) => {
           if (flags.json) {
-            ui.output(formatSchemaVerifyJson(schemaVerifyResult));
+            ui.output(formatSchemaVerifyJson(combined.result, combined.unclaimed));
           } else {
-            const output = formatSchemaVerifyOutput(schemaVerifyResult, flags);
+            // Always show schema-drift failures, even in quiet mode — exiting 1
+            // without diagnostics is unhelpful (same policy as the full-mode
+            // failure branch below).
+            const renderFlags = combined.result.ok ? flags : { ...flags, quiet: false };
+            const output = formatSchemaVerifyOutput(
+              combined.result,
+              renderFlags,
+              combined.unclaimed,
+            );
             if (output) {
               ui.log(output);
             }
           }
         });
 
-        if (result.ok && !result.value.ok) {
+        if (result.ok && !result.value.result.ok) {
           process.exit(1);
         }
 
@@ -580,11 +590,15 @@ export function createDbVerifyCommand(): Command {
       }
 
       if (flags.json) {
-        ui.output(formatSchemaVerifyJson(result.failure));
+        ui.output(formatSchemaVerifyJson(result.failure.result, result.failure.unclaimed));
       } else {
         // Always show schema-drift failures, even in quiet mode — exiting 1 without
         // diagnostics is unhelpful.
-        const output = formatSchemaVerifyOutput(result.failure, { ...flags, quiet: false });
+        const output = formatSchemaVerifyOutput(
+          result.failure.result,
+          { ...flags, quiet: false },
+          result.failure.unclaimed,
+        );
         if (output) {
           ui.log(output);
         }

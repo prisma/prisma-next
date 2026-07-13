@@ -3,6 +3,7 @@ import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-compon
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
 import { modelsMapForAssertions, modelsOf } from './contract-test-helpers';
 import { crossRef } from './cross-ref-helpers';
@@ -32,12 +33,13 @@ const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
 const timestamptzColumn = columnDescriptor('pg/timestamptz@1');
 
-function defineTestContract<const Definition extends Omit<ContractInput, 'target' | 'family'>>(
-  definition: Definition,
-) {
+function defineTestContract<
+  const Definition extends Omit<ContractInput, 'target' | 'family' | 'createNamespace'>,
+>(definition: Definition) {
   return defineContract({
     family: bareFamilyPack,
     target: postgresTargetPack,
+    createNamespace: createTestSqlNamespace,
     ...definition,
   });
 }

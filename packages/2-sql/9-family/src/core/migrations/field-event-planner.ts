@@ -88,8 +88,8 @@ export function planFieldEventOperations(
     for (const tableName of tableNames) {
       const priorTableRaw = priorTables?.[tableName];
       const newTableRaw = newTables?.[tableName];
-      const priorTable = priorTableRaw instanceof StorageTable ? priorTableRaw : undefined;
-      const newTable = newTableRaw instanceof StorageTable ? newTableRaw : undefined;
+      const priorTable = StorageTable.is(priorTableRaw) ? priorTableRaw : undefined;
+      const newTable = StorageTable.is(newTableRaw) ? newTableRaw : undefined;
       const fieldNames = unionSorted(
         priorTable ? Object.keys(priorTable.columns) : [],
         newTable ? Object.keys(newTable.columns) : [],

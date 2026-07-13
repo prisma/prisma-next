@@ -67,8 +67,10 @@ const contractSerializer = new PostgresContractSerializer();
 function resolveContract<TContract extends Contract<SqlStorage>>(
   options: PostgresServerlessOptions<TContract>,
 ): TContract {
-  const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
-  return contractSerializer.deserializeContract(contractInput) as TContract;
+  const contractJson = hasContractJson(options)
+    ? options.contractJson
+    : contractSerializer.serializeContract(options.contract);
+  return contractSerializer.deserializeContract(contractJson) as TContract;
 }
 
 function validateConnectionString(url: string): string {

@@ -8,14 +8,15 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  SqlUnboundNamespace,
-} from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  PostgresUnboundSchema,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
@@ -23,9 +24,17 @@ import pgvectorDescriptor from '../../src/exports/control';
 
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
-const emptySchema: SqlSchemaIR = {
-  tables: {},
-};
+const emptySchema = new PostgresDatabaseSchemaNode({
+  namespaces: {
+    public: new PostgresNamespaceSchemaNode({
+      schemaName: 'public',
+      tables: {},
+    }),
+  },
+  roles: [],
+  existingSchemas: [],
+  pgVersion: '',
+});
 
 describe('PostgresMigrationPlanner - storage types', () => {
   it('plans type operations before table operations', async () => {
@@ -78,7 +87,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
           },
         },
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
             id: UNBOUND_NAMESPACE_ID,
             entries: {
               table: {
@@ -174,7 +183,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
             typeParams: { values: ['USER'] },
           },
         },
-        namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
+        namespaces: { [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance },
       }),
       roots: {},
       domain: applicationDomainOf({ models: {} }),
@@ -254,7 +263,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
           },
         },
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
             id: UNBOUND_NAMESPACE_ID,
             entries: {
               table: {
@@ -324,7 +333,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
           },
         },
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
             id: UNBOUND_NAMESPACE_ID,
             entries: {
               table: {
@@ -394,7 +403,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
           },
         },
         namespaces: {
-          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+          [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
             id: UNBOUND_NAMESPACE_ID,
             entries: {
               table: {

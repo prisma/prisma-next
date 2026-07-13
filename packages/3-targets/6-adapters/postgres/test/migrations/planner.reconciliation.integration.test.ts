@@ -5,8 +5,9 @@ import {
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -39,7 +40,7 @@ function makeContract(
     storage: new SqlStorage({
       storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: { table: tables },
         }),
@@ -99,7 +100,7 @@ async function applyBaseline(
   }
 }
 
-async function introspectSchema(driver: PostgresControlDriver): Promise<SqlSchemaIR> {
+async function introspectSchema(driver: PostgresControlDriver): Promise<SqlSchemaIRNode> {
   return familyInstance.introspect({ driver });
 }
 

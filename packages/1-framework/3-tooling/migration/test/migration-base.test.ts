@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { MigrationMetadata } from '../src/metadata';
 import { buildMigrationArtifacts, Migration } from '../src/migration-base';
 
-describe('Migration', async () => {
-  describe('operations + describe() contract', async () => {
+describe('Migration', () => {
+  describe('operations + describe() contract', () => {
     it('subclasses expose operations via the getter and describe() metadata', async () => {
       class TestMigration extends Migration<{
         id: string;
@@ -76,7 +76,64 @@ describe('Migration', async () => {
     });
   });
 
-  describe('constructor accepts and stores a ControlStack', async () => {
+  describe('derived describe() from contract JSON', () => {
+    const endJson = { storage: { storageHash: 'sha256:endhash' } };
+    const startJson = { storage: { storageHash: 'sha256:starthash' } };
+
+    it('derives to from endContractJson.storage.storageHash and from:null when no start', async () => {
+      class M extends Migration {
+        readonly targetId = 'test';
+        override readonly endContractJson = endJson;
+        override get operations() {
+          return [];
+        }
+      }
+      const m = new M();
+      expect(m.describe()).toEqual({ from: null, to: 'sha256:endhash' });
+      expect(m.origin).toBeNull();
+      expect(m.destination).toEqual({ storageHash: 'sha256:endhash' });
+    });
+
+    it('derives from from startContractJson.storage.storageHash when present', async () => {
+      class M extends Migration {
+        readonly targetId = 'test';
+        override readonly startContractJson = startJson;
+        override readonly endContractJson = endJson;
+        override get operations() {
+          return [];
+        }
+      }
+      const m = new M();
+      expect(m.describe()).toEqual({ from: 'sha256:starthash', to: 'sha256:endhash' });
+      expect(m.origin).toEqual({ storageHash: 'sha256:starthash' });
+    });
+
+    it('throws a clear error when neither endContractJson nor a describe() override is present', async () => {
+      class M extends Migration {
+        readonly targetId = 'test';
+        override get operations() {
+          return [];
+        }
+      }
+      expect(() => new M().describe()).toThrow(/endContractJson or override describe\(\)/);
+    });
+
+    it('a describe() override still wins over the derived default', async () => {
+      class M extends Migration {
+        readonly targetId = 'test';
+        override readonly endContractJson = endJson;
+        override get operations() {
+          return [];
+        }
+        override describe() {
+          return { from: null, to: 'sha256:overridden' };
+        }
+      }
+      expect(new M().describe()).toEqual({ from: null, to: 'sha256:overridden' });
+    });
+  });
+
+  describe('constructor accepts and stores a ControlStack', () => {
     /**
      * The constructor injection contract is that a subclass (e.g.
      * `PostgresMigration`) can read `this.stack` to materialize whatever it
@@ -130,7 +187,7 @@ describe('Migration', async () => {
  * dry-run stdout output) lives in `@prisma-next/cli` and is exercised
  * there.
  */
-describe('buildMigrationArtifacts', async () => {
+describe('buildMigrationArtifacts', () => {
   function makeMigration(
     operations: unknown,
     meta: {

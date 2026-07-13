@@ -283,12 +283,21 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       markersBySpaceId: new Map(),
       schemaIntrospection: { tables: { user: { columns: {} }, test_box: { columns: {} } } },
       mode: 'lenient',
-      verifySchemaForMember: () => ({ ok: true }),
+      verifySchemaForSpace: () => ({
+        ok: true,
+        summary: 'Database schema satisfies contract',
+        contract: { storageHash: 'sha256:test' },
+        target: { expected: 'postgres' },
+        schema: {
+          issues: [],
+        },
+        timings: { total: 0 },
+      }),
     });
     expect(verifyResult.ok).toBe(true);
     if (!verifyResult.ok) return;
     expect(verifyResult.value.markerCheck.perSpace.get('app')).toEqual({ kind: 'absent' });
     expect(verifyResult.value.markerCheck.perSpace.get(TEST_SPACE_ID)).toEqual({ kind: 'absent' });
-    expect(verifyResult.value.schemaCheck.orphanElements).toEqual([]);
+    expect(verifyResult.value.schemaCheck.perSpace.get('app')?.ok).toBe(true);
   });
 });

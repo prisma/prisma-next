@@ -4,9 +4,14 @@ import {
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  PostgresTableSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -39,22 +44,32 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
       },
     });
 
-    const schema: SqlSchemaIR = {
-      tables: {
-        user: {
-          name: 'user',
-          columns: {
-            id: { name: 'id', nativeType: 'uuid', nullable: false },
-            email: { name: 'email', nativeType: 'text', nullable: false },
-            legacyEmail: { name: 'legacyEmail', nativeType: 'text', nullable: true },
+    const schema = new PostgresDatabaseSchemaNode({
+      namespaces: {
+        public: new PostgresNamespaceSchemaNode({
+          schemaName: 'public',
+          tables: {
+            user: new PostgresTableSchemaNode({
+              name: 'user',
+              columns: {
+                id: { name: 'id', nativeType: 'uuid', nullable: false },
+                email: { name: 'email', nativeType: 'text', nullable: false },
+                legacyEmail: { name: 'legacyEmail', nativeType: 'text', nullable: true },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              foreignKeys: [],
+              indexes: [],
+              policies: [],
+              rlsEnabled: false,
+            }),
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          foreignKeys: [],
-          indexes: [],
-        },
+        }),
       },
-    };
+      pgVersion: '',
+      roles: [],
+      existingSchemas: [],
+    });
 
     const result = planner.plan({
       contract,
@@ -93,21 +108,31 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
       },
     });
 
-    const schema: SqlSchemaIR = {
-      tables: {
-        user: {
-          name: 'user',
-          columns: {
-            id: { name: 'id', nativeType: 'uuid', nullable: false },
-            email: { name: 'email', nativeType: 'text', nullable: false },
+    const schema = new PostgresDatabaseSchemaNode({
+      namespaces: {
+        public: new PostgresNamespaceSchemaNode({
+          schemaName: 'public',
+          tables: {
+            user: new PostgresTableSchemaNode({
+              name: 'user',
+              columns: {
+                id: { name: 'id', nativeType: 'uuid', nullable: false },
+                email: { name: 'email', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              foreignKeys: [],
+              indexes: [],
+              policies: [],
+              rlsEnabled: false,
+            }),
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          foreignKeys: [],
-          indexes: [],
-        },
+        }),
       },
-    };
+      pgVersion: '',
+      roles: [],
+      existingSchemas: [],
+    });
 
     const result = planner.plan({
       contract,
@@ -145,21 +170,31 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
       },
     });
 
-    const schema: SqlSchemaIR = {
-      tables: {
-        user: {
-          name: 'user',
-          columns: {
-            id: { name: 'id', nativeType: 'uuid', nullable: false },
-            legacyEmail: { name: 'legacyEmail', nativeType: 'text', nullable: true },
+    const schema = new PostgresDatabaseSchemaNode({
+      namespaces: {
+        public: new PostgresNamespaceSchemaNode({
+          schemaName: 'public',
+          tables: {
+            user: new PostgresTableSchemaNode({
+              name: 'user',
+              columns: {
+                id: { name: 'id', nativeType: 'uuid', nullable: false },
+                legacyEmail: { name: 'legacyEmail', nativeType: 'text', nullable: true },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              foreignKeys: [],
+              indexes: [],
+              policies: [],
+              rlsEnabled: false,
+            }),
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          foreignKeys: [],
-          indexes: [],
-        },
+        }),
       },
-    };
+      pgVersion: '',
+      roles: [],
+      existingSchemas: [],
+    });
 
     const result = planner.plan({
       contract,
@@ -187,7 +222,7 @@ function createContract(
     storage: new SqlStorage({
       storageHash: coreHash('sha256:reconciliation-contract'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: { table: tables },
         }),

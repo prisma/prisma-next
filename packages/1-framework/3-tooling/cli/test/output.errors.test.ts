@@ -89,6 +89,44 @@ describe('formatErrorOutput - conflicts', () => {
   });
 });
 
+describe('formatErrorOutput - issues list label and body fallback', () => {
+  it('renders a PSL-diagnostic issue as `[kind] message`', () => {
+    // PSL interpretation diagnostics stamp `kind` (their diagnostic code) and `message` (their prose).
+    const error: CliErrorEnvelope = {
+      ...baseError,
+      code: 'PN-RUN-3000',
+      domain: 'RUN',
+      summary: 'Failed to resolve contract source',
+      meta: {
+        issues: [{ kind: 'PSL_ORPHANED_BACKRELATION_LIST', message: 'orphaned backrelation list' }],
+      },
+    };
+
+    const flags = parseGlobalFlags({ verbose: true, 'no-color': true });
+    const stripped = stripAnsi(formatErrorOutput(error, flags));
+
+    expect(stripped).toContain('[PSL_ORPHANED_BACKRELATION_LIST] orphaned backrelation list');
+  });
+
+  it('renders a schema-diff issue (no `message`) as `[reason] path/joined/with/slashes`', () => {
+    // Schema-diff issues (SchemaDiffIssue) carry no `message`; they stamp `reason` and `path`.
+    const error: CliErrorEnvelope = {
+      ...baseError,
+      code: 'PN-RUN-3000',
+      domain: 'RUN',
+      summary: 'Failed to resolve contract source',
+      meta: {
+        issues: [{ reason: 'not-found', path: ['public', 'post'] }],
+      },
+    };
+
+    const flags = parseGlobalFlags({ verbose: true, 'no-color': true });
+    const stripped = stripAnsi(formatErrorOutput(error, flags));
+
+    expect(stripped).toContain('[not-found] public/post');
+  });
+});
+
 describe('formatErrorOutput - planner warnings on apply failure', () => {
   it('prints a Warnings block when meta carries plannerWarnings', () => {
     const error: CliErrorEnvelope = {

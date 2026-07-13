@@ -1,10 +1,21 @@
-import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import type {
   SqliteColumnSpec,
   SqliteTableSpec,
 } from '../../src/core/migrations/operations/shared';
-import { buildRecreatePostchecks } from '../../src/core/migrations/operations/tables';
+import {
+  buildRecreatePostchecks,
+  buildRecreateSummary,
+} from '../../src/core/migrations/operations/tables';
+import {
+  actualColumn,
+  columnDefault,
+  expectedColumn,
+  foreignKey,
+  issue,
+  primaryKey,
+  unique,
+} from './node-issue-helpers';
 
 function colSpec(overrides: Partial<SqliteColumnSpec> = {}): SqliteColumnSpec {
   return {
@@ -19,26 +30,137 @@ function colSpec(overrides: Partial<SqliteColumnSpec> = {}): SqliteColumnSpec {
 function tableSpec(overrides: Partial<SqliteTableSpec> = {}): SqliteTableSpec {
   return {
     columns: [colSpec()],
+    uniques: [],
+    foreignKeys: [],
     ...overrides,
   };
 }
 
-describe('buildRecreatePostchecks - constraint coverage', () => {
-  it('emits a primary-key shape postcheck when a primary_key_mismatch fires', () => {
+describe('buildRecreateSummary', () => {
+  it('joins each issue path', () => {
+    const summary = buildRecreateSummary('users', [
+      issue({ path: ['database', 'users', 'column:a'], reason: 'not-equal' }),
+      issue({ path: ['database', 'users', 'column:b'], reason: 'not-equal' }),
+    ]);
+    expect(summary).toBe(
+      'Recreates table users to apply schema changes: database/users/column:a; database/users/column:b',
+    );
+  });
+});
+
+describe('buildRecreatePostchecks — column-level', () => {
+  it('emits a nullability postcheck when nullability differs', () => {
+    const spec = tableSpec({ columns: [colSpec({ name: 'email' })] });
+    const issues = [
+      issue({
+        path: ['database', 'users', 'column:email'],
+        reason: 'not-equal',
+        expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: false }),
+        actual: actualColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
+      }),
+    ];
+    const checks = buildRecreatePostchecks('users', issues, spec);
+    const check = checks.find((c) => c.description.includes('nullability'));
+    expect(check).toBeDefined();
+    expect(check!.sql).toContain('"notnull" = 1');
+  });
+
+  it('emits a type postcheck when the type changes', () => {
+    const spec = tableSpec({ columns: [colSpec({ name: 'email', typeSql: 'TEXT' })] });
+    const issues = [
+      issue({
+        path: ['database', 'users', 'column:email'],
+        reason: 'not-equal',
+        expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
+        actual: actualColumn({ name: 'email', nativeType: 'INTEGER', nullable: true }),
+      }),
+    ];
+    const checks = buildRecreatePostchecks('users', issues, spec);
+    const check = checks.find((c) => c.description.includes('type'));
+    expect(check).toBeDefined();
+    expect(check!.sql).toContain("LOWER(type) = 'text'");
+  });
+
+  it('emits both when a single not-equal issue changes type AND nullability', () => {
+    const spec = tableSpec({ columns: [colSpec({ name: 'email', typeSql: 'TEXT' })] });
+    const issues = [
+      issue({
+        path: ['database', 'users', 'column:email'],
+        reason: 'not-equal',
+        expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: false }),
+        actual: actualColumn({ name: 'email', nativeType: 'INTEGER', nullable: true }),
+      }),
+    ];
+    const checks = buildRecreatePostchecks('users', issues, spec);
+    expect(checks.filter((c) => c.description.includes('nullability'))).toHaveLength(1);
+    expect(checks.filter((c) => c.description.includes('type'))).toHaveLength(1);
+  });
+});
+
+describe('buildRecreatePostchecks — column-default', () => {
+  it('emits a default-present postcheck for not-found (missing default)', () => {
+    const spec = tableSpec({ columns: [colSpec({ name: 'email', defaultSql: 'DEFAULT 5' })] });
+    const issues = [
+      issue({
+        path: ['database', 'users', 'column:email', 'default'],
+        reason: 'not-found',
+        expected: columnDefault({ resolved: { kind: 'literal', value: 5 } }),
+      }),
+    ];
+    const checks = buildRecreatePostchecks('users', issues, spec);
+    const check = checks.find((c) => c.description.includes('default'));
+    expect(check).toBeDefined();
+    expect(check!.sql).toContain("dflt_value = '5'");
+  });
+
+  it('emits a no-default postcheck for not-expected (extra live default)', () => {
+    const spec = tableSpec({ columns: [colSpec({ name: 'email' })] });
+    const issues = [
+      issue({
+        path: ['database', 'users', 'column:email', 'default'],
+        reason: 'not-expected',
+        actual: columnDefault({ raw: "'stale'" }),
+      }),
+    ];
+    const checks = buildRecreatePostchecks('users', issues, spec);
+    const check = checks.find((c) => c.description.includes('has no default'));
+    expect(check).toBeDefined();
+    expect(check!.sql).toContain('dflt_value IS NULL');
+  });
+
+  it('emits a default-present postcheck for not-equal (default drift)', () => {
+    const spec = tableSpec({
+      columns: [colSpec({ name: 'email', defaultSql: 'DEFAULT 7' })],
+    });
+    const issues = [
+      issue({
+        path: ['database', 'users', 'column:email', 'default'],
+        reason: 'not-equal',
+        expected: columnDefault({ resolved: { kind: 'literal', value: 7 } }),
+        actual: columnDefault({ raw: '3' }),
+      }),
+    ];
+    const checks = buildRecreatePostchecks('users', issues, spec);
+    const check = checks.find((c) => c.description.includes('default'));
+    expect(check).toBeDefined();
+    expect(check!.sql).toContain("dflt_value = '7'");
+  });
+});
+
+describe('buildRecreatePostchecks — constraints', () => {
+  it('emits a primary-key shape postcheck when a primary-key issue fires', () => {
     const spec = tableSpec({
       columns: [colSpec({ name: 'a' }), colSpec({ name: 'b' }), colSpec({ name: 'c' })],
       primaryKey: { columns: ['a', 'b'] },
     });
-    const issues: SchemaIssue[] = [
-      {
-        kind: 'primary_key_mismatch',
-        table: 'users',
-        expected: 'a, b',
-        actual: 'a',
-        message: 'pk mismatch',
-      },
+    const issues = [
+      issue({
+        path: ['database', 'users', 'primary-key'],
+        reason: 'not-equal',
+        expected: primaryKey(['a', 'b']),
+        actual: primaryKey(['a']),
+      }),
     ];
-
     const checks = buildRecreatePostchecks('users', issues, spec);
     const pkCheck = checks.find((c) => c.description.includes('primary key'));
     expect(pkCheck).toBeDefined();
@@ -52,8 +174,12 @@ describe('buildRecreatePostchecks - constraint coverage', () => {
     const spec = tableSpec({
       columns: [colSpec({ name: 'id', inlineAutoincrementPrimaryKey: true })],
     });
-    const issues: SchemaIssue[] = [
-      { kind: 'primary_key_mismatch', table: 't', expected: 'id', message: 'pk' },
+    const issues = [
+      issue({
+        path: ['database', 't', 'primary-key'],
+        reason: 'not-found',
+        expected: primaryKey(['id']),
+      }),
     ];
     const checks = buildRecreatePostchecks('t', issues, spec);
     const pkCheck = checks.find((c) => c.description.includes('primary key'));
@@ -61,10 +187,14 @@ describe('buildRecreatePostchecks - constraint coverage', () => {
     expect(pkCheck!.sql).toContain("'id'");
   });
 
-  it('emits a "no primary key" postcheck when extra_primary_key fires and the spec has none', () => {
+  it('emits a "no primary key" postcheck when the PK is not-expected and the spec has none', () => {
     const spec = tableSpec({ columns: [colSpec({ name: 'x' })] });
-    const issues: SchemaIssue[] = [
-      { kind: 'extra_primary_key', table: 't', actual: 'x', message: 'extra pk' },
+    const issues = [
+      issue({
+        path: ['database', 't', 'primary-key'],
+        reason: 'not-expected',
+        actual: primaryKey(['x']),
+      }),
     ];
     const checks = buildRecreatePostchecks('t', issues, spec);
     const pkCheck = checks.find((c) => c.description.includes('no primary key'));
@@ -72,20 +202,18 @@ describe('buildRecreatePostchecks - constraint coverage', () => {
     expect(pkCheck!.sql).toContain('pk > 0) = 0');
   });
 
-  it('emits one unique postcheck per declared unique when a unique_constraint_mismatch fires', () => {
+  it('emits one unique postcheck per declared unique when a unique issue fires', () => {
     const spec = tableSpec({
       columns: [colSpec({ name: 'email' }), colSpec({ name: 'tenant' })],
       uniques: [{ columns: ['email'] }, { columns: ['tenant', 'email'], name: 'tenant_email' }],
     });
-    const issues: SchemaIssue[] = [
-      {
-        kind: 'unique_constraint_mismatch',
-        table: 'users',
-        expected: 'email',
-        message: 'unique mismatch',
-      },
+    const issues = [
+      issue({
+        path: ['database', 'users', 'unique:email'],
+        reason: 'not-found',
+        expected: unique(['email']),
+      }),
     ];
-
     const checks = buildRecreatePostchecks('users', issues, spec);
     const uniqueChecks = checks.filter((c) => c.description.includes('unique constraint'));
     expect(uniqueChecks).toHaveLength(2);
@@ -96,15 +224,11 @@ describe('buildRecreatePostchecks - constraint coverage', () => {
     expect(uniqueChecks[1]!.sql).toContain("name IN ('tenant', 'email')");
   });
 
-  it('emits one foreign-key postcheck per declared FK when foreign_key_mismatch fires', () => {
+  it('emits one foreign-key postcheck per declared FK when a foreign-key issue fires', () => {
     const spec = tableSpec({
       columns: [colSpec({ name: 'user_id' }), colSpec({ name: 'tenant_id' })],
       foreignKeys: [
-        {
-          columns: ['user_id'],
-          references: { table: 'users', columns: ['id'] },
-          constraint: true,
-        },
+        { columns: ['user_id'], references: { table: 'users', columns: ['id'] }, constraint: true },
         {
           columns: ['tenant_id', 'user_id'],
           references: { table: 'memberships', columns: ['tenant_id', 'user_id'] },
@@ -112,15 +236,17 @@ describe('buildRecreatePostchecks - constraint coverage', () => {
         },
       ],
     });
-    const issues: SchemaIssue[] = [
-      {
-        kind: 'foreign_key_mismatch',
-        table: 'posts',
-        expected: 'user_id -> users(id)',
-        message: 'fk',
-      },
+    const issues = [
+      issue({
+        path: ['database', 'posts', 'foreign-key:user_id->.users(id)'],
+        reason: 'not-found',
+        expected: foreignKey({
+          columns: ['user_id'],
+          referencedTable: 'users',
+          referencedColumns: ['id'],
+        }),
+      }),
     ];
-
     const checks = buildRecreatePostchecks('posts', issues, spec);
     const fkChecks = checks.filter((c) => c.description.includes('foreign key'));
     expect(fkChecks).toHaveLength(2);
@@ -130,7 +256,6 @@ describe('buildRecreatePostchecks - constraint coverage', () => {
     expect(fkChecks[0]!.sql).toContain("('user_id', 'id')");
     expect(fkChecks[0]!.sql).toContain('HAVING COUNT(*) = 1');
 
-    // Multi-column FK keeps both tuples and the matching count
     expect(fkChecks[1]!.sql).toContain("('tenant_id', 'tenant_id'), ('user_id', 'user_id')");
     expect(fkChecks[1]!.sql).toContain('HAVING COUNT(*) = 2');
   });
@@ -144,17 +269,14 @@ describe('buildRecreatePostchecks - constraint coverage', () => {
         { columns: ['a'], references: { table: 'x', columns: ['id'] }, constraint: true },
       ],
     });
-    const issues: SchemaIssue[] = [
-      {
-        kind: 'type_mismatch',
-        table: 't',
-        column: 'a',
-        expected: 'TEXT',
-        actual: 'INTEGER',
-        message: 'type',
-      },
+    const issues = [
+      issue({
+        path: ['database', 't', 'column:a'],
+        reason: 'not-equal',
+        expected: expectedColumn({ name: 'a', nativeType: 'TEXT', nullable: true }),
+        actual: actualColumn({ name: 'a', nativeType: 'INTEGER', nullable: true }),
+      }),
     ];
-
     const checks = buildRecreatePostchecks('t', issues, spec);
     expect(checks.some((c) => c.description.includes('primary key'))).toBe(false);
     expect(checks.some((c) => c.description.includes('unique constraint'))).toBe(false);

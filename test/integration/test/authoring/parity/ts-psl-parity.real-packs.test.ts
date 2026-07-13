@@ -3,7 +3,13 @@ import pgvectorControl from '@prisma-next/extension-pgvector/control';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyControl from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { defineContract } from '@prisma-next/postgres/contract-builder';
+import {
+  defineContract,
+  field,
+  model,
+  nativeEnum,
+  pg,
+} from '@prisma-next/postgres/contract-builder';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
@@ -55,6 +61,8 @@ function interpretWithRealPacks(schema: string) {
     composedExtensionPacks: [pgvectorControl.id],
     composedExtensionPackRefs: [pgvectorPack],
     createNamespace: postgresCreateNamespace,
+    capabilities: stack.capabilities,
+    codecLookup: stack.codecLookup,
   });
 }
 
@@ -133,6 +141,80 @@ model Document {
   id Int @id(map: "document_pkey")
   shortName sql.String(length: 35) @unique(map: "document_short_name_key")
   embedding pgvector.Vector(length: 1536)?
+}
+`);
+
+    expect(interpreted.ok).toBe(true);
+    if (!interpreted.ok) return;
+
+    expect(interpreted.value).toEqual(tsContract);
+  });
+
+  it('lowers a native_enum + pg.enum column to the same output in the default schema', () => {
+    const AalLevel = nativeEnum('AalLevel', 'aal1', 'aal2', 'aal3').map('aal_level');
+
+    const tsContract = defineContract({
+      extensionPacks: { pgvector: pgvectorPack },
+      models: {
+        Session: model('Session', {
+          fields: {
+            id: field.column(int4Column).id(),
+            aal: field.column(pg.enum(AalLevel)).optional(),
+          },
+        }).sql({ table: 'session' }),
+      },
+    });
+
+    const interpreted = interpretWithRealPacks(`namespace public {
+  native_enum AalLevel {
+    aal1 = "aal1"
+    aal2 = "aal2"
+    aal3 = "aal3"
+    @@map("aal_level")
+  }
+
+  model Session {
+    id Int @id
+    aal pg.enum(AalLevel)?
+  }
+}
+`);
+
+    expect(interpreted.ok).toBe(true);
+    if (!interpreted.ok) return;
+
+    expect(interpreted.value).toEqual(tsContract);
+  });
+
+  it('lowers a native_enum + pg.enum column to the same output in a named schema (auth)', () => {
+    const AalLevel = nativeEnum('AalLevel', 'aal1', 'aal2', 'aal3').map('aal_level');
+
+    const tsContract = defineContract({
+      extensionPacks: { pgvector: pgvectorPack },
+      namespaces: ['auth'],
+      models: {
+        Session: model('Session', {
+          namespace: 'auth',
+          fields: {
+            id: field.column(int4Column).id(),
+            aal: field.column(pg.enum(AalLevel)).optional(),
+          },
+        }).sql({ table: 'session' }),
+      },
+    });
+
+    const interpreted = interpretWithRealPacks(`namespace auth {
+  native_enum AalLevel {
+    aal1 = "aal1"
+    aal2 = "aal2"
+    aal3 = "aal3"
+    @@map("aal_level")
+  }
+
+  model Session {
+    id Int @id
+    aal pg.enum(AalLevel)?
+  }
 }
 `);
 

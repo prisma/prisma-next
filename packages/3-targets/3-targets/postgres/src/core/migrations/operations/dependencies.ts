@@ -1,5 +1,6 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { extensionExistsAst } from '../../../contract-free/checks';
+import { DEFAULT_NAMESPACE_ID } from '../../namespace-ids';
 import { quoteIdentifier } from '../../sql-utils';
 import { type Op, step } from './shared';
 
@@ -55,7 +56,7 @@ export async function installExtension(
     invariantId,
     target: {
       id: 'postgres',
-      details: { schema: 'public', objectType: 'dependency', name: extensionName },
+      details: { schema: DEFAULT_NAMESPACE_ID, objectType: 'dependency', name: extensionName },
     },
     precheck: [
       step(`verify extension "${extensionName}" is not already enabled`, absent.sql, absent.params),

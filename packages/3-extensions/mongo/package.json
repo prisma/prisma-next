@@ -35,6 +35,8 @@
   },
   "devDependencies": {
     "mongodb": "catalog:",
+    "@prisma-next/emitter": "workspace:0.14.0",
+    "@prisma-next/mongo-emitter": "workspace:0.14.0",
     "@prisma-next/test-utils": "workspace:0.14.0",
     "@prisma-next/tsconfig": "workspace:0.14.0",
     "@prisma-next/tsdown": "workspace:0.14.0",
@@ -63,6 +65,7 @@
     "./control": "./dist/control.mjs",
     "./family": "./dist/family.mjs",
     "./runtime": "./dist/runtime.mjs",
+    "./static": "./dist/static.mjs",
     "./target": "./dist/target.mjs",
     "./package.json": "./package.json"
   },

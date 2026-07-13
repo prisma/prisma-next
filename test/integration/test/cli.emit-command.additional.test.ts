@@ -166,6 +166,7 @@ describe('emit command: additional fixtures', () => {
           codecLookup: stack.codecLookup,
           controlMutationDefaults: stack.controlMutationDefaults,
           resolvedInputs: contractConfig!.source.inputs ?? [],
+          capabilities: stack.capabilities,
         });
       } finally {
         process.chdir(originalCwd);

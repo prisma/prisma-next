@@ -3,12 +3,8 @@ import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID, type OpFactoryCall } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  type StorageColumn,
-  type StorageTable,
-} from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
+import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -33,7 +29,7 @@ function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Cont
     storage: new SqlStorage({
       storageHash: coreHash(hash),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: { table: tables },
         }),

@@ -7,6 +7,7 @@ import {
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract } from '../src/contract-builder';
 import { enumType, member } from '../src/enum-type';
 
@@ -48,6 +49,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role },
       },
       ({ field: f, model: m }) =>
@@ -92,6 +94,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role, Status },
       },
       ({ field: f, model: m }) =>
@@ -121,6 +124,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
       },
       ({ field: f, model: m }) =>
         ({
@@ -148,6 +152,7 @@ describe('check-constraint lowering', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role },
       },
       ({ field: f, model: m }) =>
@@ -166,7 +171,164 @@ describe('check-constraint lowering', () => {
     const storageNs = contract.storage.namespaces['public'];
     const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
 
-    expect(userTable?.checks?.[0]).toBeInstanceOf(CheckConstraint);
+    expect(userTable?.checks?.[0]).toHaveProperty('valueSet');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CHECK is always written for a domain enum (`enumType()` + `namedType()`):
+// this authoring surface has no entity-ref-resolved, storage-enforced-type
+// path (that only exists via PSL's `pg.enum(Ref)` — see
+// `target-postgres/test/psl-pg-enum-column.test.ts` for the no-CHECK case),
+// so a domain enum's column is always a plain scalar column and always
+// needs a CHECK to enforce its member set, regardless of the codec bound to
+// it.
+// ---------------------------------------------------------------------------
+
+describe('check-constraint always written for a domain enum, regardless of codec', () => {
+  it('writes a CHECK for a domain-enum array column (many)', () => {
+    const Role = enumType('Role', pgText, member('User', 'user'), member('Admin', 'admin'));
+
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+        enums: { Role },
+      },
+      ({ field: f, model: m }) =>
+        ({
+          models: {
+            User: m('User', {
+              fields: {
+                id: f.text().id(),
+                roles: f.namedType(Role).many(),
+              },
+            }),
+          },
+        }) as const,
+    ) as Contract<SqlStorage>;
+
+    const storageNs = contract.storage.namespaces['public'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
+
+    expect(userTable?.checks).toHaveLength(1);
+    expect(userTable?.checks?.[0]).toMatchObject({
+      name: 'User_roles_check',
+      column: 'roles',
+      valueSet: {
+        plane: 'storage',
+        entityKind: 'valueSet',
+        namespaceId: 'public',
+        entityName: 'Role',
+      },
+    });
+  });
+
+  it('still writes a CHECK for a domain enum using a codec id other than pg/text@1', () => {
+    const NativeRole = enumType(
+      'NativeRole',
+      { codecId: 'test/native-enum@1', nativeType: 'native_role' },
+      member('User', 'user'),
+      member('Admin', 'admin'),
+    );
+
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+        enums: { NativeRole },
+      },
+      ({ field: f, model: m }) =>
+        ({
+          models: {
+            User: m('User', {
+              fields: {
+                id: f.text().id(),
+                role: f.namedType(NativeRole),
+              },
+            }),
+          },
+        }) as const,
+    ) as Contract<SqlStorage>;
+
+    const storageNs = contract.storage.namespaces['public'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
+
+    expect(userTable?.checks).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A value set resolved by an entity-ref type constructor (`field.descriptor.valueSet`
+// set, no `enumTypeHandle`) mirrors what PSL's `pg.enum(Ref)` produces after
+// resolution — the column's codec/native-type pairing IS the storage-level
+// enforcement, so no CHECK is written, scalar or array.
+// ---------------------------------------------------------------------------
+
+describe('check-constraint omitted for an entity-ref-resolved value set (native enum shape)', () => {
+  const nativeRoleDescriptor = {
+    codecId: 'test/native-role@1',
+    nativeType: 'native_role',
+    valueSet: {
+      plane: 'storage',
+      entityKind: 'valueSet',
+      namespaceId: 'public',
+      entityName: 'NativeRole',
+    },
+  } as const;
+
+  it('writes no CHECK for a scalar entity-ref-resolved column', () => {
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+      },
+      ({ field: f, model: m }) =>
+        ({
+          models: {
+            User: m('User', {
+              fields: {
+                id: f.text().id(),
+                role: f.column(nativeRoleDescriptor),
+              },
+            }),
+          },
+        }) as const,
+    ) as Contract<SqlStorage>;
+
+    const storageNs = contract.storage.namespaces['public'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
+
+    expect(userTable?.checks ?? []).toEqual([]);
+  });
+
+  it('writes no CHECK for an array entity-ref-resolved column (many)', () => {
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+      },
+      ({ field: f, model: m }) =>
+        ({
+          models: {
+            User: m('User', {
+              fields: {
+                id: f.text().id(),
+                roles: f.column(nativeRoleDescriptor).many(),
+              },
+            }),
+          },
+        }) as const,
+    ) as Contract<SqlStorage>;
+
+    const storageNs = contract.storage.namespaces['public'];
+    const userTable = storageNs !== undefined ? storageNs.entries.table?.['User'] : undefined;
+
+    expect(userTable?.checks ?? []).toEqual([]);
   });
 });
 
@@ -182,6 +344,7 @@ describe('check-constraint serialize→hydrate round-trip', () => {
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         enums: { Role },
       },
       ({ field: f, model: m }) =>

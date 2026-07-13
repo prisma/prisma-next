@@ -1,3 +1,4 @@
+import { MONGO_INT32_CODEC_ID, MONGO_STRING_CODEC_ID } from '@prisma-next/adapter-mongo/codec-ids';
 import mongoAdapter from '@prisma-next/adapter-mongo/control';
 import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
@@ -41,7 +42,10 @@ export function defineConfig(options: MongoConfigOptions): PrismaNextConfig<'mon
   const contractConfig =
     ext === '.ts'
       ? typescriptContractFromPath(options.contract, output)
-      : mongoContract(options.contract, { output });
+      : mongoContract(options.contract, {
+          output,
+          enumInferenceCodecs: { text: MONGO_STRING_CODEC_ID, int: MONGO_INT32_CODEC_ID },
+        });
 
   return coreDefineConfig({
     family: mongoFamilyDescriptor,

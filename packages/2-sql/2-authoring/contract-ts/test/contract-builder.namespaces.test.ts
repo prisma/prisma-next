@@ -1,5 +1,6 @@
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
@@ -34,6 +35,7 @@ describe('SqlStorage.namespaces population', () => {
   it('materialises the public namespace with lowered tables when models use the postgres default coordinate', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [minimalModelArgs],
     });
     expect(Object.keys(contract.storage.namespaces).sort()).toEqual(['public']);
@@ -47,6 +49,7 @@ describe('SqlStorage.namespaces population', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       namespaces: ['public', 'auth'],
+      createNamespace: createTestSqlNamespace,
       models: [minimalModelArgs],
     });
     const namespaceIds = Object.keys(contract.storage.namespaces).sort();
@@ -58,6 +61,7 @@ describe('SqlStorage.namespaces population', () => {
   it('places tables in the namespace referenced by the model coordinate', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [
         { ...minimalModelArgs, namespaceId: 'auth' },
         { ...minimalModelArgs, modelName: 'Post', tableName: 'blog_post' },
@@ -72,18 +76,21 @@ describe('SqlStorage.namespaces population', () => {
   it('materialises an empty public namespace when no models are declared', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [],
     });
     expect(Object.keys(contract.storage.namespaces).sort()).toEqual(['public']);
+    expect(contract.storage.namespaces['public']!.id).toBe('public');
     expect(Object.keys(contract.storage.namespaces['public']!.entries.table ?? {})).toHaveLength(0);
     expect(contract.storage.namespaces['__unbound__']).toBeUndefined(); // TML-2916
   });
 
-  it('accepts declared namespaces without a createNamespace factory', () => {
+  it('accepts declared namespaces with a createNamespace factory', () => {
     expect(() =>
       buildSqlContractFromDefinition({
         target: postgresTargetPack,
         namespaces: ['auth'],
+        createNamespace: createTestSqlNamespace,
         models: [minimalModelArgs],
       }),
     ).not.toThrow();
@@ -93,6 +100,7 @@ describe('SqlStorage.namespaces population', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
       namespaces: ['auth'],
+      createNamespace: createTestSqlNamespace,
       models: [{ ...minimalModelArgs, namespaceId: 'auth' }],
     });
     const namespaceIds = Object.keys(contract.storage.namespaces).sort();

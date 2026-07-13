@@ -21,10 +21,8 @@ import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import {
-  buildSqlNamespace,
   SqlStorage,
   type SqlStorageInput,
-  SqlUnboundNamespace,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import type {
@@ -40,6 +38,7 @@ import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational
 import { applicationDomainOf, collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Client } from 'pg';
+import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import { createExecutionContext, createSqlExecutionStack } from '../src/exports';
 import type {
   ExecutionContext,
@@ -446,8 +445,8 @@ export function createStubAdapter(): StubAdapter {
 
 export function unboundNamespaceWithTables(
   tables: Record<string, StorageTableInput>,
-): ReturnType<typeof buildSqlNamespace> {
-  return buildSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } });
+): ReturnType<typeof createTestSqlNamespace> {
+  return createTestSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { table: tables } });
 }
 
 export function emptySqlTestDomain() {
@@ -473,11 +472,15 @@ export function createTestContract(
       ? new SqlStorage({
           ...rest['storage'],
           storageHash: storageHashValue,
-          namespaces: rest['storage'].namespaces ?? { __unbound__: SqlUnboundNamespace.instance },
+          namespaces: rest['storage'].namespaces ?? {
+            __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
+          },
         })
       : new SqlStorage({
           storageHash: storageHashValue,
-          namespaces: { __unbound__: SqlUnboundNamespace.instance },
+          namespaces: {
+            __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
+          },
         }),
     domain: rest['domain'] ?? applicationDomainOf({ models: rest['models'] ?? {} }),
     roots: rest['roots'] ?? {},
@@ -501,3 +504,8 @@ export {
   teardownTestDatabase,
   withClient,
 } from '@prisma-next/test-utils';
+
+// Re-export decode helpers so cross-package tests can exercise the row-decode
+// path (e.g. RUNTIME.DECODE_FAILED for a malformed many-element) without going
+// through the full query round-trip.
+export { buildDecodeContext, decodeRow } from '../src/codecs/decoding';

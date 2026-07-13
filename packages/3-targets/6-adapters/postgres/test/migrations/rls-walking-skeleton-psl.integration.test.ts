@@ -37,6 +37,8 @@ namespace public {
   model profile {
     id       Int @id
     owner_id Int
+
+    @@rls
   }
 
   policy_select p_read {
@@ -96,6 +98,7 @@ function buildPslContract() {
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,
+    capabilities: { sql: { scalarList: true } },
   });
 }
 
@@ -216,7 +219,7 @@ describe.sequential('RLS walking skeleton — PSL author → plan → apply → 
         frameworkComponents,
       });
 
-      expect(verifyResult.schema.schemaDiffIssues).toEqual([]);
+      expect(verifyResult.schema.issues).toEqual([]);
     },
     testTimeout,
   );

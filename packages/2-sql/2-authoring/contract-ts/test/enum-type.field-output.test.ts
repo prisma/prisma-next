@@ -4,6 +4,7 @@ import type {
   ExtractFieldOutputTypes,
 } from '@prisma-next/sql-contract/types';
 import { describe, expectTypeOf, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract, field, model } from '../src/contract-builder';
 import { enumType, member } from '../src/enum-type';
 
@@ -54,6 +55,7 @@ const Priority = enumType('Priority', pgInt, member('Low', 1), member('High', 10
 const enumContract = defineContract({
   family: sqlFamilyPack,
   target: postgresTargetPack,
+  createNamespace: createTestSqlNamespace,
   enums: { Role, Status, Priority },
   models: {
     User: model('User', {

@@ -4,14 +4,16 @@ import type {
   ContractSpace,
   ControlFamilyDescriptor,
   ControlStack,
+  ControlTargetDescriptor,
 } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
 import type { SqlControlExtensionDescriptor } from '../src/core/migrations/types';
 
@@ -41,7 +43,7 @@ const fixtureHashBody = {
 
 const fixtureStorageBody = {
   namespaces: {
-    [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+    [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
       id: UNBOUND_NAMESPACE_ID,
       entries: { table: fixtureTables },
     }),
@@ -126,7 +128,7 @@ function makeStack(
         serializeContract: (contract) => contract as never,
       },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
-    },
+    } as ControlTargetDescriptor<'sql', 'postgres'>,
     adapter: {
       kind: 'adapter',
       id: 'postgres',

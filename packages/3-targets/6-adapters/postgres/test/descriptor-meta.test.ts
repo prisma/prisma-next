@@ -8,6 +8,12 @@ type HooksMap = Record<string, { expandNativeType: ExpandFn }>;
 
 const hooks = postgresAdapterDescriptorMeta.types.codecTypes.controlPlaneHooks as HooksMap;
 
+describe('postgresAdapterDescriptorMeta capabilities', () => {
+  it('descriptor reports sql.scalarList capability', () => {
+    expect(postgresAdapterDescriptorMeta.capabilities['sql']).toMatchObject({ scalarList: true });
+  });
+});
+
 describe('expandNativeType hooks via descriptor-meta', () => {
   const lengthCodecIds = [
     'sql/char@1',

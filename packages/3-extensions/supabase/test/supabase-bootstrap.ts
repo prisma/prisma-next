@@ -34,11 +34,13 @@ import type { Client } from 'pg';
  * functions. The caller passes an already-connected `pg.Client` — this
  * function does not open or close connections.
  *
- * Creates two schemas (`auth`, `storage`) and four tables whose columns
- * exactly match the `@prisma-next/extension-supabase` contract:
+ * Creates two schemas (`auth`, `storage`), the `auth.aal_level` native enum
+ * type, and five tables whose columns exactly match the
+ * `@prisma-next/extension-supabase` contract:
  *
  * - `auth.users` — id uuid PK, email text, created_at timestamptz, updated_at timestamptz
  * - `auth.identities` — id uuid PK, user_id uuid, provider text, created_at timestamptz, updated_at timestamptz
+ * - `auth.sessions` — id uuid PK, user_id uuid, aal auth.aal_level, created_at timestamptz
  * - `storage.buckets` — id text PK, name text, created_at timestamptz, updated_at timestamptz
  * - `storage.objects` — id uuid PK, bucket_id text, name text, created_at timestamptz, updated_at timestamptz
  *
@@ -80,6 +82,26 @@ export async function bootstrapSupabaseShim(client: Client): Promise<void> {
     $$
   `);
 
+  // auth.aal_level — a native Postgres enum type; Postgres has no `CREATE
+  // TYPE IF NOT EXISTS`, so existence is checked via pg_type first, matching
+  // the idempotency style used above for roles. Real Supabase ships this
+  // type as platform infrastructure; the shim creates it for test DBs so the
+  // externally-managed `native_enum` in the extension's contract has a type
+  // to bind against (Prisma Next emits no DDL for it).
+  await client.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'aal_level' AND n.nspname = 'auth'
+      ) THEN
+        CREATE TYPE auth.aal_level AS ENUM ('aal1', 'aal2', 'aal3');
+      END IF;
+    END
+    $$
+  `);
+
   await client.query(`
     CREATE TABLE IF NOT EXISTS auth.users (
       id          uuid        NOT NULL,
@@ -97,6 +119,16 @@ export async function bootstrapSupabaseShim(client: Client): Promise<void> {
       provider    text        NOT NULL,
       created_at  timestamptz NOT NULL,
       updated_at  timestamptz NOT NULL,
+      PRIMARY KEY (id)
+    )
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS auth.sessions (
+      id          uuid        NOT NULL,
+      user_id     uuid        NOT NULL,
+      aal         auth.aal_level,
+      created_at  timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY (id)
     )
   `);

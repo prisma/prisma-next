@@ -27,12 +27,33 @@ const FieldTypeSchema = ScalarFieldTypeSchema.or(ValueObjectFieldTypeSchema).or(
   UnionFieldTypeSchema,
 );
 
+const DomainEnumRefSchema = type({
+  plane: "'domain'",
+  namespaceId: 'string',
+  entityKind: "'enum'",
+  entityName: 'string',
+  'spaceId?': 'string',
+});
+
+const ContractEnumSchema = type({
+  '+': 'reject',
+  codecId: 'string',
+  members: type({
+    name: 'string',
+    value: 'string | number | boolean | null | unknown[] | Record<string, unknown>',
+  })
+    .array()
+    .atLeastLength(1)
+    .readonly(),
+});
+
 const RawFieldSchema = type({
   '+': 'reject',
   type: FieldTypeSchema,
   'nullable?': 'boolean',
   'many?': 'boolean',
   'dict?': 'boolean',
+  'valueSet?': DomainEnumRefSchema,
 });
 
 const FieldSchema = RawFieldSchema.pipe((field) => ({
@@ -321,6 +342,14 @@ export const StorageCollectionSchema = type({
   'control?': ControlPolicySchema,
 });
 
+export const StorageValueSetSchema = type({
+  '+': 'reject',
+  kind: "'valueSet'",
+  values: type('string | number | boolean | null | unknown[] | Record<string, unknown>')
+    .array()
+    .readonly(),
+});
+
 function collectionEntrySchema(fragments?: ReadonlyMap<string, Type<unknown>>): Type<unknown> {
   if (fragments === undefined || fragments.size === 0) {
     return StorageCollectionSchema;
@@ -368,6 +397,7 @@ export function createMongoNamespaceEnvelopeSchema(
     'kind?': 'string',
     entries: type({
       'collection?': type({ '[string]': collectionEntrySchema(fragments) }),
+      'valueSet?': type({ '[string]': StorageValueSetSchema }),
     }),
   }).narrow((ns, ctx) => {
     if (typeof ns !== 'object' || ns === null || Array.isArray(ns)) {
@@ -413,6 +443,7 @@ export function createMongoContractSchema(
           'valueObjects?': type({
             '[string]': type({ '+': 'reject', fields: type({ '[string]': FieldSchema }) }),
           }),
+          'enum?': type({ '[string]': ContractEnumSchema }),
         }),
       }),
     }),

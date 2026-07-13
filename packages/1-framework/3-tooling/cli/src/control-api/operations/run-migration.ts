@@ -45,10 +45,11 @@ export interface RunMigrationInputs<TFamilyId extends string, TTargetId extends 
   readonly aggregate: ContractSpaceAggregate;
   /**
    * Per-space plans, keyed by `spaceId`. Produced by either the full
-   * {@link planMigration} pipeline (`db init` / `db update` — synth
-   * for the app, graph-walk for extensions) or by direct
-   * {@link graphWalkStrategy} calls (`migrate` — graph-walk
-   * for every member). Either way, the runner consumes the same shape.
+   * {@link planMigration} pipeline (`db init` / `db update` —
+   * `planFromDiff` for the app, `resolveRecordedPath` for extensions) or
+   * by direct {@link resolveRecordedPath} calls (`migrate` — resolves
+   * the recorded path for every contract space). Either way, the runner
+   * consumes the same shape.
    */
   readonly perSpacePlans: ReadonlyMap<string, PerSpacePlan>;
   /**
@@ -229,7 +230,7 @@ export function buildPerSpaceBreakdown(
 
 /**
  * Materialise the `applyOrder` ordering into resolved per-space
- * entries. Throws if the planner output is missing a member listed
+ * entries. Throws if the planner output is missing a contract space listed
  * in `applyOrder` — a wiring bug that should never reach runtime.
  *
  * Exported so callers building their own success envelopes after a

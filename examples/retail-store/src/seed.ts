@@ -1,5 +1,6 @@
 import { createAddToCartEvent, createSearchEvent, createViewProductEvent } from './data/events';
 import type { Db } from './db';
+import { enums } from './enums';
 
 const productData = [
   {
@@ -316,7 +317,7 @@ export async function seed(db: Db) {
       },
     ],
     shippingAddress: '456 Oak Ave, Portland, OR 97201',
-    type: 'home',
+    type: enums.OrderType.members.Delivery,
     statusHistory: [{ status: 'placed', timestamp: new Date('2026-03-01T10:00:00Z') }],
   });
 

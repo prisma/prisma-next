@@ -1,5 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract, field, model, rel } from '../src/contract-builder';
 
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -81,6 +82,7 @@ function buildPortableContract<TTarget extends string>(target: PortableTargetPac
   return defineContract({
     family: bareFamilyPack,
     target,
+    createNamespace: createTestSqlNamespace,
     naming: { tables: 'snake_case', columns: 'snake_case' },
     storageHash: 'sha256:portable-contract-dsl',
     models: {

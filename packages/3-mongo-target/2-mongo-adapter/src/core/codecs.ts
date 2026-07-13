@@ -1,12 +1,13 @@
 import type { CodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
-import { voidParamsSchema } from '@prisma-next/framework-components/codec';
+import { renderTsLiteral, voidParamsSchema } from '@prisma-next/framework-components/codec';
 import {
   type MongoCodec,
   type MongoCodecRegistry,
   mongoCodec,
   newMongoCodecRegistry,
 } from '@prisma-next/mongo-codec';
-import { ObjectId } from 'mongodb';
+import { ifDefined } from '@prisma-next/utils/defined';
+import { ObjectId } from 'bson';
 import {
   MONGO_BOOLEAN_CODEC_ID,
   MONGO_DATE_CODEC_ID,
@@ -90,6 +91,7 @@ function descriptorFor<Id extends string>(
     readonly traits: readonly CodecTrait[];
     readonly targetTypes: readonly string[];
     readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
+    readonly renderValueLiteral?: CodecDescriptor['renderValueLiteral'];
   },
 ): CodecDescriptor {
   // The descriptor's `P` is structurally `Record<string, unknown>` for codecs that take params (Mongo `vector`); non-parameterized codecs ignore the slot. Cast through `unknown` to fit the `CodecDescriptor` slot's `(params: P) => …` typing without leaking a per-codec `P` into the heterogeneous descriptor list.
@@ -103,7 +105,8 @@ function descriptorFor<Id extends string>(
     paramsSchema: voidParamsSchema as CodecDescriptor['paramsSchema'],
     isParameterized: false,
     factory: (() => () => codec) as CodecDescriptor['factory'],
-    ...(renderOutputType !== undefined ? { renderOutputType } : {}),
+    ...ifDefined('renderOutputType', renderOutputType),
+    ...ifDefined('renderValueLiteral', metadata.renderValueLiteral),
   };
 }
 
@@ -129,16 +132,23 @@ export const mongoCodecDescriptors: ReadonlyArray<CodecDescriptor> = [
   descriptorFor(mongoStringCodec, {
     traits: ['equality', 'order', 'textual'],
     targetTypes: ['string'],
+    renderValueLiteral: renderTsLiteral,
   }),
   descriptorFor(mongoDoubleCodec, {
     traits: ['equality', 'order', 'numeric'],
     targetTypes: ['double'],
+    renderValueLiteral: renderTsLiteral,
   }),
   descriptorFor(mongoInt32Codec, {
     traits: ['equality', 'order', 'numeric'],
     targetTypes: ['int'],
+    renderValueLiteral: renderTsLiteral,
   }),
-  descriptorFor(mongoBooleanCodec, { traits: ['equality', 'boolean'], targetTypes: ['bool'] }),
+  descriptorFor(mongoBooleanCodec, {
+    traits: ['equality', 'boolean'],
+    targetTypes: ['bool'],
+    renderValueLiteral: renderTsLiteral,
+  }),
   descriptorFor(mongoDateCodec, { traits: ['equality', 'order'], targetTypes: ['date'] }),
   descriptorFor(mongoVectorCodec, {
     traits: ['equality'],

@@ -1,7 +1,6 @@
-import type { Token } from '../../tokenizer';
 import type { AstNode } from '../ast-helpers';
 import { findChildToken, findFirstChild } from '../ast-helpers';
-import type { SyntaxNode } from '../red';
+import type { SyntaxNode, SyntaxToken } from '../red';
 import { AttributeArgListAst } from './attributes';
 import { QualifiedNameAst } from './qualified-name';
 
@@ -26,15 +25,15 @@ export class TypeAnnotationAst implements AstNode {
     return this.argList() !== undefined;
   }
 
-  lbracket(): Token | undefined {
+  lbracket(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'LBracket');
   }
 
-  rbracket(): Token | undefined {
+  rbracket(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'RBracket');
   }
 
-  questionMark(): Token | undefined {
+  questionMark(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Question');
   }
 

@@ -16,6 +16,7 @@ export interface StorageColumnInput {
   readonly nativeType: string;
   readonly codecId: string;
   readonly nullable: boolean;
+  readonly many?: boolean;
   readonly typeParams?: Record<string, unknown>;
   readonly typeRef?: string;
   readonly default?: ColumnDefault;
@@ -40,6 +41,7 @@ export class StorageColumn extends SqlNode {
   readonly nativeType: string;
   readonly codecId: string;
   readonly nullable: boolean;
+  declare readonly many?: boolean;
   declare readonly typeParams?: Record<string, unknown>;
   declare readonly typeRef?: string;
   declare readonly default?: ColumnDefault;
@@ -51,6 +53,7 @@ export class StorageColumn extends SqlNode {
     this.nativeType = input.nativeType;
     this.codecId = input.codecId;
     this.nullable = input.nullable;
+    if (input.many !== undefined) this.many = input.many;
     if (input.typeParams !== undefined) this.typeParams = input.typeParams;
     if (input.typeRef !== undefined) this.typeRef = input.typeRef;
     if (input.default !== undefined) this.default = input.default;

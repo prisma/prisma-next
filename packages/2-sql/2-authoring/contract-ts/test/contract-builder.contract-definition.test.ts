@@ -1,7 +1,7 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
-
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 import { modelsOf } from './contract-test-helpers';
 import { crossRef, documentScopedTypes } from './cross-ref-helpers';
@@ -20,6 +20,7 @@ describe('shared contract definition lowering', () => {
   it('builds SQL contract IR from contract model nodes', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       storageTypes: {
         Role: {
           kind: 'codec-instance',
@@ -201,6 +202,7 @@ describe('shared contract definition lowering', () => {
     const contract = buildSqlContractFromDefinition(
       {
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         models: [
           {
             modelName: 'Event',
@@ -235,6 +237,7 @@ describe('shared contract definition lowering', () => {
   it('builds phase-specific execution defaults', () => {
     const contract = buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [
         {
           modelName: 'User',
@@ -271,6 +274,7 @@ describe('shared contract definition lowering', () => {
     expect(() =>
       buildSqlContractFromDefinition({
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         models: [
           {
             modelName: 'User',
@@ -306,6 +310,7 @@ describe('shared contract definition lowering', () => {
     expect(() =>
       buildSqlContractFromDefinition({
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         models: [
           {
             modelName: 'User',
@@ -337,6 +342,7 @@ describe('shared contract definition lowering', () => {
     expect(() =>
       buildSqlContractFromDefinition({
         target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
         models: [
           {
             modelName: 'User',
@@ -391,6 +397,7 @@ describe('M:N through descriptor lowering', () => {
   const buildWithTag = (target: Parameters<typeof tagModel>[0]) =>
     buildSqlContractFromDefinition({
       target: postgresTargetPack,
+      createNamespace: createTestSqlNamespace,
       models: [
         {
           modelName: 'Post',

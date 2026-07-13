@@ -16,8 +16,12 @@ function makeModel(name: string): PslModel {
   return { kind: 'model', name, fields: [], attributes: [], span: SPAN };
 }
 
-function makeExtensionBlock(discriminator: string, name: string): PslExtensionBlock {
-  return { kind: discriminator, name, parameters: {}, blockAttributes: [], span: SPAN };
+function makeExtensionBlock(
+  discriminator: string,
+  name: string,
+  keyword: string = discriminator,
+): PslExtensionBlock {
+  return { kind: discriminator, keyword, name, parameters: {}, blockAttributes: [], span: SPAN };
 }
 
 describe('makePslNamespace / makePslNamespaceEntries', () => {
@@ -141,6 +145,33 @@ describe('makePslNamespace / makePslNamespaceEntries', () => {
       const extBlocks = namespacePslExtensionBlocks(ns);
       expect(extBlocks).toHaveLength(1);
       expect(extBlocks[0]).toBe(policy);
+    });
+  });
+
+  describe('N:1 keyword-to-discriminator grouping (fake shape_circle/shape_square contribution)', () => {
+    it('routes two distinct keywords sharing one discriminator into the same entries[kind] slot', () => {
+      const circle = makeExtensionBlock('shape', 'Round', 'shape_circle');
+      const square = makeExtensionBlock('shape', 'Boxy', 'shape_square');
+      const ns = makePslNamespace({
+        kind: 'namespace',
+        name: 'public',
+        entries: makePslNamespaceEntries([], [], [circle, square]),
+        span: SPAN,
+      });
+
+      expect(Object.keys(ns.entries['shape'] ?? {})).toEqual(['Round', 'Boxy']);
+      expect(ns.entries['shape']?.['Round']).toBe(circle);
+      expect(ns.entries['shape']?.['Boxy']).toBe(square);
+    });
+
+    it('each block keeps its own keyword despite sharing a kind', () => {
+      const circle = makeExtensionBlock('shape', 'Round', 'shape_circle');
+      const square = makeExtensionBlock('shape', 'Boxy', 'shape_square');
+
+      expect(circle.kind).toBe('shape');
+      expect(square.kind).toBe('shape');
+      expect(circle.keyword).toBe('shape_circle');
+      expect(square.keyword).toBe('shape_square');
     });
   });
 });

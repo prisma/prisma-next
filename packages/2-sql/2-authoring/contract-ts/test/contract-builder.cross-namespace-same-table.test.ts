@@ -2,6 +2,7 @@ import type { TargetPackRef } from '@prisma-next/framework-components/components
 import type { ForeignKey, SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 import type { ModelNode } from '../src/contract-definition';
 
@@ -84,6 +85,7 @@ describe('same bare table name across namespaces with a cross-namespace FK', () 
   const contract = buildSqlContractFromDefinition({
     target: postgresTargetPack,
     namespaces: ['public', 'auth'],
+    createNamespace: createTestSqlNamespace,
     models: [publicUser, profile, authUser],
   });
   const storage = contract.storage as SqlStorage;
@@ -141,6 +143,7 @@ describe('same bare table name across non-Postgres default and explicit namespac
     target: sqliteTargetPack,
     namespaces: ['public'],
     models: [unboundUser, publicUserWithSameTable],
+    createNamespace: createTestSqlNamespace,
   });
   const storage = contract.storage as SqlStorage;
 

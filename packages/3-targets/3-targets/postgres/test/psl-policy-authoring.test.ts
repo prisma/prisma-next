@@ -21,6 +21,7 @@ import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {
   postgresAuthoringEntityTypes,
+  postgresAuthoringModelAttributes,
   postgresAuthoringPslBlockDescriptors,
 } from '../src/core/authoring';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
@@ -33,6 +34,7 @@ const assembled = assembleAuthoringContributions([
     authoring: {
       entityTypes: postgresAuthoringEntityTypes,
       pslBlockDescriptors: postgresAuthoringPslBlockDescriptors,
+      modelAttributes: postgresAuthoringModelAttributes,
     },
   },
 ]);
@@ -83,6 +85,8 @@ namespace public {
   model profile {
     id       Int @id
     owner_id Int
+
+    @@rls
   }
 
   policy_select p_read {
@@ -192,6 +196,8 @@ namespace public {
   model profile {
     id       Int @id
     owner_id Int
+
+    @@rls
   }
 
   policy_select p_read {
@@ -244,6 +250,7 @@ namespace public {
       authoringContributions: assembled,
       composedExtensionContracts: new Map(),
       createNamespace: postgresCreateNamespace,
+      capabilities: { sql: { scalarList: true } },
     });
 
     expect(result.ok).toBe(true);

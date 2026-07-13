@@ -92,6 +92,40 @@
               ],
               "tableName": "profile",
               "using": "\"userId\"::uuid = auth.uid()"
+            },
+            "profile_owner_write": {
+              "kind": "policy",
+              "name": "profile_owner_write_b674cdea",
+              "namespaceId": "public",
+              "operation": "update",
+              "permissive": true,
+              "prefix": "profile_owner_write",
+              "roles": [
+                "authenticated"
+              ],
+              "tableName": "profile",
+              "using": "\"userId\"::uuid = auth.uid()",
+              "withCheck": "\"userId\"::uuid = auth.uid()"
+            },
+            "profile_public_read": {
+              "kind": "policy",
+              "name": "profile_public_read_16dd15e0",
+              "namespaceId": "public",
+              "operation": "select",
+              "permissive": true,
+              "prefix": "profile_public_read",
+              "roles": [
+                "anon"
+              ],
+              "tableName": "profile",
+              "using": "true"
+            }
+          },
+          "rls": {
+            "profile": {
+              "kind": "rls",
+              "namespaceId": "public",
+              "tableName": "profile"
             }
           },
           "table": {
@@ -157,7 +191,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:c5012a2809fbe2aff181e2ddab8ae278bd2aae9ee85b1e80395923d3392bf4e4",
+    "storageHash": "sha256:9a090604d20ee5467bc7b3e74aacfe996e66e588d584ec004539f752723f6878",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",
@@ -197,7 +231,8 @@
       "defaultInInsert": true,
       "enums": true,
       "lateral": true,
-      "returning": true
+      "returning": true,
+      "scalarList": true
     }
   },
   "extensionPacks": {

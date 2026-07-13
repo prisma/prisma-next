@@ -27,6 +27,10 @@ describe('SourceFile', () => {
     expect(file.length).toEqual(11);
     expect(file.lineCount).toEqual(3);
     expect(file.lineStartOffsets()).toEqual([0, 4, 8]);
+    expect(file.lineStartOffset(0)).toEqual(0);
+    expect(file.lineStartOffset(1)).toEqual(4);
+    expect(file.lineStartOffset(2)).toEqual(8);
+    expect(file.lineStartOffset(3)).toEqual(11);
     expect(file.text).toEqual('abc\ndef\nghi');
   });
 
@@ -83,5 +87,19 @@ describe('SourceFile', () => {
     expect(file.positionAt(3)).toEqual({ line: 1, character: 1 });
     expect(file.positionAt(4)).toEqual({ line: 1, character: 2 });
     expect(file.positionAt(5)).toEqual({ line: 2, character: 0 });
+  });
+
+  it('reports line end offsets before LF and CRLF newline sequences', () => {
+    const file = new SourceFile('abc\ndef\r\nghi');
+    expect(file.lineEndOffset(0)).toEqual(3);
+    expect(file.lineEndOffset(1)).toEqual(7);
+    expect(file.lineEndOffset(2)).toEqual(12);
+    expect(file.lineEndOffset(3)).toEqual(12);
+  });
+
+  it('reports an empty line end at the following newline sequence', () => {
+    const file = new SourceFile('first\n\nthird');
+    expect(file.lineStartOffset(1)).toEqual(6);
+    expect(file.lineEndOffset(1)).toEqual(6);
   });
 });

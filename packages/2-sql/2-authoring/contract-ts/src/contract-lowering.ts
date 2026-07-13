@@ -727,6 +727,7 @@ function resolveModelNode(
       columnName,
       descriptor,
       nullable: fieldState.nullable,
+      ...(fieldState.many === true ? { many: true } : {}),
       ...(fieldState.default ? { default: fieldState.default } : {}),
       ...(fieldState.executionDefaults ? { executionDefaults: fieldState.executionDefaults } : {}),
       ...(enumHandle !== undefined ? { enumTypeHandle: enumHandle } : {}),
@@ -877,9 +878,12 @@ export function buildContractDefinition(definition: ContractInput): ContractDefi
       ? { storageTypes: collection.storageTypes }
       : {}),
     ...(definition.namespaces ? { namespaces: definition.namespaces } : {}),
-    ...(definition.createNamespace ? { createNamespace: definition.createNamespace } : {}),
+    createNamespace: definition.createNamespace,
     ...(definition.enums && Object.keys(definition.enums).length > 0
       ? { enums: definition.enums }
+      : {}),
+    ...(definition.packEntities && Object.keys(definition.packEntities).length > 0
+      ? { packEntities: definition.packEntities }
       : {}),
     models,
   };

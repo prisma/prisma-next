@@ -3,6 +3,7 @@ import { crossRef } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
@@ -17,6 +18,8 @@ const baseInput = {
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   composedExtensionContracts: new Map(),
+  createNamespace: createTestSqlNamespace,
+  capabilities: { sql: { scalarList: true } },
 } as const;
 
 function interpretSchema(schema: string) {

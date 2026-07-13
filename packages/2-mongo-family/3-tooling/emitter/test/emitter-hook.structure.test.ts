@@ -1,5 +1,6 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractModelBase } from '@prisma-next/contract/types';
 import { crossRef } from '@prisma-next/contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { mongoEmission } from '../src/index';
 import {
@@ -60,10 +61,13 @@ describe('mongoEmission.validateStructure', () => {
   it('throws when model is missing fields', () => {
     const contract = createMongoContract({
       models: {
-        User: {
+        User: blindCast<
+          ContractModelBase,
+          'intentionally missing "fields" to exercise validateStructure\'s runtime guard against malformed contracts'
+        >({
           relations: {},
           storage: { collection: 'users' },
-        },
+        }),
       },
       storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
@@ -75,12 +79,15 @@ describe('mongoEmission.validateStructure', () => {
   it('throws when model is missing relations', () => {
     const contract = createMongoContract({
       models: {
-        User: {
+        User: blindCast<
+          ContractModelBase,
+          'intentionally missing "relations" to exercise validateStructure\'s runtime guard against malformed contracts'
+        >({
           fields: {
             _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
           },
           storage: { collection: 'users' },
-        },
+        }),
       },
       storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
@@ -142,7 +149,7 @@ describe('mongoEmission.validateStructure', () => {
             _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
           },
           relations: {
-            addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+            addresses: { to: crossRef('Address'), cardinality: '1:N' },
           },
           storage: {
             collection: 'users',
@@ -222,12 +229,15 @@ describe('mongoEmission.validateStructure', () => {
   it('throws when model is missing storage', () => {
     const contract = createMongoContract({
       models: {
-        User: {
+        User: blindCast<
+          ContractModelBase,
+          'intentionally missing "storage" to exercise validateStructure\'s runtime guard against malformed contracts'
+        >({
           fields: {
             _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
           },
           relations: {},
-        },
+        }),
       },
       storage: namespacedMongoStorageFromCollections({ users: {} }),
     });
@@ -263,7 +273,7 @@ describe('mongoEmission.validateStructure', () => {
             _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
           },
           relations: {
-            addresses: { to: { model: 'Address', namespace: '__unbound__' }, cardinality: '1:N' },
+            addresses: { to: crossRef('Address'), cardinality: '1:N' },
           },
           storage: { collection: 'users' },
         },

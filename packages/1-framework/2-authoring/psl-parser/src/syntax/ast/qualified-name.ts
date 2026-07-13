@@ -1,7 +1,6 @@
-import type { Token } from '../../tokenizer';
 import type { AstNode } from '../ast-helpers';
 import { filterChildren, findChildToken, findFirstChild } from '../ast-helpers';
-import { SyntaxNode } from '../red';
+import { SyntaxNode, type SyntaxToken } from '../red';
 import { IdentifierAst } from './identifier';
 
 /** A namespace-qualified name, e.g. `pgvector.Vector` or `supabase:auth.User`. */
@@ -12,22 +11,20 @@ export class QualifiedNameAst implements AstNode {
     this.syntax = syntax;
   }
 
-  #lastSegment(): IdentifierAst | undefined {
-    let last: IdentifierAst | undefined;
+  #segmentBefore(boundary: number): IdentifierAst | undefined {
+    let found: IdentifierAst | undefined;
     for (const segment of filterChildren(this.syntax, IdentifierAst.cast)) {
-      last = segment;
+      if (segment.syntax.offset >= boundary) break;
+      found = segment;
     }
-    return last;
+    return found;
   }
 
-  #penultimateSegment(): IdentifierAst | undefined {
-    let last: IdentifierAst | undefined;
-    let penultimate: IdentifierAst | undefined;
+  #segmentAfter(boundary: number): IdentifierAst | undefined {
     for (const segment of filterChildren(this.syntax, IdentifierAst.cast)) {
-      penultimate = last;
-      last = segment;
+      if (segment.syntax.offset > boundary) return segment;
     }
-    return penultimate;
+    return undefined;
   }
 
   #separatorCount(kind: 'Dot' | 'Colon'): number {
@@ -38,26 +35,32 @@ export class QualifiedNameAst implements AstNode {
     return count;
   }
 
-  colon(): Token | undefined {
+  colon(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Colon');
   }
 
-  dot(): Token | undefined {
+  dot(): SyntaxToken | undefined {
     return findChildToken(this.syntax, 'Dot');
   }
 
   space(): IdentifierAst | undefined {
-    if (!this.colon()) return undefined;
-    return findFirstChild(this.syntax, IdentifierAst.cast);
+    const colon = this.colon();
+    if (!colon) return undefined;
+    return this.#segmentBefore(colon.offset);
   }
 
   namespace(): IdentifierAst | undefined {
-    if (!this.dot()) return undefined;
-    return this.#penultimateSegment();
+    const dot = this.dot();
+    if (!dot) return undefined;
+    return this.#segmentBefore(dot.offset);
   }
 
   identifier(): IdentifierAst | undefined {
-    return this.#lastSegment();
+    const dot = this.dot();
+    if (dot) return this.#segmentAfter(dot.offset);
+    const colon = this.colon();
+    if (colon) return this.#segmentAfter(colon.offset);
+    return findFirstChild(this.syntax, IdentifierAst.cast);
   }
 
   /**
@@ -71,6 +74,12 @@ export class QualifiedNameAst implements AstNode {
       if (text !== undefined) segments.push(text);
     }
     return segments;
+  }
+
+  /** True iff this is a single unqualified identifier whose text equals `name`. */
+  isSimpleName(name: string): boolean {
+    if (this.dot() !== undefined || this.colon() !== undefined) return false;
+    return this.identifier()?.token()?.text === name;
   }
 
   /**

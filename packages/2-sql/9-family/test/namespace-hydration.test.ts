@@ -1,9 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { type SqlStorage, StorageTable, StorageValueSet } from '@prisma-next/sql-contract/types';
+import { isStorageValueSet, type SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { SqlContractSerializer } from '../src/core/ir/sql-contract-serializer';
+import { TestSqlContractSerializer } from './test-sql-contract-serializer';
 
 function makeContractJson(entries: Record<string, Record<string, unknown>>) {
   return createSqlContract({
@@ -34,11 +34,11 @@ describe('SqlContractSerializer — built-in kind hydration', () => {
         },
       },
     });
-    const serializer = new SqlContractSerializer();
+    const serializer = new TestSqlContractSerializer();
     const contract = serializer.deserializeContract(json) as Contract<SqlStorage>;
     const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
     expect(ns).toBeDefined();
-    expect(ns!.entries.table?.['users']).toBeInstanceOf(StorageTable);
+    expect(StorageTable.is(ns!.entries.table?.['users'])).toBe(true);
   });
 
   it('hydrates valueSet entries to StorageValueSet instances', () => {
@@ -46,11 +46,11 @@ describe('SqlContractSerializer — built-in kind hydration', () => {
       table: {},
       valueSet: { Role: { kind: 'valueSet', values: ['user', 'admin'] } },
     });
-    const serializer = new SqlContractSerializer();
+    const serializer = new TestSqlContractSerializer();
     const contract = serializer.deserializeContract(json) as Contract<SqlStorage>;
     const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
     expect(ns).toBeDefined();
-    expect(ns!.entries.valueSet?.['Role']).toBeInstanceOf(StorageValueSet);
+    expect(isStorageValueSet(ns!.entries.valueSet?.['Role'])).toBe(true);
   });
 });
 
@@ -64,7 +64,7 @@ describe('SqlContractSerializer — fail-closed at validation boundary', () => {
       table: {},
       bogus: { Foo: { kind: 'bogus', name: 'Foo' } },
     });
-    const serializer = new SqlContractSerializer();
+    const serializer = new TestSqlContractSerializer();
     expect(() => serializer.deserializeContract(json)).toThrow(/bogus/);
   });
 });
@@ -99,7 +99,7 @@ describe('SqlContractSerializer — fail-closed at hydration boundary', () => {
         capabilities: {},
       },
     };
-    const serializer = new SqlContractSerializer();
+    const serializer = new TestSqlContractSerializer();
     expect(() => serializer.deserializeContract(json)).toThrow(/bogus/);
   });
 });

@@ -1,1 +1,5 @@
-export { collectionEntityKind, composeMongoEntityKinds } from '../entity-kinds';
+export {
+  collectionEntityKind,
+  composeMongoEntityKinds,
+  valueSetEntityKind,
+} from '../entity-kinds';

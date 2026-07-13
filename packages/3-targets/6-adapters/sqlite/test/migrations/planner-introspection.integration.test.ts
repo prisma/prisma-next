@@ -12,12 +12,9 @@ import { asNamespaceId, type Contract, coreHash, profileHash } from '@prisma-nex
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  type StorageColumn,
-  type StorageTable,
-} from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
+import { PrimaryKey } from '@prisma-next/sql-schema-ir/types';
+import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -69,7 +66,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
     storage: new SqlStorage({
       storageHash: coreHash(`sha256:test-${Date.now()}`),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: { table: tables },
         }),
@@ -145,7 +142,7 @@ describe('SQLite planner + introspection round-trip', () => {
       expect(schema.tables['users']!.columns['id']).toBeDefined();
       expect(schema.tables['users']!.columns['email']).toBeDefined();
       expect(schema.tables['users']!.columns['active']).toBeDefined();
-      expect(schema.tables['users']!.primaryKey).toEqual({ columns: ['id'] });
+      expect(schema.tables['users']!.primaryKey).toEqual(new PrimaryKey({ columns: ['id'] }));
 
       const idx = schema.tables['users']!.indexes.find((i) => i.name === 'idx_users_email');
       expect(idx).toBeDefined();

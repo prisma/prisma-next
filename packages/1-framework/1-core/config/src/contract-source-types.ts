@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CapabilityMatrix } from '@prisma-next/framework-components/components';
 import type {
   AssembledAuthoringContributions,
   ControlMutationDefaults,
@@ -45,16 +46,38 @@ export interface ContractSourceContext {
   readonly codecLookup: CodecLookup;
   readonly controlMutationDefaults: ControlMutationDefaults;
   readonly resolvedInputs: readonly string[];
+  readonly capabilities: CapabilityMatrix;
 }
 
 /** Lets format-aware tooling avoid file-extension sniffing and opaque loader introspection. */
 export type ContractSourceFormat = 'psl' | 'typescript';
 
-export interface ContractSourceProvider {
-  /** Absent means format-aware tooling must leave the source untouched. */
-  readonly sourceFormat?: ContractSourceFormat;
+export interface ContractSourceProviderBase {
   readonly inputs?: readonly string[];
   readonly load: (
     context: ContractSourceContext,
   ) => Promise<Result<Contract, ContractSourceDiagnostics>>;
 }
+
+export interface PslContractSourceProvider extends ContractSourceProviderBase {
+  readonly sourceFormat: 'psl';
+}
+
+export interface TypeScriptContractSourceProvider extends ContractSourceProviderBase {
+  readonly sourceFormat: 'typescript';
+}
+
+/**
+ * Third-party or unspecified source formats. Absent (or unrecognized)
+ * `sourceFormat` means format-aware tooling must leave the source untouched.
+ * Narrowing to a known format flows only through capability guards owned by
+ * the authoring layer.
+ */
+export interface OpaqueContractSourceProvider extends ContractSourceProviderBase {
+  readonly sourceFormat?: string;
+}
+
+export type ContractSourceProvider =
+  | PslContractSourceProvider
+  | TypeScriptContractSourceProvider
+  | OpaqueContractSourceProvider;

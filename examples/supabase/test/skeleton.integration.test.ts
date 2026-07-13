@@ -42,18 +42,26 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
+import { coreHash, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import supabasePack from '@prisma-next/extension-supabase/pack';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
-import type { PostgresSchema } from '@prisma-next/target-postgres/types';
+import { PostgresRole, PostgresSchema } from '@prisma-next/target-postgres/types';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import { createDb } from '../src/prisma/db';
+import type { Contract as NoPolicyContract } from './fixtures/no-policy/contract';
+import noPolicyContractJson from './fixtures/no-policy/contract.json' with { type: 'json' };
+import type { Contract as RenamedPolicyContract } from './fixtures/renamed-policy/contract';
+import renamedPolicyContractJson from './fixtures/renamed-policy/contract.json' with {
+  type: 'json',
+};
 import { bootstrapSupabaseShim } from './supabase-bootstrap';
 
 // Derive the policy wire name from the deserialized contract rather than pinning a literal.
@@ -67,7 +75,13 @@ const _publicNsDeserialized = _deserializedForConsts.storage.namespaces['public'
 // reduces to `never` in TypeScript because both define `kind` with incompatible literals
 // ('schema' vs 'postgres-schema'). We cast through unknown to break the intersection.
 const _publicNsAsSchema = _publicNsDeserialized as unknown as PostgresSchema;
-const POLICY_WIRE_NAME: string = Object.values(_publicNsAsSchema.policy)[0]?.name ?? '';
+const _allPolicies = Object.values(_publicNsAsSchema.policy);
+// The base contract now carries three policies (authenticated SELECT-own,
+// anon SELECT-all, authenticated UPDATE-own). `POLICY_WIRE_NAME` is the
+// authenticated owner-read SELECT policy — the one tests B/D target.
+const POLICY_WIRE_NAME: string =
+  _allPolicies.find((p) => p.prefix === 'profile_owner_read')?.name ?? '';
+const ALL_POLICY_WIRE_NAMES: readonly string[] = _allPolicies.map((p) => p.name);
 
 // Active in CI (test:examples). This asserts the M1 walking-skeleton behaviour only —
 // external-contract migrate/verify + the public.profile round-trip — which is green and
@@ -460,9 +474,10 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
       // level, is_local=false so it persists across statement boundaries), then
       // switch to the authenticated role for the actual query.
       await withClient(connectionString, async (pgClient) => {
-        await pgClient.query(
-          `SELECT set_config('request.jwt.claims', '{"sub":"${ownerA}"}', false)`,
-        );
+        await pgClient.query('SELECT set_config($1, $2, false)', [
+          'request.jwt.claims',
+          JSON.stringify({ sub: ownerA }),
+        ]);
         await pgClient.query('SET ROLE authenticated');
 
         const result = await pgClient.query<{
@@ -521,18 +536,365 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
 
         expect(
           appSchemaResult?.ok,
-          `Expected app schema result ok:false after DROP POLICY; schemaDiffIssues: ${JSON.stringify(appSchemaResult?.schema.schemaDiffIssues)}`,
+          `Expected app schema result ok:false after DROP POLICY; issues: ${JSON.stringify(appSchemaResult?.schema.issues)}`,
         ).toBe(false);
 
-        const policyIssue = appSchemaResult?.schema.schemaDiffIssues.find(
+        const policyIssue = appSchemaResult?.schema.issues.find(
           (issue) =>
-            issue.outcome === 'missing' && issue.coordinate.entityName === POLICY_WIRE_NAME,
+            issue.reason === 'not-found' &&
+            (issue.expected ?? issue.actual)?.id === POLICY_WIRE_NAME,
         );
         expect(
           policyIssue,
-          `Expected missing schemaDiffIssue naming '${POLICY_WIRE_NAME}'; got: ${JSON.stringify(appSchemaResult?.schema.schemaDiffIssues)}`,
+          `Expected missing issue naming '${POLICY_WIRE_NAME}'; got: ${JSON.stringify(appSchemaResult?.schema.issues)}`,
         ).toBeDefined();
-        expect(policyIssue?.outcome).toBe('missing');
+        expect(policyIssue?.reason).toBe('not-found');
+      }
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  // Variant contract states are committed fixtures emitted by the real
+  // pipeline from variant PSL sources (see test/fixtures/*.config.ts and
+  // this package's `emit` script) — never mutated contract data.
+
+  async function seedProfilesAndGrant(connectionString: string, ownerA: string, ownerB: string) {
+    await withClient(connectionString, async (pgClient) => {
+      const now = new Date().toISOString();
+      await pgClient.query(
+        'INSERT INTO auth.users (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3), ($4, $5, $3, $3)',
+        [ownerA, 'alice@example.com', now, ownerB, 'bob@example.com'],
+      );
+      await pgClient.query(
+        'INSERT INTO public.profile (id, username, "userId") VALUES ($1, $2, $3), ($4, $5, $6)',
+        [
+          'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          'alice',
+          ownerA,
+          'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          'bob',
+          ownerB,
+        ],
+      );
+      await pgClient.query('GRANT SELECT ON public.profile TO authenticated');
+    });
+  }
+
+  async function rowsVisibleToAuthenticated(
+    connectionString: string,
+    ownerSub: string,
+  ): Promise<readonly { username: string }[]> {
+    return withClient(connectionString, async (pgClient) => {
+      await pgClient.query('SELECT set_config($1, $2, false)', [
+        'request.jwt.claims',
+        JSON.stringify({ sub: ownerSub }),
+      ]);
+      await pgClient.query('SET ROLE authenticated');
+      const result = await pgClient.query<{ username: string }>(
+        'SELECT username FROM public.profile',
+      );
+      await pgClient.query('RESET ROLE');
+      return result.rows;
+    });
+  }
+
+  it(
+    'C — fail-closed: removing the last policy keeps RLS on and denies all rows',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+      await seedProfilesAndGrant(connectionString, ownerA, ownerB);
+
+      // The policy filters before the change (sanity: alice sees her row).
+      expect(await rowsVisibleToAuthenticated(connectionString, ownerA)).toEqual([
+        { username: 'alice' },
+      ]);
+
+      // The committed no-policy fixture: the schema minus ALL policy blocks,
+      // @@rls kept.
+      const noPolicyContract = noPolicyContractJson;
+
+      // Plan: exactly one drop per policy — no enablement change anywhere.
+      const planResult = await client.dbUpdate({
+        contract: noPolicyContract,
+        mode: 'plan',
+        migrationsDir,
+        acceptDataLoss: true,
+      });
+      if (!planResult.ok) {
+        throw new Error(`db update plan failed: ${JSON.stringify(planResult.failure, null, 2)}`);
+      }
+      const planIds = planResult.value.plan.operations.map((op) => op.id);
+      expect([...planIds].sort()).toEqual(
+        [...ALL_POLICY_WIRE_NAMES.map((n) => `rlsPolicy.public.profile.${n}.drop`)].sort(),
+      );
+
+      const applyResult = await client.dbUpdate({
+        contract: noPolicyContract,
+        mode: 'apply',
+        migrationsDir,
+        acceptDataLoss: true,
+      });
+      if (!applyResult.ok) {
+        throw new Error(`db update apply failed: ${JSON.stringify(applyResult.failure, null, 2)}`);
+      }
+
+      // Verify clean against the policy-less (still marked) contract.
+      const deserialized = new PostgresContractSerializer().deserializeContract<NoPolicyContract>(
+        noPolicyContractJson,
+      );
+      const verifyResult = await client.dbVerify({
+        contract: deserialized,
+        migrationsDir,
+        strict: false,
+        skipSchema: false,
+        skipMarker: false,
+      });
+      expect(
+        verifyResult.ok,
+        `dbVerify failed: ${!verifyResult.ok ? JSON.stringify(verifyResult.failure) : ''}`,
+      ).toBe(true);
+      if (verifyResult.ok) {
+        for (const [spaceId, schemaResult] of verifyResult.value.schemaResults) {
+          expect(
+            schemaResult.ok,
+            `space "${spaceId}" failed: ${JSON.stringify(schemaResult.schema?.issues)}`,
+          ).toBe(true);
+        }
+      }
+
+      // Behavioral proof: RLS is still enabled with zero policies — deny-all.
+      expect(await rowsVisibleToAuthenticated(connectionString, ownerA)).toEqual([]);
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'D — prefix-only policy rename plans exactly one ALTER POLICY … RENAME TO and keeps filtering',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+      await seedProfilesAndGrant(connectionString, ownerA, ownerB);
+
+      // The committed renamed-policy fixture: the same policy body under the
+      // prefix profile_owner_read_v2 — same content hash, new wire name.
+      const renamedContract = renamedPolicyContractJson;
+      const renamedWireName =
+        Object.values(renamedContract.storage.namespaces.public.entries.policy)[0]?.name ?? '';
+      expect(renamedWireName).toBe(
+        `profile_owner_read_v2_${POLICY_WIRE_NAME.slice(POLICY_WIRE_NAME.lastIndexOf('_') + 1)}`,
+      );
+
+      // Plan: exactly one rename — no drop, no create, no enablement change.
+      const planResult = await client.dbUpdate({
+        contract: renamedContract,
+        mode: 'plan',
+        migrationsDir,
+      });
+      if (!planResult.ok) {
+        throw new Error(`db update plan failed: ${JSON.stringify(planResult.failure, null, 2)}`);
+      }
+      const planIds = planResult.value.plan.operations.map((op) => op.id);
+      expect(planIds).toEqual([`rlsPolicy.public.profile.${POLICY_WIRE_NAME}.rename`]);
+
+      const applyResult = await client.dbUpdate({
+        contract: renamedContract,
+        mode: 'apply',
+        migrationsDir,
+      });
+      if (!applyResult.ok) {
+        throw new Error(`db update apply failed: ${JSON.stringify(applyResult.failure, null, 2)}`);
+      }
+
+      // Verify clean against the renamed contract.
+      const deserialized =
+        new PostgresContractSerializer().deserializeContract<RenamedPolicyContract>(
+          renamedPolicyContractJson,
+        );
+      const verifyResult = await client.dbVerify({
+        contract: deserialized,
+        migrationsDir,
+        strict: false,
+        skipSchema: false,
+        skipMarker: false,
+      });
+      expect(
+        verifyResult.ok,
+        `dbVerify failed: ${!verifyResult.ok ? JSON.stringify(verifyResult.failure) : ''}`,
+      ).toBe(true);
+      if (verifyResult.ok) {
+        for (const [spaceId, schemaResult] of verifyResult.value.schemaResults) {
+          expect(
+            schemaResult.ok,
+            `space "${spaceId}" failed: ${JSON.stringify(schemaResult.schema?.issues)}`,
+          ).toBe(true);
+        }
+      }
+
+      // The renamed policy still filters rows.
+      expect(await rowsVisibleToAuthenticated(connectionString, ownerA)).toEqual([
+        { username: 'alice' },
+      ]);
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  // Grants a role write access to the dev-harness WAL-capture schema. Under
+  // `SET ROLE`, an INSERT/UPDATE fires `_prisma_dev_wal.capture_event()`, which
+  // writes to `_prisma_dev_wal.events`; without these grants the role-scoped
+  // write fails with `permission denied for schema _prisma_dev_wal` before RLS
+  // is ever evaluated. This is the accommodation that lets us prove WITH CHECK
+  // enforcement under a role (not just reads).
+  async function grantWalAccess(connectionString: string, role: string): Promise<void> {
+    await withClient(connectionString, async (pg) => {
+      await pg.query(`GRANT USAGE ON SCHEMA _prisma_dev_wal TO ${role}`);
+      await pg.query(`GRANT ALL ON ALL TABLES IN SCHEMA _prisma_dev_wal TO ${role}`);
+      await pg.query(`GRANT ALL ON ALL SEQUENCES IN SCHEMA _prisma_dev_wal TO ${role}`);
+      await pg.query(`GRANT EXECUTE ON FUNCTION _prisma_dev_wal.capture_event() TO ${role}`);
+    });
+  }
+
+  it(
+    'E — anon SELECT policy: under SET ROLE anon, every profile is visible (public read)',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+      await seedProfilesAndGrant(connectionString, ownerA, ownerB);
+      await withClient(connectionString, async (pg) => {
+        await pg.query('GRANT SELECT ON public.profile TO anon');
+      });
+
+      // anon has no jwt; the `profile_public_read` policy (using = true) shows all.
+      const rows = await withClient(connectionString, async (pg) => {
+        await pg.query('SET ROLE anon');
+        const r = await pg.query<{ username: string }>(
+          'SELECT username FROM public.profile ORDER BY username',
+        );
+        await pg.query('RESET ROLE');
+        return r.rows;
+      });
+      expect(rows.map((r) => r.username)).toEqual(['alice', 'bob']);
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'F — authenticated UPDATE-own: WITH CHECK enforces — a compliant update succeeds, an ownership change is rejected',
+    async () => {
+      const { connectionString } = database;
+      const ownerA = '11111111-1111-1111-1111-111111111111';
+      const ownerB = '22222222-2222-2222-2222-222222222222';
+      const aliceId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+      await seedProfilesAndGrant(connectionString, ownerA, ownerB);
+      await withClient(connectionString, async (pg) => {
+        await pg.query('GRANT UPDATE ON public.profile TO authenticated');
+      });
+      // Role-scoped writes fire the dev WAL trigger — grant the role access.
+      await grantWalAccess(connectionString, 'authenticated');
+
+      await withClient(connectionString, async (pg) => {
+        await pg.query('SELECT set_config($1, $2, false)', [
+          'request.jwt.claims',
+          JSON.stringify({ sub: ownerA }),
+        ]);
+        await pg.query('SET ROLE authenticated');
+
+        // Compliant: rename own profile. USING matches (own row); WITH CHECK
+        // holds (userId unchanged, still = auth.uid()).
+        const compliant = await pg.query('UPDATE public.profile SET username = $1 WHERE id = $2', [
+          'alice_renamed',
+          aliceId,
+        ]);
+        expect(compliant.rowCount).toBe(1);
+
+        // Violating: reassign own row to another owner. WITH CHECK rejects — the
+        // new row's userId (ownerB) is not auth.uid() (ownerA).
+        await expect(
+          pg.query('UPDATE public.profile SET "userId" = $1 WHERE id = $2', [ownerB, aliceId]),
+        ).rejects.toThrow(/row-level security|policy|with check/i);
+
+        await pg.query('RESET ROLE');
+      });
+
+      // Final state: the compliant rename landed; ownership is unchanged (the
+      // violating update was rejected in full).
+      const final = await withClient(connectionString, async (pg) => {
+        const r = await pg.query<{ username: string; userId: string }>(
+          'SELECT username, "userId" FROM public.profile WHERE id = $1',
+          [aliceId],
+        );
+        return r.rows[0];
+      });
+      expect(final?.username).toBe('alice_renamed');
+      expect(final?.userId).toBe(ownerA);
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'G — a role the contract declares but the database lacks fails db verify, naming the role',
+    async () => {
+      // Build a contract that declares a role the live database lacks, through
+      // the real construction surface (`new PostgresRole` → `new PostgresSchema`
+      // → `new SqlStorage`) — not by patching contract wire JSON. Roles cannot
+      // be authored in PSL yet, so this is the same path a TypeScript-authored
+      // role declaration lands on: a `role` entity in the namespace's entries.
+      const base = new PostgresContractSerializer().deserializeContract<Contract>(contractJson);
+      // The deserialized namespace is a PostgresSchema at runtime; the structural
+      // contract type and the class intersect to `never`, so read it through the
+      // same narrowing the module header uses.
+      const basePublicNs = base.storage.namespaces['public'] as unknown as PostgresSchema;
+      const publicWithRole = new PostgresSchema({
+        id: basePublicNs.id,
+        entries: {
+          ...basePublicNs.entries,
+          role: {
+            missing_app_role: new PostgresRole({
+              name: 'missing_app_role',
+              namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
+            }),
+          },
+        },
+      });
+      const contractWithRole = {
+        ...base,
+        storage: new SqlStorage({
+          // A freshly constructed test contract carries a test storage hash;
+          // the marker check is skipped below because this test verifies the
+          // schema (the missing role), not migration-marker identity.
+          storageHash: coreHash('sha256:supabase-missing-role'),
+          // Carry the base storage's named types (e.g. `Uuid`) forward — the
+          // profile columns reference them.
+          ...(base.storage.types !== undefined ? { types: base.storage.types } : {}),
+          namespaces: { ...base.storage.namespaces, public: publicWithRole },
+        }),
+      };
+
+      const verifyResult = await client.dbVerify({
+        contract: contractWithRole,
+        migrationsDir,
+        strict: false,
+        skipSchema: false,
+        skipMarker: true,
+      });
+
+      expect(
+        verifyResult.ok,
+        `dbVerify operation failed unexpectedly: ${!verifyResult.ok ? JSON.stringify(verifyResult.failure) : ''}`,
+      ).toBe(true);
+      if (verifyResult.ok) {
+        const appSchemaResult = verifyResult.value.schemaResults.get('app');
+        expect(appSchemaResult?.ok).toBe(false);
+        const roleIssue = appSchemaResult?.schema.issues.find(
+          (issue) => issue.reason === 'not-found' && issue.path.includes('missing_app_role'),
+        );
+        expect(
+          roleIssue,
+          `Expected a not-found issue naming 'missing_app_role'; got: ${JSON.stringify(appSchemaResult?.schema.issues)}`,
+        ).toBeDefined();
       }
     },
     timeouts.spinUpPpgDev * 4,

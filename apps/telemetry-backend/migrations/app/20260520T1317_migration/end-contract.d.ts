@@ -89,7 +89,7 @@ type ContractBase = ContractType<
     readonly namespaces: {
       readonly __unbound__: {
         readonly id: '__unbound__';
-        readonly kind: 'sql-namespace';
+        readonly kind: 'postgres-schema';
         readonly tables: {
           readonly telemetry_event: {
             columns: {

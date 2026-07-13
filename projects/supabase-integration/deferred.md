@@ -7,8 +7,8 @@ Explicit list of things we've decided are **not** part of the Supabase integrati
 - **Realtime support.** Supabase Realtime is a separate subsystem (WebSocket-based change feed); not on the v0.1 path. Decision recorded upstream from when this work started.
 - **Storage API.** `storage.*` tables are visible via the `external`-control contract, but uploading/managing storage objects is not a database concern. We don't ship file-upload helpers.
 - **`@supabase/supabase-js` parity for non-DB features.** Auth flows (sign in, password reset), edge functions, etc. — outside Prisma Next's remit.
-- **Introspection-based emit of the Supabase contract.** We hand-author the shipped `contract.json` for v0.1. An emitter that introspects a Supabase Postgres database is plausible follow-up work, not v0.1.
-- **`prisma-next adopt --from-database` introspection.** Same family of work as above; needed for users migrating from existing Supabase apps. Likely the next obvious project after this one.
+- ~~**Introspection-based emit of the Supabase contract.**~~ **Moved into scope (2026-07-02)** — the extension now ships a complete, introspection-generated contract of everything it owns (extension-supabase Slice F; decision [C16](decisions.md)).
+- ~~**`prisma-next adopt --from-database` introspection.**~~ **Partly moved into scope (2026-07-02)** — extension-aware `contract infer` (writing a meaningful app-only `contract.prisma` that omits Supabase-owned elements) is a launch requirement (extension-supabase Slice G; decision [C16](decisions.md)). A general `adopt` UX beyond that remains follow-up.
 - **Identity providers other than Supabase.** Auth0, Clerk, custom auth, JWT-from-anywhere. The control-policy/cross-contract-ref/RLS machinery is reusable for these (they'd each become their own extension package), but they're not v0.1 targets.
 - **Typed `m.sql\`...\`` template tag for RLS predicates.** Plain strings only for v0.1. The typed template tag is real future polish; it's not on this project's critical path.
 - **Visibility / encapsulation between contract spaces.** All extension contract spaces are visible to app contracts. Tooling-level "this extension's internals are private" controls are a future concern; for v0.1 every extension is fully visible.
@@ -19,6 +19,7 @@ Explicit list of things we've decided are **not** part of the Supabase integrati
 - **`observed` policy in v0.1.** Possibly drop to ship only `managed / tolerated / external` if the design pressure pushes that way. Decided when the control-policy spec is settled; the four-policy story is the working assumption.
 - **RPC / Postgres function call surface.** No typed `rpc('fn_name', args)` equivalent. Not a regression from the status quo (users don't have this without Prisma Next either); raw SQL escape hatch is the v0.1 fallback.
 - **`CREATE EXTENSION` statements.** Handled by target-specific extension packs (e.g., the existing pgvector extension). Not a Supabase-specific concern.
+- **Runtime bound to the aggregate contract (the principled multi-root design).** Admin access to Supabase-internal tables ships as a *secondary root* — `db.asServiceRole().supabase.{sql,orm}`, implemented as two contract-bound runtimes sharing one pool ([decision C15](decisions.md)). That's the pragmatic interim. The principled end state is a single `Runtime` bound to the **aggregate contract** (the composed app + extension contract spaces) that serves all roots natively — and would be the substrate real cross-space querying rides on. Deferred; not v0.1.
 
 ## Stretch goals (in-scope if time permits)
 

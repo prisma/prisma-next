@@ -33,6 +33,7 @@ import {
   rel,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../2-sql/1-core/contract/test/test-support';
 import contractJson from '../src/contract/contract.json' with { type: 'json' };
 import { AuthIdentity, AuthUser, StorageBucket, StorageObject } from '../src/exports/contract';
 import supabasePack from '../src/exports/pack';
@@ -126,6 +127,7 @@ describe('lowering smoke test — FK + relation to AuthUser via real supabasePac
       target: postgresTargetPack,
       extensionPacks: { supabase: supabasePack },
       models: { Profile },
+      createNamespace: createTestSqlNamespace,
     });
   }
 

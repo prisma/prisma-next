@@ -1,20 +1,24 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { buildPostgresPlanDiff } from '@prisma-next/target-postgres/diff-database-schema';
 import {
   computeContentHash,
   normalizePredicate,
 } from '@prisma-next/target-postgres/rls-canonicalize';
 import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  PostgresPolicySchemaNode,
+  PostgresRlsEnablement,
   PostgresRlsPolicy,
   PostgresSchema,
-  PostgresSchemaIR,
+  PostgresTableSchemaNode,
 } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
-import { controlAdapter } from './fixtures/runner-fixtures';
 
+const SCHEMA_NAME = 'public';
 const TABLE_NAME = 'items';
 const USING = '(owner_id = current_user_id())';
 const PREFIX = 'read_own';
@@ -31,7 +35,7 @@ function managedPolicy(): PostgresRlsPolicy {
     name: WIRE_NAME,
     prefix: PREFIX,
     tableName: TABLE_NAME,
-    namespaceId: 'public',
+    namespaceId: SCHEMA_NAME,
     operation: 'select',
     roles: ['app_user'],
     using: USING,
@@ -44,7 +48,7 @@ function externalPolicy(): PostgresRlsPolicy {
     name: 'legacy_admin_policy',
     prefix: 'legacy_admin_policy',
     tableName: TABLE_NAME,
-    namespaceId: 'public',
+    namespaceId: SCHEMA_NAME,
     operation: 'select',
     roles: ['app_user'],
     using: USING,
@@ -52,38 +56,76 @@ function externalPolicy(): PostgresRlsPolicy {
   });
 }
 
-function schemaWithPolicies(policies: PostgresRlsPolicy[]): PostgresSchemaIR {
-  return new PostgresSchemaIR({
-    tables: {
-      [TABLE_NAME]: {
-        name: TABLE_NAME,
-        columns: {},
-        foreignKeys: [],
-        uniques: [],
-        indexes: [],
-      } as unknown as SqlTableIR,
+function toPolicyNode(p: PostgresRlsPolicy): PostgresPolicySchemaNode {
+  return new PostgresPolicySchemaNode({
+    name: p.name,
+    prefix: p.prefix,
+    tableName: p.tableName,
+    namespaceId: p.namespaceId,
+    operation: p.operation,
+    roles: [...p.roles],
+    ...ifDefined('using', p.using),
+    ...ifDefined('withCheck', p.withCheck),
+    permissive: p.permissive,
+  });
+}
+
+function schemaWithPolicies(policies: PostgresRlsPolicy[]): PostgresDatabaseSchemaNode {
+  return new PostgresDatabaseSchemaNode({
+    namespaces: {
+      [SCHEMA_NAME]: new PostgresNamespaceSchemaNode({
+        schemaName: SCHEMA_NAME,
+        tables: {
+          [TABLE_NAME]: new PostgresTableSchemaNode({
+            name: TABLE_NAME,
+            columns: {},
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+            policies: policies.map(toPolicyNode),
+            rlsEnabled: false,
+          }),
+        },
+      }),
     },
-    pgSchemaName: 'public',
     pgVersion: 'unknown',
-    rlsPolicies: policies,
     roles: [],
-    existingSchemas: ['public'],
-    nativeEnumTypeNames: [],
+    existingSchemas: [SCHEMA_NAME],
   });
 }
 
-function emptyContractNoPolicies(): Contract<SqlStorage> {
+function buildContract(policies: readonly PostgresRlsPolicy[]): Contract<SqlStorage> {
+  const policyEntries: Record<string, PostgresRlsPolicy> = {};
+  for (const p of policies) {
+    policyEntries[p.name] = p;
+  }
   const schema = new PostgresSchema({
-    id: UNBOUND_NAMESPACE_ID,
-    entries: { table: {}, policy: {} },
+    id: SCHEMA_NAME,
+    entries: {
+      table: {
+        [TABLE_NAME]: new StorageTable({
+          columns: {},
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        }),
+      },
+      policy: policyEntries,
+      rls: {
+        [TABLE_NAME]: new PostgresRlsEnablement({
+          tableName: TABLE_NAME,
+          namespaceId: SCHEMA_NAME,
+        }),
+      },
+    },
   });
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:collect-ext-no-policy'),
+    profileHash: profileHash('sha256:collect-ext-test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:collect-ext-no-policy'),
-      namespaces: { [UNBOUND_NAMESPACE_ID]: schema },
+      storageHash: coreHash('sha256:collect-ext-test'),
+      namespaces: { [SCHEMA_NAME]: schema },
     }),
     roots: {},
     domain: applicationDomainOf({ models: {} }),
@@ -93,56 +135,43 @@ function emptyContractNoPolicies(): Contract<SqlStorage> {
   };
 }
 
-function contractWithPolicy(): Contract<SqlStorage> {
-  const policy = managedPolicy();
-  const schema = new PostgresSchema({
-    id: UNBOUND_NAMESPACE_ID,
-    entries: { table: {}, policy: { [WIRE_NAME]: policy } },
+/**
+ * Runs the one-differ planner diff and returns only the policy findings —
+ * the RLS drift these tests assert on. Mirrors how `planner.ts` itself
+ * splits the combined issue list (`isPolicyDiffIssue`).
+ */
+function policyDiffIssues(contract: Contract<SqlStorage>, schema: PostgresDatabaseSchemaNode) {
+  const { issues } = buildPostgresPlanDiff({
+    contract,
+    actualSchema: schema,
+    frameworkComponents: [],
   });
-  return {
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: profileHash('sha256:collect-ext-with-policy'),
-    storage: new SqlStorage({
-      storageHash: coreHash('sha256:collect-ext-with-policy'),
-      namespaces: { [UNBOUND_NAMESPACE_ID]: schema },
-    }),
-    roots: {},
-    domain: applicationDomainOf({ models: {} }),
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-  };
+  return issues.filter((issue) => {
+    const node = issue.expected ?? issue.actual;
+    return node !== undefined && PostgresPolicySchemaNode.is(node);
+  });
 }
 
-describe('collectSchemaDiffIssues — RLS drift detection', () => {
+describe('buildPostgresPlanDiff — RLS drift detection', () => {
   it('no contract policy + Prisma-managed DB policy → one extra diff issue', () => {
-    const issues = controlAdapter.collectSchemaDiffIssues!(
-      emptyContractNoPolicies(),
-      schemaWithPolicies([managedPolicy()]),
-    );
+    const issues = policyDiffIssues(buildContract([]), schemaWithPolicies([managedPolicy()]));
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.outcome).toBe('extra');
-    expect(issues[0]?.coordinate.entityName).toBe(WIRE_NAME);
+    expect(issues[0]?.reason).toBe('not-expected');
+    expect(issues[0]?.actual).toMatchObject({ name: WIRE_NAME });
   });
 
   it('no contract policy + external DB policy → one extra diff issue', () => {
-    const issues = controlAdapter.collectSchemaDiffIssues!(
-      emptyContractNoPolicies(),
-      schemaWithPolicies([externalPolicy()]),
-    );
+    const issues = policyDiffIssues(buildContract([]), schemaWithPolicies([externalPolicy()]));
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.outcome).toBe('extra');
-    expect(issues[0]?.coordinate.entityName).toBe('legacy_admin_policy');
+    expect(issues[0]?.reason).toBe('not-expected');
+    expect(issues[0]?.actual).toMatchObject({ name: 'legacy_admin_policy' });
   });
 
   it('matching contract + DB policy → no issues', () => {
-    const issues = controlAdapter.collectSchemaDiffIssues!(
-      contractWithPolicy(),
-      schemaWithPolicies([managedPolicy()]),
-    );
+    const policy = managedPolicy();
+    const issues = policyDiffIssues(buildContract([policy]), schemaWithPolicies([policy]));
 
     expect(issues).toHaveLength(0);
   });

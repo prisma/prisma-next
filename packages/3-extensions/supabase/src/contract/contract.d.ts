@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:61dac13aa56bcb5b7f1c5441c2bd8fc07d88f6c870c80b4c1640fd0d180fb423'>;
+  StorageHashBase<'sha256:b2c40a9014bd2c04c3efe0dca1294857e3dbb35d52d95cc0badacd5bf4b8e587'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -50,6 +50,12 @@ export type FieldOutputTypes = {
       readonly provider: CodecTypes['pg/text@1']['output'];
       readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
       readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
+    };
+    readonly AuthSession: {
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly user_id: CodecTypes['pg/uuid@1']['output'];
+      readonly aal: 'aal1' | 'aal2' | 'aal3' | null;
+      readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
     };
     readonly AuthUser: {
       readonly id: CodecTypes['pg/uuid@1']['output'];
@@ -83,6 +89,12 @@ export type FieldInputTypes = {
       readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
       readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
     };
+    readonly AuthSession: {
+      readonly id: CodecTypes['pg/uuid@1']['input'];
+      readonly user_id: CodecTypes['pg/uuid@1']['input'];
+      readonly aal: 'aal1' | 'aal2' | 'aal3' | null;
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
+    };
     readonly AuthUser: {
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly email: CodecTypes['pg/text@1']['input'];
@@ -113,6 +125,12 @@ export type StorageColumnTypes = {
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly provider: CodecTypes['pg/text@1']['output'];
       readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
+      readonly user_id: CodecTypes['pg/uuid@1']['output'];
+    };
+    readonly sessions: {
+      readonly aal: 'aal1' | 'aal2' | 'aal3' | null;
+      readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
+      readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly user_id: CodecTypes['pg/uuid@1']['output'];
     };
     readonly users: {
@@ -146,6 +164,12 @@ export type StorageColumnInputTypes = {
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly provider: CodecTypes['pg/text@1']['input'];
       readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
+      readonly user_id: CodecTypes['pg/uuid@1']['input'];
+    };
+    readonly sessions: {
+      readonly aal: 'aal1' | 'aal2' | 'aal3' | null;
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
+      readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly user_id: CodecTypes['pg/uuid@1']['input'];
     };
     readonly users: {
@@ -226,6 +250,38 @@ type ContractBase = Omit<
               indexes: readonly [];
               foreignKeys: readonly [];
             };
+            readonly sessions: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                  readonly typeRef: 'Uuid';
+                };
+                readonly user_id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                  readonly typeRef: 'Uuid';
+                };
+                readonly aal: {
+                  readonly nativeType: 'auth.aal_level';
+                  readonly codecId: 'pg/enum@1';
+                  readonly nullable: true;
+                  readonly typeParams: { readonly typeName: 'auth.aal_level' };
+                };
+                readonly created_at: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz@1';
+                  readonly nullable: false;
+                  readonly typeRef: 'Timestamptz';
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [];
+            };
             readonly users: {
               columns: {
                 readonly id: {
@@ -256,6 +312,12 @@ type ContractBase = Omit<
               uniques: readonly [];
               indexes: readonly [];
               foreignKeys: readonly [];
+            };
+          };
+          readonly valueSet: {
+            readonly AalLevel: {
+              readonly kind: 'valueSet';
+              readonly values: readonly ['aal1', 'aal2', 'aal3'];
             };
           };
         };
@@ -366,6 +428,7 @@ type ContractBase = Omit<
       readonly namespace: 'auth' & NamespaceId;
       readonly model: 'AuthIdentity';
     };
+    readonly sessions: { readonly namespace: 'auth' & NamespaceId; readonly model: 'AuthSession' };
     readonly buckets: {
       readonly namespace: 'storage' & NamespaceId;
       readonly model: 'StorageBucket';
@@ -412,6 +475,41 @@ type ContractBase = Omit<
                 readonly provider: { readonly column: 'provider' };
                 readonly created_at: { readonly column: 'created_at' };
                 readonly updated_at: { readonly column: 'updated_at' };
+              };
+            };
+          };
+          readonly AuthSession: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly user_id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly aal: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/enum@1';
+                  readonly typeParams: { readonly typeName: 'auth.aal_level' };
+                };
+              };
+              readonly created_at: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'sessions';
+              readonly namespaceId: 'auth';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly user_id: { readonly column: 'user_id' };
+                readonly aal: { readonly column: 'aal' };
+                readonly created_at: { readonly column: 'created_at' };
               };
             };
           };
@@ -535,6 +633,7 @@ type ContractBase = Omit<
       readonly enums: true;
       readonly lateral: true;
       readonly returning: true;
+      readonly scalarList: true;
     };
   };
   readonly extensionPacks: {};

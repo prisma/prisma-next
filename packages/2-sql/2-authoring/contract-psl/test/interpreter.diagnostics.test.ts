@@ -1,23 +1,27 @@
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract,
 } from '../src/interpreter';
-
 import {
   createBuiltinLikeControlMutationDefaults,
   documentScopedTypes,
+  modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
   sqliteScalarTypeDescriptors,
   sqliteTarget,
   symbolTableInputFromParseArgs,
 } from './fixtures';
+import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
 
 const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
+  createNamespace: createTestSqlNamespace,
+  capabilities: { sql: { scalarList: true } },
 } as const;
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
@@ -150,18 +154,13 @@ model User {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
-    expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('Field "Team.id" @map requires'),
-        }),
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('Model "Team" @map requires'),
-        }),
-      ]),
+    const mapDiagnostics = result.failure.diagnostics.filter(
+      (diagnostic) => diagnostic.code === 'PSL_INVALID_ATTRIBUTE_SYNTAX',
     );
+    expect(mapDiagnostics).toHaveLength(2);
+    for (const diagnostic of mapDiagnostics) {
+      expect(diagnostic.message).toContain('Expected a string literal');
+    }
   });
 
   it('returns diagnostics for unsupported model attributes', () => {
@@ -237,8 +236,8 @@ model User {
 }
 `,
       {
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        message: 'Model "Membership" @@id references unknown field "Membership.missingId"',
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+        message: 'Field "missingId" does not exist on model "Membership"',
       },
     );
   });
@@ -764,8 +763,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('Model "Thing" @@id requires fields list argument'),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('is missing required argument "fields"'),
         }),
       ]),
     );
@@ -790,8 +789,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('@@id requires bracketed field list argument'),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Expected a non-empty list'),
         }),
       ]),
     );
@@ -816,10 +815,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining(
-            'Model "Thing" @@id references unknown field "Thing.nope"',
-          ),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Field "nope" does not exist on model "Thing"'),
         }),
       ]),
     );
@@ -870,8 +867,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('@@id map argument must be a quoted string literal'),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Expected a string literal'),
         }),
       ]),
     );
@@ -924,8 +921,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: 'Model "Thing" @@id list contains duplicate field "email"',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: 'Duplicate list entry',
         }),
       ]),
     );
@@ -1011,6 +1008,32 @@ model User {
     );
   });
 
+  it('rejects field @unique with a non-quoted map argument', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Thing {
+  id    Int @id
+  email String @unique(map: not_a_string)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Expected a string literal'),
+        }),
+      ]),
+    );
+  });
+
   it('rejects @@unique with duplicate fields in the list', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model Thing {
@@ -1031,8 +1054,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: 'Model "Thing" @@unique list contains duplicate field "email"',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: 'Duplicate list entry',
         }),
       ]),
     );
@@ -1058,8 +1081,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: 'Model "Thing" @@index list contains duplicate field "email"',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: 'Duplicate list entry',
         }),
       ]),
     );
@@ -1083,6 +1106,8 @@ model User {
         composedExtensionContracts: new Map(),
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
+        createNamespace: createTestSqlNamespace,
+        capabilities: { sql: { scalarList: true } },
       });
 
       expect(result.ok).toBe(false);
@@ -1118,6 +1143,8 @@ model User {
         composedExtensionContracts: new Map(),
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
+        createNamespace: createTestSqlNamespace,
+        capabilities: { sql: { scalarList: true } },
       });
 
       expect(result.ok).toBe(false);
@@ -1186,6 +1213,261 @@ namespace auth {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
+    });
+  });
+});
+
+describe('interpretPslDocumentToSqlContract list-field constructs', () => {
+  it('rejects an execution default now() on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  id Int @id
+  tags String[] @default(now())
+}
+`,
+      {
+        code: 'PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED',
+        message:
+          'Field "Post.tags" is a list and cannot use an execution default ("now()"). Lists have no per-element execution-default semantics; use a literal list @default or remove the default.',
+      },
+    );
+  });
+
+  it('rejects an execution default uuid() on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  id Int @id
+  tags String[] @default(uuid())
+}
+`,
+      {
+        code: 'PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED',
+        message:
+          'Field "Post.tags" is a list and cannot use an execution default ("uuid()"). Lists have no per-element execution-default semantics; use a literal list @default or remove the default.',
+      },
+    );
+  });
+
+  it('rejects an execution default autoincrement() on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  id Int @id
+  tags Int[] @default(autoincrement())
+}
+`,
+      {
+        code: 'PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED',
+        message:
+          'Field "Post.tags" is a list and cannot use an execution default ("autoincrement()"). Lists have no per-element execution-default semantics; use a literal list @default or remove the default.',
+      },
+    );
+  });
+
+  it('rejects @id on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  tags String[] @id
+}
+`,
+      {
+        code: 'PSL_LIST_ID_UNSUPPORTED',
+        message:
+          'Field "Post.tags" is a list and cannot be a primary key. Remove @id; a list cannot be an identity column.',
+      },
+    );
+  });
+
+  it('authors a plain scalar list field with no diagnostics', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  tags String[]
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(modelsOf(result.value)).toMatchObject({
+      Post: {
+        fields: {
+          tags: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'pg/text@1' },
+            many: true,
+          },
+        },
+      },
+    });
+  });
+
+  it('rejects a scalar literal default on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  id Int @id
+  tags String[] @default("x")
+}
+`,
+      {
+        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
+        message:
+          'Field "Post.tags" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.',
+      },
+    );
+  });
+
+  it('rejects a scalar numeric default on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  id Int @id
+  scores Int[] @default(5)
+}
+`,
+      {
+        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
+        message:
+          'Field "Post.scores" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.',
+      },
+    );
+  });
+
+  it('lowers an empty-array default on a list field to a literal empty array', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  tags String[] @default([])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(storage.namespaces['public']?.entries.table?.['post']?.columns['tags']).toMatchObject({
+      nativeType: 'text',
+      codecId: 'pg/text@1',
+      many: true,
+      default: { kind: 'literal', value: [] },
+    });
+  });
+
+  it('lowers a literal-list default encoding each element against the element codec', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  tags String[] @default(["a", "b"])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(storage.namespaces['public']?.entries.table?.['post']?.columns['tags']).toMatchObject({
+      many: true,
+      default: { kind: 'literal', value: ['a', 'b'] },
+    });
+  });
+
+  it('lowers a numeric-list default to a literal number array', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  scores Int[] @default([1, 2])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(storage.namespaces['public']?.entries.table?.['post']?.columns['scores']).toMatchObject({
+      many: true,
+      default: { kind: 'literal', value: [1, 2] },
+    });
+  });
+
+  it('lowers a boolean-list default to a literal boolean array', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  flags Boolean[] @default([true, false])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(storage.namespaces['public']?.entries.table?.['post']?.columns['flags']).toMatchObject({
+      many: true,
+      default: { kind: 'literal', value: [true, false] },
+    });
+  });
+
+  it('preserves commas inside a quoted list-default element', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Post {
+  id Int @id
+  tags String[] @default(["a,b", "c"])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    expect(storage.namespaces['public']?.entries.table?.['post']?.columns['tags']).toMatchObject({
+      many: true,
+      default: { kind: 'literal', value: ['a,b', 'c'] },
     });
   });
 });

@@ -13,17 +13,11 @@ import { contractToMongoSchemaIR } from '@prisma-next/family-mongo/control';
 import type { MongoControlAdapter } from '@prisma-next/family-mongo/control-adapter';
 import type {
   MigrationRunner,
-  MigrationRunnerPerSpaceOptions,
   MigrationRunnerPerSpaceSuccessValue,
   MigrationRunnerResult,
+  VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import {
-  createContractSpaceMember,
-  projectSchemaToSpace,
-} from '@prisma-next/migration-tools/aggregate';
 import type { MongoContract } from '@prisma-next/mongo-contract';
-import type { MongoSchemaCollection } from '@prisma-next/mongo-schema-ir';
-import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { mongoTargetDescriptorMeta } from './descriptor-meta';
@@ -32,6 +26,7 @@ import { MongoMigrationRunner, type MongoMigrationRunnerExecuteOptions } from '.
 import type { MongoTargetContract } from './mongo-target-contract';
 import { MongoTargetContractSerializer } from './mongo-target-contract-serializer';
 import { MongoTargetSchemaVerifier } from './mongo-target-schema-verifier';
+import { entityNamesDeclaredBy, scopeVerifyResultToSpace } from './scope-verify-result';
 
 export type { MongoControlTargetDescriptor };
 
@@ -78,7 +73,10 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
         // typed surface.
         return new MongoMigrationRunner(cachedDeps).execute({
           ...runnerOptions,
-          destinationContract: runnerOptions.destinationContract as MongoContract,
+          destinationContract: blindCast<
+            MongoContract,
+            'framework MigrationRunner types destinationContract as unknown; deserializeContract validated it upstream'
+          >(runnerOptions.destinationContract),
         });
       };
 
@@ -93,16 +91,21 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
         // markers are not rolled back when a later space fails. Re-running reads
         // each marker, finds spaces 1..N−1 at-head (no-op skip), retries N onward.
         //
-        // Per-space verify is sliced via `projectSchemaToSpace`: the live DB
-        // holds collections owned by sibling spaces, but each space's verify
-        // only sees the slice that space's contract actually claims. Without
-        // the projection an aggregate of two spaces could not pass strict
-        // verify (every other-space collection would look like an extra).
+        // Per-space verify is scoped by `scopeVerifyResultToSpace`: the live DB
+        // holds collections owned by sibling contract spaces, so each space
+        // verifies the full schema and then drops the `extra` findings for the
+        // collections a sibling space claims. Without the scoping an aggregate
+        // of two spaces could not pass strict verify (every other-space
+        // collection would look like an extra).
         //
         // See `docs/architecture docs/subsystems/10. MongoDB Family.md` §
         // Contract spaces and ADR 212 — Contract spaces.
         async execute({ driver, perSpaceOptions }): Promise<MigrationRunnerResult> {
-          const members = perSpaceOptions.map(toSpaceMember);
+          const contracts = perSpaceOptions.map((opts) =>
+            blindCast<Contract, 'destinationContract validated at aggregate boundary'>(
+              opts.destinationContract,
+            ),
+          );
           const perSpaceResults: Array<{
             space: string;
             value: MigrationRunnerPerSpaceSuccessValue;
@@ -110,24 +113,15 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
           for (let i = 0; i < perSpaceOptions.length; i++) {
             const spaceOptions = perSpaceOptions[i];
             if (!spaceOptions) continue;
-            const member = members[i];
-            if (!member) continue;
-            const others = members.filter((_, j) => j !== i);
-            const projectSchema = (schema: MongoSchemaIR): MongoSchemaIR => {
-              // `projectSchemaToSpace` returns a plain object
-              // `{...schemaIR, collections: prunedArray}` (not a
-              // `MongoSchemaIR` instance), so the descriptor rewraps
-              // the pruned collections into a fresh `MongoSchemaIR`
-              // before handing it to `verifyMongoSchema` (which
-              // depends on the class's `collectionNames` /
-              // `collection(name)` accessors).
-              const projected = projectSchemaToSpace(schema, member, others) as {
-                readonly collections: ReadonlyArray<MongoSchemaCollection>;
-              };
-              return new MongoSchemaIR(projected.collections);
-            };
+            // The runner verifies the destination contract against the full
+            // introspected schema; scope the result to this space, dropping the
+            // `extra` findings for collections a sibling space claims.
+            const ownedByOtherSpaces = entityNamesDeclaredBy(contracts.filter((_, j) => j !== i));
+            const scopeVerifyResult = (
+              result: VerifyDatabaseSchemaResult,
+            ): VerifyDatabaseSchemaResult => scopeVerifyResultToSpace(result, ownedByOtherSpaces);
             const { space, ...runnerOptions } = spaceOptions;
-            const result = await runMongo(driver, { ...runnerOptions, projectSchema });
+            const result = await runMongo(driver, { ...runnerOptions, scopeVerifyResult });
             if (!result.ok) {
               return notOk({
                 ...result.failure,
@@ -142,32 +136,15 @@ export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetCont
       return runner;
     },
     contractToSchema(contract: Contract | null) {
-      return contractToMongoSchemaIR(contract as MongoContract | null);
+      return contractToMongoSchemaIR(
+        blindCast<
+          MongoContract | null,
+          'framework contractToSchema types contract as the generic Contract; any contract reaching the mongo target is MongoContract by construction'
+        >(contract),
+      );
     },
   },
   create() {
     return { familyId: 'mongo' as const, targetId: 'mongo' as const };
   },
 };
-
-/**
- * Synthesise a {@link projectSchemaToSpace}-compatible member from a
- * per-space option entry. The projector only reads `spaceId` and
- * `contract()`; migration graph state is empty because the runner
- * consumes the destination contract directly.
- */
-function toSpaceMember(opts: MigrationRunnerPerSpaceOptions<'mongo', 'mongo'>) {
-  const contract = blindCast<Contract, 'destinationContract validated at aggregate boundary'>(
-    opts.destinationContract,
-  );
-  return createContractSpaceMember({
-    spaceId: opts.space,
-    packages: [],
-    refs: {},
-    headRef: null,
-    refsDir: '',
-    resolveContract: () => contract,
-    deserializeContract: (raw) =>
-      blindCast<Contract, 'destinationContract validated at aggregate boundary'>(raw),
-  });
-}

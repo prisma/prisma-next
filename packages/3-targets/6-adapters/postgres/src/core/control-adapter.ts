@@ -1,8 +1,4 @@
-import type {
-  Contract,
-  ContractMarkerRecord,
-  LedgerEntryRecord,
-} from '@prisma-next/contract/types';
+import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
 import {
   parseMarkerRowSafely,
   rethrowMarkerReadError,
@@ -11,11 +7,11 @@ import {
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import { APP_SPACE_ID, type SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
-import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   CodecRef,
@@ -32,15 +28,13 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
-  PrimaryKey,
+  PrimaryKeyInput,
   SqlCheckConstraintIRInput,
-  SqlColumnIR,
-  SqlForeignKeyIR,
-  SqlIndexIR,
+  SqlColumnIRInput,
+  SqlForeignKeyIRInput,
+  SqlIndexIRInput,
   SqlReferentialAction,
-  SqlSchemaIR,
-  SqlTableIR,
-  SqlUniqueIR,
+  SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
 import {
   buildControlTableBootstrapQueries,
@@ -50,23 +44,29 @@ import type {
   AddColumnAction,
   AlterTableActionVisitor,
   DropDefaultAction,
+  PostgresAlterPolicyRename,
   PostgresAlterTable,
   PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
+  PostgresCreateType,
   PostgresDdlNode,
+  PostgresDisableRowLevelSecurity,
   PostgresDropPolicy,
+  PostgresDropType,
   RlsPolicyOperation,
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
-import { diffPostgresRlsPolicies } from '@prisma-next/target-postgres/planner';
+import { parseRlsPolicyWireName } from '@prisma-next/target-postgres/rls-canonicalize';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
-  isPostgresSchemaIR,
-  PostgresRlsPolicy,
-  PostgresRole,
-  PostgresSchemaIR,
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  PostgresNativeEnumSchemaNode,
+  PostgresPolicySchemaNode,
+  PostgresRoleSchemaNode,
+  PostgresTableSchemaNode,
 } from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -122,18 +122,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * before comparison with contract native types.
    */
   readonly normalizeNativeType = normalizeSchemaNativeType;
-
-  collectSchemaDiffIssues(
-    contract: Contract<SqlStorage>,
-    schema: SqlSchemaIR,
-  ): readonly SchemaDiffIssue[] {
-    if (!isPostgresSchemaIR(schema)) {
-      throw new Error(
-        `RLS verification requires a PostgresSchemaIR; got ${(schema as { constructor?: { name?: string } }).constructor?.name ?? typeof schema}`,
-      );
-    }
-    return diffPostgresRlsPolicies({ contract, schema });
-  }
 
   bootstrapControlTableQueries(): readonly DdlNode[] {
     return buildControlTableBootstrapQueries();
@@ -575,22 +563,51 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     driver: SqlControlDriverInstance<'postgres'>,
     contract?: unknown,
     schema = 'public',
-  ): Promise<PostgresSchemaIR> {
+  ): Promise<PostgresDatabaseSchemaNode> {
     const declaredNamespaces = extractContractNamespaceIds(contract);
-    const ir =
+    const resolvedSchemas =
       declaredNamespaces.length > 0
-        ? await this.introspectNamespaces(driver, declaredNamespaces)
-        : await this.introspectSchema(driver, schema);
+        ? await this.resolveNamespaceSchemas(driver, declaredNamespaces)
+        : [schema];
+
+    // Walk schemas sequentially: every introspectSchema call shares the one
+    // control connection, so a parallel walk only serialises behind the wire
+    // protocol and trips pg's "already executing a query" deprecation.
+    const namespaces: Record<string, PostgresNamespaceSchemaNode> = {};
+    let pgVersion = 'unknown';
+    for (const resolved of resolvedSchemas) {
+      const { namespace, pgVersion: version } = await this.introspectSchema(driver, resolved);
+      namespaces[resolved] = namespace;
+      pgVersion = version;
+    }
+
+    const roles = await this.introspectRoles(driver);
     const existingSchemas = await this.listExistingSchemas(driver);
-    return new PostgresSchemaIR({
-      tables: ir.tables,
-      pgSchemaName: ir.pgSchemaName,
-      pgVersion: ir.pgVersion,
-      rlsPolicies: ir.rlsPolicies,
-      roles: ir.roles,
+    return new PostgresDatabaseSchemaNode({
+      namespaces,
+      roles,
       existingSchemas,
-      nativeEnumTypeNames: ir.nativeEnumTypeNames,
+      pgVersion,
     });
+  }
+
+  /**
+   * Reads cluster-scoped database roles. Roles are not schema-qualified, so
+   * this is queried once for the whole database rather than per namespace.
+   */
+  private async introspectRoles(
+    driver: SqlControlDriverInstance<'postgres'>,
+  ): Promise<readonly PostgresRoleSchemaNode[]> {
+    const rolesResult = await driver.query<{ rolname: string }>(
+      `SELECT rolname
+       FROM pg_catalog.pg_roles
+       WHERE rolname NOT LIKE 'pg_%'
+         AND rolname != 'postgres'
+       ORDER BY rolname`,
+    );
+    return rolesResult.rows.map(
+      (row) => new PostgresRoleSchemaNode({ name: row.rolname, namespaceId: UNBOUND_NAMESPACE_ID }),
+    );
   }
 
   /**
@@ -616,16 +633,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   /**
-   * Walks every declared namespace, resolving `UNBOUND_NAMESPACE_ID` to
-   * the connection's `current_schema()`, and merges the per-schema results
-   * into a single `SqlSchemaIR`. The merged `tables` map is flat (keyed by
-   * table name) so callers that look up by `tableName` see every contract
-   * table regardless of which namespace it lives in.
+   * Resolves the declared namespace ids to their live DDL schema names,
+   * mapping `UNBOUND_NAMESPACE_ID` to the connection's `current_schema()`
+   * and de-duplicating. The caller introspects one namespace node per
+   * resolved schema — there is no flat cross-schema merge, so two schemas
+   * holding a same-named table no longer collide.
    */
-  private async introspectNamespaces(
+  private async resolveNamespaceSchemas(
     driver: SqlControlDriverInstance<'postgres'>,
     namespaceIds: readonly string[],
-  ): Promise<PostgresSchemaIR> {
+  ): Promise<readonly string[]> {
     const resolvedSchemas: string[] = [];
     for (const id of namespaceIds) {
       if (id === UNBOUND_NAMESPACE_ID) {
@@ -637,51 +654,19 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         resolvedSchemas.push(id);
       }
     }
-    const uniqueSchemas = Array.from(new Set(resolvedSchemas));
-
-    // Walk schemas sequentially: every introspectSchema call shares the one
-    // control connection, so a parallel walk only serialises behind the wire
-    // protocol and trips pg's "already executing a query" deprecation.
-    const perSchema: PostgresSchemaIR[] = [];
-    for (const schema of uniqueSchemas) {
-      perSchema.push(await this.introspectSchema(driver, schema));
-    }
-
-    const mergedTables: Record<string, SqlTableIR> = {};
-    for (const ir of perSchema) {
-      for (const [tableName, table] of Object.entries(ir.tables)) {
-        mergedTables[tableName] = table;
-      }
-    }
-
-    const mergedRlsPolicies: PostgresRlsPolicy[] = [];
-    const mergedRoles: PostgresRole[] = [];
-    for (const ir of perSchema) {
-      mergedRlsPolicies.push(...ir.rlsPolicies);
-      mergedRoles.push(...ir.roles);
-    }
-
-    const first = perSchema[0];
-    return new PostgresSchemaIR({
-      tables: mergedTables,
-      pgSchemaName: first?.pgSchemaName ?? 'public',
-      pgVersion: first?.pgVersion ?? 'unknown',
-      rlsPolicies: mergedRlsPolicies,
-      roles: mergedRoles,
-      existingSchemas: first?.existingSchemas ?? ['public'],
-      nativeEnumTypeNames: first?.nativeEnumTypeNames ?? [],
-    });
+    return Array.from(new Set(resolvedSchemas));
   }
 
   /**
-   * Introspects a single Postgres schema and returns a raw SqlSchemaIR
-   * containing only the tables in that schema. Used by `introspect` as
+   * Introspects a single Postgres schema and returns the namespace node for
+   * that schema (its tables, their policies, and its native enum type names),
+   * alongside the cluster-scoped Postgres version. Used by `introspect` as
    * the per-namespace walk.
    */
   private async introspectSchema(
     driver: SqlControlDriverInstance<'postgres'>,
     schema: string,
-  ): Promise<PostgresSchemaIR> {
+  ): Promise<{ readonly namespace: PostgresNamespaceSchemaNode; readonly pgVersion: string }> {
     // Issue the schema-wide queries one at a time. A single control connection
     // serialises queries anyway, so Promise.all buys no parallelism here and
     // makes pg emit a "client is already executing a query" deprecation. One
@@ -923,13 +908,24 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       constraints.add(row.constraint_name);
     }
 
-    const tables: Record<string, SqlTableIR> = {};
+    const tableInputs: Record<
+      string,
+      {
+        name: string;
+        columns: Record<string, SqlColumnIRInput>;
+        primaryKey?: PrimaryKeyInput;
+        foreignKeys: readonly SqlForeignKeyIRInput[];
+        uniques: readonly SqlUniqueIRInput[];
+        indexes: readonly SqlIndexIRInput[];
+        checks?: SqlCheckConstraintIRInput[];
+      }
+    > = {};
 
     for (const tableRow of tablesResult.rows) {
       const tableName = tableRow.table_name;
 
       // Process columns for this table
-      const columns: Record<string, SqlColumnIR> = {};
+      const columns: Record<string, SqlColumnIRInput> = {};
       for (const colRow of columnsByTable.get(tableName) ?? []) {
         let nativeType = colRow.udt_name;
         const formattedType = colRow.formatted_type
@@ -955,11 +951,36 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           nativeType = colRow.udt_name || colRow.data_type;
         }
 
+        // Postgres reports array columns as data_type='ARRAY'; the element type
+        // is the `nativeType` string minus the trailing `[]`. Strip the suffix,
+        // normalize the element type to the canonical form (e.g. `integer` →
+        // `int4`), and record `many: true` so introspection consumers (verifier,
+        // psl-contract-infer) can reconstruct the full array type as needed.
+        const many = nativeType.endsWith('[]') ? true : undefined;
+        if (many) {
+          nativeType = normalizeSchemaNativeType(nativeType.slice(0, -2));
+        }
+
+        // Resolved values comparable against the contract-derived expected
+        // side: the normalized full native type (`[]` appended for arrays)
+        // and the structured parse of the raw default. Raw fields stay
+        // untouched alongside — the relational walk still reads and
+        // normalizes them itself.
+        const resolvedNativeType = `${normalizeSchemaNativeType(nativeType)}${many ? '[]' : ''}`;
+        const rawDefault = colRow.column_default ?? undefined;
         columns[colRow.column_name] = {
           name: colRow.column_name,
           nativeType,
           nullable: colRow.is_nullable === 'YES',
-          ...ifDefined('default', colRow.column_default ?? undefined),
+          ...ifDefined('default', rawDefault),
+          ...ifDefined('many', many),
+          resolvedNativeType,
+          ...ifDefined(
+            'resolvedDefault',
+            rawDefault !== undefined
+              ? parsePostgresDefault(rawDefault, resolvedNativeType)
+              : undefined,
+          ),
         };
       }
 
@@ -968,7 +989,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       const primaryKeyColumns = pkRows
         .sort((a, b) => a.ordinal_position - b.ordinal_position)
         .map((row) => row.column_name);
-      const primaryKey: PrimaryKey | undefined =
+      const primaryKey: PrimaryKeyInput | undefined =
         primaryKeyColumns.length > 0
           ? {
               columns: primaryKeyColumns,
@@ -1006,7 +1027,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           });
         }
       }
-      const foreignKeys: readonly SqlForeignKeyIR[] = Array.from(foreignKeysMap.values()).map(
+      const foreignKeys: readonly SqlForeignKeyIRInput[] = Array.from(foreignKeysMap.values()).map(
         (fk) => ({
           columns: Object.freeze([...fk.columns]) as readonly string[],
           referencedTable: fk.referencedTable,
@@ -1036,7 +1057,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           });
         }
       }
-      const uniques: readonly SqlUniqueIR[] = Array.from(uniquesMap.values()).map((uq) => ({
+      const uniques: readonly SqlUniqueIRInput[] = Array.from(uniquesMap.values()).map((uq) => ({
         columns: Object.freeze([...uq.columns]) as readonly string[],
         name: uq.name,
       }));
@@ -1074,7 +1095,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           });
         }
       }
-      const indexes: readonly SqlIndexIR[] = Array.from(indexesMap.values()).map((idx) => ({
+      const indexes: readonly SqlIndexIRInput[] = Array.from(indexesMap.values()).map((idx) => ({
         columns: Object.freeze([...idx.columns]) as readonly string[],
         name: idx.name,
         unique: idx.unique,
@@ -1097,7 +1118,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         }
       }
 
-      tables[tableName] = {
+      tableInputs[tableName] = {
         name: tableName,
         columns,
         ...ifDefined('primaryKey', primaryKey),
@@ -1108,16 +1129,25 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const nativeEnumResult = await driver.query<{ typname: string }>(
-      `SELECT t.typname
+    const nativeEnumResult = await driver.query<{ typname: string; enumvalues: unknown }>(
+      `SELECT t.typname, array_agg(e.enumlabel ORDER BY e.enumsortorder) AS enumvalues
          FROM pg_catalog.pg_type t
          JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+         JOIN pg_catalog.pg_enum e ON e.enumtypid = t.oid
          WHERE t.typtype = 'e'
            AND n.nspname = $1
+         GROUP BY t.typname
          ORDER BY t.typname`,
       [schema],
     );
-    const nativeEnumTypeNames = nativeEnumResult.rows.map((r) => r.typname);
+    const enums = nativeEnumResult.rows.map(
+      (r) =>
+        new PostgresNativeEnumSchemaNode({
+          typeName: r.typname,
+          namespaceId: schema,
+          members: parsePgNameArray(r.enumvalues),
+        }),
+    );
     const policiesResult = await driver.query<{
       schemaname: string;
       tablename: string;
@@ -1134,45 +1164,75 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
        ORDER BY tablename, policyname`,
       [schema],
     );
-    const rolesResult = await driver.query<{ rolname: string }>(
-      `SELECT rolname
-       FROM pg_catalog.pg_roles
-       WHERE rolname NOT LIKE 'pg_%'
-         AND rolname != 'postgres'
-       ORDER BY rolname`,
-    );
-    const rlsPolicies: PostgresRlsPolicy[] = policiesResult.rows.map((row) => {
+    const policiesByTable = new Map<string, PostgresPolicySchemaNode[]>();
+    for (const row of policiesResult.rows) {
       const operation = mapPgCmd(row.cmd);
-      const roles = [...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase()))].sort();
+      const policyRoles = [
+        ...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase())),
+      ].sort();
       const permissive = row.permissive.toUpperCase() === 'PERMISSIVE';
-      const hashSuffixMatch = /^(.+)_([0-9a-f]{8})$/.exec(row.policyname);
-      const prefix = hashSuffixMatch?.[1] ?? row.policyname;
-      return new PostgresRlsPolicy({
+      const prefix = parseRlsPolicyWireName(row.policyname)?.prefix ?? row.policyname;
+      const policy = new PostgresPolicySchemaNode({
         name: row.policyname,
         prefix,
         tableName: row.tablename,
         namespaceId: row.schemaname,
         operation,
-        roles,
+        roles: policyRoles,
         ...(row.qual !== null ? { using: row.qual } : {}),
         ...(row.with_check !== null ? { withCheck: row.with_check } : {}),
         permissive,
       });
-    });
+      const list = policiesByTable.get(row.tablename) ?? [];
+      list.push(policy);
+      policiesByTable.set(row.tablename, list);
+    }
 
-    const roles: PostgresRole[] = rolesResult.rows.map(
-      (row) => new PostgresRole({ name: row.rolname, namespaceId: UNBOUND_NAMESPACE_ID }),
+    // RLS enablement is a table attribute (`pg_class.relrowsecurity`), not a
+    // function of the policy set — a table can have RLS on with zero
+    // policies (deny-all) or policies present with RLS off. relkind covers
+    // both plain ('r') and partitioned ('p') tables: the table listing above
+    // (`information_schema.tables`, BASE TABLE) includes partitioned parents,
+    // and Postgres supports RLS on them.
+    //
+    // Kept as a SEPARATE query from the table listing on purpose. Folding
+    // relrowsecurity into the listing would mean replacing
+    // `information_schema.tables` (which filters by the connection role's
+    // grants) with a raw `pg_class` scan (which does not), changing WHICH
+    // tables the introspection returns — a real behavior shift, not a
+    // cleanup, and one the offline golden-diff can't catch (introspection is
+    // live-only). The only cost of two queries is the concurrent-DDL window:
+    // a table listed but missed by this scan defaults (`?? false`) to
+    // RLS-off. That default is fail-safe — the worst case downstream is a
+    // spurious ENABLE (idempotent), never a spurious DISABLE.
+    const rlsEnabledResult = await driver.query<{ tablename: string; rls_enabled: boolean }>(
+      `SELECT c.relname AS tablename, c.relrowsecurity AS rls_enabled
+         FROM pg_catalog.pg_class c
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = $1
+           AND c.relkind IN ('r', 'p')
+         ORDER BY c.relname`,
+      [schema],
+    );
+    const rlsEnabledByTable = new Map<string, boolean>(
+      rlsEnabledResult.rows.map((row) => [row.tablename, row.rls_enabled]),
     );
 
-    return new PostgresSchemaIR({
+    const tables: Record<string, PostgresTableSchemaNode> = {};
+    for (const [tableName, input] of Object.entries(tableInputs)) {
+      tables[tableName] = new PostgresTableSchemaNode({
+        ...input,
+        policies: policiesByTable.get(tableName) ?? [],
+        rlsEnabled: rlsEnabledByTable.get(tableName) ?? false,
+      });
+    }
+
+    const namespace = new PostgresNamespaceSchemaNode({
+      schemaName: schema,
       tables,
-      pgSchemaName: schema,
-      pgVersion: await this.getPostgresVersion(driver),
-      rlsPolicies,
-      roles,
-      existingSchemas: [],
-      nativeEnumTypeNames,
+      nativeEnums: enums,
     });
+    return { namespace, pgVersion: await this.getPostgresVersion(driver) };
   }
 
   /**
@@ -1194,10 +1254,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
  * `name[]` (OID 1003). When the parser is absent the raw Postgres text-array
  * literal (`{role1,role2}`) is returned as a string instead of a JS array.
  * This function accepts either form and returns a plain string array.
+ *
+ * The string branch honors Postgres array-literal quoting: an element
+ * containing a comma, quote, backslash, brace, or significant whitespace is
+ * emitted double-quoted with `\"` / `\\` escapes, and unquoted elements are
+ * whitespace-trimmed — so a label like `in progress` or `say "hi"` parses to
+ * its true value instead of being split or kept escaped.
  */
-function parsePgNameArray(value: unknown): string[] {
+export function parsePgNameArray(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value as string[];
+    return value.map(String);
   }
   if (typeof value !== 'string') {
     return [];
@@ -1210,7 +1276,55 @@ function parsePgNameArray(value: unknown): string[] {
   if (inner === '') {
     return [];
   }
-  return inner.split(',').map((s) => s.trim());
+
+  const elements: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let wasQuoted = false;
+  const pushCurrent = () => {
+    elements.push(wasQuoted ? current : current.trim());
+    current = '';
+    wasQuoted = false;
+  };
+  let i = 0;
+  while (i < inner.length) {
+    const char = inner.charAt(i);
+    if (inQuotes) {
+      if (char === '\\') {
+        current += inner[i + 1] ?? '';
+        i += 2;
+        continue;
+      }
+      if (char === '"') {
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      current += char;
+      i++;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = true;
+      wasQuoted = true;
+      i++;
+      continue;
+    }
+    if (char === ',') {
+      pushCurrent();
+      i++;
+      continue;
+    }
+    current += char;
+    i++;
+  }
+  // A still-open quote means the literal was malformed (e.g. `{"unterminated}`);
+  // reject rather than emit the partial value.
+  if (inQuotes) {
+    return [];
+  }
+  pushCurrent();
+  return elements;
 }
 
 /**
@@ -1249,6 +1363,9 @@ function extractContractNamespaceIds(contract: unknown): readonly string[] {
 }
 
 function normalizeFormattedType(formattedType: string, dataType: string, udtName: string): string {
+  if (formattedType.endsWith('[]')) {
+    return `${normalizeFormattedType(formattedType.slice(0, -2), dataType, udtName)}[]`;
+  }
   if (formattedType === 'integer') {
     return 'int4';
   }
@@ -1492,6 +1609,18 @@ function pgIsTextLikeNativeType(nativeType: string): boolean {
   );
 }
 
+function pgRenderArrayElement(el: unknown): string {
+  if (el === null) return 'NULL';
+  if (typeof el === 'number' || typeof el === 'boolean') return String(el);
+  if (typeof el === 'string') return `'${escapeLiteral(el)}'`;
+  return `'${escapeLiteral(JSON.stringify(el))}'`;
+}
+
+function pgRenderArrayLiteral(elements: unknown[]): string {
+  if (elements.length === 0) return "'{}'";
+  return `ARRAY[${elements.map(pgRenderArrayElement).join(', ')}]`;
+}
+
 function pgInlineLiteral(wire: unknown, nativeType: string): string {
   if (wire === null) return 'NULL';
   if (typeof wire === 'boolean') return wire ? 'true' : 'false';
@@ -1522,6 +1651,9 @@ function pgInlineLiteral(wire: unknown, nativeType: string): string {
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
     return `'\\x${hex}'::${nativeType}`;
+  }
+  if (Array.isArray(wire) && nativeType.endsWith('[]')) {
+    return pgRenderArrayLiteral(wire);
   }
   if (typeof wire === 'object') {
     const quoted = `'${escapeLiteral(JSON.stringify(wire))}'`;
@@ -1593,6 +1725,9 @@ function pgRenderDdlConstraint(constraint: DdlTableConstraint): string {
     }
     return sql;
   }
+  if (constraint.kind === 'check-expression') {
+    return `CONSTRAINT ${quoteIdentifier(constraint.name)} CHECK (${constraint.expression})`;
+  }
   const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {
     return `CONSTRAINT ${quoteIdentifier(constraint.name)} UNIQUE (${cols})`;
@@ -1624,6 +1759,27 @@ function pgRenderCreateSchema(node: PostgresCreateSchema): SqlExecuteRequest {
   const ifNotExists = node.ifNotExists ? 'IF NOT EXISTS ' : '';
   return {
     sql: `CREATE SCHEMA ${ifNotExists}${quoteIdentifier(node.schema)}`,
+    params: [],
+  };
+}
+
+function pgRenderCreateType(node: PostgresCreateType): SqlExecuteRequest {
+  const typeRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.name)}`
+    : quoteIdentifier(node.name);
+  const values = node.values.map((value) => `'${escapeLiteral(value)}'`).join(', ');
+  return {
+    sql: `CREATE TYPE ${typeRef} AS ENUM (${values})`,
+    params: [],
+  };
+}
+
+function pgRenderDropType(node: PostgresDropType): SqlExecuteRequest {
+  const typeRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.name)}`
+    : quoteIdentifier(node.name);
+  return {
+    sql: `DROP TYPE ${typeRef}`,
     params: [],
   };
 }
@@ -1682,6 +1838,22 @@ function pgRenderDropPolicy(node: PostgresDropPolicy): SqlExecuteRequest {
   };
 }
 
+function pgRenderAlterPolicyRename(node: PostgresAlterPolicyRename): SqlExecuteRequest {
+  const tableRef = `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`;
+  return {
+    sql: `ALTER POLICY ${quoteIdentifier(node.name)} ON ${tableRef} RENAME TO ${quoteIdentifier(node.newName)}`,
+    params: [],
+  };
+}
+
+function pgRenderDisableRowLevelSecurity(node: PostgresDisableRowLevelSecurity): SqlExecuteRequest {
+  const tableRef = `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`;
+  return {
+    sql: `ALTER TABLE ${tableRef} DISABLE ROW LEVEL SECURITY`,
+    params: [],
+  };
+}
+
 async function pgRenderDdlExecuteRequest(
   ast: PostgresDdlNode,
   codecLookup: CodecLookup,
@@ -1689,9 +1861,15 @@ async function pgRenderDdlExecuteRequest(
   const visitor = {
     createTable: (node: PostgresCreateTable) => pgRenderCreateTable(node, codecLookup),
     createSchema: (node: PostgresCreateSchema) => Promise.resolve(pgRenderCreateSchema(node)),
+    createType: (node: PostgresCreateType) => Promise.resolve(pgRenderCreateType(node)),
+    dropType: (node: PostgresDropType) => Promise.resolve(pgRenderDropType(node)),
     alterTable: (node: PostgresAlterTable) => pgRenderAlterTable(node, codecLookup),
     createPolicy: (node: PostgresCreatePolicy) => Promise.resolve(pgRenderCreatePolicy(node)),
     dropPolicy: (node: PostgresDropPolicy) => Promise.resolve(pgRenderDropPolicy(node)),
+    alterPolicyRename: (node: PostgresAlterPolicyRename) =>
+      Promise.resolve(pgRenderAlterPolicyRename(node)),
+    disableRowLevelSecurity: (node: PostgresDisableRowLevelSecurity) =>
+      Promise.resolve(pgRenderDisableRowLevelSecurity(node)),
   };
   return ast.accept(visitor);
 }

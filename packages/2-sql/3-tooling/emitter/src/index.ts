@@ -5,6 +5,7 @@ import type {
   JsonValue,
 } from '@prisma-next/contract/types';
 import {
+  renderValueSetType,
   serializeNamespaceId,
   serializeObjectKey,
   serializeValue,
@@ -314,6 +315,46 @@ export const sqlEmission = {
     return column.typeParams;
   },
 
+  resolveFieldValueSet(
+    _modelName: string,
+    fieldName: string,
+    model: ContractModelBase,
+    contract: Contract,
+  ): { readonly encodedValues: readonly JsonValue[]; readonly codecId: string } | undefined {
+    const sqlModel = blindCast<
+      ContractModel<SqlModelStorage>,
+      'a sql-family model carries SqlModelStorage in storage'
+    >(model);
+    const storageField = sqlModel.storage?.fields?.[fieldName];
+    if (!storageField) return undefined;
+
+    const storage = blindCast<
+      SqlStorage | undefined,
+      'contract.storage is SqlStorage for sql family'
+    >(contract.storage);
+    if (!storage) return undefined;
+
+    const storageNamespaceId = sqlModel.storage.namespaceId;
+    if (!storageNamespaceId) return undefined;
+
+    const table = entityAt<StorageTable>(storage, {
+      namespaceId: storageNamespaceId,
+      entityKind: 'table',
+      entityName: sqlModel.storage.table,
+    });
+    const column = table?.columns[storageField.column];
+    if (!column?.valueSet) return undefined;
+
+    const valueSet = entityAt<StorageValueSet>(storage, {
+      namespaceId: column.valueSet.namespaceId,
+      entityKind: column.valueSet.entityKind,
+      entityName: column.valueSet.entityName,
+    });
+    if (!valueSet) return undefined;
+
+    return { encodedValues: valueSet.values, codecId: column.codecId };
+  },
+
   getStorageTypeExports(contract: Contract, codecLookup?: CodecLookup): string | undefined {
     const storage = blindCast<
       SqlStorage | undefined,
@@ -370,23 +411,6 @@ export const sqlEmission = {
   },
 } as const;
 
-function renderValueSetLiteral(value: JsonValue): string | undefined {
-  if (typeof value === 'string') return serializeValue(value);
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return undefined;
-}
-
-function renderValueSetUnionBase(values: readonly JsonValue[]): string | undefined {
-  if (values.length === 0) return undefined;
-  const literals: string[] = [];
-  for (const v of values) {
-    const lit = renderValueSetLiteral(v);
-    if (lit === undefined) return undefined;
-    literals.push(lit);
-  }
-  return literals.join(' | ');
-}
-
 type ColumnTypeSide = 'output' | 'input';
 
 function columnTypeParams(
@@ -435,11 +459,14 @@ function computeColumnType(
       entityKind: column.valueSet.entityKind,
       entityName: column.valueSet.entityName,
     });
-    base = valueSet ? renderValueSetUnionBase(valueSet.values) : undefined;
+    base = valueSet
+      ? renderValueSetType(valueSet.values, column.codecId, side, codecLookup)
+      : undefined;
   }
   if (base === undefined) {
     base = renderRefinedCodecType(column, side, columnTypeParams(storage, column), codecLookup);
   }
+  if (column.many === true) base = `ReadonlyArray<${base}>`;
   return column.nullable ? `${base} | null` : base;
 }
 
@@ -509,23 +536,20 @@ function generateDocumentScopedStorageTypesType(types: SqlStorage['types']): str
   return `{ ${typeEntries.join('; ')} }`;
 }
 
-function generateNamespaceValueSetType(
-  valueSet: Readonly<Record<string, StorageValueSet>>,
-): string {
-  if (Object.keys(valueSet).length === 0) {
-    return 'Record<string, never>';
-  }
-  const entries: string[] = [];
-  for (const [name, vs] of Object.entries(valueSet)) {
-    const valuesLiteral = vs.values.map((v) => serializeValue(v)).join(', ');
-    entries.push(
-      `readonly ${serializeObjectKey(name)}: { readonly kind: 'valueSet'; readonly values: readonly [${valuesLiteral}] }`,
-    );
-  }
+/**
+ * Literalizes the `valueSet` entries slot — a core SQL entity kind (alongside
+ * `table`), not a pack-contributed one, so naming it here isn't a
+ * family→target layering leak. This is the only non-`table` entries slot with
+ * a type-level consumer (`db.nativeEnums`, `packages/3-extensions/postgres`):
+ * pack-contributed slots (`role`, `policy`, `native_enum`, …) have none and
+ * are not emitted.
+ */
+function generateValueSetBlockType(valueSets: Readonly<Record<string, StorageValueSet>>): string {
+  const entries = Object.entries(valueSets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, valueSet]) => `readonly ${serializeObjectKey(name)}: ${serializeValue(valueSet)}`);
   return `{ ${entries.join('; ')} }`;
 }
-
-const SQL_NAMESPACE_KIND_FALLBACK = 'sql-namespace' as const;
 
 function namespaceSerializedKind(ns: Namespace): string {
   const kind = ns.kind;
@@ -537,12 +561,9 @@ function namespaceSerializedKind(ns: Namespace): string {
   if (typeof kind === 'string') {
     return `readonly kind: ${serializeValue(kind)}`;
   }
-  // Plain-literal namespaces built via the contract-ts DSL bypass the
-  // class-level `Object.defineProperty(this, 'kind', { value, enumerable: false })`
-  // path, so `ns.kind` is missing on the runtime object. Surfacing the
-  // framework-default kind here keeps the emitted `.d.ts` literal
-  // structurally assignable to `Namespace`, which now requires `kind`.
-  return `readonly kind: '${SQL_NAMESPACE_KIND_FALLBACK}'`;
+  throw new Error(
+    `Namespace '${ns.id}' has no string kind — all namespaces must be target concretions with a defined kind property.`,
+  );
 }
 
 function generateTableLiteralType(table: StorageTable): string {
@@ -643,10 +664,10 @@ function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): st
     const tablesType = generateTablesMapType(
       (ns.entries.table ?? {}) as Readonly<Record<string, StorageTable>>,
     );
-    const valueSetSlot = ns.entries.valueSet;
     const entriesParts = [`readonly table: ${tablesType}`];
-    if (valueSetSlot !== undefined && Object.keys(valueSetSlot).length > 0) {
-      entriesParts.push(`readonly valueSet: ${generateNamespaceValueSetType(valueSetSlot)}`);
+    const valueSetEntries = ns.entries.valueSet;
+    if (valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0) {
+      entriesParts.push(`readonly valueSet: ${generateValueSetBlockType(valueSetEntries)}`);
     }
     const entriesType = `{ ${entriesParts.join('; ')} }`;
     parts.push(

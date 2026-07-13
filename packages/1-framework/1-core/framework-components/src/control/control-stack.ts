@@ -1,4 +1,7 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import type { CapabilityMatrix } from '../shared/capabilities';
+import { mergeCapabilityMatrices } from '../shared/capabilities';
 import type { Codec } from '../shared/codec';
 import type { AnyCodecDescriptor } from '../shared/codec-descriptor';
 import type { CodecLookup, CodecMeta, CodecRef, CodecRegistry } from '../shared/codec-types';
@@ -6,15 +9,12 @@ import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
+  AuthoringModelAttributeDescriptorNamespace,
   AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
-  isAuthoringEntityTypeDescriptor,
-  isAuthoringFieldPresetDescriptor,
-  isAuthoringPslBlockDescriptor,
-  isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
@@ -42,6 +42,7 @@ export interface AssembledAuthoringContributions {
   readonly type: AuthoringTypeNamespace;
   readonly entityTypes: AuthoringEntityTypeNamespace;
   readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
+  readonly modelAttributes: AuthoringModelAttributeDescriptorNamespace;
 }
 
 export interface ControlStack<
@@ -61,6 +62,7 @@ export interface ControlStack<
   readonly authoringContributions: AssembledAuthoringContributions;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly controlMutationDefaults: ControlMutationDefaults;
+  readonly capabilities: CapabilityMatrix;
 }
 
 export interface CreateControlStackInput<
@@ -162,32 +164,21 @@ export function assembleAuthoringContributions(
   const type = {} as Record<string, unknown>;
   const entityTypes = {} as Record<string, unknown>;
   const pslBlockDescriptors: Record<string, unknown> = {};
+  const modelAttributes: Record<string, unknown> = {};
 
   for (const descriptor of descriptors) {
     if (descriptor.authoring?.field) {
-      mergeAuthoringNamespaces(
-        field,
-        descriptor.authoring.field,
-        [],
-        isAuthoringFieldPresetDescriptor,
-        'field',
-      );
+      mergeAuthoringNamespaces(field, descriptor.authoring.field, [], 'fieldPreset', 'field');
     }
     if (descriptor.authoring?.type) {
-      mergeAuthoringNamespaces(
-        type,
-        descriptor.authoring.type,
-        [],
-        isAuthoringTypeConstructorDescriptor,
-        'type',
-      );
+      mergeAuthoringNamespaces(type, descriptor.authoring.type, [], 'typeConstructor', 'type');
     }
     if (descriptor.authoring?.entityTypes) {
       mergeAuthoringNamespaces(
         entityTypes,
         descriptor.authoring.entityTypes,
         [],
-        isAuthoringEntityTypeDescriptor,
+        'entity',
         'entity',
       );
     }
@@ -196,8 +187,17 @@ export function assembleAuthoringContributions(
         pslBlockDescriptors,
         descriptor.authoring.pslBlockDescriptors,
         [],
-        isAuthoringPslBlockDescriptor,
         'pslBlock',
+        'pslBlock',
+      );
+    }
+    if (descriptor.authoring?.modelAttributes) {
+      mergeAuthoringNamespaces(
+        modelAttributes,
+        descriptor.authoring.modelAttributes,
+        [],
+        'modelAttribute',
+        'modelAttribute',
       );
     }
   }
@@ -209,11 +209,16 @@ export function assembleAuthoringContributions(
     AuthoringPslBlockDescriptorNamespace,
     'merge target accumulator narrows to typed namespace post-merge'
   >(pslBlockDescriptors);
+  const modelAttributeNamespace = blindCast<
+    AuthoringModelAttributeDescriptorNamespace,
+    'merge target accumulator narrows to typed namespace post-merge'
+  >(modelAttributes);
   assertNoCrossRegistryCollisions(
     typeNamespace,
     fieldNamespace,
     entityTypeNamespace,
     pslBlockDescriptorNamespace,
+    modelAttributeNamespace,
   );
 
   return {
@@ -221,6 +226,7 @@ export function assembleAuthoringContributions(
     type: typeNamespace,
     entityTypes: entityTypeNamespace,
     pslBlockDescriptors: pslBlockDescriptorNamespace,
+    modelAttributes: modelAttributeNamespace,
   };
 }
 
@@ -305,16 +311,24 @@ export function extractCodecLookup(
   const descriptorsById = new Map<string, AnyCodecDescriptor>();
   const targetTypesById = new Map<string, readonly string[]>();
   const metaById = new Map<string, CodecMeta>();
+  const metaRenderersById = new Map<
+    string,
+    (params: Record<string, unknown> | JsonValue) => CodecMeta | undefined
+  >();
   const renderersById = new Map<string, (params: Record<string, unknown>) => string | undefined>();
   const inputRenderersById = new Map<
     string,
     (params: Record<string, unknown>) => string | undefined
   >();
+  const valueLiteralRenderersById = new Map<
+    string,
+    (value: JsonValue, side: 'output' | 'input') => string | undefined
+  >();
   const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
     const codecTypes = descriptor.types?.codecTypes;
     const descriptorId = descriptor.id;
-    // Descriptor-side metadata is the single source of truth for `targetTypes` / `meta` / `renderOutputType`. Every contributor ships a `codecDescriptors` list on `types.codecTypes`.
+    // Descriptor-side metadata is the single source of truth for `targetTypes` / `meta` / `renderOutputType`. A component contributes its codecs by listing `codecDescriptors` on `types.codecTypes`; each codecId has exactly one contributor across the stack.
     for (const codecDescriptor of codecTypes?.codecDescriptors ?? []) {
       assertUniqueCodecOwner({
         codecId: codecDescriptor.codecId,
@@ -331,11 +345,17 @@ export function extractCodecLookup(
       if (codecDescriptor.meta !== undefined) {
         metaById.set(codecDescriptor.codecId, codecDescriptor.meta);
       }
+      if (typeof codecDescriptor.metaFor === 'function') {
+        metaRenderersById.set(codecDescriptor.codecId, codecDescriptor.metaFor);
+      }
       if (typeof codecDescriptor.renderOutputType === 'function') {
         renderersById.set(codecDescriptor.codecId, codecDescriptor.renderOutputType);
       }
       if (typeof codecDescriptor.renderInputType === 'function') {
         inputRenderersById.set(codecDescriptor.codecId, codecDescriptor.renderInputType);
+      }
+      if (typeof codecDescriptor.renderValueLiteral === 'function') {
+        valueLiteralRenderersById.set(codecDescriptor.codecId, codecDescriptor.renderValueLiteral);
       }
       // Materialize a representative `Codec` instance for `byId.get()` so consumers reading the lookup's instance side (e.g. SQL renderer's cast-policy lookup, or the contract emitter's literal-default `encodeJson` resolver) keep finding the codec.
       //
@@ -373,9 +393,17 @@ export function extractCodecLookup(
     },
     forColumn: () => undefined,
     targetTypesFor: (id) => targetTypesById.get(id),
-    metaFor: (id) => metaById.get(id),
+    metaFor: (id, typeParams) => {
+      if (typeParams !== undefined) {
+        const paramsAware = metaRenderersById.get(id)?.(typeParams);
+        if (paramsAware !== undefined) return paramsAware;
+      }
+      return metaById.get(id);
+    },
     renderOutputTypeFor: (id, params) => renderersById.get(id)?.(params),
     renderInputTypeFor: (id, params) => inputRenderersById.get(id)?.(params),
+    renderValueLiteralFor: (id, value, side) => valueLiteralRenderersById.get(id)?.(value, side),
+    descriptorFor: (id) => descriptorsById.get(id),
   };
 }
 
@@ -513,5 +541,10 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     authoringContributions: assembleAuthoringContributions(allDescriptors),
     scalarTypeDescriptors,
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
+    capabilities: mergeCapabilityMatrices({}, [
+      target,
+      ...(adapter ? [adapter] : []),
+      ...orderedExtensionPacks,
+    ]),
   };
 }

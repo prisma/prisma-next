@@ -1,106 +1,53 @@
+import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import {
-  classifySqlVerifierIssueKind,
+  classifyStorageTypeDiffIssue,
   verifierDisposition,
-} from '../src/core/schema-verify/verifier-disposition';
+} from '../src/core/diff/verifier-disposition';
 
-describe('classifySqlVerifierIssueKind', () => {
-  it('classifies the extra nested element (column)', () => {
-    expect(classifySqlVerifierIssueKind('extra_column')).toBe('extraNestedElement');
+function issue(reason: SchemaDiffIssue['reason']): SchemaDiffIssue {
+  return { path: ['user_status'], reason };
+}
+
+describe('classifyStorageTypeDiffIssue', () => {
+  it('classifies not-found as declared-missing', () => {
+    expect(classifyStorageTypeDiffIssue(issue('not-found'))).toBe('declaredMissing');
   });
 
-  it('classifies extra auxiliaries (constraints, indexes, defaults)', () => {
-    expect(classifySqlVerifierIssueKind('extra_primary_key')).toBe('extraAuxiliary');
-    expect(classifySqlVerifierIssueKind('extra_foreign_key')).toBe('extraAuxiliary');
-    expect(classifySqlVerifierIssueKind('extra_unique_constraint')).toBe('extraAuxiliary');
-    expect(classifySqlVerifierIssueKind('extra_index')).toBe('extraAuxiliary');
-    expect(classifySqlVerifierIssueKind('extra_validator')).toBe('extraAuxiliary');
-    expect(classifySqlVerifierIssueKind('extra_default')).toBe('extraAuxiliary');
+  it('classifies not-expected as extra-auxiliary', () => {
+    expect(classifyStorageTypeDiffIssue(issue('not-expected'))).toBe('extraAuxiliary');
   });
 
-  it('classifies the extra top-level object (table)', () => {
-    expect(classifySqlVerifierIssueKind('extra_table')).toBe('extraTopLevelObject');
-  });
-
-  it('classifies declared-missing kinds', () => {
-    expect(classifySqlVerifierIssueKind('missing_schema')).toBe('declaredMissing');
-    expect(classifySqlVerifierIssueKind('missing_table')).toBe('declaredMissing');
-    expect(classifySqlVerifierIssueKind('missing_column')).toBe('declaredMissing');
-    expect(classifySqlVerifierIssueKind('type_missing')).toBe('declaredMissing');
-    expect(classifySqlVerifierIssueKind('default_missing')).toBe('declaredMissing');
-  });
-
-  it('classifies value-drift kinds', () => {
-    expect(classifySqlVerifierIssueKind('type_values_mismatch')).toBe('valueDrift');
-    expect(classifySqlVerifierIssueKind('enum_values_changed')).toBe('valueDrift');
-  });
-
-  it('classifies declared-incompatible kinds', () => {
-    expect(classifySqlVerifierIssueKind('type_mismatch')).toBe('declaredIncompatible');
-    expect(classifySqlVerifierIssueKind('nullability_mismatch')).toBe('declaredIncompatible');
-    expect(classifySqlVerifierIssueKind('primary_key_mismatch')).toBe('declaredIncompatible');
-    expect(classifySqlVerifierIssueKind('foreign_key_mismatch')).toBe('declaredIncompatible');
-    expect(classifySqlVerifierIssueKind('unique_constraint_mismatch')).toBe('declaredIncompatible');
-    expect(classifySqlVerifierIssueKind('index_mismatch')).toBe('declaredIncompatible');
-    expect(classifySqlVerifierIssueKind('default_mismatch')).toBe('declaredIncompatible');
+  it('classifies not-equal as value drift', () => {
+    expect(classifyStorageTypeDiffIssue(issue('not-equal'))).toBe('valueDrift');
   });
 });
 
 describe('verifierDisposition', () => {
-  it('fails declared drift under managed', () => {
-    expect(verifierDisposition('managed', 'missing_column')).toBe('fail');
-    expect(verifierDisposition('managed', 'type_mismatch')).toBe('fail');
-    expect(verifierDisposition('managed', 'extra_column')).toBe('fail');
-    expect(verifierDisposition('managed', 'extra_index')).toBe('fail');
-    expect(verifierDisposition('managed', 'extra_table')).toBe('fail');
+  it('fails a missing type under managed', () => {
+    expect(verifierDisposition('managed', issue('not-found'))).toBe('fail');
   });
 
-  it('suppresses extra columns only under tolerated', () => {
-    expect(verifierDisposition('tolerated', 'extra_column')).toBe('suppress');
-    expect(verifierDisposition('tolerated', 'missing_column')).toBe('fail');
-    expect(verifierDisposition('tolerated', 'extra_index')).toBe('fail');
+  it('fails a value-set change under managed and tolerated', () => {
+    expect(verifierDisposition('managed', issue('not-equal'))).toBe('fail');
+    expect(verifierDisposition('tolerated', issue('not-equal'))).toBe('fail');
   });
 
-  it('fails a type-mismatched declared column under tolerated', () => {
-    expect(verifierDisposition('tolerated', 'type_mismatch')).toBe('fail');
-  });
-
-  it('suppresses extra columns, constraints, and tables under external', () => {
-    expect(verifierDisposition('external', 'extra_column')).toBe('suppress');
-    expect(verifierDisposition('external', 'extra_index')).toBe('suppress');
-    expect(verifierDisposition('external', 'extra_table')).toBe('suppress');
-    expect(verifierDisposition('external', 'type_mismatch')).toBe('fail');
-    expect(verifierDisposition('external', 'missing_table')).toBe('fail');
-  });
-
-  it('warns on every kind under observed', () => {
-    expect(verifierDisposition('observed', 'missing_column')).toBe('warn');
-    expect(verifierDisposition('observed', 'extra_column')).toBe('warn');
-    expect(verifierDisposition('observed', 'extra_index')).toBe('warn');
-    expect(verifierDisposition('observed', 'extra_table')).toBe('warn');
-  });
-
-  it('treats type value drift like an external-owned detail', () => {
-    expect(verifierDisposition('managed', 'enum_values_changed')).toBe('fail');
-    expect(verifierDisposition('tolerated', 'enum_values_changed')).toBe('fail');
-    expect(verifierDisposition('external', 'enum_values_changed')).toBe('suppress');
-    expect(verifierDisposition('observed', 'enum_values_changed')).toBe('warn');
-    expect(verifierDisposition('external', 'type_values_mismatch')).toBe('suppress');
+  it('suppresses a value-set change under external (an external owner controls the allowed values)', () => {
+    expect(verifierDisposition('external', issue('not-equal'))).toBe('suppress');
   });
 
   it('still requires an external type to exist', () => {
-    expect(verifierDisposition('external', 'type_missing')).toBe('fail');
-    expect(verifierDisposition('observed', 'type_missing')).toBe('warn');
+    expect(verifierDisposition('external', issue('not-found'))).toBe('fail');
   });
 
-  it('suppresses check_mismatch under external policy, symmetric with enum_values_changed', () => {
-    // check_mismatch (value-set drift on a check constraint) is graded the same
-    // as enum_values_changed — both are valueDrift so external suppresses them
-    // identically. An external owner controls the allowed values; a drift should
-    // not block the app.
-    expect(verifierDisposition('external', 'check_mismatch')).toBe('suppress');
-    expect(verifierDisposition('managed', 'check_mismatch')).toBe('fail');
-    expect(verifierDisposition('tolerated', 'check_mismatch')).toBe('fail');
-    expect(verifierDisposition('observed', 'check_mismatch')).toBe('warn');
+  it('suppresses an extra type under external', () => {
+    expect(verifierDisposition('external', issue('not-expected'))).toBe('suppress');
+  });
+
+  it('warns on every reason under observed', () => {
+    expect(verifierDisposition('observed', issue('not-found'))).toBe('warn');
+    expect(verifierDisposition('observed', issue('not-expected'))).toBe('warn');
+    expect(verifierDisposition('observed', issue('not-equal'))).toBe('warn');
   });
 });

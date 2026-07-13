@@ -11,7 +11,10 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type { CodecLookup } from './codec-types';
-import type { PslBlockParam } from './psl-extension-block';
+import type { PslBlockParam, PslExtensionBlock, PslSpan } from './psl-extension-block';
+import { runtimeError } from './runtime-error';
+
+export type EnumInferredMemberType = 'text' | 'int';
 
 export type AuthoringArgRef = {
   readonly kind: 'arg';
@@ -53,14 +56,45 @@ export type AuthoringArgumentDescriptor = AuthoringArgumentDescriptorCommon &
 
 export interface AuthoringStorageTypeTemplate {
   readonly codecId: string;
-  readonly nativeType: AuthoringTemplateValue;
+  /**
+   * Optional so a type constructor whose {@link AuthoringTypeConstructorDescriptor.entityRefArg}
+   * names another entity can omit this template entirely — its output for
+   * that case is derived by the codec at `codecId`, not by resolving a
+   * literal here. Every other consumer of this shape (field presets, plain
+   * type constructors) always supplies it.
+   */
+  readonly nativeType?: AuthoringTemplateValue;
   readonly typeParams?: Record<string, AuthoringTemplateValue>;
+}
+
+/**
+ * Declares that one positional argument of a
+ * {@link AuthoringTypeConstructorDescriptor} call names another entity
+ * parsed from the same document, rather than carrying a literal value (e.g.
+ * `pg.enum(AalLevel)` naming a `native_enum` entity). `index` is the
+ * argument's position in the call; `entityKind` is the entries-slot
+ * discriminator the interpreter looks the named entity up under (the same
+ * shape {@link AuthoringEntityTypeFactoryOutput.factory} output is collected
+ * into, keyed by discriminator then block name).
+ *
+ * The interpreter resolves the named argument to the entity instance
+ * generically, driven only by this declaration — it has no target-specific
+ * knowledge of which type constructors carry one. Converting the resolved
+ * entity into the constructor's params is a separate, codec-owned concern:
+ * the codec descriptor registered for `output.codecId` supplies that
+ * conversion, not this framework type.
+ */
+export interface AuthoringTypeConstructorEntityRef {
+  readonly index: number;
+  readonly entityKind: string;
 }
 
 export interface AuthoringTypeConstructorDescriptor {
   readonly kind: 'typeConstructor';
   readonly args?: readonly AuthoringArgumentDescriptor[];
   readonly output: AuthoringStorageTypeTemplate;
+  /** Present when one of this constructor's positional arguments names another document-local entity instead of carrying a literal value. Absent for ordinary literal-argument constructors. */
+  readonly entityRefArg?: AuthoringTypeConstructorEntityRef;
 }
 
 export interface AuthoringColumnDefaultTemplateLiteral {
@@ -134,6 +168,102 @@ export interface AuthoringEntityContext {
   readonly sourceId?: string;
   /** Push channel for authoring-time diagnostics emitted by the factory. */
   readonly diagnostics?: AuthoringDiagnosticSink;
+  /**
+   * The target's default codec ids for an `enum` block that omits `@@type`.
+   * `text` is used when every member is a bare name or a string value;
+   * `int` is used when every member is an integer value. Every target pack
+   * populates this so `@@type` omission can be inferred consistently.
+   */
+  readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
+}
+
+/**
+ * Classifies an `enum` block's members (before codec decoding, which needs
+ * the codec chosen first) into which default codec an omitted `@@type`
+ * should resolve to:
+ *
+ * - every member is `bare`, or a `value` whose raw JSON is a string → `'text'`
+ * - every member is a `value` whose raw JSON is an integer → `'int'`
+ * - anything else (float, bigint, boolean, mixed, or a `ref`/`option`/`list`
+ *   parameter) → `null`, meaning the caller must require an explicit `@@type`.
+ */
+export function classifyEnumMemberType(block: PslExtensionBlock): 'text' | 'int' | null {
+  let sawText = false;
+  let sawInt = false;
+
+  for (const paramValue of Object.values(block.parameters)) {
+    if (paramValue.kind === 'bare') {
+      sawText = true;
+      continue;
+    }
+    if (paramValue.kind !== 'value') {
+      return null;
+    }
+    let jsonValue: unknown;
+    try {
+      jsonValue = JSON.parse(paramValue.raw);
+    } catch {
+      return null;
+    }
+    if (typeof jsonValue === 'string') {
+      sawText = true;
+    } else if (typeof jsonValue === 'number' && Number.isInteger(jsonValue)) {
+      sawInt = true;
+    } else {
+      return null;
+    }
+  }
+
+  if (sawText && sawInt) return null;
+  if (sawText) return 'text';
+  if (sawInt) return 'int';
+  return null;
+}
+
+/**
+ * Resolves the codec id for an `enum` block. When `@@type` is absent, the codec
+ * is inferred from the members via {@link classifyEnumMemberType}; otherwise the
+ * explicit `@@type("codec")` argument is parsed. Pushes the appropriate
+ * diagnostic and returns `undefined` when neither yields a codec. `codecSpan` is
+ * the span downstream codec-validation diagnostics should anchor to. Shared by
+ * every family's enum factory so inference and the explicit path stay identical.
+ */
+export function resolveEnumCodecId(
+  block: PslExtensionBlock,
+  ctx: AuthoringEntityContext,
+): { readonly codecId: string; readonly codecSpan: PslSpan } | undefined {
+  const sourceId = ctx.sourceId ?? 'unknown';
+  const typeAttr = block.blockAttributes.find((a) => a.name === 'type');
+
+  if (typeAttr === undefined) {
+    const inferredKind = classifyEnumMemberType(block);
+    if (inferredKind === null || ctx.enumInferenceCodecs === undefined) {
+      ctx.diagnostics?.push({
+        code: 'PSL_ENUM_CANNOT_INFER_TYPE',
+        message: `cannot infer @@type for enum "${block.name}"; add an explicit @@type(...)`,
+        sourceId,
+        span: block.span,
+      });
+      return undefined;
+    }
+    return { codecId: ctx.enumInferenceCodecs[inferredKind], codecSpan: block.span };
+  }
+
+  const rawCodecArg = typeAttr.args[0]?.value;
+  const codecId =
+    rawCodecArg?.startsWith('"') && rawCodecArg.endsWith('"') && rawCodecArg.length >= 2
+      ? rawCodecArg.slice(1, -1)
+      : undefined;
+  if (codecId === undefined) {
+    ctx.diagnostics?.push({
+      code: 'PSL_ENUM_MISSING_TYPE',
+      message: `enum "${block.name}" @@type attribute must have a quoted codec id argument`,
+      sourceId,
+      span: typeAttr.span,
+    });
+    return undefined;
+  }
+  return { codecId, codecSpan: typeAttr.args[0]?.span ?? typeAttr.span };
 }
 
 export interface AuthoringEntityTypeTemplateOutput {
@@ -223,10 +353,92 @@ export interface AuthoringPslBlockDescriptor {
    * for keys absent from `parameters`.
    */
   readonly variadicParameters?: boolean;
+  /**
+   * Declares that the model named by the block's ref parameter `parameter`
+   * must carry the bare `@@` model attribute `attribute`. The family
+   * interpreter enforces this generically over the whole parsed document —
+   * declaration order of the block and the model does not matter — and
+   * emits `PSL_EXTENSION_TARGET_MODEL_MISSING_ATTRIBUTE` naming the block
+   * and the model when the attribute is absent. A parameter that is
+   * missing or does not resolve to a model is not this rule's concern
+   * (missing-parameter and unresolved-ref diagnostics own those cases).
+   */
+  readonly requiresModelAttribute?: {
+    readonly parameter: string;
+    readonly attribute: string;
+  };
 }
 
 export type AuthoringPslBlockDescriptorNamespace = {
   readonly [name: string]: AuthoringPslBlockDescriptor | AuthoringPslBlockDescriptorNamespace;
+};
+
+/**
+ * Context surfaced to a model-attribute lowering at call time: the entity
+ * context shared with entity-type factories, plus the declaring model's
+ * name, its mapped storage name (the name of the storage object the model
+ * maps to; which kind of object that is belongs to the family, not the
+ * framework), and the namespace id the lowered entity should be filed
+ * under.
+ */
+export interface AuthoringModelAttributeContext extends AuthoringEntityContext {
+  readonly modelName: string;
+  readonly storageName: string;
+  readonly namespaceId: string;
+}
+
+/**
+ * What a model-attribute lowering returns when it produces an entity: `key`
+ * is the identity the entity is stored under within its `entries` slot
+ * (`entries[attribute][key]`); `entity` is the value stored there. A
+ * lowering that instead pushed a diagnostic through
+ * {@link AuthoringModelAttributeContext.diagnostics} returns `undefined` —
+ * the same convention {@link AuthoringEntityTypeFactoryOutput} uses.
+ */
+export interface AuthoringModelAttributeLoweringOutput {
+  readonly key: string;
+  readonly entity: unknown;
+}
+
+/**
+ * Declarative descriptor for an extension-contributed `@@` model attribute.
+ *
+ * An extension registers one of these per bare attribute name it
+ * contributes. The framework owns the generic consult in the interpreter's
+ * model-attribute loop; the contribution supplies only `spec` and `lower`.
+ *
+ * - `attribute` is the bare `@@` attribute name this descriptor claims and,
+ *   by the one-string rule, the `entries` slot its lowered entities are
+ *   grouped under (`entries[attribute][key]`).
+ * - `spec` is opaque to the framework core: an ADR-231 attribute-spec kit
+ *   `AttributeSpec<Out>` value (`modelAttribute(name, {...})` from
+ *   `@prisma-next/psl-parser`). Framework core does not depend on
+ *   psl-parser and never inspects this field; the family interpreter,
+ *   which does depend on psl-parser, parses the attribute's arguments
+ *   against it.
+ * - `lower` receives the parsed arguments and the declaring model's
+ *   context, and returns the entity to file into `entries`, or `undefined`
+ *   after pushing a diagnostic via `ctx.diagnostics`.
+ *
+ * `Out` defaults to `never` — not `unknown` — for the same contravariance
+ * reason documented on {@link AuthoringEntityTypeFactoryOutput}: a concrete
+ * pack literal's narrower `lower(parsed: ConcreteOut, ctx)` is only
+ * assignable to this base shape when the base parameter is the bottom type.
+ */
+export interface AuthoringModelAttributeDescriptor<Out = never> {
+  readonly kind: 'modelAttribute';
+  readonly attribute: string;
+  readonly spec: unknown;
+  readonly lower: (
+    parsed: Out,
+    ctx: AuthoringModelAttributeContext,
+  ) => AuthoringModelAttributeLoweringOutput | undefined;
+}
+
+export type AuthoringModelAttributeDescriptorNamespace = {
+  readonly [name: string]:
+    | AuthoringModelAttributeDescriptor
+    | AuthoringModelAttributeDescriptorNamespace;
 };
 
 export interface AuthoringContributions {
@@ -245,6 +457,15 @@ export interface AuthoringContributions {
    * registry of descriptors that teach the parser how to read those blocks.
    */
   readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
+  /**
+   * Registry of declarative `@@` model attribute descriptors this
+   * contribution registers, keyed by arbitrary path segments. Each leaf is
+   * an {@link AuthoringModelAttributeDescriptor} that claims a bare model
+   * attribute name. The framework owns the generic consult in the family
+   * interpreter's model-attribute loop; the contribution supplies only the
+   * declarative spec and the lowering.
+   */
+  readonly modelAttributes?: AuthoringModelAttributeDescriptorNamespace;
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
@@ -266,86 +487,33 @@ function isAuthoringTemplateRecord(value: unknown): value is Record<string, unkn
 }
 
 export function isAuthoringTypeConstructorDescriptor(
-  value: unknown,
+  value: AuthoringTypeConstructorDescriptor | AuthoringTypeNamespace,
 ): value is AuthoringTypeConstructorDescriptor {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { kind?: unknown }).kind === 'typeConstructor' &&
-    typeof (value as { output?: unknown }).output === 'object' &&
-    (value as { output?: unknown }).output !== null
-  );
+  return 'kind' in value && value.kind === 'typeConstructor';
 }
 
 export function isAuthoringFieldPresetDescriptor(
-  value: unknown,
+  value: AuthoringFieldPresetDescriptor | AuthoringFieldNamespace,
 ): value is AuthoringFieldPresetDescriptor {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { kind?: unknown }).kind === 'fieldPreset' &&
-    typeof (value as { output?: unknown }).output === 'object' &&
-    (value as { output?: unknown }).output !== null
-  );
+  return 'kind' in value && value.kind === 'fieldPreset';
 }
 
 export function isAuthoringEntityTypeDescriptor(
-  value: unknown,
+  value: AuthoringEntityTypeDescriptor | AuthoringEntityTypeNamespace,
 ): value is AuthoringEntityTypeDescriptor {
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    (value as { kind?: unknown }).kind !== 'entity'
-  ) {
-    return false;
-  }
-  const discriminator = (value as { discriminator?: unknown }).discriminator;
-  if (typeof discriminator !== 'string' || discriminator.length === 0) {
-    return false;
-  }
-  const output = (value as { output?: unknown }).output;
-  if (typeof output !== 'object' || output === null) {
-    return false;
-  }
-  const factory = (output as { factory?: unknown }).factory;
-  const template = (output as { template?: unknown }).template;
-  return typeof factory === 'function' || template !== undefined;
+  return 'kind' in value && value.kind === 'entity';
 }
 
 export function isAuthoringPslBlockDescriptor(
-  value: unknown,
+  value: AuthoringPslBlockDescriptor | AuthoringPslBlockDescriptorNamespace,
 ): value is AuthoringPslBlockDescriptor {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-  const record = blindCast<
-    Record<string, unknown>,
-    'type-guard probing an unknown candidate-descriptor object for known property names'
-  >(value);
-  if (record['kind'] !== 'pslBlock') {
-    return false;
-  }
-  const keyword = record['keyword'];
-  if (typeof keyword !== 'string' || keyword.length === 0) {
-    return false;
-  }
-  const discriminator = record['discriminator'];
-  if (typeof discriminator !== 'string' || discriminator.length === 0) {
-    return false;
-  }
-  const name = record['name'];
-  if (typeof name !== 'object' || name === null) {
-    return false;
-  }
-  const nameRecord = blindCast<
-    Record<string, unknown>,
-    'type-guard probing the name property of a candidate pslBlock descriptor'
-  >(name);
-  if (typeof nameRecord['required'] !== 'boolean') {
-    return false;
-  }
-  const parameters = record['parameters'];
-  return typeof parameters === 'object' && parameters !== null && !Array.isArray(parameters);
+  return 'kind' in value && value.kind === 'pslBlock';
+}
+
+export function isAuthoringModelAttributeDescriptor(
+  value: AuthoringModelAttributeDescriptor | AuthoringModelAttributeDescriptorNamespace,
+): value is AuthoringModelAttributeDescriptor {
+  return 'kind' in value && value.kind === 'modelAttribute';
 }
 
 /**
@@ -363,7 +531,8 @@ export function hasRegisteredFieldNamespace(
   if (contributions?.field === undefined || !Object.hasOwn(contributions.field, namespace)) {
     return false;
   }
-  return !isAuthoringFieldPresetDescriptor(contributions.field[namespace]);
+  const value = contributions.field[namespace];
+  return value !== undefined && !isAuthoringFieldPresetDescriptor(value);
 }
 
 function isCopyableNamespaceObject(value: unknown): value is Record<string, unknown> {
@@ -372,15 +541,87 @@ function isCopyableNamespaceObject(value: unknown): value is Record<string, unkn
   return proto === Object.prototype || proto === null;
 }
 
+/**
+ * Deep structural check run only at the composition boundary (the merge and
+ * collect walkers) to classify a raw namespace-tree node as a leaf descriptor.
+ * A node counts as a leaf iff its `kind` matches `descriptorKind` AND it
+ * carries that kind's required fields.
+ *
+ * This is boundary validation over `unknown`, NOT a type-predicate: the four
+ * exported `isAuthoring*Descriptor` predicates deliberately narrow on `kind`
+ * alone and trust the static types. The walkers, by contrast, also receive
+ * type-bypassing packs (`as unknown as never` in tests, untyped JS at runtime)
+ * whose descriptor-shaped-but-incomplete nodes must be rejected rather than
+ * silently treated as sub-namespaces — so the well-formedness check lives here.
+ */
+function isWellFormedDescriptor(value: unknown, descriptorKind: string): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('kind' in value) || value.kind !== descriptorKind) return false;
+  switch (descriptorKind) {
+    case 'typeConstructor':
+    case 'fieldPreset': {
+      if (!('output' in value)) return false;
+      const output = value.output;
+      return typeof output === 'object' && output !== null;
+    }
+    case 'entity': {
+      if (!('discriminator' in value) || typeof value.discriminator !== 'string') return false;
+      if (value.discriminator.length === 0) return false;
+      if (!('output' in value)) return false;
+      const output = value.output;
+      if (typeof output !== 'object' || output === null) return false;
+      const factory = 'factory' in output ? output.factory : undefined;
+      const template = 'template' in output ? output.template : undefined;
+      return typeof factory === 'function' || template !== undefined;
+    }
+    case 'pslBlock': {
+      if (
+        !('keyword' in value) ||
+        typeof value.keyword !== 'string' ||
+        value.keyword.length === 0
+      ) {
+        return false;
+      }
+      if (
+        !('discriminator' in value) ||
+        typeof value.discriminator !== 'string' ||
+        value.discriminator.length === 0
+      ) {
+        return false;
+      }
+      if (!('name' in value)) return false;
+      const name = value.name;
+      if (typeof name !== 'object' || name === null) return false;
+      if (!('required' in name) || typeof name.required !== 'boolean') return false;
+      if (!('parameters' in value)) return false;
+      const parameters = value.parameters;
+      return typeof parameters === 'object' && parameters !== null && !Array.isArray(parameters);
+    }
+    case 'modelAttribute': {
+      if (
+        !('attribute' in value) ||
+        typeof value.attribute !== 'string' ||
+        value.attribute.length === 0
+      ) {
+        return false;
+      }
+      if (!('spec' in value)) return false;
+      return 'lower' in value && typeof value.lower === 'function';
+    }
+    default:
+      return false;
+  }
+}
+
 function deepCopyNamespace(
   source: Record<string, unknown>,
-  isLeafDescriptor: (value: unknown) => boolean,
+  descriptorKind: string,
 ): Record<string, unknown> {
   const copy: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(source)) {
     copy[key] =
-      isCopyableNamespaceObject(value) && !isLeafDescriptor(value)
-        ? deepCopyNamespace(value, isLeafDescriptor)
+      isCopyableNamespaceObject(value) && !isWellFormedDescriptor(value, descriptorKind)
+        ? deepCopyNamespace(value, descriptorKind)
         : value;
   }
   return copy;
@@ -388,9 +629,10 @@ function deepCopyNamespace(
 
 /**
  * Merges `source` into `target` recursively at the descriptor-namespace
- * level. `isLeafDescriptor` decides which values are descriptors (terminal
- * merge points; same-path registrations across components are reported
- * as duplicates) versus sub-namespaces (recursion targets).
+ * level. `descriptorKind` is the `kind` value ('typeConstructor',
+ * 'fieldPreset', 'entity', or 'pslBlock') that identifies a descriptor
+ * (terminal merge point; same-path registrations across components are
+ * reported as duplicates) as opposed to a sub-namespace (recursion target).
  *
  * Path segments are validated against prototype-pollution names
  * (`__proto__`, `constructor`, `prototype`). A value that is neither a
@@ -408,7 +650,7 @@ export function mergeAuthoringNamespaces(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
   path: readonly string[],
-  isLeafDescriptor: (value: unknown) => boolean,
+  descriptorKind: string,
   label: string,
 ): void {
   const assertSafePath = (currentPath: readonly string[]) => {
@@ -434,14 +676,15 @@ export function mergeAuthoringNamespaces(
       // passed by reference — leaves are identity values; class instances carry
       // prototype getters that spread would destroy.
       target[key] =
-        isCopyableNamespaceObject(sourceValue) && !isLeafDescriptor(sourceValue)
-          ? deepCopyNamespace(sourceValue, isLeafDescriptor)
+        isCopyableNamespaceObject(sourceValue) &&
+        !isWellFormedDescriptor(sourceValue, descriptorKind)
+          ? deepCopyNamespace(sourceValue, descriptorKind)
           : sourceValue;
       continue;
     }
 
-    const existingIsLeaf = isLeafDescriptor(existingValue);
-    const sourceIsLeaf = isLeafDescriptor(sourceValue);
+    const existingIsLeaf = isWellFormedDescriptor(existingValue, descriptorKind);
+    const sourceIsLeaf = isWellFormedDescriptor(sourceValue, descriptorKind);
 
     if (existingIsLeaf || sourceIsLeaf) {
       throw new Error(
@@ -455,13 +698,22 @@ export function mergeAuthoringNamespaces(
       );
     }
 
-    mergeAuthoringNamespaces(existingValue, sourceValue, currentPath, isLeafDescriptor, label);
+    mergeAuthoringNamespaces(existingValue, sourceValue, currentPath, descriptorKind, label);
   }
 }
 
-function collectDescriptorPaths(
-  namespace: Readonly<Record<string, unknown>>,
-  isLeaf: (value: unknown) => boolean,
+/**
+ * Shape shared by every `Authoring*Namespace` type: a tree whose leaves are
+ * descriptors of type `D` and whose internal nodes are sub-namespaces of the
+ * same shape. `collectDescriptorPaths` and `collectDescriptorEntries` are
+ * generic over `D` so they can walk any of the four descriptor families with
+ * a properly narrowed `isLeaf` predicate instead of an `unknown`-typed one.
+ */
+type AuthoringNamespaceTree<D> = { readonly [name: string]: D | AuthoringNamespaceTree<D> };
+
+function collectDescriptorPaths<D>(
+  namespace: AuthoringNamespaceTree<D>,
+  isLeaf: (value: D | AuthoringNamespaceTree<D>) => value is D,
   path: readonly string[] = [],
 ): string[] {
   const paths: string[] = [];
@@ -472,9 +724,7 @@ function collectDescriptorPaths(
       continue;
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      paths.push(
-        ...collectDescriptorPaths(value as Readonly<Record<string, unknown>>, isLeaf, currentPath),
-      );
+      paths.push(...collectDescriptorPaths(value, isLeaf, currentPath));
     }
   }
   return paths;
@@ -485,9 +735,10 @@ interface DescriptorEntry {
   readonly discriminator: string;
 }
 
-function collectDescriptorEntries(
-  namespace: Readonly<Record<string, unknown>>,
-  isLeaf: (value: unknown) => boolean,
+function collectDescriptorEntries<D extends { readonly discriminator: string }>(
+  namespace: AuthoringNamespaceTree<D>,
+  isLeaf: (value: D | AuthoringNamespaceTree<D>) => value is D,
+  descriptorKind: string,
   label: string,
   path: readonly string[] = [],
 ): DescriptorEntry[] {
@@ -495,13 +746,16 @@ function collectDescriptorEntries(
   for (const [key, value] of Object.entries(namespace)) {
     const currentPath = [...path, key];
     if (isLeaf(value)) {
-      const record = blindCast<
-        Record<string, unknown>,
-        'discriminator extraction from a leaf already validated by isLeaf'
-      >(value);
-      const discriminator = record['discriminator'];
-      if (typeof discriminator === 'string' && discriminator.length > 0) {
-        entries.push({ path: currentPath.join('.'), discriminator });
+      // `isLeaf` narrows on `kind` alone; a type-bypassing pack can carry the
+      // right `kind` while missing the rest of the descriptor shape. Reject
+      // that here so a half-built contribution can't pass validation.
+      if (!isWellFormedDescriptor(value, descriptorKind)) {
+        throw new Error(
+          `Malformed authoring ${label} contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/keyword/discriminator) but does not satisfy the ${label} descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+        );
+      }
+      if (value.discriminator.length > 0) {
+        entries.push({ path: currentPath.join('.'), discriminator: value.discriminator });
       }
       continue;
     }
@@ -511,9 +765,9 @@ function collectDescriptorEntries(
         'walker inspects a non-leaf value for descriptor-shaped keys before recursing'
       >(value);
       // A value carrying descriptor-shaped keys (`kind`/`keyword`/`discriminator`)
-      // but failing `isAuthoringPslBlockDescriptor` (e.g. missing `parameters`) is
-      // a malformed declarative descriptor. Descending into it as a sub-namespace
-      // would silently skip it, so a half-built contribution would pass validation.
+      // but lacking a matching `kind` (so `isLeaf` rejected it) is a malformed
+      // declarative descriptor. Descending into it as a sub-namespace would
+      // silently skip it, so a half-built contribution would pass validation.
       // Reject it at load time instead, naming the path and what's wrong.
       //
       // A valid sub-namespace whose key happens to be named `kind`, `keyword`, or
@@ -535,42 +789,63 @@ function collectDescriptorEntries(
           );
         }
       }
-      entries.push(...collectDescriptorEntries(record, isLeaf, label, currentPath));
+      entries.push(...collectDescriptorEntries(value, isLeaf, descriptorKind, label, currentPath));
     }
   }
   return entries;
 }
 
 /**
- * Throws when two or more entries in the same namespace share a discriminator.
- * Duplicate discriminators within a namespace make dispatch ambiguous — the
- * lowering factory lookup dispatches by discriminator, so one would silently
- * shadow the other. Catch duplicates before building any dispatch map.
+ * Throws when two or more entries in the same namespace share a key. A
+ * duplicate key makes dispatch ambiguous — the caller's lookup dispatches by
+ * this key, so one entry would silently shadow the other. Catch duplicates
+ * before building any dispatch map.
+ *
+ * `label` (e.g. `'pslBlock'`, `'entityType'`) names which namespace the
+ * duplicate was found in and is carried in the structured error metadata;
+ * the key itself is always called `key` in both the message and the
+ * metadata, since what it semantically represents (a discriminator for
+ * `entityType`, the parser's dispatch keyword for `pslBlock`) is the
+ * caller's concern, not this function's.
  */
 function assertUniqueDiscriminators(entries: readonly DescriptorEntry[], label: string): void {
   const seen = new Map<string, string>();
-  for (const { path, discriminator } of entries) {
-    const existing = seen.get(discriminator);
+  for (const { path, discriminator: key } of entries) {
+    const existing = seen.get(key);
     if (existing !== undefined) {
-      throw new Error(
-        `Duplicate ${label} discriminator "${discriminator}" registered at both "${existing}" and "${path}". Each ${label} contribution must use a unique discriminator.`,
+      throw runtimeError(
+        'RUNTIME.DUPLICATE_AUTHORING_DISCRIMINATOR',
+        `Duplicate ${label} key "${key}" registered at both "${existing}" and "${path}". Each ${label} contribution must use a unique key.`,
+        { label, key, existingPath: existing, path },
       );
     }
-    seen.set(discriminator, path);
+    seen.set(key, path);
   }
 }
 
+interface PslBlockDescriptorEntry extends DescriptorEntry {
+  readonly keyword: string;
+}
+
 function collectPslBlockDescriptorEntries(
-  namespace: Readonly<Record<string, unknown>>,
+  namespace: AuthoringPslBlockDescriptorNamespace,
   path: readonly string[] = [],
-): DescriptorEntry[] {
-  const entries: DescriptorEntry[] = [];
+): PslBlockDescriptorEntry[] {
+  const entries: PslBlockDescriptorEntry[] = [];
   for (const [key, value] of Object.entries(namespace)) {
     const currentPath = [...path, key];
     if (isAuthoringPslBlockDescriptor(value)) {
+      // `isAuthoringPslBlockDescriptor` narrows on `kind` alone; reject a
+      // `kind: 'pslBlock'` value that is missing the rest of the shape.
+      if (!isWellFormedDescriptor(value, 'pslBlock')) {
+        throw new Error(
+          `Malformed authoring pslBlock contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/keyword/discriminator) but does not satisfy the pslBlock descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+        );
+      }
       entries.push({
         path: currentPath.join('.'),
         discriminator: value.discriminator,
+        keyword: value.keyword,
       });
       continue;
     }
@@ -587,7 +862,7 @@ function collectPslBlockDescriptorEntries(
           `Malformed authoring pslBlock contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/keyword/discriminator) but does not satisfy the pslBlock descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
         );
       }
-      entries.push(...collectPslBlockDescriptorEntries(record, currentPath));
+      entries.push(...collectPslBlockDescriptorEntries(value, currentPath));
     }
   }
   return entries;
@@ -597,6 +872,13 @@ function collectPslBlockDescriptorEntries(
  * Every `pslBlockDescriptors` entry requires a matching `entityTypes` factory
  * with the same discriminator. An `entityTypes` factory may stand alone (e.g.
  * `enum`, reachable from the TypeScript builder without any PSL block).
+ *
+ * Uniqueness for pslBlock entries is keyed on **keyword**, not discriminator:
+ * several keywords (e.g. `policy_select`/`policy_insert`) may legitimately
+ * share one discriminator, routing to the same `entityTypes` factory and the
+ * same `entries[discriminator]` slot — that N:1 shape is exactly what lets
+ * one entity kind be authored through several PSL keywords. What must stay
+ * unique is the keyword itself, since that's what the parser dispatches on.
  */
 function assertPslBlocksHaveFactories(
   entityTypeNamespace: AuthoringEntityTypeNamespace,
@@ -606,10 +888,14 @@ function assertPslBlocksHaveFactories(
   const entityEntries = collectDescriptorEntries(
     entityTypeNamespace,
     isAuthoringEntityTypeDescriptor,
+    'entity',
     'entityType',
   );
 
-  assertUniqueDiscriminators(blockEntries, 'pslBlock');
+  assertUniqueDiscriminators(
+    blockEntries.map((entry) => ({ path: entry.path, discriminator: entry.keyword })),
+    'pslBlock',
+  );
   assertUniqueDiscriminators(entityEntries, 'entityType');
 
   const entityDiscriminators = new Set(entityEntries.map((entry) => entry.discriminator));
@@ -623,11 +909,71 @@ function assertPslBlocksHaveFactories(
   }
 }
 
+function collectModelAttributeEntries(
+  namespace: AuthoringModelAttributeDescriptorNamespace,
+  path: readonly string[] = [],
+): DescriptorEntry[] {
+  const entries: DescriptorEntry[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isAuthoringModelAttributeDescriptor(value)) {
+      // `isAuthoringModelAttributeDescriptor` narrows on `kind` alone; reject a
+      // `kind: 'modelAttribute'` value that is missing the rest of the shape.
+      if (!isWellFormedDescriptor(value, 'modelAttribute')) {
+        throw new Error(
+          `Malformed authoring modelAttribute contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/attribute) but does not satisfy the modelAttribute descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+        );
+      }
+      entries.push({ path: currentPath.join('.'), discriminator: value.attribute });
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const record = blindCast<
+        Readonly<Record<string, unknown>>,
+        'walker descends into modelAttribute namespace'
+      >(value);
+      // `kind === 'modelAttribute'` is unreachable here: it would have made
+      // `isAuthoringModelAttributeDescriptor` true and taken the leaf branch
+      // above. A descriptor-shaped-but-kindless value (attribute + spec) is
+      // the only malformed case a sub-namespace walk can hit.
+      const hasAttribute = typeof record['attribute'] === 'string';
+      if (hasAttribute && 'spec' in record) {
+        throw new Error(
+          `Malformed authoring modelAttribute contribution at "${currentPath.join('.')}". The value carries descriptor keys (kind/attribute) but does not satisfy the modelAttribute descriptor shape. Fix the contribution so it is a complete descriptor, or remove the stray keys if it was meant to be a sub-namespace.`,
+        );
+      }
+      entries.push(...collectModelAttributeEntries(value, currentPath));
+    }
+  }
+  return entries;
+}
+
+/**
+ * Throws when two modelAttribute contributions — at any paths, even
+ * different ones — claim the same bare `@@` attribute name. The family
+ * interpreter dispatches by attribute name, not by registration path, so
+ * two descriptors claiming the same name would have one silently shadow
+ * the other.
+ */
+function assertUniqueModelAttributeNames(entries: readonly DescriptorEntry[]): void {
+  const seen = new Map<string, string>();
+  for (const { path, discriminator: attribute } of entries) {
+    const existing = seen.get(attribute);
+    if (existing !== undefined) {
+      throw new Error(
+        `Duplicate modelAttribute "${attribute}" registered at both "${existing}" and "${path}". Each modelAttribute contribution must claim a unique attribute name.`,
+      );
+    }
+    seen.set(attribute, path);
+  }
+}
+
 export function assertNoCrossRegistryCollisions(
   typeNamespace: AuthoringTypeNamespace,
   fieldNamespace: AuthoringFieldNamespace,
   entityTypeNamespace: AuthoringEntityTypeNamespace = {},
   pslBlockNamespace: AuthoringPslBlockDescriptorNamespace = {},
+  modelAttributeNamespace: AuthoringModelAttributeDescriptorNamespace = {},
 ): void {
   const typePaths = new Set(
     collectDescriptorPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
@@ -638,20 +984,11 @@ export function assertNoCrossRegistryCollisions(
   const entityPaths = new Set(
     collectDescriptorPaths(entityTypeNamespace, isAuthoringEntityTypeDescriptor),
   );
-  // Within-registry duplicate detection is handled upstream by the merge
-  // walker (`mergeAuthoringNamespaces` in control-stack.ts and
-  // `mergeHelperNamespaces` in composed-authoring-helpers.ts), which throws
-  // on same-path registrations within any single registry before this check
-  // runs. This function only handles the cross-registry case.
-  //
-  // Cross-registry collisions are checked among `type` / `field` /
-  // `entityTypes` only — these three are user-facing helper paths that PSL
-  // must resolve unambiguously. `pslBlockDescriptors` is an internal
-  // framework index consumed by parser and printer dispatch, not a
-  // user-facing helper path; the natural authoring pattern is the same
-  // path key in `entityTypes` and `pslBlockDescriptors` for a single
-  // contribution. The block→factory link is enforced by
-  // `assertPslBlocksHaveFactories` via the discriminator string, not by path.
+  // Within-registry duplicates are caught upstream by the merge walkers; this
+  // checks only cross-registry collisions, and only among the user-facing
+  // `type`/`field`/`entityTypes` paths. `pslBlockDescriptors` is an internal
+  // index — its block→factory link is checked by discriminator in
+  // `assertPslBlocksHaveFactories`, not by path.
   const ambiguityHint =
     'Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.';
   for (const fieldPath of fieldPaths) {
@@ -670,12 +1007,16 @@ export function assertNoCrossRegistryCollisions(
   }
 
   assertPslBlocksHaveFactories(entityTypeNamespace, pslBlockNamespace);
+  assertUniqueModelAttributeNames(collectModelAttributeEntries(modelAttributeNamespace));
 }
 
 export function resolveAuthoringTemplateValue(
-  template: AuthoringTemplateValue,
+  template: AuthoringTemplateValue | undefined,
   args: readonly unknown[],
 ): unknown {
+  if (template === undefined) {
+    return undefined;
+  }
   if (isAuthoringArgRef(template)) {
     let value = args[template.index];
 
@@ -835,7 +1176,7 @@ function resolveAuthoringStorageTypeTemplate(
   return {
     codecId: template.codecId,
     nativeType,
-    ...(typeParams === undefined ? {} : { typeParams }),
+    ...ifDefined('typeParams', typeParams),
   };
 }
 
@@ -916,12 +1257,12 @@ export function instantiateAuthoringTypeConstructor(
   return resolveAuthoringStorageTypeTemplate(descriptor.output, args);
 }
 
-export function instantiateAuthoringEntityType(
+export function instantiateAuthoringEntityType<TOutput = unknown>(
   helperPath: string,
   descriptor: AuthoringEntityTypeDescriptor,
   args: readonly unknown[],
   ctx: AuthoringEntityContext,
-): unknown {
+): TOutput {
   // Factory-output entities carry their input contract on the factory
   // signature itself — TypeScript narrows callers via
   // `EntityHelperFunction`'s extracted `input` parameter, and the factory
@@ -936,14 +1277,16 @@ export function instantiateAuthoringEntityType(
     // contravariant position (see the type's docstring). The runtime
     // delegates input validation to the pack's factory itself, so we
     // forward the supplied input here without a static input contract.
-    const factory = descriptor.output.factory as (
-      input: unknown,
-      ctx: AuthoringEntityContext,
-    ) => unknown;
+    const factory = blindCast<
+      (input: unknown, ctx: AuthoringEntityContext) => TOutput,
+      'entity factory output is caller-selected via instantiateAuthoringEntityType<TOutput>'
+    >(descriptor.output.factory);
     return factory(input, ctx);
   }
   validateAuthoringHelperArguments(helperPath, descriptor.args, args);
-  return resolveAuthoringTemplateValue(descriptor.output.template, args);
+  return blindCast<TOutput, 'template-output resolves to the declared TOutput by convention'>(
+    resolveAuthoringTemplateValue(descriptor.output.template, args),
+  );
 }
 
 export function instantiateAuthoringFieldPreset(

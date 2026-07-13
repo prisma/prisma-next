@@ -108,6 +108,32 @@ async function encodeParamValue(
     return value;
   }
 
+  if (metadata.codec?.many) {
+    if (!Array.isArray(value)) {
+      wrapEncodeFailure(
+        new TypeError(`expected an array for many-typed parameter, got ${typeof value}`),
+        metadata,
+        paramIndex,
+        codec.id,
+      );
+    }
+    const encoded: unknown[] = [];
+    for (let i = 0; i < value.length; i++) {
+      const elem = value[i];
+      if (elem === null || elem === undefined) {
+        encoded.push(null);
+        continue;
+      }
+      try {
+        encoded.push(await codec.encode(elem, ctx));
+      } catch (error) {
+        if (isRuntimeError(error)) throw error;
+        wrapEncodeFailure(error, metadata, paramIndex, codec.id);
+      }
+    }
+    return encoded;
+  }
+
   try {
     return await codec.encode(value, ctx);
   } catch (error) {

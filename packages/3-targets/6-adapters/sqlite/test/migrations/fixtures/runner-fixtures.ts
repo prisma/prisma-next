@@ -17,13 +17,13 @@ import {
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type AggregateMigrationEdgeRef,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildControlTableBootstrapQueries } from '@prisma-next/target-sqlite/contract-free';
-import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
+import sqliteTargetDescriptor, { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -39,7 +39,7 @@ export const contract: Contract<SqlStorage> = {
   storage: new SqlStorage({
     storageHash: coreHash('sha256:contract'),
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+      [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
         id: UNBOUND_NAMESPACE_ID,
         entries: {
           table: {
@@ -65,9 +65,9 @@ export const contract: Contract<SqlStorage> = {
   meta: {},
 };
 
-export const emptySchema: SqlSchemaIR = {
+export const emptySchema = new SqlSchemaIR({
   tables: {},
-};
+});
 
 const controlStack = createControlStack({
   family: sqlFamilyDescriptor,
@@ -166,7 +166,7 @@ export function toPlanContractInfo(c: Contract<SqlStorage>) {
 
 export function synthEdges(plan: MigrationPlan): readonly AggregateMigrationEdgeRef[] {
   return [
-    buildSynthMigrationEdge({
+    buildFabricatedMigrationEdge({
       currentMarkerStorageHash: plan.origin?.storageHash,
       destinationStorageHash: plan.destination.storageHash,
       operationCount: plan.operations.length,

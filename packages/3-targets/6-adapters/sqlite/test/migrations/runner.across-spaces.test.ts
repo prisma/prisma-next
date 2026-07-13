@@ -1,7 +1,8 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -25,7 +26,7 @@ const extensionContract: Contract<SqlStorage> = {
   storage: new SqlStorage({
     storageHash: coreHash('sha256:ext-contract'),
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+      [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
         id: UNBOUND_NAMESPACE_ID,
         entries: { table: {} },
       }),
@@ -119,6 +120,10 @@ function buildAppPlan() {
           {
             description: 'create user',
             sql: 'CREATE TABLE user (id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE)',
+          },
+          {
+            description: 'create email index',
+            sql: 'CREATE INDEX user_email_idx ON user (email)',
           },
         ],
         postcheck: [],

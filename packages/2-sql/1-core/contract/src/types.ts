@@ -10,7 +10,6 @@ export interface SqlControlDriverInstance<T extends string = string>
   ): Promise<{ readonly rows: Row[] }>;
 }
 
-export { buildSqlNamespace, buildSqlNamespaceMap } from './ir/build-sql-namespace';
 export { CheckConstraint, type CheckConstraintInput } from './ir/check-constraint';
 export {
   ForeignKey,
@@ -25,17 +24,18 @@ export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export {
+  isMaterializedSqlNamespace,
   isSqlAuthoringContributions,
   type SqlAuthoringContributions,
   type SqlNamespace,
+  SqlNamespaceBase,
   type SqlNamespaceEntries,
   type SqlNamespaceFactory,
-  type SqlNamespaceTablesInput,
+  type SqlNamespaceInput,
   SqlStorage,
   type SqlStorageInput,
   type SqlStorageTypeEntry,
 } from './ir/sql-storage';
-export { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
 export { StorageTable, type StorageTableInput } from './ir/storage-table';
 export {
@@ -45,7 +45,11 @@ export {
   type StorageTypeInstanceInput,
   toStorageTypeInstance,
 } from './ir/storage-type-instance';
-export { StorageValueSet, type StorageValueSetInput } from './ir/storage-value-set';
+export {
+  isStorageValueSet,
+  StorageValueSet,
+  type StorageValueSetInput,
+} from './ir/storage-value-set';
 export {
   UniqueConstraint,
   type UniqueConstraintInput,
@@ -119,12 +123,19 @@ export type CodecTypesOf<T> = [T] extends [never]
  * Dispatch hint identifying the first-argument target of an operation.
  *
  * Used by ORM column helpers to decide whether an operation is reachable on a
- * field. Either names a concrete codec identity or a set of capability traits
- * that the field's codec must carry.
+ * field. Names a concrete codec identity, a set of capability traits the
+ * field's codec must carry, or targets list-typed (`many`) fields. Element
+ * capability gating for list ops travels in `elementTraits`.
  */
 export type QueryOperationSelfSpec =
-  | { readonly codecId: string; readonly traits?: never }
-  | { readonly traits: readonly CodecTrait[]; readonly codecId?: never };
+  | { readonly codecId: string; readonly traits?: never; readonly many?: never }
+  | { readonly traits: readonly CodecTrait[]; readonly codecId?: never; readonly many?: never }
+  | {
+      readonly many: true;
+      readonly elementTraits?: readonly CodecTrait[];
+      readonly codecId?: never;
+      readonly traits?: never;
+    };
 
 /**
  * Structural shape an operation's impl must return: any value carrying a

@@ -3,6 +3,7 @@ import type {
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
@@ -17,7 +18,11 @@ describe('composed mutation default registries', () => {
   const interpretPslDocumentToSqlContract = (
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
-      'target' | 'scalarTypeDescriptors' | 'composedExtensionContracts'
+      | 'target'
+      | 'scalarTypeDescriptors'
+      | 'composedExtensionContracts'
+      | 'createNamespace'
+      | 'capabilities'
     > &
       Partial<Pick<InterpretPslDocumentToSqlContractInput, 'composedExtensionContracts'>>,
   ) =>
@@ -25,6 +30,8 @@ describe('composed mutation default registries', () => {
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
+      createNamespace: createTestSqlNamespace,
+      capabilities: { sql: { scalarList: true } },
       ...input,
     });
 

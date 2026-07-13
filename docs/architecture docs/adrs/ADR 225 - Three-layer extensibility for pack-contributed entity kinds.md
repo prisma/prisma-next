@@ -22,7 +22,7 @@ A contribution provides all three under the same discriminator:
 2. **An `entityTypes` factory** carrying the `discriminator` and an `output.factory: (input, ctx) => IRNode` that constructs the IR instance from the lowering input.
 3. **A `pslBlockDescriptors` entry** — an `AuthoringPslBlockDescriptor` carrying the same `discriminator`, describing the PSL block as data ([ADR 126](ADR%20126%20-%20PSL%20top-level%20block%20SPI.md)).
 
-The discriminator is the routing key in both directions. Parsing sets `PslExtensionBlock.kind = descriptor.discriminator`, and the lowering machinery looks up the factory by that key; printing looks up the descriptor by discriminator to reconstruct PSL from the IR node. Convention: `<target-or-family>-<kind>`, e.g. `postgres-policy-select`.
+Parsing and lowering route by discriminator; printing routes by keyword. Parsing sets `PslExtensionBlock.kind = descriptor.discriminator`, and the lowering machinery looks up the factory by that key; printing looks up the descriptor by the block's own `keyword` (several keywords may share one discriminator — see [ADR 126](ADR%20126%20-%20PSL%20top-level%20block%20SPI.md)) to reconstruct PSL from the IR node. Convention: `<target-or-family>-<kind>`, e.g. `postgres-policy-select`.
 
 ## Why three layers, one key
 
@@ -70,7 +70,7 @@ PSL source text
   └─→ generic validator   → checks parameters against the descriptor
   └─→ entityTypes factory → looked up by discriminator; constructs the IR instance
   └─→ namespace.entries[discriminator][name]   (ADR 224 coordinate model)
-  └─→ generic printer     → looks up the descriptor by discriminator; reconstructs PSL from the IR node
+  └─→ generic printer     → looks up the descriptor by keyword; reconstructs PSL from the IR node
 ```
 
 The `entries[discriminator][name]` path mirrors the IR's coordinate model ([ADR 224](ADR%20224%20-%20Namespace%20concretions%20address%20entities%20by%20coordinate.md)), so a generic walker reading `entries` structurally reaches built-in and contributed kinds alike, without knowing their names ahead of time.

@@ -7,9 +7,13 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
-import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  PostgresTableSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -48,26 +52,45 @@ const RECONCILIATION_POLICY: MigrationOperationPolicy = {
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 const planner = createPostgresMigrationPlanner(testAdapter);
 
-const emptySchema: SqlSchemaIR = { tables: {} };
+const emptySchema = new PostgresDatabaseSchemaNode({
+  namespaces: {
+    public: new PostgresNamespaceSchemaNode({
+      schemaName: 'public',
+      tables: {},
+    }),
+  },
+  roles: [],
+  existingSchemas: [],
+  pgVersion: '',
+});
 
 function liveSchemaWithUsers(
   columns: Record<string, { name: string; nativeType: string; nullable: boolean }>,
-): SqlSchemaIR {
-  return {
-    tables: {
-      users: {
-        name: 'users',
-        columns,
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        foreignKeys: [],
-        indexes: [],
-      },
+): PostgresDatabaseSchemaNode {
+  return new PostgresDatabaseSchemaNode({
+    namespaces: {
+      public: new PostgresNamespaceSchemaNode({
+        schemaName: 'public',
+        tables: {
+          users: new PostgresTableSchemaNode({
+            name: 'users',
+            columns,
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            foreignKeys: [],
+            indexes: [],
+            rlsEnabled: false,
+          }),
+        },
+      }),
     },
-  };
+    roles: [],
+    existingSchemas: [],
+    pgVersion: '',
+  });
 }
 
-async function planAgainst(contract: Contract<SqlStorage>, schema: SqlSchemaIR) {
+async function planAgainst(contract: Contract<SqlStorage>, schema: PostgresDatabaseSchemaNode) {
   const result = planner.plan({
     contract,
     schema,
@@ -229,7 +252,7 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', async () =
           expect.objectContaining({
             kind: 'controlPolicySuppressedCall',
             summary: expect.stringContaining(
-              "has effective control 'external' but table declared 'managed'",
+              "has effective control 'external' but declared 'managed'",
             ),
           }),
         ]),
@@ -244,7 +267,7 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', async () =
 // but never be modified in place. The same diff under `managed` emits the
 // add-column.
 describe('PostgresMigrationPlanner.plan tolerated vs managed add-column', async () => {
-  const liveSchemaWithUsersIdOnly: SqlSchemaIR = liveSchemaWithUsers({
+  const liveSchemaWithUsersIdOnly: PostgresDatabaseSchemaNode = liveSchemaWithUsers({
     id: { name: 'id', nativeType: 'text', nullable: false },
   });
 

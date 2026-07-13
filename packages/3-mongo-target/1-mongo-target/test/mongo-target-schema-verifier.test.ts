@@ -79,7 +79,7 @@ describe('MongoTargetSchemaVerifier', () => {
     const result = verifier.verifySchema({ contract, schema });
 
     expect(result.ok).toBe(false);
-    expect(result.issues.some((i) => i.kind === 'missing_table')).toBe(true);
+    expect(result.issues.some((i) => i.reason === 'not-found' && i.path[0] === 'items')).toBe(true);
   });
 
   it('uses the family-shared scaffolding: walks each namespace and aggregates issues', () => {

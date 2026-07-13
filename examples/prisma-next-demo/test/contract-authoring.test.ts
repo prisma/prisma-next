@@ -9,6 +9,6 @@ describe('demo TS contract authoring', () => {
 
     expect(userIdColumn.codecId).toBe(userIdTargetColumn.codecId);
     expect(userIdColumn.nativeType).toBe(userIdTargetColumn.nativeType);
-    expect(userIdColumn).toHaveProperty('typeParams', userIdTargetColumn['typeParams']);
+    expect({ ...userIdColumn }).toEqual({ ...userIdTargetColumn });
   });
 });

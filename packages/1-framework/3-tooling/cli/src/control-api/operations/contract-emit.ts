@@ -221,6 +221,7 @@ export async function executeContractEmit(
       codecLookup: stack.codecLookup,
       controlMutationDefaults: stack.controlMutationDefaults,
       resolvedInputs: contractConfig.source.inputs ?? [],
+      capabilities: stack.capabilities,
     };
 
     startSpan(onProgress, 'resolveSource', 'Resolving contract source...');
@@ -258,16 +259,16 @@ export async function executeContractEmit(
       // Blind cast: `validateProviderResult` upstream has already
       // pinned `validatedContract.value` to the provider's loose
       // `Contract` envelope, but the local `Contract` type at this
-      // call site is the precise structural interface. Re-narrowing
-      // the envelope into the precise type is exactly what the
-      // `familyInstance.deserializeContract(enrichedIR)` call on the
-      // next line does — the cast just defers the structural check
-      // by one statement so `enrichContract` can decorate first.
+      // call site is the precise structural interface. The cast just
+      // defers the structural check by one statement so `enrichContract`
+      // can decorate first; the subsequent serialize→deserialize round-trip
+      // re-narrows the envelope into the precise type.
       const enrichedIR = enrichContract(
         validatedContract.value as unknown as Contract,
         frameworkComponents,
       );
-      const deserializedContract = familyInstance.deserializeContract(enrichedIR);
+      const rawContractJson = config.target.contractSerializer.serializeContract(enrichedIR);
+      const deserializedContract = familyInstance.deserializeContract(rawContractJson);
       // Each target's descriptor ships a `contractSerializer` SPI; the
       // framework canonicalizer threads its `serializeContract` so the
       // on-disk JSON envelope is constructed by target-owned code

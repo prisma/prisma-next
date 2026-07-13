@@ -48,7 +48,7 @@ type GeneratedLikeStorage = {
   namespaces: {
     __unbound__: {
       id: '__unbound__';
-      kind: 'sql-namespace';
+      kind: 'schema';
       entries: {
         table: {
           user: {
@@ -415,7 +415,7 @@ type VOContractBase = Omit<
     namespaces: {
       __unbound__: {
         id: '__unbound__';
-        kind: 'sql-namespace';
+        kind: 'schema';
         entries: {
           table: {
             users: {

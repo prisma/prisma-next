@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract, StorageNamespace } from '@prisma-next/contract/types';
+import type { SchemaEntityCoordinate } from '@prisma-next/framework-components/control';
+import { coordinateKey, elementCoordinates } from '@prisma-next/framework-components/ir';
 import { join } from 'pathe';
 import {
   errorBundleNotFoundForGraphNode,
@@ -19,10 +21,10 @@ import type { Refs } from '../refs';
 import { readRefSnapshot } from '../refs/snapshot';
 import type { ContractSpaceHeadRecord } from '../verify-contract-spaces';
 import type {
+  AggregateContractSpace,
   ContractAtOptions,
   ContractAtResult,
   ContractSpaceAggregate,
-  ContractSpaceMember,
 } from './types';
 
 function hasErrnoCode(error: unknown, code: string): boolean {
@@ -157,24 +159,24 @@ async function resolveGraphNodeContractAt(args: {
 }
 
 /**
- * Resolve a member's head ref, asserting it is present. The apply/verify
+ * Resolve a contract space's head ref, asserting it is present. The apply/verify
  * engine only runs after `checkIntegrity` has refused on `headRefMissing`,
- * so a member reaching the planner / verifier without a head ref is a
+ * so a space reaching the planner / verifier without a head ref is a
  * programming error (the integrity gate was skipped), not a user-facing
- * state. The app member's head ref is always synthesised, so this only
+ * state. The app space's head ref is always synthesised, so this only
  * ever guards an ungated extension space.
  */
-export function requireHeadRef(member: ContractSpaceMember): ContractSpaceHeadRecord {
-  if (member.headRef === null) {
+export function requireHeadRef(space: AggregateContractSpace): ContractSpaceHeadRecord {
+  if (space.headRef === null) {
     throw new Error(
-      `Contract space "${member.spaceId}" has no head ref; the integrity gate must refuse a missing head ref before planning or verifying.`,
+      `Contract space "${space.spaceId}" has no head ref; the integrity gate must refuse a missing head ref before planning or verifying.`,
     );
   }
-  return member.headRef;
+  return space.headRef;
 }
 
 /**
- * Build a {@link ContractSpaceMember} with lazily-memoised `graph()`,
+ * Build a {@link AggregateContractSpace} with lazily-memoised `graph()`,
  * `contract()`, and `contractAt()` facets.
  *
  * `graph()` reconstructs the migration graph from `packages` on first
@@ -186,7 +188,7 @@ export function requireHeadRef(member: ContractSpaceMember): ContractSpaceHeadRe
  * the same resolution order as plan-time ref resolution: ref snapshot first
  * (when `opts.refName` is set), else the matching package's `end-contract.*`.
  */
-export function createContractSpaceMember(args: {
+export function createAggregateContractSpace(args: {
   readonly spaceId: string;
   readonly packages: readonly OnDiskMigrationPackage[];
   readonly refs: Refs;
@@ -194,13 +196,13 @@ export function createContractSpaceMember(args: {
   readonly refsDir: string;
   readonly resolveContract: () => Contract;
   readonly deserializeContract: (raw: unknown) => Contract;
-}): ContractSpaceMember {
+}): AggregateContractSpace {
   const { spaceId, packages, refs, headRef, refsDir, resolveContract, deserializeContract } = args;
   let graphMemo: MigrationGraph | undefined;
   let contractMemo: Contract | undefined;
   const contractAtMemo = new Map<string, ContractAtResult>();
 
-  function memberGraph(): MigrationGraph {
+  function spaceGraph(): MigrationGraph {
     graphMemo ??= reconstructGraph(packages);
     return graphMemo;
   }
@@ -210,7 +212,7 @@ export function createContractSpaceMember(args: {
     packages,
     refs,
     headRef,
-    graph: memberGraph,
+    graph: spaceGraph,
     contract() {
       contractMemo ??= resolveContract();
       return contractMemo;
@@ -227,7 +229,7 @@ export function createContractSpaceMember(args: {
         opts,
         refsDir,
         packages,
-        graph: memberGraph(),
+        graph: spaceGraph(),
         deserializeContract,
       });
       contractAtMemo.set(key, result);
@@ -237,29 +239,45 @@ export function createContractSpaceMember(args: {
 }
 
 /**
- * Collect the union of every namespace declared across all members of an
+ * Collect the union of every namespace declared across all contract spaces of an
  * aggregate (app + extensions) and return a minimal object with the shape
  * `{ storage: { namespaces } }` suitable for passing to
  * `familyInstance.introspect`.
  *
  * Callers invoke this after the integrity gate (`buildContractSpaceAggregate`
- * with `checkContracts: true`), so every `member.contract()` call is safe —
+ * with `checkContracts: true`), so every `space.contract()` call is safe —
  * no try/catch is needed here.
  */
 export function collectAggregateNamespaces(aggregate: ContractSpaceAggregate): {
   readonly storage: { readonly namespaces: Readonly<Record<string, StorageNamespace>> };
 } {
   const merged: Record<string, StorageNamespace> = {};
-  for (const member of aggregate.spaces()) {
-    for (const [key, ns] of Object.entries(member.contract().storage.namespaces)) {
-      merged[key] = ns;
+  for (const space of aggregate.spaces()) {
+    for (const [key, ns] of Object.entries(space.contract().storage.namespaces)) {
+      const existing = merged[key];
+      merged[key] = existing === undefined ? ns : mergeNamespaceEntries(existing, ns);
     }
   }
   return { storage: { namespaces: merged } };
 }
 
 /**
- * Assemble a {@link ContractSpaceAggregate} value from its members and a
+ * Union two contract spaces' declarations for the same namespace id, per
+ * entity kind. Two spaces may legitimately share a namespace (e.g. both
+ * declaring tables in `public`); element-level disjointness is enforced by
+ * `checkIntegrity`, so the kind maps never collide on a name — replacing the
+ * whole namespace would silently drop the earlier space's entities.
+ */
+function mergeNamespaceEntries(a: StorageNamespace, b: StorageNamespace): StorageNamespace {
+  const entries: Record<string, Readonly<Record<string, unknown>>> = { ...a.entries };
+  for (const [entityKind, kindMap] of Object.entries(b.entries)) {
+    entries[entityKind] = { ...entries[entityKind], ...kindMap };
+  }
+  return { ...a, entries };
+}
+
+/**
+ * Assemble a {@link ContractSpaceAggregate} value from its contract spaces and a
  * `checkIntegrity` implementation. The query methods (`listSpaces` /
  * `hasSpace` / `space` / `spaces`) are derived here so every aggregate —
  * loader-built or test-built — shares one query surface: `app` first,
@@ -268,13 +286,23 @@ export function collectAggregateNamespaces(aggregate: ContractSpaceAggregate): {
  */
 export function createContractSpaceAggregate(args: {
   readonly targetId: string;
-  readonly app: ContractSpaceMember;
-  readonly extensions: readonly ContractSpaceMember[];
+  readonly app: AggregateContractSpace;
+  readonly extensions: readonly AggregateContractSpace[];
   readonly checkIntegrity: (opts?: IntegrityQueryOptions) => readonly IntegrityViolation[];
 }): ContractSpaceAggregate {
   const { targetId, app, extensions, checkIntegrity } = args;
-  const ordered: readonly ContractSpaceMember[] = [app, ...extensions];
+  const ordered: readonly AggregateContractSpace[] = [app, ...extensions];
   const byId = new Map(ordered.map((m) => [m.spaceId, m]));
+  const spaceDeclares = (
+    space: AggregateContractSpace,
+    coordinate: SchemaEntityCoordinate,
+  ): boolean => {
+    const key = coordinateKey(coordinate);
+    for (const coord of elementCoordinates(space.contract().storage)) {
+      if (coordinateKey(coord) === key) return true;
+    }
+    return false;
+  };
   return {
     targetId,
     app,
@@ -283,6 +311,9 @@ export function createContractSpaceAggregate(args: {
     hasSpace: (id) => byId.has(id),
     space: (id) => byId.get(id),
     spaces: () => ordered,
+    declaresEntity: (coordinate) => ordered.some((space) => spaceDeclares(space, coordinate)),
+    declaringSpaces: (coordinate) =>
+      ordered.filter((space) => spaceDeclares(space, coordinate)).map((s) => s.spaceId),
     checkIntegrity,
   };
 }

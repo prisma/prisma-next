@@ -1,10 +1,8 @@
 import type {
   Contract,
   ContractMarkerRecord,
-  ControlPolicy,
   LedgerEntryRecord,
 } from '@prisma-next/contract/types';
-import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
@@ -13,6 +11,7 @@ import type {
   ControlFamilyInstance,
   ControlStack,
   CoreSchemaView,
+  DiffSubjectGranularity,
   MigrationPlanOperation,
   OperationPreview,
   OperationPreviewCapable,
@@ -25,13 +24,13 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   APP_SPACE_ID,
-  dispositionForCategory,
   SchemaTreeNode,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import { isPlainRecord } from '@prisma-next/framework-components/ir';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
@@ -43,17 +42,26 @@ import type {
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
-import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIRNode, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
+import type {
+  SqlControlTargetDescriptor,
+  SqlDescribedContractSpace,
+} from './control-target-descriptor';
+import {
+  classifyDiffEntityKind,
+  classifyDiffSubjectGranularity,
+  verifySqlSchemaByDiff,
+} from './diff/schema-verify';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
+import type { SqlSchemaDiffFn } from './migrations/schema-differ';
 import type {
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
 } from './migrations/types';
 import { sqlOperationsToPreview } from './operation-preview';
-import { sqlSchemaIrToPslAst } from './psl-contract-infer/sql-schema-ir-to-psl-ast';
-import { verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds } from './verify';
 
 function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
@@ -190,9 +198,9 @@ interface SqlFamilyInstanceState {
 }
 
 export interface SqlControlFamilyInstance
-  extends ControlFamilyInstance<'sql', SqlSchemaIR>,
-    SchemaViewCapable<SqlSchemaIR>,
-    PslContractInferCapable<SqlSchemaIR>,
+  extends ControlFamilyInstance<'sql', SqlSchemaIRNode>,
+    SchemaViewCapable<SqlSchemaIRNode>,
+    PslContractInferCapable<SqlSchemaIRNode>,
     OperationPreviewCapable,
     SqlFamilyInstanceState {
   /**
@@ -214,21 +222,40 @@ export interface SqlControlFamilyInstance
   }): Promise<VerifyDatabaseResult>;
 
   /**
-   * Verify a contract against an already-introspected schema slice.
+   * Verify a contract against an already-introspected schema.
    *
    * Callers that need to verify against the live database compose
    * `introspect({ driver })` + `verifySchema({ contract, schema, ... })`.
-   * The aggregate verifier projects each member's claimed slice via
-   * `projectSchemaToSpace` and hands the projected slice in — this
-   * keeps per-member verification from surfacing sibling-space tables
-   * as `extras`.
+   * The aggregate verifier hands in the full introspected schema and scopes
+   * the returned result to each member's contract space afterwards — so
+   * sibling-space tables never survive as `extras`.
    */
   verifySchema(options: {
     readonly contract: unknown;
-    readonly schema: SqlSchemaIR;
+    readonly schema: SqlSchemaIRNode;
     readonly strict: boolean;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): VerifyDatabaseSchemaResult;
+
+  /**
+   * Classifies a diff issue's subject granularity on demand, resolved from
+   * its node's `nodeKind` via the target's classifier. Satisfies the
+   * {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+   * capability that framework consumers spanning contract spaces (the
+   * migration aggregate's unclaimed-elements sweep) detect via
+   * `hasSchemaSubjectClassifier` and call instead of reading family/target
+   * node vocabulary. Nothing is stamped on the issue or the node.
+   */
+  classifySubjectGranularity(issue: SchemaDiffIssue): DiffSubjectGranularity | undefined;
+
+  /**
+   * Classifies a diff issue's subject storage `entityKind` on demand,
+   * resolved from its node's `nodeKind` via the target's classifier —
+   * sibling of `classifySubjectGranularity` above, part of the same
+   * {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+   * capability. Nothing is stamped on the issue or the node.
+   */
+  classifyEntityKind(issue: SchemaDiffIssue): string | undefined;
 
   sign(options: {
     readonly driver: SqlControlDriverInstance<string>;
@@ -240,9 +267,9 @@ export interface SqlControlFamilyInstance
   introspect(options: {
     readonly driver: SqlControlDriverInstance<string>;
     readonly contract?: unknown;
-  }): Promise<SqlSchemaIR>;
+  }): Promise<SqlSchemaIRNode>;
 
-  inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst;
+  inferPslContract(schemaIR: SqlSchemaIRNode): PslDocumentAst;
 
   lowerAst(
     ast: AnyQueryAst | DdlNode,
@@ -297,8 +324,6 @@ export interface SqlControlFamilyInstance
   }): Promise<void>;
 
   bootstrapControlTableQueries(): readonly DdlNode[];
-
-  bootstrapSignMarkerQueries(): readonly DdlNode[];
 
   toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview;
 }
@@ -527,12 +552,66 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
   const targetSerializer = (
     target as unknown as {
-      contractSerializer?: { deserializeContract(json: unknown): Contract<SqlStorage> };
+      contractSerializer?: {
+        deserializeContract(json: unknown): Contract<SqlStorage>;
+        serializeContract(contract: Contract<SqlStorage>): unknown;
+      };
     }
   ).contractSerializer;
-  const deserializeWithTargetSerializer = (contractJson: unknown): Contract<SqlStorage> => {
+  // Database→PSL inference is target logic (it owns the dialect type/default
+  // maps and walks its own schema tree), so it is read off the descriptor like
+  // `contractSerializer`. Absent for targets without `contract infer` (Mongo).
+  const targetInferPslContract = blindCast<
+    SqlControlTargetDescriptor<TTargetId, unknown>,
+    'reading the optional target-descriptor inferPslContract hook'
+  >(target).inferPslContract;
+  // The full-tree node diff the verify VERDICT derives from. Read lazily so
+  // construction-only stub descriptors (schema-view tests) keep working; the
+  // throw happens at verify time.
+  const diffSchema = blindCast<
+    { readonly diffSchema?: SqlSchemaDiffFn },
+    'reading the target-descriptor diffSchema hook'
+  >(target).diffSchema;
+  // The target's nodeKind → granularity classifier, resolved on demand by the
+  // verdict and by the instance's `classifySubjectGranularity` method below —
+  // never stamped onto an issue. Read lazily for the same
+  // construction-only-stub reason as `diffSchema`; the throw happens at call
+  // time.
+  const targetGranularityOf = blindCast<
+    { readonly classifySubjectGranularity?: (nodeKind: string) => DiffSubjectGranularity },
+    'reading the target-descriptor classifySubjectGranularity hook'
+  >(target).classifySubjectGranularity;
+  // The target's nodeKind → storage entityKind classifier — sibling of
+  // `targetGranularityOf` above, read the same lazy way for the same
+  // construction-only-stub reason.
+  const targetEntityKindOf = blindCast<
+    { readonly classifyEntityKind?: (nodeKind: string) => string | undefined },
+    'reading the target-descriptor classifyEntityKind hook'
+  >(target).classifyEntityKind;
+  // `contract infer` needs each extension pack's already-assembled contract,
+  // carried as-is (no merging — that is the contract-spaces machinery's
+  // concern), paired with the `spaceId` its descriptor was registered under
+  // (neither the contract JSON nor `ContractSpace` self-declares it), so the
+  // target hook can omit elements those contracts describe and qualify a
+  // cross-space relation with the owning pack's space id.
+  const describedContracts: readonly SqlDescribedContractSpace[] = extensions.flatMap(
+    (extension) =>
+      extension.contractSpace
+        ? [{ spaceId: extension.id, contract: extension.contractSpace.contractJson }]
+        : [],
+  );
+  const deserializeWithTargetSerializer = (contractOrJson: unknown): Contract<SqlStorage> => {
     const serializer = targetSerializer ?? new SqlContractSerializer();
-    return serializer.deserializeContract(contractJson) as Contract<SqlStorage>;
+    const json =
+      targetSerializer !== undefined && !isPlainRecord(contractOrJson)
+        ? targetSerializer.serializeContract(
+            blindCast<
+              Contract<SqlStorage>,
+              'isPlainRecord returned false, so contractOrJson is a class instance, not raw JSON'
+            >(contractOrJson),
+          )
+        : contractOrJson;
+    return serializer.deserializeContract(json) as Contract<SqlStorage>;
   };
 
   return {
@@ -673,40 +752,66 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
     verifySchema(options: {
       readonly contract: unknown;
-      readonly schema: SqlSchemaIR;
+      readonly schema: SqlSchemaIRNode;
       readonly strict: boolean;
       readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
     }): VerifyDatabaseSchemaResult {
       const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
-      const controlAdapter = getControlAdapter();
-      const sqlResult = verifySqlSchema({
+      if (!diffSchema) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required diffSchema descriptor operation`,
+        );
+      }
+      if (!targetGranularityOf) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required classifySubjectGranularity descriptor operation`,
+        );
+      }
+      // THE VERDICT: the target's full-tree node diff, graded by the
+      // family's post-diff filters (strict gating + control-policy
+      // disposition), plus the codec verifyType hook findings. The result
+      // is issue-based — `ok` holds exactly when both issue lists are empty.
+      return verifySqlSchemaByDiff({
         contract,
         schema: options.schema,
         strict: options.strict,
-        typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
-        ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
-        ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
+        diffSchema,
+        granularityOf: targetGranularityOf,
       });
-      const rawSchemaDiffIssues =
-        controlAdapter.collectSchemaDiffIssues?.(contract, options.schema) ?? [];
-      const schemaDiffIssues = filterSchemaDiffIssues(
-        rawSchemaDiffIssues,
-        contract.defaultControlPolicy,
-      );
-      if (schemaDiffIssues.length === 0) return sqlResult;
-      const totalFails = sqlResult.schema.counts.fail + schemaDiffIssues.length;
-      return {
-        ...sqlResult,
-        ok: false,
-        code: sqlResult.code ?? 'PN-RUN-3010',
-        summary: `Database schema does not satisfy contract (${totalFails} failure${totalFails === 1 ? '' : 's'})`,
-        schema: {
-          ...sqlResult.schema,
-          schemaDiffIssues,
-          counts: { ...sqlResult.schema.counts, fail: totalFails },
-        },
-      };
+    },
+
+    /**
+     * Classifies a diff issue's subject granularity on demand, by resolving
+     * its node's `nodeKind` through the target's classifier — the
+     * {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+     * capability. Framework consumers spanning contract spaces (the
+     * migration aggregate's unclaimed-elements sweep) detect and call this
+     * instead of reaching into the concrete schema-IR node, which they
+     * cannot read; nothing is stamped on the issue or the node.
+     */
+    classifySubjectGranularity(issue: SchemaDiffIssue): DiffSubjectGranularity | undefined {
+      if (!targetGranularityOf) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required classifySubjectGranularity descriptor operation`,
+        );
+      }
+      return classifyDiffSubjectGranularity(issue, targetGranularityOf);
+    },
+    /**
+     * Classifies a diff issue's subject storage `entityKind` on demand, by
+     * resolving its node's `nodeKind` through the target's classifier —
+     * the sibling of `classifySubjectGranularity` above, and part of the
+     * same {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+     * capability.
+     */
+    classifyEntityKind(issue: SchemaDiffIssue): string | undefined {
+      if (!targetEntityKindOf) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required classifyEntityKind descriptor operation`,
+        );
+      }
+      return classifyDiffEntityKind(issue, targetEntityKindOf);
     },
     async sign(options: {
       readonly driver: SqlControlDriverInstance<string>;
@@ -871,12 +976,17 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     async introspect(options: {
       readonly driver: SqlControlDriverInstance<string>;
       readonly contract?: unknown;
-    }): Promise<SqlSchemaIR> {
+    }): Promise<SqlSchemaIRNode> {
       return getControlAdapter().introspect(options.driver, options.contract);
     },
 
-    inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst {
-      return sqlSchemaIrToPslAst(schemaIR);
+    inferPslContract(schemaIR: SqlSchemaIRNode): PslDocumentAst {
+      if (!targetInferPslContract) {
+        throw new Error(
+          `Target "${target.targetId}" does not support contract infer (no inferPslContract on its descriptor).`,
+        );
+      }
+      return targetInferPslContract(schemaIR, describedContracts);
     },
 
     lowerAst(
@@ -890,17 +1000,52 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       return getControlAdapter().bootstrapControlTableQueries();
     },
 
-    bootstrapSignMarkerQueries(): readonly DdlNode[] {
-      return getControlAdapter().bootstrapSignMarkerQueries();
-    },
-
     toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview {
       return sqlOperationsToPreview(operations);
     },
 
-    toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
-      const tableNodes: readonly SchemaTreeNode[] = Object.entries(schema.tables).map(
-        ([tableName, table]: [string, SqlTableIR]) => {
+    toSchemaView(schema: SqlSchemaIRNode): CoreSchemaView {
+      // Walk the schema-IR tree's own structure (root → namespaces → tables)
+      // into one flat list of table nodes. A root that exposes a `namespaces`
+      // record (Postgres) contributes each namespace's tables; a flat root
+      // (SQLite) is its own single namespace. The single-schema common case
+      // renders the same table-level view as today — no synthetic namespace
+      // level.
+      const root = blindCast<
+        {
+          readonly namespaces?: Readonly<
+            Record<string, { readonly tables: Record<string, SqlTableIR> }>
+          >;
+          readonly tables?: Record<string, SqlTableIR>;
+        },
+        'structural read of the schema-IR tree own namespaces/tables records'
+      >(schema);
+      // A multi-namespace root qualifies every table's display name with its
+      // namespace key, so same-named tables in different namespaces (e.g.
+      // public.thing and auth.thing) render distinct ids and labels. The
+      // single-namespace case (and a flat SQLite root) keeps today's bare
+      // names. Synthesized constraint/index fallback names keep the bare table
+      // name — that is the name the database derives them from.
+      const namespaceEntries: ReadonlyArray<[string | undefined, Record<string, SqlTableIR>]> =
+        root.namespaces !== undefined
+          ? Object.entries(root.namespaces).map(
+              ([namespaceKey, namespace]): [string, Record<string, SqlTableIR>] => [
+                namespaceKey,
+                namespace.tables,
+              ],
+            )
+          : [[undefined, root.tables ?? {}]];
+      const qualify = namespaceEntries.length > 1;
+      const tableEntries: ReadonlyArray<[string, string, SqlTableIR]> = namespaceEntries.flatMap(
+        ([namespaceKey, tables]) =>
+          Object.entries(tables).map(([tableName, table]): [string, string, SqlTableIR] => [
+            qualify && namespaceKey !== undefined ? `${namespaceKey}.${tableName}` : tableName,
+            tableName,
+            table,
+          ]),
+      );
+      const tableNodes: readonly SchemaTreeNode[] = tableEntries.map(
+        ([displayName, tableName, table]: [string, string, SqlTableIR]) => {
           const children: SchemaTreeNode[] = [];
 
           const columnNodes: SchemaTreeNode[] = [];
@@ -911,7 +1056,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             columnNodes.push(
               new SchemaTreeNode({
                 kind: 'field',
-                id: `column-${tableName}-${columnName}`,
+                id: `column-${displayName}-${columnName}`,
                 label,
                 meta: {
                   nativeType: column.nativeType,
@@ -926,7 +1071,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'collection',
-                id: `columns-${tableName}`,
+                id: `columns-${displayName}`,
                 label: 'columns',
                 children: columnNodes,
               }),
@@ -938,7 +1083,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'index',
-                id: `primary-key-${tableName}`,
+                id: `primary-key-${displayName}`,
                 label: `primary key: ${pkColumns}`,
                 meta: {
                   columns: table.primaryKey.columns,
@@ -954,7 +1099,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'index',
-                id: `unique-${tableName}-${name}`,
+                id: `unique-${displayName}-${name}`,
                 label,
                 meta: {
                   columns: unique.columns,
@@ -970,7 +1115,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             children.push(
               new SchemaTreeNode({
                 kind: 'index',
-                id: `index-${tableName}-${name}`,
+                id: `index-${displayName}-${name}`,
                 label,
                 meta: {
                   columns: index.columns,
@@ -998,8 +1143,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
           return new SchemaTreeNode({
             kind: 'entity',
-            id: `table-${tableName}`,
-            label: `table ${tableName}`,
+            id: `table-${displayName}`,
+            label: `table ${displayName}`,
             ...(Object.keys(tableMeta).length > 0 ? { meta: tableMeta } : {}),
             ...(children.length > 0 ? { children } : {}),
           });
@@ -1016,32 +1161,4 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       };
     },
   };
-}
-
-/**
- * Filters schema diff issues (from `collectSchemaDiffIssues`) through the
- * contract's `defaultControlPolicy`. Issues whose outcome maps to a suppressed
- * category under the effective policy are removed. This mirrors the control-policy
- * filtering applied by `verifySqlSchema` for table/column-level findings.
- *
- * Outcome → category mapping:
- * - `'extra'`    → `'extraAuxiliary'`    (an extra auxiliary entity, e.g. an RLS policy)
- * - `'missing'`  → `'declaredMissing'`
- * - `'mismatch'` → `'declaredIncompatible'`
- */
-export function filterSchemaDiffIssues(
-  issues: readonly SchemaDiffIssue[],
-  defaultControlPolicy: ControlPolicy | undefined,
-): readonly SchemaDiffIssue[] {
-  if (issues.length === 0) return issues;
-  const policy = effectiveControlPolicy(undefined, defaultControlPolicy);
-  return issues.filter((issue) => {
-    const category =
-      issue.outcome === 'extra'
-        ? ('extraAuxiliary' as const)
-        : issue.outcome === 'missing'
-          ? ('declaredMissing' as const)
-          : ('declaredIncompatible' as const);
-    return dispositionForCategory(policy, category) !== 'suppress';
-  });
 }

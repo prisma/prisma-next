@@ -10,7 +10,7 @@ import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import AddPostsAuthorIndex from '../migrations/app/20260415_add-posts-author-index/migration';
+import AddUserRoleEnum from '../migrations/app/20260626T1605_add_user_role_enum/migration';
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -25,10 +25,10 @@ function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
 
 const migrationDir = resolve(
   import.meta.dirname,
-  '../migrations/app/20260415_add-posts-author-index',
+  '../migrations/app/20260626T1605_add_user_role_enum',
 );
 
-describe('hand-authored migration (20260415_add-posts-author-index)', {
+describe('planner-generated migration (20260626T1605_add_user_role_enum)', {
   timeout: timeouts.spinUpMongoMemoryServer,
 }, () => {
   let replSet: MongoMemoryReplSet;
@@ -62,11 +62,10 @@ describe('hand-authored migration (20260415_add-posts-author-index)', {
   }, timeouts.spinUpMongoMemoryServer);
 
   it('migration class can be imported and operations accessed directly', () => {
-    const instance = new AddPostsAuthorIndex();
+    const instance = new AddUserRoleEnum();
     const ops = instance.operations;
-    expect(ops).toHaveLength(2);
-    expect(ops[0]!.id).toBe('index.posts.create(authorId:1)');
-    expect(ops[1]!.id).toBe('index.posts.create(createdAt:-1,authorId:1)');
+    expect(ops).toHaveLength(1);
+    expect(ops[0]!.id).toBe('validator.users.update');
   });
 
   it('migration.json has expected structure', () => {
@@ -79,11 +78,11 @@ describe('hand-authored migration (20260415_add-posts-author-index)', {
   });
 
   it('ops.json deserializes and applies against real MongoDB', async () => {
-    await db.createCollection('posts');
+    await db.createCollection('users');
 
     const opsJson = readFileSync(resolve(migrationDir, 'ops.json'), 'utf-8');
     const ops = deserializeMongoOps(JSON.parse(opsJson));
-    expect(ops).toHaveLength(2);
+    expect(ops).toHaveLength(1);
 
     const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
     try {
@@ -98,20 +97,15 @@ describe('hand-authored migration (20260415_add-posts-author-index)', {
         plan: {
           targetId: 'mongo',
           destination: {
-            storageHash: 'sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe',
+            storageHash: 'sha256:250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
           },
           operations: JSON.parse(opsJson),
         },
         // Synthetic-contract opt-out (paired with `strictVerification: false`):
-        // this test feeds a hand-rolled ops JSON file to the runner; we have
-        // no authored MongoContract to pass. Supply the minimum well-formed
-        // shape `contractToMongoSchemaIR` reads (`storage.namespaces`) so
-        // the verifier degrades to an empty-expected diff rather than
-        // crashing in `contractToMongoSchemaIR` before the strict flag
-        // is consulted.
+        // this test feeds ops.json to the runner without a full contract.
         destinationContract: {
           storage: {
-            storageHash: 'sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe',
+            storageHash: 'sha256:250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
             namespaces: {
               __unbound__: {
                 id: '__unbound__',
@@ -127,10 +121,10 @@ describe('hand-authored migration (20260415_add-posts-author-index)', {
         migrationEdges: [
           {
             migrationHash:
-              'sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe',
-            dirName: 'manual-migration',
+              'sha256:250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
+            dirName: 'planner-generated-migration',
             from: '',
-            to: 'sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe',
+            to: 'sha256:250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
             operationCount: ops.length,
           },
         ],
@@ -138,25 +132,26 @@ describe('hand-authored migration (20260415_add-posts-author-index)', {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.value.operationsExecuted).toBe(2);
+      expect(result.value.operationsExecuted).toBe(1);
 
-      const indexes = await db.collection('posts').listIndexes().toArray();
-
-      const authorIdIndex = indexes.find(
-        (idx) =>
-          idx['key'] &&
-          (idx['key'] as Record<string, number>)['authorId'] === 1 &&
-          !('createdAt' in (idx['key'] as Record<string, number>)),
-      );
-      expect(authorIdIndex).toBeDefined();
-
-      const compoundIndex = indexes.find(
-        (idx) =>
-          idx['key'] &&
-          (idx['key'] as Record<string, number>)['createdAt'] === -1 &&
-          (idx['key'] as Record<string, number>)['authorId'] === 1,
-      );
-      expect(compoundIndex).toBeDefined();
+      // The collMod should have set the validator with the enum constraint.
+      // Verify via listCollections — the options.validator.$jsonSchema should
+      // include the role enum.
+      const collections = await db.listCollections({ name: 'users' }).toArray();
+      expect(collections).toHaveLength(1);
+      const collectionInfo = collections[0]! as Record<string, unknown>;
+      const validator = (collectionInfo['options'] as Record<string, unknown> | undefined)?.[
+        'validator'
+      ];
+      expect(validator).toBeDefined();
+      const jsonSchema = (validator as Record<string, unknown> | undefined)?.['$jsonSchema'];
+      expect(jsonSchema).toBeDefined();
+      const roleField = (
+        (jsonSchema as Record<string, unknown> | undefined)?.['properties'] as
+          | Record<string, unknown>
+          | undefined
+      )?.['role'];
+      expect(roleField).toMatchObject({ bsonType: 'string', enum: ['admin', 'author', 'reader'] });
     } finally {
       await controlDriver.close();
     }

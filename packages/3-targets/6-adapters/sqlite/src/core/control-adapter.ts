@@ -23,15 +23,14 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
-  PrimaryKey,
-  SqlColumnIR,
-  SqlForeignKeyIR,
-  SqlIndexIR,
+  PrimaryKeyInput,
+  SqlColumnIRInput,
+  SqlForeignKeyIRInput,
+  SqlIndexIRInput,
   SqlReferentialAction,
-  SqlSchemaIR,
-  SqlTableIR,
-  SqlUniqueIR,
+  SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -520,15 +519,28 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         `PRAGMA index_list("${escapePragmaArg(tableName)}")`,
       );
 
-      const columns: Record<string, SqlColumnIR> = {};
+      const columns: Record<string, SqlColumnIRInput> = {};
       const pkColumns: Array<{ name: string; pk: number }> = [];
 
       for (const col of columnsResult.rows) {
+        // Resolved values comparable against the contract-derived expected
+        // side: the normalized native type and the structured parse of the
+        // raw default. Raw fields stay untouched alongside — the relational
+        // walk still reads and normalizes them itself.
+        const resolvedNativeType = normalizeSqliteNativeType(col.type);
+        const rawDefault = col.dflt_value ?? undefined;
         columns[col.name] = {
           name: col.name,
           nativeType: col.type.toLowerCase(),
           nullable: col.notnull === 0 && col.pk === 0,
-          ...ifDefined('default', col.dflt_value ?? undefined),
+          ...ifDefined('default', rawDefault),
+          resolvedNativeType,
+          ...ifDefined(
+            'resolvedDefault',
+            rawDefault !== undefined
+              ? parseSqliteDefault(rawDefault, resolvedNativeType)
+              : undefined,
+          ),
         };
         if (col.pk > 0) {
           pkColumns.push({ name: col.name, pk: col.pk });
@@ -536,7 +548,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       }
 
       pkColumns.sort((a, b) => a.pk - b.pk);
-      const primaryKey: PrimaryKey | undefined =
+      const primaryKey: PrimaryKeyInput | undefined =
         pkColumns.length > 0 ? { columns: pkColumns.map((c) => c.name) } : undefined;
 
       const fkMap = new Map<number, FkAccumulator>();
@@ -555,7 +567,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
           });
         }
       }
-      const foreignKeys: readonly SqlForeignKeyIR[] = Array.from(fkMap.values()).map((fk) => ({
+      const foreignKeys: readonly SqlForeignKeyIRInput[] = Array.from(fkMap.values()).map((fk) => ({
         columns: Object.freeze([...fk.columns]) as readonly string[],
         referencedTable: fk.referencedTable,
         referencedColumns: Object.freeze([...fk.referencedColumns]) as readonly string[],
@@ -563,8 +575,8 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         ...ifDefined('onUpdate', mapSqliteReferentialAction(fk.onUpdate)),
       }));
 
-      const uniques: SqlUniqueIR[] = [];
-      const indexes: SqlIndexIR[] = [];
+      const uniques: SqlUniqueIRInput[] = [];
+      const indexes: SqlIndexIRInput[] = [];
 
       for (const idx of indexListResult.rows) {
         // origin: 'c' = CREATE INDEX, 'u' = UNIQUE constraint, 'pk' = PRIMARY KEY
@@ -589,19 +601,19 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         // Skip 'pk' origin — already captured in primaryKey
       }
 
-      tables[tableName] = {
+      tables[tableName] = new SqlTableIR({
         name: tableName,
         columns,
         ...ifDefined('primaryKey', primaryKey),
         foreignKeys,
         uniques,
         indexes,
-      };
+      });
     }
 
-    return {
+    return new SqlSchemaIR({
       tables,
-    };
+    });
   }
 }
 
@@ -729,6 +741,12 @@ function sqliteRenderDdlConstraint(constraint: DdlTableConstraint): string {
       sql = `CONSTRAINT ${quoteIdentifier(constraint.name)} ${sql}`;
     }
     return sql;
+  }
+  if (constraint.kind === 'check-expression') {
+    throw new Error(
+      `SQLite does not support expression CHECK constraints (constraint "${constraint.name}"). ` +
+        'Scalar-array columns and their element-non-null checks are Postgres-only.',
+    );
   }
   const cols = constraint.columns.map(quoteIdentifier).join(', ');
   if (constraint.name !== undefined) {

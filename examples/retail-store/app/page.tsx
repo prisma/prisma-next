@@ -3,7 +3,7 @@ import { Badge } from '../src/components/ui/badge';
 import { Button } from '../src/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../src/components/ui/card';
 import { findProductsPaginated, searchProducts } from '../src/data/products';
-import { getDb } from '../src/db-singleton';
+import { getDb } from '../src/db';
 
 export const dynamic = 'force-dynamic';
 

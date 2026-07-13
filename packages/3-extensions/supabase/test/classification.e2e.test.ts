@@ -32,9 +32,10 @@ import { coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import {
   applicationDomainOf,
   createDevDatabase,
@@ -57,7 +58,7 @@ function buildAppContract(): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:supabase-classification-test-app'),
       namespaces: {
-        public: buildSqlNamespace({
+        public: postgresCreateNamespace({
           id: 'public',
           entries: {
             table: {
@@ -227,7 +228,7 @@ describe('supabase external-schema classification (db init + db verify)', () => 
         ).toBe(true);
 
         if (verifyResult.ok) {
-          // Every space (app + supabase) must have a passing schema result.
+          // Every space (app + supabase) must have a passing verify result.
           for (const [spaceId, schemaResult] of verifyResult.value.schemaResults) {
             expect(
               schemaResult.ok,
@@ -235,7 +236,7 @@ describe('supabase external-schema classification (db init + db verify)', () => 
             ).toBe(true);
           }
 
-          // The supabase space's schema result must reflect external-present
+          // The supabase space's verify result must reflect external-present
           // status: it passes, meaning auth.* / storage.* are confirmed present
           // and were not flagged as missing owned tables.
           const supabaseVerifyResult = verifyResult.value.schemaResults.get('supabase');

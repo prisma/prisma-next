@@ -1,12 +1,12 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type SqlStorageInput } from '@prisma-next/sql-contract/types';
-import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, type SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { verifyPostgresNamespacePresence } from '../../src/core/migrations/verify-postgres-namespaces';
 import { PostgresSchema, PostgresUnboundSchema } from '../../src/core/postgres-schema';
-import { PostgresSchemaIR } from '../../src/core/postgres-schema-ir';
+import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
 
 function makeContract(
   namespaceIds: readonly string[],
@@ -40,23 +40,23 @@ function makeContract(
   };
 }
 
-function makeSchema(existingSchemas?: readonly string[]): SqlSchemaIR {
+function makeSchema(existingSchemas?: readonly string[]): SqlSchemaIRNode {
+  // `existingSchemas` is database-level, on the root node. A bare flat schema
+  // (no root) exercises the `['public']` default — proving the consumer reads
+  // `existingSchemas` from the database root (CF-1), not a per-namespace node.
   if (existingSchemas === undefined) {
     return new SqlSchemaIR({ tables: {} });
   }
-  return new PostgresSchemaIR({
-    tables: {},
-    pgSchemaName: 'public',
-    pgVersion: 'unknown',
-    rlsPolicies: [],
+  return new PostgresDatabaseSchemaNode({
+    namespaces: {},
     roles: [],
     existingSchemas,
-    nativeEnumTypeNames: [],
+    pgVersion: 'unknown',
   });
 }
 
 describe('verifyPostgresNamespacePresence', () => {
-  it('emits missing_schema for a declared namespace whose schema is absent from introspection', () => {
+  it('emits a postgres-namespace not-found issue for a declared namespace whose schema is absent from introspection', () => {
     const contract = makeContract(['auth']);
     const schema = makeSchema(['public']);
 
@@ -64,10 +64,10 @@ describe('verifyPostgresNamespacePresence', () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
-      kind: 'missing_schema',
-      namespaceId: 'auth',
+      path: ['database', 'auth'],
+      reason: 'not-found',
+      expected: { nodeKind: 'postgres-namespace', schemaName: 'auth' },
     });
-    expect(issues[0]?.message).toContain('auth');
   });
 
   it('does not emit missing_schema when the introspected list already contains the namespace', () => {
@@ -104,19 +104,16 @@ describe('verifyPostgresNamespacePresence', () => {
     const issues = verifyPostgresNamespacePresence({ contract, schema });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ kind: 'missing_schema', namespaceId: 'auth' });
+    expect(issues[0]).toMatchObject({ path: ['database', 'auth'], reason: 'not-found' });
   });
 
-  it('emits a missing_schema for every declared-but-absent namespace in coordinate-sorted order', () => {
+  it('emits a not-found issue for every declared-but-absent namespace in coordinate-sorted order', () => {
     const contract = makeContract(['analytics', 'auth', 'public']);
     const schema = makeSchema(['public']);
 
     const issues = verifyPostgresNamespacePresence({ contract, schema });
 
     expect(issues).toHaveLength(2);
-    expect(issues.map((i) => ('namespaceId' in i ? i.namespaceId : undefined))).toEqual([
-      'analytics',
-      'auth',
-    ]);
+    expect(issues.map((i) => i.path[1])).toEqual(['analytics', 'auth']);
   });
 });

@@ -11,20 +11,17 @@ import type { Contract } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
 import sqlFamilyDescriptor, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
-import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import {
   APP_SPACE_ID,
   createControlStack,
   type MigrationOperationPolicy,
   type MigrationRunnerFailure,
 } from '@prisma-next/framework-components/control';
-import { buildSynthMigrationEdge } from '@prisma-next/migration-tools/aggregate';
+import { buildFabricatedMigrationEdge } from '@prisma-next/migration-tools/aggregate';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { field } from '@prisma-next/sqlite/contract-builder';
-import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
-import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
-import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
+import sqliteTargetDescriptor, { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import sqlitePack from '@prisma-next/target-sqlite/pack';
 
 const controlStack = createControlStack({
@@ -39,7 +36,11 @@ const controlAdapter = sqliteAdapterDescriptor.create(controlStack);
 
 const fw = [sqliteTargetDescriptor, sqliteAdapterDescriptor, sqliteDriverDescriptor] as const;
 
-export const pack = { family: sqlFamilyPack, target: sqlitePack } as const;
+export const pack = {
+  family: sqlFamilyPack,
+  target: sqlitePack,
+  createNamespace: sqliteCreateNamespace,
+} as const;
 export const int = field.column(integerColumn);
 export const text = field.column(textColumn);
 export { integerColumn, textColumn };
@@ -84,7 +85,7 @@ function createTestDb() {
 }
 
 const CONTROL_TABLES = new Set(['_prisma_marker', '_prisma_ledger']);
-const emptySchema: SqlSchemaIR = { tables: {} };
+const emptySchema = new SqlSchemaIR({ tables: {} });
 
 function synthEdges(plan: {
   readonly origin?: { readonly storageHash: string } | null;
@@ -92,7 +93,7 @@ function synthEdges(plan: {
   readonly operations: readonly unknown[];
 }) {
   return [
-    buildSynthMigrationEdge({
+    buildFabricatedMigrationEdge({
       currentMarkerStorageHash: plan.origin?.storageHash,
       destinationStorageHash: plan.destination.storageHash,
       operationCount: plan.operations.length,
@@ -202,19 +203,15 @@ export async function applyMigration(
       throw new Error(`Destination runner failed: ${formatFailure(runResult.failure)}`);
 
     const freshSchema = await adapter.introspect(driver);
-    const vr = verifySqlSchema({
+    const vr = familyInstance.verifySchema({
       contract: options.destination,
       schema: freshSchema,
       strict: false,
-      typeMetadataRegistry: familyInstance.typeMetadataRegistry,
       frameworkComponents: fw,
-      normalizeDefault: parseSqliteDefault,
-      normalizeNativeType: normalizeSqliteNativeType,
     });
     if (!vr.ok) {
-      throw new Error(
-        `Schema verification failed:\n${vr.schema.issues.map((i) => `  - [${i.kind}] ${i.message}`).join('\n')}`,
-      );
+      const lines = vr.schema.issues.map((i) => `  - ${i.reason}: ${i.path.join('/')}`);
+      throw new Error(`Schema verification failed:\n${lines.join('\n')}`);
     }
 
     const userTables: Record<string, SqlSchemaIR['tables'][string]> = {};
@@ -223,7 +220,7 @@ export async function applyMigration(
     }
     await runAssertions({
       driver,
-      schema: { ...freshSchema, tables: userTables },
+      schema: new SqlSchemaIR({ ...freshSchema, tables: userTables }),
       operationsExecuted: runResult.value.perSpaceResults[0]?.value.operationsExecuted ?? 0,
       plannedOperationIds: (await Promise.all(planResult.plan.operations)).map((op) => op.id),
     });

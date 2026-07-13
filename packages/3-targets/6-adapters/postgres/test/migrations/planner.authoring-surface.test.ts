@@ -1,29 +1,19 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import {
-  contractToSchemaIR as contractToSchemaIRImpl,
-  extractCodecControlHooks,
-  type NativeTypeExpander,
-} from '@prisma-next/family-sql/control';
-import {
   APP_SPACE_ID,
   type MigrationPlanner,
   type MigrationPlannerSuccessResult,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { buildSqlNamespace, SqlStorage } from '@prisma-next/sql-contract/types';
-import postgresTargetDescriptor, {
-  postgresRenderDefault,
-} from '@prisma-next/target-postgres/control';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import postgresAdapterDescriptor from '../../src/exports/control';
-
-const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
-const expandParameterizedNativeType: NativeTypeExpander = (input) => {
-  if (!input.codecId) return input.nativeType;
-  const hooks = adapterCodecHooks.get(input.codecId);
-  return hooks?.expandNativeType?.(input) ?? input.nativeType;
-};
 
 function createEmptyContract(): Contract<SqlStorage> {
   return {
@@ -33,7 +23,7 @@ function createEmptyContract(): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: { table: {} },
         }),
@@ -59,10 +49,16 @@ describe('PostgresMigrationPlanner authoring surface', () => {
     it('emits a migration scaffold carrying the destination storage hash', () => {
       const planner = makeFrameworkPlanner();
       const contract = createEmptyContract();
-      const fromSchemaIR = contractToSchemaIRImpl(null, {
-        annotationNamespace: 'pg',
-        expandNativeType: expandParameterizedNativeType,
-        renderDefault: postgresRenderDefault,
+      const fromSchemaIR = new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {},
+          }),
+        },
+        pgVersion: '',
+        roles: [],
+        existingSchemas: [],
       });
 
       const fromContract: Contract<SqlStorage> = {
@@ -70,7 +66,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
         storage: new SqlStorage({
           storageHash: coreHash('sha256:from'),
           namespaces: {
-            [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+            [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
               id: UNBOUND_NAMESPACE_ID,
               entries: { table: {} },
             }),
@@ -95,9 +91,13 @@ describe('PostgresMigrationPlanner authoring surface', () => {
 
       expect(source).toContain("from '@prisma-next/postgres/migration'");
       expect(source).toMatch(/\bMigration\b/);
-      expect(source).toContain('export default class M extends Migration');
-      expect(source).toContain(`from: "${coreHash('sha256:from')}"`);
-      expect(source).toContain(`to: "${contract.storage.storageHash}"`);
+      // New shape: base derives describe() from the imported contract JSON, so
+      // the scaffold carries `Migration<Start, End>` + the JSON/field imports
+      // and emits no describe()/hash literals.
+      expect(source).toContain('export default class M extends Migration<Start, End>');
+      expect(source).toContain('override readonly endContractJson = endContract;');
+      expect(source).not.toContain('describe()');
+      expect(source).not.toContain(coreHash('sha256:from'));
     });
   });
 
@@ -118,7 +118,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       expect(empty.destination).toEqual({ storageHash: 'sha256:to' });
     });
 
-    it('renders a stub whose describe() carries from/to and whose operations list is empty', () => {
+    it('renders a stub that derives from/to from contract JSON and has an empty operations list', () => {
       const planner = makeFrameworkPlanner();
       const empty = planner.emptyMigration(
         {
@@ -132,9 +132,11 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       const source = empty.renderTypeScript();
 
       expect(source).toContain("from '@prisma-next/postgres/migration'");
-      expect(source).toContain('export default class M extends Migration');
-      expect(source).toContain('from: "sha256:from"');
-      expect(source).toContain('to: "sha256:to"');
+      expect(source).toContain('export default class M extends Migration<Start, End>');
+      expect(source).toContain('override readonly endContractJson = endContract;');
+      expect(source).not.toContain('describe()');
+      expect(source).not.toContain('"sha256:from"');
+      expect(source).not.toContain('"sha256:to"');
       expect(source).toContain('override get operations()');
     });
   });

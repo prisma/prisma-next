@@ -2,15 +2,15 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  SqlUnboundNamespace,
-} from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
+import {
+  SqliteUnboundDatabase,
+  sqliteCreateNamespace,
+} from '../../src/core/sqlite-unbound-database';
 
 const stubLowerer: ExecuteRequestLowerer = {
   lower: () => {
@@ -27,7 +27,7 @@ function createContract(): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:to'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {
@@ -59,12 +59,12 @@ function fromContractWithHash(hash: string): Contract<SqlStorage> {
     ...createContract(),
     storage: new SqlStorage({
       storageHash: coreHash(hash),
-      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqliteUnboundDatabase.instance },
     }),
   };
 }
 
-const emptySchema: SqlSchemaIR = { tables: {} };
+const emptySchema = new SqlSchemaIR({ tables: {} });
 
 describe('SqliteMigrationPlanner authoring surface', () => {
   describe('plan(...).plan', () => {
@@ -170,10 +170,15 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       const source = result.plan.renderTypeScript();
       expect(source).toContain("from '@prisma-next/sqlite/migration'");
       expect(source).toMatch(/\bMigration\b/);
-      expect(source).toContain('export default class M extends Migration');
-      expect(source).toContain(`from: "${coreHash('sha256:from')}"`);
-      expect(source).toContain(`to: "${createContract().storage.storageHash}"`);
-      expect(source).toContain('createTable(');
+      // New shape: base derives describe() from the imported contract JSON, so
+      // the scaffold carries `Migration<Start, End>` + the JSON/field imports
+      // and emits no `describe()` / hash literals.
+      expect(source).toContain('export default class M extends Migration<Start, End>');
+      expect(source).toContain('override readonly startContractJson = startContract;');
+      expect(source).toContain('override readonly endContractJson = endContract;');
+      expect(source).not.toContain('describe()');
+      expect(source).not.toContain(coreHash('sha256:from'));
+      expect(source).toContain('this.createTable(');
     });
   });
 
@@ -194,7 +199,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       expect(empty.destination).toEqual({ storageHash: 'sha256:to' });
     });
 
-    it('renders a stub whose describe() carries from/to and whose operations list is empty', () => {
+    it('renders a stub that derives from/to from contract JSON and has an empty operations list', () => {
       const planner = createSqliteMigrationPlanner(stubLowerer);
       const empty = planner.emptyMigration(
         {
@@ -207,9 +212,13 @@ describe('SqliteMigrationPlanner authoring surface', () => {
 
       const source = empty.renderTypeScript();
       expect(source).toContain("from '@prisma-next/sqlite/migration'");
-      expect(source).toContain('export default class M extends Migration');
-      expect(source).toContain('from: "sha256:from"');
-      expect(source).toContain('to: "sha256:to"');
+      // New shape: base derives from/to; scaffold imports the contract JSON
+      // rather than embedding hash literals or a describe() method.
+      expect(source).toContain('export default class M extends Migration<Start, End>');
+      expect(source).toContain('override readonly endContractJson = endContract;');
+      expect(source).not.toContain('describe()');
+      expect(source).not.toContain('"sha256:from"');
+      expect(source).not.toContain('"sha256:to"');
       expect(source).toContain('override get operations()');
     });
   });

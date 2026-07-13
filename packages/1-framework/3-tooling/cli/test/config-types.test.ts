@@ -46,19 +46,6 @@ describe('defineConfig', () => {
           target: { expected: 'postgres' },
           schema: {
             issues: [],
-            schemaDiffIssues: [],
-            root: {
-              status: 'pass' as const,
-              kind: 'root',
-              name: 'root',
-              contractPath: '',
-              code: '',
-              message: '',
-              expected: null,
-              actual: null,
-              children: [],
-            },
-            counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
           },
           timings: { total: 0 },
         }),
@@ -208,7 +195,13 @@ describe('defineConfig', () => {
       composedExtensionPacks: [],
       composedExtensionContracts: new Map(),
       scalarTypeDescriptors: new Map(),
-      authoringContributions: { field: {}, type: {}, entityTypes: {}, pslBlockDescriptors: {} },
+      authoringContributions: {
+        field: {},
+        type: {},
+        entityTypes: {},
+        pslBlockDescriptors: {},
+        modelAttributes: {},
+      },
       codecLookup: {
         get: () => undefined,
         targetTypesFor: () => undefined,
@@ -217,6 +210,7 @@ describe('defineConfig', () => {
       },
       controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
       resolvedInputs: [],
+      capabilities: {},
     });
 
     expect(config.output).toBe('output/contract.json');

@@ -575,13 +575,13 @@ type ContractBase = Omit<
             };
           };
           readonly valueSet: {
-            readonly user_type: {
-              readonly kind: 'valueSet';
-              readonly values: readonly ['admin', 'user'];
-            };
             readonly Priority: {
               readonly kind: 'valueSet';
               readonly values: readonly ['low', 'high', 'urgent'];
+            };
+            readonly user_type: {
+              readonly kind: 'valueSet';
+              readonly values: readonly ['admin', 'user'];
             };
           };
         };
@@ -978,6 +978,7 @@ type ContractBase = Omit<
       readonly enums: true;
       readonly lateral: true;
       readonly returning: true;
+      readonly scalarList: true;
     };
   };
   readonly extensionPacks: {

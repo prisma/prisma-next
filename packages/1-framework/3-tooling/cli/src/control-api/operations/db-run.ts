@@ -1,5 +1,5 @@
 /**
- * Backs `db init` / `db update`. Strategy: introspect → planMigration; synth-for-app + graph-walk-extensions; plan-mode + orphan-marker preflight.
+ * Backs `db init` / `db update`. Strategy: introspect → planMigration; planFromDiff-for-app + resolveRecordedPath-extensions; plan-mode + orphan-marker preflight.
  */
 
 import type { Contract } from '@prisma-next/contract/types';
@@ -97,10 +97,11 @@ export interface ExecuteRunOptions<TFamilyId extends string, TTargetId extends s
  *    integrity violation short-circuits with a structured error.
  * 2. **Read DB state**: marker rows (`familyInstance.readAllMarkers`)
  *    + introspected schema (`familyInstance.introspect`).
- * 3. **Plan**: {@link planMigration} chooses graph-walk vs synth per
- *    member according to `callerPolicy.ignoreGraphFor`. The app member
- *    is forced through synth (today's daily-driver behaviour); every
- *    extension member walks its on-disk graph.
+ * 3. **Plan**: {@link planMigration} chooses `resolveRecordedPath` vs
+ *    `planFromDiff` per space according to `callerPolicy.ignoreGraphFor`.
+ *    The app space is forced through `planFromDiff` (today's daily-driver
+ *    behaviour); every extension space walks its on-disk graph via
+ *    `resolveRecordedPath`.
  * 4. **Apply** (when `mode === 'apply'`): every per-space `MigrationPlan`
  *    feeds into the runner's `execute` — one outer
  *    transaction across every space; failure on any space rolls back
@@ -168,9 +169,9 @@ export async function executeRun<TFamilyId extends string, TTargetId extends str
   });
   onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.introspect, outcome: 'ok' });
 
-  // 3. Plan via aggregate planner. App is forced through synth (today's
-  // `db init` / `db update` daily-driver behaviour); extensions walk
-  // their on-disk migration graphs.
+  // 3. Plan via aggregate planner. App is forced through planFromDiff
+  // (today's `db init` / `db update` daily-driver behaviour); extensions
+  // walk their on-disk migration graphs via resolveRecordedPath.
   onProgress?.({
     action,
     kind: 'spanStart',
@@ -200,7 +201,7 @@ export async function executeRun<TFamilyId extends string, TTargetId extends str
   const appResolution = orderedResolutions.find((r) => r.spaceId === aggregate.app.spaceId);
   if (!appResolution) {
     throw new Error(
-      'Aggregate planner returned no plan for the app member — the planner is supposed to always emit one.',
+      'Aggregate planner returned no plan for the app space — the planner is supposed to always emit one.',
     );
   }
   const appPlan = appResolution.entry.plan;
@@ -228,9 +229,9 @@ export async function executeRun<TFamilyId extends string, TTargetId extends str
   // 5. Run mode: hand off to the shared `runMigration` primitive.
   // The runner-driving tail is identical for `db init` / `db update` /
   // `migrate` — only how each caller produces `perSpacePlans`
-  // differs (synth + graph-walk via planMigration here; graph-walk
-  // only for migrate). Each caller produces perSpacePlans differently;
-  // this helper handles the shared run tail.
+  // differs (planFromDiff + resolveRecordedPath via planMigration here;
+  // resolveRecordedPath only for migrate). Each caller produces
+  // perSpacePlans differently; this helper handles the shared run tail.
   const applied = await runMigration({
     aggregate,
     perSpacePlans: planResult.value.perSpace,
@@ -280,14 +281,14 @@ function aggregatePlannerWarnings(
 
 /**
  * Compare the live `_prisma_marker` rows against the aggregate's
- * declared members. Any marker row whose `space` is not a member of
+ * declared contract spaces. Any marker row whose `space` is not a space of
  * the aggregate is an "orphan" — typically a marker left behind by
  * an extension that was removed from `extensionPacks` without first
  * cleaning up its on-disk migrations / database tables.
  *
  * Returns a {@link CliStructuredError} envelope (code `5002`,
  * `kind: 'orphanMarker'`) for the first orphan it finds, or `null`
- * when every marker row maps to a declared member. Mirrors the M2
+ * when every marker row maps to a declared contract space. Mirrors the M2
  * `runContractSpaceVerifierMarkerCheck` envelope so downstream
  * tooling (integration tests, JSON consumers) keeps asserting on the
  * same shape.
@@ -296,13 +297,13 @@ function detectOrphanMarkers(
   aggregate: ContractSpaceAggregate,
   markerRows: ReadonlyMap<string, unknown>,
 ): CliStructuredError | null {
-  const memberSpaceIds = new Set<string>([
+  const aggregateSpaceIds = new Set<string>([
     aggregate.app.spaceId,
     ...aggregate.extensions.map((m) => m.spaceId),
   ]);
   const orphans: string[] = [];
   for (const [spaceId, row] of markerRows) {
-    if (row !== null && row !== undefined && !memberSpaceIds.has(spaceId)) {
+    if (row !== null && row !== undefined && !aggregateSpaceIds.has(spaceId)) {
       orphans.push(spaceId);
     }
   }
@@ -328,7 +329,7 @@ function detectOrphanMarkers(
 }
 
 function mapPlannerError(error: PlannerError): DbInitResult | DbUpdateResult {
-  if (error.kind === 'appSynthFailure') {
+  if (error.kind === 'planFromDiffFailed') {
     const failure: DbInitFailure | DbUpdateFailure = {
       code: 'PLANNING_FAILED',
       summary: 'Migration planning failed due to conflicts',

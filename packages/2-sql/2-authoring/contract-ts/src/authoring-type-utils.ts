@@ -2,6 +2,7 @@ import type {
   AuthoringArgumentDescriptor,
   AuthoringFieldPresetDescriptor,
 } from '@prisma-next/framework-components/authoring';
+import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { ScalarFieldBuilder, ScalarFieldState } from './contract-dsl';
 
 export type UnionToIntersection<U> = (U extends unknown ? (value: U) => void : never) extends (
@@ -114,9 +115,11 @@ export type FieldBuilderFromPresetDescriptor<
   ConstraintName extends string | undefined = undefined,
 > = ScalarFieldBuilder<
   ScalarFieldState<
-    ResolveTemplateValue<Descriptor['output']['codecId'], Args> extends string
-      ? ResolveTemplateValue<Descriptor['output']['codecId'], Args>
-      : string,
+    ColumnTypeDescriptor<
+      ResolveTemplateValue<Descriptor['output']['codecId'], Args> extends string
+        ? ResolveTemplateValue<Descriptor['output']['codecId'], Args>
+        : string
+    >,
     undefined,
     ResolveTemplateValue<Descriptor['output']['nullable'], Args> extends true ? true : false,
     undefined,

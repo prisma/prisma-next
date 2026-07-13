@@ -1,6 +1,5 @@
-import type { Contract } from '@prisma-next/contract/types';
 import type { CodecRegistry } from '@prisma-next/framework-components/codec';
-import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import type { StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   BinaryExpr,
@@ -32,7 +31,7 @@ export interface PostgresAdapterOptions {
   readonly codecLookup?: CodecRegistry;
 }
 
-export type PostgresContract = Contract<SqlStorage> & { readonly target: 'postgres' };
+export type { PostgresContract } from '@prisma-next/target-postgres/types';
 
 export type Expr = ColumnRef | ParamRef | DefaultValueExpr;
 

@@ -1,13 +1,13 @@
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  buildSqlNamespace,
   SqlStorage,
   type SqlStorageTypeEntry,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import type { AnyCodecDescriptor } from '../src/ast/codec-types';
 import { buildCodecDescriptorRegistry } from '../src/codec-descriptor-registry';
 
@@ -78,7 +78,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     return new SqlStorage({
       storageHash: 'sha256:test' as SqlStorage['storageHash'],
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: { table: parts.tables },
         }),
@@ -257,11 +257,11 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn namespace coordinat
     return new SqlStorage({
       storageHash: 'sha256:test' as SqlStorage['storageHash'],
       namespaces: {
-        public: buildSqlNamespace({
+        public: createTestSqlNamespace({
           id: 'public',
           entries: { table: { users: table({ id: 'pg/int4@1', email: 'pg/text@1' }) } },
         }),
-        auth: buildSqlNamespace({
+        auth: createTestSqlNamespace({
           id: 'auth',
           entries: { table: { users: table({ id: 'pg/int4@1', token: 'pg/varchar@1' }) } },
         }),

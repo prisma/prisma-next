@@ -1,5 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
 import { testIndexPack } from './helpers/test-index-pack';
@@ -31,12 +32,13 @@ function defineTestContract<
 >(
   definition: Omit<
     ContractInput<typeof bareFamilyPack, typeof postgresTargetPack, Types, Models, ExtensionPacks>,
-    'family' | 'target'
+    'family' | 'target' | 'createNamespace'
   >,
 ) {
   return defineContract({
     family: bareFamilyPack,
     target: postgresTargetPack,
+    createNamespace: createTestSqlNamespace,
     ...definition,
   });
 }
@@ -249,6 +251,7 @@ describe('contract definition constraint support', () => {
         // The pack is intentionally malformed for this test; the runtime
         // shape check is what we want to exercise.
         extensionPacks: { malformed: malformedIndexPack as unknown as typeof testIndexPack },
+        createNamespace: createTestSqlNamespace,
         models: {
           Doc: model('Doc', {
             fields: {
@@ -267,6 +270,7 @@ describe('contract definition constraint support', () => {
           family: bareFamilyPack,
           target: postgresTargetPack,
           extensionPacks: { testIndexes: testIndexPack },
+          createNamespace: createTestSqlNamespace,
         },
         ({ model: helperModel, field: helperField }) => ({
           models: {

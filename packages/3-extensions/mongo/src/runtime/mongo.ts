@@ -1,23 +1,17 @@
-import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
+  AnyMongoTypeMaps,
   MongoContract,
   MongoContractWithTypeMaps,
-  MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import type { MongoOrmClient, MongoQueryPlan } from '@prisma-next/mongo-orm';
+import type { MongoOrmClient, MongoQueryPlan, MongoRawClient } from '@prisma-next/mongo-orm';
 import { mongoOrm } from '@prisma-next/mongo-orm';
-import { mongoQuery } from '@prisma-next/mongo-query-builder';
 import type { MongoMiddleware, MongoRuntime } from '@prisma-next/mongo-runtime';
-import {
-  createMongoExecutionContext,
-  createMongoExecutionStack,
-  createMongoRuntime,
-} from '@prisma-next/mongo-runtime';
-import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
+import { createMongoRuntime, type MongoExecutionContext } from '@prisma-next/mongo-runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { buildMongoStaticContext, type MongoStaticContext } from '../static/mongo-static';
 import {
   type MongoBinding,
   type MongoBindingInput,
@@ -27,12 +21,19 @@ import {
 
 export type MongoTargetId = 'mongo';
 
+type UnboundEnums<TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>> =
+  MongoStaticContext<TContract>['enums'];
+
 export interface MongoClient<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 > {
   readonly orm: MongoOrmClient<TContract>;
-  readonly query: ReturnType<typeof mongoQuery<TContract>>;
+  readonly query: MongoStaticContext<TContract>['query'];
+  readonly raw: MongoRawClient<TContract>;
   readonly contract: TContract;
+  readonly enums: UnboundEnums<TContract>;
+  readonly context: MongoExecutionContext<TContract>;
+  execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row>;
   connect(bindingInput?: MongoBindingInput): Promise<MongoRuntime>;
   runtime(): Promise<MongoRuntime>;
   close(): Promise<void>;
@@ -56,7 +57,7 @@ export interface MongoBindingOptions {
 }
 
 export type MongoOptionsWithContract<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 > = MongoBindingOptions &
   MongoOptionsBase & {
     readonly contract: TContract;
@@ -69,7 +70,7 @@ export type MongoOptionsWithContract<
  * the type body — the contract value comes through `contractJson` at runtime.
  */
 export type MongoOptionsWithContractJson<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 > = MongoBindingOptions &
   MongoOptionsBase & {
     readonly contractJson: unknown;
@@ -82,18 +83,18 @@ export type MongoOptionsWithContractJson<
   };
 
 export type MongoOptions<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 > = MongoOptionsWithContract<TContract> | MongoOptionsWithContractJson<TContract>;
 
-function hasContractJson<TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>>(
-  options: MongoOptions<TContract>,
-): options is MongoOptionsWithContractJson<TContract> {
+function hasContractJson<
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
+>(options: MongoOptions<TContract>): options is MongoOptionsWithContractJson<TContract> {
   return 'contractJson' in options;
 }
 
-function resolveContract<TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>>(
-  options: MongoOptions<TContract>,
-): TContract {
+function resolveContract<
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
+>(options: MongoOptions<TContract>): TContract {
   const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
   return new MongoContractSerializer().deserializeContract(contractInput) as TContract;
 }
@@ -107,20 +108,18 @@ function resolveContract<TContract extends MongoContractWithTypeMaps<MongoContra
  * - Emitted: pass `Contract` type explicitly. Example: `mongo<Contract>({ contractJson, url })`
  */
 export default function mongo<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 >(options: MongoOptionsWithContract<TContract>): MongoClient<TContract>;
 export default function mongo<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 >(options: MongoOptionsWithContractJson<TContract>): MongoClient<TContract>;
 export default function mongo<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
 >(options: MongoOptions<TContract>): MongoClient<TContract> {
   const contract = resolveContract(options);
   let binding = resolveOptionalMongoBinding(options);
 
-  // `mongoQuery` calls its parameter `contractJson`, but accepts the validated
-  // contract value here (it normalises both internally).
-  const query = mongoQuery<TContract>({ contractJson: contract });
+  const { context, query, enums, raw } = buildMongoStaticContext<TContract>(contract);
 
   // Single source of truth for the lifecycle. `runtimePromise` is the in-flight
   // or settled build; `closed` is the terminal state set by `close()`. A failed
@@ -130,11 +129,6 @@ export default function mongo<
   let ownedDispose: (() => Promise<void>) | undefined;
 
   const buildRuntime = async (resolvedBinding: MongoBinding): Promise<MongoRuntime> => {
-    const stack = createMongoExecutionStack({
-      target: mongoRuntimeTarget,
-      adapter: mongoRuntimeAdapter,
-    });
-    const context = createMongoExecutionContext({ contract, stack });
     const driver =
       resolvedBinding.kind === 'url'
         ? await MongoDriverImpl.fromConnection(resolvedBinding.url, resolvedBinding.dbName)
@@ -145,7 +139,7 @@ export default function mongo<
     return createMongoRuntime({
       context,
       driver,
-      ...(options.mode !== undefined ? { mode: options.mode } : {}),
+      ...ifDefined('mode', options.mode),
       ...ifDefined('middleware', options.middleware),
     });
   };
@@ -173,23 +167,27 @@ export default function mongo<
     return runtimePromise;
   };
 
+  function execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row> {
+    async function* iterate(): AsyncGenerator<Row, void, unknown> {
+      const runtime = await getRuntime();
+      yield* runtime.execute(plan);
+    }
+    return new AsyncIterableResult(iterate());
+  }
+
   const orm = mongoOrm<TContract>({
     contract,
-    executor: {
-      execute<Row>(plan: MongoQueryPlan<Row>) {
-        async function* iterate(): AsyncGenerator<Row, void, unknown> {
-          const runtime = await getRuntime();
-          yield* runtime.execute(plan);
-        }
-        return new AsyncIterableResult(iterate());
-      },
-    },
+    executor: { execute },
   });
 
   return {
     orm,
     query,
+    raw,
     contract,
+    enums,
+    context,
+    execute,
 
     async connect(bindingInput?: MongoBindingInput): Promise<MongoRuntime> {
       if (closed) {

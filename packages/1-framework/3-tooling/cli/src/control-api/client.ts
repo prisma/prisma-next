@@ -631,6 +631,7 @@ class ControlClientImpl implements ControlClient {
         codecLookup: stack.codecLookup,
         controlMutationDefaults: stack.controlMutationDefaults,
         resolvedInputs: contractConfig.source.inputs ?? [],
+        capabilities: stack.capabilities,
       };
       const providerResult = await contractConfig.source.load(sourceContext);
       if (!providerResult.ok) {
@@ -696,17 +697,18 @@ class ControlClientImpl implements ControlClient {
       // payload — `enrichContract` only adds capability + extension
       // metadata onto whatever shape it receives. The structural
       // check happens immediately afterwards via
-      // `familyInstance.deserializeContract(enrichedIR)`, which is
-      // the seam-of-record and the only thing that may surface
+      // `familyInstance.deserializeContract`, which is the
+      // seam-of-record and the only thing that may surface
       // structural errors to the caller.
       const enrichedIR = enrichContract(
         contractRaw as unknown as Contract,
         this.frameworkComponents ?? [],
       );
+      const rawContractJson = this.options.target.contractSerializer.serializeContract(enrichedIR);
 
       let deserializedContract: Contract;
       try {
-        deserializedContract = this.familyInstance.deserializeContract(enrichedIR);
+        deserializedContract = this.familyInstance.deserializeContract(rawContractJson);
       } catch (error) {
         onProgress?.({
           action: 'emit',

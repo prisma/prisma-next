@@ -12,20 +12,25 @@ import {
 import {
   type AnyEntityKindDescriptor,
   type Namespace,
-  NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
-import type { SqlNamespaceTablesInput, SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlNamespaceInput, SqlStorage } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
-import type { JsonObject, JsonValue } from '@prisma-next/utils/json';
+import type { JsonObject } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
-import { postgresTargetDescriptorMeta } from './descriptor-meta';
-import { policyEntityKind, roleEntityKind } from './entity-kinds';
-import { isPostgresSchema, PostgresSchema } from './postgres-schema';
+import { PG_INT_CODEC_ID, PG_TEXT_CODEC_ID } from './codec-ids';
+import {
+  nativeEnumEntityKind,
+  policyEntityKind,
+  rlsEnablementEntityKind,
+  roleEntityKind,
+} from './entity-kinds';
+import { PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
   family: 'sql',
   target: 'postgres',
+  enumInferenceCodecs: { text: PG_TEXT_CODEC_ID, int: PG_INT_CODEC_ID },
 };
 
 function isAuthoringEntityTypeFactoryOutput(
@@ -70,23 +75,22 @@ function collectStorageTypesHydrators(
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
   constructor(extraPackEntityKinds: readonly AnyEntityKindDescriptor[] = []) {
     const storageTypesHydrators = collectStorageTypesHydrators(postgresAuthoringEntityTypes);
-    super(storageTypesHydrators, [policyEntityKind, roleEntityKind, ...extraPackEntityKinds]);
-  }
-
-  protected override get defaultNamespaceId(): string {
-    return postgresTargetDescriptorMeta.defaultNamespaceId;
+    super(storageTypesHydrators, [
+      policyEntityKind,
+      roleEntityKind,
+      rlsEnablementEntityKind,
+      nativeEnumEntityKind,
+      ...extraPackEntityKinds,
+    ]);
   }
 
   protected override hydrateSqlNamespaceEntry(
     nsId: string,
-    raw: Namespace | Record<string, unknown>,
-  ): Namespace | SqlNamespaceTablesInput {
-    if (raw instanceof NamespaceBase) {
-      return raw;
-    }
+    raw: Record<string, unknown>,
+  ): Namespace | SqlNamespaceInput {
     const hydrated = blindCast<
-      SqlNamespaceTablesInput,
-      'super.hydrateSqlNamespaceEntry returns SqlNamespaceTablesInput when raw is not a NamespaceBase'
+      SqlNamespaceInput,
+      'raw is always plain JSON, so super.hydrateSqlNamespaceEntry returns SqlNamespaceInput'
     >(super.hydrateSqlNamespaceEntry(nsId, raw));
     const { id, entries } = hydrated;
 
@@ -111,24 +115,16 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
   override serializeContract(contract: Contract<SqlStorage>): JsonObject {
     const { storage, ...rest } = contract;
     const namespacesJson: Record<string, JsonObject> = {};
+    // Each namespace serializes to its id, its schema-kind tag, and the
+    // base's generic entries walk — every enumerable kind on
+    // `PostgresSchema.entries`, including `native_enum`.
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
-      if (isPostgresSchema(ns)) {
-        namespacesJson[nsId] = this.serializePostgresNamespace(ns, ns.id === UNBOUND_NAMESPACE_ID);
-      } else {
-        const isUnboundSlot = nsId === UNBOUND_NAMESPACE_ID;
-        namespacesJson[nsId] = {
-          id: nsId,
-          kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
-          entries: {
-            table: Object.fromEntries(
-              Object.entries(ns.entries.table ?? {}).map(([tableName, table]) => [
-                tableName,
-                this.serializeJsonObject(table),
-              ]),
-            ),
-          },
-        };
-      }
+      const isUnboundSlot = ns.id === UNBOUND_NAMESPACE_ID;
+      namespacesJson[nsId] = {
+        id: ns.id,
+        kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
+        entries: this.serializeNamespaceEntries(ns.entries),
+      };
     }
     const storageOut: Record<string, unknown> = {
       storageHash: String(storage.storageHash),
@@ -148,50 +144,5 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
       ...rest,
       storage: storageOut,
     });
-  }
-
-  private serializePostgresNamespace(ns: PostgresSchema, isUnboundSlot: boolean): JsonObject {
-    const tablesOut: Record<string, JsonObject> = {};
-    for (const [tableName, table] of Object.entries(ns.table)) {
-      tablesOut[tableName] = this.serializeJsonObject(table);
-    }
-    const valueSetEntries = ns.valueSet;
-    const valueSetOut: Record<string, JsonObject> = {};
-    if (valueSetEntries !== undefined) {
-      for (const [valueSetName, valueSet] of Object.entries(valueSetEntries)) {
-        valueSetOut[valueSetName] = this.serializeJsonObject(valueSet);
-      }
-    }
-    const roleOut: Record<string, JsonObject> = {};
-    for (const [roleName, role] of Object.entries(ns.role)) {
-      roleOut[roleName] = this.serializeJsonObject(role);
-    }
-    const policyOut: Record<string, JsonObject> = {};
-    for (const [policyName, policy] of Object.entries(ns.policy)) {
-      policyOut[policyName] = this.serializeJsonObject(policy);
-    }
-    return {
-      id: ns.id,
-      kind: isUnboundSlot ? 'postgres-unbound-schema' : 'postgres-schema',
-      entries: {
-        table: tablesOut,
-        ...(Object.keys(valueSetOut).length > 0 ? { valueSet: valueSetOut } : {}),
-        ...(Object.keys(roleOut).length > 0 ? { role: roleOut } : {}),
-        ...(Object.keys(policyOut).length > 0 ? { policy: policyOut } : {}),
-      },
-    };
-  }
-
-  private serializeJsonObject(value: unknown): JsonObject {
-    return blindCast<
-      JsonObject,
-      'serializeJsonValue round-trips an IR node through JSON, yielding a JsonObject'
-    >(this.serializeJsonValue(value));
-  }
-
-  private serializeJsonValue(value: unknown): JsonValue {
-    return blindCast<JsonValue, 'JSON.parse(JSON.stringify(x)) yields a JsonValue'>(
-      JSON.parse(JSON.stringify(value)),
-    );
   }
 }

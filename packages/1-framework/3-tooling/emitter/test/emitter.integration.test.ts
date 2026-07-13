@@ -1,4 +1,5 @@
 import type { CrossReference } from '@prisma-next/contract/types';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -7,6 +8,21 @@ import { createMockSpi } from './mock-spi';
 import { createTestContract, emit, modelsFromCanonicalContract } from './utils';
 
 const mockSqlHook = createMockSpi();
+
+function literalCodecLookup(): CodecLookup {
+  return {
+    get: () => undefined,
+    targetTypesFor: () => undefined,
+    metaFor: () => undefined,
+    renderOutputTypeFor: () => undefined,
+    renderValueLiteralFor: (_id, value) =>
+      typeof value === 'string'
+        ? `'${value}'`
+        : typeof value === 'number' || typeof value === 'boolean'
+          ? String(value)
+          : undefined,
+  };
+}
 
 describe('emitter integration', () => {
   it(
@@ -237,10 +253,10 @@ describe('emitter integration', () => {
     async () => {
       // Emit-then-consume proof. A real consumer reads the EMITTED contract.d.ts,
       // not `typeof contract`: the in-memory authoring handle's literal tuples are
-      // erased by emission. This drives the full emit pipeline (the same path
-      // `generate-contract-dts.ts` wires the enum resolver through) and asserts the
-      // emitted typemap text carries the member-value union for a field that only
-      // declares a `valueSet` ref — its codec output is bare `string`.
+      // erased by emission. This drives the full emit pipeline and asserts the
+      // emitted typemap text carries the member-value union for an enum field —
+      // produced via the family `resolveFieldValueSet` resolver + the codec seam
+      // (`renderValueLiteralFor`), the same path the SQL/Mongo emitters wire.
       const ir = createTestContract({
         models: {
           Post: {
@@ -301,10 +317,24 @@ describe('emitter integration', () => {
         extensionPacks: { postgres: { version: '0.0.1' }, pg: {} },
       });
 
+      const enumResolvingSpi = createMockSpi({
+        resolveFieldValueSet: (_modelName, fieldName, _model, contract) => {
+          if (fieldName !== 'priority') return undefined;
+          const domainEnum = contract.domain.namespaces['__unbound__']?.enum?.['Priority'];
+          return domainEnum
+            ? { encodedValues: domainEnum.members.map((m) => m.value), codecId: domainEnum.codecId }
+            : undefined;
+        },
+      });
+
       const result = await emit(
         ir,
-        { codecTypeImports: [], extensionIds: ['postgres', 'pg'] },
-        mockSqlHook,
+        {
+          codecTypeImports: [],
+          extensionIds: ['postgres', 'pg'],
+          codecLookup: literalCodecLookup(),
+        },
+        enumResolvingSpi,
       );
 
       const outputMap = result.contractDts.slice(

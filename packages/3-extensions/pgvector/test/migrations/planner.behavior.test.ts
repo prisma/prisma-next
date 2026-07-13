@@ -15,16 +15,19 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  buildSqlNamespace,
-  buildSqlNamespaceMap,
   SqlStorage,
   type SqlStorageInput,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  PostgresTableSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
@@ -36,22 +39,31 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   const contract = createTestContract();
 
   it('returns empty plan when schema already satisfies contract (superset)', () => {
-    const schema: SqlSchemaIR = {
-      tables: {
-        user: buildUserTableSchema(),
-        post: buildPostTableSchema(),
-        extra: {
-          name: 'extra',
-          columns: {
-            id: { name: 'id', nativeType: 'uuid', nullable: false },
+    const schema = new PostgresDatabaseSchemaNode({
+      namespaces: {
+        public: new PostgresNamespaceSchemaNode({
+          schemaName: 'public',
+          tables: {
+            user: buildUserTableSchema(),
+            post: buildPostTableSchema(),
+            extra: new PostgresTableSchemaNode({
+              name: 'extra',
+              columns: {
+                id: { name: 'id', nativeType: 'uuid', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              foreignKeys: [],
+              indexes: [],
+              rlsEnabled: false,
+            }),
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          foreignKeys: [],
-          indexes: [],
-        },
+        }),
       },
-    };
+      roles: [],
+      existingSchemas: [],
+      pgVersion: '',
+    });
 
     const result = planner.plan({
       contract,
@@ -69,20 +81,29 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   });
 
   it('plans additive operations for subset schema (missing column/index/fk)', async () => {
-    const schema: SqlSchemaIR = {
-      tables: {
-        user: {
-          name: 'user',
-          columns: {
-            id: { name: 'id', nativeType: 'uuid', nullable: false },
+    const schema = new PostgresDatabaseSchemaNode({
+      namespaces: {
+        public: new PostgresNamespaceSchemaNode({
+          schemaName: 'public',
+          tables: {
+            user: new PostgresTableSchemaNode({
+              name: 'user',
+              columns: {
+                id: { name: 'id', nativeType: 'uuid', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              foreignKeys: [],
+              indexes: [],
+              rlsEnabled: false,
+            }),
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          foreignKeys: [],
-          indexes: [],
-        },
+        }),
       },
-    };
+      roles: [],
+      existingSchemas: [],
+      pgVersion: '',
+    });
 
     const result = planner.plan({
       contract,
@@ -109,21 +130,30 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   });
 
   it('fails with conflicts when schema has incompatible column types', () => {
-    const schema: SqlSchemaIR = {
-      tables: {
-        user: {
-          name: 'user',
-          columns: {
-            id: { name: 'id', nativeType: 'uuid', nullable: false },
-            email: { name: 'email', nativeType: 'uuid', nullable: false },
+    const schema = new PostgresDatabaseSchemaNode({
+      namespaces: {
+        public: new PostgresNamespaceSchemaNode({
+          schemaName: 'public',
+          tables: {
+            user: new PostgresTableSchemaNode({
+              name: 'user',
+              columns: {
+                id: { name: 'id', nativeType: 'uuid', nullable: false },
+                email: { name: 'email', nativeType: 'uuid', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              foreignKeys: [],
+              indexes: [],
+              rlsEnabled: false,
+            }),
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          foreignKeys: [],
-          indexes: [],
-        },
+        }),
       },
-    };
+      roles: [],
+      existingSchemas: [],
+      pgVersion: '',
+    });
 
     const result = planner.plan({
       contract,
@@ -140,7 +170,8 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
         expect.objectContaining({
           kind: 'typeMismatch',
           location: {
-            table: 'user',
+            entityKind: 'table',
+            entityName: 'user',
             column: 'email',
           },
         }),
@@ -354,13 +385,14 @@ describe('NOT NULL column without default uses temporary default', () => {
         indexes: [],
         foreignKeys: [],
       },
-      {
+      new PostgresTableSchemaNode({
         name: 'user',
         columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
         uniques: [],
         foreignKeys: [],
         indexes: [],
-      },
+        rlsEnabled: false,
+      }),
     );
 
     const addCol = await getRequiredOperation(operationsPromise, 'column.user.slug');
@@ -441,7 +473,7 @@ describe('NOT NULL column without default uses temporary default', () => {
           },
         },
         extraSchemaTables: {
-          org: {
+          org: new PostgresTableSchemaNode({
             name: 'org',
             columns: {
               id: { name: 'id', nativeType: 'uuid', nullable: false },
@@ -450,7 +482,8 @@ describe('NOT NULL column without default uses temporary default', () => {
             uniques: [],
             foreignKeys: [],
             indexes: [],
-          },
+            rlsEnabled: false,
+          }),
         },
       },
     );
@@ -586,23 +619,19 @@ function createTestContract(
   };
   const storageInput = overrides?.storage ?? {
     namespaces: {
-      [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+      [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
         id: UNBOUND_NAMESPACE_ID,
         entries: { table: defaultTables },
       }),
     },
   };
   const { storage: _s, ...rest } = overrides ?? {};
-  const namespaces = (
-    storageInput.namespaces
-      ? buildSqlNamespaceMap(storageInput.namespaces)
-      : {
-          [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
-            id: UNBOUND_NAMESPACE_ID,
-            entries: { table: defaultTables },
-          }),
-        }
-  ) as SqlStorageInput['namespaces'];
+  const namespaces = (storageInput.namespaces ?? {
+    [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: defaultTables },
+    }),
+  }) as SqlStorageInput['namespaces'];
   return {
     target: 'postgres',
     targetFamily: 'sql',
@@ -621,8 +650,8 @@ function createTestContract(
   };
 }
 
-function buildUserTableSchema(): SqlSchemaIR['tables'][string] {
-  return {
+function buildUserTableSchema(): PostgresTableSchemaNode {
+  return new PostgresTableSchemaNode({
     name: 'user',
     columns: {
       id: { name: 'id', nativeType: 'uuid', nullable: false },
@@ -632,7 +661,8 @@ function buildUserTableSchema(): SqlSchemaIR['tables'][string] {
     uniques: [{ columns: ['email'], name: 'user_email_key' }],
     foreignKeys: [],
     indexes: [{ columns: ['email'], name: 'user_email_idx', unique: false }],
-  };
+    rlsEnabled: false,
+  });
 }
 
 /**
@@ -699,19 +729,19 @@ function createPlannerControlHookComponent(
 
 async function planUserTableOperations(
   userTable: StorageTable,
-  schemaUserTable: SqlSchemaIR['tables'][string],
+  schemaUserTable: PostgresTableSchemaNode,
   options?: {
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;
     extraStorageTypes?: Contract<SqlStorage>['storage']['types'];
     extraContractTables?: Record<string, StorageTable>;
-    extraSchemaTables?: SqlSchemaIR['tables'];
+    extraSchemaTables?: Record<string, PostgresTableSchemaNode>;
   },
 ) {
   const planner = createPostgresMigrationPlanner(testAdapter);
   const contract = createTestContract({
     storage: {
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {
@@ -724,12 +754,20 @@ async function planUserTableOperations(
       ...(options?.extraStorageTypes ? { types: options.extraStorageTypes } : {}),
     },
   });
-  const schema: SqlSchemaIR = {
-    tables: {
-      ...(options?.extraSchemaTables ?? {}),
-      user: schemaUserTable,
+  const schema = new PostgresDatabaseSchemaNode({
+    namespaces: {
+      public: new PostgresNamespaceSchemaNode({
+        schemaName: 'public',
+        tables: {
+          ...(options?.extraSchemaTables ?? {}),
+          user: schemaUserTable,
+        },
+      }),
     },
-  };
+    roles: [],
+    existingSchemas: [],
+    pgVersion: '',
+  });
   const result = planner.plan({
     contract,
     schema,
@@ -756,19 +794,20 @@ async function getRequiredOperation(
   return operation;
 }
 
-function buildUserTableSchemaWithoutEmail(): SqlSchemaIR['tables'][string] {
-  return {
+function buildUserTableSchemaWithoutEmail(): PostgresTableSchemaNode {
+  return new PostgresTableSchemaNode({
     name: 'user',
     columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
     primaryKey: { columns: ['id'] },
     uniques: [],
     foreignKeys: [],
     indexes: [],
-  };
+    rlsEnabled: false,
+  });
 }
 
-function buildPostTableSchema(): SqlSchemaIR['tables'][string] {
-  return {
+function buildPostTableSchema(): PostgresTableSchemaNode {
+  return new PostgresTableSchemaNode({
     name: 'post',
     columns: {
       id: { name: 'id', nativeType: 'uuid', nullable: false },
@@ -783,8 +822,16 @@ function buildPostTableSchema(): SqlSchemaIR['tables'][string] {
         referencedTable: 'user',
         referencedColumns: ['id'],
         name: 'post_userId_fkey',
+        // The differ pairs FK nodes by id, which folds in
+        // `resolvedReferencedNamespace` — match what
+        // `contractToPostgresDatabaseSchemaNode` stamps on the expected side
+        // for an unbound-namespace FK target (resolves to the live `public`
+        // DDL schema), or this hand-built actual node never pairs and shows
+        // up as a spurious drop+recreate.
+        resolvedReferencedNamespace: 'public',
       },
     ],
     indexes: [{ columns: ['userId'], name: 'post_userId_idx', unique: false }],
-  };
+    rlsEnabled: false,
+  });
 }

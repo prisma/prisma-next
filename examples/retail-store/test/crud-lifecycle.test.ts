@@ -7,6 +7,7 @@ import { findLocations } from '../src/data/locations';
 import { createOrder, deleteOrder, getOrderById, getUserOrders } from '../src/data/orders';
 import { findProductById, findProducts } from '../src/data/products';
 import { findUserById, findUsers } from '../src/data/users';
+import { enums } from '../src/enums';
 import { setupTestDb } from './setup';
 
 describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
@@ -117,7 +118,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
         },
       ],
       shippingAddress: '456 Test Ave',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date('2026-01-01') }],
     });
 
@@ -214,7 +215,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
         },
       ],
       shippingAddress: '123 St',
-      type: 'home',
+      type: enums.OrderType.members.Delivery,
       statusHistory: [{ status: 'placed', timestamp: new Date() }],
     });
 

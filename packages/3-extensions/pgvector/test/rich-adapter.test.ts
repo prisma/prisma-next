@@ -1,5 +1,4 @@
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   AggregateExpr,
@@ -25,6 +24,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../2-sql/9-family/test/test-sql-contract-serializer';
 import pgvectorRuntime from '../src/exports/runtime';
 import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 

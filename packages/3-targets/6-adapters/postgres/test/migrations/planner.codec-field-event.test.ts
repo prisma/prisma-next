@@ -4,21 +4,30 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID, type OpFactoryCall } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import {
-  buildSqlNamespace,
-  SqlStorage,
-  type StorageColumn,
-  type StorageTable,
-} from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
-const emptySchema: SqlSchemaIR = { tables: {} };
+const emptySchema = new PostgresDatabaseSchemaNode({
+  namespaces: {
+    public: new PostgresNamespaceSchemaNode({
+      schemaName: 'public',
+      tables: {},
+    }),
+  },
+  pgVersion: '',
+  roles: [],
+  existingSchemas: [],
+});
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 const PG_TEXT_CODEC = 'pg/text@1';
@@ -40,7 +49,7 @@ function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Cont
     storage: new SqlStorage({
       storageHash: coreHash(hash),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: buildSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: { table: tables },
         }),

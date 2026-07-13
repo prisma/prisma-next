@@ -5,6 +5,7 @@ import { parse } from '@prisma-next/psl-parser/syntax';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 // postgresPack is used directly in interpretPslDocumentToSqlContract (not in defineContract).
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
 
 const scalarTypeDescriptors = new Map<string, { codecId: string; nativeType: string }>([
@@ -29,6 +30,8 @@ function interpret(schema: string) {
     composedExtensionContracts: new Map(),
     composedExtensionPacks: [paradedbPack.id],
     composedExtensionPackRefs: [paradedbPack],
+    createNamespace: postgresCreateNamespace,
+    capabilities: { sql: { scalarList: true } },
   });
 }
 

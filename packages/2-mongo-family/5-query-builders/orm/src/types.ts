@@ -1,11 +1,11 @@
 import type { ContractReferenceRelation } from '@prisma-next/contract/types';
 import type {
+  AnyMongoTypeMaps,
   ExtractMongoCodecTypes,
   InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoModelsMap,
-  MongoTypeMaps,
   MongoUnboundFieldInputTypes,
   MongoUnboundFieldOutputTypes,
 } from '@prisma-next/mongo-contract';
@@ -42,7 +42,7 @@ export type EmbedRelationKeys<
 }[keyof ModelRelations<TContract, ModelName>];
 
 type ResolvedOutputRow<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
 > = string extends keyof MongoUnboundFieldOutputTypes<TContract>
   ? InferModelRow<TContract, ModelName>
@@ -53,7 +53,7 @@ type ResolvedOutputRow<
     : InferModelRow<TContract, ModelName>;
 
 type ResolvedInputRow<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
 > = string extends keyof MongoUnboundFieldInputTypes<TContract>
   ? InferModelRow<TContract, ModelName>
@@ -70,7 +70,7 @@ type RelationTargetModel<TContract extends MongoContract, R> = R extends {
   : never;
 
 type EmbedRelationRowType<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   RelKey extends keyof ModelRelations<TContract, ModelName>,
 > = ModelRelations<TContract, ModelName>[RelKey] extends infer R
@@ -87,7 +87,7 @@ type EmbedRelationRowType<
   : never;
 
 export type InferFullRow<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
 > =
   EmbedRelationKeys<TContract, ModelName> extends never
@@ -102,7 +102,7 @@ export type InferFullRow<
       };
 
 type VariantRow<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
 > = MongoModelsMap<TContract>[ModelName] extends {
   readonly discriminator: { readonly field: infer DiscField extends string };
@@ -122,7 +122,7 @@ type VariantRow<
   : InferFullRow<TContract, ModelName>;
 
 export type InferRootRow<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
 > = VariantRow<TContract, ModelName>;
 
@@ -136,7 +136,7 @@ export type VariantNames<
   : never;
 
 export type VariantModelRow<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   VariantName extends string,
 > = MongoModelsMap<TContract>[ModelName] extends {
@@ -155,7 +155,7 @@ export type VariantModelRow<
   : InferFullRow<TContract, ModelName>;
 
 type IncludeRelationRowType<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   RelKey extends keyof ModelRelations<TContract, ModelName>,
 > = ModelRelations<TContract, ModelName>[RelKey] extends ContractReferenceRelation
@@ -172,7 +172,7 @@ type IncludeRelationRowType<
   : never;
 
 export type IncludeResultFields<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   TInclude extends MongoIncludeSpec<TContract, ModelName>,
 > = {
@@ -184,7 +184,7 @@ export type IncludeResultFields<
 };
 
 export type MongoWhereFilter<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   TCodecTypes extends Record<string, { output: unknown }> = ExtractMongoCodecTypes<TContract>,
 > = {
@@ -208,18 +208,18 @@ export type MongoIncludeSpec<
 export type NoIncludes = Pick<Record<string, boolean>, never>;
 
 export type IncludedRow<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   TIncludes extends MongoIncludeSpec<TContract, ModelName> = NoIncludes,
 > = InferRootRow<TContract, ModelName> & IncludeResultFields<TContract, ModelName, TIncludes>;
 
 export type DefaultModelRow<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
 > = ResolvedOutputRow<TContract, ModelName>;
 
 export type CreateInput<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
 > = Omit<ResolvedInputRow<TContract, ModelName>, '_id'> &
   Partial<
@@ -243,7 +243,7 @@ type DiscriminatorField<
 // When input/output types diverge (parameterized codecs), this needs an
 // input-side VariantModelRow.
 export type VariantCreateInput<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   VariantName extends string,
 > = Omit<
@@ -258,7 +258,7 @@ export type VariantCreateInput<
   >;
 
 export type ResolvedCreateInput<
-  TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+  TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
   TVariant extends string,
 > = [TVariant] extends [never]

@@ -5,7 +5,6 @@ import { DatabaseSync } from 'node:sqlite';
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
@@ -20,6 +19,7 @@ import {
 } from '@prisma-next/sql-runtime';
 import { SqliteRuntimeImpl } from '@prisma-next/sqlite/runtime';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
+import { TestSqlContractSerializer as SqlContractSerializer } from '../../../../../packages/2-sql/9-family/test/test-sql-contract-serializer';
 
 export interface SqliteTestContext<TContract extends Contract<SqlStorage>> {
   readonly db: Db<TContract>;

@@ -21,10 +21,10 @@ import type { UnionToIntersection } from './authoring-type-utils';
 import type { AttributeStageIdFieldNames, FieldStateOf, ScalarFieldBuilder } from './contract-dsl';
 import type { EnumTypeHandle } from './enum-type';
 
-export type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
-  ? C extends Record<string, { output: unknown }>
-    ? C
-    : Record<string, never>
+export type ExtractCodecTypesFromPack<P> = P extends {
+  __codecTypes?: infer C extends Record<string, { output: unknown }>;
+}
+  ? C
   : Record<string, never>;
 
 export type MergeExtensionCodecTypes<Packs extends Record<string, unknown>> = UnionToIntersection<
@@ -279,6 +279,8 @@ type FieldNullableOf<FieldState> = FieldState extends {
   ? Nullable
   : boolean;
 
+type FieldManyOf<FieldState> = FieldState extends { readonly many?: true } ? true : false;
+
 type FieldColumnOverrideOf<FieldState> = Present<
   FieldState extends { readonly columnName?: infer ColumnName } ? ColumnName : never
 >;
@@ -471,15 +473,17 @@ type StorageColumn<
   NativeType extends string,
   TypeRef extends string | undefined = undefined,
   TypeParams extends Record<string, unknown> | undefined = undefined,
+  Many extends boolean = false,
 > = {
   readonly nativeType: NativeType;
   readonly codecId: CodecId;
   readonly nullable: Nullable;
   readonly default?: ColumnDefault;
-} & (TypeRef extends string ? { readonly typeRef: TypeRef } : Record<string, never>) &
+} & (TypeRef extends string ? { readonly typeRef: TypeRef } : Record<never, never>) &
   (TypeParams extends Record<string, unknown>
     ? { readonly typeParams: TypeParams }
-    : Record<string, never>);
+    : Record<never, never>) &
+  (Many extends true ? { readonly many: true } : Record<never, never>);
 
 type ModelStorageColumn<
   Definition,
@@ -496,7 +500,8 @@ type ModelStorageColumn<
           ResolveFieldDescriptor<Definition, ModelFieldState<Definition, ModelName, FieldName>>
         >,
         ResolveFieldColumnTypeRef<Definition, ModelFieldState<Definition, ModelName, FieldName>>,
-        ResolveFieldColumnTypeParams<Definition, ModelFieldState<Definition, ModelName, FieldName>>
+        ResolveFieldColumnTypeParams<Definition, ModelFieldState<Definition, ModelName, FieldName>>,
+        FieldManyOf<ModelFieldState<Definition, ModelName, FieldName>>
       >
     : never;
 
@@ -677,6 +682,8 @@ type BuiltStorage<Definition> = {
   };
 };
 
+type StorageColumnManyOf<Col> = Col extends { readonly many: true } ? true : false;
+
 // The enum value union for an enum-typed field, or `never` for a non-enum
 // field. The field's `typeRef` carries the authored `EnumTypeHandle`, whose
 // `Values` tuple preserves the literal member values (text or numeric).
@@ -688,6 +695,31 @@ type EnumValueUnion<FieldState> = [FieldTypeRefOf<FieldState>] extends [
     : Values[number]
   : never;
 
+// The member-value literal tuple carried on a descriptor's `entityRef.entity`
+// (e.g. a target's native-enum entity), or `never` when the descriptor has no
+// entityRef, its entity has no `members`, or `members` is widened to
+// `readonly string[]` — this is checked with non-optional property shapes so
+// a descriptor genuinely lacking `entityRef` fails the structural match
+// instead of matching vacuously through the framework type's optional slot.
+type DescriptorEntityMembers<Descriptor> = Descriptor extends {
+  readonly entityRef: {
+    readonly entity: { readonly members: infer Members extends readonly string[] };
+  };
+}
+  ? Members
+  : never;
+
+// The value-set member union for a descriptor-carried entity (the type-level
+// mirror of the runtime's generic `deriveValueSetFromEntity` fold), or
+// `never` for a field with no descriptor, a descriptor with no entityRef.entity,
+// or a widened (non-literal) members tuple — mirroring `EnumValueUnion`'s
+// erasure guard.
+type DescriptorValueSetUnion<FieldState> = [FieldDescriptorOf<FieldState>] extends [never]
+  ? never
+  : readonly string[] extends DescriptorEntityMembers<FieldDescriptorOf<FieldState>>
+    ? never
+    : DescriptorEntityMembers<FieldDescriptorOf<FieldState>>[number];
+
 // The codec's `output` / `input` JS type for a field's column, before
 // nullability. `unknown` when the codec is not in the definition's codec map.
 type CodecChannelType<
@@ -698,21 +730,33 @@ type CodecChannelType<
 > = ModelStorageColumn<Definition, ModelName, FieldName>['codecId'] extends infer Id extends
   keyof CodecTypesFromDefinition<Definition>
   ? CodecTypesFromDefinition<Definition>[Id] extends { readonly [K in Channel]: infer T }
-    ? T
+    ? StorageColumnManyOf<ModelStorageColumn<Definition, ModelName, FieldName>> extends true
+      ? ReadonlyArray<T>
+      : T
     : unknown
   : unknown;
 
-// A field's read/write JS type: the enum value union when the field is
-// enum-typed, otherwise the codec channel type, with column nullability applied.
+// The literal value union for a field: the enum-typed union takes precedence
+// (matching today's behavior), falling back to the descriptor-carried
+// value-set union; `never` when neither applies.
+type FieldValueUnion<FieldState> = [EnumValueUnion<FieldState>] extends [never]
+  ? DescriptorValueSetUnion<FieldState>
+  : EnumValueUnion<FieldState>;
+
+// A field's read/write JS type: the value union (enum or descriptor value-set)
+// when the field carries one, otherwise the codec channel type, with column
+// nullability applied.
 type FieldChannelType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
   Channel extends 'output' | 'input',
 > =
-  | ([EnumValueUnion<ModelFieldState<Definition, ModelName, FieldName>>] extends [never]
+  | ([FieldValueUnion<ModelFieldState<Definition, ModelName, FieldName>>] extends [never]
       ? CodecChannelType<Definition, ModelName, FieldName, Channel>
-      : EnumValueUnion<ModelFieldState<Definition, ModelName, FieldName>>)
+      : StorageColumnManyOf<ModelStorageColumn<Definition, ModelName, FieldName>> extends true
+        ? ReadonlyArray<FieldValueUnion<ModelFieldState<Definition, ModelName, FieldName>>>
+        : FieldValueUnion<ModelFieldState<Definition, ModelName, FieldName>>)
   | (FieldNullableOf<ModelFieldState<Definition, ModelName, FieldName>> extends true
       ? null
       : never);

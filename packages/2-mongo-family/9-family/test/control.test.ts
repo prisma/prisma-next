@@ -43,12 +43,12 @@ describe('mongoFamilyDescriptor', () => {
 
 describe('mongoFamilyPack', () => {
   it('has expected shape', () => {
-    expect(mongoFamilyPack).toEqual({
-      kind: 'family',
-      id: 'mongo',
-      familyId: 'mongo',
-      version: '0.0.1',
-    });
+    expect(mongoFamilyPack.kind).toBe('family');
+    expect(mongoFamilyPack.id).toBe('mongo');
+    expect(mongoFamilyPack.familyId).toBe('mongo');
+    expect(mongoFamilyPack.version).toBe('0.0.1');
+    expect(mongoFamilyPack.authoring?.entityTypes).toBeDefined();
+    expect(mongoFamilyPack.authoring?.pslBlockDescriptors).toBeDefined();
   });
 });
 
@@ -76,7 +76,7 @@ describe('createMongoFamilyInstance', () => {
     expect(() =>
       instance.verifySchema({
         contract: {},
-        schema: { collections: [] } as MongoSchemaIR,
+        schema: new MongoSchemaIR([]),
         strict: false,
         frameworkComponents: [],
       }),

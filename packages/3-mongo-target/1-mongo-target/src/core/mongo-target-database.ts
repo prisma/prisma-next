@@ -8,13 +8,17 @@ import type {
   MongoCollection,
   MongoCollectionInput,
   MongoNamespaceEntries,
+  MongoValueSetInput,
 } from '@prisma-next/mongo-contract';
 import { composeMongoEntityKinds } from '@prisma-next/mongo-contract/entity-kinds';
 import { blindCast } from '@prisma-next/utils/casts';
 
 export interface MongoTargetDatabaseInput {
   readonly id: string;
-  readonly entries?: Readonly<Record<string, Readonly<Record<string, MongoCollectionInput>>>>;
+  readonly entries?: Readonly<Record<string, Readonly<Record<string, unknown>>>> & {
+    readonly collection?: Readonly<Record<string, MongoCollectionInput>>;
+    readonly valueSet?: Readonly<Record<string, MongoValueSetInput>>;
+  };
 }
 
 /**
@@ -40,7 +44,7 @@ export class MongoTargetDatabase extends NamespaceBase {
     super();
     this.id = input.id;
 
-    const rawEntries: Record<string, Readonly<Record<string, MongoCollectionInput>>> = {
+    const rawEntries: Record<string, Readonly<Record<string, unknown>>> = {
       collection: {},
       ...input.entries,
     };
