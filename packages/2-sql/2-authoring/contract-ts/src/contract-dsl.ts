@@ -158,7 +158,6 @@ function toColumnDefault(value: ColumnDefaultLiteralInputValue | ColumnDefault):
   return { kind: 'literal', value };
 }
 
-// Chaining methods use `as unknown as <ConditionalType>` because TypeScript cannot narrow generic conditional return types through object spread. The runtime values are correct — the casts bridge the gap between the spread result and the compile-time conditional type that encodes the state transition.
 export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFieldState> {
   declare readonly __state: State;
 
@@ -411,12 +410,17 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
       );
     }
 
-    return new ScalarFieldBuilder({
-      ...this.state,
-      ...(spec.column ? { columnName: spec.column } : {}),
-      ...(idSpec ? { id: { name: idSpec.name } } : {}),
-      ...(uniqueSpec ? { unique: { name: uniqueSpec.name } } : {}),
-    } as unknown as ApplyFieldSqlSpec<State, Spec>);
+    return new ScalarFieldBuilder(
+      blindCast<
+        ApplyFieldSqlSpec<State, Spec>,
+        'conditional object spread does not narrow ApplyFieldSqlSpec; runtime shape is correct'
+      >({
+        ...this.state,
+        ...(spec.column ? { columnName: spec.column } : {}),
+        ...(idSpec ? { id: { name: idSpec.name } } : {}),
+        ...(uniqueSpec ? { unique: { name: uniqueSpec.name } } : {}),
+      }),
+    );
   }
 
   build(): State {
