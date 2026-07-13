@@ -9,7 +9,8 @@
  *    FK onto `"public"."user"(id)`.
  * 3. The consumer flow — sign-up through the real HTTP server, an
  *    authenticated request reading the session via BetterAuth, and the
- *    `Profile → user` ORM join through the aggregate client.
+ *    `Profile → user` FK traversed explicitly across the two typed
+ *    views (aggregate client for `Profile`, space view for `User`).
  */
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -117,7 +118,7 @@ describe('authenticated flow over the HTTP server', () => {
     expect(response.status).toBe(401);
   });
 
-  it('signs up, reads the session, and joins Profile → user', {
+  it('signs up, reads the session, and traverses Profile → user across the two views', {
     timeout: timeouts.databaseOperation,
   }, async () => {
     // Sign-up through BetterAuth's own HTTP handler.
@@ -143,8 +144,8 @@ describe('authenticated flow over the HTTP server', () => {
       userId,
     });
 
-    // Authenticated request: session via BetterAuth, Profile → user join
-    // via the ORM.
+    // Authenticated request: session via BetterAuth, Profile → user
+    // traversed explicitly across the two typed views.
     const me = await fetch(`${baseUrl}/api/me`, {
       headers: { cookie: cookie ?? '' },
     });
