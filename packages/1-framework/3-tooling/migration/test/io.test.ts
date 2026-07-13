@@ -100,6 +100,18 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     expect(pkg.endContractJson).toBeUndefined();
   });
 
+  it('treats a literal-null end snapshot as absent', async () => {
+    // `undefined` is the single "no snapshot" sentinel downstream; a null
+    // contract is not a storable state.
+    const dir = join(tmpDir, '20260225T1430_null_snapshot');
+    await writeTestPackage(dir);
+    await writeFile(join(dir, 'end-contract.json'), 'null');
+
+    const pkg = await readMigrationPackage(dir);
+
+    expect('endContractJson' in pkg).toBe(false);
+  });
+
   it('writes pretty-printed JSON', async () => {
     const dir = join(tmpDir, '20260225T1430_test');
     await writeTestPackage(dir);
@@ -661,6 +673,8 @@ describe('readMigrationsDir', () => {
     await writeTestPackage(intactDir);
     await writeTestPackage(tamperedDir);
     await writeFile(join(tamperedDir, 'ops.json'), JSON.stringify([], null, 2));
+    await writeFile(join(intactDir, 'end-contract.json'), JSON.stringify({ marker: 'intact' }));
+    await writeFile(join(tamperedDir, 'end-contract.json'), JSON.stringify({ marker: 'tampered' }));
 
     const { packages, problems } = await readMigrationsDir(tmpDir);
     // Both packages are retained (hashMismatch is recoverable)
@@ -669,6 +683,13 @@ describe('readMigrationsDir', () => {
       '20260225T1400_intact',
       '20260225T1500_tampered',
     ]);
+    // Snapshots are gated to verified packages: the tampered package's
+    // snapshot must not be loadable (it could otherwise reach the ledger's
+    // contract store), while the intact package keeps its snapshot.
+    const intact = packages.find((p) => p.dirName === '20260225T1400_intact');
+    const tampered = packages.find((p) => p.dirName === '20260225T1500_tampered');
+    expect(intact?.endContractJson).toEqual({ marker: 'intact' });
+    expect(tampered && 'endContractJson' in tampered).toBe(false);
     // One problem: hashMismatch on the tampered package
     expect(problems).toHaveLength(1);
     const problem = problems[0]!;

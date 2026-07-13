@@ -3,6 +3,7 @@ import type {
   MigrationMetadata,
   MigrationPackage,
 } from '@prisma-next/framework-components/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { basename, dirname, join, resolve } from 'pathe';
 import {
@@ -183,7 +184,10 @@ export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise
  * Snapshots are author-time conveniences (ADR 197), never structural
  * runner inputs, so a missing or unparseable file is treated as absent
  * (`undefined`) — a package holding only `migration.json` + `ops.json`
- * must keep loading (pinned regression in this package).
+ * must keep loading (pinned regression in this package). A file holding
+ * the JSON literal `null` is also treated as absent: `undefined` is the
+ * single "no snapshot" sentinel downstream, and a null contract is not
+ * a storable state (the contract store's `contract_json` is NOT NULL).
  */
 async function readEndContractJson(dir: string): Promise<unknown> {
   let raw: string;
@@ -193,7 +197,8 @@ async function readEndContractJson(dir: string): Promise<unknown> {
     return undefined;
   }
   try {
-    return JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
+    return parsed === null ? undefined : parsed;
   } catch {
     return undefined;
   }
@@ -258,7 +263,7 @@ export async function readMigrationPackage(dir: string): Promise<OnDiskMigration
     dirPath: absoluteDir,
     metadata,
     ops,
-    ...(endContractJson !== undefined ? { endContractJson } : {}),
+    ...ifDefined('endContractJson', endContractJson),
   };
 
   const verification = verifyMigrationHash(pkg);
@@ -319,13 +324,14 @@ async function readMigrationPackageRaw(dir: string): Promise<OnDiskMigrationPack
   const opsResult = MigrationOpsSchema(ops);
   if (opsResult instanceof type.errors) return null;
 
-  const endContractJson = await readEndContractJson(absoluteDir);
+  // Deliberately no `endContractJson`: this loader only runs for packages
+  // that failed hash / invariants verification, and a snapshot from an
+  // unverifiable package must never reach the ledger's contract store.
   return {
     dirName: basename(absoluteDir),
     dirPath: absoluteDir,
     metadata,
     ops,
-    ...(endContractJson !== undefined ? { endContractJson } : {}),
   };
 }
 

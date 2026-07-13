@@ -12,7 +12,7 @@ export function buildSynthMigrationEdge(args: {
     from: args.currentMarkerStorageHash ?? '',
     to: args.destinationStorageHash,
     operationCount: args.operationCount,
-    ...(args.destinationContractJson != null
+    ...(args.destinationContractJson !== undefined
       ? { destinationContractJson: args.destinationContractJson }
       : {}),
   };

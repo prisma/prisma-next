@@ -115,12 +115,13 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
 
   const destinationStorageHash = synthedPlan.destination.storageHash;
   const synthedOps = await Promise.all(synthedPlan.operations);
+  const destinationContract = input.member.contract();
   return {
     kind: 'ok',
     result: {
       plan,
       displayOps: synthedOps,
-      destinationContract: input.member.contract(),
+      destinationContract,
       strategy: 'synth',
       ...(plannerResult.warnings && plannerResult.warnings.length > 0
         ? { warnings: plannerResult.warnings }
@@ -130,7 +131,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
           currentMarkerStorageHash: input.currentMarker?.storageHash,
           destinationStorageHash,
           operationCount: synthedOps.length,
-          destinationContractJson: input.member.contract(),
+          destinationContractJson: destinationContract,
         }),
       ],
     },
