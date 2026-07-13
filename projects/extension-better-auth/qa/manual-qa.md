@@ -3,7 +3,7 @@
 > **Be the user.** This script drives the shipped BetterAuth extension the way its two consumer audiences would (see `drive/calibration/patterns.md § Consumer audiences`):
 >
 > - **(a) An app developer (end user)** who opens `examples/better-auth/README.md` and follows it verbatim — three-step schema flow, run the server, sign up with curl, make an authenticated request — including the mistakes a real user makes (wrong password, no cookie, copy-paste of every command exactly as printed).
-> - **(b) An extension author** who reads `packages/3-extensions/better-auth/README.md`, ADR 231 (stringly-typed adapters over contract-typed collections), and the amended ADR 212 (managed table-DDL spaces) as the *precedent* for their own extension — docs-fidelity QA: do the docs actually teach what the code does (two-views architecture, three-step flow, error postures)?
+> - **(b) An extension author** who reads `packages/3-extensions/better-auth/README.md` and the amended ADR 212 (managed table-DDL spaces) as the *precedent* for their own extension — docs-fidelity QA: do the docs actually teach what the code does (two-views architecture, three-step flow, error postures)? _(ADR 231 was removed from the PR by operator decision, 2026-07-13; adapter-contract claims are now checked against the package README only.)_
 >
 > **Out of scope of this script.** Do not re-run `pnpm test:packages` / `pnpm test:integration` / `pnpm typecheck` / `pnpm lint:deps` / the BetterAuth conformance suite — CI owns those (see "Scenarios deliberately not in this script"). Do not modify any tracked file; do not commit; do not run destructive git commands.
 >
@@ -30,7 +30,7 @@ The spec's Project DoD, numbered for the coverage map (team-DoD floor items excl
 | 2 | Run the server, sign up, make the authenticated request | The README's "Run it" section works copy-paste to an authenticated `/api/me` response | workspace | AC-5 |
 | 3 | Probe the failure postures a real user hits **(judgement)** | Wrong password, no cookie, duplicate sign-up produce legible, honest errors over the live HTTP surface | workspace | AC-5 |
 | 4 | Prove the managed space is quiescent at head | `db update` is a no-op on an initialized database; re-running emit/plan leaves the tree clean | workspace | AC-4 |
-| 5 | Read the extension-author docs against the code **(judgement)** | Package README, ADR 231, amended ADR 212, and subsystem doc 6 teach what the code actually does | read-only | AC-6, AC-5 |
+| 5 | Read the extension-author docs against the code **(judgement)** | Package README, amended ADR 212, and subsystem doc 6 teach what the code actually does | read-only | AC-6, AC-5 |
 | 6 | Construct the aggregate client without the runtime descriptor **(negative control)** | The documented "Contract requires extension pack 'better-auth'" rejection fires with the promised copy | tmpdir | AC-5, AC-6 |
 | 7 | Configure `additionalFields` like BetterAuth's own docs suggest **(negative control, judgement)** | The adapter's `UNKNOWN_FIELD` fail-fast posture is what a real consumer actually experiences | workspace | AC-5 |
 | 8 | Exploratory: probe the example's HTTP + CLI surface beyond the script **(exploratory)** | Surfaces unknown unknowns in the consumer journey | workspace | (no AC; charter) |
@@ -282,7 +282,7 @@ Nothing to restore if clean; otherwise capture artefacts, then `git restore` exa
 
 **Isolation:** `read-only`
 
-**Oracle:** The shipped source is ground truth; the docs under test are `packages/3-extensions/better-auth/README.md`, `docs/architecture docs/adrs/ADR 231 - Stringly-typed third-party interfaces adapt over contract-typed collections.md`, `docs/architecture docs/adrs/ADR 212 - Contract spaces.md` (§ Amendment), `docs/architecture docs/subsystems/6. Ecosystem Extensions & Packs.md`, and `.agents/rules/contract-space-package-layout.mdc`.
+**Oracle:** The shipped source is ground truth; the docs under test are `packages/3-extensions/better-auth/README.md`, `docs/architecture docs/adrs/ADR 212 - Contract spaces.md` (§ Amendment), `docs/architecture docs/subsystems/6. Ecosystem Extensions & Packs.md`, and `.agents/rules/contract-space-package-layout.mdc`.
 
 **Preconditions:** none (fully parallel).
 
@@ -290,15 +290,15 @@ Nothing to restore if clean; otherwise capture artefacts, then `git restore` exa
 
 1. **Two-views architecture:** compare the package README's "two-views" code block against `examples/better-auth/src/prisma/db.ts` — same construction options (`extensions: [betterAuthRuntimeDescriptor]`, `verifyMarker: false`, shared `Pool`), same rationale (marker names the aggregate; cross-space relations typed `never` / not `include()`-able).
 2. **Config key:** the README says "List it in `prisma-next.config.ts` `extensionPacks`" — check against `examples/better-auth/prisma-next.config.ts` and `packages/3-extensions/postgres/src/config/define-config.ts` (what key does the worked example's `defineConfig` actually accept?).
-3. **Error posture table:** compare the README's and ADR 231's error-code lists against `packages/3-extensions/better-auth/src/adapter/errors.ts` (codes, and whether each message names the offending surface as promised).
+3. **Error posture table:** compare the README's error-code list against `packages/3-extensions/better-auth/src/adapter/errors.ts` (codes, and whether each message names the offending surface as promised).
 4. **Three-step flow:** compare the package README's "Schema flow in a consuming app" commands against the example README's three steps and against what scenario 1 actually ran (note: the package README prints bare `prisma-next …` — is that runnable in a consuming app as printed?).
-5. **ADR 231's five obligations:** for each, find the implementing code (`model-map.ts` `satisfies` bound; codec crossing via collections; `errors.ts` fail-fast; `join.ts` + transaction rebinding in `adapter/index.ts`; two-views in the example) — flag any obligation the code doesn't actually meet or the ADR overstates.
+5. **The README's adapter-contract claims:** for each (typed model map; codec crossing via collections; fail-fast errors; native join + transaction rebinding; two-views consumption), find the implementing code (`model-map.ts` `satisfies` bound; `errors.ts`; `join.ts` + `adapter/index.ts`; the example) — flag any claim the code doesn't actually meet or the README overstates.
 6. **Amended ADR 212 + precedent naming:** confirm the `src/contract/` grouped layout described in the amendment matches the package's actual tree; confirm subsystem doc 6 and the layout rule name `better-auth` as the managed-space (table-DDL) precedent; spot-check `scripts/regen-extension-migrations.mjs` resolves both layouts as the amendment claims. Follow every relative link in the docs under test and note any that 404.
 7. **Development section:** confirm `pnpm build:contract-space` exists in the package's `package.json` and `test/contract-handles.test.ts` exists as the README's claimed drift tripwire.
 
 ### What you should see
 
-- Every checkable claim resolves to real code with matching behaviour/copy; links resolve; the reading order (README → ADR 231 → ADR 212) tells one coherent story an extension author could follow to build the next adapter without reading the framework source.
+- Every checkable claim resolves to real code with matching behaviour/copy; links resolve; the reading order (README → ADR 212 § Amendment) tells one coherent story an extension author could follow to build the next adapter without reading the framework source.
 
 ### Failure modes
 
@@ -359,11 +359,11 @@ Nothing mutated (dead connection string, no writes). No restore beyond process e
 
 **What you're proving from the user's seat:** BetterAuth's documentation actively encourages `user.additionalFields`; the spec declares it a non-goal that must "fail fast with a typed adapter error naming the unsupported surface". Plant the violation a real consumer is *most likely* to plant, and judge the failure from the app developer's programmatic seat (litmus answers 2 + 3). CI's adapter tests assert the `UNKNOWN_FIELD` error class directly; nobody has observed what a consumer actually sees when the rejection travels up through `betterAuth()`'s sign-up flow. **Coverage boundary:** proves the `UNKNOWN_FIELD` gate for one extra field on `user` during sign-up — not every unsupported surface (plugin tables, renamed models, secondaryStorage).
 
-**Covers:** AC-5 (fail-fast posture per spec non-goals / ADR 231 obligation 3)
+**Covers:** AC-5 (fail-fast posture per spec non-goals / README error contract)
 
 **Isolation:** `workspace` (module resolution from the example dir; reuses db1; writes no rows if the gate holds)
 
-**Oracle:** `packages/3-extensions/better-auth/src/adapter/errors.ts` `unknownField()` copy ("Unknown field … additionalFields are not supported by this adapter."); ADR 231 obligation 3 ("rejected *before* any query is built, with an error that names the offending surface").
+**Oracle:** `packages/3-extensions/better-auth/src/adapter/errors.ts` `unknownField()` copy ("Unknown field … additionalFields are not supported by this adapter."); README error contract ("rejected *before* any query is built, with an error that names the offending surface").
 
 **Preconditions:**
 
@@ -416,7 +416,7 @@ Nothing mutated (dead connection string, no writes). No restore beyond process e
 ### What you should see
 
 - Step 1: sign-up fails; somewhere in the surfaced error chain the adapter's `UNKNOWN_FIELD` copy is findable and *legible* — the runner judges whether an app developer could diagnose "remove `additionalFields` or drop the field" from what's printed, or whether BetterAuth swallows the typed error into something opaque.
-- Step 2: `grace rows: 0` — the rejection fired before any row was written (fail-*fast*, per ADR 231).
+- Step 2: `grace rows: 0` — the rejection fired before any row was written (fail-*fast*, per the README's error contract).
 
 ### Failure modes
 
