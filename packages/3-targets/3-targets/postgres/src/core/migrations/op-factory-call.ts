@@ -38,10 +38,20 @@ import { FunctionColumnDefault, LiteralColumnDefault } from '@prisma-next/sql-re
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { columnExistsAst, tableExistsAst } from '../../contract-free/checks';
+import {
+  columnExistsAst,
+  nativeEnumTypeExistsAst,
+  nativeEnumValueExistsAst,
+  tableExistsAst,
+} from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
 import type { PostgresRlsPolicy } from '../postgres-rls-policy';
-import { escapeLiteral, quoteIdentifier } from '../sql-utils';
+import {
+  escapeLiteral,
+  quoteIdentifier,
+  quoteQualifiedName,
+  validateEnumValueLength,
+} from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import { boundSchema } from './bound-schema';
 import {
@@ -1400,6 +1410,103 @@ export class DropNativeEnumTypeCall extends PostgresOpFactoryCallNode {
   }
 }
 
+/** Schema-qualified, quoted enum type name — unqualified when `schemaName` is the unbound sentinel, matching `boundSchema`'s DDL-node convention. */
+function qualifiedNativeEnumTypeName(schemaName: string, typeName: string): string {
+  const bound = boundSchema(schemaName);
+  return quoteQualifiedName(bound === undefined ? typeName : `${bound}.${typeName}`);
+}
+
+const ADD_VALUE_TRANSACTION_CAVEAT =
+  'A newly added enum value cannot be used until the transaction that adds it commits, so a ' +
+  'migration that both appends a value and uses it in the same step will fail at apply.';
+
+/**
+ * `ALTER TYPE <qualified> ADD VALUE '<value>'` for a suffix-appended member on
+ * a managed native enum. Built directly as SQL text (qualified via
+ * `quoteQualifiedName`, the value escaped via `escapeLiteral`) rather than a
+ * typed DDL node — mirrors how `enableRowLevelSecurity` renders its execute
+ * step, since no DDL-AST node exists for this statement. Prechecks/postchecks
+ * are still typed catalog queries lowered through the control adapter.
+ * `validateEnumValueLength` runs at construction, so an over-length value
+ * fails before planning produces a call.
+ */
+export class AddNativeEnumValueCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'addNativeEnumValue' as const;
+  readonly operationClass = 'additive' as const;
+  readonly schemaName: string;
+  readonly typeName: string;
+  readonly value: string;
+  readonly label: string;
+  readonly summary: string;
+
+  constructor(schemaName: string, typeName: string, value: string) {
+    super();
+    validateEnumValueLength(value, typeName);
+    this.schemaName = schemaName;
+    this.typeName = typeName;
+    this.value = value;
+    this.label = `Add value "${value}" to enum type "${typeName}"`;
+    this.summary = `Adds value "${value}" to enum type "${typeName}". ${ADD_VALUE_TRANSACTION_CAVEAT}`;
+    this.freeze();
+  }
+
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `AddNativeEnumValueCall.toOp: a lowerer is required on the Postgres planner path (type "${this.typeName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    const { schemaName, typeName, value } = this;
+    const typeChecks = nativeEnumTypeExistsAst(schemaName, typeName);
+    const valueChecks = nativeEnumValueExistsAst({ schema: schemaName, typeName, value });
+    const typePresent = await lowerer.lowerToExecuteRequest(typeChecks.typePresent());
+    const valueAbsent = await lowerer.lowerToExecuteRequest(valueChecks.valueAbsent());
+    const valuePresent = await lowerer.lowerToExecuteRequest(valueChecks.valuePresent());
+    const qualifiedType = qualifiedNativeEnumTypeName(schemaName, typeName);
+    return {
+      id: `addNativeEnumValue.${typeName}.${value}`,
+      label: this.label,
+      summary: this.summary,
+      operationClass: 'additive',
+      target: targetDetails('type', typeName, schemaName),
+      precheck: [
+        step(`ensure enum type "${typeName}" exists`, typePresent.sql, typePresent.params),
+        step(
+          `ensure value "${value}" is absent from enum type "${typeName}"`,
+          valueAbsent.sql,
+          valueAbsent.params,
+        ),
+      ],
+      execute: [
+        step(
+          `add value "${value}" to enum type "${typeName}"`,
+          `ALTER TYPE ${qualifiedType} ADD VALUE '${escapeLiteral(value)}'`,
+        ),
+      ],
+      postcheck: [
+        step(
+          `verify value "${value}" exists on enum type "${typeName}"`,
+          valuePresent.sql,
+          valuePresent.params,
+        ),
+      ],
+    };
+  }
+
+  renderTypeScript(): string {
+    const opts = [
+      `schema: ${jsonToTsSource(this.schemaName)}`,
+      `typeName: ${jsonToTsSource(this.typeName)}`,
+      `value: ${jsonToTsSource(this.value)}`,
+    ];
+    return `this.addNativeEnumValue({ ${opts.join(', ')} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
+  }
+}
+
 // ============================================================================
 // Data transform
 // ============================================================================
@@ -1646,6 +1753,7 @@ export type PostgresOpFactoryCall =
   | CreateSchemaCall
   | CreateNativeEnumTypeCall
   | DropNativeEnumTypeCall
+  | AddNativeEnumValueCall
   | CreatePostgresRlsPolicyCall
   | DropPostgresRlsPolicyCall
   | EnableRowLevelSecurityCall

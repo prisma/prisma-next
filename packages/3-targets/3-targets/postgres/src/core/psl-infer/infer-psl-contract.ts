@@ -301,10 +301,10 @@ export function inferPostgresPslContract(
   // `elementCoordinates` keys `entries.native_enum` by physical type name, no
   // enum-specific index). An inferred block carries no explicit `control` and
   // inherits the contract's `defaultControl`; under `defaultControl: 'managed'`
-  // the planner now owns the type's create/drop lifecycle and `db verify`
-  // reports member drift (#949). Member-value changes are reported as a named
-  // diagnostic, not yet auto-migrated — `ALTER TYPE … ADD VALUE` is the
-  // remaining forward work in projects/native-postgres-enums/spec.md.
+  // the planner owns the type's create/drop lifecycle and `db verify` reports
+  // member drift (#949). A suffix-appended member plans `ALTER TYPE ... ADD
+  // VALUE`; any other member change (rename, removal, reorder) is refused
+  // with a named diagnostic — see `docs/reference/postgres-native-enums.md`.
   const enumDefinitions = new Map<string, readonly string[]>();
   const packOwnedEnumTypesByNamespace = new Map<string, Map<string, string>>();
   const enumNamespaceNames = new Set<string>();

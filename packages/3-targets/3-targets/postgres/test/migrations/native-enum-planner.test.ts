@@ -2,10 +2,12 @@
  * Managed native-enum create/delete at the planner level (Phase 2 Slice A):
  * a missing managed enum lowers to `CREATE TYPE … AS ENUM` ordered before the
  * dependent table DDL; an unclaimed live enum lowers to `DROP TYPE` ordered
- * after dependent-table removal; a member-value mismatch is a NAMED
- * unsupported diagnostic (never silent, never drop-and-recreate); rendering
- * is schema-qualified, quoted, declaration-ordered, and literal-escaped; a
- * sibling-space-owned live enum is never dropped.
+ * after dependent-table removal; a non-suffix-append member-value change is a
+ * NAMED unsupported diagnostic (never silent, never drop-and-recreate) — see
+ * `native-enum-planner.add-value.test.ts` for the full append/refusal
+ * classification (Phase 2 Slice B); rendering is schema-qualified, quoted,
+ * declaration-ordered, and literal-escaped; a sibling-space-owned live enum
+ * is never dropped.
  */
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import {
@@ -283,7 +285,7 @@ describe('member-value mismatch is a named unsupported diagnostic', () => {
     expect(result.failure).toEqual([
       expect.objectContaining({
         kind: 'unsupportedOperation',
-        summary: expect.stringMatching(/enum value changes are not auto-migrated yet/),
+        summary: expect.stringMatching(/changed beyond appending new values/),
       }),
     ]);
     expect(result.failure[0]?.summary).toContain('order_status');

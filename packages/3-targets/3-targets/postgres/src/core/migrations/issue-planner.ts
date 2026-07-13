@@ -58,6 +58,7 @@ import { resolveNamespaceIdForDdlSchema } from './control-policy';
 import {
   AddColumnCall,
   AddForeignKeyCall,
+  AddNativeEnumValueCall,
   AddPrimaryKeyCall,
   AddUniqueCall,
   AlterColumnTypeCall,
@@ -156,6 +157,7 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
     case 'createExtension':
     case 'createSchema':
     case 'createNativeEnumType':
+    case 'addNativeEnumValue':
       return 'dep';
     case 'dropTable':
     case 'dropNativeEnumType':
@@ -543,12 +545,47 @@ function nodeConflict(kind: SqlPlannerConflict['kind'], message: string): SqlPla
 }
 
 /**
+ * True when `actualMembers` (the live database's ordered members) is a
+ * strict, order-preserving prefix of `expectedMembers` (the contract's) —
+ * the database already carries every contract member, in declaration
+ * order, and the contract declares at least one member the database still
+ * lacks. Any other relationship — a renamed value, a removed value, a
+ * reordering, or the database holding members the contract lacks — is not
+ * a suffix append.
+ */
+function isNativeEnumSuffixAppend(
+  actualMembers: readonly string[],
+  expectedMembers: readonly string[],
+): boolean {
+  if (actualMembers.length >= expectedMembers.length) return false;
+  return actualMembers.every((member, index) => member === expectedMembers[index]);
+}
+
+/** Operator-worded refusal for a native-enum member change beyond a suffix append (design ruling — tests match this verbatim). */
+function nativeEnumMemberChangeRefusal(options: {
+  readonly ddlSchemaName: string;
+  readonly typeName: string;
+  readonly expectedMembers: readonly string[];
+  readonly actualMembers: readonly string[];
+}): string {
+  return (
+    `Native enum type "${options.ddlSchemaName}"."${options.typeName}" changed beyond appending new values ` +
+    `(contract declares [${options.expectedMembers.join(', ')}], database has [${options.actualMembers.join(', ')}]). ` +
+    "Prisma Next does not modify a native enum's existing values (rename, removal, reorder) — " +
+    'see https://pris.ly/d/postgres-native-enums. Author the change manually with `migration new`.'
+  );
+}
+
+/**
  * Managed native-enum issue -> op lowering. A missing declared type creates
  * it; an unclaimed live type drops it (ownership-scoped upstream by
  * `retainUnownedExtras`, destructiveness gated by the operation-class
- * policy); a paired member-value mismatch is a NAMED unsupported diagnostic
- * — never a silent no-op and never a drop-and-recreate. Slice B replaces the
- * diagnostic with order-aware `ALTER TYPE ... ADD VALUE` / refusal semantics.
+ * policy); a paired member-value mismatch lowers to one `ALTER TYPE ... ADD
+ * VALUE` per appended member when the database's members are a strict,
+ * order-preserving prefix of the contract's — any other change (rename,
+ * removal, reorder, or the database holding members the contract lacks) is
+ * refused with a NAMED diagnostic, never a silent no-op and never a
+ * drop-and-recreate.
  */
 function mapNativeEnumNodeIssue(
   issue: SchemaDiffIssue,
@@ -582,16 +619,27 @@ function mapNativeEnumNodeIssue(
     PostgresNativeEnumSchemaNode,
     'a not-equal native-enum issue carries both sides; the expected node names the type'
   >(issue.expected);
-  const actualMembers = blindCast<
+  const actual = blindCast<
     PostgresNativeEnumSchemaNode,
     'a not-equal native-enum issue carries both sides'
-  >(issue.actual).members;
+  >(issue.actual);
+  if (isNativeEnumSuffixAppend(actual.members, expected.members)) {
+    const appendedValues = expected.members.slice(actual.members.length);
+    return ok(
+      appendedValues.map(
+        (value) => new AddNativeEnumValueCall(schemaName, expected.typeName, value),
+      ),
+    );
+  }
   return notOk(
     nodeConflict(
       'unsupportedOperation',
-      `Native enum type "${ddlSchemaName}"."${expected.typeName}" member values changed ` +
-        `(contract declares [${expected.members.join(', ')}], database has [${actualMembers.join(', ')}]); ` +
-        'enum value changes are not auto-migrated yet. Author the change manually with `migration new`.',
+      nativeEnumMemberChangeRefusal({
+        ddlSchemaName,
+        typeName: expected.typeName,
+        expectedMembers: expected.members,
+        actualMembers: actual.members,
+      }),
     ),
   );
 }

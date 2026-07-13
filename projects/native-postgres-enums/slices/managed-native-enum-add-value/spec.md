@@ -20,9 +20,9 @@ native_enum UserRole {
 ALTER TYPE "public"."user_role" ADD VALUE 'guest';
 ```
 
-— one op per appended value, in declaration order, applied in place with no table rewrite. Any other member change — a rename, a removal, a reorder — is **refused** with a diagnostic naming the class and the manual path (`migration new`); it is never lowered to an op. And a namespace that declares only enums (no tables) becomes visible to verify/plan, so `db init` creates its schema and types.
+— one op per appended value, in declaration order, applied in place with no table rewrite. Any other member change — a rename, a removal, a reorder — is **refused** with a diagnostic naming the class and the manual path (`migration new`); it is never lowered to an op.
 
-**Why now:** Slice A (PR #949) shipped the managed create/delete lifecycle and deliberately punted the value-mismatch case to a named diagnostic. This slice replaces that diagnostic with the real semantics, closing the last Phase-2 requirement pair (R8/R9) and the enums-only-namespace limitation Slice A carried. Not on the Supabase critical path (operator ruling): Supabase enums are external, and external drift stays suppressed.
+**Why now:** Slice A (PR #949) shipped the managed create/delete lifecycle and deliberately punted the value-mismatch case to a named diagnostic. This slice replaces that diagnostic with the real semantics, closing the last Phase-2 requirement pair (R8/R9). Not on the Supabase critical path (operator ruling): Supabase enums are external, and external drift stays suppressed.
 
 ## Chosen design
 
@@ -36,22 +36,21 @@ ALTER TYPE "public"."user_role" ADD VALUE 'guest';
 
 **4. The non-transactional caveat is documented and surfaced, not engineered around.** Postgres ≥ 12 permits `ADD VALUE` inside a transaction, but the added value is **unusable until that transaction commits**; the runner applies a space's op sequence under a single transaction (`concatenate-space-apply-inputs.ts`). Settled consequence (project spec #4): a migration that appends a value **and uses it** in the same migration (a `dataTransform` writing it, a default referencing it) fails at apply with Postgres's own "unsafe use of new value" error — that is the documented boundary, and splitting transactions or reordering around usage is out of scope. The op's rendered description (the `describe`/summary surface `migration plan` prints) carries the caveat sentence so the operator sees it at plan time. No new runner machinery, no per-op transaction flag.
 
-**5. Enums-only namespaces become visible.** `pruneTableLessNamespaces` ([`diff-database-schema.ts:67`](../../../../packages/3-targets/3-targets/postgres/src/core/migrations/diff-database-schema.ts)) currently drops any expected namespace with zero tables (pinned legacy behavior), making an enums-only namespace invisible to both verify and plan (both call sites). The filter keeps a namespace that declares native enums (`tables > 0 || nativeEnums > 0`); the `existingSchemas` filter follows. Consequence — the desired behavior: `db init` on an enums-only-namespace contract creates the schema and its types; verify reports their absence instead of silence. The pinned test (`verdict-table-less-namespace.test.ts`) updates to pin the new boundary: a namespace with no tables **and no enums** still prunes.
+**5. Control-policy grading rides Slice A unchanged.** The suffix-append issue flows through the same node-issue partition: `managed` plans the `ADD VALUE`s; `external`/`observed` suppress (an externally-appended value is not our drift to fix — R5). Strict verify still fails a member mismatch under `managed` and `external` exactly as Slice A pinned; only the **planner's** lowering changes.
 
-**6. Control-policy grading rides Slice A unchanged.** The suffix-append issue flows through the same node-issue partition: `managed` plans the `ADD VALUE`s; `external`/`observed` suppress (an externally-appended value is not our drift to fix — R5). Strict verify still fails a member mismatch under `managed` and `external` exactly as Slice A pinned; only the **planner's** lowering changes.
-
-**7. The hand-authored surface gains the same verb.** `postgres-migration.ts` gets `addNativeEnumValue({ schema, typeName, value })` via `controlAdapterFor('addNativeEnumValue')`, mirroring `createNativeEnumType`/`dropNativeEnumType` — so a refused change's manual path (`migration new`) can express the append it does want alongside hand-written rewrite steps.
+**6. The hand-authored surface gains the same verb.** `postgres-migration.ts` gets `addNativeEnumValue({ schema, typeName, value })` via `controlAdapterFor('addNativeEnumValue')`, mirroring `createNativeEnumType`/`dropNativeEnumType` — so a refused change's manual path (`migration new`) can express the append it does want alongside hand-written rewrite steps.
 
 ## Coherence rationale (slice-INVEST · _Small_)
 
-One reviewer sitting: a planner-lowering change confined to one function's tail, one op class following two existing siblings, one filter-predicate widening, one migration-surface method, and their tests. No framework/family surface changes, no new diff machinery, no runner changes. Rollback is one revert.
+One reviewer sitting: a planner-lowering change confined to one function's tail, one op class following two existing siblings, one migration-surface method, and their tests. No framework/family surface changes, no new diff machinery, no runner changes. Rollback is one revert.
 
 ## Scope
 
-**In:** the suffix-append classification + `AddNativeEnumValueCall` lowering; the plain-language refusal diagnostic with the `pris.ly` link; the `docs/reference/postgres-native-enums.md` page (content from the project explainer, `projects/` copy becomes a pointer); the op class with prechecks/postchecks + caveat-bearing description; the `pruneTableLessNamespaces` widening (verify + plan call sites) + pinned-test update; the hand-authored `addNativeEnumValue`; unit + planner tests; a live PGlite integration proof (single + multi append, all three refusal classes, enums-only-namespace `db init` → `verify` round-trip, external append suppressed).
+**In:** the suffix-append classification + `AddNativeEnumValueCall` lowering; the plain-language refusal diagnostic with the `pris.ly` link; the `docs/reference/postgres-native-enums.md` page (content from the project explainer, `projects/` copy becomes a pointer); the op class with prechecks/postchecks + caveat-bearing description; the hand-authored `addNativeEnumValue`; unit + planner tests; a live PGlite integration proof (single + multi append, all three refusal classes, external append suppressed).
 
 **Deliberately out:**
 
+- Enums-only-namespace visibility (a namespace declaring native enums but no tables) — the contract builder derives a namespace's existence from its **models**, so a model-less namespace never reaches verify/plan regardless of anything this slice does. The fix is a generic contract-builder change (every pack-contributed entity kind, not just native enums), pulled into its own follow-up slice; Slice A's `pruneTableLessNamespaces` prune stays as-is here.
 - Transaction splitting / usage-aware ordering for same-migration value use — documented boundary (design point 4), permanently.
 - `RENAME VALUE`, removal, reorder lowering — project non-goal, permanent.
 - Positional inserts (`ADD VALUE … BEFORE/AFTER`) — a non-suffix insert is a reorder; refused.
@@ -65,15 +64,14 @@ One reviewer sitting: a planner-lowering change confined to one function's tail,
 | DB has **more** members than the contract (live-appended value not yet adopted) | Not a suffix-append of the contract over the DB → refusal (adopt via `contract infer` or hand-author) |
 | Duplicate member in the contract | Rejected at authoring/emit (existing entity validation), never reaches the planner |
 | Appended value > 63 bytes | `validateEnumValueLength` throws at op construction (Slice-A rule, UTF-8 bytes) |
-| Enums-only namespace, `external` grade | Namespace now visible, but external suppresses its DDL — visible ≠ managed |
 
 ## Slice-specific done conditions
 
-R8 and R9 proven against a live database (PGlite): the append path applies and round-trips verify; each refusal class (rename, removal, reorder) yields the diagnostic and zero ops; the enums-only-namespace contract completes `db init` → `db verify` green. Plan output shows the caveat on the `ADD VALUE` op description. (CI-green, reviewer-accept, project-DoD floor inherited.)
+R8 and R9 proven against a live database (PGlite): the append path applies and round-trips verify; each refusal class (rename, removal, reorder) yields the diagnostic and zero ops. Plan output shows the caveat on the `ADD VALUE` op description. (CI-green, reviewer-accept, project-DoD floor inherited.)
 
 ## Open questions
 
-None — the design is fully settled by project spec §4/§Phase-2 and migration-design §4–§5; the operator ruled the slice off the Supabase critical path and in-scoped the namespace gap.
+None — the design is fully settled by project spec §4/§Phase-2 and migration-design §4–§5; the operator ruled the slice off the Supabase critical path, and the enums-only-namespace gap out of this slice (pulled to the generic contract-builder follow-up).
 
 ## References
 
@@ -81,8 +79,8 @@ None — the design is fully settled by project spec §4/§Phase-2 and migration
 - Migration design: [`../../specs/migration-design.md`](../../specs/migration-design.md) §4 (diff→ops table), §5 (the ops + caveat)
 - Slice A (as-built substrate): [`../managed-native-enum-create-delete/spec.md`](../managed-native-enum-create-delete/spec.md) + PR #949; known-limitation note (the prune) at its § Known limitation
 - Diagnostic being replaced: `mapNativeEnumNodeIssue`'s `not-equal` tail, `packages/3-targets/3-targets/postgres/src/core/migrations/issue-planner.ts`
-- Prune site: `pruneTableLessNamespaces`, `packages/3-targets/3-targets/postgres/src/core/migrations/diff-database-schema.ts` (both call sites)
 - Runner transaction model: `packages/1-framework/3-tooling/migration/src/concatenate-space-apply-inputs.ts`
+- Enums-only-namespace visibility (deferred): the generic contract-builder namespace-derivation follow-up slice
 
 ## Dispatch plan
 
