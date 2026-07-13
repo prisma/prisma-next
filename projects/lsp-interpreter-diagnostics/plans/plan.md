@@ -170,7 +170,7 @@ Behavior identical by construction (same values, typed instead of cast).
 
 ### Implement M3: Providers implement the capability (sql + mongo)
 
-**Status:** ► In progress — slice 04, branch `tml-2984-slice-04-provider-interpret`
+**Status:** ► In progress — slice 04 delivered (`b1ffecafe` + `cdd1ffb21`, 4/4 SDoD), PR open; complete on merge
 
 _Outcomes_
 Both `prismaContract()` factories return providers satisfying `PslInterpretCapable`

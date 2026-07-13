@@ -41,16 +41,24 @@ test only means something when at least one real provider narrows true.
 
 ## Slice Definition of Done (beyond CI / reviewer / project-DoD)
 
-- [ ] SDoD1 — sql: for the same schema content, `interpret` over parse+symbol-table
-      artifacts returns exactly the interpreter-stage diagnostics `load` reports
-      (seed diagnostics excluded) — provider-level parity test (TC-4); and `interpret`
-      on malformed-but-parseable input returns diagnostics, never throws (TC-5).
-- [ ] SDoD2 — mongo: same pair (TC-6, TC-7).
-- [ ] SDoD3 — guard integration (TC-1): `hasPslInterpreter` narrows the real
-      `prismaContract(...)` config source for both providers, and the narrowed
-      `interpret` is callable with a real assembled context.
-- [ ] SDoD4 — `load` behavior unchanged: existing provider suites green untouched;
-      `pnpm fixtures:check` zero drift; zero new casts.
+- [x] SDoD1 — sql parity (deep-equal incl. spans, seeds-exclusion four-way pin) +
+      no-throw on malformed-but-parseable AND recovered-CST input. ✓ `b1ffecafe` +
+      `cdd1ffb21` (`sql-contract-psl/test/provider.interpret.test.ts`).
+- [x] SDoD2 — mongo: same six-test mirror. ✓ `cdd1ffb21`
+      (`mongo-contract-psl/test/provider.interpret.test.ts`).
+- [x] SDoD3 — `hasPslInterpreter` narrows both real `prismaContract(...)` sources;
+      narrowed `interpret` invoked with genuine contexts. ✓ both test files.
+- [x] SDoD4 — both `load`s bit-identical (existing suites untouched green; fixtures
+      zero drift both dispatches); zero new casts (reviewer-scanned both commits).
+      Mirror asymmetries verified against each provider's removed inline code —
+      family differences, not drift. ✓
+
+**Slice-close ritual (2026-07-13):** both dispatches SATISFIED R1, zero findings;
+4/4 SDoD PASS; `origin/main` rebased (one unrelated native-enums commit) + gates
+re-verified (typecheck 143/143, sql 352/352, mongo 152/152); manual QA: **N/A — no
+user-observable change yet** (the capability exists but nothing calls it until
+slice 05; the playground QA covers it end-to-end in M6). Grep gate: zero `projects/`
+references in long-lived files.
 
 ## Edge cases (pre-investigated)
 
