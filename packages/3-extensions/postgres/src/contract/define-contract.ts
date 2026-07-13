@@ -11,14 +11,11 @@ import type {
   EnumTypeHandle,
   MergeEnums,
   ModelLike,
-  PackEntitiesInput,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { buildBoundContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
-import { ifDefined } from '@prisma-next/utils/defined';
 import type { RlsEntityHandle } from './rls';
-import { lowerRlsEntities } from './rls-lowering';
 
 type SqlFamily = typeof sqlFamilyPack;
 type PostgresPack = typeof postgresPack;
@@ -56,12 +53,14 @@ type PostgresBaseScaffold<
     Record<never, never>,
     ExtensionPacks
   >,
-  'family' | 'target' | 'types' | 'models' | 'enums' | 'createNamespace'
+  'family' | 'target' | 'types' | 'models' | 'enums' | 'createNamespace' | 'entities'
 > & {
   /**
-   * RLS handles (`policy*`, `rlsEnabled`, `role`) lowered into the generic
-   * pack-entities channel at build time, mirroring the PSL `policy_*` /
-   * `@@rls` lowering key-for-key and wire-name-for-wire-name.
+   * RLS handles (`policy*`, `rlsEnabled`, `role`), lowered by the generic
+   * contract build through the postgres pack's entity-handle hook —
+   * mirroring the PSL `policy_*` / `@@rls` lowering key-for-key and
+   * wire-name-for-wire-name. This wrapper only narrows the element type;
+   * it contains no entity-kind logic.
    */
   readonly entities?: readonly RlsEntityHandle[];
 };
@@ -115,11 +114,8 @@ export function defineContract<
 ): PostgresResult<Types, Models, ExtensionPacks, MergeEnums<ScaffoldEnums, FactoryEnums>>;
 
 // Implementation — delegates to buildBoundContract which pre-binds family/target,
-// carrying zero casts at this layer. When `entities` is present the delegation
-// goes through a wrapping factory: the RLS lowering needs the full model set
-// (scaffold + factory-built), which only exists inside the factory invocation,
-// and its lowered pack entities ride the factory's `packEntities` return so
-// buildBoundContract's own merge and collision guards stay authoritative.
+// carrying zero casts and zero entity-kind logic at this layer: the generic
+// build lowers `entities` through the pack-registered entity-handle hook.
 export function defineContract(
   definition: PostgresDefinition<TypesConstraint, ModelsConstraint, undefined, EnumsConstraint>,
   factory?: (helpers: ComposedAuthoringHelpers<SqlFamily, PostgresPack, undefined>) => {
@@ -128,38 +124,9 @@ export function defineContract(
     readonly enums?: EnumsConstraint;
   },
 ): PostgresResult<TypesConstraint, ModelsConstraint, undefined, EnumsConstraint> {
-  const { entities, ...rest } = definition;
-  const bound = { ...rest, createNamespace: postgresCreateNamespace };
-  if (entities === undefined || entities.length === 0) {
-    if (factory !== undefined) {
-      return buildBoundContract(sqlFamilyPack, postgresPack, bound, factory);
-    }
-    return buildBoundContract(sqlFamilyPack, postgresPack, bound);
+  const bound = { ...definition, createNamespace: postgresCreateNamespace };
+  if (factory !== undefined) {
+    return buildBoundContract(sqlFamilyPack, postgresPack, bound, factory);
   }
-
-  const loweringFactory = (
-    helpers: ComposedAuthoringHelpers<SqlFamily, PostgresPack, undefined>,
-  ): {
-    readonly types?: TypesConstraint;
-    readonly models?: ModelsConstraint;
-    readonly enums?: EnumsConstraint;
-    readonly packEntities?: PackEntitiesInput;
-  } => {
-    const built = factory !== undefined ? factory(helpers) : {};
-    const models = { ...(bound.models ?? {}), ...(built.models ?? {}) };
-    const types = { ...(bound.types ?? {}), ...(built.types ?? {}) };
-    const packEntities = lowerRlsEntities(entities, {
-      family: sqlFamilyPack,
-      target: postgresPack,
-      createNamespace: postgresCreateNamespace,
-      ...ifDefined('naming', bound.naming),
-      ...ifDefined('namespaces', bound.namespaces),
-      ...ifDefined('extensionPacks', bound.extensionPacks),
-      ...ifDefined('foreignKeyDefaults', bound.foreignKeyDefaults),
-      ...(Object.keys(models).length > 0 ? { models } : {}),
-      ...(Object.keys(types).length > 0 ? { types } : {}),
-    });
-    return { ...built, ...ifDefined('packEntities', packEntities) };
-  };
-  return buildBoundContract(sqlFamilyPack, postgresPack, bound, loweringFactory);
+  return buildBoundContract(sqlFamilyPack, postgresPack, bound);
 }

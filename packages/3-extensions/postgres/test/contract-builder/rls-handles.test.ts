@@ -54,8 +54,8 @@ describe('role', () => {
 describe('rlsEnabled', () => {
   it('captures the model handle by reference on a frozen branded handle', () => {
     const handle = rlsEnabled(Profile);
-    expect(handle).toEqual({ entityKind: 'rls', model: Profile });
-    expect(handle.model).toBe(Profile);
+    expect(handle).toEqual({ entityKind: 'rls', refs: { target: Profile } });
+    expect(handle.refs.target).toBe(Profile);
     expect(Object.isFrozen(handle)).toBe(true);
   });
 
@@ -66,7 +66,7 @@ describe('rlsEnabled', () => {
       'supabase',
     );
     const handle = rlsEnabled(AuthUser);
-    expect(handle.model).toBe(AuthUser);
+    expect(handle.refs.target).toBe(AuthUser);
   });
 });
 
@@ -82,11 +82,11 @@ describe('policy helpers capture inputs faithfully', () => {
       entityKind: 'policy',
       operation: 'select',
       name: 'profile_owner_read',
-      model: Profile,
+      refs: { target: Profile },
       roles: [authenticated],
       using: '"userId"::uuid = auth.uid()',
     });
-    expect(handle.model).toBe(Profile);
+    expect(handle.refs.target).toBe(Profile);
     expect(handle.roles[0]).toBe(authenticated);
     expect(Object.isFrozen(handle)).toBe(true);
     expect(Object.isFrozen(handle.roles)).toBe(true);
@@ -103,7 +103,7 @@ describe('policy helpers capture inputs faithfully', () => {
       entityKind: 'policy',
       operation: 'delete',
       name: 'profile_owner_delete',
-      model: Profile,
+      refs: { target: Profile },
       roles: [authenticated],
       using: 'true',
     });
@@ -120,7 +120,7 @@ describe('policy helpers capture inputs faithfully', () => {
       entityKind: 'policy',
       operation: 'insert',
       name: 'profile_owner_insert',
-      model: Profile,
+      refs: { target: Profile },
       roles: [authenticated],
       withCheck: '"userId"::uuid = auth.uid()',
     });
@@ -138,7 +138,7 @@ describe('policy helpers capture inputs faithfully', () => {
       entityKind: 'policy',
       operation: 'update',
       name: 'profile_owner_write',
-      model: Profile,
+      refs: { target: Profile },
       roles: [authenticated],
       using: '"userId"::uuid = auth.uid()',
       withCheck: '"userId"::uuid = auth.uid()',
@@ -156,7 +156,7 @@ describe('policy helpers capture inputs faithfully', () => {
       entityKind: 'policy',
       operation: 'update',
       name: 'profile_owner_write',
-      model: Profile,
+      refs: { target: Profile },
       roles: [authenticated],
       using: '"userId"::uuid = auth.uid()',
     });
@@ -174,7 +174,7 @@ describe('policy helpers capture inputs faithfully', () => {
       entityKind: 'policy',
       operation: 'all',
       name: 'profile_check_all',
-      model: Profile,
+      refs: { target: Profile },
       roles: [authenticated],
       withCheck: 'true',
     });
@@ -193,7 +193,7 @@ describe('policy helpers capture inputs faithfully', () => {
       entityKind: 'policy',
       operation: 'all',
       name: 'profile_owner_all',
-      model: Profile,
+      refs: { target: Profile },
       roles: [anon, authenticated],
       using: 'true',
       withCheck: 'true',

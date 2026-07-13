@@ -6,6 +6,7 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import type { PackEntityHandle } from '@prisma-next/sql-contract/entity-handle-lowering-hook';
 import type {
   SqlNamespaceBase,
   SqlNamespaceInput,
@@ -78,6 +79,7 @@ type ContractDefinition<
   readonly codecLookup?: CodecLookup;
   readonly enums?: Enums;
   readonly packEntities?: PackEntitiesInput;
+  readonly entities?: readonly PackEntityHandle[];
 };
 
 type ContractScaffold<
@@ -104,6 +106,7 @@ type ContractScaffold<
   readonly codecLookup?: CodecLookup;
   readonly enums?: Enums;
   readonly packEntities?: PackEntitiesInput;
+  readonly entities?: readonly PackEntityHandle[];
 };
 
 type ContractFactory<
@@ -118,6 +121,7 @@ type ContractFactory<
   readonly models?: Models;
   readonly enums?: Enums;
   readonly packEntities?: PackEntitiesInput;
+  readonly entities?: readonly PackEntityHandle[];
 };
 
 function validateTargetPackRef(
@@ -327,6 +331,7 @@ type BoundDefinitionInput<
   readonly codecLookup?: CodecLookup;
   readonly enums?: Record<string, EnumTypeHandle>;
   readonly packEntities?: PackEntitiesInput;
+  readonly entities?: readonly PackEntityHandle[];
 };
 
 // A bare `Record<string, EnumTypeHandle>` (no literal keys) is the widened
@@ -450,6 +455,7 @@ export function buildBoundContract<
     readonly models?: Record<string, ModelLike>;
     readonly enums?: Record<string, EnumTypeHandle>;
     readonly packEntities?: PackEntitiesInput;
+    readonly entities?: readonly PackEntityHandle[];
   },
 >(
   family: F,
@@ -476,6 +482,7 @@ export function buildBoundContract(
         readonly models?: Record<string, ModelLike>;
         readonly enums?: Record<string, EnumTypeHandle>;
         readonly packEntities?: PackEntitiesInput;
+        readonly entities?: readonly PackEntityHandle[];
       })
     | undefined,
 ) {
@@ -491,12 +498,14 @@ export function buildBoundContract(
     );
     const mergedEnums = { ...(definition.enums ?? {}), ...built.enums };
     const mergedPackEntities = mergePackEntities(definition.packEntities, built.packEntities);
+    const mergedEntities = [...(definition.entities ?? []), ...(built.entities ?? [])];
     return buildContractFromDsl({
       ...full,
       ...ifDefined('types', built.types),
       ...ifDefined('models', built.models),
       ...ifDefined('enums', Object.keys(mergedEnums).length > 0 ? mergedEnums : undefined),
       ...ifDefined('packEntities', mergedPackEntities),
+      ...ifDefined('entities', mergedEntities.length > 0 ? mergedEntities : undefined),
     });
   }
 

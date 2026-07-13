@@ -11,7 +11,13 @@ import type {
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
 import { modelAttribute } from '@prisma-next/psl-parser';
+import type {
+  EntityHandleLoweringInput,
+  LoweredPackEntity,
+  ResolvedEntityHandleRef,
+} from '@prisma-next/sql-contract/entity-handle-lowering-hook';
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { PostgresNativeEnum } from './postgres-native-enum';
@@ -24,7 +30,11 @@ import {
   PostgresRlsPolicySchema,
   PostgresRoleSchema,
 } from './postgres-validators';
-import { computeContentHash, normalizePredicate } from './rls/canonicalize';
+import {
+  computeContentHash,
+  normalizePredicate,
+  POLICY_OPERATION_PREDICATES,
+} from './rls/canonicalize';
 import { formatRlsPolicyWireName } from './rls/wire-name';
 
 /**
@@ -62,22 +72,6 @@ const POLICY_KEYWORD_OPERATION: Readonly<Record<string, RlsPolicyOperation>> = {
   policy_update: 'update',
   policy_delete: 'delete',
   policy_all: 'all',
-};
-
-/**
- * Which predicate each RLS operation admits, mirroring Postgres: SELECT and
- * DELETE decide row visibility/eligibility with `USING` only; INSERT validates
- * the new row with `WITH CHECK` only; UPDATE and ALL take both. A predicate
- * outside this set is a load-time error (see {@link lowerRlsPolicyFromBlock}).
- */
-const POLICY_OPERATION_PREDICATES: Readonly<
-  Record<RlsPolicyOperation, { readonly using: boolean; readonly withCheck: boolean }>
-> = {
-  select: { using: true, withCheck: false },
-  insert: { using: false, withCheck: true },
-  update: { using: true, withCheck: true },
-  delete: { using: true, withCheck: false },
-  all: { using: true, withCheck: true },
 };
 
 function readRefParam(block: PslExtensionBlock, key: string): string | undefined {
@@ -129,6 +123,46 @@ function unwrapQuotedString(raw: string): string {
   return result;
 }
 
+/**
+ * Assembles a {@link PostgresRlsPolicy} from lowered inputs: normalizes the
+ * predicates, computes the content-hash wire name, and constructs the frozen
+ * entity. The single hash-assembly body shared by the PSL block lowering
+ * ({@link lowerRlsPolicyFromBlock}) and the TS entity-handle lowering
+ * ({@link postgresLowerEntityHandles}) so the two surfaces cannot drift.
+ */
+function buildRlsPolicyEntity(input: {
+  readonly prefix: string;
+  readonly tableName: string;
+  readonly namespaceId: string;
+  readonly operation: RlsPolicyOperation;
+  readonly roles: readonly string[];
+  readonly using?: string;
+  readonly withCheck?: string;
+}): PostgresRlsPolicy {
+  const wireHash = computeContentHash({
+    ...ifDefined('using', input.using !== undefined ? normalizePredicate(input.using) : undefined),
+    ...ifDefined(
+      'withCheck',
+      input.withCheck !== undefined ? normalizePredicate(input.withCheck) : undefined,
+    ),
+    roles: input.roles,
+    operation: input.operation,
+    permissive: true,
+  });
+
+  return new PostgresRlsPolicy({
+    name: formatRlsPolicyWireName(input.prefix, wireHash),
+    prefix: input.prefix,
+    tableName: input.tableName,
+    namespaceId: input.namespaceId,
+    operation: input.operation,
+    roles: input.roles,
+    ...ifDefined('using', input.using),
+    ...ifDefined('withCheck', input.withCheck),
+    permissive: true,
+  });
+}
+
 function lowerRlsPolicyFromBlock(
   block: RlsPolicyExtensionBlock,
   ctx: AuthoringEntityContext,
@@ -176,17 +210,7 @@ function lowerRlsPolicyFromBlock(
   const using = usingRaw !== undefined ? unwrapQuotedString(usingRaw) : undefined;
   const withCheck = withCheckRaw !== undefined ? unwrapQuotedString(withCheckRaw) : undefined;
 
-  const wireHash = computeContentHash({
-    ...ifDefined('using', using !== undefined ? normalizePredicate(using) : undefined),
-    ...ifDefined('withCheck', withCheck !== undefined ? normalizePredicate(withCheck) : undefined),
-    roles,
-    operation,
-    permissive: true,
-  });
-  const wireName = formatRlsPolicyWireName(prefix, wireHash);
-
-  return new PostgresRlsPolicy({
-    name: wireName,
+  return buildRlsPolicyEntity({
     prefix,
     tableName,
     namespaceId: block.namespaceId,
@@ -194,7 +218,6 @@ function lowerRlsPolicyFromBlock(
     roles,
     ...ifDefined('using', using),
     ...ifDefined('withCheck', withCheck),
-    permissive: true,
   });
 }
 
@@ -606,3 +629,181 @@ export const postgresAuthoringFieldPresets = {
     },
   },
 } as const satisfies AuthoringFieldNamespace;
+
+/**
+ * Postgres identifiers cap at 63 characters and the wire name appends a
+ * 9-character `_<8hex>` suffix, so the authored prefix is bounded at 54.
+ */
+const RLS_POLICY_PREFIX_MAX_LENGTH = 54;
+
+interface RlsRoleHandleShape {
+  readonly entityKind: 'role';
+  readonly name: string;
+}
+
+interface RlsPolicyHandleShape {
+  readonly entityKind: 'policy';
+  readonly operation: RlsPolicyOperation;
+  readonly name: string;
+  readonly roles: readonly { readonly name: string }[];
+  readonly using?: string;
+  readonly withCheck?: string;
+}
+
+interface RlsTargetCoordinate {
+  readonly namespaceId: string;
+  readonly tableName: string;
+}
+
+/**
+ * Resolves an entity handle's `target` ref to a table coordinate of this
+ * contract, or throws the load-time diagnostic naming the handle: a
+ * cross-space target is rejected (you cannot CREATE POLICY on a table
+ * another space owns) and an unresolved target names the model.
+ */
+function requireLocalTarget(
+  refs: Readonly<Record<string, ResolvedEntityHandleRef>>,
+  subject: string,
+): RlsTargetCoordinate {
+  const target = refs['target'];
+  if (target !== undefined && target.kind === 'resolved') {
+    return { namespaceId: target.namespaceId, tableName: target.tableName };
+  }
+  if (target !== undefined && target.kind === 'cross-space') {
+    throw new Error(
+      `defineContract: ${subject} targets model "${target.modelName ?? target.tableName}", which lives in another contract space. Policies and rlsEnabled entries must target a model declared in this contract.`,
+    );
+  }
+  throw new Error(
+    `defineContract: ${subject} targets model "${target?.modelName ?? '<anonymous>'}", which is not in the contract's models. Add the model to \`models\`.`,
+  );
+}
+
+/**
+ * The SQL-family entity-handle batch lowering hook for the Postgres pack
+ * (`SqlEntityHandleLoweringContribution`). Receives every `entities` handle
+ * whose kind this pack registered — batch, so the cross-entity diagnostics
+ * (duplicate prefix, policy without rlsEnabled, duplicate role) can see
+ * sibling handles — and lowers them with the same keying and hash assembly
+ * as the PSL path: `policy` keyed by prefix (wire name via
+ * {@link buildRlsPolicyEntity}), `rls` keyed by table name, `role` keyed by
+ * name and filed under the default namespace (roles are declared
+ * contract-wide; PSL has no role block to set a precedent).
+ */
+export function postgresLowerEntityHandles(
+  input: EntityHandleLoweringInput,
+): readonly LoweredPackEntity[] {
+  const enablements = new Map<
+    string,
+    { coordinate: RlsTargetCoordinate; entity: PostgresRlsEnablement }
+  >();
+  const roles = new Map<string, PostgresRole>();
+  const policies: {
+    readonly handle: RlsPolicyHandleShape;
+    readonly refs: Readonly<Record<string, ResolvedEntityHandleRef>>;
+  }[] = [];
+  const coordinateKey = (coordinate: RlsTargetCoordinate): string =>
+    `${coordinate.namespaceId} ${coordinate.tableName}`;
+
+  for (const { handle, refs } of input.handles) {
+    switch (handle.entityKind) {
+      case 'rls': {
+        const coordinate = requireLocalTarget(refs, 'an rlsEnabled entry');
+        const key = coordinateKey(coordinate);
+        if (!enablements.has(key)) {
+          enablements.set(key, {
+            coordinate,
+            entity: new PostgresRlsEnablement({
+              tableName: coordinate.tableName,
+              namespaceId: coordinate.namespaceId,
+            }),
+          });
+        }
+        break;
+      }
+      case 'role': {
+        const roleHandle = blindCast<
+          RlsRoleHandleShape,
+          'role handles are constructed only by the postgres contract-builder role() constructor, which enforces this shape'
+        >(handle);
+        if (roles.has(roleHandle.name)) {
+          throw new Error(
+            `defineContract: role "${roleHandle.name}" is declared more than once in the entities list.`,
+          );
+        }
+        roles.set(
+          roleHandle.name,
+          new PostgresRole({ name: roleHandle.name, namespaceId: input.defaultNamespaceId }),
+        );
+        break;
+      }
+      case 'policy': {
+        const policyHandle = blindCast<
+          RlsPolicyHandleShape,
+          'policy handles are constructed only by the postgres contract-builder policy*() constructors, which enforce this shape'
+        >(handle);
+        policies.push({ handle: policyHandle, refs });
+        break;
+      }
+      default:
+        throw new Error(
+          `defineContract: the postgres pack does not lower "${handle.entityKind}" handles from the entities list.`,
+        );
+    }
+  }
+
+  const rows: LoweredPackEntity[] = [];
+  const seenPrefixes = new Set<string>();
+
+  for (const { handle: policy, refs } of policies) {
+    const prefix = policy.name;
+    if (prefix.length > RLS_POLICY_PREFIX_MAX_LENGTH) {
+      throw new Error(
+        `defineContract: policy prefix "${prefix}" exceeds the ${RLS_POLICY_PREFIX_MAX_LENGTH}-character maximum (Postgres identifiers cap at 63 characters and the wire name appends a 9-character hash suffix).`,
+      );
+    }
+    const coordinate = requireLocalTarget(refs, `policy "${prefix}"`);
+    if (!enablements.has(coordinateKey(coordinate))) {
+      const target = refs['target'];
+      throw new Error(
+        `defineContract: policy "${prefix}" targets model "${target?.modelName ?? coordinate.tableName}", whose table is not RLS-enabled. Add rlsEnabled(<model>) to the entities list.`,
+      );
+    }
+    const prefixKey = `${coordinate.namespaceId} ${prefix}`;
+    if (seenPrefixes.has(prefixKey)) {
+      throw new Error(
+        `defineContract: policy prefix "${prefix}" is declared more than once in namespace "${coordinate.namespaceId}". Policy prefixes must be unique per namespace.`,
+      );
+    }
+    seenPrefixes.add(prefixKey);
+
+    const roleNames = [...new Set(policy.roles.map((roleHandle) => roleHandle.name))].sort();
+    rows.push({
+      namespaceId: coordinate.namespaceId,
+      entityKind: 'policy',
+      key: prefix,
+      entity: buildRlsPolicyEntity({
+        prefix,
+        tableName: coordinate.tableName,
+        namespaceId: coordinate.namespaceId,
+        operation: policy.operation,
+        roles: roleNames,
+        ...ifDefined('using', policy.using),
+        ...ifDefined('withCheck', policy.withCheck),
+      }),
+    });
+  }
+
+  for (const { coordinate, entity } of enablements.values()) {
+    rows.push({
+      namespaceId: coordinate.namespaceId,
+      entityKind: 'rls',
+      key: coordinate.tableName,
+      entity,
+    });
+  }
+  for (const [name, entity] of roles) {
+    rows.push({ namespaceId: input.defaultNamespaceId, entityKind: 'role', key: name, entity });
+  }
+  return rows;
+}

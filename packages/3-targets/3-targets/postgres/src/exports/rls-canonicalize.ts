@@ -2,6 +2,7 @@ export {
   type ContentHashParts,
   computeContentHash,
   normalizePredicate,
+  POLICY_OPERATION_PREDICATES,
   type RlsPolicyOperation,
 } from '../core/rls/canonicalize';
 export {

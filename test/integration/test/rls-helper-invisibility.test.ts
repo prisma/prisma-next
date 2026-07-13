@@ -39,4 +39,22 @@ describe('RLS helper invisibility off Postgres', () => {
       expect(exported, `mongo must not export ${name}`).not.toContain(name);
     }
   });
+
+  it("an RLS handle in sqlite's defineContract fails the generic unclaimed-kind check", () => {
+    const { field, model, policySelect, rlsEnabled } = postgresContractBuilder;
+    const intColumn = { codecId: 'sqlite/integer@1', nativeType: 'INTEGER' } as const;
+    const Profile = model('Profile', {
+      fields: { id: field.column(intColumn).id() },
+    }).sql({ table: 'profile' });
+
+    expect(() =>
+      sqliteContractBuilder.defineContract({
+        models: { Profile },
+        entities: [
+          rlsEnabled(Profile),
+          policySelect(Profile, { name: 'p_read', roles: [], using: 'true' }),
+        ],
+      }),
+    ).toThrow(/entityKind "rls", which no composed pack registers/);
+  });
 });

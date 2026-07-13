@@ -1,5 +1,14 @@
+import {
+  type AuthoringEntityTypeNamespace,
+  isAuthoringEntityTypeDescriptor,
+} from '@prisma-next/framework-components/authoring';
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef } from '@prisma-next/framework-components/components';
+import {
+  providesEntityHandleLowering,
+  type ResolvedEntityHandleRef,
+  type ResolvedPackEntityHandle,
+} from '@prisma-next/sql-contract/entity-handle-lowering-hook';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
@@ -8,6 +17,7 @@ import type {
   ForeignKeyNode,
   IndexNode,
   ModelNode,
+  PackEntitiesInput,
   PrimaryKeyNode,
   RelationNode,
   UniqueConstraintNode,
@@ -19,6 +29,7 @@ import {
   type FieldStateOf,
   type ForeignKeyConstraint,
   type IdConstraint,
+  isCrossSpaceHandle,
   type ModelAttributesSpec,
   normalizeRelationFieldNames,
   type RelationBuilder,
@@ -864,9 +875,191 @@ function lowerModels(
   );
 }
 
+/**
+ * Kind-agnostic walk over the author-declared `entities` handle list:
+ *
+ * 1. Index the bound packs' `entityTypes` contributions by discriminator so
+ *    each handle's `entityKind` maps to the pack that registered it; a
+ *    handle whose kind no composed pack registers is an error naming the
+ *    kind.
+ * 2. Resolve each handle's declared model refs (`handle.refs`, actual
+ *    model-handle objects) to storage table coordinates — identity against
+ *    the contract's `models` record first, then the handle's declared model
+ *    name against the build's model specs; never by re-deriving a table
+ *    name. A cross-space (extensionModel) handle resolves to its own
+ *    coordinate annotated with `spaceId`.
+ * 3. Call each owning pack's batch lowering hook once with all of its
+ *    claimed handles, and fold the returned rows into `packEntities`
+ *    (namespace → kind → key), rejecting two different entities in one
+ *    slot.
+ *
+ * No entity kind is named anywhere in this walk.
+ */
+function lowerPackEntityHandles(
+  definition: ContractInput,
+  modelSpecs: ReadonlyMap<string, RuntimeModelSpec>,
+): PackEntitiesInput | undefined {
+  const entities = definition.entities;
+  if (entities === undefined || entities.length === 0) return undefined;
+
+  const components: readonly {
+    readonly authoring?: import('@prisma-next/framework-components/authoring').AuthoringContributions;
+  }[] = [
+    definition.target,
+    ...Object.values<ExtensionPackRef<'sql', string>>(definition.extensionPacks ?? {}),
+  ];
+  const owningComponent = new Map<string, (typeof components)[number]>();
+  const walkEntityTypes = (
+    namespace: AuthoringEntityTypeNamespace,
+    component: (typeof components)[number],
+  ): void => {
+    for (const value of Object.values(namespace)) {
+      if (isAuthoringEntityTypeDescriptor(value)) {
+        owningComponent.set(value.discriminator, component);
+      } else {
+        walkEntityTypes(value, component);
+      }
+    }
+  };
+  for (const component of components) {
+    const entityTypes = component.authoring?.entityTypes;
+    if (entityTypes !== undefined) walkEntityTypes(entityTypes, component);
+  }
+
+  const defaultNamespaceId = definition.target.defaultNamespaceId;
+  const modelNamesByIdentity = new Map<unknown, string>();
+  for (const [modelName, modelBuilder] of Object.entries(definition.models ?? {})) {
+    modelNamesByIdentity.set(modelBuilder, modelName);
+  }
+  const coordinateOf = (modelName: string): ResolvedEntityHandleRef | undefined => {
+    const spec = modelSpecs.get(modelName);
+    if (spec === undefined) return undefined;
+    return {
+      kind: 'resolved',
+      namespaceId: spec.namespace ?? defaultNamespaceId,
+      tableName: spec.tableName,
+      modelName,
+    };
+  };
+  const declaredModelName = (value: unknown): string | undefined => {
+    if (typeof value !== 'object' || value === null || !('stageOne' in value)) return undefined;
+    const stageOne = value.stageOne;
+    if (typeof stageOne !== 'object' || stageOne === null || !('modelName' in stageOne)) {
+      return undefined;
+    }
+    return typeof stageOne.modelName === 'string' ? stageOne.modelName : undefined;
+  };
+  const resolveRef = (value: unknown): ResolvedEntityHandleRef => {
+    const modelName = declaredModelName(value);
+    if (isCrossSpaceHandle(value)) {
+      const tableName = value.tableName;
+      const namespaceId = value.stageOne.namespace;
+      if (tableName !== undefined && namespaceId !== undefined) {
+        return {
+          kind: 'cross-space',
+          spaceId: value.spaceId,
+          namespaceId,
+          tableName,
+          ...ifDefined('modelName', modelName),
+        };
+      }
+      return { kind: 'unresolved', ...ifDefined('modelName', modelName) };
+    }
+    const identityName = modelNamesByIdentity.get(value);
+    const resolved =
+      (identityName !== undefined ? coordinateOf(identityName) : undefined) ??
+      (modelName !== undefined ? coordinateOf(modelName) : undefined);
+    return resolved ?? { kind: 'unresolved', ...ifDefined('modelName', modelName) };
+  };
+
+  const claimed = new Map<(typeof components)[number], ResolvedPackEntityHandle[]>();
+  for (const handle of entities) {
+    const component = owningComponent.get(handle.entityKind);
+    if (component === undefined) {
+      throw new Error(
+        `defineContract: entities contains a handle with entityKind "${handle.entityKind}", which no composed pack registers. Compose a pack whose entityTypes contribution claims "${handle.entityKind}", or remove the handle.`,
+      );
+    }
+    const refs: Record<string, ResolvedEntityHandleRef> = {};
+    for (const [refName, refValue] of Object.entries(handle.refs ?? {})) {
+      refs[refName] = resolveRef(refValue);
+    }
+    const forComponent = claimed.get(component) ?? [];
+    forComponent.push({ handle, refs });
+    claimed.set(component, forComponent);
+  }
+
+  const pack: Record<string, Record<string, Record<string, unknown>>> = {};
+  for (const [component, handles] of claimed) {
+    const authoring = component.authoring;
+    if (!providesEntityHandleLowering(authoring)) {
+      const kinds = [...new Set(handles.map((entry) => entry.handle.entityKind))].sort();
+      throw new Error(
+        `defineContract: entityKind(s) ${kinds.map((kind) => `"${kind}"`).join(', ')} are registered by a pack that does not implement entity-handle lowering (no lowerEntityHandles on its authoring contributions).`,
+      );
+    }
+    for (const row of authoring.lowerEntityHandles({ handles, defaultNamespaceId })) {
+      const forNamespace = pack[row.namespaceId] ?? {};
+      pack[row.namespaceId] = forNamespace;
+      const forKind = forNamespace[row.entityKind] ?? {};
+      forNamespace[row.entityKind] = forKind;
+      const existing = forKind[row.key];
+      if (existing !== undefined && existing !== row.entity) {
+        throw new Error(
+          `defineContract: two different "${row.entityKind}" entities named "${row.key}" in namespace "${row.namespaceId}" — pack-entity names must be unique per namespace.`,
+        );
+      }
+      forKind[row.key] = row.entity;
+    }
+  }
+  return pack;
+}
+
+/**
+ * Deep-merges the author-declared `packEntities` with rows lowered from the
+ * `entities` handle list — three levels (namespace, kind, name). A same-name
+ * slot present on both sides is tolerated only for the identical entity
+ * instance, mirroring `mergeCollectedPackEntities` in `build-contract.ts`.
+ */
+function mergeDeclaredAndLoweredPackEntities(
+  declared: PackEntitiesInput | undefined,
+  lowered: PackEntitiesInput | undefined,
+): PackEntitiesInput | undefined {
+  if (lowered === undefined) return declared;
+  if (declared === undefined) return lowered;
+  const result: Record<string, Record<string, Record<string, unknown>>> = {};
+  const namespaces = new Set([...Object.keys(declared), ...Object.keys(lowered)]);
+  for (const namespaceId of namespaces) {
+    const kinds = new Set([
+      ...Object.keys(declared[namespaceId] ?? {}),
+      ...Object.keys(lowered[namespaceId] ?? {}),
+    ]);
+    const forNamespace: Record<string, Record<string, unknown>> = {};
+    for (const kind of kinds) {
+      const declaredForKind = declared[namespaceId]?.[kind];
+      const loweredForKind = lowered[namespaceId]?.[kind];
+      for (const [name, entity] of Object.entries(loweredForKind ?? {})) {
+        const existing = declaredForKind?.[name];
+        if (existing !== undefined && existing !== entity) {
+          throw new Error(
+            `defineContract: two different "${kind}" entities named "${name}" in namespace "${namespaceId}" — an entities-list handle conflicts with a declared pack entity; pack-entity names must be unique per namespace.`,
+          );
+        }
+      }
+      forNamespace[kind] = { ...declaredForKind, ...loweredForKind };
+    }
+    result[namespaceId] = forNamespace;
+  }
+  return result;
+}
+
 export function buildContractDefinition(definition: ContractInput): ContractDefinition {
   const collection = collectRuntimeModelSpecs(definition);
   const models = lowerModels(collection, definition.extensionPacks);
+  const packEntities = mergeDeclaredAndLoweredPackEntities(
+    definition.packEntities,
+    lowerPackEntityHandles(definition, collection.modelSpecs),
+  );
 
   return {
     target: definition.target,
@@ -882,9 +1075,7 @@ export function buildContractDefinition(definition: ContractInput): ContractDefi
     ...(definition.enums && Object.keys(definition.enums).length > 0
       ? { enums: definition.enums }
       : {}),
-    ...(definition.packEntities && Object.keys(definition.packEntities).length > 0
-      ? { packEntities: definition.packEntities }
-      : {}),
+    ...(packEntities && Object.keys(packEntities).length > 0 ? { packEntities } : {}),
     models,
   };
 }

@@ -1,4 +1,5 @@
 import type { ScalarFieldBuilder } from '@prisma-next/sql-contract-ts/contract-builder';
+import { POLICY_OPERATION_PREDICATES } from '@prisma-next/target-postgres/rls-canonicalize';
 import type { RlsPolicyOperation } from '@prisma-next/target-postgres/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 
@@ -29,7 +30,8 @@ export interface RlsRoleHandle<Name extends string = string> {
 /** Enablement handle produced by {@link rlsEnabled}. */
 export interface RlsEnablementHandle {
   readonly entityKind: 'rls';
-  readonly model: RlsTargetModel;
+  /** Declared model refs, resolved to table coordinates by the generic contract build. */
+  readonly refs: { readonly target: RlsTargetModel };
 }
 
 /**
@@ -42,7 +44,8 @@ export interface RlsPolicyHandle<Operation extends RlsPolicyOperation = RlsPolic
   readonly operation: Operation;
   /** The policy name prefix (PSL's block name); the wire name appends a content hash. */
   readonly name: string;
-  readonly model: RlsTargetModel;
+  /** Declared model refs, resolved to table coordinates by the generic contract build. */
+  readonly refs: { readonly target: RlsTargetModel };
   readonly roles: readonly RlsRoleHandle[];
   readonly using?: string;
   readonly withCheck?: string;
@@ -93,24 +96,13 @@ function assertNonEmptyName(helper: string, name: string): void {
   }
 }
 
-/**
- * Which predicate each operation admits, mirroring Postgres and the PSL
- * lowering's matrix (`PSL_RLS_PREDICATE_NOT_FOR_OPERATION`): SELECT and
- * DELETE take `using` only; INSERT takes `withCheck` only; UPDATE and ALL
- * take either or both. The descriptor types enforce this statically; the
- * runtime check here is the backstop for untyped (plain-JS) callers.
- */
-const POLICY_OPERATION_PREDICATES: Readonly<
-  Record<
-    RlsPolicyOperation,
-    { readonly helper: string; readonly using: boolean; readonly withCheck: boolean }
-  >
-> = {
-  select: { helper: 'policySelect', using: true, withCheck: false },
-  insert: { helper: 'policyInsert', using: false, withCheck: true },
-  update: { helper: 'policyUpdate', using: true, withCheck: true },
-  delete: { helper: 'policyDelete', using: true, withCheck: false },
-  all: { helper: 'policyAll', using: true, withCheck: true },
+/** The user-facing helper name per operation, for runtime error messages. */
+const HELPER_NAMES: Readonly<Record<RlsPolicyOperation, string>> = {
+  select: 'policySelect',
+  insert: 'policyInsert',
+  update: 'policyUpdate',
+  delete: 'policyDelete',
+  all: 'policyAll',
 };
 
 function buildPolicyHandle<Operation extends RlsPolicyOperation>(
@@ -121,8 +113,12 @@ function buildPolicyHandle<Operation extends RlsPolicyOperation>(
     readonly withCheck?: string;
   },
 ): RlsPolicyHandle<Operation> {
+  const helper = HELPER_NAMES[operation];
+  // The descriptor types enforce the predicate matrix statically; this
+  // runtime check (over the same single-homed matrix the PSL lowering uses)
+  // is the backstop for untyped (plain-JS) callers.
   const support = POLICY_OPERATION_PREDICATES[operation];
-  assertNonEmptyName(`${support.helper}("${descriptor.name}")`, descriptor.name);
+  assertNonEmptyName(`${helper}("${descriptor.name}")`, descriptor.name);
 
   const supported =
     support.using && support.withCheck
@@ -132,14 +128,14 @@ function buildPolicyHandle<Operation extends RlsPolicyOperation>(
         : '`withCheck` only';
   const rejectPredicate = (predicate: 'using' | 'withCheck'): never => {
     throw new Error(
-      `${support.helper}: policy "${descriptor.name}" does not take a \`${predicate}\` predicate; the ${operation.toUpperCase()} operation uses ${supported}.`,
+      `${helper}: policy "${descriptor.name}" does not take a \`${predicate}\` predicate; the ${operation.toUpperCase()} operation uses ${supported}.`,
     );
   };
   if (descriptor.using !== undefined && !support.using) rejectPredicate('using');
   if (descriptor.withCheck !== undefined && !support.withCheck) rejectPredicate('withCheck');
   if (descriptor.using === undefined && descriptor.withCheck === undefined) {
     throw new Error(
-      `${support.helper}: policy "${descriptor.name}" requires at least one predicate; the ${operation.toUpperCase()} operation uses ${supported}.`,
+      `${helper}: policy "${descriptor.name}" requires at least one predicate; the ${operation.toUpperCase()} operation uses ${supported}.`,
     );
   }
 
@@ -147,7 +143,7 @@ function buildPolicyHandle<Operation extends RlsPolicyOperation>(
     entityKind: 'policy' as const,
     operation,
     name: descriptor.name,
-    model,
+    refs: Object.freeze({ target: model }),
     roles: Object.freeze([...descriptor.roles]),
     ...ifDefined('using', descriptor.using),
     ...ifDefined('withCheck', descriptor.withCheck),
@@ -171,7 +167,7 @@ export function role<const Name extends string>(name: Name): RlsRoleHandle<Name>
  * LEVEL SECURITY` planning.
  */
 export function rlsEnabled(model: RlsTargetModel): RlsEnablementHandle {
-  return Object.freeze({ entityKind: 'rls' as const, model });
+  return Object.freeze({ entityKind: 'rls' as const, refs: Object.freeze({ target: model }) });
 }
 
 /** Authors a `FOR SELECT` policy (PSL `policy_select`): row visibility via `using`. */

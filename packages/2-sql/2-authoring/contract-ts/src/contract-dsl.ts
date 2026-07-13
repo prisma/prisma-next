@@ -1592,6 +1592,14 @@ export type ContractInput<
    * purpose — neither this type nor the assembler names a specific kind.
    */
   readonly packEntities?: import('./contract-definition').PackEntitiesInput;
+  /**
+   * Author-declared pack-entity handles, lowered by the pack that registered
+   * each handle's `entityKind` (through the SQL-family batch lowering hook)
+   * into `packEntities` rows at build time. Generic on purpose — neither
+   * this type nor the walk names a specific kind; a handle whose kind no
+   * composed pack registers is a build error.
+   */
+  readonly entities?: readonly import('@prisma-next/sql-contract/entity-handle-lowering-hook').PackEntityHandle[];
 };
 
 export function model<
@@ -1713,7 +1721,7 @@ type CrossSpaceHandle = {
   readonly stageOne: { readonly namespace?: string };
 };
 
-function isCrossSpaceHandle(value: unknown): value is CrossSpaceHandle {
+export function isCrossSpaceHandle(value: unknown): value is CrossSpaceHandle {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
