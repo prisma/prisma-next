@@ -8,6 +8,7 @@ import type {
 } from '@prisma-next/framework-components/runtime';
 import {
   buildNamespacedNativeEnums,
+  isPgPool,
   type NamespacedNativeEnums,
 } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
@@ -207,7 +208,7 @@ function resolveKeyMaterial<TContract extends Contract<SqlStorage>>(
 function toPool<TContract extends Contract<SqlStorage>>(
   options: SupabaseOptions<TContract>,
 ): { pool: Pool; owned: boolean } | undefined {
-  if (options.pg instanceof Pool) {
+  if (options.pg !== undefined && isPgPool(options.pg)) {
     return { pool: options.pg, owned: false };
   }
   if (typeof options.url === 'string') {
