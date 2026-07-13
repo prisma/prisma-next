@@ -433,27 +433,15 @@ interface DependencyDeclaringDescriptor {
   };
 }
 
-interface ContractSpaceCarryingDescriptor {
-  readonly id: string;
-  readonly contractSpace?: {
-    readonly contractJson?: unknown;
-  };
-}
-
 function assembleExtensionContracts(
-  extensions: ReadonlyArray<ContractSpaceCarryingDescriptor>,
+  extensions: ReadonlyArray<
+    Pick<ControlExtensionDescriptor<string, string>, 'id' | 'contractSpace'>
+  >,
 ): ReadonlyMap<string, Contract> {
   const result = new Map<string, Contract>();
   for (const ext of extensions) {
-    const contractJson = ext.contractSpace?.contractJson;
-    if (contractJson === undefined) continue;
-    result.set(
-      ext.id,
-      blindCast<
-        Contract,
-        'contractSpace.contractJson is the emitted, validated contract for this extension space'
-      >(contractJson),
-    );
+    if (ext.contractSpace === undefined) continue;
+    result.set(ext.id, ext.contractSpace.contractJson);
   }
   return result;
 }
