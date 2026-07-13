@@ -54,7 +54,7 @@ describe('printPsl', () => {
       model Login {
         id     Int     @id
         _2faId Int     @map("2fa_id")
-        _2fa   Account @relation(fields: [_2faId], references: [id])
+        _2fa   Account @relation(fields: [_2faId], references: [id], index: false)
 
         @@map("login")
       }
@@ -123,7 +123,7 @@ describe('printPsl', () => {
       model Login {
         id        Int     @id
         accountId Int     @map("account_id")
-        account   Account @relation(fields: [accountId], references: [userId2])
+        account   Account @relation(fields: [accountId], references: [userId2], index: false)
 
         @@map("login")
       }
@@ -245,6 +245,40 @@ describe('printPsl', () => {
         _type    String @map("type")
 
         @@index([category, _type], map: "record_category_type_idx")
+        @@map("record")
+      }
+      "
+    `);
+  });
+
+  it('preserves a non-default index access method (e.g. hash)', () => {
+    const schemaIR = new SqlSchemaIR({
+      tables: {
+        record: {
+          name: 'record',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+            token: { name: 'token', nativeType: 'text', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [
+            { columns: ['token'], unique: false, name: 'record_token_hash_idx', type: 'hash' },
+          ],
+        },
+      },
+    });
+    const result = printPslFromSql(schemaIR);
+    expect(result).toMatchInlineSnapshot(`
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+
+      model Record {
+        id    Int    @id
+        token String
+
+        @@index([token], map: "record_token_hash_idx", type: "hash")
         @@map("record")
       }
       "

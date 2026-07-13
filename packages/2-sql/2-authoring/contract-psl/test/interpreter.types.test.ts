@@ -141,6 +141,7 @@ model Event {
   CreatedAt = DateTime @db.Timestamp(3)
   PublishedAt = DateTime @db.Timestamptz(6)
   ReminderAt = DateTime @db.Timetz(2)
+  Ip = String @db.Inet
 }
 
 model Event {
@@ -150,6 +151,7 @@ model Event {
   createdAt CreatedAt
   publishedAt PublishedAt
   reminderAt ReminderAt
+  ip Ip
 }`,
       sourceId: 'schema.prisma',
     });
@@ -187,6 +189,10 @@ model Event {
         codecId: 'pg/timetz@1',
         nativeType: 'timetz',
         typeParams: { precision: 2 },
+      },
+      Ip: {
+        codecId: 'pg/inet@1',
+        nativeType: 'inet',
       },
     });
     expect(result.value.storage).toMatchObject({
@@ -226,6 +232,12 @@ model Event {
                     nativeType: 'timetz',
                     nullable: false,
                     typeRef: 'ReminderAt',
+                  },
+                  ip: {
+                    codecId: 'pg/inet@1',
+                    nativeType: 'inet',
+                    nullable: false,
+                    typeRef: 'Ip',
                   },
                 },
               },

@@ -10,6 +10,7 @@ import type {
   SymbolTable,
 } from '@prisma-next/psl-parser';
 import {
+  bool,
   fieldAttribute,
   fieldRef,
   identifier,
@@ -121,6 +122,13 @@ const sqlRelation = fieldAttribute('relation', {
         identifier('SetDefault'),
       ),
     ),
+    /**
+     * Opts a foreign key out of its default backing index
+     * (`index: false`). Omitted (the default) keeps the FK's derived
+     * backing-index expectation; only `false` is meaningful — there is no
+     * `index: true` spelling since that is already the default.
+     */
+    index: optional(bool()),
   },
   refine: relationInvariants,
 });

@@ -28,6 +28,17 @@ export interface SqlIndexIRInput {
  * on the remaining attributes: `unique`, `type`, and `options`. A unique
  * index and a non-unique index on the same columns are different objects
  * and are not equal — there is no "stronger satisfies weaker".
+ *
+ * Deliberately column-tuple-only (not `unique`): a contract `@@index`
+ * (non-unique) must still pair against a live unique index of the same
+ * columns so the differ can report the mismatch as an incompatible index
+ * change rather than a spurious missing+extra pair — see
+ * `planner.unique-index-structural.test.ts`. The corollary is that two
+ * indexes legitimately coexisting on one table with the *same* column tuple
+ * (e.g. a unique index and a redundant plain index Postgres has no problem
+ * hosting side by side) collide on this id; the postgres control adapter's
+ * introspection keeps only one such index per table+column-tuple rather
+ * than handing the differ two same-tree siblings it cannot represent.
  */
 export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.index;

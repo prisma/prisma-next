@@ -1043,7 +1043,7 @@ describe('PostgresControlAdapter', () => {
       ]);
     });
 
-    it('skips index rows with null attname', async () => {
+    it('excludes an index entirely when any key has a null attname (expression key)', async () => {
       const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
       const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
@@ -1121,8 +1121,119 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(tablesOf(result)['user']?.indexes).toHaveLength(1);
-      expect(tablesOf(result)['user']?.indexes[0]?.columns).toEqual(['id']);
+      // A key with `attname: null` means an expression key Postgres reports
+      // with an unresolvable attribute number. Keeping the index with just
+      // its real-column keys would silently misrepresent a multi-column
+      // expression index as a shorter plain-column one, which can collide
+      // with an unrelated real index on that shorter column list — the
+      // whole index is excluded instead (see PostgresControlAdapter's
+      // `introspectSchema` index-processing comment).
+      expect(tablesOf(result)['user']?.indexes).toHaveLength(0);
+    });
+
+    it('keeps only the unique index when a unique and a plain index share one column tuple', async () => {
+      const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
+        familyId: 'sql',
+        targetId: 'postgres',
+        query: async <Row = Record<string, unknown>>(sql: string) => {
+          if (sql.includes('information_schema.tables')) {
+            return { rows: [{ table_name: 'user' }] as unknown as Row[] };
+          }
+          if (sql.includes('information_schema.columns')) {
+            return {
+              rows: [
+                {
+                  table_name: 'user',
+                  column_name: 'id',
+                  data_type: 'integer',
+                  udt_name: 'int4',
+                  is_nullable: 'NO',
+                  character_maximum_length: null,
+                  numeric_precision: null,
+                  numeric_scale: null,
+                },
+                {
+                  table_name: 'user',
+                  column_name: 'email',
+                  data_type: 'text',
+                  udt_name: 'text',
+                  is_nullable: 'NO',
+                  character_maximum_length: null,
+                  numeric_precision: null,
+                  numeric_scale: null,
+                },
+              ] as unknown as Row[],
+            };
+          }
+          if (sql.includes('PRIMARY KEY')) {
+            return {
+              rows: [
+                {
+                  table_name: 'user',
+                  constraint_name: 'user_pkey',
+                  column_name: 'id',
+                  ordinal_position: 1,
+                },
+              ] as unknown as Row[],
+            };
+          }
+          if (sql.includes('FOREIGN KEY')) {
+            return { rows: [] as unknown as Row[] };
+          }
+          if (sql.includes('UNIQUE')) {
+            return { rows: [] as unknown as Row[] };
+          }
+          if (sql.includes('pg_indexes')) {
+            return {
+              rows: [
+                {
+                  tablename: 'user',
+                  indexname: 'user_email_unique_idx',
+                  indisunique: true,
+                  attname: 'email',
+                  index_position: 1,
+                },
+                {
+                  tablename: 'user',
+                  indexname: 'user_email_plain_idx',
+                  indisunique: false,
+                  attname: 'email',
+                  index_position: 1,
+                },
+              ] as unknown as Row[],
+            };
+          }
+          if (sql.includes('pg_extension')) {
+            return { rows: [] as unknown as Row[] };
+          }
+          if (sql.includes('version()')) {
+            return {
+              rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
+            };
+          }
+          return { rows: [] as unknown as Row[] };
+        },
+        close: async () => {},
+      };
+
+      const result = await adapter.introspect(mockDriver);
+
+      // Postgres permits a unique index and a plain index coexisting on the
+      // identical column list; the schema differ's diff-tree node id for an
+      // index is the column tuple alone, so keeping both would produce two
+      // same-tree siblings with the same id ("duplicate id among siblings").
+      // The unique one wins (it is a strict superset of what the plain one
+      // would add).
+      const indexes = tablesOf(result)['user']?.indexes;
+      expect(indexes).toHaveLength(1);
+      expect(indexes?.[0]).toEqual(
+        expect.objectContaining({
+          name: 'user_email_unique_idx',
+          unique: true,
+          columns: ['email'],
+        }),
+      );
     });
 
     it('handles custom schema name', async () => {

@@ -25,6 +25,7 @@ import {
 } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { backingIndexColumnKeys } from '../foreign-key-index-backing';
 
 /**
  * Target-specific callback that expands a column's base `nativeType` and optional
@@ -91,11 +92,24 @@ function convertColumn(
         ...ifDefined('typeParams', resolved.typeParams),
       })
     : resolved.nativeType;
-  const nativeType = column.many ? `${baseNativeType}[]` : baseNativeType;
+  // `many: true` columns keep `nativeType` as the bare element type (matching
+  // how the introspected/"actual" side reports it — see the postgres control
+  // adapter's own `many`-stripping normalization) and carry the array-ness in
+  // the separate `many` field instead of baking `[]` into `nativeType`.
+  // Baking it in here (`"text[]"`) made every `@@` list-typed column
+  // permanently mismatch against a live introspected column reporting
+  // `{ nativeType: "text", many: true }`, regardless of whether the two are
+  // otherwise identical — `db verify` reported every such column
+  // `not-equal`. `resolvedNativeType` still carries the full `"text[]"`
+  // form: it is the side both this and the introspected column already
+  // agree on as the comparable "expanded" type.
+  const nativeType = baseNativeType;
+  const resolvedNativeType = column.many ? `${baseNativeType}[]` : baseNativeType;
   return {
     name,
     nativeType,
     nullable: column.nullable,
+    ...ifDefined('many', column.many),
     ...ifDefined(
       'default',
       column.default != null && renderDefault ? renderDefault(column.default, column) : undefined,
@@ -104,7 +118,7 @@ function convertColumn(
     // full native type doubles as the resolved value, and the contract's
     // structured default is the resolved default (the introspected side
     // stamps its normalizer's parse of the raw expression).
-    resolvedNativeType: nativeType,
+    resolvedNativeType,
     ...ifDefined('resolvedDefault', column.default ?? undefined),
     // The column's codec identity, carried the same way the query AST
     // carries `CodecRef` (TML-2456) — the migration planner's op-builders
@@ -294,11 +308,7 @@ function convertTable(
     );
   }
 
-  const satisfiedIndexColumns = new Set([
-    ...table.indexes.map((idx) => idx.columns.join(',')),
-    ...table.uniques.map((unique) => unique.columns.join(',')),
-    ...(table.primaryKey ? [table.primaryKey.columns.join(',')] : []),
-  ]);
+  const satisfiedIndexColumns = new Set(backingIndexColumnKeys(table));
   const fkBackingIndexes: SqlIndexIRInput[] = [];
   for (const fk of table.foreignKeys) {
     if (fk.index === false) continue;
