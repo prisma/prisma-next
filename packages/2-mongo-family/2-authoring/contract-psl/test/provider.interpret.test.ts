@@ -1,21 +1,43 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { hasPslInterpreter, type PslInterpretInput } from '@prisma-next/psl-parser/interpret';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
-import { prismaContract } from '../src/exports/provider';
-import { createPostgresTestContext, postgresTarget } from './fixtures';
-
-const baseOptions = {
-  target: postgresTarget,
-  createNamespace: createTestSqlNamespace,
-} as const;
+import { mongoContract } from '../src/exports/provider';
 
 const SOURCE_ID = './schema.prisma';
+
+const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
+  ['String', 'mongo/string@1'],
+  ['ObjectId', 'mongo/objectId@1'],
+]);
+
+function createMongoTestContext(overrides?: Partial<ContractSourceContext>): ContractSourceContext {
+  return {
+    composedExtensionPacks: [],
+    composedExtensionContracts: new Map(),
+    scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    authoringContributions: {
+      field: {},
+      type: {},
+      entityTypes: {},
+      pslBlockDescriptors: {},
+      modelAttributes: {},
+    },
+    codecLookup: emptyCodecLookup,
+    controlMutationDefaults: {
+      defaultFunctionRegistry: new Map(),
+      generatorDescriptors: [],
+    },
+    resolvedInputs: [],
+    capabilities: {},
+    ...overrides,
+  };
+}
 
 function buildInterpretInput(schema: string, context: ContractSourceContext): PslInterpretInput {
   const { document, sourceFile } = parse(schema);
@@ -29,14 +51,14 @@ function buildInterpretInput(schema: string, context: ContractSourceContext): Ps
 }
 
 function interpretCapableSource(schemaPath: string) {
-  const contract = prismaContract(schemaPath, baseOptions);
+  const contract = mongoContract(schemaPath);
   if (!hasPslInterpreter(contract.source)) {
-    throw new Error('expected prismaContract source to carry the interpret capability');
+    throw new Error('expected mongoContract source to carry the interpret capability');
   }
   return contract.source;
 }
 
-describe('prismaContract interpret capability', () => {
+describe('mongoContract interpret capability', () => {
   const originalCwd = process.cwd();
   const tempDirs: string[] = [];
 
@@ -48,8 +70,8 @@ describe('prismaContract interpret capability', () => {
     tempDirs.length = 0;
   });
 
-  it('narrows a real prismaContract source via hasPslInterpreter', () => {
-    const contract = prismaContract(SOURCE_ID, baseOptions);
+  it('narrows a real mongoContract source via hasPslInterpreter', () => {
+    const contract = mongoContract(SOURCE_ID);
 
     expect(hasPslInterpreter(contract.source)).toBe(true);
     if (!hasPslInterpreter(contract.source)) return;
@@ -58,24 +80,22 @@ describe('prismaContract interpret capability', () => {
 
   it('returns the same diagnostics as load when parse and symbol table are clean', async () => {
     const schema = `model User {
-  id Int @id
-  things Unknown[]
+  id ObjectId @id @map("_id")
+  bad Mystery
 }
 `;
-    const tempDir = await mkdtemp(join(tmpdir(), 'psl-interpret-'));
+    const tempDir = await mkdtemp(join(tmpdir(), 'mongo-interpret-'));
     tempDirs.push(tempDir);
     const schemaPath = join(tempDir, 'schema.prisma');
     await writeFile(schemaPath, schema, 'utf-8');
 
     process.chdir(tempDir);
     const source = interpretCapableSource(SOURCE_ID);
-    const loadResult = await source.load(
-      createPostgresTestContext({ resolvedInputs: [schemaPath] }),
-    );
+    const loadResult = await source.load(createMongoTestContext({ resolvedInputs: [schemaPath] }));
     expect(loadResult.ok).toBe(false);
     if (loadResult.ok) return;
 
-    const context = createPostgresTestContext();
+    const context = createMongoTestContext();
     const interpretDiagnostics = source.interpret(buildInterpretInput(schema, context), context);
 
     expect(interpretDiagnostics).toEqual(loadResult.failure.diagnostics);
@@ -94,23 +114,21 @@ describe('prismaContract interpret capability', () => {
 
   it('returns [] for a schema load interprets successfully', async () => {
     const schema = `model User {
-  id Int @id
+  id ObjectId @id @map("_id")
   email String
 }
 `;
-    const tempDir = await mkdtemp(join(tmpdir(), 'psl-interpret-'));
+    const tempDir = await mkdtemp(join(tmpdir(), 'mongo-interpret-'));
     tempDirs.push(tempDir);
     const schemaPath = join(tempDir, 'schema.prisma');
     await writeFile(schemaPath, schema, 'utf-8');
 
     process.chdir(tempDir);
     const source = interpretCapableSource(SOURCE_ID);
-    const loadResult = await source.load(
-      createPostgresTestContext({ resolvedInputs: [schemaPath] }),
-    );
+    const loadResult = await source.load(createMongoTestContext({ resolvedInputs: [schemaPath] }));
     expect(loadResult.ok).toBe(true);
 
-    const context = createPostgresTestContext();
+    const context = createMongoTestContext();
     const interpretDiagnostics = source.interpret(buildInterpretInput(schema, context), context);
 
     expect(interpretDiagnostics).toEqual([]);
@@ -118,18 +136,18 @@ describe('prismaContract interpret capability', () => {
 
   it('does not throw on malformed-but-parseable input and still reports interpreter diagnostics', () => {
     const schema = `model Dup {
-  id Int @id
+  id ObjectId @id @map("_id")
 }
 model Dup {
-  id Int @id
+  id ObjectId @id @map("_id")
 }
 model Other {
-  id Int @id
+  id ObjectId @id @map("_id")
   bad Mystery
 }
 `;
     const source = interpretCapableSource(SOURCE_ID);
-    const context = createPostgresTestContext();
+    const context = createMongoTestContext();
     const input = buildInterpretInput(schema, context);
 
     let diagnostics: readonly unknown[] = [];
@@ -146,10 +164,10 @@ model Other {
 
   it('does not throw on a recovered CST from a syntax-broken schema', () => {
     const schema = `model User {
-  id Int @id
+  id ObjectId @id @map("_id")
 `;
     const source = interpretCapableSource(SOURCE_ID);
-    const context = createPostgresTestContext();
+    const context = createMongoTestContext();
     const input = buildInterpretInput(schema, context);
 
     let diagnostics: readonly unknown[] | undefined;
@@ -164,30 +182,28 @@ model Other {
     // The same schema through load carries symbol-table seeds; interpret starts
     // from the caller's artifacts, so only interpreter-produced diagnostics appear.
     const schema = `model Dup {
-  id Int @id
+  id ObjectId @id @map("_id")
 }
 model Dup {
-  id Int @id
+  id ObjectId @id @map("_id")
 }
 model Other {
-  id Int @id
+  id ObjectId @id @map("_id")
   bad Mystery
 }
 `;
-    const tempDir = await mkdtemp(join(tmpdir(), 'psl-interpret-'));
+    const tempDir = await mkdtemp(join(tmpdir(), 'mongo-interpret-'));
     tempDirs.push(tempDir);
     const schemaPath = join(tempDir, 'schema.prisma');
     await writeFile(schemaPath, schema, 'utf-8');
 
     process.chdir(tempDir);
     const source = interpretCapableSource(SOURCE_ID);
-    const loadResult = await source.load(
-      createPostgresTestContext({ resolvedInputs: [schemaPath] }),
-    );
+    const loadResult = await source.load(createMongoTestContext({ resolvedInputs: [schemaPath] }));
     expect(loadResult.ok).toBe(false);
     if (loadResult.ok) return;
 
-    const context = createPostgresTestContext();
+    const context = createMongoTestContext();
     const interpretDiagnostics = source.interpret(buildInterpretInput(schema, context), context);
 
     const loadCodes = loadResult.failure.diagnostics.map((d) => d.code);
