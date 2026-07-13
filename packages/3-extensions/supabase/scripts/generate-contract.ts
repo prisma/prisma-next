@@ -31,7 +31,6 @@ import {
   type PslModel,
   type PslNamedTypeDeclaration,
   type PslNamespace,
-  UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
 import { printPsl } from '@prisma-next/psl-printer';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
@@ -42,7 +41,7 @@ import {
 } from '@prisma-next/target-postgres/types';
 import { createDevDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
-import { SUPABASE_ROLES } from '../src/contract/roles';
+import { SupabaseRole } from '../src/contract/roles';
 import { restoreSupabaseReference } from '../test/fixtures/supabase-reference/restore';
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -374,14 +373,15 @@ function roleExtensionBlock(name: string): PslExtensionBlock {
 /**
  * Roles are cluster-scoped in Postgres: the `role` block factory stamps the
  * unbound coordinate on every lowered entity, so the blocks must be declared
- * at the top level, outside any `namespace { … }` block — they belong in the
- * parser's synthesised `__unspecified__` bucket, not in `auth` or `storage`.
+ * inside an explicit `namespace unbound { … }` block, not in `auth` or
+ * `storage`. `resolveNamespaceIdForSqlTarget` maps the `unbound` bucket name
+ * to the framework's `__unbound__` sentinel.
  */
 function roleNamespace(): PslNamespace {
   return makePslNamespace({
     kind: 'namespace',
-    name: UNSPECIFIED_PSL_NAMESPACE_ID,
-    entries: makePslNamespaceEntries([], [], SUPABASE_ROLES.map(roleExtensionBlock)),
+    name: 'unbound',
+    entries: makePslNamespaceEntries([], [], SupabaseRole.values.map(roleExtensionBlock)),
     span: SYNTHETIC_SPAN,
   });
 }

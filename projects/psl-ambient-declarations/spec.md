@@ -62,7 +62,7 @@ Ambient members default to the same control-policy story as everything else. Rol
 
 ### Migration from the interim
 
-Fold the shipped top-level `role` blocks into `environment { }`: a small PSL move, one upgrade-skill entry for external authors, and a one-line change to the Supabase pack's contract generator (which writes the role blocks from `SUPABASE_ROLES`). The interpreter's entity-coordinate filing rule stays — `environment` members are simply the third lexical origin besides "named namespace" and "top level".
+Fold the shipped top-level `role` blocks into `environment { }`: a small PSL move, one upgrade-skill entry for external authors, and a one-line change to the Supabase pack's contract generator (which writes the role blocks from `SupabaseRole.values`). The interpreter's entity-coordinate filing rule stays — `environment` members are simply the third lexical origin besides "named namespace" and "top level".
 
 ## Open questions (settle at pickup)
 

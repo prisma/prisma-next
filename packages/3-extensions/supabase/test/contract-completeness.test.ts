@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import contractJson from '../src/contract/contract.json' with { type: 'json' };
-import { SUPABASE_ROLES } from '../src/contract/roles';
+import { SupabaseRole } from '../src/contract/roles';
 
 const AUTH_TABLES = [
   'audit_log_entries',
@@ -80,7 +80,7 @@ describe('contract completeness — auth/storage table, native enum, and role se
   const storage = contractJson.storage as unknown as ContractJsonStorage;
   const auth = storage.namespaces['auth'];
   const storageNs = storage.namespaces['storage'];
-  const unbound = storage.namespaces['__unbound__'];
+  const unboundNs = storage.namespaces['__unbound__'];
 
   it('declares all 23 auth tables', () => {
     expect(Object.keys(auth?.entries.table ?? {}).sort()).toEqual([...AUTH_TABLES].sort());
@@ -103,9 +103,9 @@ describe('contract completeness — auth/storage table, native enum, and role se
   });
 
   it('declares the three platform roles under external control', () => {
-    const roles = unbound?.entries.role ?? {};
-    expect(Object.keys(roles).sort()).toEqual([...SUPABASE_ROLES].sort());
-    for (const roleName of SUPABASE_ROLES) {
+    const roles = unboundNs?.entries.role ?? {};
+    expect(Object.keys(roles).sort()).toEqual([...SupabaseRole.values].sort());
+    for (const roleName of SupabaseRole.values) {
       expect(roles[roleName]?.control).toBe('external');
     }
   });

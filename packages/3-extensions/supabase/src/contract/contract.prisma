@@ -13,17 +13,6 @@ types {
   Payload = Json @db.Json
 }
 
-namespace unbound {
-  role anon {
-  }
-
-  role authenticated {
-  }
-
-  role service_role {
-  }
-}
-
 namespace auth {
   model AuditLogEntries {
     id         Id         @id(map: "audit_log_entries_pkey")
@@ -702,5 +691,16 @@ namespace storage {
     ANALYTICS = "ANALYTICS"
     VECTOR = "VECTOR"
     @@map("buckettype")
+  }
+}
+
+namespace unbound {
+  role anon {
+  }
+
+  role authenticated {
+  }
+
+  role service_role {
   }
 }
