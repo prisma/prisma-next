@@ -271,7 +271,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     // Content-addressed store: one row per distinct contract, keyed by hash.
     expect(await countContractRows(driver!)).toBe(2);
     const stored = await driver!.query<{ core_hash: string }>(
-      `select core_hash from prisma_contract.contract order by core_hash`,
+      'select core_hash from prisma_contract.contract order by core_hash',
     );
     expect(stored.rows.map((row) => row.core_hash).sort()).toEqual([midHash, destHash].sort());
   });
