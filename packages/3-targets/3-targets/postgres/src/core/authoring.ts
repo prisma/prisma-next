@@ -10,6 +10,7 @@ import type {
   AuthoringTypeNamespace,
   PslExtensionBlock,
 } from '@prisma-next/framework-components/authoring';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { modelAttribute } from '@prisma-next/psl-parser';
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -17,7 +18,7 @@ import { PG_ENUM_CODEC_ID } from './codec-ids';
 import { PostgresNativeEnum } from './postgres-native-enum';
 import { PostgresRlsEnablement, type PostgresRlsEnablementInput } from './postgres-rls-enablement';
 import { PostgresRlsPolicy, type RlsPolicyOperation } from './postgres-rls-policy';
-import { PostgresRole, type PostgresRoleInput } from './postgres-role';
+import { PostgresRole } from './postgres-role';
 import {
   PostgresNativeEnumSchema,
   PostgresRlsEnablementSchema,
@@ -48,6 +49,11 @@ export const postgresAuthoringTypes = {
 } as const satisfies AuthoringTypeNamespace;
 
 export interface RlsPolicyExtensionBlock extends PslExtensionBlock {
+  readonly namespaceId: string;
+}
+
+/** A parsed `role` block annotated with its lexical namespace id by the interpreter. */
+export interface RoleExtensionBlock extends PslExtensionBlock {
   readonly namespaceId: string;
 }
 
@@ -306,13 +312,36 @@ const nativeEnumEntityTypeOutput = {
 } satisfies AuthoringEntityTypeFactoryOutput<PslExtensionBlock, PostgresNativeEnum | undefined> &
   SqlValueSetDerivingEntityTypeOutput;
 
+/**
+ * Lowers a `role <name> {}` block into a {@link PostgresRole}. Roles are
+ * cluster-scoped in Postgres, so the block must be declared inside
+ * `namespace unbound { … }` — any other lexical namespace (a named schema,
+ * or the default bucket top-level declarations resolve to) is a load-time
+ * diagnostic. The lowered entity carries the unbound coordinate.
+ */
+function lowerRoleFromBlock(
+  block: RoleExtensionBlock,
+  ctx: AuthoringEntityContext,
+): PostgresRole | undefined {
+  if (block.namespaceId !== UNBOUND_NAMESPACE_ID) {
+    ctx.diagnostics?.push({
+      code: 'PSL_ROLE_BLOCK_OUTSIDE_UNBOUND_NAMESPACE',
+      message: `\`role\` block "${block.name}" must be declared inside \`namespace unbound { }\`, not in namespace "${block.namespaceId}"`,
+      sourceId: ctx.sourceId ?? 'unknown',
+      span: block.span,
+    });
+    return undefined;
+  }
+  return new PostgresRole({ name: block.name, namespaceId: UNBOUND_NAMESPACE_ID });
+}
+
 export const postgresAuthoringEntityTypes = {
   role: {
     kind: 'entity',
     discriminator: 'role',
     validatorSchema: PostgresRoleSchema,
     output: {
-      factory: (input: PostgresRoleInput): PostgresRole => new PostgresRole(input),
+      factory: lowerRoleFromBlock,
     },
   },
   rls: {
@@ -460,6 +489,19 @@ export const postgresAuthoringPslBlockDescriptors = {
     name: { required: true },
     parameters: {},
     variadicParameters: true,
+  },
+  /**
+   * PSL block descriptor for `role` (e.g. `role anon {}`). Name-only, no
+   * parameters and no body content. Declared inside `namespace unbound { }`
+   * — see {@link lowerRoleFromBlock} for the placement check and the
+   * coordinate the lowered entity carries.
+   */
+  role: {
+    kind: 'pslBlock',
+    keyword: 'role',
+    discriminator: 'role',
+    name: { required: true },
+    parameters: {},
   },
 } as const satisfies AuthoringPslBlockDescriptorNamespace;
 

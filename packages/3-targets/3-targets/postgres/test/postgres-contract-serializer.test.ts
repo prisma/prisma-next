@@ -477,6 +477,44 @@ describe('role + policy round-trip', () => {
     expect(ns).toBeInstanceOf(PostgresSchema);
   });
 
+  it('round-trips a roles-only unbound slot (does not collapse to PostgresSchema.unbound)', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {},
+              role: {
+                anon: { kind: 'role', name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const contract = serializer.deserializeContract(input);
+    const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(ns).not.toBe(PostgresSchema.unbound);
+    expect(ns?.entries['role']).toMatchObject({
+      anon: { kind: 'role', name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID, control: 'external' },
+    });
+
+    const reserialized = serializer.serializeContract(contract);
+    const reserializedUnbound = (
+      reserialized as { storage: { namespaces: Record<string, unknown> } }
+    ).storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(reserializedUnbound).toMatchObject({
+      id: UNBOUND_NAMESPACE_ID,
+      kind: 'postgres-unbound-schema',
+      entries: {
+        role: { anon: { kind: 'role', name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID } },
+      },
+    });
+  });
+
   it('rejects a malformed policy entry (bad operation literal)', () => {
     const serializer = new PostgresContractSerializer();
     const input = createSqlContract({
