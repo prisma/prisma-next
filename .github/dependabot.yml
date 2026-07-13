@@ -67,6 +67,12 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "vitest"
         update-types: ["version-update:semver-major"]
+      # The @codingame/monaco-vscode-* service overrides (and the `vscode`
+      # alias pointing at @codingame/monaco-vscode-extension-api) must move in
+      # lockstep with each other; a single-package major bump can never build,
+      # so Dependabot's per-package major PRs are pure noise for this suite.
+      - dependency-name: "@codingame/*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
