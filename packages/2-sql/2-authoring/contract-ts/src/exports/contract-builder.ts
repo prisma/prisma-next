@@ -16,12 +16,12 @@ export {
   rel,
 } from '../contract-builder';
 export type {
+  AttachedEntities,
   ContractDefinition,
   FieldNode,
   ForeignKeyNode,
   IndexNode,
   ModelNode,
-  PackEntitiesInput,
   PrimaryKeyNode,
   RelationNode,
   UniqueConstraintNode,

@@ -12,12 +12,12 @@ import {
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
+  AttachedEntities,
   ContractDefinition,
   FieldNode,
   ForeignKeyNode,
   IndexNode,
   ModelNode,
-  PackEntitiesInput,
   PrimaryKeyNode,
   RelationNode,
   UniqueConstraintNode,
@@ -889,16 +889,16 @@ function lowerModels(
  *    name. A cross-space (extensionModel) handle resolves to its own
  *    coordinate annotated with `spaceId`.
  * 3. Call each owning pack's batch lowering hook once with all of its
- *    claimed handles, and fold the returned rows into `packEntities`
- *    (namespace → kind → key), rejecting two different entities in one
- *    slot.
+ *    claimed handles, and fold the returned rows into the namespace-scoped
+ *    attachments (namespace → kind → key), rejecting two different entities
+ *    in one slot. The result becomes `ContractDefinition.attachedEntities`.
  *
  * No entity kind is named anywhere in this walk.
  */
 function lowerPackEntityHandles(
   definition: ContractInput,
   modelSpecs: ReadonlyMap<string, RuntimeModelSpec>,
-): PackEntitiesInput | undefined {
+): AttachedEntities | undefined {
   const entities = definition.entities;
   if (entities === undefined || entities.length === 0) return undefined;
 
@@ -1015,51 +1015,10 @@ function lowerPackEntityHandles(
   return pack;
 }
 
-/**
- * Deep-merges the author-declared `packEntities` with rows lowered from the
- * `entities` handle list — three levels (namespace, kind, name). A same-name
- * slot present on both sides is tolerated only for the identical entity
- * instance, mirroring `mergeCollectedPackEntities` in `build-contract.ts`.
- */
-function mergeDeclaredAndLoweredPackEntities(
-  declared: PackEntitiesInput | undefined,
-  lowered: PackEntitiesInput | undefined,
-): PackEntitiesInput | undefined {
-  if (lowered === undefined) return declared;
-  if (declared === undefined) return lowered;
-  const result: Record<string, Record<string, Record<string, unknown>>> = {};
-  const namespaces = new Set([...Object.keys(declared), ...Object.keys(lowered)]);
-  for (const namespaceId of namespaces) {
-    const kinds = new Set([
-      ...Object.keys(declared[namespaceId] ?? {}),
-      ...Object.keys(lowered[namespaceId] ?? {}),
-    ]);
-    const forNamespace: Record<string, Record<string, unknown>> = {};
-    for (const kind of kinds) {
-      const declaredForKind = declared[namespaceId]?.[kind];
-      const loweredForKind = lowered[namespaceId]?.[kind];
-      for (const [name, entity] of Object.entries(loweredForKind ?? {})) {
-        const existing = declaredForKind?.[name];
-        if (existing !== undefined && existing !== entity) {
-          throw new Error(
-            `defineContract: two different "${kind}" entities named "${name}" in namespace "${namespaceId}" — an entities-list handle conflicts with a declared pack entity; pack-entity names must be unique per namespace.`,
-          );
-        }
-      }
-      forNamespace[kind] = { ...declaredForKind, ...loweredForKind };
-    }
-    result[namespaceId] = forNamespace;
-  }
-  return result;
-}
-
 export function buildContractDefinition(definition: ContractInput): ContractDefinition {
   const collection = collectRuntimeModelSpecs(definition);
   const models = lowerModels(collection, definition.extensionPacks);
-  const packEntities = mergeDeclaredAndLoweredPackEntities(
-    definition.packEntities,
-    lowerPackEntityHandles(definition, collection.modelSpecs),
-  );
+  const attachedEntities = lowerPackEntityHandles(definition, collection.modelSpecs);
 
   return {
     target: definition.target,
@@ -1075,7 +1034,7 @@ export function buildContractDefinition(definition: ContractInput): ContractDefi
     ...(definition.enums && Object.keys(definition.enums).length > 0
       ? { enums: definition.enums }
       : {}),
-    ...(packEntities && Object.keys(packEntities).length > 0 ? { packEntities } : {}),
+    ...(attachedEntities && Object.keys(attachedEntities).length > 0 ? { attachedEntities } : {}),
     models,
   };
 }

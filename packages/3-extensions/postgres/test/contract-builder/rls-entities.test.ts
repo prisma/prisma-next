@@ -1,6 +1,7 @@
 /**
- * `defineContract({ entities: [...] })` lowers RLS handles into the generic
- * `packEntities` channel with PSL-matching keys and wire names:
+ * `defineContract({ entities: [...] })` lowers RLS handles into namespace
+ * entries via the generic entity-handle channel, with PSL-matching keys and
+ * wire names:
  *
  *  1. Every helper (all five operations, single- and dual-predicate update,
  *     roles referenced + declared, rlsEnabled) lands in

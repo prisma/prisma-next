@@ -59,12 +59,15 @@ function makeGadgetPack(options?: { readonly withHook?: boolean }) {
         : {
             lowerEntityHandles: (input: EntityHandleLoweringInput): LoweredPackEntity[] => {
               calls.push(input);
-              return input.handles.map((entry, index) => ({
-                namespaceId: input.defaultNamespaceId,
-                entityKind: 'gadget',
-                key: `gadget_${index}`,
-                entity: { kind: 'gadget', refs: entry.refs },
-              }));
+              return input.handles.map((entry, index) => {
+                const h = entry.handle as { readonly key?: string; readonly entity?: unknown };
+                return {
+                  namespaceId: input.defaultNamespaceId,
+                  entityKind: 'gadget',
+                  key: h.key ?? `gadget_${index}`,
+                  entity: h.entity ?? { kind: 'gadget', refs: entry.refs },
+                };
+              });
             },
           }),
     },
@@ -155,17 +158,24 @@ describe('generic entities handle channel', () => {
     ).toThrow(/"gadget".*does not implement entity-handle lowering/);
   });
 
-  it('rejects a lowered row colliding with a different declared pack entity of the same name', () => {
+  it('rejects two handles lowering to the same name+kind in one namespace with different entities', () => {
     const { pack } = makeGadgetPack();
+    // Extra pack-handle fields (`key`/`entity`) are read by the pack hook but
+    // absent from the minimal `PackEntityHandle` contract; infer the literal
+    // and let structural assignability carry it to `entities` without an
+    // excess-property check on a freshly-annotated literal.
+    const collidingHandles = [
+      { entityKind: 'gadget', key: 'g', entity: { id: 1 } },
+      { entityKind: 'gadget', key: 'g', entity: { id: 2 } },
+    ];
     expect(() =>
       defineContract({
         family: sqlFamilyPack,
         target: targetPack,
         createNamespace: createTestSqlNamespace,
         extensionPacks: { gadgetDemo: pack },
-        packEntities: { public: { gadget: { gadget_0: { kind: 'gadget', declared: true } } } },
-        entities: [{ entityKind: 'gadget' }],
+        entities: collidingHandles,
       }),
-    ).toThrow(/two different "gadget" entities named "gadget_0" in namespace "public"/);
+    ).toThrow(/two different "gadget" entities named "g" in namespace "public"/);
   });
 });

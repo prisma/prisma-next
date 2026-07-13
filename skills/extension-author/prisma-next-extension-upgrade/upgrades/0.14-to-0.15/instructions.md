@@ -558,9 +558,11 @@ contributions extension exported from
 `@prisma-next/sql-contract/entity-handle-lowering-hook`), which target-postgres
 implements beside its PSL lowering. `@prisma-next/extension-supabase` gains `anon` /
 `authenticated` role-handle exports from `/contract`. Supporting additive exports
-only elsewhere: `buildContractDefinition` + `PackEntitiesInput` from
+only elsewhere: `buildContractDefinition` from
 `@prisma-next/sql-contract-ts/contract-builder`; `formatRlsPolicyWireName` +
 `POLICY_OPERATION_PREDICATES` from `@prisma-next/target-postgres/rls-canonicalize`.
-All net-new surface — nothing existing was changed or removed. No extension-author
-action required. Incidental substrate diff only.
+`entities` is the sole public channel for attaching pack entities; the internal
+`packEntities` input never had a real author and was removed (test-only, never
+documented as user-facing), so no extension-author action is required. Incidental
+substrate diff only.
 -->
