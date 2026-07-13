@@ -74,6 +74,8 @@ Derived from the Project DoD (AC numbers = DoD order) and cross-cutting requirem
 | TC-16 | Playground manual QA: unresolvable relation appears live positioned on the span, disappears on fix, no restart; config break/fix cycle on the config URI | AC1, AC9 (manual halves) |
 | TC-17 | `pnpm lint:deps` green with the new psl-parser → config edge; cast-ratchet count unchanged | AC6 |
 
+| TC-18 | Core `ControlExtensionDescriptor` declares `contractSpace?: ContractSpace`; both family overrides compile as covariant narrowings; `assembleExtensionContracts` + load-order reads use typed access; tightened grep gate: zero `contractJson` casts repo-wide | AC12 (scope addition) |
+
 _TC-15 (end-to-end parity test, former AC2) dropped by operator decision (2026-07-09);
 the spec's DoD is amended accordingly. Build/editor parity is held by construction
 (one shared inner interpretation function per provider, pinned by TC-4/TC-6), span
@@ -84,7 +86,7 @@ retains the original DoD order; AC2 is retired._
 
 ### Implement M1: Provider union + capability seam
 
-**Status:** ► In progress — slice 01 delivered, PR open (D1 `19113b122`, D2 `e08581e78`; complete on merge)
+**Status:** ✓ Complete — merged to main as PR #939 (2026-07-10)
 
 _Outcomes_
 `ContractSourceProvider` is a `sourceFormat`-keyed union (`Psl…`/`TypeScript…`/`Opaque…`
@@ -115,7 +117,7 @@ gate separating old from new behavior.
 
 ### Implement M2: ControlStack exposes extension contracts
 
-**Status:** ☐ Not started
+**Status:** ► In progress — slice 02 delivered; reviews as PR #948 (combined with M2b per operator, 2026-07-10)
 
 _Outcomes_
 `ControlStack` carries `extensionContracts: ReadonlyMap<string, Contract>`, built by
@@ -144,6 +146,27 @@ stack-shaped objects surface via typecheck and gain the new property.
       `drive/calibration/grep-library.md` (satisfies: TC-8)
 - [ ] Gate: existing emit/e2e tests, `pnpm fixtures:check`, `pnpm lint:deps`,
       cast-ratchet ≤ baseline
+
+### Implement M2b: contractSpace declared on the core extension descriptor
+
+**Status:** ► In progress — slice 03 delivered (`2c3c1de79`, SATISFIED 4/4 SDoD); folded into PR #948 with M2 (operator-directed: the stack rewrote slice 02's internals, so one PR is the coherent reviewable unit; #967 closed). Scope addition, operator-authorized 2026-07-10
+
+_Outcomes_
+Core `ControlExtensionDescriptor` carries `contractSpace?: ContractSpace`; sql + mongo
+overrides remain as covariant narrowings; the `assembleExtensionContracts` `blindCast`
+and the structural descriptor views in `control-stack.ts` are deleted — typed access
+end-to-end; the grep gate tightens from "outside framework-components" to "nowhere".
+`extensionContracts` stays the consumer surface; only its construction changes.
+
+**Shipping strategy:** type-level addition; optional member, so every existing
+descriptor remains valid; families' narrowed overrides are already assignable.
+Behavior identical by construction (same values, typed instead of cast).
+
+**Tasks:**
+
+- [ ] Declare the member in core; delete the cast + structural views; verify the
+      `MigrationPackage` fit and whether the load-order dependency view can go typed;
+      tighten the grep-library gate (satisfies: TC-18)
 
 ### Implement M3: Providers implement the capability (sql + mongo)
 

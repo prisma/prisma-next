@@ -27,10 +27,10 @@ import {
   hasSchemaView,
 } from '@prisma-next/framework-components/control';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
-import { blindCast } from '@prisma-next/utils/casts';
+
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { toExtensionInputs } from '../utils/extension-pack-inputs';
+
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { enrichContract } from './contract-enrichment';
 import { ContractValidationError } from './errors';
@@ -606,26 +606,9 @@ class ControlClientImpl implements ControlClient {
 
     try {
       const stack = this.stack!;
-      const extensionInputs = toExtensionInputs(
-        blindCast<
-          readonly unknown[],
-          'toExtensionInputs accepts readonly unknown[] per its documented structural cast boundary'
-        >(stack.extensionPacks),
-      );
-      const composedExtensionContracts = new Map<string, Contract>(
-        extensionInputs
-          .filter((p) => p.contractSpace !== undefined)
-          .map((p) => [
-            p.id,
-            blindCast<
-              Contract,
-              'contractSpace.contractJson is the typed contract for this extension space'
-            >(p.contractSpace!.contractJson),
-          ]),
-      );
       const sourceContext = {
         composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
-        composedExtensionContracts,
+        composedExtensionContracts: stack.extensionContracts,
         scalarTypeDescriptors: stack.scalarTypeDescriptors,
         authoringContributions: stack.authoringContributions,
         codecLookup: stack.codecLookup,
