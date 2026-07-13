@@ -284,3 +284,14 @@ Native enums are opt-in — existing schemas without a `native_enum` emit and ru
 unchanged, and a re-emit picks up any contract shape. No user action required.
 Incidental substrate diff only.
 -->
+
+<!--
+Dependabot runtime-deps group bump (PR #962): runtime dependency version
+bumps only (arktype 2.2.x, prettier 3.9.4, pg 8.22, pg-cursor 2.21, next
+16.2.10, react-router 7.18, radix/tailwind patches and friends), plus a
+`pnpm dedupe arktype` so every workspace package resolves the same arktype
+instance (the split 2.2.2/2.2.3 resolution broke cross-package `Type`
+assignability). The `examples/` diff is package.json dependency version
+ranges only — no framework surface, contract shape, or emitted artefact
+changes. No user action required. Incidental substrate diff only.
+-->
