@@ -46,7 +46,7 @@ One reviewer sitting: a planner-lowering change confined to one function's tail,
 
 ## Scope
 
-**In:** the suffix-append classification + `AddNativeEnumValueCall` lowering; the plain-language refusal diagnostic with the `pris.ly` link; the `docs/reference/postgres-native-enums.md` page (content from the project explainer, `projects/` copy becomes a pointer); the op class with prechecks/postchecks + caveat-bearing description; the hand-authored `addNativeEnumValue`; unit + planner tests; a live PGlite integration proof (single + multi append, all three refusal classes, external append suppressed).
+**In:** the suffix-append classification + `AddNativeEnumValueCall` lowering; the plain-language refusal diagnostic with the `pris.ly` link; the `docs/reference/postgres-native-enums.md` page (content from the project explainer, `projects/` copy becomes a pointer); the op class with prechecks/postchecks + caveat-bearing description; the hand-authored `addNativeEnumValue`; unit + planner tests; a live PGlite integration proof (single + multi append, all three refusal classes, external append suppressed); a **real-PostgreSQL** integration proof that the appended value round-trips CRUD (throwaway-database isolated, availability-gated, wired to the Postgres service CI already provisions).
 
 **Deliberately out:**
 
@@ -67,7 +67,7 @@ One reviewer sitting: a planner-lowering change confined to one function's tail,
 
 ## Slice-specific done conditions
 
-R8 and R9 proven against a live database (PGlite): the append path applies and round-trips verify; each refusal class (rename, removal, reorder) yields the diagnostic and zero ops. Plan output shows the caveat on the `ADD VALUE` op description. (CI-green, reviewer-accept, project-DoD floor inherited.)
+R8 and R9 proven against a live database: the append path applies and round-trips verify, and each refusal class (rename, removal, reorder) yields the diagnostic and zero ops (PGlite). Additionally, against a **real PostgreSQL server** (throwaway database, skipped when none is reachable), the appended value is usable for CRUD — INSERT / SELECT / UPDATE / DELETE in statements after the migration commits — which PGlite's single-connection model cannot fully stand in for. Plan output shows the caveat on the `ADD VALUE` op description. (CI-green, reviewer-accept, project-DoD floor inherited.)
 
 ## Open questions
 
