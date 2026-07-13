@@ -519,6 +519,26 @@ describe('adapter-postgres codecs', () => {
           'Invalid ISO date string for pg/timestamptz@1',
         );
       });
+
+      it('decodes the numeric-offset rendering Postgres emits inside JSON aggregates', () => {
+        const result = codec.decodeJson('2026-07-10T17:48:32.412+00:00') as Date;
+        expect(result).toBeInstanceOf(Date);
+        expect(result.getTime()).toBe(new Date('2026-07-10T17:48:32.412Z').getTime());
+      });
+
+      it('decodes non-UTC offsets to the correct instant', () => {
+        const result = codec.decodeJson('2026-07-10T19:48:32.412+02:00') as Date;
+        expect(result.getTime()).toBe(new Date('2026-07-10T17:48:32.412Z').getTime());
+      });
+
+      it('still rejects implementation-defined Date-parseable formats', () => {
+        expect(() => codec.decodeJson('January 15, 2024')).toThrow(
+          'Invalid ISO date string for pg/timestamptz@1',
+        );
+        expect(() => codec.decodeJson('01/15/2024')).toThrow(
+          'Invalid ISO date string for pg/timestamptz@1',
+        );
+      });
     });
 
     describe('pg/timestamp@1', () => {
@@ -542,6 +562,25 @@ describe('adapter-postgres codecs', () => {
 
       it('throws on malformed date string in decodeJson', () => {
         expect(() => codec.decodeJson('garbage')).toThrow(
+          'Invalid ISO date string for pg/timestamp@1',
+        );
+      });
+
+      it('decodes the zone-less rendering Postgres emits inside JSON aggregates as local time', () => {
+        const result = codec.decodeJson('2024-01-15T14:30:00.123') as Date;
+        expect(result).toBeInstanceOf(Date);
+        // A zone-less ISO string is interpreted as local time — matching how
+        // the pg driver parses `timestamp without time zone` wire values.
+        expect(result.getTime()).toBe(new Date('2024-01-15T14:30:00.123').getTime());
+      });
+
+      it('decodes offset renderings to the correct instant', () => {
+        const result = codec.decodeJson('2024-01-15T14:30:00.123+00:00') as Date;
+        expect(result.getTime()).toBe(new Date('2024-01-15T14:30:00.123Z').getTime());
+      });
+
+      it('still rejects implementation-defined Date-parseable formats', () => {
+        expect(() => codec.decodeJson('January 15, 2024')).toThrow(
           'Invalid ISO date string for pg/timestamp@1',
         );
       });

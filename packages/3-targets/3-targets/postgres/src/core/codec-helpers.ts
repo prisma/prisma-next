@@ -71,15 +71,26 @@ export const pgNumericRenderOutputType = (typeParams: {
   return `Numeric<${precision}, ${scale}>`;
 };
 
-// ISO 8601 UTC: `YYYY-MM-DDTHH:MM:SS[.mmm…]Z`. Trailing `Z` is required; fractional seconds are optional. Other `Date`-parseable formats (`January 15, 2024`, `01/15/2024`, etc.) are intentionally rejected because those formats are implementation-defined and not the documented contract for `pg/timestamp@1` / `pg/timestamptz@1`.
-const ISO_8601_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
+// ISO 8601: `YYYY-MM-DDTHH:MM:SS[.mmm…]` with an optional `Z`, numeric
+// offset (`+HH:MM` / `+HH`), or no zone designator. Covers both the
+// `Date.toISOString()` round-trip form (`…Z`, written by `encodeJson`) and
+// the renderings Postgres emits when a timestamp crosses a JSON boundary
+// (`row_to_json` / `json_agg`): timestamptz as `…+00:00` (session-zone
+// numeric offset) and zone-less timestamp with no designator at all. A
+// zone-less string is interpreted as local time by `new Date(…)` — the
+// same interpretation the pg driver applies to `timestamp without time
+// zone` wire values. Other `Date`-parseable formats (`January 15, 2024`,
+// `01/15/2024`, etc.) remain rejected because those formats are
+// implementation-defined and not the documented contract for
+// `pg/timestamp@1` / `pg/timestamptz@1`.
+const ISO_8601 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/;
 
 export const pgTimestampEncodeJson = (value: Date): JsonValue => value.toISOString();
 export const pgTimestampDecodeJson = (json: JsonValue): Date => {
   if (typeof json !== 'string') {
     throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
   }
-  if (!ISO_8601_UTC.test(json)) {
+  if (!ISO_8601.test(json)) {
     throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
   }
   const date = new Date(json);
@@ -94,7 +105,7 @@ export const pgTimestamptzDecodeJson = (json: JsonValue): Date => {
   if (typeof json !== 'string') {
     throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);
   }
-  if (!ISO_8601_UTC.test(json)) {
+  if (!ISO_8601.test(json)) {
     throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
   }
   const date = new Date(json);
