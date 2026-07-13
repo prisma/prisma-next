@@ -6,6 +6,7 @@
   "sideEffects": false,
   "scripts": {
     "build:contract-space": "prisma-next contract emit",
+    "contract:generate": "tsx scripts/generate-contract.ts",
     "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -49,6 +50,7 @@
     "@prisma-next/tsdown": "workspace:0.14.0",
     "@types/pg": "catalog:",
     "tsdown": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
