@@ -38,19 +38,29 @@ the bridges the gap forced." Type-level only; bit-identical behavior by construc
 
 ## Slice Definition of Done (beyond CI / reviewer / project-DoD)
 
-- [ ] SDoD1 — Core `ControlExtensionDescriptor` declares `contractSpace?: ContractSpace`;
-      sql + mongo overrides compile unchanged (their existing
-      descriptor-self-consistency suites stay green); type test pins the covariant
-      narrowing (family descriptor assignable where core descriptor is expected, with
-      typed `contractSpace` access).
-- [ ] SDoD2 — Zero `contractJson` casts repo-wide: `assembleExtensionContracts`
-      cast-free, `ContractSpaceCarryingDescriptor` deleted; tightened grep gate
-      documented and passing (with positive control against pre-change tree).
-- [ ] SDoD3 — Load-order dependency view either typed (if `Contract.extensionPacks`
-      admits it) or explicitly reported as kept-with-reason.
-- [ ] SDoD4 — `MigrationPackage` fit verified: both families' shipped descriptor
-      migrations satisfy core's `ContractSpace.migrations` (typecheck is the proof;
-      any wrinkle surfaces, not worked around).
+- [x] SDoD1 — Core declaration in place (`control-descriptors.ts:89`); sql + mongo
+      overrides compile with **zero edits** (298/298 + 170/170); test-d pins the
+      covariant narrowing structurally (core cannot import families — the
+      `extends`-declaration itself is the compile-time proof, `toExtend` as
+      belt-and-braces). ✓ `2c3c1de79`
+- [x] SDoD2 — Zero `contractJson` casts repo-wide; view deleted; gate tightened to
+      **two regex forms** (reach-through + picked-variable — the exclusion-drop alone
+      would have been blind to the form the control-stack cast used);
+      reviewer-executed both directions with historical positive controls. ✓
+- [x] SDoD3 — Load-order view **kept-with-reason**, reviewer-accepted:
+      `buildExtensionLoadOrder` is public API (exported via `exports/control.ts`,
+      consumed by `family-sql/control-instance.ts`); its structural parameter is a
+      contract, not a cast bridge (casts nothing); typing it costs fixture
+      fabrication + API narrowing for zero cast savings. ✓
+- [x] SDoD4 — `MigrationPackage` fit proven by zero-edit family compiles under
+      override-compatibility checking; the dirPath wrinkle did not materialize. ✓
+
+**Slice-close ritual (2026-07-10):** single dispatch SATISFIED; 4/4 SDoD PASS; manual
+QA: **N/A — no user-observable change** (type-level declaration lift, bit-identical
+behavior). Follow-up candidate recorded in `learnings.md`: `CrossSpaceFkView`
+(`family-sql/control-instance.ts:382`) could take the same typed-declaration
+treatment. Stacked on slice 02; PR mechanics per orchestrator (base = slice-02 branch
+until #948 merges).
 
 ## Edge cases (pre-investigated)
 
