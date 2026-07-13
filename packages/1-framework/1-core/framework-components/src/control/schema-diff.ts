@@ -1,46 +1,60 @@
-export type SchemaDiffOutcome = 'missing' | 'extra' | 'mismatch';
+import type { ExpectationFailureReason } from './control-operation-results';
 
-export interface SchemaDiffIssue {
+export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   /** Path from the root node down to the diffed node, as a sequence of local keys. */
   readonly path: readonly string[];
-  readonly outcome: SchemaDiffOutcome;
-  readonly message: string;
-  /** The expected (contract-side) node, when available. Absent for `extra` outcomes. */
-  readonly expected?: DiffableNode;
-  /** The actual (live-DB-side) node, when available. Absent for `missing` outcomes. */
-  readonly actual?: DiffableNode;
+  /** Why the actual state fails the expectation. Consumers filter on this field. */
+  readonly reason: ExpectationFailureReason;
+  /** The expected (desired-side) node, when available. Absent for `not-expected` issues. */
+  readonly expected?: TNode;
+  /** The actual (current-side) node, when available. Absent for `not-found` issues. */
+  readonly actual?: TNode;
 }
 
 /**
  * A node in the schema tree. Every node in the tree implements this interface.
  *
- * `id` must be unique among sibling nodes at the same level — the differ keys
- * on it and treats a collision as the same entity (enforced by a duplicate-id
- * throw). The differ accumulates these ids into a path that stamps every emitted
- * issue.
+ * The differ pairs siblings by the combination of `nodeKind` and `id`, not by
+ * `id` alone: `id` needs only be unique among siblings of the same
+ * `nodeKind` at the same level, not globally unique at that level. Two
+ * distinct kinds of child in distinct slots (e.g. a role and a namespace) may
+ * legitimately share a name — they are never paired against each other, so
+ * the collision is harmless. A node never folds its kind into its id string
+ * to route around this; `nodeKind` is the discriminant that does that job.
+ * A same-`nodeKind`/same-`id` collision among siblings is a genuine
+ * duplicate and is enforced by a throw. The differ accumulates ids (not
+ * nodeKind) into a path that stamps every emitted issue.
  */
 export interface DiffableNode {
   readonly id: string;
+  readonly nodeKind: string;
   isEqualTo(other: DiffableNode): boolean;
   children(): readonly DiffableNode[];
 }
 
-function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
-  const key = node.id;
-  if (map.has(key)) {
-    throw new Error(`diffSchemas: duplicate id among siblings: ${key}`);
-  }
-  map.set(key, node);
+/** Delimiter joining `nodeKind` and `id` into one sibling-map key. Every `nodeKind` is a code-defined literal (kebab-case-style), so a null character can never appear in one. */
+const SIBLING_KEY_DELIMITER = '\u0000';
+
+function siblingKey(node: DiffableNode): string {
+  return `${node.nodeKind}${SIBLING_KEY_DELIMITER}${node.id}`;
 }
 
-function outcomeMessage(outcome: SchemaDiffOutcome, path: readonly string[]): string {
-  return `${outcome}: ${path.join('/')}`;
+function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
+  const key = siblingKey(node);
+  if (map.has(key)) {
+    throw new Error(`diffSchemas: duplicate id among siblings: ${node.nodeKind}/${node.id}`);
+  }
+  map.set(key, node);
 }
 
 function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
   const path = [...parentPath, node.id];
   return [
-    { path, outcome: 'missing', message: outcomeMessage('missing', path), expected: node },
+    {
+      path,
+      reason: 'not-found',
+      expected: node,
+    },
     ...node.children().flatMap((c) => emitMissingSubtree(c, path)),
   ];
 }
@@ -48,7 +62,11 @@ function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): 
 function emitExtraSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
   const path = [...parentPath, node.id];
   return [
-    { path, outcome: 'extra', message: outcomeMessage('extra', path), actual: node },
+    {
+      path,
+      reason: 'not-expected',
+      actual: node,
+    },
     ...node.children().flatMap((c) => emitExtraSubtree(c, path)),
   ];
 }
@@ -79,8 +97,7 @@ function diffPair(
   if (!expected.isEqualTo(actual)) {
     issues.push({
       path,
-      outcome: 'mismatch',
-      message: outcomeMessage('mismatch', path),
+      reason: 'not-equal',
       expected,
       actual,
     });
@@ -90,7 +107,8 @@ function diffPair(
 }
 
 /**
- * Align one level of nodes by id; emit issues in input order and recurse.
+ * Align one level of nodes by `(nodeKind, id)`; emit issues in input order
+ * and recurse.
  *
  * A missing node emits one issue for itself and one for every node in its
  * subtree (total descent). Same for extra nodes. A matched pair recurses via
@@ -129,4 +147,28 @@ function diffChildren(
   }
 
   return issues;
+}
+
+/**
+ * The result of diffing a contract's expected schema against the introspected
+ * actual schema: one node-typed issue list. Carries no verdict, verification
+ * tree, or counts — those are the verifier's own presentation, built from the
+ * same underlying comparison.
+ *
+ * `TNode` is the concrete schema-IR node the issues carry; it defaults to
+ * `DiffableNode`, so this is purely additive — a caller that wants the
+ * concrete node opts in (the Postgres planner uses the concrete node type),
+ * everyone else keeps the default unchanged.
+ */
+export class SchemaDiff<TNode extends DiffableNode = DiffableNode> {
+  readonly issues: readonly SchemaDiffIssue<TNode>[];
+
+  constructor(issues: readonly SchemaDiffIssue<TNode>[]) {
+    this.issues = issues;
+  }
+
+  /** Returns a new `SchemaDiff` narrowed to the issues `keep` returns true for. */
+  filter(keep: (issue: SchemaDiffIssue<TNode>) => boolean): SchemaDiff<TNode> {
+    return new SchemaDiff(this.issues.filter(keep));
+  }
 }

@@ -3,7 +3,7 @@ import {
   type SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   contract,
@@ -187,14 +187,14 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       conflicts: [
         expect.objectContaining({
           kind: 'typeMismatch',
-          location: { table: 'user', column: 'email' },
+          location: { entityKind: 'table', entityName: 'user', column: 'email' },
         }),
       ],
     });
   });
 });
 
-async function introspectSchema(driver: PostgresControlDriver): Promise<SqlSchemaIR> {
+async function introspectSchema(driver: PostgresControlDriver): Promise<SqlSchemaIRNode> {
   return familyInstance.introspect({
     driver,
     contract: contract,

@@ -2,12 +2,12 @@ export type {
   PrimaryKeyInput,
   SqlAnnotations,
   SqlCheckConstraintIRInput,
+  SqlColumnDefaultIRInput,
   SqlColumnIRInput,
   SqlForeignKeyIRInput,
   SqlIndexIRInput,
   SqlReferentialAction,
   SqlSchemaIRInput,
-  SqlSchemaTarget,
   SqlTableIRInput,
   SqlTypeMetadata,
   SqlTypeMetadataRegistry,
@@ -15,8 +15,13 @@ export type {
 } from '../types';
 
 export {
+  assertNode,
   PrimaryKey,
+  RelationalSchemaNodeKind,
+  relationalNodeEntityKind,
+  relationalNodeGranularity,
   SqlCheckConstraintIR,
+  SqlColumnDefaultIR,
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,

@@ -1,11 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
-  ContractSerializer,
   ContractSpace,
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
-  MigratableTargetDescriptor,
   MigrationOperationPolicy,
   MigrationPlan,
   MigrationPlannerConflict,
@@ -18,8 +16,8 @@ import type {
   MigrationRunnerResult,
   OperationContext,
   OpFactoryCall,
-  SchemaIssue,
-  SchemaVerifier,
+  SchemaDiffIssue,
+  SchemaOwnership,
 } from '@prisma-next/framework-components/control';
 import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import type {
@@ -30,10 +28,9 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlAdapter } from '../control-adapter';
-import type { SqlControlFamilyInstance } from '../control-instance';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
 
@@ -102,20 +99,28 @@ export interface FieldEventContext {
 }
 
 export interface CodecControlHooks<TTargetDetails = unknown> {
+  /**
+   * `schema` is typed as the family-level `SqlSchemaIRNode` (not the concrete
+   * `SqlSchemaIR` class) because the actual value handed in is whatever
+   * per-namespace node the calling target's tree shape produces — a flat
+   * `SqlSchemaIR` for SQLite, a `PostgresNamespaceSchemaNode` for Postgres —
+   * read structurally for its `tables`/`nativeEnums` fields. Hooks that need
+   * the concrete Postgres shape narrow via `PostgresNamespaceSchemaNode.is(schema)`.
+   */
   planTypeOperations?: (options: {
     readonly typeName: string;
     readonly typeInstance: StorageTypeInstance;
     readonly contract: Contract<SqlStorage>;
-    readonly schema: SqlSchemaIR;
+    readonly schema: SqlSchemaIRNode;
     readonly schemaName?: string;
     readonly policy: MigrationOperationPolicy;
   }) => StorageTypePlanResult<TTargetDetails>;
   verifyType?: (options: {
     readonly typeName: string;
     readonly typeInstance: StorageTypeInstance;
-    readonly schema: SqlSchemaIR;
+    readonly schema: SqlSchemaIRNode;
     readonly schemaName?: string;
-  }) => readonly SchemaIssue[];
+  }) => readonly SchemaDiffIssue[];
   introspectTypes?: (options: {
     readonly driver: SqlControlDriverInstance<string>;
     readonly schemaName?: string;
@@ -277,12 +282,12 @@ export type SqlPlannerConflictKind =
   | 'controlPolicySuppressedCall';
 
 export interface SqlPlannerConflictLocation {
-  readonly namespace?: string;
-  readonly table?: string;
+  readonly namespaceId?: string;
+  readonly entityKind?: string;
+  readonly entityName?: string;
   readonly column?: string;
   readonly index?: string;
   readonly constraint?: string;
-  readonly type?: string;
 }
 
 export interface SqlPlannerConflict extends MigrationPlannerConflict {
@@ -308,7 +313,12 @@ export type SqlPlannerResult<TTargetDetails> =
 
 export interface SqlMigrationPlannerPlanOptions {
   readonly contract: Contract<SqlStorage>;
-  readonly schema: SqlSchemaIR;
+  /**
+   * The "from"/live schema as the target's introspected node (SQLite a flat
+   * `SqlSchemaIR`, Postgres a `PostgresDatabaseSchemaNode` root). Structure-aware
+   * consumers narrow the concrete shape before walking it.
+   */
+  readonly schema: SqlSchemaIRNode;
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   /**
@@ -343,6 +353,16 @@ export interface SqlMigrationPlannerPlanOptions {
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  /**
+   * Ownership oracle over the whole contract-space composition (the passive
+   * aggregate). The planner asks it, per live extra node, whether any space
+   * declares that entity: a sibling-owned node is left untouched, an unowned
+   * node is a genuine extra it may drop under a destructive policy. The
+   * planner holds no list of other spaces' names — ownership lives in the
+   * aggregate; it only asks. Absent for a single-space plan handed no
+   * aggregate. See {@link SchemaOwnership}.
+   */
+  readonly ownership?: SchemaOwnership;
 }
 
 export interface SqlMigrationPlanner<TTargetDetails> {
@@ -454,30 +474,6 @@ export interface SqlMigrationRunner<TTargetDetails> {
   executeOnConnection(
     options: SqlMigrationRunnerExecuteOptions<TTargetDetails>,
   ): Promise<SqlMigrationRunnerResult>;
-}
-
-export interface SqlControlTargetDescriptor<
-  TTargetId extends string,
-  TTargetDetails,
-  TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
-> extends MigratableTargetDescriptor<'sql', TTargetId, SqlControlFamilyInstance> {
-  readonly queryOperations?: () => SqlOperationDescriptors;
-  /**
-   * JSON ⇄ class boundary for the SQL target's contract. The descriptor
-   * composes a concrete `SqlContractSerializerBase` subclass; the rest
-   * of the control stack reaches `descriptor.contractSerializer` rather
-   * than importing a per-target deserialization function.
-   */
-  readonly contractSerializer: ContractSerializer<TContract>;
-  /**
-   * Per-target schema verifier walking the contract against
-   * `SqlSchemaIR`. The descriptor composes a concrete
-   * `SqlSchemaVerifierBase` subclass; the family-shared walk lives on
-   * the base, the target-specific dispatch on the subclass.
-   */
-  readonly schemaVerifier: SchemaVerifier<TContract, SqlSchemaIR>;
-  createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
-  createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }
 
 export interface CreateSqlMigrationPlanOptions<TTargetDetails> {

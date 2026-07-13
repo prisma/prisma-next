@@ -8,7 +8,11 @@ import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
-import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import {
+  PostgresDatabaseSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { createPostgresScalarTypeDescriptors } from '../../src/core/control-mutation-defaults';
@@ -28,12 +32,34 @@ namespace public {
   model profile {
     id       Int @id
     owner_id Int
+
+    @@rls
   }
 
   policy_select p_read {
     target = profile
     roles  = [app_user]
     using  = "owner_id = current_setting('app.uid')::int"
+  }
+}
+`;
+
+// A `policy_update` with both predicates — proves the contract → plan → render
+// path threads `withCheck` through for a non-select operation.
+const PSL_UPDATE = `
+namespace public {
+  model profile {
+    id       Int @id
+    owner_id Int
+
+    @@rls
+  }
+
+  policy_update p_write {
+    target    = profile
+    roles     = [app_user]
+    using     = "owner_id = current_setting('app.uid')::int"
+    withCheck = "owner_id = current_setting('app.uid')::int"
   }
 }
 `;
@@ -54,11 +80,11 @@ function buildScalarTypeDescriptors(): ReadonlyMap<
   return result;
 }
 
-function buildPslContract() {
+function buildPslContract(psl: string = PSL) {
   const assembled = assembleAuthoringContributions([postgresTargetDescriptor]);
   const scalarTypeDescriptors = buildScalarTypeDescriptors();
 
-  const { document, sourceFile } = parse(PSL);
+  const { document, sourceFile } = parse(psl);
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
@@ -88,7 +114,7 @@ function buildPslContract() {
 }
 
 describe('migration plan emits RLS (offline, no live database)', () => {
-  it('derives a PostgresSchemaIR from the contract and plans CREATE POLICY + ENABLE RLS', async () => {
+  it('derives a PostgresDatabaseSchemaNode from the contract and plans CREATE POLICY + ENABLE RLS', async () => {
     const result = buildPslContract();
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -96,15 +122,18 @@ describe('migration plan emits RLS (offline, no live database)', () => {
     const contract = result.value as Contract<SqlStorage>;
 
     // The initial `migration plan` derives the "from" schema from a null
-    // contract (no prior state) — an empty PostgresSchemaIR. The differ then
-    // reports the contract's policy as missing → CREATE POLICY.
+    // contract (no prior state) — an empty PostgresDatabaseSchemaNode. The differ
+    // then reports the contract's policy as missing → CREATE POLICY.
     const fromSchema = postgresTargetDescriptor.migrations.contractToSchema(
       null,
       frameworkComponents,
+    ) as SqlSchemaIRNode;
+    PostgresDatabaseSchemaNode.assert(fromSchema);
+    expect(fromSchema).toBeInstanceOf(PostgresDatabaseSchemaNode);
+    const allPolicies = Object.values(fromSchema.namespaces).flatMap((ns) =>
+      Object.values(ns.tables).flatMap((t) => t.policies),
     );
-    expect(fromSchema).toBeInstanceOf(PostgresSchemaIR);
-    if (!(fromSchema instanceof PostgresSchemaIR)) return;
-    expect(fromSchema.rlsPolicies).toEqual([]);
+    expect(allPolicies).toEqual([]);
 
     const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
     const planResult = planner.plan({
@@ -126,5 +155,44 @@ describe('migration plan emits RLS (offline, no live database)', () => {
 
     expect(allSql.some((s) => s.includes('ENABLE ROW LEVEL SECURITY'))).toBe(true);
     expect(allSql.some((s) => s.includes('CREATE POLICY'))).toBe(true);
+  });
+
+  it('plans FOR UPDATE with both USING and WITH CHECK for a policy_update contract', async () => {
+    const result = buildPslContract(PSL_UPDATE);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const contract = result.value as Contract<SqlStorage>;
+    const fromSchema = postgresTargetDescriptor.migrations.contractToSchema(
+      null,
+      frameworkComponents,
+    ) as SqlSchemaIRNode;
+    PostgresDatabaseSchemaNode.assert(fromSchema);
+
+    const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+    const planResult = planner.plan({
+      contract,
+      schema: fromSchema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+
+    expect(planResult.kind).toBe('success');
+    if (planResult.kind !== 'success') return;
+
+    const ops = await Promise.all(planResult.plan.operations);
+    const createPolicySql = ops
+      .flatMap((op) => op.execute)
+      .map((step) => step.sql)
+      .find((s) => s.includes('CREATE POLICY'));
+
+    expect(createPolicySql).toBeDefined();
+    expect(createPolicySql).toContain('FOR UPDATE');
+    expect(createPolicySql).toContain("USING (owner_id = current_setting('app.uid')::int)");
+    expect(createPolicySql).toContain("WITH CHECK (owner_id = current_setting('app.uid')::int)");
+    // USING must precede WITH CHECK.
+    expect(createPolicySql!.indexOf('USING')).toBeLessThan(createPolicySql!.indexOf('WITH CHECK'));
   });
 });

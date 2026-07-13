@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { ContractSpaceMember } from '@prisma-next/migration-tools/aggregate';
+import type { AggregateContractSpace } from '@prisma-next/migration-tools/aggregate';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import {
@@ -45,11 +45,11 @@ export type FromResolution =
 
 export interface ResolveFromForPlanInput {
   readonly optionsFrom?: string | undefined;
-  readonly member: ContractSpaceMember;
+  readonly space: AggregateContractSpace;
 }
 
-function graphIsEmpty(member: ContractSpaceMember): boolean {
-  return member.packages.length === 0;
+function graphIsEmpty(space: AggregateContractSpace): boolean {
+  return space.packages.length === 0;
 }
 
 function getReachableRefs(
@@ -98,14 +98,14 @@ type RefContractResolution =
 
 async function resolveContractRef(
   parsed: ContractRef,
-  member: ContractSpaceMember,
+  space: AggregateContractSpace,
   options?: { readonly explicitLabel?: string; readonly artifactRole?: 'from' | 'to' },
 ): Promise<Result<RefContractResolution, CliStructuredError>> {
   const { hash, provenance } = parsed;
   const refName = provenance.kind === 'ref' ? provenance.refName : undefined;
 
   try {
-    const at = await member.contractAt(hash, refName !== undefined ? { refName } : undefined);
+    const at = await space.contractAt(hash, refName !== undefined ? { refName } : undefined);
 
     if (at.provenance === 'snapshot') {
       return ok({
@@ -139,7 +139,7 @@ async function resolveFromPolicy(
   refs: Refs,
   explicitFromLabel?: string,
 ): Promise<Result<FromResolution, CliStructuredError>> {
-  const resolution = await resolveContractRef(parsed, input.member, {
+  const resolution = await resolveContractRef(parsed, input.space, {
     ...(explicitFromLabel !== undefined ? { explicitLabel: explicitFromLabel } : {}),
     artifactRole: 'from',
   });
@@ -157,7 +157,7 @@ async function resolveFromPolicy(
   }
 
   const { hash, contract, contractJson, contractDts } = resolution.value;
-  if (graphIsEmpty(input.member)) {
+  if (graphIsEmpty(input.space)) {
     return ok({
       kind: 'auto-baseline',
       fromHash: hash,
@@ -167,7 +167,7 @@ async function resolveFromPolicy(
     });
   }
 
-  const graph = input.member.graph();
+  const graph = input.space.graph();
   const graphTip = findLatestMigration(graph)?.to ?? null;
   try {
     assertFromIsGraphNode(hash, graph, refs, graphTip);
@@ -189,9 +189,9 @@ async function resolveFromPolicy(
 export async function resolveFromForPlan(
   input: ResolveFromForPlanInput,
 ): Promise<Result<FromResolution, CliStructuredError>> {
-  const { optionsFrom, member } = input;
-  const graph = member.graph();
-  const refs = member.refs;
+  const { optionsFrom, space } = input;
+  const graph = space.graph();
+  const refs = space.refs;
 
   if (optionsFrom === undefined) {
     const dbRef = refs['db'];
@@ -208,7 +208,7 @@ export async function resolveFromForPlan(
   const refResult = parseContractRef(optionsFrom, { graph, refs });
   if (!refResult.ok) {
     if (looksLikeFullHash(optionsFrom)) {
-      const empty = graphIsEmpty(member);
+      const empty = graphIsEmpty(space);
       const graphTip = findLatestMigration(graph)?.to ?? null;
       if (empty) {
         return notOk(errorSnapshotMissing(optionsFrom, { viaRef: false }));
@@ -222,7 +222,7 @@ export async function resolveFromForPlan(
 }
 
 export interface ResolveToForPlanInput {
-  readonly member: ContractSpaceMember;
+  readonly space: AggregateContractSpace;
 }
 
 export interface ResolvedContractRef {
@@ -236,16 +236,16 @@ export async function resolveToForPlan(
   optionsTo: string,
   input: ResolveToForPlanInput,
 ): Promise<Result<ResolvedContractRef, CliStructuredError>> {
-  const { member } = input;
-  const graph = member.graph();
-  const refs = member.refs;
+  const { space } = input;
+  const graph = space.graph();
+  const refs = space.refs;
 
   const refResult = parseContractRef(optionsTo, { graph, refs });
   if (!refResult.ok) {
     return notOk(mapRefResolutionError(refResult.failure));
   }
 
-  const resolution = await resolveContractRef(refResult.value, member, {
+  const resolution = await resolveContractRef(refResult.value, space, {
     explicitLabel: optionsTo,
     artifactRole: 'to',
   });

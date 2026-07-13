@@ -13,6 +13,7 @@ type Accessor<Values extends readonly unknown[], Names extends readonly string[]
   has(v: Values[number]): boolean;
   nameOf(v: Values[number]): string | undefined;
   ordinalOf(v: Values[number]): number;
+  readonly Value: Values[number];
 };
 
 // A literal contract shape mirroring the no-emit (built) carrier: enums are
@@ -97,4 +98,17 @@ test('enums.public.Role.members.Admin is the value literal', () => {
 
 test('enums.public.Role.names is the literal name tuple', () => {
   expectTypeOf(publicEnums.Role.names).toEqualTypeOf<readonly ['User', 'Admin']>();
+});
+
+// ---------------------------------------------------------------------------
+// enums.<ns>.<Name>.Value is the phantom value-union type (type-only, no
+// runtime property) — `typeof accessor.Value` gives the literal union.
+// ---------------------------------------------------------------------------
+
+test('enums.public.Role.Value is the literal value union', () => {
+  expectTypeOf(publicEnums.Role.Value).toEqualTypeOf<'user' | 'admin'>();
+});
+
+test('enums.public.Status.Value is the literal value union', () => {
+  expectTypeOf(publicEnums.Status.Value).toEqualTypeOf<'active' | 'inactive'>();
 });

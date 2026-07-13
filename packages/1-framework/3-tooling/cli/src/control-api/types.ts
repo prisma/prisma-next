@@ -545,7 +545,7 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
  *
  * The control-api operation is responsible for: loading the
  * contract-space aggregate, reading per-space marker rows from the
- * live database, plotting per-space paths via `graphWalkStrategy`
+ * live database, plotting per-space paths via `resolveRecordedPath`
  * (replay-only — no synth, no introspection), and dispatching
  * through the shared `runMigration` primitive. The CLI command
  * just resolves the descriptor surface (config, refs, contract
@@ -557,9 +557,9 @@ export interface MigrateOptions {
   /** Migrations root directory (`migrations/` under the project). */
   readonly migrationsDir: string;
   /**
-   * Optional app-space ref override. When provided, the app member's
+   * Optional app-space ref override. When provided, the app space's
    * graph-walk targets this hash instead of `contract.storage.storageHash`.
-   * Extension members always walk to their own `headRef.hash`.
+   * Extension spaces always walk to their own `headRef.hash`.
    */
   readonly refHash?: string;
   /**
@@ -631,17 +631,17 @@ export interface MigrateRanEntry {
 
 /**
  * Successful migrate result. Carries both the top-level fields
- * (`markerHash` is the **app member's** post-migrate marker) and the
+ * (`markerHash` is the **app space's** post-migrate marker) and the
  * per-space breakdown (`perSpace` — markers / operations in canonical
  * schedule order).
  */
 /**
- * Path-decision summary for the **app member** post-migrate. Surfaced
+ * Path-decision summary for the **app space** post-migrate. Surfaced
  * at the top level (and consumed by the cli-journeys suite, which
  * inspects `requiredInvariants`/`satisfiedInvariants`/
  * `selectedPath` to validate invariant routing).
  *
- * Per-space path decisions for extension members are not surfaced —
+ * Per-space path decisions for extension spaces are not surfaced —
  * extensions own their own ref/invariant control.
  */
 export interface MigratePathDecision {
@@ -673,7 +673,7 @@ export interface MigrateSuccess {
    */
   readonly perSpace: ReadonlyArray<PerSpaceExecutionEntry>;
   /**
-   * Path-decision data for the app member. Present whenever the
+   * Path-decision data for the app space. Present whenever the
    * graph-walk strategy ran for the app (i.e. always for the
    * aggregate-walking migrate path). Absent only for the no-op
    * "Already up to date" early return when the app has no plan.
@@ -864,7 +864,7 @@ export interface ControlClient {
    *   markers, and (unless `skipSchema` is true) per-space schema
    *   verification with pre-projection (closes F23).
    *
-   * @returns Result pattern: per-space schema results on success;
+   * @returns Result pattern: per-space verify results on success;
    *          structured CLI error on marker / loader failure.
    * @throws If not connected or infrastructure failure
    */

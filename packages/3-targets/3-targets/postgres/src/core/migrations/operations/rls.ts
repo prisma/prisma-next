@@ -1,8 +1,13 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { rlsEnabledAst, rlsPolicyExistsAst } from '../../../contract-free/checks';
-import { createPolicy, dropPolicy } from '../../../contract-free/ddl';
-import type { PostgresRlsPolicy } from '../../schema-ir/postgres-rls-policy';
+import {
+  alterPolicyRename,
+  createPolicy,
+  disableRowLevelSecurity as disableRowLevelSecurityDdl,
+  dropPolicy,
+} from '../../../contract-free/ddl';
+import type { PostgresRlsPolicy } from '../../postgres-rls-policy';
 import { qualifyTableName } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
 
@@ -101,6 +106,82 @@ export async function enableRowLevelSecurity(
     ],
     postcheck: [
       step(`verify row-level security is enabled on "${tableName}"`, enabled.sql, enabled.params),
+    ],
+  };
+}
+
+export async function disableRowLevelSecurity(
+  schemaName: string,
+  tableName: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
+  const ddlNode = disableRowLevelSecurityDdl({ schema: schemaName, table: tableName });
+  const checks = rlsEnabledAst(schemaName, tableName);
+  const enabled = await lowerer.lowerToExecuteRequest(checks.rlsEnabled());
+  const execute = await lowerer.lowerToExecuteRequest(ddlNode);
+  const disabled = await lowerer.lowerToExecuteRequest(checks.rlsDisabled());
+  return {
+    id: `rowLevelSecurity.${schemaName}.${tableName}.disable`,
+    label: `Disable row-level security on "${tableName}"`,
+    operationClass: 'destructive',
+    target: targetDetails('rowLevelSecurity', tableName, schemaName),
+    precheck: [
+      step(`check RLS is currently enabled on "${tableName}"`, enabled.sql, enabled.params),
+    ],
+    execute: [step(`disable row-level security on "${tableName}"`, execute.sql, execute.params)],
+    postcheck: [
+      step(
+        `verify row-level security is disabled on "${tableName}"`,
+        disabled.sql,
+        disabled.params,
+      ),
+    ],
+  };
+}
+
+export async function renameRlsPolicy(
+  schemaName: string,
+  tableName: string,
+  oldPolicyName: string,
+  newPolicyName: string,
+  lowerer: ExecuteRequestLowerer,
+): Promise<Op> {
+  const ddlNode = alterPolicyRename({
+    schema: schemaName,
+    table: tableName,
+    name: oldPolicyName,
+    newName: newPolicyName,
+  });
+  const oldChecks = rlsPolicyExistsAst({
+    schema: schemaName,
+    table: tableName,
+    policyName: oldPolicyName,
+  });
+  const newChecks = rlsPolicyExistsAst({
+    schema: schemaName,
+    table: tableName,
+    policyName: newPolicyName,
+  });
+  const oldPresent = await lowerer.lowerToExecuteRequest(oldChecks.policyPresent());
+  const execute = await lowerer.lowerToExecuteRequest(ddlNode);
+  const newPresent = await lowerer.lowerToExecuteRequest(newChecks.policyPresent());
+  return {
+    id: `rlsPolicy.${schemaName}.${tableName}.${oldPolicyName}.rename`,
+    label: `Rename RLS policy "${oldPolicyName}" to "${newPolicyName}" on "${tableName}"`,
+    operationClass: 'widening',
+    target: targetDetails('rlsPolicy', newPolicyName, schemaName, tableName),
+    precheck: [
+      step(`ensure RLS policy "${oldPolicyName}" exists`, oldPresent.sql, oldPresent.params),
+    ],
+    execute: [
+      step(
+        `rename RLS policy "${oldPolicyName}" to "${newPolicyName}"`,
+        execute.sql,
+        execute.params,
+      ),
+    ],
+    postcheck: [
+      step(`verify RLS policy "${newPolicyName}" exists`, newPresent.sql, newPresent.params),
     ],
   };
 }

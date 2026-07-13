@@ -228,7 +228,7 @@ describe('supabase external-schema classification (db init + db verify)', () => 
         ).toBe(true);
 
         if (verifyResult.ok) {
-          // Every space (app + supabase) must have a passing schema result.
+          // Every space (app + supabase) must have a passing verify result.
           for (const [spaceId, schemaResult] of verifyResult.value.schemaResults) {
             expect(
               schemaResult.ok,
@@ -236,7 +236,7 @@ describe('supabase external-schema classification (db init + db verify)', () => 
             ).toBe(true);
           }
 
-          // The supabase space's schema result must reflect external-present
+          // The supabase space's verify result must reflect external-present
           // status: it passes, meaning auth.* / storage.* are confirmed present
           // and were not flagged as missing owned tables.
           const supabaseVerifyResult = verifyResult.value.schemaResults.get('supabase');

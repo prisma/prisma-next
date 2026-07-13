@@ -20,9 +20,11 @@
     "@prisma-next/utils": "workspace:0.14.0"
   },
   "devDependencies": {
+    "@prisma-next/contract": "workspace:0.14.0",
     "@prisma-next/psl-parser": "workspace:0.14.0",
     "@prisma-next/tsconfig": "workspace:0.14.0",
     "@prisma-next/tsdown": "workspace:0.14.0",
+    "@standard-schema/spec": "^1.1.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

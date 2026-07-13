@@ -1,16 +1,19 @@
-import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { SqlControlTargetDescriptor } from '@prisma-next/family-sql/control';
-import { contractToSchemaIR } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type {
   ControlTargetInstance,
   MigrationPlanner,
   MigrationRunner,
 } from '@prisma-next/framework-components/control';
-import { SqlStorage, type StorageColumn } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  relationalNodeEntityKind,
+  relationalNodeGranularity,
+} from '@prisma-next/sql-schema-ir/types';
 import { sqliteTargetDescriptorMeta } from './descriptor-meta';
+import { diffSqliteSchema, sqliteContractToSchema } from './migrations/diff-database-schema';
 import { createSqliteMigrationPlanner } from './migrations/planner';
-import { renderDefaultLiteral } from './migrations/planner-ddl-builders';
 import type { SqlitePlanTargetDetails } from './migrations/planner-target-details';
 import { createSqliteMigrationRunner } from './migrations/runner';
 import { SqliteContractSerializer } from './sqlite-contract-serializer';
@@ -20,21 +23,16 @@ function isSqlContract(contract: Contract | null): contract is Contract<SqlStora
   return contract === null || contract.storage instanceof SqlStorage;
 }
 
-function sqliteRenderDefault(def: ColumnDefault, _column: StorageColumn): string {
-  if (def.kind === 'function') {
-    if (def.expression === 'now()') {
-      return "datetime('now')";
-    }
-    return def.expression;
-  }
-  return renderDefaultLiteral(def.value);
-}
-
 const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', SqlitePlanTargetDetails> =
   {
     ...sqliteTargetDescriptorMeta,
     contractSerializer: new SqliteContractSerializer(),
     schemaVerifier: new SqliteSchemaVerifier(),
+    diffSchema(input) {
+      return diffSqliteSchema(input);
+    },
+    classifySubjectGranularity: relationalNodeGranularity,
+    classifyEntityKind: relationalNodeEntityKind,
     migrations: {
       createPlanner(adapter: SqlControlAdapter<'sqlite'>): MigrationPlanner<'sql', 'sqlite'> {
         return createSqliteMigrationPlanner(adapter);
@@ -55,10 +53,7 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
             'sqliteControlTargetDescriptor.contractToSchema received a non-SQL contract; expected Contract<SqlStorage>',
           );
         }
-        return contractToSchemaIR(contract, {
-          annotationNamespace: 'sqlite',
-          renderDefault: sqliteRenderDefault,
-        });
+        return sqliteContractToSchema(contract);
       },
     },
     create(): ControlTargetInstance<'sql', 'sqlite'> {

@@ -2,7 +2,10 @@ import {
   computeContentHash,
   normalizePredicate,
 } from '@prisma-next/target-postgres/rls-canonicalize';
-import { isPostgresSchemaIR, PostgresRlsPolicy } from '@prisma-next/target-postgres/types';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresPolicySchemaNode,
+} from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createDriver,
@@ -57,11 +60,11 @@ describe.sequential('RLS introspection', () => {
     );
 
     const schema = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(schema);
 
-    expect(isPostgresSchemaIR(schema)).toBe(true);
-    if (!isPostgresSchemaIR(schema)) return;
-
-    const { rlsPolicies } = schema;
+    const rlsPolicies = Object.values(schema.namespaces['public']!.tables).flatMap(
+      (t) => t.policies,
+    );
 
     expect(rlsPolicies).toBeDefined();
     expect(Array.isArray(rlsPolicies)).toBe(true);
@@ -69,7 +72,7 @@ describe.sequential('RLS introspection', () => {
 
     const policy = rlsPolicies.find((p) => p.tableName === 'posts');
     expect(policy).toBeDefined();
-    expect(policy).toBeInstanceOf(PostgresRlsPolicy);
+    expect(policy).toBeInstanceOf(PostgresPolicySchemaNode);
 
     // Introspect reads policyname verbatim from pg_policies — no hash recompute.
     expect(policy!.name).toBe(wireName);
@@ -81,13 +84,41 @@ describe.sequential('RLS introspection', () => {
     expect(policy!.permissive).toBe(true);
   });
 
+  it('stamps rlsEnabled per table from pg_class.relrowsecurity', {
+    timeout: testTimeout,
+  }, async () => {
+    await driver!.query('CREATE TABLE guarded (id int PRIMARY KEY)');
+    await driver!.query('CREATE TABLE open_wide (id int PRIMARY KEY)');
+    await driver!.query('ALTER TABLE guarded ENABLE ROW LEVEL SECURITY');
+
+    const schema = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(schema);
+
+    const tables = schema.namespaces['public']!.tables;
+    expect(tables['guarded']?.rlsEnabled).toBe(true);
+    expect(tables['open_wide']?.rlsEnabled).toBe(false);
+  });
+
+  it('stamps rlsEnabled on a partitioned parent table (relkind p)', {
+    timeout: testTimeout,
+  }, async () => {
+    await driver!.query(
+      'CREATE TABLE events (id int NOT NULL, region text NOT NULL) PARTITION BY LIST (region)',
+    );
+    await driver!.query("CREATE TABLE events_eu PARTITION OF events FOR VALUES IN ('eu')");
+    await driver!.query('ALTER TABLE events ENABLE ROW LEVEL SECURITY');
+
+    const schema = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(schema);
+
+    expect(schema.namespaces['public']!.tables['events']?.rlsEnabled).toBe(true);
+  });
+
   it('returns roles excluding system roles', {
     timeout: testTimeout,
   }, async () => {
     const schema = await familyInstance.introspect({ driver: driver! });
-
-    expect(isPostgresSchemaIR(schema)).toBe(true);
-    if (!isPostgresSchemaIR(schema)) return;
+    PostgresDatabaseSchemaNode.assert(schema);
 
     const { roles } = schema;
 

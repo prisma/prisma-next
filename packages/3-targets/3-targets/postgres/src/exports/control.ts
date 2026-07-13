@@ -1,8 +1,7 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { SqlControlTargetDescriptor } from '@prisma-next/family-sql/control';
-import { extractCodecControlHooks } from '@prisma-next/family-sql/control';
+import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlTargetInstance,
   MigrationRunner,
@@ -11,7 +10,8 @@ import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
-import { contractToPostgresSchemaIR } from '../core/migrations/contract-to-postgres-schema-ir';
+import { contractToPostgresDatabaseSchemaNode } from '../core/migrations/contract-to-postgres-database-schema-node';
+import { diffPostgresSchema } from '../core/migrations/diff-database-schema';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
@@ -19,26 +19,12 @@ import { createPostgresMigrationRunner } from '../core/migrations/runner';
 import { PostgresContractSerializer } from '../core/postgres-contract-serializer';
 import type { PostgresContract } from '../core/postgres-schema';
 import { PostgresSchemaVerifier } from '../core/postgres-schema-verifier';
-
-function buildNativeTypeExpander(
-  frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>,
-) {
-  if (!frameworkComponents) {
-    return undefined;
-  }
-  const codecHooks = extractCodecControlHooks(frameworkComponents);
-  return (input: {
-    readonly nativeType: string;
-    readonly codecId?: string;
-    readonly typeParams?: Record<string, unknown>;
-  }) => {
-    if (!input.typeParams) return input.nativeType;
-    if (!input.codecId) return input.nativeType;
-    const hooks = codecHooks.get(input.codecId);
-    if (!hooks?.expandNativeType) return input.nativeType;
-    return hooks.expandNativeType(input);
-  };
-}
+import { inferPostgresPslContract } from '../core/psl-infer/infer-psl-contract';
+import { PostgresDatabaseSchemaNode } from '../core/schema-ir/postgres-database-schema-node';
+import {
+  postgresDiffSubjectEntityKind,
+  postgresDiffSubjectGranularity,
+} from '../core/schema-ir/schema-node-kinds';
 
 export function postgresRenderDefault(def: ColumnDefault, column: StorageColumn): string {
   if (def.kind === 'function') {
@@ -52,6 +38,15 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
     ...postgresTargetDescriptorMeta,
     contractSerializer: new PostgresContractSerializer(),
     schemaVerifier: new PostgresSchemaVerifier(),
+    inferPslContract(schema, describedContracts) {
+      PostgresDatabaseSchemaNode.assert(schema);
+      return inferPostgresPslContract(schema, describedContracts);
+    },
+    diffSchema(input) {
+      return diffPostgresSchema(input);
+    },
+    classifySubjectGranularity: postgresDiffSubjectGranularity,
+    classifyEntityKind: postgresDiffSubjectEntityKind,
     migrations: {
       createPlanner(adapter: SqlControlAdapter<'postgres'>) {
         return createPostgresMigrationPlanner(adapter);
@@ -65,7 +60,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           PostgresContract | null,
           'the family resolver only binds this hook for a Postgres-target contract'
         >(contract);
-        return contractToPostgresSchemaIR(postgresContract, {
+        return contractToPostgresDatabaseSchemaNode(postgresContract, {
           annotationNamespace: 'pg',
           ...ifDefined('expandNativeType', expander),
           renderDefault: postgresRenderDefault,

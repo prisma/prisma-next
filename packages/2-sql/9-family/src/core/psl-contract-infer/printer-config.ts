@@ -1,12 +1,6 @@
 import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { DefaultMappingOptions } from './default-mapping';
 
-/**
- * Internal printer-shaped configuration, used by the SQL family's
- * `sqlSchemaIrToPslAst` helper (M2). The framework-level psl-printer no longer
- * exposes these — they're consumed only inside the SQL family.
- */
-
 export type PslNativeTypeAttribute = {
   readonly name: string;
   readonly args?: readonly string[];
@@ -43,6 +37,18 @@ export interface PslPrinterOptions {
 export type RelationField = {
   readonly fieldName: string;
   readonly typeName: string;
+  /**
+   * Namespace qualifier for a cross-space relation (e.g. `"auth"` for a
+   * relation into `supabase:auth.AuthUser`). Absent for a same-namespace
+   * relation.
+   */
+  readonly typeNamespaceId?: string | undefined;
+  /**
+   * Contract-space qualifier for a relation into another stack extension
+   * pack's contract space (e.g. `"supabase"`). Absent for a same-space
+   * relation.
+   */
+  readonly typeContractSpaceId?: string | undefined;
   readonly referencedTableName?: string | undefined;
   readonly optional: boolean;
   readonly list: boolean;

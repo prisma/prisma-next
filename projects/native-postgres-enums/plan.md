@@ -1,136 +1,64 @@
 # Native Postgres enums — plan
 
-**Spec:** [`spec.md`](spec.md)
-**Linear project:** _(to create — see § Tracker)_
+**Spec:** [`spec.md`](spec.md) · **Designs:** [`specs/authoring-design.md`](specs/authoring-design.md), [`specs/querying-design.md`](specs/querying-design.md), [`specs/migration-design.md`](specs/migration-design.md)
 
-## At a glance
+## Status
 
-Two phases. **Phase 1** makes a native Postgres enum representable in the contract and
-surfaced to the app as a typed value union, graded `external` so Prisma Next emits no DDL
-— this is the primary deliverable and what unblocks Supabase. **Phase 2** lets Prisma Next
-create/delete native enums and migrate the cheap ops (add value, rename value) in place,
-refusing the expensive ones (remove, reorder). Each slice is a vertical: it goes all the
-way to a typed read or a live-database migration, with an end-to-end test — never a layer
-in isolation.
+Phase 1 (external enums) is **shipped** — [PR #906](https://github.com/prisma/prisma-next/pull/906). The forward work is Phase 2 (managed enums) and the TS authoring mirror, below. This plan is the work breakdown; the design is in [`spec.md`](spec.md).
 
-Phase 1 needs the contract representation + the TML-2886 typing path. Phase 2 adds the
-SchemaIR node, the Contract→SchemaIR projection, the generic-differ integration, and the
-four migration ops — all reusing the RLS top-level-object template
-(`PostgresRlsPolicy`/`PostgresRole` → `PostgresEnumType`).
+## Shipped — Phase 1 (external enums, no DDL)
 
-## Phase 1 — represent + surface (external-graded, no DDL)
+The complete external-enum vertical — represent → type → cast → runtime access → Supabase demonstration. Satisfies **R1–R5**. Design of record: [`spec.md`](spec.md); implementation is the commits below.
 
-### Slice P1.S1 — `native-enum-representation-and-typing`
-- **Outcome:** A native Postgres enum is a first-class storage entity and a column using it
-  reads as the value union. The storage `type` entity (`kind: postgres-enum`, ordered
-  `values`, optional `control`) round-trips through serializer + validator (composed into
-  the Postgres pack's `composeSqlEntityKinds([…, typeEntityKind])`). A storage column
-  references the type and reads/writes as the value union — query builder + ORM, emitted
-  contract **and** no-emit path — via the TML-2886 `StorageColumnTypes` lookup. `db.enums`
-  parity holds (it reads the unchanged domain enum).
-- **Covers:** R1, R2, R3, R4. Components #1, #5, #6.
-- **Builds on:** `composeSqlEntityKinds` + the RLS top-level-object pattern (landed);
-  TML-2886 `StorageColumnTypes` (landed).
-- **Proven by:** an authored fixture contract carrying a native `type` entity + a column
-  that references it; type-tests asserting the value union (QB, ORM, direct
-  `StorageColumnTypes` index) and a negative test for out-of-set input; round-trip +
-  `fixtures:check`.
-- **Resolves:** Open decisions 1 (column→type join shape) and 2 (slot name) — these are
-  design calls this slice must settle in its spec before building.
+- **Representation, typing, cast, `db.nativeEnums`** (`cbb1f6e50` → `a105437f6`) — the `native_enum` pack entity + derived value-set; the `pg.enum(Ref)` column + `pg/enum@1` codec typed via the value-set → codec path; the per-column `$N::<type>` cast; the Postgres-only `db.nativeEnums` accessor. Satisfies R1–R4.
+- **Supabase demonstration + schema-qualification fix** (`b8c4a69a7`, `1a3306cf4`) — the Supabase extension declares `auth.aal_level`; the example proves the whole path end-to-end against real Postgres. Running it for real exposed that a non-`public` schema needs a **schema-qualified** type reference (`auth.aal_level`) for both the cast and `db verify` — fixed by qualifying the column's `nativeType` by its namespace. Satisfies R5 and proves R1–R4 end-to-end.
 
-### Slice P1.S2 — `external-native-enums-supabase`
-- **Outcome:** Native enums graded `external` produce no DDL and no drift reports; the
-  Supabase extension contributes its built-in native enums into the contract, and they
-  surface in the supabase example as typed unions. Introspection captures **ordered**
-  enum values (`pg_enum.enumsortorder`), not just names.
-- **Covers:** R5. Component #1 (introspection side) + the grade plumbing.
-- **Builds on:** P1.S1 (representation); the RLS extension-contribution seam
-  (extension-migration-participation) — **dependency to confirm landed** (see § Tracker).
-- **Proven by:** the supabase example carrying a Supabase-defined native enum, end-to-end:
-  represented, typed read, and `db verify` / migration emits nothing for it.
-- **Resolves:** Open decision 4 (extension-declared vs. introspected source).
+## Shipped — infer adoption (R6, pulled forward from Phase 2)
 
-### Slice P1.S3 — `adopt-native-enums`
-- **Outcome:** Contract-infer emits the native `type` representation for an introspected
-  native enum instead of throwing (today's hard refusal at
-  `sql-schema-ir-to-psl-ast.ts`). A user porting an existing Postgres/Supabase project gets
-  their native enums into the contract.
-- **Covers:** R6. Component #1 (adoption path).
-- **Builds on:** P1.S1 (representation) + P1.S2 (ordered-value introspection).
-- **Proven by:** an introspect→contract test over a database with a native enum; the
-  inverted path emits the `type` entity + typed columns.
-- **Resolves:** Open decision 3 (adopted-enum grade — `external` for the first cut).
-- **Parallel with P1.S2** once P1.S1 lands, if introspection is split cleanly; otherwise
-  sequence after P1.S2.
+- **`contract infer` adopts native enum types** instead of throwing — introspection reads ordered member values (`pg_enum.enumsortorder`), infer emits `native_enum` blocks + `pg.enum(<Name>)` columns wrapped in an explicit `namespace <schema> { … }` block (enum-free output stays byte-identical), pack-owned types subtract by type name, and a live PGlite round trip proves infer → emit → `db verify` against the source database for the `public` and `auth.aal_level` shapes. Slice spec: [`slices/infer-native-enum-adoption/spec.md`](slices/infer-native-enum-adoption/spec.md).
+- **R6 status:** adoption shipped **ahead of Phase-2 Slices A/B** (sequencing inversion, unblocks Supabase Slice F). The managed lifecycle (`CREATE TYPE` / `DROP TYPE` / `ADD VALUE`, differ integration) is still forward work below — an inferred enum under `defaultControl: 'managed'` claims a lifecycle the planner does not yet enforce until Slices A/B land.
 
-## Phase 2 — create / delete / cheap ops (PN-managed)
+## In flight — native_enum serializes into contract.json
 
-### Slice P2.S1 — `native-enum-schema-ir-and-diff`
-- **Outcome:** A `PostgresEnumType` `DiffableNode` (`identity()` on the type name,
-  `isEqualTo()` over ordered values) exists; the contract's native `type` entities project
-  into `PostgresSchemaIR` (new `enumTypes` field, mirroring `rlsPolicies`/`roles`); the
-  generic differ reports missing / extra / value-mismatch; `external`/`observed` grades
-  suppress drift (phase-1 enums stay untouched).
-- **Covers:** R10. Components #2, #3 (read/verify side).
-- **Builds on:** P1.S1; the RLS generic differ (`diffSchemas`/`diffNodes`) — landed/landing.
-- **Proven by:** verify against a live database — matching enum (no issues), value drift
-  (mismatch reported), external enum (suppressed).
+- **`entries.native_enum` becomes an ordinary enumerable entries kind** so it round-trips through `contract.json` and is captured by `storageHash` (hardens R1; prerequisite for the Phase-2 planner reading ordered members from storage, and for pack-owned subtraction on production-hydrated contracts). Closes the infer-adoption slice's "serialized pack contracts expose no enum type names" follow-up. Slice spec: [`slices/serialize-native-enum-entities/spec.md`](slices/serialize-native-enum-entities/spec.md).
 
-### Slice P2.S2 — `create-delete-native-enums`
-- **Outcome:** A domain enum can be authored with the native strategy (PSL/TS attribute
-  selecting native realization; default stays check). Prisma Next emits `CREATE TYPE … AS
-  ENUM` (declared order) and `DROP TYPE`, ordered relative to the columns that depend on
-  the type (the planner's existing `'type'` → dependency bucket).
-- **Covers:** R7. Component #4 (create/delete) + authoring opt-in for #5.
-- **Builds on:** P2.S1 (SchemaIR + diff).
-- **Proven by:** live-database end-to-end — author native enum → `CREATE TYPE` + table uses
-  it → typed read → drop → `DROP TYPE`, ordered correctly.
+## Forward work
 
-### Slice P2.S3 — `cheap-enum-ops-and-refuse-expensive`
-- **Outcome:** Adding a value and renaming a value migrate in place (`ALTER TYPE … ADD
-  VALUE` / `RENAME VALUE`) with no table rewrite; a diff that would remove or reorder values
-  is refused with a diagnostic naming the manual procedure — never lowered to an op. The
-  `ADD VALUE` non-transactional caveat is surfaced to the runner.
-- **Covers:** R8, R9. Component #4 (alter ops + refusal).
-- **Builds on:** P2.S1 + P2.S2.
-- **Proven by:** live-database end-to-end for add + rename; a negative test that
-  remove/reorder produces the diagnostic and no op.
+### Generic namespace-`entries` serialization — shipped, [TML-2981]
 
-## Sequencing
+- **Outcome:** the SQL contract serializer emits a namespace's entity kinds by iterating `entries` (symmetric with the already-generic hydrate path), so an extension-contributed kind round-trips with no serializer edit; byte-identical emitted output. Merged: [PR #931](https://github.com/prisma/prisma-next/pull/931).
+- **The work:** lift generic entries serialization into `SqlContractSerializerBase`; rewire the Postgres + SQLite serializers to delegate; `native_enum` stays excluded via non-enumerability. Slice spec: [`slices/generic-namespace-entries-serialization/spec.md`](slices/generic-namespace-entries-serialization/spec.md).
+- **Origin:** review point O1 on PR #906.
 
-- **P1.S1 first** — every other slice reads the contract representation it lands.
-- **P1.S2 / P1.S3 parallelize** after P1.S1 (both build on representation; S3 wants S2's
-  ordered-value introspection — sequence if that split isn't clean).
-- **Phase 2 after Phase 1**, sequential: schema-IR + diff → create/delete → cheap ops +
-  refusal. Mutation builds on the verify path; cheap ops build on create/delete.
-- **Phase boundary is a real stop:** Phase 1 is independently shippable (it's the promised
-  first deliverable). Phase 2 begins only when Phase 1 has landed and the user-facing
-  message's first promise is met.
+### TS authoring mirror — shipped, [TML-2965]
 
-## Dependencies (external)
+- **Outcome:** a `native_enum` is authorable in the TS DSL (`nativeEnum(…)` + `field.column(pg.enum(handle))`), producing a contract byte-identical to the PSL version. Merged: [PR #935](https://github.com/prisma/prisma-next/pull/935).
+- **The work:** a generic **`ContractDefinition` pack-entity attachment** — route author-declared, namespace-scoped pack entities into `entries.<kind>` (+ derive their value-set) through the `defineContract` chain, following the `enums` wiring; a bespoke `nativeEnum(...)` handle + deferred `pg.enum(handle)` descriptor; and relocating type-name qualification out of the codec into a generic build-stage step (so a named schema like `auth` is authorable in TS). Slice spec: [`slices/native-enum-ts-authoring/spec.md`](slices/native-enum-ts-authoring/spec.md).
+- **Follow-ups:** RLS `role`/`policy` TS wiring rides the same seam (unexercised here); the auto-composed generic `type.pg.enum` path repair is [TML-2983](https://linear.app/prisma-company/issue/TML-2983).
+- **Proven by:** a PSL + TS byte-identical parity test.
 
-- **RLS differ + extension-contribution seam.** The top-level-object template
-  (`composeSqlEntityKinds`, `DiffableNode`, the generic differ) and the
-  extension-contribution mechanism. The composition + differ are landed (PR #771) / landing
-  (PR #868). The extension-contribution seam (extension-migration-participation) gates
-  **P1.S2** specifically — confirm its state before scheduling that slice.
-- **TML-2886 `StorageColumnTypes`.** Landed (this just-merged work). The typing path P1.S1
-  rides.
+### Parser `refKind` for entity-ref type-constructor arguments — deferred, [TML-2978]
+
+- **Outcome:** the PSL parser / symbol table knows a type-constructor argument (e.g. `AalLevel` in `pg.enum(AalLevel)`) is a reference — enabling parse-time / LSP scope validation and editor navigation (go-to-definition / rename / autocomplete) on it.
+- **Why deferred:** not a correctness dependency. The native-enum generic collapse ([`specs/native-enum-generic-collapse.md`](specs/native-enum-generic-collapse.md)) declares "argument is a ref" on the type-constructor descriptor and resolves it in the interpreter, so a bad reference is still rejected (at build time). This is the grammar/LSP layer on top — purely additive author ergonomics, and it lives in the PSL parser, a different area from the collapse. **Consider once the collapse and the Phase-1 critical path are complete.**
+
+### Phase 2 — managed native enums
+
+Prisma Next creates and drops the type and migrates **add-value** in place. Satisfies **R6–R10**. Design: [`spec.md`](spec.md) § Phase 2 and [`specs/migration-design.md`](specs/migration-design.md). Three vertical slices, in order, each proven against a live database:
+
+- **Slice A — create / delete (R7, R10). SHIPPED.** Slice: [`slices/managed-native-enum-create-delete/spec.md`](slices/managed-native-enum-create-delete/spec.md). `PostgresNativeEnumSchemaNode` (schema-scoped identity, ordered-member equality, carries the expected-side `control` grade); both projections (contract `entries.native_enum` → expected nodes, introspected `nativeEnums` → actual nodes) feed the unified differ, which reports missing / extra / value-mismatch, graded by control policy (`managed` fails/plans, `external`/`observed` suppress — R5 Phase-1 enums untouched); `CREATE TYPE` / `DROP TYPE` ops ordered before/after the dependent column (via the existing dep/drop buckets); a `pg.enum` column's type renders as its schema-qualified, per-segment-quoted identifier in CREATE TABLE DDL (`"auth"."aal_level"`). Drop-safety resolves enum ownership by **physical type name** across all composition spaces (`compositionStorages`), so a pack's `@@map`-renamed enum in a shared schema is never wrongly dropped. Proven live (PGlite) for both `public` and named-schema shapes. **A value-mismatch is reported by verify but the planner emits a named unsupported diagnostic — `"…enum value changes are not auto-migrated yet. Author the change manually with \`migration new\`."` — which Slice B replaces.**
+- **Slice B — add value (R8, R9). NEXT.** The order-aware diff — a pure suffix-append → `ALTER TYPE … ADD VALUE`; a rename, removal, or reorder is refused with a diagnostic and never lowered to an op — plus the `ADD VALUE` op, with its non-transactional caveat surfaced to the runner. Replaces Slice A's value-mismatch diagnostic (wording above) with the real ADD VALUE lowering / refusal semantics.
+- **Slice C — adoption (R6). SHIPPED** ahead of Slices A/B via [PR #944](https://github.com/prisma/prisma-next/pull/944) (see "Shipped — infer adoption" above); `contract infer` emits `native_enum` blocks inheriting `defaultControl`. The managed-grade enforcement it claimed is now provided by Slice A.
+
+**Known limitations carried by Slice A** (see its spec): an **enums-only namespace** (a contract namespace declaring enums but no tables) is pruned before diffing (`pruneTableLessNamespaces`), so it is invisible to verify/plan — follow-up, likely alongside Slice B. The **drop-safety type-name ownership gap is CLOSED** (not a limitation) — resolved in Slice A via `compositionStorages`.
+
+## Dependencies
+
+- **Value-set → codec typing ([TML-2952]).** Merged and in this branch; native typing rides it unchanged (a native column carries a `valueSet` ref like a check-enum column).
+- **Pack-entity + variadic-block mechanisms** (`postgresAuthoringEntityTypes`, `variadicParameters` block descriptors, `composeSqlEntityKinds`). Landed — RLS and the SQL `enum` block ship on them.
+- **[TML-2960]** (no-emit per-instance column typing). Not a blocker: emit typing works today; no-emit column typing is out of scope until 2960 lands.
+- **Phase 2 only:** the RLS SchemaIR differ + extension-contribution seam — the template Phase 2's SchemaIR node, projection, and diff integration follow.
 
 ## Tracker
 
-Not yet created. Before opening implementation PRs: create the Linear project "Native
-Postgres enums" and one issue per slice (no sub-issues — use the project + relations +
-labels per repo convention). Hold until the operator approves the spec + this plan.
-
-## Cruft to retire or justify (tracked, not assumed)
-
-The pre-migration hacky-enum plumbing overlaps this work and must be either reused with
-justification or deleted:
-- the uncomposed `PostgresEnumTypeSchema` validator,
-- `StorageColumn.typeRef` + the `storage.types` map resolved in `planner-type-resolution.ts`
-  (Postgres) and `planner-ddl-builders.ts` (SQLite),
-- the names-only `nativeEnumTypeNames` introspection field.
-
-P1.S1 decides reuse-vs-replace for the column→type join (Open decision 1); whatever it
-doesn't adopt, a later slice deletes so the final state has one representation.
+Linear was intentionally skipped for the shipped Phase-1 slices (tracked in-repo). Cross-cutting follow-ups filed: **[TML-2960]** (no-emit per-instance column typing), **[TML-2965]** (TS authoring mirror + the generic `ContractDefinition` pack-entity attachment, shared with RLS), and **[TML-2978]** (parser `refKind` for entity-ref type-constructor arguments, deferred from the generic collapse — consider post-critical-path).

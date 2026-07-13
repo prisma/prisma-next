@@ -1,10 +1,41 @@
 import { CliStructuredError } from '@prisma-next/errors/control';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
+import {
+  PrimaryKey,
+  SqlForeignKeyIR,
+  SqlIndexIR,
+  SqlUniqueIR,
+} from '@prisma-next/sql-schema-ir/types';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
+import type {
+  PostgresDatabaseSchemaNode,
+  PostgresTableSchemaNode,
+} from '@prisma-next/target-postgres/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
-import { PostgresControlAdapter, parsePgReloptions } from '../src/core/control-adapter';
+import {
+  PostgresControlAdapter,
+  parsePgNameArray,
+  parsePgReloptions,
+} from '../src/core/control-adapter';
+
+/**
+ * These tests introspect a single schema, so the root holds exactly one
+ * namespace node. This helper returns that namespace's tables, replacing the
+ * old flat `result.tables` access.
+ */
+function tablesOf(
+  result: PostgresDatabaseSchemaNode,
+): Readonly<Record<string, PostgresTableSchemaNode>> {
+  const namespaces = Object.values(result.namespaces);
+  return namespaces[0]?.tables ?? {};
+}
+
+/** The sole introspected namespace's schema name. */
+function schemaNameOf(result: PostgresDatabaseSchemaNode): string | undefined {
+  return Object.values(result.namespaces)[0]?.schemaName;
+}
 
 type QueryHandler = {
   readonly match: (sql: string) => boolean;
@@ -48,8 +79,8 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables).toEqual({});
-      expect(result.pgSchemaName).toBe('public');
+      expect(tablesOf(result)).toEqual({});
+      expect(schemaNameOf(result)).toBe('public');
       expect(result.pgVersion).toEqual(expect.any(String));
       expect(result.existingSchemas).toEqual([]);
     });
@@ -154,16 +185,15 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables).toHaveProperty('user');
-      expect(result.tables['user']?.columns).toHaveProperty('id');
-      expect(result.tables['user']?.columns).toHaveProperty('email');
-      expect(result.tables['user']?.columns['id']?.nativeType).toBe('int4');
-      expect(result.tables['user']?.columns['email']?.nativeType).toBe('character varying(255)');
-      expect(result.tables['user']?.columns['id']?.nullable).toBe(false);
-      expect(result.tables['user']?.primaryKey).toEqual({
-        columns: ['id'],
-        name: 'user_pkey',
-      });
+      expect(tablesOf(result)).toHaveProperty('user');
+      expect(tablesOf(result)['user']?.columns).toHaveProperty('id');
+      expect(tablesOf(result)['user']?.columns).toHaveProperty('email');
+      expect(tablesOf(result)['user']?.columns['id']?.nativeType).toBe('int4');
+      expect(tablesOf(result)['user']?.columns['email']?.nativeType).toBe('character varying(255)');
+      expect(tablesOf(result)['user']?.columns['id']?.nullable).toBe(false);
+      expect(tablesOf(result)['user']?.primaryKey).toEqual(
+        new PrimaryKey({ columns: ['id'], name: 'user_pkey' }),
+      );
     });
 
     it('handles character varying without length', async () => {
@@ -218,7 +248,7 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.columns['text_col']?.nativeType).toBe('character varying');
+      expect(tablesOf(result)['user']?.columns['text_col']?.nativeType).toBe('character varying');
     });
 
     it('handles numeric with precision and scale', async () => {
@@ -273,7 +303,7 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.columns['price']?.nativeType).toBe('numeric(10,2)');
+      expect(tablesOf(result)['user']?.columns['price']?.nativeType).toBe('numeric(10,2)');
     });
 
     it('handles numeric with precision only', async () => {
@@ -328,7 +358,7 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.columns['amount']?.nativeType).toBe('numeric(10)');
+      expect(tablesOf(result)['user']?.columns['amount']?.nativeType).toBe('numeric(10)');
     });
 
     it('handles numeric without precision', async () => {
@@ -383,7 +413,7 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.columns['value']?.nativeType).toBe('numeric');
+      expect(tablesOf(result)['user']?.columns['value']?.nativeType).toBe('numeric');
     });
 
     it('maps json and jsonb columns to native types', async () => {
@@ -448,8 +478,8 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['event']?.columns['payload']?.nativeType).toBe('jsonb');
-      expect(result.tables['event']?.columns['raw']?.nativeType).toBe('json');
+      expect(tablesOf(result)['event']?.columns['payload']?.nativeType).toBe('jsonb');
+      expect(tablesOf(result)['event']?.columns['raw']?.nativeType).toBe('json');
     });
 
     it('uses formatted_type for bit length', async () => {
@@ -482,7 +512,7 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.columns['flags']?.nativeType).toBe('bit(8)');
+      expect(tablesOf(result)['user']?.columns['flags']?.nativeType).toBe('bit(8)');
     });
 
     it('normalizes formatted_type variants', async () => {
@@ -581,13 +611,13 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.columns['name']?.nativeType).toBe('character varying(255)');
-      expect(result.tables['user']?.columns['code']?.nativeType).toBe('character(4)');
-      expect(result.tables['user']?.columns['flags']?.nativeType).toBe('bit varying(6)');
-      expect(result.tables['user']?.columns['seen_at']?.nativeType).toBe('timestamptz(3)');
-      expect(result.tables['user']?.columns['created_at']?.nativeType).toBe('timestamp(6)');
-      expect(result.tables['user']?.columns['local_time']?.nativeType).toBe('time(0)');
-      expect(result.tables['user']?.columns['zoned_time']?.nativeType).toBe('timetz(2)');
+      expect(tablesOf(result)['user']?.columns['name']?.nativeType).toBe('character varying(255)');
+      expect(tablesOf(result)['user']?.columns['code']?.nativeType).toBe('character(4)');
+      expect(tablesOf(result)['user']?.columns['flags']?.nativeType).toBe('bit varying(6)');
+      expect(tablesOf(result)['user']?.columns['seen_at']?.nativeType).toBe('timestamptz(3)');
+      expect(tablesOf(result)['user']?.columns['created_at']?.nativeType).toBe('timestamp(6)');
+      expect(tablesOf(result)['user']?.columns['local_time']?.nativeType).toBe('time(0)');
+      expect(tablesOf(result)['user']?.columns['zoned_time']?.nativeType).toBe('timetz(2)');
     });
 
     it('handles foreign keys', async () => {
@@ -654,14 +684,14 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['post']?.foreignKeys).toEqual([
-        {
+      expect(tablesOf(result)['post']?.foreignKeys).toEqual([
+        new SqlForeignKeyIR({
           columns: ['user_id'],
           referencedTable: 'user',
           referencedSchema: 'public',
           referencedColumns: ['id'],
           name: 'post_user_id_fkey',
-        },
+        }),
       ]);
     });
 
@@ -740,15 +770,15 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['order']?.foreignKeys).toEqual([
-        {
+      expect(tablesOf(result)['order']?.foreignKeys).toEqual([
+        new SqlForeignKeyIR({
           columns: ['user_id', 'account_id'],
           referencedTable: 'account',
           referencedSchema: 'public',
           referencedColumns: ['user_id', 'id'],
           name: 'order_account_fkey',
           onDelete: 'cascade',
-        },
+        }),
       ]);
     });
 
@@ -811,11 +841,8 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.uniques).toEqual([
-        {
-          columns: ['email'],
-          name: 'user_email_key',
-        },
+      expect(tablesOf(result)['user']?.uniques).toEqual([
+        new SqlUniqueIR({ columns: ['email'], name: 'user_email_key' }),
       ]);
     });
 
@@ -877,11 +904,8 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.uniques).toEqual([
-        {
-          columns: ['email', 'tenant_id'],
-          name: 'user_email_tenant_key',
-        },
+      expect(tablesOf(result)['user']?.uniques).toEqual([
+        new SqlUniqueIR({ columns: ['email', 'tenant_id'], name: 'user_email_tenant_key' }),
       ]);
     });
 
@@ -945,12 +969,8 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.indexes).toEqual([
-        {
-          columns: ['name'],
-          name: 'user_name_idx',
-          unique: false,
-        },
+      expect(tablesOf(result)['user']?.indexes).toEqual([
+        new SqlIndexIR({ columns: ['name'], name: 'user_name_idx', unique: false }),
       ]);
     });
 
@@ -1014,12 +1034,12 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.indexes).toEqual([
-        {
+      expect(tablesOf(result)['user']?.indexes).toEqual([
+        new SqlIndexIR({
           columns: ['email', 'tenant_id'],
           name: 'user_email_tenant_idx',
           unique: false,
-        },
+        }),
       ]);
     });
 
@@ -1101,8 +1121,8 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.indexes).toHaveLength(1);
-      expect(result.tables['user']?.indexes[0]?.columns).toEqual(['id']);
+      expect(tablesOf(result)['user']?.indexes).toHaveLength(1);
+      expect(tablesOf(result)['user']?.indexes[0]?.columns).toEqual(['id']);
     });
 
     it('handles custom schema name', async () => {
@@ -1130,7 +1150,7 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver, undefined, 'custom_schema');
 
-      expect(result.pgSchemaName).toBe('custom_schema');
+      expect(schemaNameOf(result)).toBe('custom_schema');
     });
 
     it(
@@ -1241,7 +1261,7 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.primaryKey).toBeUndefined();
+      expect(tablesOf(result)['user']?.primaryKey).toBeUndefined();
     });
 
     it('handles primary key without constraint name', async () => {
@@ -1305,10 +1325,8 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.primaryKey).toEqual({
-        columns: ['id'],
-      });
-      expect(result.tables['user']?.primaryKey?.name).toBeUndefined();
+      expect(tablesOf(result)['user']?.primaryKey).toEqual(new PrimaryKey({ columns: ['id'] }));
+      expect(tablesOf(result)['user']?.primaryKey?.name).toBeUndefined();
     });
 
     it('normalizes integer/float/bool formatted types', async () => {
@@ -1396,12 +1414,12 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['metrics']?.columns['id']?.nativeType).toBe('int4');
-      expect(result.tables['metrics']?.columns['small']?.nativeType).toBe('int2');
-      expect(result.tables['metrics']?.columns['big']?.nativeType).toBe('int8');
-      expect(result.tables['metrics']?.columns['real_col']?.nativeType).toBe('float4');
-      expect(result.tables['metrics']?.columns['double_col']?.nativeType).toBe('float8');
-      expect(result.tables['metrics']?.columns['active']?.nativeType).toBe('bool');
+      expect(tablesOf(result)['metrics']?.columns['id']?.nativeType).toBe('int4');
+      expect(tablesOf(result)['metrics']?.columns['small']?.nativeType).toBe('int2');
+      expect(tablesOf(result)['metrics']?.columns['big']?.nativeType).toBe('int8');
+      expect(tablesOf(result)['metrics']?.columns['real_col']?.nativeType).toBe('float4');
+      expect(tablesOf(result)['metrics']?.columns['double_col']?.nativeType).toBe('float8');
+      expect(tablesOf(result)['metrics']?.columns['active']?.nativeType).toBe('bool');
     });
 
     it('sorts multi-column primary key by ordinal position and skips PK from uniques', async () => {
@@ -1469,11 +1487,81 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(result.tables['user']?.primaryKey).toEqual({
-        columns: ['tenant_id', 'id'],
-        name: 'user_pkey',
+      expect(tablesOf(result)['user']?.primaryKey).toEqual(
+        new PrimaryKey({ columns: ['tenant_id', 'id'], name: 'user_pkey' }),
+      );
+      expect(tablesOf(result)['user']?.uniques).toEqual([]);
+    });
+
+    it('stamps normalized resolvedNativeType and parsed resolvedDefault on columns', async () => {
+      const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'doc' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              table_name: 'doc',
+              column_name: 'status',
+              data_type: 'text',
+              udt_name: 'text',
+              is_nullable: 'NO',
+              column_default: "'draft'::text",
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              table_name: 'doc',
+              column_name: 'created_at',
+              data_type: 'timestamp with time zone',
+              udt_name: 'timestamptz',
+              is_nullable: 'NO',
+              column_default: 'now()',
+              formatted_type: 'timestamp with time zone',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              table_name: 'doc',
+              column_name: 'tags',
+              data_type: 'ARRAY',
+              udt_name: '_text',
+              is_nullable: 'YES',
+              column_default: null,
+              formatted_type: 'text[]',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+          ],
+        },
+        { match: includes('PRIMARY KEY'), rows: [] },
+        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes('UNIQUE'), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+      const columns = tablesOf(result)['doc']?.columns;
+
+      expect(columns?.['status']?.default).toBe("'draft'::text");
+      expect(columns?.['status']?.resolvedNativeType).toBe('text');
+      expect(columns?.['status']?.resolvedDefault).toEqual({ kind: 'literal', value: 'draft' });
+
+      expect(columns?.['created_at']?.resolvedNativeType).toBe('timestamptz');
+      expect(columns?.['created_at']?.resolvedDefault).toEqual({
+        kind: 'function',
+        expression: 'now()',
       });
-      expect(result.tables['user']?.uniques).toEqual([]);
+
+      expect(columns?.['tags']?.many).toBe(true);
+      expect(columns?.['tags']?.nativeType).toBe('text');
+      expect(columns?.['tags']?.resolvedNativeType).toBe('text[]');
+      expect(columns?.['tags']?.resolvedDefault).toBeUndefined();
     });
   });
 
@@ -1510,7 +1598,7 @@ describe('PostgresControlAdapter', () => {
 
       // format_type() returns '"BillingState"' for mixed-case enums;
       // introspection must strip the quotes so it matches the contract's unquoted name
-      expect(result.tables['Organization']?.columns['billingState']?.nativeType).toBe(
+      expect(tablesOf(result)['Organization']?.columns['billingState']?.nativeType).toBe(
         'BillingState',
       );
     });
@@ -1546,7 +1634,7 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       // Lowercase enum names are not quoted by format_type(), should pass through unchanged
-      expect(result.tables['user']?.columns['role']?.nativeType).toBe('role');
+      expect(tablesOf(result)['user']?.columns['role']?.nativeType).toBe('role');
     });
   });
 
@@ -1596,6 +1684,50 @@ describe('PostgresControlAdapter', () => {
     it('returns undefined for a null or empty input', () => {
       expect(parsePgReloptions(null, 'item_body_idx')).toBeUndefined();
       expect(parsePgReloptions([], 'item_body_idx')).toBeUndefined();
+    });
+  });
+
+  describe('parsePgNameArray', () => {
+    it('passes a real JS array through as strings', () => {
+      expect(parsePgNameArray(['a', 'b'])).toEqual(['a', 'b']);
+    });
+
+    it('parses an unquoted array literal', () => {
+      expect(parsePgNameArray('{draft,review,done}')).toEqual(['draft', 'review', 'done']);
+    });
+
+    it('returns empty for an empty literal, non-strings, and non-literals', () => {
+      expect(parsePgNameArray('{}')).toEqual([]);
+      expect(parsePgNameArray(42)).toEqual([]);
+      expect(parsePgNameArray('not-a-literal')).toEqual([]);
+    });
+
+    it('parses a quoted element containing whitespace', () => {
+      expect(parsePgNameArray('{"in progress",done}')).toEqual(['in progress', 'done']);
+    });
+
+    it('parses a quoted element containing a comma', () => {
+      expect(parsePgNameArray('{"a,b",c}')).toEqual(['a,b', 'c']);
+    });
+
+    it('parses a quoted element containing an escaped double quote', () => {
+      expect(parsePgNameArray('{"say \\"hi\\"",plain}')).toEqual(['say "hi"', 'plain']);
+    });
+
+    it('parses a quoted element containing an escaped backslash', () => {
+      expect(parsePgNameArray('{"back\\\\slash"}')).toEqual(['back\\slash']);
+    });
+
+    it('parses a quoted element containing braces', () => {
+      expect(parsePgNameArray('{"{curly}",other}')).toEqual(['{curly}', 'other']);
+    });
+
+    it('does not trim significant leading/trailing whitespace inside quotes', () => {
+      expect(parsePgNameArray('{" padded "}')).toEqual([' padded ']);
+    });
+
+    it('rejects an unterminated quoted element', () => {
+      expect(parsePgNameArray('{"unterminated}')).toEqual([]);
     });
   });
 

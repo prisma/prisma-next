@@ -231,12 +231,7 @@ withTempDir(({ createTempDir }) => {
               },
               schema: {
                 summary: expect.any(String),
-                counts: {
-                  pass: expect.any(Number),
-                  warn: expect.any(Number),
-                  fail: expect.any(Number),
-                  totalNodes: expect.any(Number),
-                },
+                strict: expect.any(Boolean),
               },
             });
 
@@ -505,6 +500,60 @@ withTempDir(({ createTempDir }) => {
             ok: true,
             summary: expect.stringContaining('satisfies contract'),
           });
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'prints schema-only failure diagnostics even under --quiet',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            fixtureSubdir,
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const configPath = testSetup.configPath;
+          // The contract expects a `user` table the database does not have, so
+          // the schema-only verify fails.
+          const contractJson = createTestContract({
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              },
+            },
+          });
+          const contractPath = resolve(testSetup.testDir, 'output/contract.json');
+          mkdirSync(resolve(testSetup.testDir, 'output'), { recursive: true });
+          writeFileSync(contractPath, JSON.stringify(contractJson, null, 2), 'utf-8');
+
+          const outputStartIndex = consoleOutput.length;
+          const command = createDbVerifyCommand();
+          const verifyCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await expect(
+              executeCommand(command, [
+                '--config',
+                configPath,
+                '--schema-only',
+                '--quiet',
+                '--no-color',
+              ]),
+            ).rejects.toThrow('process.exit called');
+          } finally {
+            process.chdir(verifyCwd);
+          }
+
+          expect(getExitCode()).toBe(1);
+
+          // Exiting 1 without diagnostics is unhelpful: the failure render
+          // overrides --quiet, same as the full-mode branch.
+          const rendered = consoleOutput.slice(outputStartIndex).join('\n');
+          expect(rendered).toContain('user');
+          expect(rendered).toContain('does not satisfy contract');
         });
       },
       timeouts.spinUpPpgDev,

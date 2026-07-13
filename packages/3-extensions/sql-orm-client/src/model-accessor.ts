@@ -22,6 +22,7 @@ import {
   resolveFieldToColumn,
   resolveModelRelations,
   resolveModelTableName,
+  resolvePolymorphismInfo,
   resolveVariantFieldColumns,
   type VariantColumnRef,
 } from './collection-contract';
@@ -80,6 +81,20 @@ export function createModelAccessor<
   const variantFieldColumns: Record<string, VariantColumnRef> = variantName
     ? resolveVariantFieldColumns(contract, namespaceId, modelName, variantName)
     : {};
+  // A selected variant's own relations are resolved against the variant's
+  // coordinates: the variant model name (so join columns read the variant's
+  // field→column map) and the variant's table (the MTI variant table the
+  // read path joins in, or the base table for STI, where the variant's
+  // columns physically live). They shadow a same-named base relation.
+  const variantCoordinates = variantName
+    ? {
+        name: variantName,
+        relations: resolveModelRelations(contract, namespaceId, variantName),
+        tableName:
+          resolvePolymorphismInfo(contract, namespaceId, modelName)?.variants.get(variantName)
+            ?.table ?? tableName,
+      }
+    : undefined;
 
   const opsByCodecId = new Map<string, NamedOp[]>();
 
@@ -114,6 +129,20 @@ export function createModelAccessor<
       get(_target, prop: string | symbol): unknown {
         if (typeof prop !== 'string') {
           return undefined;
+        }
+
+        if (variantCoordinates) {
+          const variantRelation = variantCoordinates.relations[prop];
+          if (variantRelation) {
+            return createRelationFilterAccessor(
+              context,
+              namespaceId,
+              variantCoordinates.name,
+              variantCoordinates.tableName,
+              prop,
+              variantRelation,
+            );
+          }
         }
 
         const relation = modelRelations[prop];

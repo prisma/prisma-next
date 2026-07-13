@@ -1,28 +1,29 @@
 import type { ColumnDefault, Contract, JsonValue } from '@prisma-next/contract/types';
+import type { CodecRef } from '@prisma-next/framework-components/codec';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
 import {
   type CheckConstraint,
   type ForeignKey,
   type Index,
-  isStorageTable,
   isStorageTypeInstance,
   type SqlStorage,
   type StorageColumn,
-  type StorageTable,
+  StorageTable,
   type StorageTypeInstance,
   type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
-import type {
-  SqlAnnotations,
-  SqlCheckConstraintIRInput,
-  SqlColumnIR,
-  SqlForeignKeyIR,
-  SqlIndexIR,
+import {
+  type SqlAnnotations,
+  type SqlCheckConstraintIRInput,
+  type SqlColumnIRInput,
+  type SqlForeignKeyIRInput,
+  type SqlIndexIRInput,
   SqlSchemaIR,
   SqlTableIR,
-  SqlUniqueIR,
+  type SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 /**
@@ -73,7 +74,7 @@ function convertColumn(
   storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
-): SqlColumnIR {
+): SqlColumnIRInput {
   // Resolve `typeRef` so columns that delegate their `nativeType`/`codecId`/
   // `typeParams` to a named `storage.types` entry expand the same way as
   // columns that inline those fields. Without this resolution, a
@@ -99,6 +100,43 @@ function convertColumn(
       'default',
       column.default != null && renderDefault ? renderDefault(column.default, column) : undefined,
     ),
+    // Contract-derived columns are resolved by construction: the computed
+    // full native type doubles as the resolved value, and the contract's
+    // structured default is the resolved default (the introspected side
+    // stamps its normalizer's parse of the raw expression).
+    resolvedNativeType: nativeType,
+    ...ifDefined('resolvedDefault', column.default ?? undefined),
+    // The column's codec identity, carried the same way the query AST
+    // carries `CodecRef` (TML-2456) — the migration planner's op-builders
+    // resolve DDL rendering from this at plan time (Decision 5), instead of
+    // reading a derivation-precomputed render payload.
+    codecRef: buildColumnCodecRef(resolved, column.many),
+    codecBaseNativeType: resolved.nativeType,
+    ...(column.typeRef !== undefined ? { codecNamedType: true } : {}),
+  };
+}
+
+/**
+ * Builds the column's `CodecRef` from its resolved (post-`typeRef`) codec
+ * identity — the same construction the query AST and the migration DDL
+ * renderer already use (TML-2456, TML-2918).
+ */
+function buildColumnCodecRef(
+  resolved: Pick<StorageColumn, 'codecId' | 'nativeType' | 'typeParams'>,
+  many: boolean | undefined,
+): CodecRef {
+  return {
+    codecId: resolved.codecId,
+    ...ifDefined(
+      'typeParams',
+      resolved.typeParams !== undefined
+        ? blindCast<
+            JsonValue,
+            'resolved.typeParams is JsonValue-shaped storage metadata; the narrowed (non-undefined) value lands in CodecRef.typeParams which is JsonValue'
+          >(resolved.typeParams)
+        : undefined,
+    ),
+    ...ifDefined('many', many),
   };
 }
 
@@ -194,26 +232,42 @@ function convertCheck(check: CheckConstraint, storage: SqlStorage): SqlCheckCons
   };
 }
 
-function convertUnique(unique: UniqueConstraint): SqlUniqueIR {
+function convertUnique(unique: UniqueConstraint): SqlUniqueIRInput {
   return {
     columns: unique.columns,
     ...ifDefined('name', unique.name),
   };
 }
 
-function convertIndex(index: Index): SqlIndexIR {
+function convertIndex(index: Index): SqlIndexIRInput {
   return {
     columns: index.columns,
     unique: false,
     ...ifDefined('name', index.name),
+    // Carried so the derived index node compares type/options against the
+    // introspected side (the legacy walk read them from the contract).
+    ...ifDefined('type', index.type),
+    ...ifDefined('options', index.options),
   };
 }
 
-function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
+/**
+ * The FK's referenced-namespace identity comes from the target's namespace
+ * node, not the raw namespace-id string. An unbound target namespace stamps
+ * no `referencedSchema` at all — the FK node's id renders the absence as the
+ * empty segment, which is what flat (single-schema) introspection produces,
+ * so both diff sides' FK ids meet by construction. A bound namespace (or a
+ * cross-space target whose namespace lives in another contract's storage)
+ * stamps its coordinate verbatim; namespaced targets (Postgres) resolve the
+ * real DDL schema downstream.
+ */
+function convertForeignKey(fk: ForeignKey, storage: SqlStorage): SqlForeignKeyIRInput {
+  const targetNamespace = storage.namespaces[fk.target.namespaceId];
+  const targetIsUnbound = targetNamespace?.isUnbound === true;
   return {
     columns: fk.source.columns,
     referencedTable: fk.target.tableName,
-    referencedSchema: fk.target.namespaceId,
+    ...(targetIsUnbound ? {} : { referencedSchema: fk.target.namespaceId }),
     referencedColumns: fk.target.columns,
     ...ifDefined('name', fk.name),
     ...ifDefined('onDelete', fk.onDelete),
@@ -229,7 +283,7 @@ function convertTable(
   renderDefault: DefaultRenderer | undefined,
   storage: SqlStorage,
 ): SqlTableIR {
-  const columns: Record<string, SqlColumnIR> = {};
+  const columns: Record<string, SqlColumnIRInput> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
     columns[colName] = convertColumn(
       colName,
@@ -245,7 +299,7 @@ function convertTable(
     ...table.uniques.map((unique) => unique.columns.join(',')),
     ...(table.primaryKey ? [table.primaryKey.columns.join(',')] : []),
   ]);
-  const fkBackingIndexes: SqlIndexIR[] = [];
+  const fkBackingIndexes: SqlIndexIRInput[] = [];
   for (const fk of table.foreignKeys) {
     if (fk.index === false) continue;
     const key = fk.source.columns.join(',');
@@ -263,15 +317,17 @@ function convertTable(
       ? table.checks.map((c) => convertCheck(c, storage))
       : undefined;
 
-  return {
+  return new SqlTableIR({
     name,
     columns,
     ...ifDefined('primaryKey', table.primaryKey),
-    foreignKeys: table.foreignKeys.filter((fk) => fk.constraint !== false).map(convertForeignKey),
+    foreignKeys: table.foreignKeys
+      .filter((fk) => fk.constraint !== false)
+      .map((fk) => convertForeignKey(fk, storage)),
     uniques: table.uniques.map(convertUnique),
     indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
     ...ifDefined('checks', checks),
-  };
+  });
 }
 
 /**
@@ -305,7 +361,7 @@ export function detectDestructiveChanges(
 
     for (const tableName of Object.keys(fromTables)) {
       const toTableRaw = toNs?.entries.table?.[tableName];
-      if (!isStorageTable(toTableRaw)) {
+      if (!StorageTable.is(toTableRaw)) {
         conflicts.push({
           kind: 'tableRemoved',
           summary: `Table "${tableName}" was removed`,
@@ -315,7 +371,7 @@ export function detectDestructiveChanges(
       const toTable = toTableRaw;
 
       const fromTableRaw = fromTables[tableName];
-      if (!isStorageTable(fromTableRaw)) continue;
+      if (!StorageTable.is(fromTableRaw)) continue;
       const fromTable = fromTableRaw;
 
       for (const columnName of Object.keys(fromTable.columns)) {
@@ -360,6 +416,48 @@ export interface ContractToSchemaIROptions {
  *
  * Returns an empty schema IR when `contract` is `null` (new project).
  */
+/**
+ * Converts the tables of a single namespace into a `SqlSchemaIR`, keyed by
+ * table name within that namespace. Unlike {@link contractToSchemaIR}, which
+ * flattens every namespace's tables into one bare-keyed record (and throws on a
+ * cross-namespace name collision), this scopes the table iteration to one
+ * namespace so the same table name can exist in two schemas.
+ *
+ * The full `storage` is still passed to `convertTable`, so value-set / enum /
+ * type resolution that legitimately spans namespaces is unaffected. Foreign
+ * keys are built purely from the FK descriptor (`fk.target`), so cross-namespace
+ * FKs survive per-namespace conversion. The `annotations` block (storage-type
+ * derived) is omitted here — the per-namespace tree consumer reads only the
+ * per-table fields.
+ */
+export function contractNamespaceToSchemaIR(
+  storage: SqlStorage,
+  namespaceId: string,
+  options: ContractToSchemaIROptions,
+): SqlSchemaIR {
+  if (options.annotationNamespace.length === 0) {
+    throw new Error('annotationNamespace must be a non-empty string');
+  }
+  const namespace = storage.namespaces[namespaceId];
+  if (!namespace) {
+    return new SqlSchemaIR({ tables: {} });
+  }
+  const storageTypes: ResolvedStorageTypes = { ...(storage.types ?? {}) };
+  const tables: Record<string, SqlTableIR> = {};
+  for (const [tableName, tableDefRaw] of Object.entries(namespace.entries.table ?? {})) {
+    StorageTable.assert(tableDefRaw, `namespaces.${namespaceId}.entries.table.${tableName}`);
+    tables[tableName] = convertTable(
+      tableName,
+      tableDefRaw,
+      storageTypes,
+      options.expandNativeType,
+      options.renderDefault,
+      storage,
+    );
+  }
+  return new SqlSchemaIR({ tables });
+}
+
 export function contractToSchemaIR(
   contract: Contract<SqlStorage> | null,
   options: ContractToSchemaIROptions,
@@ -369,21 +467,15 @@ export function contractToSchemaIR(
   }
 
   if (!contract) {
-    return { tables: {} };
+    return new SqlSchemaIR({ tables: {} });
   }
 
   const storage = contract.storage;
-  const storageTypes: ResolvedStorageTypes = {
-    ...((storage.types ?? {}) as ResolvedStorageTypes),
-  };
+  const storageTypes: ResolvedStorageTypes = { ...(storage.types ?? {}) };
   const tables: Record<string, SqlTableIR> = {};
   for (const ns of Object.values(storage.namespaces)) {
     for (const [tableName, tableDefRaw] of Object.entries(ns.entries.table ?? {})) {
-      if (!isStorageTable(tableDefRaw)) {
-        throw new Error(
-          `contractToSchemaIR: expected StorageTable at namespaces.${ns.id}.entries.table.${tableName}`,
-        );
-      }
+      StorageTable.assert(tableDefRaw, `namespaces.${ns.id}.entries.table.${tableName}`);
       const tableDef = tableDefRaw;
       if (tables[tableName] !== undefined) {
         throw new Error(
@@ -407,10 +499,10 @@ export function contractToSchemaIR(
     options.resolveEnumNamespaceSchema,
   );
 
-  return {
+  return new SqlSchemaIR({
     tables,
     ...ifDefined('annotations', annotations),
-  };
+  });
 }
 
 function deriveAnnotations(
@@ -420,7 +512,7 @@ function deriveAnnotations(
 ): SqlAnnotations | undefined {
   const storageTypes: Record<string, StorageTypeInstance> = {};
 
-  for (const typeInstance of Object.values((storage.types ?? {}) as ResolvedStorageTypes)) {
+  for (const typeInstance of Object.values(storage.types ?? {})) {
     if (isStorageTypeInstance(typeInstance)) {
       storageTypes[typeInstance.nativeType] = typeInstance;
     }

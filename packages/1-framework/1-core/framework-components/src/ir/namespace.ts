@@ -61,10 +61,26 @@ export const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
 export interface Namespace extends IRNode, StorageNamespace {
   readonly kind: string;
   readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  /**
+   * Whether this namespace is the late-bound unbound slot (see
+   * {@link UNBOUND_NAMESPACE_ID}). Optional so JSON-shaped structural
+   * satisfiers remain valid; every hydrated `NamespaceBase` concretion
+   * answers it.
+   */
+  readonly isUnbound?: boolean;
 }
 
 export abstract class NamespaceBase extends IRNodeBase implements Namespace {
   abstract readonly id: string;
   abstract readonly entries: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
   abstract override readonly kind: string;
+
+  /**
+   * Answers "am I the unbound namespace" as node behavior, so consumers
+   * never compare ids against the sentinel. This getter is the single
+   * encapsulated place the {@link UNBOUND_NAMESPACE_ID} comparison lives.
+   */
+  get isUnbound(): boolean {
+    return this.id === UNBOUND_NAMESPACE_ID;
+  }
 }

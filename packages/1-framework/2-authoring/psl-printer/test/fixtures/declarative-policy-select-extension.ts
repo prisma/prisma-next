@@ -46,7 +46,7 @@ export interface PolicySelectIrInput {
   /** Resolved model name (raw identifier from the `target` ref parameter). */
   readonly target: string;
   /** Chosen option token, or undefined when the `as` parameter was omitted. */
-  readonly as?: 'permissive' | 'restrictive';
+  readonly as?: 'permissive' | 'restrictive' | undefined;
   /** Raw predicate string extracted from the `using` value literal. */
   readonly using: string;
 }

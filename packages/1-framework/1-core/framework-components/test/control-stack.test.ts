@@ -18,6 +18,7 @@ import type { Codec } from '../src/shared/codec';
 import type { AnyCodecDescriptor } from '../src/shared/codec-descriptor';
 import type { CodecLookup } from '../src/shared/codec-types';
 import type { ComponentDescriptor } from '../src/shared/framework-components';
+import { isRuntimeError } from '../src/shared/runtime-error';
 
 function createDescriptor<K extends string = 'target'>(
   overrides: Partial<ComponentDescriptor<string>> & { kind?: K } = {} as Partial<
@@ -128,7 +129,13 @@ describe('extractComponentIds', () => {
 describe('assembleAuthoringContributions', () => {
   it('returns empty namespaces for descriptors without authoring', () => {
     const result = assembleAuthoringContributions([createDescriptor()]);
-    expect(result).toEqual({ field: {}, type: {}, entityTypes: {}, pslBlockDescriptors: {} });
+    expect(result).toEqual({
+      field: {},
+      type: {},
+      entityTypes: {},
+      pslBlockDescriptors: {},
+      modelAttributes: {},
+    });
   });
 
   it('merges field namespaces from multiple descriptors', () => {
@@ -255,10 +262,13 @@ describe('assembleAuthoringContributions', () => {
     expect(Object.keys(result.entityTypes)).toEqual(['enum', 'demo']);
   });
 
-  function makeDeclarativePslBlockDescriptor(discriminator: string) {
+  function makeDeclarativePslBlockDescriptor(
+    discriminator: string,
+    keyword: string = discriminator,
+  ) {
     return {
       kind: 'pslBlock' as const,
-      keyword: 'policy_select',
+      keyword,
       discriminator,
       name: { required: true },
       parameters: {},
@@ -409,7 +419,7 @@ describe('assembleAuthoringContributions', () => {
     ).not.toThrow();
   });
 
-  it('rejects two pslBlockDescriptors contributions sharing a discriminator', () => {
+  it('rejects two pslBlockDescriptors contributions sharing a keyword', () => {
     expect(() =>
       assembleAuthoringContributions([
         createDescriptor({
@@ -427,13 +437,78 @@ describe('assembleAuthoringContributions', () => {
               },
             },
             pslBlockDescriptors: {
-              policyA: makeDeclarativePslBlockDescriptor('shared-disc'),
-              policyB: makeDeclarativePslBlockDescriptor('shared-disc'),
+              // Different discriminators — that alone is fine (N:1 below) —
+              // but the same keyword, which is the parser's real dispatch key.
+              policyA: makeDeclarativePslBlockDescriptor('shared-disc', 'shared_keyword'),
+              policyB: makeDeclarativePslBlockDescriptor('shared-disc-b', 'shared_keyword'),
             },
           },
         }),
       ]),
-    ).toThrow(/Duplicate pslBlock discriminator "shared-disc".*"policyA".*"policyB"/);
+    ).toThrow(/Duplicate pslBlock key "shared_keyword".*"policyA".*"policyB"/);
+  });
+
+  it('raises a structured runtime error for a duplicate pslBlock keyword', () => {
+    let caught: unknown;
+    try {
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              policyA: {
+                kind: 'entity',
+                discriminator: 'shared-disc',
+                output: { factory: () => ({}) },
+              },
+              policyB: {
+                kind: 'entity',
+                discriminator: 'shared-disc-b',
+                output: { factory: () => ({}) },
+              },
+            },
+            pslBlockDescriptors: {
+              policyA: makeDeclarativePslBlockDescriptor('shared-disc', 'shared_keyword'),
+              policyB: makeDeclarativePslBlockDescriptor('shared-disc-b', 'shared_keyword'),
+            },
+          },
+        }),
+      ]);
+    } catch (error) {
+      caught = error;
+    }
+    expect(isRuntimeError(caught)).toBe(true);
+    if (isRuntimeError(caught)) {
+      expect(caught.code).toBe('RUNTIME.DUPLICATE_AUTHORING_DISCRIMINATOR');
+      expect(caught.category).toBe('RUNTIME');
+      expect(caught.details).toEqual({
+        label: 'pslBlock',
+        key: 'shared_keyword',
+        existingPath: 'policyA',
+        path: 'policyB',
+      });
+    }
+  });
+
+  it('allows two pslBlockDescriptors contributions sharing a discriminator when their keywords differ (N:1)', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            entityTypes: {
+              shapeEntity: {
+                kind: 'entity',
+                discriminator: 'shape',
+                output: { factory: () => ({}) },
+              },
+            },
+            pslBlockDescriptors: {
+              shapeCircle: makeDeclarativePslBlockDescriptor('shape', 'shape_circle'),
+              shapeSquare: makeDeclarativePslBlockDescriptor('shape', 'shape_square'),
+            },
+          },
+        }),
+      ]),
+    ).not.toThrow();
   });
 
   it('rejects two entityTypes contributions sharing a discriminator', () => {
@@ -456,7 +531,7 @@ describe('assembleAuthoringContributions', () => {
           },
         }),
       ]),
-    ).toThrow(/Duplicate entityType discriminator "shared-entity-disc".*"enumA".*"enumB"/);
+    ).toThrow(/Duplicate entityType key "shared-entity-disc".*"enumA".*"enumB"/);
   });
 
   it('accepts entityTypes-only contributions without a matching pslBlockDescriptors entry (standalone factory is allowed)', () => {
@@ -757,6 +832,54 @@ describe('extractCodecLookup', () => {
     ]);
     expect(lookup.renderValueLiteralFor?.('a@1', 'val', 'output')).toBeUndefined();
   });
+
+  it('metaFor returns the static meta for a non-parameterized codec regardless of typeParams', () => {
+    const descriptorWithMeta: AnyCodecDescriptor = {
+      ...stubDescriptor('text@1'),
+      meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
+    };
+    const lookup = extractCodecLookup([
+      { id: 'desc', types: { codecTypes: { codecDescriptors: [descriptorWithMeta] } } },
+    ]);
+    expect(lookup.metaFor('text@1')).toEqual({ db: { sql: { postgres: { nativeType: 'text' } } } });
+    expect(lookup.metaFor('text@1', { irrelevant: true })).toEqual({
+      db: { sql: { postgres: { nativeType: 'text' } } },
+    });
+  });
+
+  it('metaFor prefers the descriptor params-aware metaFor over static meta when typeParams is given', () => {
+    const enumDescriptor: AnyCodecDescriptor = {
+      ...stubDescriptor('pg/enum@1'),
+      meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
+      metaFor: (typeParams: unknown) =>
+        typeParams !== null && typeof typeParams === 'object' && 'typeName' in typeParams
+          ? { db: { sql: { postgres: { nativeType: String(typeParams.typeName) } } } }
+          : undefined,
+    };
+    const lookup = extractCodecLookup([
+      { id: 'desc', types: { codecTypes: { codecDescriptors: [enumDescriptor] } } },
+    ]);
+    expect(lookup.metaFor('pg/enum@1', { typeName: 'auth.aal_level' })).toEqual({
+      db: { sql: { postgres: { nativeType: 'auth.aal_level' } } },
+    });
+    expect(lookup.metaFor('pg/enum@1')).toEqual({
+      db: { sql: { postgres: { nativeType: 'text' } } },
+    });
+  });
+
+  it('metaFor falls back to the static meta when the params-aware metaFor returns undefined', () => {
+    const enumDescriptor: AnyCodecDescriptor = {
+      ...stubDescriptor('pg/enum@1'),
+      meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
+      metaFor: () => undefined,
+    };
+    const lookup = extractCodecLookup([
+      { id: 'desc', types: { codecTypes: { codecDescriptors: [enumDescriptor] } } },
+    ]);
+    expect(lookup.metaFor('pg/enum@1', { typeName: 'auth.aal_level' })).toEqual({
+      db: { sql: { postgres: { nativeType: 'text' } } },
+    });
+  });
 });
 
 describe('assembleScalarTypeDescriptors', () => {
@@ -977,6 +1100,7 @@ describe('createControlStack', () => {
       type: {},
       entityTypes: {},
       pslBlockDescriptors: {},
+      modelAttributes: {},
     });
   });
 });

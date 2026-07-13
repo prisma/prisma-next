@@ -37,7 +37,7 @@ describe('offset tracking', () => {
     // start offset is only correct if every consumed token (the leading
     // segments and that trivia) advanced the running offset counter.
     const source = 'a.b\n.c';
-    const { diagnostics, cursor } = parse(source, parseTypeAnnotation);
+    const { diagnostics, cursor } = parseTypeAnnotationTree(source);
 
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_QUALIFIED_NAME');
@@ -101,6 +101,36 @@ describe('recoverToSyncPoint', () => {
 function parse(source: string, run: (cursor: Cursor) => GreenNode) {
   const cursor = new Cursor(source);
   const node = run(cursor);
+  return { node, diagnostics: cursor.diagnostics, cursor };
+}
+
+// `parseTypeAnnotation` returns void and emits no node for an empty type, so
+// these well-formed cases are wrapped in a synthetic root to recover the
+// emitted `TypeAnnotation` subtree.
+function parseTypeAnnotationTree(source: string) {
+  const cursor = new Cursor(source);
+  cursor.startNode('Document');
+  parseTypeAnnotation(cursor);
+  const root = cursor.finishNode();
+  const node = root.children[0];
+  if (node === undefined || node.type !== 'node') {
+    throw new Error('expected parseTypeAnnotation to emit a TypeAnnotation node');
+  }
+  return { node, diagnostics: cursor.diagnostics, cursor };
+}
+
+// `parseAttributeArg` returns void and emits no node for an empty argument, so
+// these content-bearing cases are wrapped in a synthetic root to recover the
+// emitted `AttributeArg` subtree.
+function parseAttributeArgTree(source: string) {
+  const cursor = new Cursor(source);
+  cursor.startNode('Document');
+  parseAttributeArg(cursor);
+  const root = cursor.finishNode();
+  const node = root.children[0];
+  if (node === undefined || node.type !== 'node') {
+    throw new Error('expected parseAttributeArg to emit an AttributeArg node');
+  }
   return { node, diagnostics: cursor.diagnostics, cursor };
 }
 
@@ -182,7 +212,7 @@ describe('parseAttribute well-formed', () => {
 describe('parseAttributeArg well-formed', () => {
   it('parses a positional identifier argument', () => {
     const source = 'id';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "AttributeArg
@@ -195,7 +225,7 @@ describe('parseAttributeArg well-formed', () => {
 
   it('parses a named argument with a colon and array value', () => {
     const source = 'fields: [id]';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "AttributeArg
@@ -311,7 +341,7 @@ describe('parseExpression well-formed', () => {
 describe('parseTypeAnnotation well-formed', () => {
   it('parses a bare reference', () => {
     const source = 'String';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -325,7 +355,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a dot-qualified reference', () => {
     const source = 'auth.User';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -342,7 +372,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a colon-prefixed cross-space reference with namespace and optional suffix', () => {
     const source = 'supabase:auth.User?';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -363,7 +393,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a colon-prefixed reference without namespace', () => {
     const source = 'supabase:User';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -380,7 +410,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses an inline constructor call', () => {
     const source = 'Vector(1536)';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -400,7 +430,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a namespace-qualified constructor call into a single FunctionCall chain', () => {
     const source = 'pgvector.Vector(1536)';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -423,7 +453,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a qualified constructor with a named argument and an optional suffix', () => {
     const source = 'pgvector.Vector(length: 1536)?';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -451,7 +481,7 @@ describe('parseTypeAnnotation well-formed', () => {
 
   it('parses a list suffix', () => {
     const source = 'String[]';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(printTree(node)).toMatchInlineSnapshot(`
       "TypeAnnotation
@@ -469,7 +499,7 @@ describe('parseTypeAnnotation well-formed', () => {
 describe('parseTypeAnnotation fault tolerance', () => {
   it('flags triple-dot over-qualification but still yields a subtree that round-trips', () => {
     const source = 'a.b.c';
-    const { node, diagnostics, cursor } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics, cursor } = parseTypeAnnotationTree(source);
 
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
@@ -486,7 +516,7 @@ describe('parseTypeAnnotation fault tolerance', () => {
 
   it('flags double-colon over-qualification but still yields a subtree', () => {
     const source = 'a:b:c';
-    const { node, diagnostics, cursor } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics, cursor } = parseTypeAnnotationTree(source);
 
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
@@ -503,7 +533,7 @@ describe('parseTypeAnnotation fault tolerance', () => {
 
   it('flags a trailing dot with no following segment', () => {
     const source = 'Int.';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
@@ -514,7 +544,7 @@ describe('parseTypeAnnotation fault tolerance', () => {
 
   it('flags a trailing colon with no following segment', () => {
     const source = 'supabase:';
-    const { node, diagnostics } = parse(source, parseTypeAnnotation);
+    const { node, diagnostics } = parseTypeAnnotationTree(source);
 
     expect(node.kind).toBe('TypeAnnotation');
     expect(greenText(node)).toBe(source);
@@ -599,7 +629,7 @@ describe('parseAttribute fault tolerance', () => {
 describe('argument-position object literal', () => {
   it('parses an object literal argument into an ObjectLiteralExpr queryable via fields()', () => {
     const source = '{ a: 1, b: "x" }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
 
     expect(node.kind).toBe('AttributeArg');
     expect(greenText(node)).toBe(source);
@@ -619,7 +649,7 @@ describe('argument-position object literal', () => {
 
   it('parses a nested object literal recursively, round-tripping losslessly', () => {
     const source = '{ a: { b: 1 } }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
 
@@ -633,7 +663,7 @@ describe('argument-position object literal', () => {
 
   it('allows a trailing comma', () => {
     const source = '{ a: 1, }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(0);
 
@@ -646,7 +676,7 @@ describe('argument-position object literal', () => {
 
   it('reports a missing colon but still yields a best-effort node and round-trips', () => {
     const source = '{ a 1 }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
@@ -658,7 +688,7 @@ describe('argument-position object literal', () => {
 
   it('reports a missing value but still yields a best-effort node and round-trips', () => {
     const source = '{ a: }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
@@ -667,7 +697,7 @@ describe('argument-position object literal', () => {
 
   it('reports an unterminated object literal anchored on the opening brace', () => {
     const source = '{ a: 1';
-    const { node, diagnostics, cursor } = parse(source, parseAttributeArg);
+    const { node, diagnostics, cursor } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe('PSL_INVALID_OBJECT_LITERAL');
@@ -682,7 +712,7 @@ describe('argument-position object literal', () => {
 
   it('accepts a string-literal key, exposing the unquoted name', () => {
     const source = '{ "k": 1 }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source); // round-trip holds, object terminated
     expect(diagnostics).toEqual([]);
 
@@ -697,7 +727,7 @@ describe('argument-position object literal', () => {
 
   it('accepts a mix of identifier and string-literal keys with no diagnostics', () => {
     const source = '{ a: 1, "k": 2 }';
-    const { node, diagnostics } = parse(source, parseAttributeArg);
+    const { node, diagnostics } = parseAttributeArgTree(source);
     expect(greenText(node)).toBe(source); // round-trip holds
     expect(diagnostics).toEqual([]);
 

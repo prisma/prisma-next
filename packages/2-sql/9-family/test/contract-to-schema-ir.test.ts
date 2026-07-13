@@ -6,8 +6,22 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import {
+  CheckConstraint,
+  SqlStorage,
+  type StorageColumn,
+  type StorageTable,
+  StorageValueSet,
+} from '@prisma-next/sql-contract/types';
+import {
+  PrimaryKey,
+  SqlCheckConstraintIR,
+  SqlColumnIR,
+  SqlForeignKeyIR,
+  SqlIndexIR,
+  SqlSchemaIR,
+  SqlUniqueIR,
+} from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
@@ -88,9 +102,7 @@ describe('contractToSchemaIR', () => {
   it('converts empty storage to empty schema IR', () => {
     const result = contractToSchemaIR(null, { renderDefault: testRenderer });
 
-    expect(result).toEqual<SqlSchemaIR>({
-      tables: {},
-    });
+    expect(result).toEqual<SqlSchemaIR>(new SqlSchemaIR({ tables: {} }));
   });
 
   it('converts a single table with columns', () => {
@@ -120,9 +132,30 @@ describe('contractToSchemaIR', () => {
     expect(result.tables['User']!.name).toBe('User');
 
     const columns = result.tables['User']!.columns;
-    expect(columns['id']).toEqual({ name: 'id', nativeType: 'text', nullable: false });
-    expect(columns['email']).toEqual({ name: 'email', nativeType: 'text', nullable: false });
-    expect(columns['name']).toEqual({ name: 'name', nativeType: 'text', nullable: true });
+    expect(columns['id']).toEqual(
+      new SqlColumnIR({
+        name: 'id',
+        nativeType: 'text',
+        nullable: false,
+        resolvedNativeType: 'text',
+      }),
+    );
+    expect(columns['email']).toEqual(
+      new SqlColumnIR({
+        name: 'email',
+        nativeType: 'text',
+        nullable: false,
+        resolvedNativeType: 'text',
+      }),
+    );
+    expect(columns['name']).toEqual(
+      new SqlColumnIR({
+        name: 'name',
+        nativeType: 'text',
+        nullable: true,
+        resolvedNativeType: 'text',
+      }),
+    );
   });
 
   it('drops codecId, typeParams, and typeRef from columns', () => {
@@ -165,11 +198,25 @@ describe('contractToSchemaIR', () => {
     const columnA = result.tables['T']!.columns['a']!;
     const columnB = result.tables['T']!.columns['b']!;
 
-    expect(columnA).toEqual({ name: 'a', nativeType: 'vector', nullable: false });
+    expect(columnA).toEqual(
+      new SqlColumnIR({
+        name: 'a',
+        nativeType: 'vector',
+        nullable: false,
+        resolvedNativeType: 'vector',
+      }),
+    );
     expect('codecId' in columnA).toBe(false);
     expect('typeParams' in columnA).toBe(false);
     expect('typeRef' in columnA).toBe(false);
-    expect(columnB).toEqual({ name: 'b', nativeType: 'vector', nullable: false });
+    expect(columnB).toEqual(
+      new SqlColumnIR({
+        name: 'b',
+        nativeType: 'vector',
+        nullable: false,
+        resolvedNativeType: 'vector',
+      }),
+    );
     expect('codecId' in columnB).toBe(false);
     expect('typeParams' in columnB).toBe(false);
     expect('typeRef' in columnB).toBe(false);
@@ -453,7 +500,9 @@ describe('contractToSchemaIR', () => {
     });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
-    expect(result.tables['T']!.primaryKey).toEqual({ columns: ['id'], name: 'T_pkey' });
+    expect(result.tables['T']!.primaryKey).toEqual(
+      new PrimaryKey({ columns: ['id'], name: 'T_pkey' }),
+    );
   });
 
   it('converts unique constraints', () => {
@@ -477,7 +526,9 @@ describe('contractToSchemaIR', () => {
     });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
-    expect(result.tables['T']!.uniques).toEqual([{ columns: ['email'], name: 'T_email_key' }]);
+    expect(result.tables['T']!.uniques).toEqual([
+      new SqlUniqueIR({ columns: ['email'], name: 'T_email_key' }),
+    ]);
   });
 
   it('converts indexes with unique: false', () => {
@@ -502,7 +553,7 @@ describe('contractToSchemaIR', () => {
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.indexes).toEqual([
-      { columns: ['email'], name: 'T_email_idx', unique: false },
+      new SqlIndexIR({ columns: ['email'], name: 'T_email_idx', unique: false }),
     ]);
   });
 
@@ -546,15 +597,14 @@ describe('contractToSchemaIR', () => {
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['Post']!.foreignKeys).toEqual([
-      {
+      new SqlForeignKeyIR({
         columns: ['authorId'],
         referencedTable: 'User',
-        referencedSchema: UNBOUND_NAMESPACE_ID,
         referencedColumns: ['id'],
         name: 'Post_authorId_fkey',
         onDelete: 'cascade',
         onUpdate: 'restrict',
-      },
+      }),
     ]);
   });
 
@@ -619,17 +669,20 @@ describe('contractToSchemaIR', () => {
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['WorkflowState']!.foreignKeys).toEqual([
-      {
+      new SqlForeignKeyIR({
         columns: ['workflowId', 'teamId'],
         referencedTable: 'Workflow',
-        referencedSchema: UNBOUND_NAMESPACE_ID,
         referencedColumns: ['id', 'teamId'],
         name: 'workflow_state_workflow_team_fkey',
         onDelete: 'cascade',
-      },
+      }),
     ]);
     expect(result.tables['WorkflowState']!.indexes).toEqual([
-      { columns: ['workflowId'], unique: false, name: 'WorkflowState_workflowId_idx' },
+      new SqlIndexIR({
+        columns: ['workflowId'],
+        unique: false,
+        name: 'WorkflowState_workflowId_idx',
+      }),
     ]);
   });
 
@@ -762,7 +815,7 @@ describe('contractToSchemaIR', () => {
     });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
-    expect(result.tables['T']!.uniques[0]).toEqual({ columns: ['a', 'b'] });
+    expect(result.tables['T']!.uniques[0]).toEqual(new SqlUniqueIR({ columns: ['a', 'b'] }));
   });
 
   it('handles foreign keys without names', () => {
@@ -799,12 +852,13 @@ describe('contractToSchemaIR', () => {
     });
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
-    expect(result.tables['Post']!.foreignKeys[0]).toEqual({
-      columns: ['authorId'],
-      referencedTable: 'User',
-      referencedSchema: UNBOUND_NAMESPACE_ID,
-      referencedColumns: ['id'],
-    });
+    expect(result.tables['Post']!.foreignKeys[0]).toEqual(
+      new SqlForeignKeyIR({
+        columns: ['authorId'],
+        referencedTable: 'User',
+        referencedColumns: ['id'],
+      }),
+    );
   });
 
   it('does not synthesize FK backing index when FK columns match primary key columns', () => {
@@ -944,8 +998,87 @@ describe('contractToSchemaIR', () => {
 
     const result = contractToSchemaIR(wrap(storage));
     expect(result.tables['Post']!.indexes).toEqual([
-      { columns: ['userId'], unique: false, name: 'Post_userId_idx' },
+      new SqlIndexIR({ columns: ['userId'], unique: false, name: 'Post_userId_idx' }),
     ]);
+  });
+});
+
+describe('contractToSchemaIR — FK referenced-namespace identity', () => {
+  function postTable(targetNamespaceId: string): StorageTable {
+    return table({
+      columns: { authorId: col({ nativeType: 'text' }) },
+      foreignKeys: [
+        {
+          source: {
+            namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+            tableName: 'Post',
+            columns: ['authorId'],
+          },
+          target: {
+            namespaceId: asNamespaceId(targetNamespaceId),
+            tableName: 'User',
+            columns: ['id'],
+          },
+          name: 'Post_authorId_fkey',
+          constraint: true,
+          index: false,
+        },
+      ],
+    });
+  }
+
+  it('an FK targeting the unbound namespace derives with an absent referenced namespace', () => {
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: { table: { Post: postTable(UNBOUND_NAMESPACE_ID) } },
+        }),
+      },
+    });
+
+    const fk = contractToSchemaIR(wrap(storage)).tables['Post']!.foreignKeys[0]!;
+    expect(fk.referencedSchema).toBeUndefined();
+    expect(fk.resolvedReferencedNamespace).toBeUndefined();
+    expect(fk.id).toBe('foreign-key:authorId->.User(id)');
+  });
+
+  it('an FK targeting a bound namespace derives its identity as before', () => {
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: { table: { Post: postTable('accounting') } },
+        }),
+        accounting: createTestSqlNamespace({
+          id: 'accounting',
+          entries: { table: { User: table({ columns: { id: col({ nativeType: 'text' }) } }) } },
+        }),
+      },
+    });
+
+    const fk = contractToSchemaIR(wrap(storage)).tables['Post']!.foreignKeys[0]!;
+    expect(fk.referencedSchema).toBe('accounting');
+    expect(fk.resolvedReferencedNamespace).toBe('accounting');
+    expect(fk.id).toBe('foreign-key:authorId->accounting.User(id)');
+  });
+
+  it('an FK targeting a namespace absent from storage keeps its coordinate (cross-space)', () => {
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: { table: { Post: postTable('other_contract_ns') } },
+        }),
+      },
+    });
+
+    const fk = contractToSchemaIR(wrap(storage)).tables['Post']!.foreignKeys[0]!;
+    expect(fk.referencedSchema).toBe('other_contract_ns');
+    expect(fk.resolvedReferencedNamespace).toBe('other_contract_ns');
   });
 });
 
@@ -1081,6 +1214,108 @@ describe('detectDestructiveChanges', () => {
         kind: 'columnRemoved',
         summary: 'Column "T"."toString" was removed',
       },
+    ]);
+  });
+});
+
+describe('contractToSchemaIR — resolved leaf values', () => {
+  it('stamps resolvedNativeType equal to the computed native type', () => {
+    const storage = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({ columns: { id: col({ nativeType: 'text' }) } }),
+    });
+
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
+    expect(result.tables['T']!.columns['id']!.resolvedNativeType).toBe('text');
+  });
+
+  it('stamps the expanded type into resolvedNativeType when expandNativeType is provided', () => {
+    const storage = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({
+        columns: {
+          id: col({ nativeType: 'character', codecId: 'sql/char@1', typeParams: { length: 36 } }),
+        },
+      }),
+    });
+
+    const result = contractToSchemaIR(wrap(storage), {
+      expandNativeType: (input) =>
+        input.typeParams && 'length' in input.typeParams
+          ? `${input.nativeType}(${input.typeParams['length']})`
+          : input.nativeType,
+      renderDefault: testRenderer,
+    });
+    expect(result.tables['T']!.columns['id']!.resolvedNativeType).toBe('character(36)');
+  });
+
+  it('appends [] to resolvedNativeType for array columns', () => {
+    const storage = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({ columns: { tags: col({ nativeType: 'text', many: true }) } }),
+    });
+
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
+    expect(result.tables['T']!.columns['tags']!.resolvedNativeType).toBe('text[]');
+  });
+
+  it('stamps the contract ColumnDefault into resolvedDefault', () => {
+    const storage = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({
+        columns: {
+          status: col({ nativeType: 'text', default: { kind: 'literal', value: 'draft' } }),
+          created: col({
+            nativeType: 'timestamptz',
+            default: { kind: 'function', expression: 'now()' },
+          }),
+          plain: col({ nativeType: 'text' }),
+        },
+      }),
+    });
+
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
+    const columns = result.tables['T']!.columns;
+    expect(columns['status']!.resolvedDefault).toEqual({ kind: 'literal', value: 'draft' });
+    expect(columns['created']!.resolvedDefault).toEqual({ kind: 'function', expression: 'now()' });
+    expect(columns['plain']!.resolvedDefault).toBeUndefined();
+  });
+
+  it('check nodes carry the value-set resolved permittedValues', () => {
+    const valueSetName = 'T_status_values';
+    const ns = createTestSqlNamespace({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: {
+        table: {
+          T: table({
+            columns: { status: col({ nativeType: 'text' }) },
+            checks: [
+              new CheckConstraint({
+                name: 'T_status_check',
+                column: 'status',
+                valueSet: {
+                  plane: 'storage',
+                  entityKind: 'valueSet',
+                  namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                  entityName: valueSetName,
+                },
+              }),
+            ],
+          }),
+        },
+        valueSet: {
+          [valueSetName]: new StorageValueSet({ kind: 'valueSet', values: ['draft', 'published'] }),
+        },
+      },
+    });
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: { [UNBOUND_NAMESPACE_ID]: ns },
+    });
+
+    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
+    expect(result.tables['T']!.checks).toEqual([
+      new SqlCheckConstraintIR({
+        name: 'T_status_check',
+        column: 'status',
+        permittedValues: ['draft', 'published'],
+      }),
     ]);
   });
 });

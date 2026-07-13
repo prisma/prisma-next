@@ -7,7 +7,11 @@ import {
   computeContentHash,
   normalizePredicate,
 } from '@prisma-next/target-postgres/rls-canonicalize';
-import { PostgresRlsPolicy, PostgresSchema } from '@prisma-next/target-postgres/types';
+import {
+  PostgresRlsEnablement,
+  PostgresRlsPolicy,
+  PostgresSchema,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -63,6 +67,12 @@ function buildContractWithPolicy(): Contract<SqlStorage> {
         }),
       },
       policy: { [policy.name]: policy },
+      rls: {
+        [TABLE_NAME]: new PostgresRlsEnablement({
+          tableName: TABLE_NAME,
+          namespaceId: UNBOUND_NAMESPACE_ID,
+        }),
+      },
     },
   });
 
@@ -157,7 +167,7 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
     });
 
-    expect(result.schema.schemaDiffIssues).toEqual([]);
+    expect(result.schema.issues).toEqual([]);
   });
 
   it('emits a missing SchemaDiffIssue when policy is declared but absent in the database', {
@@ -209,7 +219,7 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
     });
 
-    const rlsIssues = result.schema.schemaDiffIssues.filter((i) => i.outcome === 'missing');
+    const rlsIssues = result.schema.issues.filter((i) => i.reason === 'not-found');
     expect(rlsIssues).toHaveLength(1);
     expect(rlsIssues[0]?.expected).toMatchObject({ name: policy.name });
   });
@@ -262,7 +272,7 @@ describe.sequential('RLS verify extension issues', () => {
     });
 
     expect(result.ok).toBe(false);
-    const rlsIssues = result.schema.schemaDiffIssues.filter((i) => i.outcome === 'missing');
-    expect(rlsIssues[0]?.message).toContain(policy.name);
+    const rlsIssues = result.schema.issues.filter((i) => i.reason === 'not-found');
+    expect(rlsIssues[0]?.path.join('/')).toContain(policy.name);
   });
 });

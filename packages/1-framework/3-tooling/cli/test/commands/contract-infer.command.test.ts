@@ -346,6 +346,7 @@ describe('createContractInferCommand', () => {
     // without a codecLookup the printer emits the raw string as-is.
     const policySelectBlock: PslExtensionBlock = {
       kind: policySelectDiscriminator,
+      keyword: 'policy_select',
       name: 'ReadOnlyUsers',
       parameters: {
         target: { kind: 'ref', identifier: 'User', span: SYNTHETIC_SPAN },

@@ -1,7 +1,12 @@
 import type { StorageBase } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
-import { type EntityCoordinate, elementCoordinates, entityAt } from '../src/ir/storage';
+import {
+  coordinateKey,
+  type EntityCoordinate,
+  elementCoordinates,
+  entityAt,
+} from '../src/ir/storage';
 
 function assertStoragePlaneCoordinates(coordinates: EntityCoordinate[]): void {
   expect(coordinates.length).toBeGreaterThan(0);
@@ -61,6 +66,26 @@ describe('elementCoordinates', () => {
     expect(coordinates.some((c) => c.entityKind === 'id')).toBe(false);
     expect(coordinates.some((c) => c.entityKind === 'skippedNull')).toBe(false);
     expect(coordinates.some((c) => c.entityKind === 'skippedScalar')).toBe(false);
+  });
+});
+
+describe('coordinateKey', () => {
+  it('produces the same key for the same coordinate', () => {
+    const a = coordinateKey({ namespaceId: 'public', entityKind: 'table', entityName: 'users' });
+    const b = coordinateKey({ namespaceId: 'public', entityKind: 'table', entityName: 'users' });
+    expect(a).toBe(b);
+  });
+
+  it('does not collide when a delimiter-joined key would', () => {
+    const a = coordinateKey({ namespaceId: 'a b', entityKind: 'c', entityName: 'd' });
+    const b = coordinateKey({ namespaceId: 'a', entityKind: 'b c', entityName: 'd' });
+    expect(a).not.toBe(b);
+  });
+
+  it('distinguishes coordinates that differ only in entityKind', () => {
+    const table = coordinateKey({ namespaceId: 'public', entityKind: 'table', entityName: 'x' });
+    const widget = coordinateKey({ namespaceId: 'public', entityKind: 'widget', entityName: 'x' });
+    expect(table).not.toBe(widget);
   });
 });
 

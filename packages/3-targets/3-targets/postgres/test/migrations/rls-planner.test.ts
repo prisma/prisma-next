@@ -1,6 +1,7 @@
 /**
- * Unit tests for the RLS planner — verifyPostgresRlsPolicies feeds SchemaIssue[]
- * through the generic pipeline (collectSchemaIssues → planIssues → mapIssueToCall).
+ * Unit tests for the RLS planner — the one-differ tree diff feeds node-typed
+ * `SchemaDiffIssue`s through the generic pipeline (`planIssues` → the node
+ * issue-to-call mapper).
  *
  * - Fresh contract → CREATE TABLE + ENABLE RLS + CREATE POLICY ordering
  * - Edit (same prefix, different hash) → CREATE new + DROP old via missing+extra issues
@@ -20,10 +21,15 @@ import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
+import { PostgresRlsEnablement } from '../../src/core/postgres-rls-enablement';
+import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
+import { PostgresRole } from '../../src/core/postgres-role';
 import { PostgresSchema } from '../../src/core/postgres-schema';
-import { PostgresRlsPolicy } from '../../src/core/schema-ir/postgres-rls-policy';
-import { PostgresSchemaIR } from '../../src/core/schema-ir/postgres-schema-ir';
-import { PostgresTableIR } from '../../src/core/schema-ir/postgres-table-ir';
+import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
+import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresPolicySchemaNode } from '../../src/core/schema-ir/postgres-policy-schema-node';
+import { PostgresRoleSchemaNode } from '../../src/core/schema-ir/postgres-role-schema-node';
+import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 import { PostgresCreatePolicy } from '../../src/exports/ddl';
 
 const stubLowerer: ExecuteRequestLowerer = {
@@ -71,10 +77,24 @@ function buildContractWithPolicy(
   return buildContractWith([policy]);
 }
 
-function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<SqlStorage> {
+function buildContractWith(
+  policies: readonly PostgresRlsPolicy[],
+  roleNames: readonly string[] = [],
+): Contract<SqlStorage> {
   const policyEntries: Record<string, PostgresRlsPolicy> = {};
   for (const p of policies) {
     policyEntries[p.name] = p;
+  }
+  const rlsEntries: Record<string, PostgresRlsEnablement> = {};
+  for (const p of policies) {
+    rlsEntries[p.tableName] = new PostgresRlsEnablement({
+      tableName: p.tableName,
+      namespaceId: p.namespaceId,
+    });
+  }
+  const roleEntries: Record<string, PostgresRole> = {};
+  for (const name of roleNames) {
+    roleEntries[name] = new PostgresRole({ name, namespaceId: UNBOUND_NAMESPACE_ID });
   }
 
   const schema = new PostgresSchema({
@@ -93,6 +113,8 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
         }),
       },
       policy: policyEntries,
+      rls: rlsEntries,
+      role: roleEntries,
     },
   });
 
@@ -112,36 +134,60 @@ function buildContractWith(policies: readonly PostgresRlsPolicy[]): Contract<Sql
   };
 }
 
-function schemaWith(policies: readonly PostgresRlsPolicy[]): PostgresSchemaIR {
-  return new PostgresSchemaIR({
-    tables: {
-      [TABLE_NAME]: new PostgresTableIR({
-        name: TABLE_NAME,
-        columns: {
-          id: { name: 'id', nativeType: 'int4', nullable: false },
-          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
-        },
-        foreignKeys: [],
-        uniques: [],
-        indexes: [],
-        rlsPolicies: policies,
-      }),
-    },
-    pgSchemaName: 'public',
-    pgVersion: 'unknown',
-    roles: [],
-    existingSchemas: ['public'],
-    nativeEnumTypeNames: [],
+function policyNode(policy: PostgresRlsPolicy): PostgresPolicySchemaNode {
+  return new PostgresPolicySchemaNode({
+    name: policy.name,
+    prefix: policy.prefix,
+    tableName: policy.tableName,
+    namespaceId: policy.namespaceId,
+    operation: policy.operation,
+    roles: [...policy.roles],
+    ...(policy.using !== undefined ? { using: policy.using } : {}),
+    ...(policy.withCheck !== undefined ? { withCheck: policy.withCheck } : {}),
+    permissive: policy.permissive,
   });
 }
 
-const emptySchema = new PostgresSchemaIR({
-  tables: {},
-  pgSchemaName: 'public',
-  pgVersion: 'unknown',
+// Live-side tree. `rlsEnabled` defaults to true: the contract fixtures mark
+// the table, so the in-sync scenarios need the live bit on; the
+// enablement-drift matrix lives in rls-enablement-planner.test.ts.
+function schemaWith(
+  policies: readonly PostgresRlsPolicy[],
+  options?: { readonly rlsEnabled?: boolean; readonly roleNames?: readonly string[] },
+): PostgresDatabaseSchemaNode {
+  return new PostgresDatabaseSchemaNode({
+    namespaces: {
+      public: new PostgresNamespaceSchemaNode({
+        schemaName: 'public',
+        tables: {
+          [TABLE_NAME]: new PostgresTableSchemaNode({
+            name: TABLE_NAME,
+            columns: {
+              id: { name: 'id', nativeType: 'int4', nullable: false },
+              user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+            },
+            foreignKeys: [],
+            uniques: [],
+            indexes: [],
+            policies: policies.map(policyNode),
+            rlsEnabled: options?.rlsEnabled ?? true,
+          }),
+        },
+      }),
+    },
+    roles: (options?.roleNames ?? []).map(
+      (name) => new PostgresRoleSchemaNode({ name, namespaceId: UNBOUND_NAMESPACE_ID }),
+    ),
+    existingSchemas: ['public'],
+    pgVersion: 'unknown',
+  });
+}
+
+const emptySchema = new PostgresDatabaseSchemaNode({
+  namespaces: {},
   roles: [],
   existingSchemas: ['public'],
-  nativeEnumTypeNames: [],
+  pgVersion: 'unknown',
 });
 const DB_UPDATE_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -337,7 +383,74 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
   });
 });
 
-// `migration plan` derives a contract-backed PostgresSchemaIR (the
-// `contractToSchema` projection) and emits CREATE POLICY through the same diff
-// pipeline as the live paths. A non-PostgresSchemaIR schema is rejected; the
-// `migration plan` e2e proves the emission end-to-end.
+describe('RLS planner roles produce zero ops (AC-6)', () => {
+  // Roles are existence-verify only (provisioning is a project non-goal), so a
+  // role diff issue must add NO migration op — never CREATE/DROP ROLE, and
+  // never the unsupported-operation fail-loud in mapNodeIssueToCall. Proven by
+  // comparing each role-present plan against a role-free baseline: the role
+  // difference must leave the op set byte-identical.
+
+  async function plan(contract: Contract<SqlStorage>, schema: PostgresDatabaseSchemaNode) {
+    const planner = createPostgresMigrationPlanner(stubLowerer);
+    const result = planner.plan({
+      contract,
+      schema,
+      policy: DB_UPDATE_POLICY,
+      fromContract: null,
+      frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
+    });
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') throw new Error('expected a successful plan');
+    return result;
+  }
+
+  async function planOpIds(
+    contract: Contract<SqlStorage>,
+    schema: PostgresDatabaseSchemaNode,
+  ): Promise<readonly string[]> {
+    const result = await plan(contract, schema);
+    const ops = await Promise.all(result.plan.operations);
+    return ops.map((op) => op.id);
+  }
+
+  it('a declared role missing from the live schema adds zero ops (vs a role-free baseline) and no role op', async () => {
+    const baseline = await planOpIds(buildContractWith([]), schemaWith([]));
+    // Contract now declares role `app_user`; live schema still has no role →
+    // a not-found role diff issue, which must add nothing to the plan.
+    const withMissingRole = await planOpIds(buildContractWith([], ['app_user']), schemaWith([]));
+
+    expect(withMissingRole).toEqual(baseline);
+    expect(withMissingRole.some((id) => /role/i.test(id))).toBe(false);
+  });
+
+  it('an extra live role the contract does not declare adds zero ops and no drop, even under a destructive policy', async () => {
+    const baseline = await planOpIds(buildContractWith([]), schemaWith([]));
+    // Live schema carries an undeclared `legacy` role → a not-expected role
+    // diff issue; under a destructive policy it must still plan nothing (the
+    // framework never drops an undeclared role).
+    const withExtraRole = await planOpIds(
+      buildContractWith([]),
+      schemaWith([], { roleNames: ['legacy'] }),
+    );
+
+    expect(withExtraRole).toEqual(baseline);
+    // No op references the undeclared role — in particular, no drop.
+    expect(withExtraRole.some((id) => /legacy/i.test(id))).toBe(false);
+  });
+
+  it('a missing declared role is now surfaced as a controlPolicySuppressedCall warning', async () => {
+    const result = await plan(buildContractWith([], ['app_user']), schemaWith([]));
+    expect(result.warnings?.some((w) => w.kind === 'controlPolicySuppressedCall')).toBe(true);
+  });
+
+  it('an extra live role is now surfaced as a controlPolicySuppressedCall warning', async () => {
+    const result = await plan(buildContractWith([]), schemaWith([], { roleNames: ['legacy'] }));
+    expect(result.warnings?.some((w) => w.kind === 'controlPolicySuppressedCall')).toBe(true);
+  });
+});
+
+// `migration plan` derives a contract-backed PostgresDatabaseSchemaNode (the
+// `contractToPostgresDatabaseSchemaNode` projection) and emits CREATE POLICY
+// through the same diff pipeline as the live paths. A non-database-root schema
+// is rejected; the `migration plan` e2e proves the emission end-to-end.

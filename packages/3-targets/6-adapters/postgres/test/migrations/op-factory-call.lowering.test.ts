@@ -8,17 +8,23 @@
  *   the planner can only emit unfilled stubs.
  * - `TypeScriptRenderablePostgresMigration` routes `operations` through
  *   `renderOps` and `renderTypeScript()` through `renderCallsToTypeScript`.
+ * - `AddNotNullColumnWithTempDefaultCall` pins the exact `ADD COLUMN` SQL
+ *   for a codec-typed, parameterized column resolved via `codecHooks`
+ *   (type token + temp-default backfill via `resolveIdentityValue`).
  *
  * Construction-side checks live in op-factory-call.construction.test.ts;
  * TypeScript rendering of individual calls and the `renderCallsToTypeScript`
  * aggregator are covered in op-factory-call.rendering.test.ts.
  */
 
+import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import { col } from '@prisma-next/sql-relational-core/contract-free';
 import {
   AddColumnCall,
   AddForeignKeyCall,
+  AddNotNullColumnWithTempDefaultCall,
   AddPrimaryKeyCall,
   AddUniqueCall,
   AlterColumnTypeCall,
@@ -37,6 +43,7 @@ import {
   SetDefaultCall,
   SetNotNullCall,
 } from '@prisma-next/target-postgres/op-factory-call';
+import { resolveIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
 import { TypeScriptRenderablePostgresMigration } from '@prisma-next/target-postgres/planner-produced-postgres-migration';
 import { renderOps } from '@prisma-next/target-postgres/render-ops';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -247,5 +254,47 @@ describe('TypeScriptRenderablePostgresMigration', () => {
       "import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';",
     );
     expect(source).toContain('this.dropTable({ schema: "public", table: "stale" })');
+  });
+});
+
+describe('AddNotNullColumnWithTempDefaultCall', () => {
+  it('renders the exact ADD COLUMN SQL for a parameterized codec type with its temp-default backfill', async () => {
+    const codecHooks = new Map<string, CodecControlHooks>([
+      [
+        'pg/vector@1',
+        {
+          expandNativeType: ({ nativeType, typeParams }) =>
+            `${nativeType}(${typeParams?.['length']})`,
+          resolveIdentityValue: () => "'[0,0,0]'",
+        },
+      ],
+    ]);
+    const column: StorageColumn = {
+      nativeType: 'vector',
+      codecId: 'pg/vector@1',
+      nullable: false,
+      typeParams: { length: 3 },
+    };
+
+    const temporaryDefault = resolveIdentityValue(column, codecHooks, {});
+    if (temporaryDefault === null) {
+      throw new Error('expected the pg/vector@1 codec hook to resolve an identity value');
+    }
+    expect(temporaryDefault).toBe("'[0,0,0]'");
+
+    const call = new AddNotNullColumnWithTempDefaultCall({
+      schemaName: 'public',
+      tableName: 'doc',
+      columnName: 'embedding',
+      column,
+      codecHooks,
+      storageTypes: {},
+      temporaryDefault,
+    });
+    const op = await call.toOp(testAdapter);
+
+    expect(op.execute[0]?.sql).toBe(
+      `ALTER TABLE "public"."doc" ADD COLUMN "embedding" vector(3) DEFAULT ('[0,0,0]') NOT NULL`,
+    );
   });
 });

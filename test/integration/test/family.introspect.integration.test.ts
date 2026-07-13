@@ -3,6 +3,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import postgres from '@prisma-next/target-postgres/control';
+import { PostgresDatabaseSchemaNode } from '@prisma-next/target-postgres/types';
 import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -76,9 +77,11 @@ describe('family instance introspect', () => {
           const schemaIR = await familyInstance.introspect({
             driver,
           });
+          PostgresDatabaseSchemaNode.assert(schemaIR);
+          const ns = schemaIR.namespaces['public']!;
 
           expect(schemaIR).toBeDefined();
-          expect(schemaIR.tables).toBeDefined();
+          expect(ns.tables).toBeDefined();
         } finally {
           await driver.close();
         }
@@ -108,8 +111,10 @@ describe('family instance introspect', () => {
           const schemaIR = await familyInstance.introspect({
             driver,
           });
+          PostgresDatabaseSchemaNode.assert(schemaIR);
+          const ns = schemaIR.namespaces['public']!;
 
-          const userTable = schemaIR.tables['user'];
+          const userTable = ns.tables['user'];
           expect(userTable).toBeDefined();
           if (!userTable) {
             throw new Error('user table not found');
@@ -172,8 +177,10 @@ describe('family instance introspect', () => {
           const schemaIR = await familyInstance.introspect({
             driver,
           });
+          PostgresDatabaseSchemaNode.assert(schemaIR);
+          const ns = schemaIR.namespaces['public']!;
 
-          const userTable = schemaIR.tables['user'];
+          const userTable = ns.tables['user'];
           expect(userTable).toBeDefined();
           if (!userTable) {
             throw new Error('user table not found');
@@ -209,8 +216,10 @@ describe('family instance introspect', () => {
           const schemaIR = await familyInstance.introspect({
             driver,
           });
+          PostgresDatabaseSchemaNode.assert(schemaIR);
+          const ns = schemaIR.namespaces['public']!;
 
-          const userTable = schemaIR.tables['user'];
+          const userTable = ns.tables['user'];
           expect(userTable).toBeDefined();
           if (!userTable) {
             throw new Error('user table not found');
@@ -249,8 +258,10 @@ describe('family instance introspect', () => {
           const schemaIR = await familyInstance.introspect({
             driver,
           });
+          PostgresDatabaseSchemaNode.assert(schemaIR);
+          const ns = schemaIR.namespaces['public']!;
 
-          const postTable = schemaIR.tables['post'];
+          const postTable = ns.tables['post'];
           expect(postTable).toBeDefined();
           if (!postTable) {
             throw new Error('post table not found');
@@ -298,8 +309,10 @@ describe('family instance introspect', () => {
           const schemaIR = await familyInstance.introspect({
             driver,
           });
+          PostgresDatabaseSchemaNode.assert(schemaIR);
+          const ns = schemaIR.namespaces['public']!;
 
-          const postTable = schemaIR.tables['post'];
+          const postTable = ns.tables['post'];
           expect(postTable).toBeDefined();
           if (!postTable) {
             throw new Error('post table not found');
@@ -317,7 +330,7 @@ describe('family instance introspect', () => {
     );
 
     it(
-      'includes Postgres annotations',
+      'carries per-namespace native enum nodes',
       async () => {
         if (!connectionString) {
           throw new Error('Connection string not set');
@@ -338,9 +351,10 @@ describe('family instance introspect', () => {
           const schemaIR = await familyInstance.introspect({
             driver,
           });
+          PostgresDatabaseSchemaNode.assert(schemaIR);
+          const ns = schemaIR.namespaces['public']!;
 
-          expect(schemaIR.annotations).toBeDefined();
-          expect(schemaIR.annotations?.['pg']).toBeDefined();
+          expect(Array.isArray(ns.nativeEnums)).toBe(true);
         } finally {
           await driver.close();
         }

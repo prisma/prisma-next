@@ -4,6 +4,7 @@ import type {
   ContractSpace,
   ControlFamilyDescriptor,
   ControlStack,
+  ControlTargetDescriptor,
 } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
@@ -127,7 +128,7 @@ function makeStack(
         serializeContract: (contract) => contract as never,
       },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
-    },
+    } as ControlTargetDescriptor<'sql', 'postgres'>,
     adapter: {
       kind: 'adapter',
       id: 'postgres',

@@ -18,7 +18,11 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
-import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
@@ -26,13 +30,16 @@ import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
-const emptySchema = new PostgresSchemaIR({
-  tables: {},
-  pgSchemaName: 'public',
+const emptySchema = new PostgresDatabaseSchemaNode({
+  namespaces: {
+    public: new PostgresNamespaceSchemaNode({
+      schemaName: 'public',
+      tables: {},
+    }),
+  },
   pgVersion: '',
   roles: [],
   existingSchemas: [],
-  nativeEnumTypeNames: [],
 });
 
 /**

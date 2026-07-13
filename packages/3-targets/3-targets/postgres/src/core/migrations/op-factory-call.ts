@@ -40,7 +40,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { columnExistsAst, tableExistsAst } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
-import type { PostgresRlsPolicy } from '../schema-ir/postgres-rls-policy';
+import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import { boundSchema } from './bound-schema';
@@ -63,7 +63,14 @@ import {
 } from './operations/constraints';
 import { createExtension } from './operations/dependencies';
 import { createIndex, dropIndex } from './operations/indexes';
-import { createRlsPolicy, dropRlsPolicy, enableRowLevelSecurity } from './operations/rls';
+import { createNativeEnumType, dropNativeEnumType } from './operations/native-enum-types';
+import {
+  createRlsPolicy,
+  disableRowLevelSecurity,
+  dropRlsPolicy,
+  enableRowLevelSecurity,
+  renameRlsPolicy,
+} from './operations/rls';
 import type { ForeignKeySpec } from './operations/shared';
 import { step, targetDetails } from './operations/shared';
 import { dropTable } from './operations/tables';
@@ -1313,6 +1320,87 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
 }
 
 // ============================================================================
+// Native enum types
+// ============================================================================
+
+export class CreateNativeEnumTypeCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'createNativeEnumType' as const;
+  readonly operationClass = 'additive' as const;
+  readonly schemaName: string;
+  readonly typeName: string;
+  readonly members: readonly string[];
+  readonly label: string;
+
+  constructor(schemaName: string, typeName: string, members: readonly string[]) {
+    super();
+    this.schemaName = schemaName;
+    this.typeName = typeName;
+    this.members = Object.freeze([...members]);
+    this.label = `Create enum type "${typeName}"`;
+    this.freeze();
+  }
+
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `CreateNativeEnumTypeCall.toOp: a DDL lowerer is required on the Postgres planner path (type "${this.typeName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return createNativeEnumType(this.schemaName, this.typeName, this.members, lowerer);
+  }
+
+  renderTypeScript(): string {
+    const opts = [
+      `schema: ${jsonToTsSource(this.schemaName)}`,
+      `typeName: ${jsonToTsSource(this.typeName)}`,
+      `members: ${jsonToTsSource(this.members)}`,
+    ];
+    return `this.createNativeEnumType({ ${opts.join(', ')} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
+  }
+}
+
+export class DropNativeEnumTypeCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'dropNativeEnumType' as const;
+  readonly operationClass = 'destructive' as const;
+  readonly schemaName: string;
+  readonly typeName: string;
+  readonly label: string;
+
+  constructor(schemaName: string, typeName: string) {
+    super();
+    this.schemaName = schemaName;
+    this.typeName = typeName;
+    this.label = `Drop enum type "${typeName}"`;
+    this.freeze();
+  }
+
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `DropNativeEnumTypeCall.toOp: a DDL lowerer is required on the Postgres planner path (type "${this.typeName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return dropNativeEnumType(this.schemaName, this.typeName, lowerer);
+  }
+
+  renderTypeScript(): string {
+    const opts = [
+      `schema: ${jsonToTsSource(this.schemaName)}`,
+      `typeName: ${jsonToTsSource(this.typeName)}`,
+    ];
+    return `this.dropNativeEnumType({ ${opts.join(', ')} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
+  }
+}
+
+// ============================================================================
 // Data transform
 // ============================================================================
 
@@ -1461,6 +1549,78 @@ export class EnableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
   }
 }
 
+export class DisableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'disableRowLevelSecurity' as const;
+  readonly operationClass = 'destructive' as const;
+  readonly schemaName: string;
+  readonly tableName: string;
+  readonly label: string;
+
+  constructor(schemaName: string, tableName: string) {
+    super();
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    this.label = `Disable row-level security on "${tableName}"`;
+    this.freeze();
+  }
+
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `DisableRowLevelSecurityCall.toOp: a lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return disableRowLevelSecurity(this.schemaName, this.tableName, lowerer);
+  }
+
+  renderTypeScript(): string {
+    return `disableRowLevelSecurity(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)})`;
+  }
+}
+
+export class RenamePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'renameRlsPolicy' as const;
+  // `widening` is chosen so the rename plans under every allowance set except
+  // additive-only init — a rename is neither additive-creation nor
+  // destructive, and the class vocabulary has no neutral middle class. It is
+  // NOT that a rename widens anything; this is the accepted typology tradeoff.
+  readonly operationClass = 'widening' as const;
+  readonly schemaName: string;
+  readonly tableName: string;
+  readonly oldPolicyName: string;
+  readonly newPolicyName: string;
+  readonly label: string;
+
+  constructor(schemaName: string, tableName: string, oldPolicyName: string, newPolicyName: string) {
+    super();
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    this.oldPolicyName = oldPolicyName;
+    this.newPolicyName = newPolicyName;
+    this.label = `Rename RLS policy "${oldPolicyName}" to "${newPolicyName}" on "${tableName}"`;
+    this.freeze();
+  }
+
+  async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
+    if (lowerer === undefined) {
+      throw new Error(
+        `RenamePostgresRlsPolicyCall.toOp: a lowerer is required on the Postgres planner path (policy "${this.oldPolicyName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+      );
+    }
+    return renameRlsPolicy(
+      this.schemaName,
+      this.tableName,
+      this.oldPolicyName,
+      this.newPolicyName,
+      lowerer,
+    );
+  }
+
+  renderTypeScript(): string {
+    return `renameRlsPolicy(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.oldPolicyName)}, ${jsonToTsSource(this.newPolicyName)})`;
+  }
+}
+
 export type PostgresOpFactoryCall =
   | CreateTableCall
   | DropTableCall
@@ -1484,7 +1644,11 @@ export type PostgresOpFactoryCall =
   | RawSqlCall
   | CreateExtensionCall
   | CreateSchemaCall
+  | CreateNativeEnumTypeCall
+  | DropNativeEnumTypeCall
   | CreatePostgresRlsPolicyCall
   | DropPostgresRlsPolicyCall
   | EnableRowLevelSecurityCall
+  | DisableRowLevelSecurityCall
+  | RenamePostgresRlsPolicyCall
   | DataTransformCall;

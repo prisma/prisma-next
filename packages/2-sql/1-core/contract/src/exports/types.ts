@@ -62,7 +62,6 @@ export {
   Index,
   isMaterializedSqlNamespace,
   isSqlAuthoringContributions,
-  isStorageTable,
   isStorageTypeInstance,
   isStorageValueSet,
   PrimaryKey,

@@ -1,6 +1,8 @@
 import type { MigrationOperationClass } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
-import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import { RelationalSchemaNodeKind, type SqlColumnIR } from '@prisma-next/sql-schema-ir/types';
+import { blindCast } from '@prisma-next/utils/casts';
 import { tableExistsAst } from '../../../contract-free/checks';
 import { stripOuterParens } from '../../default-normalizer';
 import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
@@ -109,7 +111,7 @@ export interface RecreateTableArgs {
   /**
    * Per-issue postcheck steps appended after the structural postchecks. The
    * planner pre-builds these via `buildRecreatePostchecks` so the call IR
-   * carries flat, serializable data only — no `SchemaIssue` references.
+   * carries flat, serializable data only — no `SchemaDiffIssue` references.
    */
   readonly postchecks: readonly { readonly description: string; readonly sql: string }[];
   readonly operationClass: MigrationOperationClass;
@@ -195,33 +197,37 @@ export async function recreateTable(
 }
 
 /**
- * Build a one-line summary of a recreate-table operation from the schema
+ * Build a one-line summary of a recreate-table operation from the schema-diff
  * issues that triggered it. Lives next to `recreateTable` so the planner
  * (which has the issues) can produce the same description the factory
  * used to build inline. Keeping the formatting target-side keeps
- * `RecreateTableCall` issue-free at the IR layer.
+ * `RecreateTableCall` issue-free at the IR layer. `SchemaDiffIssue` carries
+ * no rendered message, so this renders one from each issue's path.
  */
-export function buildRecreateSummary(tableName: string, issues: readonly SchemaIssue[]): string {
-  const messages = issues.map((i) => i.message).join('; ');
+export function buildRecreateSummary(
+  tableName: string,
+  issues: readonly SchemaDiffIssue[],
+): string {
+  const messages = issues.map((i) => i.path.join('/')).join('; ');
   return `Recreates table ${tableName} to apply schema changes: ${messages}`;
 }
 
-const COLUMN_LEVEL_ISSUE_KINDS = new Set<SchemaIssue['kind']>([
-  'nullability_mismatch',
-  'default_mismatch',
-  'default_missing',
-  'extra_default',
-  'type_mismatch',
-]);
+function nodeKindOf(issue: SchemaDiffIssue): string | undefined {
+  const node = issue.expected ?? issue.actual;
+  if (node === undefined) return undefined;
+  return blindCast<{ readonly nodeKind: string }, 'every diff-tree node declares nodeKind'>(node)
+    .nodeKind;
+}
 
-const PK_ISSUE_KINDS = new Set<SchemaIssue['kind']>(['primary_key_mismatch', 'extra_primary_key']);
-
-const UNIQUE_ISSUE_KINDS = new Set<SchemaIssue['kind']>([
-  'unique_constraint_mismatch',
-  'extra_unique_constraint',
-]);
-
-const FK_ISSUE_KINDS = new Set<SchemaIssue['kind']>(['foreign_key_mismatch', 'extra_foreign_key']);
+/** Mirrors `SqlColumnIR.isEqualTo`'s type comparison, isolated so a `not-equal` column issue's postcheck can target type drift and nullability drift independently. */
+function columnTypeChanged(expected: SqlColumnIR, actual: SqlColumnIR): boolean {
+  if (expected.resolvedNativeType !== undefined && actual.resolvedNativeType !== undefined) {
+    return expected.resolvedNativeType !== actual.resolvedNativeType;
+  }
+  return (
+    expected.nativeType !== actual.nativeType || Boolean(expected.many) !== Boolean(actual.many)
+  );
+}
 
 /**
  * Returns the columns the contract expects as the table's primary key. Picks
@@ -238,50 +244,97 @@ function quoteSqlList(values: readonly string[]): string {
   return values.map((v) => `'${escapeLiteral(v)}'`).join(', ');
 }
 
+function columnNameFromNode(issue: SchemaDiffIssue): string | undefined {
+  const node = issue.expected ?? issue.actual;
+  if (node === undefined) return undefined;
+  return blindCast<
+    { readonly name: string },
+    'a column or column-default issue node carries name (default nodes read the owning column name off the diff path instead)'
+  >(node).name;
+}
+
+/**
+ * A column-default issue's own node has no back-reference to its owning
+ * column — it's a transient child built by `SqlColumnIR.children()`. The
+ * column's id (`column:<name>`) is always the diff path's second-to-last
+ * segment for a default issue (`[..., tableId, columnId, 'default']`), so
+ * the name is recovered from the path rather than the node.
+ */
+function columnNameFromDefaultIssuePath(issue: SchemaDiffIssue): string | undefined {
+  const columnId = issue.path[issue.path.length - 2];
+  if (columnId === undefined) return undefined;
+  const prefix = 'column:';
+  return columnId.startsWith(prefix) ? columnId.slice(prefix.length) : columnId;
+}
+
 /**
  * Per-issue postchecks verifying the recreated table's shape against the
- * contract spec. Column-level issues (`nullability_mismatch`,
- * `default_mismatch`, …) emit one targeted check each; constraint-level
- * issues (`primary_key_mismatch`, `unique_constraint_mismatch`,
- * `foreign_key_mismatch`, plus their `extra_*` siblings) emit one
- * `pragma_*`-driven check per declared constraint in the contract spec, so
- * a recreated table with the right columns but the wrong PK / unique / FK
- * shape fails the postcheck instead of passing silently. Exported so the
- * planner can pre-build the list at construction time and
- * `RecreateTableCall` doesn't have to carry `SchemaIssue` objects through
+ * expected spec. Column-level issues (`sql-column` `not-equal`,
+ * `sql-column-default` any reason) emit one targeted check each;
+ * constraint-level issues (`sql-primary-key`, `sql-unique`, `sql-foreign-key`,
+ * any reason) emit one `pragma_*`-driven check per declared constraint in the
+ * expected spec, so a recreated table with the right columns but the wrong
+ * PK / unique / FK shape fails the postcheck instead of passing silently.
+ * Exported so the planner can pre-build the list at construction time and
+ * `RecreateTableCall` doesn't have to carry `SchemaDiffIssue` objects through
  * to render time.
  */
 export function buildRecreatePostchecks(
   tableName: string,
-  issues: readonly SchemaIssue[],
+  issues: readonly SchemaDiffIssue[],
   spec: SqliteTableSpec,
 ): Array<{ description: string; sql: string }> {
   const checks: Array<{ description: string; sql: string }> = [];
   const t = escapeLiteral(tableName);
   const byName = new Map(spec.columns.map((c) => [c.name, c]));
 
+  let hasPkIssue = false;
+  let hasUniqueIssue = false;
+  let hasFkIssue = false;
+
   for (const issue of issues) {
-    if (issue.kind === 'enum_values_changed') continue;
-    if (!COLUMN_LEVEL_ISSUE_KINDS.has(issue.kind)) continue;
-    if (!issue.column) continue;
-    const c = escapeLiteral(issue.column);
-    if (issue.kind === 'nullability_mismatch') {
-      // `expected` carries the contract's nullable flag as a string. We only
-      // emit a postcheck when the value is recognized — anything else
-      // (case-folded, numeric coding, etc.) is left to the structural
-      // verifier so a typo here can't silently invert the meaning.
-      let wantNotNull: boolean | undefined;
-      if (issue.expected === 'false') wantNotNull = true;
-      else if (issue.expected === 'true') wantNotNull = false;
-      if (wantNotNull !== undefined) {
+    const nodeKind = nodeKindOf(issue);
+    if (nodeKind === RelationalSchemaNodeKind.column && issue.reason === 'not-equal') {
+      const columnName = columnNameFromNode(issue);
+      if (columnName === undefined) continue;
+      const c = escapeLiteral(columnName);
+      const expected = blindCast<SqlColumnIR, 'a not-equal column issue carries the expected node'>(
+        issue.expected,
+      );
+      const actual = blindCast<SqlColumnIR, 'a not-equal column issue carries the actual node'>(
+        issue.actual,
+      );
+      if (expected.nullable !== actual.nullable) {
         checks.push({
-          description: `verify "${issue.column}" nullability on "${tableName}"`,
-          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND "notnull" = ${wantNotNull ? 1 : 0}`,
+          description: `verify "${columnName}" nullability on "${tableName}"`,
+          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND "notnull" = ${expected.nullable ? 0 : 1}`,
         });
       }
+      if (columnTypeChanged(expected, actual)) {
+        const colSpec = byName.get(columnName);
+        if (colSpec) {
+          checks.push({
+            description: `verify "${columnName}" type on "${tableName}"`,
+            sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND LOWER(type) = '${escapeLiteral(colSpec.typeSql.toLowerCase())}'`,
+          });
+        }
+      }
+      continue;
     }
-    if (issue.kind === 'default_mismatch' || issue.kind === 'default_missing') {
-      const colSpec = byName.get(issue.column);
+    if (nodeKind === RelationalSchemaNodeKind.columnDefault) {
+      const columnName = columnNameFromDefaultIssuePath(issue);
+      if (columnName === undefined) continue;
+      const c = escapeLiteral(columnName);
+      if (issue.reason === 'not-expected') {
+        checks.push({
+          description: `verify "${columnName}" has no default on "${tableName}"`,
+          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value IS NULL`,
+        });
+        continue;
+      }
+      // not-found (missing) or not-equal (drift) — both want the expected
+      // default SQL present on the live column.
+      const colSpec = byName.get(columnName);
       const expectedRaw = colSpec?.defaultSql.startsWith('DEFAULT ')
         ? // SQLite's pragma_table_info.dflt_value strips outer parens for
           // expression defaults (per the SQLite docs), so `(datetime('now'))`
@@ -291,34 +344,20 @@ export function buildRecreatePostchecks(
         : null;
       if (expectedRaw) {
         checks.push({
-          description: `verify "${issue.column}" default on "${tableName}"`,
+          description: `verify "${columnName}" default on "${tableName}"`,
           sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value = '${escapeLiteral(expectedRaw)}'`,
         });
       }
+      continue;
     }
-    if (issue.kind === 'type_mismatch') {
-      const colSpec = byName.get(issue.column);
-      if (colSpec) {
-        checks.push({
-          description: `verify "${issue.column}" type on "${tableName}"`,
-          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND LOWER(type) = '${escapeLiteral(colSpec.typeSql.toLowerCase())}'`,
-        });
-      }
-    }
-    if (issue.kind === 'extra_default') {
-      checks.push({
-        description: `verify "${issue.column}" has no default on "${tableName}"`,
-        sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value IS NULL`,
-      });
-    }
+    if (nodeKind === RelationalSchemaNodeKind.primaryKey) hasPkIssue = true;
+    if (nodeKind === RelationalSchemaNodeKind.unique) hasUniqueIssue = true;
+    if (nodeKind === RelationalSchemaNodeKind.foreignKey) hasFkIssue = true;
   }
 
   // Constraint-level issues — emit one postcheck per declared constraint in
-  // the contract spec when *any* issue of that kind fires, since recreate
+  // the expected spec when *any* issue of that kind fires, since recreate
   // rebuilds the entire table at once.
-  const hasPkIssue = issues.some((i) => PK_ISSUE_KINDS.has(i.kind));
-  const hasUniqueIssue = issues.some((i) => UNIQUE_ISSUE_KINDS.has(i.kind));
-  const hasFkIssue = issues.some((i) => FK_ISSUE_KINDS.has(i.kind));
 
   if (hasPkIssue) {
     const pkColumns = expectedPrimaryKeyColumns(spec);

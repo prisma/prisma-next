@@ -1,16 +1,19 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { SqlSchemaVerifierBase } from '@prisma-next/family-sql/ir';
-import type { SchemaIssue, SchemaVerifyOptions } from '@prisma-next/framework-components/control';
+import type {
+  SchemaDiffIssue,
+  SchemaVerifyOptions,
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
 /**
  * Postgres target `SchemaVerifier` concretion. Plugs into the
  * SQL-shared verification surface; production verification today still
- * routes through the legacy `verifySqlSchema` entry point, which
- * carries options (codec hooks, normalizers, framework components)
- * that the framework-level `SchemaVerifyOptions` shape does not yet
- * surface.
+ * routes through the family verify verdict (`verifySqlSchemaByDiff` over
+ * `diffPostgresSchema`), which carries options (codec hooks,
+ * normalizers, framework components) that the framework-level
+ * `SchemaVerifyOptions` shape does not yet surface.
  *
  * The hooks return the empty list pending the call-site migration that
  * routes the existing verifier behaviour through the SPI — at that
@@ -25,13 +28,13 @@ export class PostgresSchemaVerifier extends SqlSchemaVerifierBase<
 > {
   protected verifyCommonSqlSchema(
     _options: SchemaVerifyOptions<Contract<SqlStorage>, SqlSchemaIR>,
-  ): readonly SchemaIssue[] {
+  ): readonly SchemaDiffIssue[] {
     return [];
   }
 
   protected verifyTargetExtensions(
     _options: SchemaVerifyOptions<Contract<SqlStorage>, SqlSchemaIR>,
-  ): readonly SchemaIssue[] {
+  ): readonly SchemaDiffIssue[] {
     return [];
   }
 }

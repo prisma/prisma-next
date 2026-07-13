@@ -13,6 +13,7 @@ import {
   FieldDeclarationAst,
   FunctionCallAst,
   filterChildren,
+  findChildToken,
   type GenericBlockMemberAst,
   IdentifierAst,
   ModelDeclarationAst,
@@ -85,7 +86,7 @@ export const semanticTokensLegend: SemanticTokensLegend = {
 export interface SemanticTokenSource {
   readonly document: DocumentAst;
   readonly sourceFile: SourceFile;
-  readonly symbolTable: SymbolTable | undefined;
+  readonly symbolTable: SymbolTable;
   readonly scalarTypes: readonly string[];
 }
 
@@ -352,13 +353,15 @@ function collectAttribute(
   tokens: PendingSemanticToken[],
   namespace: string | undefined,
 ): void {
-  collectDecoratorName(attribute.name(), source.sourceFile.text, tokens);
+  const marker =
+    findChildToken(attribute.syntax, 'At') ?? findChildToken(attribute.syntax, 'DoubleAt');
+  collectDecoratorName(attribute.name(), marker, tokens);
   collectAttributeArgList(attribute.argList(), source, tokens, namespace);
 }
 
 function collectDecoratorName(
   name: QualifiedNameAst | undefined,
-  sourceText: string,
+  marker: SyntaxToken | undefined,
   tokens: PendingSemanticToken[],
 ): void {
   if (name === undefined) {
@@ -366,7 +369,7 @@ function collectDecoratorName(
   }
   const segments = identifierSegments(name);
   for (const [index, segment] of segments.entries()) {
-    tokens.push(rangeForDecoratorIdentifier(segment.identifier, sourceText, index === 0));
+    tokens.push(rangeForDecoratorIdentifier(segment.identifier, index === 0 ? marker : undefined));
   }
 }
 
@@ -525,7 +528,7 @@ function classifyTypeReference(
   const table = source.symbolTable;
   const namespaceName = path.length > 1 ? path[path.length - 2] : namespace;
   const namespaceScope =
-    namespaceName !== undefined ? table?.topLevel.namespaces[namespaceName] : undefined;
+    namespaceName !== undefined ? table.topLevel.namespaces[namespaceName] : undefined;
 
   if (namespaceScope !== undefined) {
     if (Object.hasOwn(namespaceScope.models, name)) {
@@ -539,22 +542,20 @@ function classifyTypeReference(
     }
   }
 
-  if (table !== undefined) {
-    if (Object.hasOwn(table.topLevel.models, name)) {
-      return { tokenType: 'class' };
-    }
-    if (Object.hasOwn(table.topLevel.compositeTypes, name)) {
-      return { tokenType: 'struct' };
-    }
-    if (Object.hasOwn(table.topLevel.scalars, name)) {
-      return { tokenType: 'type', modifierBitset: semanticTokenModifierBits.defaultLibrary };
-    }
-    if (
-      Object.hasOwn(table.topLevel.typeAliases, name) ||
-      Object.hasOwn(table.topLevel.blocks, name)
-    ) {
-      return { tokenType: 'type' };
-    }
+  if (Object.hasOwn(table.topLevel.models, name)) {
+    return { tokenType: 'class' };
+  }
+  if (Object.hasOwn(table.topLevel.compositeTypes, name)) {
+    return { tokenType: 'struct' };
+  }
+  if (Object.hasOwn(table.topLevel.scalars, name)) {
+    return { tokenType: 'type', modifierBitset: semanticTokenModifierBits.defaultLibrary };
+  }
+  if (
+    Object.hasOwn(table.topLevel.typeAliases, name) ||
+    Object.hasOwn(table.topLevel.blocks, name)
+  ) {
+    return { tokenType: 'type' };
   }
 
   if (source.scalarTypes.includes(name)) {
@@ -564,8 +565,8 @@ function classifyTypeReference(
   return { tokenType: 'type' };
 }
 
-function isKnownNamespace(name: string, table: SymbolTable | undefined): boolean {
-  return table !== undefined && Object.hasOwn(table.topLevel.namespaces, name);
+function isKnownNamespace(name: string, table: SymbolTable): boolean {
+  return Object.hasOwn(table.topLevel.namespaces, name);
 }
 
 function identifierSegments(name: QualifiedNameAst): readonly IdentifierSegment[] {
@@ -622,20 +623,14 @@ function rangeForIdentifier(
 
 function rangeForDecoratorIdentifier(
   identifier: IdentifierAst,
-  sourceText: string,
-  includePrefix: boolean,
+  marker: SyntaxToken | undefined,
 ): PendingSemanticToken {
   const range = rangeForIdentifier(identifier, 'decorator');
-  if (!includePrefix) {
+  if (marker === undefined || marker.offset >= range.startOffset) {
     return range;
   }
-
-  let startOffset = range.startOffset;
-  while (startOffset > 0 && sourceText.charAt(startOffset - 1) === '@') {
-    startOffset--;
-  }
   return createPendingSemanticToken(
-    startOffset,
+    marker.offset,
     range.endOffset,
     'decorator',
     range.modifierBitset,

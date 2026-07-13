@@ -25,6 +25,23 @@ function usersTable(columnName: string, codecId: string): StorageTable {
   });
 }
 
+function enumTable(): StorageTable {
+  return new StorageTable({
+    columns: {
+      status: {
+        codecId: 'pg/enum@1',
+        nativeType: 'aal_level',
+        nullable: false,
+        typeParams: { typeName: 'aal_level' },
+      },
+    },
+    primaryKey: { columns: ['status'] },
+    uniques: [],
+    indexes: [],
+    foreignKeys: [],
+  });
+}
+
 function twoNamespaceSameTableName(): SqlStorage {
   return new SqlStorage({
     storageHash: STORAGE_HASH,
@@ -75,5 +92,22 @@ describe('codecRefForStorageColumn', () => {
       codecId: 'pg/text@1',
     });
     expect(codecRefForStorageColumn(storage, 'public', 'users', 'missing')).toBeUndefined();
+  });
+
+  it("derives {codecId, typeParams} for an enum column, from the column's own typeParams", () => {
+    const storage = new SqlStorage({
+      storageHash: STORAGE_HASH,
+      namespaces: {
+        public: createTestSqlNamespace({
+          id: 'public',
+          entries: { table: { session: enumTable() } },
+        }),
+      },
+    });
+
+    expect(codecRefForStorageColumn(storage, 'public', 'session', 'status')).toEqual({
+      codecId: 'pg/enum@1',
+      typeParams: { typeName: 'aal_level' },
+    });
   });
 });

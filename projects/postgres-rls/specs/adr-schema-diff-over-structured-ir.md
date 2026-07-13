@@ -12,7 +12,8 @@ The differ **walks the two IRs as a tree.** It is given two corresponding nodes 
 
 ```ts
 interface DiffableNode {
-  id(): string;                              // unique among siblings at this level; a single path segment
+  id(): string;                              // a single path segment
+  nodeKind(): string;                        // per-node discriminant; never folded into id()
   isEqualTo(other: DiffableNode): boolean;   // compares a matched pair
   children(): readonly DiffableNode[];       // the node's children; empty for a leaf
 }
@@ -22,27 +23,27 @@ The differ accumulates ids into a **path** as it descends. Starting at `diffSche
 
 ```ts
 const issues: readonly SchemaDiffIssue[] = diffSchemas(expected, actual);
-// SchemaDiffIssue = { path: readonly string[], outcome, message, expected?, actual? }
+// SchemaDiffIssue = { path: readonly string[], outcome, expected?, actual? }
 //   outcome: 'missing' | 'extra' | 'mismatch'
 ```
 
-`id()` must be unique among sibling nodes aligned at a level: the differ keys on it and treats a collision as the same entity (enforced by a duplicate-id throw).
+The differ pairs siblings by the combination of `nodeKind()` and `id()`, not by `id()` alone: `id()` needs only be unique among siblings of the same `nodeKind()` at a level, not unique across the whole level (enforced by a duplicate throw on a genuine same-kind/same-id collision). Two distinct kinds of child in the same slot list — say a role and a namespace — may legitimately share a name; they are never paired against each other, so the shared name is harmless. A node never encodes its kind into its `id()` string to route around a collision; `nodeKind()` is the discriminant that does that job.
 
 Not every node is an entity with a contract-level coordinate. A column has no `EntityCoordinate`; its identity within the differ is its path. The differ is agnostic to entity coordinates entirely; it operates only on ids and paths.
 
 The differ is **total**: an unmatched node emits its own issue and descends, emitting an issue for every node in the missing or extra subtree. Coalescing a parent change over its children is the planner's responsibility. Ownership filtering — dropping `extra` issues in namespaces a contract doesn't own — is the caller's responsibility, not the differ's.
 
-It emits a `mismatch` when a matched pair is not `isEqualTo`, pairs their children by `id()`, recurses into each matched child, and emits one issue per disagreement.
+It emits a `mismatch` when a matched pair is not `isEqualTo`, pairs their children by `(nodeKind(), id())`, recurses into each matched child, and emits one issue per disagreement.
 
 The top node of each IR is the **database** — a real node in the topology, since you connect to and migrate one database, not a synthetic wrapper fabricated to satisfy the differ. Its `id()` is the database/schema name; its `isEqualTo` is trivially true until there are database-level attributes worth diffing; its `children()` are the database's entities. (Roles are cluster-scoped — above any one database — so when they enter the diff they will attach to a cluster node above the database root, or to the database root pragmatically; that is settled when roles are diffed, not here.)
 
 - **missing** — in expected, not in actual.
 - **extra** — in actual, not in expected.
-- **mismatch** — the two pair by id, but `isEqualTo` is false.
+- **mismatch** — the two pair by `(nodeKind(), id())`, but `isEqualTo` is false.
 
 For instance, an RLS policy present in the expected IR but absent from the database produces one `missing` issue at that policy's path, which the planner turns into a `CREATE POLICY`. The path records exactly where in the schema tree the issue sits.
 
-The differ is generic: it calls only those three methods, so its code never names a policy, a role, or a table. Each node supplies its own `id` / `isEqualTo` / `children` from the package that defines it.
+The differ is generic: it calls only those methods, so its code never names a policy, a role, or a table. Each node supplies its own `id` / `nodeKind` / `isEqualTo` / `children` from the package that defines it.
 
 ## The two sides are derived IRs of one shape
 
@@ -74,7 +75,7 @@ Each of those is a relationship between nodes. The walk keeps those relationship
 ## Responsibilities
 
 - **The framework** owns the walk, the pairing, the `missing | extra | mismatch` vocabulary, and the path. It names no node type.
-- **A node** implements `id()`, `isEqualTo()`, and `children()` in the package that defines it. A target-only node — an RLS policy, a role — implements them in the target package, the one place its type is named.
+- **A node** implements `id()`, `nodeKind()`, `isEqualTo()`, and `children()` in the package that defines it. A target-only node — an RLS policy, a role — implements them in the target package, the one place its type is named.
 - **A derivation** builds one side's IR, populating every node that side carries in canonical form, so `isEqualTo` is a plain structural comparison rather than a normalizing one. A target's two derivations live with the target, written directly — not registered through a shared surface.
 
 For a **content-addressed** node — an RLS policy — `id()` settles equality on its own: the wire name encodes the body, so two policies that pair by id are equal by construction. `isEqualTo` carries the nodes whose id does not capture their whole content.
@@ -115,4 +116,6 @@ Relational table attributes (columns, indexes, constraints) are not yet diffed t
 
 **Port every node type onto the differ at once.** Move the relational node types — tables, columns, indexes, constraints — onto the walk in the same step that establishes it. Rejected as scope: each relational node type carries non-structural equality (type aliases, default normalization) and cross-sibling synthesis that are work in their own right. The walk handles a tree of any depth already, so which node types populate the tree can grow on its own schedule.
 
-**Key nodes on `EntityCoordinate`.** Use the four-part `{plane, namespaceId, entityKind, entityName}` struct as the sibling key. Rejected because not all nodes are entities — a column has no `EntityCoordinate` — and it created a real bug: `PostgresRlsPolicy.coord()` omitted the table, but policy wire names are only unique per-table, so two tables with the same policy (same prefix + same body → same wire name) collided and the duplicate-key throw falsely rejected a valid contract. Path-based ids fix this by design: each node folds only what is needed for sibling uniqueness into its id.
+**Key nodes on `EntityCoordinate`.** Use the four-part `{plane, namespaceId, entityKind, entityName}` struct as the sibling key. Rejected because not all nodes are entities — a column has no `EntityCoordinate` — and it created a real bug: `PostgresRlsPolicy.coord()` omitted the table, but policy wire names are only unique per-table, so two tables with the same policy (same prefix + same body → same wire name) collided and the duplicate-key throw falsely rejected a valid contract. Path-based ids fix this by design: a node's identity within the differ is its position in the tree (the accumulated path), not a coordinate reconstructed from a struct.
+
+**Fold a node's kind into its `id()` string.** Have a node whose name could collide with a differently-typed sibling (a role named `public` colliding with a namespace named `public`) prefix a sigil onto its `id()` so the two can never collide in the flat sibling map. Rejected: it leaks a differ-internal collision-avoidance detail into `id()`, which is also the value stamped into every emitted issue's `path` — so the sigil leaks into paths and needs laundering wherever a path is turned into a message. The differ now carries the discriminant itself: `nodeKind()` joins `id()` to key siblings, so `id()` needs only be unique among siblings of the same kind, and a node never encodes its kind into its id string.

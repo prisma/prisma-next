@@ -7,6 +7,7 @@ import {
   hasOperationPreview,
   type MigrationPlanOperation,
   type OperationPreview,
+  type SchemaOwnership,
 } from '@prisma-next/framework-components/control';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
@@ -97,6 +98,7 @@ async function runPlannerLeg(
   contract: Contract,
   fromContract: Contract | null,
   spaceId: string,
+  ownership: SchemaOwnership,
 ): Promise<Result<PlannerSuccess, CliStructuredError>> {
   const fromSchema = migrations.contractToSchema(fromContract, frameworkComponents);
   const plannerResult = planner.plan({
@@ -106,6 +108,12 @@ async function runPlannerLeg(
     fromContract,
     frameworkComponents,
     spaceId,
+    // Offline `migration plan` is the aggregate-of-(possibly one) degenerate
+    // case: the same ownership consultation the live aggregate flow uses. A
+    // from→to extra (a table removed from the contract) is not declared by any
+    // space in the aggregate, so it stays a genuine drop; a table another
+    // space owns is never dropped.
+    ownership,
   });
   if (plannerResult.kind === 'failure') {
     return notOk(
@@ -321,11 +329,11 @@ async function executeMigrationPlanCommand(
   if (!tolerantAggregateResult.ok) {
     return notOk(tolerantAggregateResult.failure);
   }
-  const resolutionMember = tolerantAggregateResult.value.app;
+  const resolutionSpace = tolerantAggregateResult.value.app;
 
   const resolutionResult = await resolveFromForPlan({
     optionsFrom: options.from,
-    member: resolutionMember,
+    space: resolutionSpace,
   });
 
   if (!resolutionResult.ok) {
@@ -365,7 +373,7 @@ async function executeMigrationPlanCommand(
   // change.
   if (options.to !== undefined) {
     const toResolution = await resolveToForPlan(options.to, {
-      member: resolutionMember,
+      space: resolutionSpace,
     });
     if (!toResolution.ok) {
       return notOk(toResolution.failure);
@@ -498,6 +506,7 @@ async function executeMigrationPlanCommand(
         fromContract,
         null,
         aggregate.app.spaceId,
+        aggregate,
       );
       if (!baselineLeg.ok) {
         return notOk(baselineLeg.failure);
@@ -567,6 +576,7 @@ async function executeMigrationPlanCommand(
         aggregate.app.contract(),
         fromContract,
         aggregate.app.spaceId,
+        aggregate,
       );
       if (!deltaLeg.ok) {
         return notOk(deltaLeg.failure);
@@ -640,6 +650,7 @@ async function executeMigrationPlanCommand(
       aggregate.app.contract(),
       fromContract,
       aggregate.app.spaceId,
+      aggregate,
     );
     if (!deltaLeg.ok) {
       return notOk(deltaLeg.failure);

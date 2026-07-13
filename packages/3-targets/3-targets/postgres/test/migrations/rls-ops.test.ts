@@ -11,7 +11,7 @@ import {
   dropRlsPolicy,
   enableRowLevelSecurity,
 } from '../../src/core/migrations/operations/rls';
-import { PostgresRlsPolicy } from '../../src/core/schema-ir/postgres-rls-policy';
+import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import { PostgresCreatePolicy, PostgresDropPolicy } from '../../src/exports/ddl';
 
 function recordingCheckLowerer(): { lowerer: ExecuteRequestLowerer; received: unknown[] } {
@@ -165,7 +165,9 @@ describe('createRlsPolicy op', () => {
       }).policyAbsent(),
     );
     expect(op.precheck[0]?.params).toEqual(['p1']);
-    expect(op.precheck[0]?.sql).not.toContain('read_own_profiles_ab12cd34');
+    // Recording lowerer stubs the SQL, so a not-contains assertion on it is
+    // vacuous — real param-binding safety is pinned through the actual adapter
+    // lowerer in adapter-postgres `verification-checks-lowering.test.ts`.
   });
 
   it('lowers a parameterized policy-present postcheck', async () => {
@@ -228,7 +230,7 @@ describe('dropRlsPolicy op', () => {
 
   it('lowers a parameterized policy-present precheck (name never inlined)', async () => {
     const { lowerer, received } = recordingCheckLowerer();
-    const op = await dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34', lowerer);
+    await dropRlsPolicy('public', 'profiles', 'read_own_profiles_ab12cd34', lowerer);
     expect(received).toContainEqual(
       rlsPolicyExistsAst({
         schema: 'public',
@@ -236,7 +238,9 @@ describe('dropRlsPolicy op', () => {
         policyName: 'read_own_profiles_ab12cd34',
       }).policyPresent(),
     );
-    expect(op.precheck[0]?.sql).not.toContain('read_own_profiles_ab12cd34');
+    // Recording lowerer stubs the SQL; the real param-binding safety is pinned
+    // through the actual adapter lowerer in adapter-postgres
+    // `verification-checks-lowering.test.ts`.
   });
 
   it('lowers a parameterized policy-absent postcheck', async () => {

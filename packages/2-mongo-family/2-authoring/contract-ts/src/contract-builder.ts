@@ -25,7 +25,6 @@ import { errorEnumCodecNotInPackStack } from '@prisma-next/errors/control';
 import type { AuthoringEntityTypeNamespace } from '@prisma-next/framework-components/authoring';
 import {
   assertNoCrossRegistryCollisions,
-  isAuthoringEntityTypeDescriptor,
   mergeAuthoringNamespaces,
 } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
@@ -817,7 +816,7 @@ function composeMongoEntityHelpers(
   for (const component of components) {
     const ns = extractEntitiesNamespace(component);
     if (Object.keys(ns).length > 0) {
-      mergeAuthoringNamespaces(merged, ns, [], isAuthoringEntityTypeDescriptor, 'entity');
+      mergeAuthoringNamespaces(merged, ns, [], 'entity', 'entity');
     }
   }
   // Mongo authoring does not yet ship contributed field / type namespaces in

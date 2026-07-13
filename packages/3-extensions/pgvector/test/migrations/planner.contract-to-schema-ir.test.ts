@@ -15,7 +15,7 @@ import {
   extractCodecControlHooks,
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, type SchemaOwnership } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   SqlStorage,
@@ -23,10 +23,18 @@ import {
   type StorageColumn,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
+import { SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
 import { postgresRenderDefault } from '@prisma-next/target-postgres/control';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
-import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import { resolveDdlSchemaForNamespaceStorage } from '@prisma-next/target-postgres/schema-ir-annotations';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  PostgresNativeEnumSchemaNode,
+  PostgresTableSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
@@ -91,24 +99,80 @@ function createTestContract(
   };
 }
 
-// Carry the contract's enum native-type names in `nativeEnumTypeNames` (the
-// `PostgresSchemaIR` field that records which enum types already exist — the
-// signal the enum `planTypeOperations` hook reads to decide whether to emit a
-// `CREATE TYPE`).
+// Carry the contract's enum native-type names as `nativeEnums` nodes (the
+// `PostgresNamespaceSchemaNode` field that records which enum types already
+// exist — the signal the enum `planTypeOperations` hook reads to decide
+// whether to emit a `CREATE TYPE`). Member values are irrelevant to that
+// signal, so each node carries an empty `members` list.
 function contractToSchemaIR(
   contract: Contract<SqlStorage> | null,
   options?: Omit<Parameters<typeof contractToSchemaIRImpl>[1], 'annotationNamespace'>,
-): PostgresSchemaIR {
+): PostgresDatabaseSchemaNode {
   const sqlIr = contractToSchemaIRImpl(contract, { annotationNamespace: 'pg', ...options });
-  const nativeEnumTypeNames =
-    contract === null ? [] : Object.values(contract.storage.types ?? {}).map((t) => t.nativeType);
-  return new PostgresSchemaIR({
-    tables: sqlIr.tables,
-    pgSchemaName: 'public',
-    pgVersion: '',
+  const enums =
+    contract === null
+      ? []
+      : Object.values(contract.storage.types ?? {}).map(
+          (t) =>
+            new PostgresNativeEnumSchemaNode({
+              typeName: t.nativeType,
+              namespaceId: 'public',
+              members: [],
+            }),
+        );
+  const tables = Object.fromEntries(
+    Object.entries(sqlIr.tables).map(([name, t]) => [
+      name,
+      new PostgresTableSchemaNode({
+        name: t.name,
+        columns: t.columns,
+        // The flat family `contractToSchemaIR` stamps `referencedSchema` only
+        // for bound FK targets (absent = unbound namespace) and never resolves
+        // `resolvedReferencedNamespace` — that fixup is `contractToPostgresDatabaseSchemaNode`'s
+        // own responsibility. The differ pairs FK nodes by id, which folds in
+        // `resolvedReferencedNamespace`, so this test double must apply the same
+        // restoration and resolution the real Postgres tree-builder does, or an
+        // unresolved FK here never pairs with the differ's Postgres-tree-derived
+        // expected side and shows up as a spurious drop+recreate.
+        foreignKeys:
+          contract === null
+            ? t.foreignKeys
+            : t.foreignKeys.map(
+                (fk) =>
+                  new SqlForeignKeyIR({
+                    columns: fk.columns,
+                    referencedTable: fk.referencedTable,
+                    referencedColumns: fk.referencedColumns,
+                    referencedSchema: fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
+                    ...(fk.name !== undefined ? { name: fk.name } : {}),
+                    ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
+                    ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
+                    resolvedReferencedNamespace: resolveDdlSchemaForNamespaceStorage(
+                      contract.storage,
+                      fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
+                    ),
+                  }),
+              ),
+        uniques: t.uniques,
+        indexes: t.indexes,
+        ...(t.primaryKey !== undefined ? { primaryKey: t.primaryKey } : {}),
+        ...(t.annotations !== undefined ? { annotations: t.annotations } : {}),
+        ...(t.checks !== undefined ? { checks: t.checks } : {}),
+        rlsEnabled: false,
+      }),
+    ]),
+  );
+  return new PostgresDatabaseSchemaNode({
+    namespaces: {
+      public: new PostgresNamespaceSchemaNode({
+        schemaName: 'public',
+        tables,
+        nativeEnums: enums,
+      }),
+    },
     roles: [],
     existingSchemas: [],
-    nativeEnumTypeNames,
+    pgVersion: '',
   });
 }
 
@@ -695,10 +759,13 @@ function createAdapterHooksComponent(): TargetBoundComponentDescriptor<'sql', st
       const values = typeInstance.typeParams?.['values'] as string[] | undefined;
       if (!values || values.length === 0) return { operations: [] };
 
-      // The "enum already exists" signal lives in `nativeEnumTypeNames` on a
-      // `PostgresSchemaIR` (the production-shaped field a real hook reads).
-      const existingEnumTypes =
-        schema instanceof PostgresSchemaIR ? schema.nativeEnumTypeNames : [];
+      // The "enum already exists" signal lives in `nativeEnums` on the
+      // per-schema `PostgresNamespaceSchemaNode`. The strategy layer hands
+      // the hook that namespace node (the per-schema `SqlSchemaIR` shape),
+      // so read the field directly off it.
+      const existingEnumTypes = PostgresNamespaceSchemaNode.is(schema)
+        ? schema.nativeEnums.map((e) => e.typeName)
+        : [];
 
       if (existingEnumTypes.includes(typeInstance.nativeType)) {
         return { operations: [] };
@@ -842,6 +909,21 @@ function createDemoContract(
   };
 }
 
+// `user_type` is declared via `storage.types` (a codec-instance type managed
+// by the test's `planTypeOperations` hook), not via `entries.native_enum` —
+// so the app contract never "declares" it as a native_enum entity in the
+// storage-entries sense. `contractToSchemaIR` still represents it as a live
+// `enums` node (the signal `planTypeOperations` reads to skip a redundant
+// CREATE TYPE), so without an ownership answer the differ would see an
+// unpaired "extra" enum and plan a `dropNativeEnumType` for a type this
+// space's own codec hook is actively managing. This oracle declares it owned,
+// matching how a real `ContractSpaceAggregate` would answer once a pack
+// declares the coordinate.
+const ownsUserTypeEnum: SchemaOwnership = {
+  declaresEntity: (coordinate) =>
+    coordinate.entityKind === 'native_enum' && coordinate.entityName === 'user_type',
+};
+
 describe('incremental migration with full contract surface (enums, FKs)', () => {
   const frameworkComponents = [createAdapterHooksComponent(), pgvectorDescriptor];
 
@@ -874,6 +956,7 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      ownership: ownsUserTypeEnum,
     });
 
     expect(result.kind).toBe('success');
@@ -905,6 +988,7 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      ownership: ownsUserTypeEnum,
     });
 
     expect(result.kind).toBe('success');

@@ -1,9 +1,9 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
+import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
+import { PostgresRole } from '../src/core/postgres-role';
 import { PostgresSchema } from '../src/core/postgres-schema';
-import { PostgresRlsPolicy } from '../src/core/schema-ir/postgres-rls-policy';
-import { PostgresRole } from '../src/core/schema-ir/postgres-role';
 
 const emptyTableInput = {
   columns: {},
@@ -39,6 +39,13 @@ describe('PostgresRole', () => {
     expect(json['kind']).toBe('role');
     expect(json['name']).toBe('authenticated');
     expect(json['namespaceId']).toBe(UNBOUND_NAMESPACE_ID);
+  });
+
+  it('defaults control to external when not provided', () => {
+    const role = new PostgresRole({ name: 'authenticated', namespaceId: UNBOUND_NAMESPACE_ID });
+    expect(role.control).toBe('external');
+    const json = JSON.parse(JSON.stringify(role)) as Record<string, unknown>;
+    expect(json['control']).toBe('external');
   });
 });
 

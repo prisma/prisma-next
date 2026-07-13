@@ -2,7 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { loadConfig } from '@prisma-next/config-loader';
 import type { Contract } from '@prisma-next/contract/types';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { type ContractSpaceMember, requireHeadRef } from '@prisma-next/migration-tools/aggregate';
+import {
+  type AggregateContractSpace,
+  requireHeadRef,
+} from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { errorUnknownInvariant, MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { findLatestMigration, isGraphNode } from '@prisma-next/migration-tools/migration-graph';
@@ -13,7 +16,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { createControlClient } from '../control-api/client';
-import { planMemberPath } from '../control-api/operations/migrate';
+import { planSpacePath } from '../control-api/operations/migrate';
 import type {
   MigrateFailure,
   MigratePathDecision,
@@ -149,8 +152,8 @@ export interface MigrateResult {
  * Computes the path through the SAME seam as `executeMigrate`:
  * - `readAllMarkers()` for the from-state (when no `--from` is given), preserving
  *   the full marker including `invariants` (not just `storageHash`).
- * - `planMemberPath()` (shared with `executeMigrate`) for per-member path selection,
- *   which feeds `graphWalkStrategy()` with the same target hash, target invariants,
+ * - `planSpacePath()` (shared with `executeMigrate`) for per-space path selection,
+ *   which feeds `resolveRecordedPath()` with the same target hash, target invariants,
  *   and current marker as the real apply path uses.
  *
  * Returns BEFORE any write boundary (`runMigration` / marker / DDL). No
@@ -203,7 +206,7 @@ async function executeMigrateShowCommand(
   const appGraph = aggregate.app.graph();
 
   // Resolve the --to target (defaults to the on-disk contract, same as migrate).
-  // Also capture the ref's invariants so planMemberPath feeds graphWalkStrategy the
+  // Also capture the ref's invariants so planSpacePath feeds resolveRecordedPath the
   // same target invariants that real migrate would use (refInvariants ?? headRef.invariants).
   let targetHash: string = contractHash;
   let refInvariants: readonly string[] | undefined;
@@ -258,13 +261,13 @@ async function executeMigrateShowCommand(
   // - Explicit --from: parse it offline (no connection).
   // - Omitted: read the live DB marker via readAllMarkers() — the same source migrate uses.
   //
-  // Full marker records (storageHash + invariants) are preserved so planMemberPath
-  // can feed graphWalkStrategy the complete currentMarker — exactly as executeMigrate
+  // Full marker records (storageHash + invariants) are preserved so planSpacePath
+  // can feed resolveRecordedPath the complete currentMarker — exactly as executeMigrate
   // does via familyInstance.readAllMarkers(). A stripped { storageHash, invariants: [] }
   // marker would produce a different `required` set and a different (incorrect) path.
   type LiveMarker = { readonly storageHash: string; readonly invariants: readonly string[] };
   const markerBySpace = new Map<string, LiveMarker | null>();
-  const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
+  const allSpaces: ReadonlyArray<AggregateContractSpace> = [aggregate.app, ...aggregate.extensions];
 
   if (hasExplicitFrom) {
     // @db with explicit --from requires a connection
@@ -301,7 +304,7 @@ async function executeMigrateShowCommand(
       } else {
         // Offline hypothetical: the --from ref only carries a hash (no live invariants).
         // Apply the from-hash marker to the APP space only. Extension spaces are left
-        // absent from markerBySpace (treated as null / greenfield by planMemberPath),
+        // absent from markerBySpace (treated as null / greenfield by planSpacePath),
         // so they plan from their own marker → own head — exactly as executeMigrate does.
         const fromHash = fromResult.value.hash;
         const offlineMarker: LiveMarker | null =
@@ -334,9 +337,9 @@ async function executeMigrateShowCommand(
       const allMarkers = await client.readAllMarkers();
       // Store the full marker record (storageHash + invariants) per space.
       // This is the same data executeMigrate uses via familyInstance.readAllMarkers().
-      for (const member of allMembers) {
-        const marker = allMarkers.get(member.spaceId);
-        markerBySpace.set(member.spaceId, marker ?? null);
+      for (const space of allSpaces) {
+        const marker = allMarkers.get(space.spaceId);
+        markerBySpace.set(space.spaceId, marker ?? null);
       }
     } catch (error) {
       if (CliStructuredError.is(error)) {
@@ -355,35 +358,35 @@ async function executeMigrateShowCommand(
     }
   }
 
-  // Walk the path via planMemberPath — the same helper executeMigrate uses.
-  // planMemberPath feeds graphWalkStrategy identical inputs (targetHash, targetInvariants,
+  // Walk the path via planSpacePath — the same helper executeMigrate uses.
+  // planSpacePath feeds resolveRecordedPath identical inputs (targetHash, targetInvariants,
   // currentMarker with full invariants), so the preview path is always the path migrate runs.
   //
   // Canonical schedule order: extensions alphabetically first, then app — mirroring the
   // runner's `applyOrder` in operations/migrate.ts so the "Will run, in order:" list
   // reflects the actual execution sequence (extensions install first, app last).
-  const canonicalOrderMembers: ReadonlyArray<ContractSpaceMember> = [
+  const canonicalOrderSpaces: ReadonlyArray<AggregateContractSpace> = [
     ...aggregate.extensions,
     aggregate.app,
   ];
   const orderedMigrations: MigrateShowMigration[] = [];
-  for (const member of canonicalOrderMembers) {
-    const isAppMember = member.spaceId === aggregate.app.spaceId;
-    const headRef = requireHeadRef(member);
-    const memberTargetHash = isAppMember ? targetHash : headRef.hash;
-    const memberRefInvariants = isAppMember ? refInvariants : undefined;
-    const liveMarker = markerBySpace.get(member.spaceId) ?? null;
+  for (const space of canonicalOrderSpaces) {
+    const isAppSpace = space.spaceId === aggregate.app.spaceId;
+    const headRef = requireHeadRef(space);
+    const spaceTargetHash = isAppSpace ? targetHash : headRef.hash;
+    const spaceRefInvariants = isAppSpace ? refInvariants : undefined;
+    const liveMarker = markerBySpace.get(space.spaceId) ?? null;
 
-    const outcome = planMemberPath({
-      member,
+    const outcome = planSpacePath({
+      space,
       aggregate,
-      targetHash: memberTargetHash,
-      refInvariants: memberRefInvariants,
+      targetHash: spaceTargetHash,
+      refInvariants: spaceRefInvariants,
       liveMarker,
     });
 
     if (outcome.kind === 'at-head') {
-      // Empty-graph member already at target — nothing to run for this space.
+      // Empty-graph space already at target — nothing to run for this space.
       continue;
     }
     if (outcome.kind === 'never-planned') {
@@ -417,7 +420,7 @@ async function executeMigrateShowCommand(
 
     for (const edge of outcome.plan.migrationEdges) {
       orderedMigrations.push({
-        spaceId: member.spaceId,
+        spaceId: space.spaceId,
         dirName: edge.dirName,
         migrationHash: edge.migrationHash,
         from: edge.from,
@@ -445,12 +448,12 @@ async function executeMigrateShowCommand(
     // before rendering. This ensures the name column, hash column, and ops column
     // start at the same horizontal offset across every space section AND the
     // "Will run, in order:" list below.
-    const memberLayouts = allMembers.map((member) => {
-      const isApp = member.spaceId === aggregate.app.spaceId;
-      const memberGraph = member.graph();
-      const rowModel = buildMigrationGraphRows(memberGraph, isApp ? { contractHash } : {});
+    const spaceLayouts = allSpaces.map((space) => {
+      const isApp = space.spaceId === aggregate.app.spaceId;
+      const spaceGraph = space.graph();
+      const rowModel = buildMigrationGraphRows(spaceGraph, isApp ? { contractHash } : {});
       const edgeAnnotations = new Map<string, MigrationEdgeAnnotation>();
-      for (const edge of memberGraph.migrationByHash.values()) {
+      for (const edge of spaceGraph.migrationByHash.values()) {
         edgeAnnotations.set(edge.migrationHash, {
           pathHighlight: onPathHashes.has(edge.migrationHash) ? 'on-path' : 'off-path',
         });
@@ -459,17 +462,17 @@ async function executeMigrateShowCommand(
       // green/continuous; off-path lanes dim. Rows, gutter, and labels all come
       // from this one grid.
       const grid = buildGrid(rowModel, {}, highlightFromEdgeAnnotations(edgeAnnotations));
-      return { member, isApp, memberGraph, rowModel, grid, edgeAnnotations };
+      return { space, isApp, spaceGraph, rowModel, grid, edgeAnnotations };
     });
 
     // Global max across all space grids so every section's labels share columns.
     const globalLabelColumn =
-      memberLayouts.length > 1
-        ? Math.max(...memberLayouts.map(({ grid }) => computeLabelColumn(grid, 'unicode')))
+      spaceLayouts.length > 1
+        ? Math.max(...spaceLayouts.map(({ grid }) => computeLabelColumn(grid, 'unicode')))
         : undefined;
     const globalMaxDirNameWidthFromLayouts =
-      memberLayouts.length > 1
-        ? Math.max(...memberLayouts.map(({ rowModel }) => computeMaxDirNameWidth(rowModel)))
+      spaceLayouts.length > 1
+        ? Math.max(...spaceLayouts.map(({ rowModel }) => computeMaxDirNameWidth(rowModel)))
         : undefined;
     // The run-list name column width must be at least as wide as the global tree dirName
     // width so that tree sections and the list align at the hash column.
@@ -485,10 +488,10 @@ async function executeMigrateShowCommand(
     runListLeftPad = globalLabelColumn;
 
     // Render each space section with globally computed widths.
-    const showSpaceHeadings = allMembers.length > 1;
+    const showSpaceHeadings = allSpaces.length > 1;
     const sections: string[] = [];
-    for (const { member, isApp, rowModel, grid, edgeAnnotations } of memberLayouts) {
-      const liveMarker = markerBySpace.get(member.spaceId) ?? null;
+    for (const { space, isApp, rowModel, grid, edgeAnnotations } of spaceLayouts) {
+      const liveMarker = markerBySpace.get(space.spaceId) ?? null;
       const liveMarkerHash = liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
       const tree = renderMigrationGraphCommand({
         grid,
@@ -496,7 +499,7 @@ async function executeMigrateShowCommand(
         contractHash,
         isAppSpace: isApp,
         ...(needsLiveMarker ? { dbHash: liveMarkerHash } : {}),
-        refsByHash: listRefsByContractHash(member),
+        refsByHash: listRefsByContractHash(space),
         edgeAnnotationsByHash: edgeAnnotations,
         colorize,
         glyphMode: 'unicode',
@@ -505,7 +508,7 @@ async function executeMigrateShowCommand(
       });
       if (tree.length === 0) continue;
       if (showSpaceHeadings) {
-        sections.push(`${member.spaceId}:\n${indentMigrationGraphTreeBlock(tree, '  ')}`);
+        sections.push(`${space.spaceId}:\n${indentMigrationGraphTreeBlock(tree, '  ')}`);
       } else {
         sections.push(tree);
       }

@@ -1,4 +1,4 @@
-import { elementCoordinates } from '@prisma-next/framework-components/ir';
+import { coordinateKey, elementCoordinates } from '@prisma-next/framework-components/ir';
 import { EMPTY_CONTRACT_HASH } from '../constants';
 import { MigrationToolsError } from '../errors';
 import type {
@@ -9,16 +9,16 @@ import type {
 import type { PackageLoadProblem } from '../io';
 import type { OnDiskMigrationPackage } from '../package';
 import type { RefLoadProblem } from '../refs';
-import type { ContractSpaceMember } from './types';
+import type { AggregateContractSpace } from './types';
 
 /**
  * One space's load-time facts that `checkIntegrity` judges: the loaded
- * member, the load-time problems `readMigrationsDir` surfaced for it, and
+ * contract space, the load-time problems `readMigrationsDir` surfaced for it, and
  * whether it is the app space (the app head ref is synthesised, so the
  * head-ref checks are skipped for it).
  */
 export interface IntegritySpaceState {
-  readonly member: ContractSpaceMember;
+  readonly space: AggregateContractSpace;
   readonly problems: readonly PackageLoadProblem[];
   /** Per-ref problems: a user ref `*.json` that exists but is unparseable. */
   readonly refProblems: readonly RefLoadProblem[];
@@ -53,8 +53,8 @@ export function computeIntegrityViolations(
 ): readonly IntegrityViolation[] {
   const violations: IntegrityViolation[] = [];
 
-  for (const { member, problems, refProblems, headRefProblem, isApp } of input.spaces) {
-    const { spaceId } = member;
+  for (const { space, problems, refProblems, headRefProblem, isApp } of input.spaces) {
+    const { spaceId } = space;
 
     for (const problem of problems) {
       violations.push(loadProblemToViolation(spaceId, problem));
@@ -77,7 +77,7 @@ export function computeIntegrityViolations(
       });
     }
 
-    for (const pkg of member.packages) {
+    for (const pkg of space.packages) {
       const from = pkg.metadata.from ?? EMPTY_CONTRACT_HASH;
       const isSelfEdge = from === pkg.metadata.to;
       const hasDataOp = pkg.ops.some((op) => op.operationClass === 'data');
@@ -86,7 +86,7 @@ export function computeIntegrityViolations(
       }
     }
 
-    violations.push(...duplicateMigrationHashViolations(spaceId, member.packages));
+    violations.push(...duplicateMigrationHashViolations(spaceId, space.packages));
 
     // For non-app spaces: a missing head.json is always an authoring error
     // (headRefMissing). The graph-reachability check (headRefNotInGraph) only
@@ -97,13 +97,10 @@ export function computeIntegrityViolations(
     // planner emits no DDL for it — the database is treated as already at the
     // declared state.
     if (!isApp && headRefProblem === null) {
-      if (member.headRef === null) {
+      if (space.headRef === null) {
         violations.push({ kind: 'headRefMissing', spaceId });
-      } else if (
-        member.packages.length > 0 &&
-        !headRefPresentInGraph(member, member.headRef.hash)
-      ) {
-        violations.push({ kind: 'headRefNotInGraph', spaceId, hash: member.headRef.hash });
+      } else if (space.packages.length > 0 && !headRefPresentInGraph(space, space.headRef.hash)) {
+        violations.push({ kind: 'headRefNotInGraph', spaceId, hash: space.headRef.hash });
       }
     }
   }
@@ -174,8 +171,8 @@ function duplicateMigrationHashViolations(
  * Whether a space's head-ref hash is present in its reconstructed graph.
  * An empty graph is reachable only by the empty-contract sentinel.
  */
-function headRefPresentInGraph(member: ContractSpaceMember, headHash: string): boolean {
-  const graph = member.graph();
+function headRefPresentInGraph(space: AggregateContractSpace, headHash: string): boolean {
+  const graph = space.graph();
   if (graph.nodes.size === 0) {
     return headHash === EMPTY_CONTRACT_HASH;
   }
@@ -187,7 +184,7 @@ function layoutViolations(
   declaredExtensions: readonly DeclaredExtensionEntry[],
 ): readonly IntegrityViolation[] {
   const out: IntegrityViolation[] = [];
-  const extensionSpaceIds = new Set(spaces.filter((s) => !s.isApp).map((s) => s.member.spaceId));
+  const extensionSpaceIds = new Set(spaces.filter((s) => !s.isApp).map((s) => s.space.spaceId));
   const declaredIds = new Set(declaredExtensions.map((d) => d.id));
 
   for (const id of [...extensionSpaceIds].sort()) {
@@ -208,31 +205,31 @@ function contractViolations(input: IntegrityComputationInput): readonly Integrit
   const elementClaimedBy = new Map<string, string[]>();
   const elementLabel = new Map<string, string>();
 
-  for (const { member } of input.spaces) {
-    let contract: ReturnType<ContractSpaceMember['contract']>;
+  for (const { space } of input.spaces) {
+    let contract: ReturnType<AggregateContractSpace['contract']>;
     try {
-      contract = member.contract();
+      contract = space.contract();
     } catch (error) {
-      out.push({ kind: 'contractUnreadable', spaceId: member.spaceId, detail: detailOf(error) });
+      out.push({ kind: 'contractUnreadable', spaceId: space.spaceId, detail: detailOf(error) });
       continue;
     }
 
     if (contract.target !== input.targetId) {
       out.push({
         kind: 'targetMismatch',
-        spaceId: member.spaceId,
+        spaceId: space.spaceId,
         expected: input.targetId,
         actual: contract.target,
       });
     }
 
-    for (const { namespaceId, entityKind, entityName } of elementCoordinates(contract.storage)) {
-      const key = `${namespaceId}:${entityKind}:${entityName}`;
+    for (const coordinate of elementCoordinates(contract.storage)) {
+      const key = coordinateKey(coordinate);
       const claimers = elementClaimedBy.get(key);
-      if (claimers) claimers.push(member.spaceId);
+      if (claimers) claimers.push(space.spaceId);
       else {
-        elementClaimedBy.set(key, [member.spaceId]);
-        elementLabel.set(key, `${namespaceId}.${entityName}`);
+        elementClaimedBy.set(key, [space.spaceId]);
+        elementLabel.set(key, `${coordinate.namespaceId}.${coordinate.entityName}`);
       }
     }
   }

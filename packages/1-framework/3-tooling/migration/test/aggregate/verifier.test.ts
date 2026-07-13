@@ -1,23 +1,24 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createContractSpaceAggregate } from '../../src/aggregate/aggregate';
 import type { ContractMarkerRecordLike } from '../../src/aggregate/marker-types';
-import type { ContractSpaceAggregate, ContractSpaceMember } from '../../src/aggregate/types';
+import type { AggregateContractSpace, ContractSpaceAggregate } from '../../src/aggregate/types';
+import type {
+  SchemaEntityKindClassifier,
+  SchemaSubjectClassifier,
+} from '../../src/aggregate/unclaimed-elements';
 import { verifyMigration } from '../../src/aggregate/verifier';
-import { makeContractSpaceMember } from '../fixtures';
+import { makeAggregateContractSpace } from '../fixtures';
 
-interface StubSchemaResult {
-  readonly tablesSeen: readonly string[];
-}
-
-function makeMember(args: {
+function makeSpace(args: {
   spaceId: string;
   headHash: string;
   invariants?: readonly string[];
   tables?: Record<string, unknown>;
-}): ContractSpaceMember {
+}): AggregateContractSpace {
   const tables = args.tables ?? {};
   const contract = createSqlContract({
     target: 'postgres',
@@ -27,7 +28,7 @@ function makeMember(args: {
       },
     },
   });
-  return makeContractSpaceMember({
+  return makeAggregateContractSpace({
     spaceId: args.spaceId,
     contract: contract as Contract,
     headRef: { hash: args.headHash, invariants: args.invariants ?? [] },
@@ -35,8 +36,8 @@ function makeMember(args: {
 }
 
 function makeAggregate(args: {
-  app: ContractSpaceMember;
-  extensions?: ContractSpaceMember[];
+  app: AggregateContractSpace;
+  extensions?: AggregateContractSpace[];
 }): ContractSpaceAggregate {
   return createContractSpaceAggregate({
     targetId: 'postgres',
@@ -46,30 +47,70 @@ function makeAggregate(args: {
   });
 }
 
-const STUB_VERIFY = (
-  projectedSchema: unknown,
-  _member: ContractSpaceMember,
+/**
+ * A per-space verifier standing in for a family's: it verifies the space's
+ * contract against the **full** live schema and flags every live table the
+ * space does not declare as an `extra_table` warning — exactly the shape the
+ * real family verify produces before the aggregate verifier scopes it.
+ */
+const FULL_SCHEMA_VERIFY = (
+  schema: unknown,
+  space: AggregateContractSpace,
   _mode: 'strict' | 'lenient',
-): StubSchemaResult => {
-  const schema = projectedSchema as { tables?: Record<string, unknown> } | null;
-  if (!schema || typeof schema !== 'object' || !schema.tables) {
-    return { tablesSeen: [] };
-  }
-  return { tablesSeen: Object.keys(schema.tables).sort() };
+): VerifyDatabaseSchemaResult => {
+  const liveTables = Object.keys((schema as { tables?: Record<string, unknown> })?.tables ?? {});
+  const declared = new Set(
+    Object.keys(space.contract().storage.namespaces[UNBOUND_NAMESPACE_ID]?.entries['table'] ?? {}),
+  );
+  const extras = liveTables.filter((name) => !declared.has(name));
+  return {
+    ok: true,
+    summary: 'Database schema satisfies contract',
+    contract: { storageHash: 'sha256:test' },
+    target: { expected: 'postgres' },
+    schema: {
+      issues: extras.map((name) => ({
+        path: [name],
+        reason: 'not-expected' as const,
+        message: `Extra table "${name}"`,
+      })),
+    },
+    timings: { total: 0 },
+  };
 };
+
+/**
+ * The classifier fixtures standing in for a real family's
+ * `hasSchemaSubjectClassifier` capability: every `FULL_SCHEMA_VERIFY` issue
+ * is a bare single-segment path naming a whole table, so both classifiers
+ * resolve it the same way regardless of path shape.
+ */
+const CLASSIFY_SUBJECT_GRANULARITY: SchemaSubjectClassifier = () => 'entity';
+const CLASSIFY_ENTITY_KIND: SchemaEntityKindClassifier = () => 'table';
+
+function extraTables(result: VerifyDatabaseSchemaResult | undefined): string[] {
+  return (result?.schema.issues ?? [])
+    .flatMap((issue) =>
+      issue.reason === 'not-expected' && issue.path.length === 1 ? [issue.path[0]] : [],
+    )
+    .filter((name): name is string => name !== undefined)
+    .sort();
+}
 
 describe('verifyMigration', () => {
   describe('markerCheck', () => {
-    it('reports `absent` when the member has no marker row', () => {
+    it('reports `absent` when the space has no marker row', () => {
       const aggregate = makeAggregate({
-        app: makeMember({ spaceId: 'app', headHash: 'sha256:app-head' }),
+        app: makeSpace({ spaceId: 'app', headHash: 'sha256:app-head' }),
       });
       const result = verifyMigration({
         aggregate,
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
+        verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
       expect(result.ok).toBe(true);
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({ kind: 'absent' });
@@ -77,7 +118,7 @@ describe('verifyMigration', () => {
 
     it('reports `ok` when marker hash + invariants match the head ref', () => {
       const aggregate = makeAggregate({
-        app: makeMember({
+        app: makeSpace({
           spaceId: 'app',
           headHash: 'sha256:app-head',
           invariants: ['inv-1'],
@@ -91,14 +132,16 @@ describe('verifyMigration', () => {
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
+        verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({ kind: 'ok' });
     });
 
     it('reports `hashMismatch` when marker hash differs from head ref', () => {
       const aggregate = makeAggregate({
-        app: makeMember({ spaceId: 'app', headHash: 'sha256:expected' }),
+        app: makeSpace({ spaceId: 'app', headHash: 'sha256:expected' }),
       });
       const markers = new Map<string, ContractMarkerRecordLike>([
         ['app', { storageHash: 'sha256:actual', invariants: [] }],
@@ -108,7 +151,9 @@ describe('verifyMigration', () => {
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
+        verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({
         kind: 'hashMismatch',
@@ -119,9 +164,9 @@ describe('verifyMigration', () => {
 
     it('reports `missingInvariants` when the head ref declares invariants the marker lacks', () => {
       const aggregate = makeAggregate({
-        app: makeMember({ spaceId: 'app', headHash: 'sha256:h' }),
+        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h' }),
         extensions: [
-          makeMember({
+          makeSpace({
             spaceId: 'cipher',
             headHash: 'sha256:cipher',
             invariants: ['cipher:create-v1', 'cipher:rotate-v1'],
@@ -136,7 +181,9 @@ describe('verifyMigration', () => {
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
+        verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
       expect(result.assertOk().markerCheck.perSpace.get('cipher')).toEqual({
         kind: 'missingInvariants',
@@ -144,9 +191,9 @@ describe('verifyMigration', () => {
       });
     });
 
-    it('lists orphan markers (rows for non-aggregate members)', () => {
+    it('lists orphan markers (rows for non-aggregate spaces)', () => {
       const aggregate = makeAggregate({
-        app: makeMember({ spaceId: 'app', headHash: 'sha256:h' }),
+        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h' }),
       });
       const markers = new Map<string, ContractMarkerRecordLike>([
         ['app', { storageHash: 'sha256:h', invariants: [] }],
@@ -158,7 +205,9 @@ describe('verifyMigration', () => {
         markersBySpaceId: markers,
         schemaIntrospection: { tables: {} },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
+        verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
       expect(result.assertOk().markerCheck.orphanMarkers.map((o) => o.spaceId)).toEqual([
         'cipher',
@@ -168,16 +217,11 @@ describe('verifyMigration', () => {
   });
 
   describe('schemaCheck', () => {
-    it('projects the schema per member before invoking the verifier (F23 lock)', () => {
-      // Multi-member deployment: each member sees only its own tables.
+    it('each space view shows its declared nodes only, no extras', () => {
       const aggregate = makeAggregate({
-        app: makeMember({
-          spaceId: 'app',
-          headHash: 'sha256:h',
-          tables: { user: {} },
-        }),
+        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [
-          makeMember({
+          makeSpace({
             spaceId: 'cipher',
             headHash: 'sha256:cipher',
             tables: { cipher_state: {} },
@@ -197,24 +241,57 @@ describe('verifyMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: liveSchema,
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
+        verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
 
       const schemaCheck = result.assertOk().schemaCheck;
-      // App member's pass saw `user` and `orphan_table` (cipher_state pruned).
-      expect(schemaCheck.perSpace.get('app')?.tablesSeen).toEqual(['orphan_table', 'user']);
-      // Cipher member's pass saw `cipher_state` and `orphan_table` (user pruned).
-      expect(schemaCheck.perSpace.get('cipher')?.tablesSeen).toEqual([
-        'cipher_state',
-        'orphan_table',
-      ]);
+      // No space's contract-satisfaction view carries the undeclared table
+      // (nor a sibling's table) — extras are stripped from every per-space view.
+      expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual([]);
+      expect(extraTables(schemaCheck.perSpace.get('cipher'))).toEqual([]);
     });
 
-    it('reports live tables not claimed by any member as `orphanElements`', () => {
+    it('reports a table no space declares once in the unclaimed list', () => {
       const aggregate = makeAggregate({
-        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [
-          makeMember({
+          makeSpace({
+            spaceId: 'cipher',
+            headHash: 'sha256:cipher',
+            tables: { cipher_state: {} },
+          }),
+        ],
+      });
+      const liveSchema = {
+        tables: {
+          user: { columns: {} },
+          cipher_state: { columns: {} },
+          orphan_table: { columns: {} },
+        },
+      };
+
+      const result = verifyMigration({
+        aggregate,
+        markersBySpaceId: new Map(),
+        schemaIntrospection: liveSchema,
+        mode: 'strict',
+        verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
+      });
+
+      // `orphan_table` is declared by no space, so it appears exactly once —
+      // not once per space, the bug the two-part split fixes.
+      expect(result.assertOk().schemaCheck.unclaimed).toEqual(['orphan_table']);
+    });
+
+    it('deduplicates and sorts multiple undeclared tables into one list', () => {
+      const aggregate = makeAggregate({
+        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        extensions: [
+          makeSpace({
             spaceId: 'cipher',
             headHash: 'sha256:cipher',
             tables: { cipher_state: {} },
@@ -234,23 +311,43 @@ describe('verifyMigration', () => {
         aggregate,
         markersBySpaceId: new Map(),
         schemaIntrospection: liveSchema,
-        // Lenient mode: the verifier still reports orphan elements; the
-        // caller (db verify) decides whether to treat them as errors.
         mode: 'lenient',
-        verifySchemaForMember: STUB_VERIFY,
+        verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
 
-      expect(result.assertOk().schemaCheck.orphanElements).toEqual([
-        { kind: 'table', name: 'another_orphan' },
-        { kind: 'table', name: 'mystery_table' },
-      ]);
+      expect(result.assertOk().schemaCheck.unclaimed).toEqual(['another_orphan', 'mystery_table']);
     });
 
-    it('returns an empty `orphanElements` list when every live table is claimed', () => {
+    it('single-space: an undeclared table is unclaimed, not a node in the space view', () => {
       const aggregate = makeAggregate({
-        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+      });
+      const liveSchema = {
+        tables: { user: { columns: {} }, legacy_events: { columns: {} } },
+      };
+
+      const result = verifyMigration({
+        aggregate,
+        markersBySpaceId: new Map(),
+        schemaIntrospection: liveSchema,
+        mode: 'strict',
+        verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
+      });
+
+      const schemaCheck = result.assertOk().schemaCheck;
+      expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual([]);
+      expect(schemaCheck.unclaimed).toEqual(['legacy_events']);
+    });
+
+    it('leaves the unclaimed list empty when every live table is declared by some space', () => {
+      const aggregate = makeAggregate({
+        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
         extensions: [
-          makeMember({
+          makeSpace({
             spaceId: 'cipher',
             headHash: 'sha256:cipher',
             tables: { cipher_state: {} },
@@ -268,15 +365,20 @@ describe('verifyMigration', () => {
           },
         },
         mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
+        verifySchemaForSpace: FULL_SCHEMA_VERIFY,
+        classifySubjectGranularity: CLASSIFY_SUBJECT_GRANULARITY,
+        classifyEntityKind: CLASSIFY_ENTITY_KIND,
       });
 
-      expect(result.assertOk().schemaCheck.orphanElements).toEqual([]);
+      const schemaCheck = result.assertOk().schemaCheck;
+      expect(extraTables(schemaCheck.perSpace.get('app'))).toEqual([]);
+      expect(extraTables(schemaCheck.perSpace.get('cipher'))).toEqual([]);
+      expect(schemaCheck.unclaimed).toEqual([]);
     });
 
-    it('returns notOk(introspectionFailure) when verifySchemaForMember throws', () => {
+    it('returns notOk(introspectionFailure) when verifySchemaForSpace throws', () => {
       const aggregate = makeAggregate({
-        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
       });
 
       const result = verifyMigration({
@@ -284,7 +386,7 @@ describe('verifyMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: { user: { columns: {} } } },
         mode: 'strict',
-        verifySchemaForMember: () => {
+        verifySchemaForSpace: () => {
           throw new Error('introspection broke');
         },
       });
@@ -296,33 +398,10 @@ describe('verifyMigration', () => {
       });
     });
 
-    it('returns notOk(introspectionFailure) when projectSchemaToSpace throws via a malformed schema', () => {
-      const aggregate = makeAggregate({
-        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
-      });
-
-      const exploding = {
-        get tables() {
-          throw new Error('schema access blew up');
-        },
-      };
-
-      const result = verifyMigration({
-        aggregate,
-        markersBySpaceId: new Map(),
-        schemaIntrospection: exploding,
-        mode: 'strict',
-        verifySchemaForMember: STUB_VERIFY,
-      });
-
-      expect(result.ok).toBe(false);
-      expect(result.assertNotOk().kind).toBe('introspectionFailure');
-    });
-
-    it('threads the verifier mode (strict / lenient) to the per-member callback verbatim', () => {
+    it('threads the verifier mode (strict / lenient) to the per-space callback verbatim', () => {
       let observedMode: 'strict' | 'lenient' | undefined;
       const aggregate = makeAggregate({
-        app: makeMember({ spaceId: 'app', headHash: 'sha256:h' }),
+        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h' }),
       });
 
       verifyMigration({
@@ -330,9 +409,9 @@ describe('verifyMigration', () => {
         markersBySpaceId: new Map(),
         schemaIntrospection: { tables: {} },
         mode: 'lenient',
-        verifySchemaForMember: (_schema, _member, mode) => {
+        verifySchemaForSpace: (schema, space, mode) => {
           observedMode = mode;
-          return { tablesSeen: [] };
+          return FULL_SCHEMA_VERIFY(schema, space, mode);
         },
       });
 

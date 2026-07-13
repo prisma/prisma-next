@@ -156,16 +156,16 @@ export async function enumerateCheckSpaces(
     candidateDirs.filter((name) => !RESERVED_SPACE_SUBDIR_NAMES.has(name)).filter(isValidSpaceId),
   );
   const spaces: CheckSpace[] = [];
-  for (const member of aggregate.spaces()) {
-    const spaceId = member.spaceId;
+  for (const space of aggregate.spaces()) {
+    const spaceId = space.spaceId;
     if (!isValidSpaceId(spaceId)) continue;
     if (!onDiskSpaceIds.has(spaceId)) continue;
     const migrationsDir = spaceMigrationDirectory(projectMigrationsDir, spaceId);
     spaces.push({
       spaceId,
-      packages: member.packages,
-      refs: member.refs,
-      graph: member.graph(),
+      packages: space.packages,
+      refs: space.refs,
+      graph: space.graph(),
       migrationsDir,
       refsDir: spaceRefsDirectory(migrationsDir),
     });

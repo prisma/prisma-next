@@ -10,12 +10,14 @@ import type { ExecutionContext, SqlRuntimeExtensionDescriptor } from '@prisma-ne
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { blindCast } from '@prisma-next/utils/casts';
+import { buildNamespacedNativeEnums, type NamespacedNativeEnums } from '../runtime/native-enums';
 import type { PostgresTargetId } from '../runtime/postgres';
 
 export interface PostgresStaticContext<TContract extends Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
   readonly contract: TContract;
   readonly enums: NamespacedEnums<TContract>;
+  readonly nativeEnums: NamespacedNativeEnums<TContract>;
   readonly sql: Db<TContract>;
   readonly raw: RawSqlTag;
 }
@@ -27,7 +29,11 @@ export function buildPostgresStaticContext<TContract extends Contract<SqlStorage
   const sqlDb: Db<TContract> = sql<TContract>({ context, rawCodecInferer });
   const raw: RawSqlTag = createRawSql(rawCodecInferer);
   const enums = Object.freeze(buildNamespacedEnums<TContract>(context.contract.domain));
-  return { context, contract: context.contract, enums, sql: sqlDb, raw };
+  const nativeEnums = blindCast<
+    NamespacedNativeEnums<TContract>,
+    'buildNamespacedNativeEnums returns the namespace-keyed accessor map this contract types'
+  >(Object.freeze(buildNamespacedNativeEnums(context.contract.storage)));
+  return { context, contract: context.contract, enums, nativeEnums, sql: sqlDb, raw };
 }
 
 export default function postgresStatic<TContract extends Contract<SqlStorage>>(options: {

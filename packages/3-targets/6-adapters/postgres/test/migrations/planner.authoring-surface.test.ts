@@ -1,30 +1,19 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import {
-  contractToSchemaIR as contractToSchemaIRImpl,
-  extractCodecControlHooks,
-  type NativeTypeExpander,
-} from '@prisma-next/family-sql/control';
-import {
   APP_SPACE_ID,
   type MigrationPlanner,
   type MigrationPlannerSuccessResult,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
-import postgresTargetDescriptor, {
-  postgresRenderDefault,
-} from '@prisma-next/target-postgres/control';
-import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
+import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import postgresAdapterDescriptor from '../../src/exports/control';
-
-const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
-const expandParameterizedNativeType: NativeTypeExpander = (input) => {
-  if (!input.codecId) return input.nativeType;
-  const hooks = adapterCodecHooks.get(input.codecId);
-  return hooks?.expandNativeType?.(input) ?? input.nativeType;
-};
 
 function createEmptyContract(): Contract<SqlStorage> {
   return {
@@ -60,17 +49,16 @@ describe('PostgresMigrationPlanner authoring surface', () => {
     it('emits a migration scaffold carrying the destination storage hash', () => {
       const planner = makeFrameworkPlanner();
       const contract = createEmptyContract();
-      const fromSchemaIR = new PostgresSchemaIR({
-        tables: contractToSchemaIRImpl(null, {
-          annotationNamespace: 'pg',
-          expandNativeType: expandParameterizedNativeType,
-          renderDefault: postgresRenderDefault,
-        }).tables,
-        pgSchemaName: 'public',
+      const fromSchemaIR = new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {},
+          }),
+        },
         pgVersion: '',
         roles: [],
         existingSchemas: [],
-        nativeEnumTypeNames: [],
       });
 
       const fromContract: Contract<SqlStorage> = {

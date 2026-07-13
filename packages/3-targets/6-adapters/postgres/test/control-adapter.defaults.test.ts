@@ -189,7 +189,7 @@ describe('PostgresControlAdapter column defaults', () => {
     ]);
 
     const result = await adapter.introspect(mockDriver);
-    const columns = result.tables['user']?.columns ?? {};
+    const columns = Object.values(result.namespaces)[0]?.tables['user']?.columns ?? {};
 
     // Defaults are stored as raw strings from the database
     expect(columns['id']).toMatchObject({

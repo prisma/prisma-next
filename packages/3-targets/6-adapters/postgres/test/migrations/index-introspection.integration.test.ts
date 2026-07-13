@@ -7,6 +7,7 @@
  * the same columns — forcing a spurious DROP+CREATE on every plan even
  * when the live index already matches the contract.
  */
+import { PostgresDatabaseSchemaNode } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createDriver,
@@ -47,8 +48,10 @@ describe.sequential('Postgres index introspection — type and options', () => {
     await driver!.query('CREATE TABLE doc (id int PRIMARY KEY, body text NOT NULL)');
     await driver!.query('CREATE INDEX doc_body_idx ON doc (body)');
 
-    const schema = await familyInstance.introspect({ driver: driver! });
-    const indexes = schema.tables['doc']?.indexes ?? [];
+    const result = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(result);
+    const ns = result.namespaces['public']!;
+    const indexes = ns.tables['doc']?.indexes ?? [];
     const idx = indexes.find((i) => i.name === 'doc_body_idx');
     expect(idx).toBeDefined();
     expect(idx?.type).toBeUndefined();
@@ -59,8 +62,10 @@ describe.sequential('Postgres index introspection — type and options', () => {
     await driver!.query('CREATE TABLE doc (id int PRIMARY KEY, tags jsonb NOT NULL)');
     await driver!.query('CREATE INDEX doc_tags_gin_idx ON doc USING gin (tags)');
 
-    const schema = await familyInstance.introspect({ driver: driver! });
-    const idx = schema.tables['doc']?.indexes.find((i) => i.name === 'doc_tags_gin_idx');
+    const result = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(result);
+    const ns = result.namespaces['public']!;
+    const idx = ns.tables['doc']?.indexes.find((i) => i.name === 'doc_tags_gin_idx');
     expect(idx).toBeDefined();
     expect(idx?.type).toBe('gin');
     expect(idx?.options).toBeUndefined();
@@ -72,8 +77,10 @@ describe.sequential('Postgres index introspection — type and options', () => {
     await driver!.query('CREATE TABLE doc (id int PRIMARY KEY, body text NOT NULL)');
     await driver!.query('CREATE INDEX doc_body_idx ON doc (body) WITH (fillfactor = 70)');
 
-    const schema = await familyInstance.introspect({ driver: driver! });
-    const idx = schema.tables['doc']?.indexes.find((i) => i.name === 'doc_body_idx');
+    const result = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(result);
+    const ns = result.namespaces['public']!;
+    const idx = ns.tables['doc']?.indexes.find((i) => i.name === 'doc_body_idx');
     expect(idx).toBeDefined();
     // btree is the Postgres default → type is dropped to undefined
     expect(idx?.type).toBeUndefined();
@@ -90,8 +97,10 @@ describe.sequential('Postgres index introspection — type and options', () => {
       'CREATE INDEX doc_tags_gin_idx ON doc USING gin (tags) WITH (fastupdate = false)',
     );
 
-    const schema = await familyInstance.introspect({ driver: driver! });
-    const idx = schema.tables['doc']?.indexes.find((i) => i.name === 'doc_tags_gin_idx');
+    const result = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(result);
+    const ns = result.namespaces['public']!;
+    const idx = ns.tables['doc']?.indexes.find((i) => i.name === 'doc_tags_gin_idx');
     expect(idx).toBeDefined();
     expect(idx?.type).toBe('gin');
     expect(idx?.options).toEqual({ fastupdate: 'false' });
@@ -118,8 +127,10 @@ describe.sequential('Postgres index introspection — type and options', () => {
       'CREATE INDEX sync_run_lookup_idx ON sync_run (source, entity, started_at)',
     );
 
-    const schema = await familyInstance.introspect({ driver: driver! });
-    const idx = schema.tables['sync_run']?.indexes.find((i) => i.name === 'sync_run_lookup_idx');
+    const result = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(result);
+    const ns = result.namespaces['public']!;
+    const idx = ns.tables['sync_run']?.indexes.find((i) => i.name === 'sync_run_lookup_idx');
     expect(idx).toBeDefined();
     expect(idx?.columns).toEqual(['source', 'entity', 'started_at']);
   });

@@ -4,18 +4,22 @@ import {
 } from '@prisma-next/adapter-postgres/control';
 
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   SqlStorage,
   type SqlStorageInput,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
-import { planIssues } from '@prisma-next/target-postgres/issue-planner';
+import { buildPostgresPlanDiff } from '@prisma-next/target-postgres/diff-database-schema';
+import { coalesceSubtreeIssues, planIssues } from '@prisma-next/target-postgres/issue-planner';
 import type { CreateTableCall } from '@prisma-next/target-postgres/op-factory-call';
+import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { renderCallsToTypeScript } from '@prisma-next/target-postgres/render-typescript';
 import {
+  PostgresDatabaseSchemaNode,
+  PostgresNamespaceSchemaNode,
   PostgresSchema,
+  PostgresTableSchemaNode,
   PostgresUnboundSchema,
   postgresCreateNamespace,
 } from '@prisma-next/target-postgres/types';
@@ -52,11 +56,44 @@ function makeContract(
   };
 }
 
-const defaultCtx = {
-  schemaName: 'public',
-  codecHooks: new Map(),
-  storageTypes: {},
-};
+/** An empty introspected tree — every table in `contract` surfaces as `not-found`. */
+const emptyRoot = new PostgresDatabaseSchemaNode({
+  namespaces: {},
+  roles: [],
+  existingSchemas: ['public'],
+  pgVersion: 'unknown',
+});
+
+/**
+ * Diffs `contract` against `actual` via the one differ, coalesces the
+ * redundant subtree issues (the differ is total), and plans the node issues
+ * with the real strategy list unless `strategies` overrides it. Mirrors the
+ * production wiring in `PostgresMigrationPlanner.planSql`.
+ */
+function planAgainst(
+  contract: Contract<SqlStorage>,
+  actual: PostgresDatabaseSchemaNode,
+  options: {
+    readonly fromContract?: Contract<SqlStorage> | null;
+    readonly strategies?: readonly [];
+  } = {},
+) {
+  const { issues } = buildPostgresPlanDiff({
+    contract,
+    actualSchema: actual,
+    frameworkComponents: [],
+  });
+  const coalesced = coalesceSubtreeIssues(issues);
+  return planIssues({
+    issues: coalesced,
+    toContract: contract,
+    fromContract: options.fromContract ?? null,
+    schemaName: 'public',
+    codecHooks: new Map(),
+    storageTypes: contract.storage.types ?? {},
+    ...(options.strategies !== undefined ? { strategies: options.strategies } : {}),
+  });
+}
 
 describe('planIssues', () => {
   describe('missing_table', () => {
@@ -77,17 +114,8 @@ describe('planIssues', () => {
           },
         },
       });
-      const issues: SchemaIssue[] = [
-        { kind: 'missing_table', table: 'user', message: 'Table "user" is missing' },
-      ];
 
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
-      });
+      const result = planAgainst(toContract, emptyRoot);
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
@@ -101,8 +129,8 @@ describe('planIssues', () => {
   });
 
   describe('notNullBackfill call strategy', () => {
-    it('emits AddColumnCall(nullable) + DataTransformCall + SetNotNullCall', () => {
-      const toContract = makeContract({
+    function contractWithStatus(): Contract<SqlStorage> {
+      return makeContract({
         entries: {
           table: {
             user: {
@@ -118,22 +146,42 @@ describe('planIssues', () => {
           },
         },
       });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'missing_column',
-          table: 'user',
-          column: 'status',
-          message: 'Column "status" is missing',
-        },
-      ];
+    }
 
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+    function actualWithoutStatus(): PostgresDatabaseSchemaNode {
+      return new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {
+              user: new PostgresTableSchemaNode({
+                name: 'user',
+                columns: {
+                  id: {
+                    name: 'id',
+                    nativeType: 'uuid',
+                    nullable: false,
+                    resolvedNativeType: 'uuid',
+                  },
+                },
+                primaryKey: { columns: ['id'] },
+                foreignKeys: [],
+                uniques: [],
+                indexes: [],
+                policies: [],
+                rlsEnabled: false,
+              }),
+            },
+          }),
+        },
+        roles: [],
+        existingSchemas: ['public'],
+        pgVersion: 'unknown',
       });
+    }
+
+    it('emits AddColumnCall(nullable) + DataTransformCall + SetNotNullCall', () => {
+      const result = planAgainst(contractWithStatus(), actualWithoutStatus());
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
@@ -145,38 +193,7 @@ describe('planIssues', () => {
     });
 
     it('DataTransformCall.toOp() throws PN-MIG-2001', () => {
-      const toContract = makeContract({
-        entries: {
-          table: {
-            user: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-      });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'missing_column',
-          table: 'user',
-          column: 'status',
-          message: 'Column "status" is missing',
-        },
-      ];
-
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
-      });
+      const result = planAgainst(contractWithStatus(), actualWithoutStatus());
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
@@ -204,40 +221,43 @@ describe('planIssues', () => {
           },
         },
       });
-      const fromContract = makeContract({
-        entries: {
-          table: {
-            user: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
+      const actual = new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {
+              user: new PostgresTableSchemaNode({
+                name: 'user',
+                columns: {
+                  id: {
+                    name: 'id',
+                    nativeType: 'uuid',
+                    nullable: false,
+                    resolvedNativeType: 'uuid',
+                  },
+                  email: {
+                    name: 'email',
+                    nativeType: 'text',
+                    nullable: true,
+                    resolvedNativeType: 'text',
+                  },
+                },
+                primaryKey: { columns: ['id'] },
+                foreignKeys: [],
+                uniques: [],
+                indexes: [],
+                policies: [],
+                rlsEnabled: false,
+              }),
             },
-          },
+          }),
         },
+        roles: [],
+        existingSchemas: ['public'],
+        pgVersion: 'unknown',
       });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'nullability_mismatch',
-          table: 'user',
-          column: 'email',
-          expected: 'NOT NULL',
-          actual: 'NULL',
-          message: 'Column "email" nullability mismatch: expected NOT NULL, got NULL',
-        },
-      ];
 
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract,
-        storageTypes: toContract.storage.types ?? {},
-      });
+      const result = planAgainst(toContract, actual);
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
@@ -249,6 +269,39 @@ describe('planIssues', () => {
   });
 
   describe('typeChange call strategy', () => {
+    function actualWithAge(nativeType: string): PostgresDatabaseSchemaNode {
+      return new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {
+              user: new PostgresTableSchemaNode({
+                name: 'user',
+                columns: {
+                  id: {
+                    name: 'id',
+                    nativeType: 'uuid',
+                    nullable: false,
+                    resolvedNativeType: 'uuid',
+                  },
+                  age: { name: 'age', nativeType, nullable: false, resolvedNativeType: nativeType },
+                },
+                primaryKey: { columns: ['id'] },
+                foreignKeys: [],
+                uniques: [],
+                indexes: [],
+                policies: [],
+                rlsEnabled: false,
+              }),
+            },
+          }),
+        },
+        roles: [],
+        existingSchemas: ['public'],
+        pgVersion: 'unknown',
+      });
+    }
+
     it('emits AlterColumnTypeCall for safe widening', () => {
       const toContract = makeContract({
         entries: {
@@ -266,40 +319,11 @@ describe('planIssues', () => {
           },
         },
       });
-      const fromContract = makeContract({
-        entries: {
-          table: {
-            user: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                age: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-      });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'type_mismatch',
-          table: 'user',
-          column: 'age',
-          expected: 'int8',
-          actual: 'int4',
-          message: 'Type mismatch on "age"',
-        },
-      ];
 
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract,
-        storageTypes: toContract.storage.types ?? {},
-      });
+      // `typeChangeCallStrategy` only fires when the planner has a prior
+      // contract (`migration plan`); any non-null contract satisfies the
+      // gate, it is never otherwise read by this strategy.
+      const result = planAgainst(toContract, actualWithAge('int4'), { fromContract: toContract });
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
@@ -325,40 +349,8 @@ describe('planIssues', () => {
           },
         },
       });
-      const fromContract = makeContract({
-        entries: {
-          table: {
-            user: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                age: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-      });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'type_mismatch',
-          table: 'user',
-          column: 'age',
-          expected: 'text',
-          actual: 'int4',
-          message: 'Type mismatch on "age"',
-        },
-      ];
 
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract,
-        storageTypes: toContract.storage.types ?? {},
-      });
+      const result = planAgainst(toContract, actualWithAge('int4'), { fromContract: toContract });
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
@@ -369,8 +361,46 @@ describe('planIssues', () => {
     });
   });
 
-  describe('index_mismatch', () => {
-    it('threads contract index type and options into CreateIndexCall when the index is missing', () => {
+  describe('index missing on an existing table', () => {
+    function actualDocWithoutIndex(): PostgresDatabaseSchemaNode {
+      return new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {
+              doc: new PostgresTableSchemaNode({
+                name: 'doc',
+                columns: {
+                  id: {
+                    name: 'id',
+                    nativeType: 'uuid',
+                    nullable: false,
+                    resolvedNativeType: 'uuid',
+                  },
+                  body: {
+                    name: 'body',
+                    nativeType: 'text',
+                    nullable: false,
+                    resolvedNativeType: 'text',
+                  },
+                },
+                primaryKey: { columns: ['id'] },
+                foreignKeys: [],
+                uniques: [],
+                indexes: [],
+                policies: [],
+                rlsEnabled: false,
+              }),
+            },
+          }),
+        },
+        roles: [],
+        existingSchemas: ['public'],
+        pgVersion: 'unknown',
+      });
+    }
+
+    it('threads contract index type and options into CreateIndexCall', () => {
       const toContract = makeContract({
         entries: {
           table: {
@@ -387,22 +417,8 @@ describe('planIssues', () => {
           },
         },
       });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'index_mismatch',
-          table: 'doc',
-          expected: 'body',
-          message: 'Table "doc" is missing index: body',
-        },
-      ];
 
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
-      });
+      const result = planAgainst(toContract, actualDocWithoutIndex());
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
@@ -439,22 +455,8 @@ describe('planIssues', () => {
           },
         },
       });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'index_mismatch',
-          table: 'doc',
-          expected: 'body',
-          message: 'Table "doc" is missing index: body',
-        },
-      ];
 
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
-      });
+      const result = planAgainst(toContract, actualDocWithoutIndex());
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
@@ -484,22 +486,8 @@ describe('planIssues', () => {
           },
         },
       });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'index_mismatch',
-          table: 'doc',
-          expected: 'body',
-          message: 'Table "doc" is missing index: body',
-        },
-      ];
 
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
-      });
+      const result = planAgainst(toContract, actualDocWithoutIndex());
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
@@ -509,52 +497,6 @@ describe('planIssues', () => {
         indexName: 'doc_body_idx',
         indexType: undefined,
         options: undefined,
-      });
-    });
-  });
-
-  describe('foreign_key_mismatch', () => {
-    it('returns foreignKeyConflict when the destination contract lacks a matching FK entry', () => {
-      const toContract = makeContract({
-        entries: {
-          table: {
-            order: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                user_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-      });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'foreign_key_mismatch',
-          table: 'order',
-          expected: 'user_id -> user(id)',
-          message: 'Foreign key on "order" is missing',
-        },
-      ];
-
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) throw new Error('expected notOk');
-      expect(result.failure).toHaveLength(1);
-      expect(result.failure[0]).toMatchObject({
-        kind: 'foreignKeyConflict',
-        summary: expect.stringContaining('not found in destination contract'),
-        location: { table: 'order' },
       });
     });
   });
@@ -577,23 +519,37 @@ describe('planIssues', () => {
           },
         },
       });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'missing_column',
-          table: 'user',
-          column: 'status',
-          message: 'Column "status" is missing',
+      const actual = new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {
+              user: new PostgresTableSchemaNode({
+                name: 'user',
+                columns: {
+                  id: {
+                    name: 'id',
+                    nativeType: 'uuid',
+                    nullable: false,
+                    resolvedNativeType: 'uuid',
+                  },
+                },
+                primaryKey: { columns: ['id'] },
+                foreignKeys: [],
+                uniques: [],
+                indexes: [],
+                policies: [],
+                rlsEnabled: false,
+              }),
+            },
+          }),
         },
-      ];
-
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
-        strategies: [],
+        roles: [],
+        existingSchemas: ['public'],
+        pgVersion: 'unknown',
       });
+
+      const result = planAgainst(toContract, actual, { strategies: [] });
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
@@ -623,22 +579,37 @@ describe('planIssues', () => {
           },
         },
       });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'missing_column',
-          table: 'user',
-          column: 'status',
-          message: 'Column "status" is missing',
+      const actual = new PostgresDatabaseSchemaNode({
+        namespaces: {
+          public: new PostgresNamespaceSchemaNode({
+            schemaName: 'public',
+            tables: {
+              user: new PostgresTableSchemaNode({
+                name: 'user',
+                columns: {
+                  id: {
+                    name: 'id',
+                    nativeType: 'uuid',
+                    nullable: false,
+                    resolvedNativeType: 'uuid',
+                  },
+                },
+                primaryKey: { columns: ['id'] },
+                foreignKeys: [],
+                uniques: [],
+                indexes: [],
+                policies: [],
+                rlsEnabled: false,
+              }),
+            },
+          }),
         },
-      ];
-
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+        roles: [],
+        existingSchemas: ['public'],
+        pgVersion: 'unknown',
       });
+
+      const result = planAgainst(toContract, actual);
       if (!result.ok) throw new Error('expected ok');
 
       const ts = renderCallsToTypeScript(result.value.calls, {
@@ -684,7 +655,30 @@ describe('planIssues', () => {
       };
     }
 
-    it('translates missing_schema into a CreateSchemaCall classified as a dep', () => {
+    /**
+     * Runs the FULL production wiring through `PostgresMigrationPlanner.plan`
+     * (the namespace-presence stitch, prepended internally, is a private
+     * implementation detail — exercising it through the public planner is
+     * the faithful way to pin its behaviour).
+     */
+    async function planWithNamespaceStitch(
+      contract: Contract<SqlStorage>,
+      actual: PostgresDatabaseSchemaNode,
+    ) {
+      const planner = createPostgresMigrationPlanner(testAdapter);
+      const result = planner.plan({
+        contract,
+        schema: actual,
+        policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+        fromContract: null,
+        frameworkComponents: [],
+        spaceId: 'app',
+      });
+      if (result.kind !== 'success') throw new Error('expected planner success');
+      return await Promise.all(result.plan.operations);
+    }
+
+    it('translates a missing schema into a CREATE SCHEMA op ordered before the table', async () => {
       const userTable: StorageTableInput = {
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -698,68 +692,42 @@ describe('planIssues', () => {
       const toContract = makeNamespacedContract({
         auth: { entries: { table: { user: userTable } } },
       });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'missing_schema',
-          namespaceId: 'auth',
-          message: 'Schema "auth" is missing from database',
-        },
-        {
-          kind: 'missing_table',
-          table: 'user',
-          namespaceId: 'auth',
-          message: 'Table "user" is missing',
-        },
-      ];
-
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+      const actual = new PostgresDatabaseSchemaNode({
+        namespaces: {},
+        roles: [],
+        existingSchemas: ['public'],
+        pgVersion: 'unknown',
       });
 
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      const calls = result.value.calls;
-      expect(calls[0]).toMatchObject({ factoryName: 'createSchema', schemaName: 'auth' });
-      const createSchemaIdx = calls.findIndex((c) => c.factoryName === 'createSchema');
-      const createTableIdx = calls.findIndex((c) => c.factoryName === 'createTable');
+      const ops = await planWithNamespaceStitch(toContract, actual);
+      const opIds = ops.map((op) => op.id);
+
+      const createSchemaIdx = opIds.findIndex((id) => id.startsWith('schema.'));
+      const createTableIdx = opIds.findIndex((id) => id.startsWith('table.'));
       expect(createSchemaIdx).toBeGreaterThanOrEqual(0);
       expect(createTableIdx).toBeGreaterThanOrEqual(0);
       expect(createSchemaIdx).toBeLessThan(createTableIdx);
+      expect(opIds[createSchemaIdx]).toBe('schema.auth');
     });
 
-    it('emits a CreateSchemaCall whose toOp emits CREATE SCHEMA IF NOT EXISTS', async () => {
+    it('emits a CREATE SCHEMA IF NOT EXISTS DDL statement', async () => {
       const toContract = makeNamespacedContract({ auth: { entries: { table: {} } } });
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'missing_schema',
-          namespaceId: 'auth',
-          message: 'Schema "auth" is missing from database',
-        },
-      ];
-
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+      const actual = new PostgresDatabaseSchemaNode({
+        namespaces: {},
+        roles: [],
+        existingSchemas: ['public'],
+        pgVersion: 'unknown',
       });
 
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error('expected ok');
-      const call = result.value.calls[0]!;
-      expect(call.factoryName).toBe('createSchema');
-      const op = await call.toOp(testAdapter);
-      expect(op.execute?.[0]?.sql).toContain('CREATE SCHEMA IF NOT EXISTS "auth"');
+      const ops = await planWithNamespaceStitch(toContract, actual);
+      const createSchemaOp = ops.find((op) => op.id === 'schema.auth');
+      expect(createSchemaOp).toBeDefined();
+      expect(createSchemaOp?.execute?.[0]?.sql).toContain('CREATE SCHEMA IF NOT EXISTS "auth"');
     });
   });
 
-  describe('namespace coordinate on issues', () => {
-    function makeMultiNamespaceContract(): Contract<SqlStorage> {
+  describe('multi-namespace DDL qualification', () => {
+    it('emits correctly-qualified DDL for each same-named table under its own namespace', () => {
       const userTable: StorageTableInput = {
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -770,7 +738,7 @@ describe('planIssues', () => {
         indexes: [],
         foreignKeys: [],
       };
-      return {
+      const toContract: Contract<SqlStorage> = {
         target: 'postgres',
         targetFamily: 'sql',
         profileHash: profileHash('sha256:test'),
@@ -794,60 +762,25 @@ describe('planIssues', () => {
         extensionPacks: {},
         meta: {},
       };
-    }
-
-    it('surfaces an explicit conflict when an issue carries a stale namespaceId not present in the contract', () => {
-      const toContract = makeMultiNamespaceContract();
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'missing_table',
-          table: 'users',
-          namespaceId: 'tenant_c',
-          message: 'Table "users" is missing',
-        },
-      ];
-
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+      const actual = new PostgresDatabaseSchemaNode({
+        namespaces: {},
+        roles: [],
+        existingSchemas: ['public', 'tenant_a', 'tenant_b'],
+        pgVersion: 'unknown',
       });
 
-      expect(result.ok).toBe(false);
-      if (result.ok) throw new Error('expected conflict');
-      expect(result.failure).toHaveLength(1);
-      const conflict = result.failure[0]!;
-      expect(conflict.summary).toContain('users');
-      expect(conflict.summary).toContain('tenant_c');
-    });
-
-    it('emits correctly-qualified DDL when an issue carries a valid namespaceId', () => {
-      const toContract = makeMultiNamespaceContract();
-      const issues: SchemaIssue[] = [
-        {
-          kind: 'missing_table',
-          table: 'users',
-          namespaceId: 'tenant_a',
-          message: 'Table "users" is missing',
-        },
-      ];
-
-      const result = planIssues({
-        ...defaultCtx,
-        issues,
-        toContract,
-        fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
-      });
+      const result = planAgainst(toContract, actual);
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
-      const createTableCall = result.value.calls[0] as CreateTableCall;
-      expect(createTableCall.factoryName).toBe('createTable');
-      expect(createTableCall.tableName).toBe('users');
-      expect(createTableCall.schemaName).toBe('tenant_a');
+      const createTableCalls = result.value.calls.filter(
+        (c) => c.factoryName === 'createTable',
+      ) as CreateTableCall[];
+      expect(createTableCalls).toHaveLength(2);
+      expect(createTableCalls.map((c) => `${c.schemaName}.${c.tableName}`).sort()).toEqual([
+        'tenant_a.users',
+        'tenant_b.users',
+      ]);
     });
   });
 });

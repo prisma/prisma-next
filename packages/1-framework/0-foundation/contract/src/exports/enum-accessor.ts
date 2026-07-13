@@ -1,6 +1,7 @@
 export type {
   ContractEnumAccessor,
   EnumAccessor,
+  EnumEntriesToAccessors,
   EnumMemberNames,
   EnumValues,
   NamespacedEnums,

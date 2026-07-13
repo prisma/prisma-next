@@ -13,7 +13,7 @@ import {
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type AggregateMigrationEdgeRef,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
@@ -21,7 +21,10 @@ import { buildControlTableBootstrapQueries } from '@prisma-next/target-postgres/
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
-import { PostgresSchemaIR, postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import {
+  PostgresDatabaseSchemaNode,
+  postgresCreateNamespace,
+} from '@prisma-next/target-postgres/types';
 import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { createPostgresBuiltinCodecLookup } from '../../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../../src/core/control-adapter';
@@ -61,13 +64,11 @@ export const contract: Contract<SqlStorage> = {
   meta: {},
 };
 
-export const emptySchema = new PostgresSchemaIR({
-  tables: {},
-  pgSchemaName: 'public',
-  pgVersion: 'unknown',
+export const emptySchema = new PostgresDatabaseSchemaNode({
+  namespaces: {},
   roles: [],
   existingSchemas: ['public'],
-  nativeEnumTypeNames: [],
+  pgVersion: 'unknown',
 });
 
 const controlStack = createControlStack({
@@ -142,7 +143,7 @@ export function toPlanContractInfo(c: Contract<SqlStorage>) {
 
 export function synthEdges(plan: MigrationPlan): readonly AggregateMigrationEdgeRef[] {
   return [
-    buildSynthMigrationEdge({
+    buildFabricatedMigrationEdge({
       currentMarkerStorageHash: plan.origin?.storageHash,
       destinationStorageHash: plan.destination.storageHash,
       operationCount: plan.operations.length,

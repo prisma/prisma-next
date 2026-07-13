@@ -51,6 +51,51 @@ describe('buildColumnTypeSql', () => {
     expect(buildColumnTypeSql(column, noHooks)).toBe('"my_enum"');
   });
 
+  it('quotes each segment of a schema-qualified typeRef native type', () => {
+    const column = col({ nativeType: 'auth.aal_level', typeRef: 'AalLevel' });
+    expect(buildColumnTypeSql(column, noHooks)).toBe('"auth"."aal_level"');
+  });
+
+  // A native-enum column carries `typeParams.typeName` (the referenced named
+  // database type); it renders through the general named-type path, keyed off
+  // that signal — never a codec-id branch.
+  it('renders an unqualified named-type column as a single quoted identifier', () => {
+    const column = col({
+      nativeType: 'order_status',
+      codecId: 'pg/enum@1',
+      typeParams: { typeName: 'order_status' },
+    });
+    expect(buildColumnTypeSql(column, noHooks)).toBe('"order_status"');
+  });
+
+  it('renders a schema-qualified named-type column segment-by-segment', () => {
+    const column = col({
+      nativeType: 'auth.aal_level',
+      codecId: 'pg/enum@1',
+      typeParams: { typeName: 'auth.aal_level' },
+    });
+    expect(buildColumnTypeSql(column, noHooks)).toBe('"auth"."aal_level"');
+  });
+
+  it('appends [] for a named-type array column', () => {
+    const column = col({
+      nativeType: 'order_status',
+      codecId: 'pg/enum@1',
+      typeParams: { typeName: 'order_status' },
+      many: true,
+    });
+    expect(buildColumnTypeSql(column, noHooks)).toBe('"order_status"[]');
+  });
+
+  it('keys the named-type path off typeParams.typeName, not the codec id', () => {
+    const column = col({
+      nativeType: 'my_domain.my_type',
+      codecId: 'some/other-codec@1',
+      typeParams: { typeName: 'my_domain.my_type' },
+    });
+    expect(buildColumnTypeSql(column, noHooks)).toBe('"my_domain"."my_type"');
+  });
+
   it('rejects unsafe native type names', () => {
     expect(() => buildColumnTypeSql(col({ nativeType: 'text; DROP TABLE' }), noHooks)).toThrow(
       'Unsafe native type',

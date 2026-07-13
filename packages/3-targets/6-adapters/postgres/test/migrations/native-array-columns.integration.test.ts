@@ -3,9 +3,9 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestSqlNamespace } from '../../../../../2-sql/1-core/contract/test/test-support';
 import {
   controlAdapter,
   createDriver,
@@ -29,7 +29,7 @@ function buildArrayContract(): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:native-array-columns'),
       namespaces: {
-        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+        [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
           entries: {
             table: {
@@ -89,7 +89,7 @@ describe.sequential('native array columns DDL', () => {
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('migrates many:true columns to native Postgres array types', {
     timeout: testTimeout,

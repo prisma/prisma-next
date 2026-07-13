@@ -759,7 +759,8 @@ model Bug {
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            code: 'PSL_DISCRIMINATOR_FIELD_NOT_FOUND',
+            code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+            message: expect.stringContaining('does not exist'),
           }),
         ]),
       );

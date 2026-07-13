@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
@@ -57,7 +57,7 @@ describe('findNearestConfigPathForFile', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'prisma-next-config-path-for-file-'));
+    tempDir = realpathSync(mkdtempSync(join(tmpdir(), 'prisma-next-config-path-for-file-')));
   });
 
   afterEach(() => {
@@ -87,7 +87,7 @@ describe('loadConfigForFile', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'prisma-next-config-for-file-'));
+    tempDir = realpathSync(mkdtempSync(join(tmpdir(), 'prisma-next-config-for-file-')));
   });
 
   afterEach(() => {
@@ -149,7 +149,7 @@ describe('loadConfig', () => {
 
   beforeEach(() => {
     originalCwd = process.cwd();
-    tempDir = mkdtempSync(join(tmpdir(), 'prisma-next-config-'));
+    tempDir = realpathSync(mkdtempSync(join(tmpdir(), 'prisma-next-config-')));
   });
 
   afterEach(() => {

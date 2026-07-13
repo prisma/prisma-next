@@ -1,8 +1,89 @@
 ---
 from: "0.14"
 to: "0.15"
-changes: []
+changes:
+  - id: db-verify-json-single-issue-list
+    summary: |
+      `prisma-next db verify --json` (and `db verify --schema-only --json`) now report a single
+      `schema.issues` array instead of the split `schema.issues` / `schema.schemaDiffIssues`
+      pair — the one-differ-two-ir-planner slice unified the CLI's schema-issue vocabulary onto
+      one shape: `{ path, reason, message, expected?, actual? }`. `reason` replaces the retired
+      `outcome` field (`'missing'` -> `'not-found'`, `'extra'` -> `'not-expected'`, `'mismatch'`
+      -> `'not-equal'`). The same collapse applies to `schema.warnings`. If a script or CI step
+      parses `db verify --json` output and reads `schema.schemaDiffIssues` /
+      `schema.warnings.schemaDiffIssues`, or compares an issue's `.outcome` field, update it:
+      read `schema.issues` (it already carries everything the two lists used to, concatenated)
+      and switch any `.outcome` comparison to the matching `.reason` value.
+    detection:
+      glob: "**/*.{ts,mts,cts,js,mjs,sh}"
+      contains:
+        - "schemaDiffIssues"
+        - ".outcome === 'missing'"
+        - ".outcome === 'extra'"
+        - ".outcome === 'mismatch'"
+      anyMatch: true
+  - id: policy-target-models-require-rls-attribute
+    summary: |
+      RLS enablement is now an explicit, authored table attribute: a `policy_select` block's
+      `target` model must declare `@@rls`, or `prisma-next contract emit` fails with
+      `PSL_EXTENSION_TARGET_MODEL_MISSING_ATTRIBUTE` naming the model and the policy. Add
+      `@@rls` to every policy-bearing model and re-run `prisma-next contract emit`; the
+      re-emitted `contract.json` gains an `rls` marker entity and a new storage hash. Plan
+      semantics follow the marker, not the policy set: a marked table with RLS off plans
+      `ENABLE ROW LEVEL SECURITY` (even with policies in sync), removing every policy keeps
+      RLS enabled (fail-closed deny-all), removing `@@rls` itself plans
+      `DISABLE ROW LEVEL SECURITY` (requires the destructive allowance), and changing only a
+      policy's name prefix plans a single `ALTER POLICY ... RENAME TO` instead of drop+create.
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "policy_select"
+      anyMatch: true
 ---
+
+<!--
+TML-2501 (extension-supabase slice B close-out, this PR): test-only. The only
+`examples/` touch is `examples/supabase/test/rls-role-binding.integration.test.ts`:
+the acceptance test's fixture no longer hand-applies `ENABLE ROW LEVEL SECURITY` /
+`CREATE POLICY` SQL — the test now exercises exactly the policies `dbInit` applies
+from `contract.prisma`, and gains a WITH CHECK assertion (reassigning an owned row
+to another owner is rejected). No framework surface, contract shape, or emitted
+artefact changes. No user action required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2870 (Postgres RLS slice 4: all policy operations + roles): additive. The
+PSL RLS surface gains the non-select policy keywords `policy_insert`,
+`policy_update`, `policy_delete`, and `policy_all`, each with an optional
+`withCheck` predicate (per-operation predicate matrix enforced at load time),
+alongside the existing `policy_select`. Postgres database roles also enter
+`db verify`: a role a contract declares but the live cluster lacks fails verify
+under every control policy, while an undeclared live role is tolerated
+unconditionally (the framework references but does not own the cluster's role
+list). Both are opt-in and additive — existing schemas that use only
+`policy_select` (or no `policy_*` blocks) emit and verify byte-identically, and
+no contract declares a role today unless authored to. The only `examples/`
+touch is the `examples/supabase` walking skeleton: `Profile` gains an `anon`
+public-read policy and an `authenticated` UPDATE-own policy (`using` +
+`withCheck`), its `contract.json`/`contract.d.ts` regenerate, and the
+integration tests extend to prove WITH CHECK enforcement under `SET ROLE` and
+role verify. No user upgrade action — a re-emit picks up any contract shape.
+Incidental substrate diff only.
+-->
+
+<!--
+Postgres-RLS slice 2.5 (one-differ-two-ir-planner), final unit: retires the
+coordinate-based issue vocabulary (`BaseSchemaIssue` / `SchemaIssue` /
+`EnumValuesChangedIssue` / the legacy `outcome` field) now that the migration
+planner and `db verify` both run on the one node-typed differ. The only
+`examples/` touch is `examples/supabase/test/skeleton.integration.test.ts`,
+which read a verify result's `schema.schemaDiffIssues` list and an issue's
+`.outcome` field directly — updated to `schema.issues` and `.reason` per the
+`db-verify-json-single-issue-list` entry above. Superseds the "internal
+refactor... not a stable shipped API" framing of the TML-2931 entry below: the
+JSON shape is now settled and consumer-facing action is required for the
+collapse.
+-->
 
 <!--
 TML-2891 (eliminate the SQL family placeholder namespace): app authors who build
@@ -162,6 +243,16 @@ required. Incidental substrate diff only.
 -->
 
 <!--
+Slow-query warning middleware example (PR #912): the `prisma-next-demo` example
+gains a `slowQueryWarning` custom middleware (`src/prisma/slow-query-warning.ts`,
+wired into the runtime `middleware: [...]` chain in `src/prisma/db.ts`, with
+offline unit tests). Documentation-driven example code only — it exercises the
+existing public `SqlMiddleware` `afterExecute` hook and changes no framework
+surface, contract shape, or emitted artefact. No user action required.
+Incidental substrate diff only.
+-->
+
+<!--
 TML-2953 (this PR): Mongo enum fields now type through a storage value set, the same
 way SQL does. Authoring a Mongo enum writes a value set into
 `contract.storage.namespaces[<ns>].entries.valueSet[<Enum>]` (the codec-encoded
@@ -173,4 +264,23 @@ validator are byte-identical. `db.enums` runtime behaviour is unchanged. A re-em
 picks up the new `contract.json` shape; existing migrations are unaffected (the value
 set is non-physical — no new migration op). No user action required. Incidental
 substrate diff only.
+-->
+
+<!--
+TML-2976 (native Postgres enums, external Supabase types — this PR): adds external
+native Postgres enum support — Postgres `CREATE TYPE ... AS ENUM` types the database
+already owns (e.g. Supabase's `auth.aal_level`), represented via a `native_enum` PSL
+entity, typed as a value union, and read at runtime through a Postgres-only
+`db.nativeEnums` accessor. The `examples/` diff is additive:
+- `examples/supabase` gains `src/session-queries.ts` and
+  `test/native-enum-session.integration.test.ts` (reading `auth.aal_level`), plus a
+  regenerated `src/contract.d.ts`.
+- `examples/prisma-next-demo` and `examples/retail-store` switch their enum
+  value-union annotations from `EnumValues<Db['enums'][X]>` to the equivalent `.Value`
+  phantom (`Db['enums'][X]['Value']`). `EnumValues` is unchanged and still exported;
+  `.Value` is the new preferred form, so this is an optional style adoption, not a
+  forced migration.
+Native enums are opt-in — existing schemas without a `native_enum` emit and run
+unchanged, and a re-emit picks up any contract shape. No user action required.
+Incidental substrate diff only.
 -->

@@ -21,18 +21,20 @@ import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {
   postgresAuthoringEntityTypes,
+  postgresAuthoringModelAttributes,
   postgresAuthoringPslBlockDescriptors,
 } from '../src/core/authoring';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
+import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
 import { PostgresSchema, postgresCreateNamespace } from '../src/core/postgres-schema';
 import { computeContentHash } from '../src/core/rls/canonicalize';
-import { PostgresRlsPolicy } from '../src/core/schema-ir/postgres-rls-policy';
 
 const assembled = assembleAuthoringContributions([
   {
     authoring: {
       entityTypes: postgresAuthoringEntityTypes,
       pslBlockDescriptors: postgresAuthoringPslBlockDescriptors,
+      modelAttributes: postgresAuthoringModelAttributes,
     },
   },
 ]);
@@ -83,6 +85,8 @@ namespace public {
   model profile {
     id       Int @id
     owner_id Int
+
+    @@rls
   }
 
   policy_select p_read {
@@ -192,6 +196,8 @@ namespace public {
   model profile {
     id       Int @id
     owner_id Int
+
+    @@rls
   }
 
   policy_select p_read {
