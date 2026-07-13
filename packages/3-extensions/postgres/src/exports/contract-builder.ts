@@ -33,8 +33,6 @@ export {
   type RlsEnablementHandle,
   type RlsEntityHandle,
   type RlsPolicyHandle,
-  type RlsPredicate,
-  type RlsPredicateContext,
   type RlsRoleHandle,
   type RlsTargetModel,
   type RlsUsingPolicyDescriptor,

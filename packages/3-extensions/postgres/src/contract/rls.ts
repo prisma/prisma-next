@@ -1,5 +1,6 @@
 import type { ScalarFieldBuilder } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { RlsPolicyOperation } from '@prisma-next/target-postgres/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 /**
  * Structural shape of the model handles the RLS helpers accept: any named
@@ -14,19 +15,6 @@ export interface RlsTargetModel {
     readonly fields: Record<string, ScalarFieldBuilder>;
   };
 }
-
-/** Context passed to a function-form predicate when the contract is lowered. */
-export interface RlsPredicateContext {
-  /** Returns the qualified identifier (`"schema"."table"`) for a model handle. */
-  readonly ref: (model: RlsTargetModel) => string;
-}
-
-/**
- * A policy predicate: opaque SQL, either a literal string or a function of
- * {@link RlsPredicateContext} evaluated once at contract-build time. The
- * function form is stored on the handle, never invoked at authoring time.
- */
-export type RlsPredicate = string | ((ctx: RlsPredicateContext) => string);
 
 /**
  * Role handle produced by {@link role}. Usable as a reference in a policy's
@@ -56,8 +44,8 @@ export interface RlsPolicyHandle<Operation extends RlsPolicyOperation = RlsPolic
   readonly name: string;
   readonly model: RlsTargetModel;
   readonly roles: readonly RlsRoleHandle[];
-  readonly using?: RlsPredicate;
-  readonly withCheck?: RlsPredicate;
+  readonly using?: string;
+  readonly withCheck?: string;
 }
 
 /**
@@ -74,12 +62,12 @@ interface RlsPolicyDescriptorBase {
 
 /** Descriptor for the USING-only operations: SELECT and DELETE. */
 export interface RlsUsingPolicyDescriptor extends RlsPolicyDescriptorBase {
-  readonly using: RlsPredicate;
+  readonly using: string;
 }
 
 /** Descriptor for the WITH CHECK-only operation: INSERT. */
 export interface RlsWithCheckPolicyDescriptor extends RlsPolicyDescriptorBase {
-  readonly withCheck: RlsPredicate;
+  readonly withCheck: string;
 }
 
 /**
@@ -91,12 +79,12 @@ export interface RlsWithCheckPolicyDescriptor extends RlsPolicyDescriptorBase {
  */
 export type RlsUsingWithCheckPolicyDescriptor =
   | (RlsPolicyDescriptorBase & {
-      readonly using: RlsPredicate;
-      readonly withCheck?: RlsPredicate;
+      readonly using: string;
+      readonly withCheck?: string;
     })
   | (RlsPolicyDescriptorBase & {
-      readonly using?: RlsPredicate;
-      readonly withCheck: RlsPredicate;
+      readonly using?: string;
+      readonly withCheck: string;
     });
 
 function assertNonEmptyName(helper: string, name: string): void {
@@ -129,8 +117,8 @@ function buildPolicyHandle<Operation extends RlsPolicyOperation>(
   operation: Operation,
   model: RlsTargetModel,
   descriptor: RlsPolicyDescriptorBase & {
-    readonly using?: RlsPredicate;
-    readonly withCheck?: RlsPredicate;
+    readonly using?: string;
+    readonly withCheck?: string;
   },
 ): RlsPolicyHandle<Operation> {
   const support = POLICY_OPERATION_PREDICATES[operation];
@@ -161,8 +149,8 @@ function buildPolicyHandle<Operation extends RlsPolicyOperation>(
     name: descriptor.name,
     model,
     roles: Object.freeze([...descriptor.roles]),
-    ...(descriptor.using !== undefined ? { using: descriptor.using } : {}),
-    ...(descriptor.withCheck !== undefined ? { withCheck: descriptor.withCheck } : {}),
+    ...ifDefined('using', descriptor.using),
+    ...ifDefined('withCheck', descriptor.withCheck),
   });
 }
 

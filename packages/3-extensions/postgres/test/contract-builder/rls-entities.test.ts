@@ -8,13 +8,10 @@
  *     `entries.role[name]` with the same entity shapes and content-hash wire
  *     names the PSL path produces (`lowerRlsPolicyFromBlock`).
  *  2. The lowered entities survive serialize → deserialize losslessly.
- *  3. `ref()` resolves local and cross-space model handles to qualified
- *     identifiers, and the predicate feeds the wire-name hash (renaming the
- *     referenced table changes the wire name).
- *  4. Authoring mistakes throw at defineContract time, naming the prefix
+ *  3. Authoring mistakes throw at defineContract time, naming the prefix
  *     only: duplicate prefix per namespace, unknown target model, target
  *     without rlsEnabled, duplicate role declaration, prefix over the cap.
- *  5. A policy's tableName is always the build-resolved table name — factory
+ *  4. A policy's tableName is always the build-resolved table name — factory
  *     `.sql({ table })` form and default (identity) naming both included.
  */
 
@@ -230,60 +227,6 @@ describe('round-trip through the contract serializer', () => {
   });
 });
 
-describe('ref() predicates', () => {
-  const AuthUser = extensionModel(
-    'AuthUser',
-    { namespace: 'auth', fields: { id: field.column(textColumn).id() }, table: 'users' },
-    'supabase',
-  );
-
-  it('resolves a local model handle and a cross-space handle to qualified identifiers', () => {
-    const Profile = makeProfile();
-    const contract = defineContract({
-      models: { Profile },
-      entities: [
-        rlsEnabled(Profile),
-        policySelect(Profile, {
-          name: 'p_ref',
-          roles: [authenticated],
-          using: ({ ref }) => `${ref(Profile)}."userId" = ${ref(AuthUser)}."id"`,
-        }),
-      ],
-    });
-
-    expect(namespace(contract, 'public').policy['p_ref']?.using).toBe(
-      '"public"."profile"."userId" = "auth"."users"."id"',
-    );
-  });
-
-  it("renaming the referenced model's declared table changes the predicate and the wire name", () => {
-    const build = (table: string) => {
-      const Profile = model('Profile', {
-        fields: { id: field.column(intColumn).id() },
-      }).sql({ table });
-      return defineContract({
-        models: { Profile },
-        entities: [
-          rlsEnabled(Profile),
-          policySelect(Profile, {
-            name: 'p_ref',
-            roles: [authenticated],
-            using: ({ ref }) => `${ref(Profile)}.id > 0`,
-          }),
-        ],
-      });
-    };
-
-    const before = namespace(build('profile'), 'public').policy['p_ref'];
-    const after = namespace(build('profile_rows'), 'public').policy['p_ref'];
-
-    expect(before?.using).toBe('"public"."profile".id > 0');
-    expect(after?.using).toBe('"public"."profile_rows".id > 0');
-    expect(before?.name).not.toBe(after?.name);
-    expect(after?.name).toMatch(/^p_ref_[0-9a-f]{8}$/);
-  });
-});
-
 describe('load-time diagnostics name the prefix', () => {
   it('rejects a duplicate policy prefix in one namespace', () => {
     const Profile = makeProfile();
@@ -361,29 +304,6 @@ describe('load-time diagnostics name the prefix', () => {
 
     expect(() => defineContract({ entities: [rlsEnabled(AuthUser)] })).toThrow(
       /rlsEnabled entry targets model "AuthUser", which lives in another contract space/,
-    );
-  });
-
-  it('a ref() that does not resolve names the policy prefix', () => {
-    const Profile = makeProfile();
-    const Unknown = model('Unknown', {
-      fields: { id: field.column(intColumn).id() },
-    }).sql({ table: 'unknowns' });
-
-    expect(() =>
-      defineContract({
-        models: { Profile },
-        entities: [
-          rlsEnabled(Profile),
-          policySelect(Profile, {
-            name: 'p_ref_miss',
-            roles: [anon],
-            using: ({ ref }) => `${ref(Unknown)}.id > 0`,
-          }),
-        ],
-      }),
-    ).toThrow(
-      /policy "p_ref_miss".*targets model "Unknown", which is not in the contract's models/,
     );
   });
 

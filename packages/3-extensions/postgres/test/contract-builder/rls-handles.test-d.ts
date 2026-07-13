@@ -1,12 +1,19 @@
 /**
  * Static predicate matrix for the RLS policy helpers, mirroring Postgres:
  * SELECT/DELETE take `using` only; INSERT takes `withCheck` only; UPDATE/ALL
- * take either or both (at least one). `permissive` is not authorable on any
- * of them.
+ * take either or both (at least one). Predicates are opaque strings.
+ * `permissive` is not authorable on any of them.
  */
 
 import { expectTypeOf } from 'vitest';
-import type { RlsPolicyHandle, RlsRoleHandle } from '../../src/exports/contract-builder';
+import type {
+  RlsPolicyHandle,
+  RlsRoleHandle,
+  RlsTargetModel,
+  RlsUsingPolicyDescriptor,
+  RlsUsingWithCheckPolicyDescriptor,
+  RlsWithCheckPolicyDescriptor,
+} from '../../src/exports/contract-builder';
 import {
   field,
   model,
@@ -46,30 +53,13 @@ expectTypeOf(
   policyAll(Profile, { name: 'p', roles: [anon], using: 'true', withCheck: 'true' }),
 ).toExtend<RlsPolicyHandle<'all'>>();
 
-// The function form receives a ref callback and is stored, not evaluated.
-policySelect(Profile, { name: 'p', roles: [anon], using: ({ ref }) => `id = ${ref(Profile)}.id` });
-
-// SELECT does not take withCheck.
-// @ts-expect-error — policySelect rejects a withCheck predicate
-policySelect(Profile, { name: 'p', roles: [anon], using: 'true', withCheck: 'true' });
-
-// DELETE does not take withCheck.
-// @ts-expect-error — policyDelete rejects a withCheck predicate
-policyDelete(Profile, { name: 'p', roles: [anon], using: 'true', withCheck: 'true' });
-
-// INSERT does not take using.
-// @ts-expect-error — policyInsert rejects a using predicate
-policyInsert(Profile, { name: 'p', roles: [anon], withCheck: 'true', using: 'true' });
-
-// UPDATE takes using, withCheck, or both — each single-predicate form compiles.
+// UPDATE/ALL take using, withCheck, or both — each single-predicate form compiles.
 expectTypeOf(policyUpdate(Profile, { name: 'p', roles: [anon], using: 'true' })).toExtend<
   RlsPolicyHandle<'update'>
 >();
 expectTypeOf(policyUpdate(Profile, { name: 'p', roles: [anon], withCheck: 'true' })).toExtend<
   RlsPolicyHandle<'update'>
 >();
-
-// ALL takes using, withCheck, or both — each single-predicate form compiles.
 expectTypeOf(policyAll(Profile, { name: 'p', roles: [anon], using: 'true' })).toExtend<
   RlsPolicyHandle<'all'>
 >();
@@ -77,40 +67,34 @@ expectTypeOf(policyAll(Profile, { name: 'p', roles: [anon], withCheck: 'true' })
   RlsPolicyHandle<'all'>
 >();
 
-// Zero predicates on UPDATE/ALL is a compile error.
-// @ts-expect-error — policyUpdate requires at least one predicate
-policyUpdate(Profile, { name: 'p', roles: [anon] });
-// @ts-expect-error — policyAll requires at least one predicate
-policyAll(Profile, { name: 'p', roles: [anon] });
+// Predicates are opaque strings — a function form is not accepted.
+expectTypeOf<RlsUsingPolicyDescriptor['using']>().toEqualTypeOf<string>();
+expectTypeOf<RlsWithCheckPolicyDescriptor['withCheck']>().toEqualTypeOf<string>();
 
-// `permissive` is not authorable on any helper.
-// @ts-expect-error — permissive is not an authoring input
-policySelect(Profile, { name: 'p', roles: [anon], using: 'true', permissive: true });
-// @ts-expect-error — permissive is not an authoring input
-policyInsert(Profile, { name: 'p', roles: [anon], withCheck: 'true', permissive: true });
-policyUpdate(Profile, {
-  name: 'p',
-  roles: [anon],
-  using: 'true',
-  withCheck: 'true',
-  // @ts-expect-error — permissive is not an authoring input
-  permissive: true,
-});
-// @ts-expect-error — permissive is not an authoring input
-policyDelete(Profile, { name: 'p', roles: [anon], using: 'true', permissive: false });
-policyAll(Profile, {
-  name: 'p',
-  roles: [anon],
-  using: 'true',
-  withCheck: 'true',
-  // @ts-expect-error — permissive is not an authoring input
-  permissive: true,
-});
+// SELECT/DELETE descriptors do not take withCheck; INSERT does not take using.
+expectTypeOf<RlsUsingPolicyDescriptor>().not.toHaveProperty('withCheck');
+expectTypeOf<RlsWithCheckPolicyDescriptor>().not.toHaveProperty('using');
+
+// Zero predicates on UPDATE/ALL is rejected.
+expectTypeOf<{
+  name: string;
+  roles: readonly RlsRoleHandle[];
+}>().not.toExtend<RlsUsingWithCheckPolicyDescriptor>();
+
+// `permissive` is not a property of any descriptor type.
+expectTypeOf<RlsUsingPolicyDescriptor>().not.toHaveProperty('permissive');
+expectTypeOf<RlsWithCheckPolicyDescriptor>().not.toHaveProperty('permissive');
+expectTypeOf<Extract<RlsUsingWithCheckPolicyDescriptor, { using: string }>>().not.toHaveProperty(
+  'permissive',
+);
 
 // Roles must be role handles, not bare strings.
-// @ts-expect-error — roles takes RlsRoleHandle values, not strings
-policySelect(Profile, { name: 'p', roles: ['anon'], using: 'true' });
+expectTypeOf<{
+  name: string;
+  roles: readonly string[];
+  using: string;
+}>().not.toExtend<RlsUsingPolicyDescriptor>();
 
-// rlsEnabled takes a model handle, not a table-name string.
-// @ts-expect-error — rlsEnabled takes a model handle
-rlsEnabled('profile');
+// Model parameters take model handles, not table-name strings.
+expectTypeOf<string>().not.toExtend<RlsTargetModel>();
+expectTypeOf(rlsEnabled).parameter(0).toEqualTypeOf<RlsTargetModel>();

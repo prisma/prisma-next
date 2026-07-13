@@ -2,17 +2,16 @@
  * RLS authoring handles (`policySelect`/`policyInsert`/`policyUpdate`/
  * `policyDelete`/`policyAll`, `rlsEnabled`, `role`) are inert branded values:
  *
- *  1. Each helper captures its inputs faithfully — name, roles, predicates,
- *     and the model handle by reference. Nothing is resolved, hashed, or
- *     registered at construction time; a function-form predicate is stored
- *     un-invoked.
+ *  1. Each helper captures its inputs faithfully — name, roles, predicate
+ *     strings, and the model handle by reference. Nothing is resolved,
+ *     hashed, or registered at construction time.
  *  2. Handles are frozen plain values, safely reusable across arrays and
  *     helper calls.
  *  3. Empty names are rejected at construction.
  */
 
 import { extensionModel } from '@prisma-next/sql-contract-ts/contract-builder';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { RlsRoleHandle } from '../../src/exports/contract-builder';
 import {
   field,
@@ -199,18 +198,6 @@ describe('policy helpers capture inputs faithfully', () => {
       using: 'true',
       withCheck: 'true',
     });
-  });
-
-  it('stores a function-form predicate without invoking it', () => {
-    const usingFn = vi.fn(() => 'true');
-    const handle = policySelect(Profile, {
-      name: 'profile_fn_read',
-      roles: [anon],
-      using: usingFn,
-    });
-
-    expect(handle.using).toBe(usingFn);
-    expect(usingFn).not.toHaveBeenCalled();
   });
 
   it('rejects an empty policy name', () => {
