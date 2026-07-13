@@ -55,7 +55,7 @@
     "@prisma-next/test-utils": "workspace:0.15.0",
     "@prisma-next/tsconfig": "workspace:0.15.0",
     "@types/node": "catalog:",
-    "@types/react": "^19.2.16",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "mongodb-memory-server": "catalog:",
     "pathe": "^2.0.3",
