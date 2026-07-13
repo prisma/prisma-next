@@ -45,9 +45,24 @@ applications) uses the **same** on-disk shape:
   information. Migration directories sit *directly* under `migrations/`,
   and `refs/` sits at `migrations/refs/`. Configure with
   `migrations.dir: 'migrations'` — not `migrations/<space-id>`.
-- **No `src/contract/` subdirectory.** The contract source and the
-  emitted `contract.json` / `contract.d.ts` sit *directly* in `src/`.
+- **Flat vs grouped contract layout.** TS-authored spaces keep the contract
+  source and the emitted `contract.json` / `contract.d.ts` *directly* in
+  `src/` (pgvector, paradedb). PSL-authored spaces whose contract surface
+  carries more than the source/artefact pair — e.g. branded cross-space
+  model handles in `handles.ts` — may group it under `src/contract/`
+  (supabase, better-auth). `scripts/regen-extension-migrations.mjs`
+  resolves both layouts; see the layout amendment in ADR 212.
 - **`prisma-next.config.ts` lives at the package root**, not under `src/`.
+
+## Managed table-DDL spaces
+
+A space is not limited to `storage.types` registration and
+`CREATE EXTENSION` invariants: a pack may declare domain models with
+tables, uniques, and FKs and ship the planner-emitted baseline migration
+that creates them — the framework then owns those tables' DDL lifecycle.
+`packages/3-extensions/better-auth/` is the precedent (four auth tables
+with cascading FKs, consumed via cross-space FK handles and a
+contract-typed adapter).
 
 ## Contrast with the consuming app layout
 

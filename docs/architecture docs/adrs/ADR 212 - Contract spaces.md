@@ -119,7 +119,7 @@ Key rules (these are the spots where mistakes recur, so the convention spells th
   - *Migrations only* — installs invariants (e.g. a Postgres extension) but ships no tables or native types → omit the contract source entirely; wire `emptyContract({ output: 'src/contract.json', target })`. Example: `@prisma-next/extension-paradedb`.
   - *Typed objects PSL can't yet express* (e.g. pgvector's parameterised `vector` registration under `storage.types` — `types {}` blocks instantiate, they don't register a parameterised base type) → keep `src/contract.ts`; wire `typescriptContract(contract, 'src/contract.json')`, with a comment in the source naming the missing PSL surface.
 - **No `<space-id>` subdirectory inside `migrations/`.** A package owns exactly one contract space, so the space-id directory adds no information. Migration directories sit *directly* under `migrations/`, and `refs/` sits at `migrations/refs/`. Configure this with `migrations.dir: 'migrations'` (not `migrations/<space-id>`).
-- **No `src/contract/` subdirectory.** The contract source, emitted `contract.json`, and emitted `contract.d.ts` sit *directly* in `src/`.
+- **No `src/contract/` subdirectory** for TS-authored spaces: the contract source, emitted `contract.json`, and emitted `contract.d.ts` sit *directly* in `src/`. **Amendment:** PSL-authored spaces may instead group the contract surface under `src/contract/` — see "Amendment: the `src/contract/` grouped layout" below.
 - **`prisma-next.config.ts` is at the package root.** The CLI treats each contract-space package as a self-contained "project"; the in-package config is the source of truth for that project's emit and migration paths.
 
 The contrast with the consuming app's on-disk layout: when an application composes multiple contract spaces, *its* `migrations/` directory ends up with one subdirectory per space (`migrations/<space-id>/`) because there are multiple spaces. That's an emergent shape from composition, not a per-package authoring convention. Inside a contract-space package, the space-id subdirectory does not belong.
@@ -160,6 +160,27 @@ A handful of extensions need **Path B** — hand-scaffolding the migration direc
 4. Runs `pnpm tsx migrations/<dirName>/migration.ts` to canonicalize `ops.json` + `migration.json` from the subclass output.
 
 pgvector (whose contract declares only `vector(N)` under `storage.types`) is the exemplar. Future migrations on a Path-B-bootstrapped extension that *do* add tables / models can use `migration plan` (Path A) directly — the path choice is per-migration, not per-extension.
+
+#### Amendment: the `src/contract/` grouped layout, and the managed table-DDL space
+
+Two points extend the layout convention above; both are conventions in force, recorded here so the section stays the single reference.
+
+**The `src/contract/` grouped layout is an accepted variant for PSL-authored spaces.** When a space's contract surface is more than the source/artefact pair — a PSL source, the emitted `contract.{json,d.ts}`, *and* space-coupled TypeScript such as branded cross-space model handles (`handles.ts`) — grouping them under `src/contract/` keeps the package's `src/` legible:
+
+```text
+src/
+├── contract/
+│   ├── contract.prisma           ← PSL source
+│   ├── contract.json             ← emitted (do not edit)
+│   ├── contract.d.ts             ← emitted (do not edit)
+│   └── handles.ts                ← branded model handles for cross-space FKs
+├── exports/                      ← subpath barrels (pack, contract, …)
+└── …                             ← the package's other surfaces (adapter, runtime, …)
+```
+
+`@prisma-next/extension-supabase` and `@prisma-next/extension-better-auth` use this shape; `scripts/regen-extension-migrations.mjs` resolves both layouts (`src/contract.json` and `src/contract/contract.json`), which is the documented rule rather than an accident. TS-authored, artefact-pair-only spaces (pgvector, paradedb) keep the flat `src/contract.{ts,json,d.ts}` layout. The other layout rules (no `<space-id>` subdirectory in `migrations/`, root-level `prisma-next.config.ts`) are unchanged in both variants.
+
+**A managed space may ship application-visible table DDL.** The space mechanism is not limited to `storage.types` registration and `CREATE EXTENSION` invariants: a pack can declare domain models with tables, uniques, and FKs in its space contract and ship the planner-emitted (Path A) baseline migration that creates them. The framework then owns those tables' lifecycle end-to-end — `db init` walks the space to head, `db update` is a no-op at head, and the verifier holds the tables to the same managed policy as app tables. `@prisma-next/extension-better-auth` is the worked example: four auth tables with uniques and cascading FKs, consumed by apps through cross-space FK handles ([ADR 226](./ADR%20226%20-%20Cross-contract%20foreign-key%20references.md)) and a contract-typed adapter.
 
 ### On-disk layout (the user's repo)
 
