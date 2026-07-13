@@ -11,6 +11,11 @@ const preserveEmptyPatterns = [
   ['storage', 'namespaces', '*', 'entries', 'table', '*'],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', ['uniques', 'indexes', 'foreignKeys']],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', 'foreignKeys', ['constraint', 'index']],
+  // A column default's literal payload is data, not shape — `{ kind:
+  // 'literal', value: false }` (or `value: []`) must survive the
+  // default-omission walk or the emitted contract fails its own
+  // validation on the next read (PN-CLI-4003 on `Boolean @default(false)`).
+  ['storage', 'namespaces', '*', 'entries', 'table', '*', 'columns', '*', 'default', 'value'],
 ] as const satisfies readonly PathPattern[];
 
 const sortTargets = [

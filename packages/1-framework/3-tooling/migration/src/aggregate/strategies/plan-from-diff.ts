@@ -120,12 +120,13 @@ export async function planFromDiff<TFamilyId extends string, TTargetId extends s
 
   const destinationStorageHash = producedPlan.destination.storageHash;
   const producedOps = await Promise.all(producedPlan.operations);
+  const destinationContract = input.space.contract();
   return {
     kind: 'ok',
     result: {
       plan,
       displayOps: producedOps,
-      destinationContract: input.space.contract(),
+      destinationContract,
       strategy: 'plan-from-diff',
       ...(plannerResult.warnings && plannerResult.warnings.length > 0
         ? { warnings: plannerResult.warnings }
@@ -135,6 +136,7 @@ export async function planFromDiff<TFamilyId extends string, TTargetId extends s
           currentMarkerStorageHash: input.currentMarker?.storageHash,
           destinationStorageHash,
           operationCount: producedOps.length,
+          destinationContractJson: destinationContract,
         }),
       ],
     },

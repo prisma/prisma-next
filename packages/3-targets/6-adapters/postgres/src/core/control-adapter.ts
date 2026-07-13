@@ -75,6 +75,7 @@ import {
   execute,
   infoSchemaTables,
   ledger,
+  ledgerContract,
   ledgerReadShape,
   marker,
   mergeInvariants,
@@ -444,7 +445,11 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   /**
-   * Appends a ledger entry for `space`. See the
+   * Appends a ledger entry for `space`. When the edge carries a
+   * destination contract snapshot, the content-addressed
+   * `prisma_contract.contract` store is populated first (keyed by the
+   * destination hash, DO NOTHING on revisit) so a reader never sees a
+   * ledger row whose stored destination contract is missing. See the
    * `SqlControlAdapter.writeLedgerEntry` contract.
    */
   async writeLedgerEntry(
@@ -457,10 +462,23 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       readonly migrationName: string;
       readonly migrationHash: string;
       readonly operations: readonly unknown[];
+      readonly destinationContractJson?: unknown;
     },
   ): Promise<void> {
+    const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
+    if (entry.destinationContractJson !== undefined) {
+      await execute(
+        lower,
+        driver,
+        ledgerContract
+          .upsert({ core_hash: entry.to, contract_json: entry.destinationContractJson })
+          .onConflict(ledgerContract.core_hash)
+          .doNothing()
+          .build(),
+      );
+    }
     await execute(
-      (query) => this.lower(query, { contract: undefined }),
+      lower,
       driver,
       ledger
         .insert({
