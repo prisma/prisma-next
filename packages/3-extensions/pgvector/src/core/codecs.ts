@@ -43,6 +43,22 @@ const vectorParamsSchema = arktype({
 
 const PG_VECTOR_META = { db: { sql: { postgres: { nativeType: 'vector' } } } } as const;
 
+function parseVector(value: string): number[] {
+  if (!value.startsWith('[') || !value.endsWith(']')) {
+    throw new Error(`Invalid vector format: expected "[...]", got "${value}"`);
+  }
+  const content = value.slice(1, -1).trim();
+  return content === ''
+    ? []
+    : content.split(',').map((entry) => {
+        const number = Number.parseFloat(entry.trim());
+        if (Number.isNaN(number)) {
+          throw new Error(`Invalid vector value: "${entry}" is not a number`);
+        }
+        return number;
+      });
+}
+
 export class PgVectorCodec extends CodecImpl<
   typeof VECTOR_CODEC_ID,
   readonly ['equality'],
@@ -68,25 +84,6 @@ export class PgVectorCodec extends CodecImpl<
     }
   }
 
-  private parseVector(value: string): number[] {
-    if (!value.startsWith('[') || !value.endsWith(']')) {
-      throw new Error(`Invalid vector format: expected "[...]", got "${value}"`);
-    }
-    const content = value.slice(1, -1).trim();
-    const parsed =
-      content === ''
-        ? []
-        : content.split(',').map((entry) => {
-            const number = Number.parseFloat(entry.trim());
-            if (Number.isNaN(number)) {
-              throw new Error(`Invalid vector value: "${entry}" is not a number`);
-            }
-            return number;
-          });
-    this.assertVector(parsed);
-    return parsed;
-  }
-
   async encode(value: number[], _ctx: CodecCallContext): Promise<string> {
     this.assertVector(value);
     return `[${value.join(',')}]`;
@@ -96,7 +93,9 @@ export class PgVectorCodec extends CodecImpl<
     if (typeof wire !== 'string') {
       throw new Error('Vector wire value must be a string');
     }
-    return this.parseVector(wire);
+    const value = parseVector(wire);
+    this.assertVector(value);
+    return value;
   }
 
   encodeJson(value: number[]): JsonValue {
@@ -108,7 +107,9 @@ export class PgVectorCodec extends CodecImpl<
     if (typeof json !== 'string') {
       throw new Error('Vector database JSON value must be a string');
     }
-    return this.parseVector(json);
+    const value = parseVector(json);
+    this.assertVector(value);
+    return value;
   }
 }
 
