@@ -1619,6 +1619,9 @@ importers:
       '@prisma-next/config':
         specifier: workspace:0.14.0
         version: link:../../1-core/config
+      '@prisma-next/contract':
+        specifier: workspace:0.14.0
+        version: link:../../0-foundation/contract
       '@prisma-next/framework-components':
         specifier: workspace:0.14.0
         version: link:../../1-core/framework-components

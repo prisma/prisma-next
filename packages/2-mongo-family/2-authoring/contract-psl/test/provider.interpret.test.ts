@@ -78,7 +78,7 @@ describe('mongoContract interpret capability', () => {
     expect(typeof contract.source.interpret).toBe('function');
   });
 
-  it('returns the same diagnostics as load when parse and symbol table are clean', async () => {
+  it('returns the same failure diagnostics as load when parse and symbol table are clean', async () => {
     const schema = `model User {
   id ObjectId @id @map("_id")
   bad Mystery
@@ -96,10 +96,12 @@ describe('mongoContract interpret capability', () => {
     if (loadResult.ok) return;
 
     const context = createMongoTestContext();
-    const interpretDiagnostics = source.interpret(buildInterpretInput(schema, context), context);
+    const interpretResult = source.interpret(buildInterpretInput(schema, context), context);
 
-    expect(interpretDiagnostics).toEqual(loadResult.failure.diagnostics);
-    expect(interpretDiagnostics).toEqual(
+    expect(interpretResult.ok).toBe(false);
+    if (interpretResult.ok) return;
+    expect(interpretResult.failure.diagnostics).toEqual(loadResult.failure.diagnostics);
+    expect(interpretResult.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           code: 'PSL_UNSUPPORTED_FIELD_TYPE',
@@ -112,7 +114,7 @@ describe('mongoContract interpret capability', () => {
     );
   });
 
-  it('returns [] for a schema load interprets successfully', async () => {
+  it('returns the same contract load returns for a clean schema', async () => {
     const schema = `model User {
   id ObjectId @id @map("_id")
   email String
@@ -127,11 +129,15 @@ describe('mongoContract interpret capability', () => {
     const source = interpretCapableSource(SOURCE_ID);
     const loadResult = await source.load(createMongoTestContext({ resolvedInputs: [schemaPath] }));
     expect(loadResult.ok).toBe(true);
+    if (!loadResult.ok) return;
 
     const context = createMongoTestContext();
-    const interpretDiagnostics = source.interpret(buildInterpretInput(schema, context), context);
+    const interpretResult = source.interpret(buildInterpretInput(schema, context), context);
 
-    expect(interpretDiagnostics).toEqual([]);
+    expect(interpretResult.ok).toBe(true);
+    if (!interpretResult.ok) return;
+    // mongo load applies no post-processing, so the contracts are structurally identical.
+    expect(interpretResult.value).toEqual(loadResult.value);
   });
 
   it('does not throw on malformed-but-parseable input and still reports interpreter diagnostics', () => {
@@ -150,12 +156,16 @@ model Other {
     const context = createMongoTestContext();
     const input = buildInterpretInput(schema, context);
 
-    let diagnostics: readonly unknown[] = [];
+    let result: ReturnType<typeof source.interpret> | undefined;
     expect(() => {
-      diagnostics = source.interpret(input, context);
+      result = source.interpret(input, context);
     }).not.toThrow();
 
-    expect(diagnostics).toEqual(
+    expect(result).toBeDefined();
+    if (result === undefined || result.ok) {
+      throw new Error('expected interpret to report diagnostics');
+    }
+    expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: 'PSL_UNSUPPORTED_FIELD_TYPE', sourceId: SOURCE_ID }),
       ]),
@@ -170,48 +180,40 @@ model Other {
     const context = createMongoTestContext();
     const input = buildInterpretInput(schema, context);
 
-    let diagnostics: readonly unknown[] | undefined;
+    let result: ReturnType<typeof source.interpret> | undefined;
     expect(() => {
-      diagnostics = source.interpret(input, context);
+      result = source.interpret(input, context);
     }).not.toThrow();
 
-    expect(Array.isArray(diagnostics)).toBe(true);
+    expect(result).toBeDefined();
+    expect(typeof result?.ok).toBe('boolean');
   });
 
-  it('excludes parse and symbol-table seeds from interpret diagnostics', async () => {
-    // The same schema through load carries symbol-table seeds; interpret starts
-    // from the caller's artifacts, so only interpreter-produced diagnostics appear.
-    const schema = `model Dup {
-  id ObjectId @id @map("_id")
-}
-model Dup {
-  id ObjectId @id @map("_id")
-}
-model Other {
+  it('prepends caller seeds and excludes them when absent', () => {
+    const schema = `model Other {
   id ObjectId @id @map("_id")
   bad Mystery
 }
 `;
-    const tempDir = await mkdtemp(join(tmpdir(), 'mongo-interpret-'));
-    tempDirs.push(tempDir);
-    const schemaPath = join(tempDir, 'schema.prisma');
-    await writeFile(schemaPath, schema, 'utf-8');
-
-    process.chdir(tempDir);
+    const seed = {
+      code: 'PSL_CALLER_SEED',
+      message: 'seeded by the caller',
+      sourceId: SOURCE_ID,
+    };
     const source = interpretCapableSource(SOURCE_ID);
-    const loadResult = await source.load(createMongoTestContext({ resolvedInputs: [schemaPath] }));
-    expect(loadResult.ok).toBe(false);
-    if (loadResult.ok) return;
-
     const context = createMongoTestContext();
-    const interpretDiagnostics = source.interpret(buildInterpretInput(schema, context), context);
+    const input = buildInterpretInput(schema, context);
 
-    const loadCodes = loadResult.failure.diagnostics.map((d) => d.code);
-    const interpretCodes = interpretDiagnostics.map((d) => d.code);
-    expect(loadCodes).toContain('PSL_DUPLICATE_DECLARATION');
-    expect(interpretCodes).toContain('PSL_UNSUPPORTED_FIELD_TYPE');
-    expect(interpretCodes).not.toContain('PSL_DUPLICATE_DECLARATION');
-    expect(loadCodes).toEqual(expect.arrayContaining(interpretCodes));
-    expect(loadCodes.length).toBeGreaterThan(interpretCodes.length);
+    const unseeded = source.interpret(input, context);
+    const seeded = source.interpret(input, context, [seed]);
+
+    expect(unseeded.ok).toBe(false);
+    expect(seeded.ok).toBe(false);
+    if (unseeded.ok || seeded.ok) return;
+
+    expect(unseeded.failure.diagnostics).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'PSL_CALLER_SEED' })]),
+    );
+    expect(seeded.failure.diagnostics).toEqual([seed, ...unseeded.failure.diagnostics]);
   });
 });

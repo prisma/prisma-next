@@ -1,14 +1,9 @@
 import { readFile } from 'node:fs/promises';
-import type {
-  ContractConfig,
-  ContractSourceContext,
-  ContractSourceDiagnostic,
-} from '@prisma-next/config/config-types';
+import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-specifier-default-control-policy';
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import type { SymbolTable } from '@prisma-next/psl-parser';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { PslInterpretCapable } from '@prisma-next/psl-parser/interpret';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
@@ -78,51 +73,42 @@ function buildColumnDescriptorMap(
   return result;
 }
 
-interface PslInterpretArtifacts {
-  readonly symbolTable: SymbolTable;
-  readonly sourceFile: SourceFile;
-  readonly sourceId: string;
-}
-
 export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
-  const interpretArtifacts = (
-    artifacts: PslInterpretArtifacts,
-    context: ContractSourceContext,
-    seedDiagnostics: readonly ContractSourceDiagnostic[],
-  ) => {
-    const scalarTypeDescriptors = buildColumnDescriptorMap(
-      context.scalarTypeDescriptors,
-      context.codecLookup,
-    );
-    return interpretPslDocumentToSqlContract({
-      symbolTable: artifacts.symbolTable,
-      sourceFile: artifacts.sourceFile,
-      sourceId: artifacts.sourceId,
-      seedDiagnostics,
-      target: options.target,
-      authoringContributions: context.authoringContributions,
-      scalarTypeDescriptors,
-      ...ifDefined(
-        'composedExtensionPacks',
-        context.composedExtensionPacks.length > 0 ? [...context.composedExtensionPacks] : undefined,
-      ),
-      composedExtensionContracts: context.composedExtensionContracts,
-      ...ifDefined(
-        'composedExtensionPackRefs',
-        options.composedExtensionPackRefs?.length ? options.composedExtensionPackRefs : undefined,
-      ),
-      controlMutationDefaults: context.controlMutationDefaults,
-      createNamespace: options.createNamespace,
-      capabilities: context.capabilities,
-      codecLookup: context.codecLookup,
-      ...ifDefined('enumInferenceCodecs', options.enumInferenceCodecs),
-    });
-  };
-
   const source: PslInterpretCapable = {
     sourceFormat: 'psl',
     inputs: [schemaPath],
-    load: async (context) => {
+    interpret(input, context, seedDiagnostics = []) {
+      const scalarTypeDescriptors = buildColumnDescriptorMap(
+        context.scalarTypeDescriptors,
+        context.codecLookup,
+      );
+      return interpretPslDocumentToSqlContract({
+        symbolTable: input.symbolTable,
+        sourceFile: input.sourceFile,
+        sourceId: input.sourceId,
+        seedDiagnostics,
+        target: options.target,
+        authoringContributions: context.authoringContributions,
+        scalarTypeDescriptors,
+        ...ifDefined(
+          'composedExtensionPacks',
+          context.composedExtensionPacks.length > 0
+            ? [...context.composedExtensionPacks]
+            : undefined,
+        ),
+        composedExtensionContracts: context.composedExtensionContracts,
+        ...ifDefined(
+          'composedExtensionPackRefs',
+          options.composedExtensionPackRefs?.length ? options.composedExtensionPackRefs : undefined,
+        ),
+        controlMutationDefaults: context.controlMutationDefaults,
+        createNamespace: options.createNamespace,
+        capabilities: context.capabilities,
+        codecLookup: context.codecLookup,
+        ...ifDefined('enumInferenceCodecs', options.enumInferenceCodecs),
+      });
+    },
+    async load(context) {
       const [absoluteSchemaPath] = context.resolvedInputs;
       if (absoluteSchemaPath === undefined) {
         throw new Error(
@@ -162,8 +148,8 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),
       ];
 
-      const interpreted = interpretArtifacts(
-        { symbolTable, sourceFile, sourceId: schemaPath },
+      const interpreted = this.interpret(
+        { document, sourceFile, symbolTable, sourceId: schemaPath },
         context,
         seedDiagnostics,
       );
@@ -174,17 +160,6 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
       return ok(
         applySpecifierDefaultControlPolicy(interpreted.value, options.defaultControlPolicy),
       );
-    },
-    interpret: (input, context) => {
-      const interpreted = interpretArtifacts(
-        { symbolTable: input.symbolTable, sourceFile: input.sourceFile, sourceId: input.sourceId },
-        context,
-        [],
-      );
-      if (!interpreted.ok) {
-        return interpreted.failure.diagnostics;
-      }
-      return [];
     },
   };
 

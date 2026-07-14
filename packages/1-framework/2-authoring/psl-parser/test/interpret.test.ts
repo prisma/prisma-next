@@ -10,7 +10,7 @@ describe('hasPslInterpreter', () => {
     const provider: PslInterpretCapable = {
       sourceFormat: 'psl',
       load,
-      interpret: () => [],
+      interpret: () => ok({} as never),
     };
     const source: ContractSourceProvider = provider;
 
@@ -18,11 +18,10 @@ describe('hasPslInterpreter', () => {
   });
 
   it('exposes interpret on the narrowed source', () => {
-    const diagnostics = [{ code: 'PSL_DEMO', message: 'demo diagnostic' }];
     const provider: PslInterpretCapable = {
       sourceFormat: 'psl',
       load,
-      interpret: () => diagnostics,
+      interpret: () => ok({} as never),
     };
     const source: ContractSourceProvider = provider;
 

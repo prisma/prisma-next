@@ -1,16 +1,11 @@
 import { readFile } from 'node:fs/promises';
-import type {
-  ContractConfig,
-  ContractSourceContext,
-  ContractSourceDiagnostic,
-} from '@prisma-next/config/config-types';
-import type { SymbolTable } from '@prisma-next/psl-parser';
+import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { PslInterpretCapable } from '@prisma-next/psl-parser/interpret';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { notOk, ok } from '@prisma-next/utils/result';
+import { notOk } from '@prisma-next/utils/result';
 
 import { interpretPslDocumentToMongoContract } from './interpreter';
 
@@ -33,33 +28,23 @@ function mapParseDiagnostics(
   }));
 }
 
-interface PslInterpretArtifacts {
-  readonly symbolTable: SymbolTable;
-  readonly sourceFile: SourceFile;
-  readonly sourceId: string;
-}
-
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
-  const interpretArtifacts = (
-    artifacts: PslInterpretArtifacts,
-    context: ContractSourceContext,
-    seedDiagnostics: readonly ContractSourceDiagnostic[],
-  ) =>
-    interpretPslDocumentToMongoContract({
-      symbolTable: artifacts.symbolTable,
-      sourceFile: artifacts.sourceFile,
-      sourceId: artifacts.sourceId,
-      seedDiagnostics,
-      scalarTypeDescriptors: context.scalarTypeDescriptors,
-      codecLookup: context.codecLookup,
-      authoringContributions: context.authoringContributions,
-      ...ifDefined('enumInferenceCodecs', options?.enumInferenceCodecs),
-    });
-
   const source: PslInterpretCapable = {
     sourceFormat: 'psl',
     inputs: [schemaPath],
-    load: async (context) => {
+    interpret(input, context, seedDiagnostics = []) {
+      return interpretPslDocumentToMongoContract({
+        symbolTable: input.symbolTable,
+        sourceFile: input.sourceFile,
+        sourceId: input.sourceId,
+        seedDiagnostics,
+        scalarTypeDescriptors: context.scalarTypeDescriptors,
+        codecLookup: context.codecLookup,
+        authoringContributions: context.authoringContributions,
+        ...ifDefined('enumInferenceCodecs', options?.enumInferenceCodecs),
+      });
+    },
+    async load(context) {
       const [absoluteSchemaPath] = context.resolvedInputs;
       if (absoluteSchemaPath === undefined) {
         throw new Error(
@@ -99,27 +84,11 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),
       ];
 
-      const interpreted = interpretArtifacts(
-        { symbolTable, sourceFile, sourceId: schemaPath },
+      return this.interpret(
+        { document, sourceFile, symbolTable, sourceId: schemaPath },
         context,
         seedDiagnostics,
       );
-      if (!interpreted.ok) {
-        return interpreted;
-      }
-
-      return ok(interpreted.value);
-    },
-    interpret: (input, context) => {
-      const interpreted = interpretArtifacts(
-        { symbolTable: input.symbolTable, sourceFile: input.sourceFile, sourceId: input.sourceId },
-        context,
-        [],
-      );
-      if (!interpreted.ok) {
-        return interpreted.failure.diagnostics;
-      }
-      return [];
     },
   };
 

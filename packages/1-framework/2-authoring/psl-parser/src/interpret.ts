@@ -1,9 +1,12 @@
 import type {
   ContractSourceContext,
   ContractSourceDiagnostic,
+  ContractSourceDiagnostics,
   ContractSourceProvider,
   PslContractSourceProvider,
 } from '@prisma-next/config/config-types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { Result } from '@prisma-next/utils/result';
 import type { SourceFile } from './source-file';
 import type { SymbolTable } from './symbol-table';
 import type { DocumentAst } from './syntax/ast/declarations';
@@ -29,7 +32,8 @@ export interface PslInterpretCapable extends PslContractSourceProvider {
   interpret(
     input: PslInterpretInput,
     context: ContractSourceContext,
-  ): readonly ContractSourceDiagnostic[];
+    seedDiagnostics?: readonly ContractSourceDiagnostic[],
+  ): Result<Contract, ContractSourceDiagnostics>;
 }
 
 /** The single seam that narrows a contract source to the interpret capability. */
