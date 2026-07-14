@@ -2,6 +2,9 @@
 from: "0.14"
 to: "0.15"
 changes:
+  - id: sql-orm-includes-decode-codec-values
+    summary: |
+      SQL ORM includes now decode every scalar child field through its contract-bound codec, matching top-level query results. Update application code and tests that relied on included fields retaining the database's JSON representation: for example, Postgres `bytea` include fields now return `Uint8Array` instead of `\\x`-prefixed hex text, and timestamp include fields return `Date` instead of timestamp strings. Custom codec-backed include fields likewise return the value produced by the codec's `decodeJson` method.
   - id: db-verify-json-single-issue-list
     summary: |
       `prisma-next db verify --json` (and `db verify --schema-only --json`) now report a single
