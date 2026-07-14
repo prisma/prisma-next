@@ -316,7 +316,7 @@ model UuidNativeBad {
       schema: `model Defaults {
   id Int @id
   touchedAt DateTime @default(dbgenerated("clock_timestamp()"))
-  payload Json @default(dbgenerated("'{}'::jsonb"))
+  payload Jsonb @default(dbgenerated("'{}'::jsonb"))
 }`,
       sourceId: 'schema.prisma',
     });

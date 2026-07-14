@@ -59,6 +59,23 @@ changes:
         - "createSqliteScalarTypeDescriptors"
         - "scalarTypeDescriptors"
       anyMatch: true
+  - id: postgres-json-rebound-to-native-json
+    summary: |
+      On the postgres target the PSL `Json` scalar re-binds from `pg/jsonb@1` / `jsonb` to
+      `pg/json@1` / `json`; a new bare `Jsonb` scalar carries `pg/jsonb@1` / `jsonb`. Postgres
+      schemas that use `Json` and mean jsonb storage (which every pre-0.15 `Json` field did)
+      must switch those fields — and `types {}` aliases — to `Jsonb`, then re-run
+      `prisma-next contract emit`; with `Jsonb` the emitted `contract.json` is byte-identical
+      to the pre-0.15 output. A field left as `Json` now emits a native `json` column and a
+      new storage hash, which against an existing jsonb database is a schema change. The
+      legacy `@db.Json` attribute path is unchanged (`Json @db.Json` still yields
+      `pg/json@1` / `json`), and sqlite/mongo `Json` bindings are untouched. The TS builder
+      surface (`field.json()`, `jsonbColumn`) is unchanged and stays jsonb.
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "Json"
+      anyMatch: true
 ---
 
 <!--

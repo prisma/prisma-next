@@ -372,7 +372,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     };
 
     if (isValueObjectField) {
-      descriptor = scalarColumnDescriptors.get('Json');
+      // Value objects store in the richest JSON storage the target contributes
+      // (postgres: Jsonb -> jsonb); targets without a Jsonb scalar fall back to Json.
+      descriptor = scalarColumnDescriptors.get('Jsonb') ?? scalarColumnDescriptors.get('Json');
     } else if (isListField) {
       if (capabilities['sql']?.['scalarList'] !== true) {
         diagnostics.push({

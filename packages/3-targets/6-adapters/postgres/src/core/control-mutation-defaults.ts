@@ -170,7 +170,8 @@ export const postgresScalarAuthoringTypes = {
     kind: 'typeConstructor',
     output: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
   },
-  Json: { kind: 'typeConstructor', output: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' } },
+  Json: { kind: 'typeConstructor', output: { codecId: 'pg/json@1', nativeType: 'json' } },
+  Jsonb: { kind: 'typeConstructor', output: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' } },
   Bytes: { kind: 'typeConstructor', output: { codecId: 'pg/bytea@1', nativeType: 'bytea' } },
 } as const satisfies AuthoringTypeNamespace;
 

@@ -390,6 +390,25 @@ changes:
         - "scalarTypeDescriptors"
         - "assembleScalarTypeDescriptors"
       anyMatch: true
+  - id: postgres-json-rebound-to-native-json
+    summary: |
+      On the postgres target the PSL `Json` scalar re-binds from `pg/jsonb@1` / `jsonb` to
+      `pg/json@1` / `json`; a new bare `Jsonb` scalar carries `pg/jsonb@1` / `jsonb`
+      (`postgresScalarAuthoringTypes` in `@prisma-next/adapter-postgres`). Extension test
+      schemas and fixtures that author postgres `Json` fields and mean jsonb storage must
+      switch those fields to `Jsonb`; assertions that pin the `Json` name's derived binding
+      (e.g. over `collectScalarTypeConstructors(stack.authoringContributions.type)` or
+      `stack.scalarTypes`) now expect `Json -> { codecId: 'pg/json@1', nativeType: 'json' }`
+      plus the new `Jsonb -> { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }` entry. PSL
+      value-object storage columns still emit jsonb (the interpreter now prefers the target's
+      `Jsonb` scalar and falls back to `Json`). The legacy `@db.Json` attribute path
+      (`NATIVE_TYPE_SPECS`) is unchanged, as are sqlite/mongo `Json` bindings and the TS
+      builder surface (`field.json()`, `jsonbColumn`).
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "Json"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in

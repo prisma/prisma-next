@@ -30,6 +30,7 @@ const REPRESENTATIVE_SCHEMA = `model sample {
   price     Decimal
   createdAt DateTime
   payload   Json
+  document  Jsonb
   raw       Bytes
 }
 `;
@@ -71,7 +72,8 @@ describe('postgres scalar types derived from the unified namespace', () => {
       Float: { codecId: 'pg/float8@1', nativeType: 'float8' },
       Decimal: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
       DateTime: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
-      Json: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
+      Json: { codecId: 'pg/json@1', nativeType: 'json' },
+      Jsonb: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
       Bytes: { codecId: 'pg/bytea@1', nativeType: 'bytea' },
       VarChar: { codecId: 'sql/varchar@1', nativeType: 'character varying', typeParams: {} },
       Char: { codecId: 'sql/char@1', nativeType: 'character', typeParams: {} },
@@ -99,6 +101,7 @@ describe('postgres scalar types derived from the unified namespace', () => {
       'Float',
       'Int',
       'Json',
+      'Jsonb',
       'Numeric',
       'Real',
       'SmallInt',
@@ -132,7 +135,8 @@ describe('postgres scalar types derived from the unified namespace', () => {
                     ratio: { codecId: 'pg/float8@1', nativeType: 'float8' },
                     price: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
                     createdAt: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
-                    payload: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
+                    payload: { codecId: 'pg/json@1', nativeType: 'json' },
+                    document: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
                     raw: { codecId: 'pg/bytea@1', nativeType: 'bytea' },
                   },
                 },

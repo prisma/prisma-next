@@ -61,7 +61,8 @@ const postgresScalarTypeDescriptors = new Map([
   ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
   ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
   ['Boolean', { codecId: 'pg/bool@1', nativeType: 'bool' }],
-  ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
+  ['Json', { codecId: 'pg/json@1', nativeType: 'json' }],
+  ['Jsonb', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
 ]) as ReadonlyMap<string, { codecId: string; nativeType: string }>;
 
 function interpretMongoPsl(schema: string) {

@@ -246,7 +246,8 @@ describe('postgresScalarAuthoringTypes', () => {
     ['Float', 'pg/float8@1'],
     ['Decimal', 'pg/numeric@1'],
     ['DateTime', 'pg/timestamptz@1'],
-    ['Json', 'pg/jsonb@1'],
+    ['Json', 'pg/json@1'],
+    ['Jsonb', 'pg/jsonb@1'],
     ['Bytes', 'pg/bytea@1'],
   ] as const;
 
