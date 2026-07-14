@@ -16,6 +16,7 @@ import {
   type ToWhereExpr,
   type WhereArg,
 } from '@prisma-next/sql-relational-core/ast';
+import type { ScopeField } from '@prisma-next/sql-relational-core/expression';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
@@ -68,6 +69,10 @@ import {
   isIncludeCombine,
   isIncludeScalar,
 } from './include-descriptors';
+import {
+  INTERNAL_TO_TEMP_TABLE_QUERY_SOURCE,
+  type InternalTempTableQuerySource,
+} from './internal-temp-table-source';
 import { createModelAccessor } from './model-accessor';
 import {
   buildPrimaryKeyFilterFromRow,
@@ -90,6 +95,7 @@ import {
   compileUpsertReturning,
   mergeAnnotations,
 } from './query-plan';
+import { storageTableForContract } from './storage-resolution';
 import {
   type AggregateBuilder,
   type AggregateResult,
@@ -602,6 +608,49 @@ export class Collection<
     >({
       selectedFields,
     });
+  }
+
+  [INTERNAL_TO_TEMP_TABLE_QUERY_SOURCE](): InternalTempTableQuerySource<
+    Record<string, ScopeField>
+  > {
+    if (this.state.includes.length > 0) {
+      throw new Error('tempTable().as(...) does not support include(...) projections.');
+    }
+
+    const compiled = compileSelect(
+      this.contract,
+      this.namespaceId,
+      this.tableName,
+      this.state,
+      this.modelName,
+    );
+
+    if (compiled.ast.kind !== 'select') {
+      throw new Error('tempTable().as(...) expected a SELECT AST.');
+    }
+    const ast = compiled.ast;
+
+    const table = storageTableForContract(this.contract, this.namespaceId, this.tableName);
+    const selectedColumns = this.state.selectedFields ?? Object.keys(table.columns);
+    const rowFields: Record<string, ScopeField> = {};
+
+    for (const column of selectedColumns) {
+      const columnSpec = table.columns[column];
+      if (!columnSpec) {
+        throw new Error(
+          `tempTable().as(...): unknown selected column "${column}" for table "${this.tableName}".`,
+        );
+      }
+      rowFields[column] = {
+        codecId: columnSpec.codecId,
+        nullable: columnSpec.nullable,
+      };
+    }
+
+    return {
+      buildAst: () => ast,
+      getRowFields: () => rowFields,
+    };
   }
 
   /**

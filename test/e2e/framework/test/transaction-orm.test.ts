@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import arktypeJson from '@prisma-next/extension-arktype-json/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import postgres from '@prisma-next/postgres/runtime';
+import { ColumnRef, ProjectionItem, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { planFromAst } from '@prisma-next/sql-relational-core/plan';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import type { Varchar } from '@prisma-next/target-postgres/codec-types';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
@@ -167,6 +169,86 @@ describe('transaction ORM integration', { timeout: timeouts.spinUpPpgDev }, () =
 
       const post = await db.orm.public.Post.where({ title: 'Doomed Post' }).first();
       expect(post).toBeNull();
+    });
+  });
+
+  it('tempTable() materializes a tx.sql subquery and is reusable in FROM and JOIN statements in the same transaction', async () => {
+    await withPostgresClient(async (db) => {
+      await db.transaction(async (tx) => {
+        const email = v('temp-source@example.com');
+        const created = await tx.orm.public.User.create({ email });
+
+        const source = tx.sql.public.user
+          .select('id', 'email')
+          .where((f, fns) => fns.eq(f.email, email));
+
+        const temp = await tx.tempTable().as(source);
+
+        const rows = await tx
+          .execute(
+            planFromAst(
+              SelectAst.from(temp.buildAst()).withProjection([
+                ProjectionItem.of('id', ColumnRef.of(temp.name, 'id')),
+                ProjectionItem.of('email', ColumnRef.of(temp.name, 'email')),
+              ]),
+              db.context.contract,
+              'dsl',
+            ),
+          )
+          .toArray();
+
+        const joinedRows = await tx
+          .execute(
+            tx.sql.public.user
+              .innerJoin(temp, (f, fns) => fns.eq(f['user']!['id'], f[temp.name]!['id']))
+              .select('created_at')
+              .build(),
+          )
+          .toArray();
+
+        expect(rows).toEqual([{ id: created.id, email: 'temp-source@example.com' }]);
+        expect(joinedRows).toHaveLength(1);
+        await temp.drop();
+      });
+    });
+  });
+
+  it('tempTable() accepts ORM collection sources directly and is reusable in FROM and JOIN statements', async () => {
+    await withPostgresClient(async (db) => {
+      await db.transaction(async (tx) => {
+        const email = v('temp-orm-source@example.com');
+        const created = await tx.orm.public.User.create({ email });
+
+        const source = tx.orm.public.User.select('id', 'email').where({ email });
+
+        const temp = await tx.tempTable().as(source);
+
+        const rows = await tx
+          .execute(
+            planFromAst(
+              SelectAst.from(temp.buildAst()).withProjection([
+                ProjectionItem.of('id', ColumnRef.of(temp.name, 'id')),
+                ProjectionItem.of('email', ColumnRef.of(temp.name, 'email')),
+              ]),
+              db.context.contract,
+              'dsl',
+            ),
+          )
+          .toArray();
+
+        const joinedRows = await tx
+          .execute(
+            tx.sql.public.user
+              .innerJoin(temp, (f, fns) => fns.eq(f['user']!['id'], f[temp.name]!['id']))
+              .select('created_at')
+              .build(),
+          )
+          .toArray();
+
+        expect(rows).toEqual([{ id: created.id, email: 'temp-orm-source@example.com' }]);
+        expect(joinedRows).toHaveLength(1);
+        await temp.drop();
+      });
     });
   });
 });

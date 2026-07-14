@@ -99,22 +99,53 @@ export interface Runtime extends RuntimeQueryable {
 export interface RuntimeConnection extends RuntimeQueryable {
   transaction(): Promise<RuntimeTransaction>;
   /**
-   * Returns the connection to the pool for reuse. Only call this when the connection is known to be in a clean state. If a transaction commit/rollback failed or the connection is otherwise suspect, call `destroy(reason)` instead.
+   * Register a hook to run immediately before the connection is released back to the pool.
+   * Hooks are invoked in registration order and awaited sequentially. If any hook throws,
+   * the connection is destroyed rather than returned to the pool, and the error propagates.
+   * Not invoked when `destroy()` is called directly.
+   */
+  registerReleaseHook(hook: () => Promise<void>): void;
+  /**
+   * Returns the connection to the pool for reuse. Runs all registered release hooks first;
+   * if any hook throws the connection is destroyed and the error propagates. Only call this
+   * when the connection is known to be in a clean state. If a transaction commit/rollback
+   * failed or the connection is otherwise suspect, call `destroy(reason)` instead.
    */
   release(): Promise<void>;
   /**
-   * Evicts the connection so it is never reused. Call this when the connection may be in an indeterminate state (e.g. a failed rollback leaving an open transaction, or a broken socket).
+   * Evicts the connection so it is never reused. Call this when the connection may be in an
+   * indeterminate state (e.g. a failed rollback leaving an open transaction, or a broken socket).
    *
-   * If teardown fails the error is propagated and the connection remains retryable, so the caller can decide whether to swallow the failure or retry cleanup. Calling destroy() or release() more than once after a successful teardown is caller error.
+   * If teardown fails the error is propagated and the connection remains retryable, so the caller
+   * can decide whether to swallow the failure or retry cleanup. Calling destroy() or release() more
+   * than once after a successful teardown is caller error.
    *
-   * `reason` is advisory context only. It may be surfaced to driver-level observability hooks (e.g. pg-pool's `'release'` event) but does not influence eviction behavior and is not rethrown.
+   * `reason` is advisory context only. It may be surfaced to driver-level observability hooks
+   * (e.g. pg-pool's `'release'` event) but does not influence eviction behavior and is not rethrown.
    */
   destroy(reason?: unknown): Promise<void>;
+}
+
+/**
+ * Restricted view of a {@link RuntimeConnection} passed to a {@link withConnection} callback.
+ * Exposes query execution and release-hook registration, but not the raw `release()` / `destroy()`
+ * lifecycle methods — those are managed by `withConnection` itself.
+ */
+export interface ConnectionContext extends RuntimeQueryable {
+  registerReleaseHook(hook: () => Promise<void>): void;
 }
 
 export interface RuntimeTransaction extends RuntimeQueryable {
   commit(): Promise<void>;
   rollback(): Promise<void>;
+  /**
+   * Register a hook to run immediately before the transaction is committed.
+   * Hooks are invoked in registration order and awaited sequentially. If any
+   * hook throws, the commit is aborted and the error propagates to the caller.
+   * Not invoked on rollback.
+   */
+  registerPreCommitHook(hook: () => Promise<void>): void;
+  runPreCommitHooks(): Promise<void>;
 }
 
 export interface RuntimeQueryable extends RuntimeScope {
@@ -133,6 +164,13 @@ export interface RuntimeQueryable extends RuntimeScope {
 
 export interface TransactionContext extends RuntimeQueryable {
   readonly invalidated: boolean;
+  /**
+   * Register a hook to run immediately before the transaction is committed.
+   * Hooks are invoked in registration order and awaited sequentially. If any
+   * hook throws, the commit is aborted and the error propagates to the caller.
+   * Not invoked on rollback.
+   */
+  registerPreCommitHook(hook: () => Promise<void>): void;
 }
 
 export type { RuntimeTelemetryEvent, TelemetryOutcome, VerifyMarkerOption };
@@ -611,14 +649,28 @@ export abstract class SqlRuntimeBase<TContract extends Contract<SqlStorage> = Co
   async connection(): Promise<RuntimeConnection> {
     const driverConn = await this.driver.acquireConnection();
     const self = this;
+    const releaseHooks: Array<() => Promise<void>> = [];
 
     const wrappedConnection: RuntimeConnection = {
       async transaction(): Promise<RuntimeTransaction> {
         const driverTx = await driverConn.beginTransaction();
         return self.wrapTransaction(driverTx);
       },
+      registerReleaseHook(hook: () => Promise<void>): void {
+        releaseHooks.push(hook);
+      },
       async release(): Promise<void> {
-        await driverConn.release();
+        try {
+          let hook = releaseHooks.shift();
+          while (hook !== undefined) {
+            await hook();
+            hook = releaseHooks.shift();
+          }
+          await driverConn.release();
+        } catch (err) {
+          await driverConn.destroy(err);
+          throw err;
+        }
       },
       async destroy(reason?: unknown): Promise<void> {
         await driverConn.destroy(reason);
@@ -649,10 +701,26 @@ export abstract class SqlRuntimeBase<TContract extends Contract<SqlStorage> = Co
     return wrappedConnection;
   }
 
-  private wrapTransaction(driverTx: SqlTransaction): RuntimeTransaction {
+  protected wrapTransaction(driverTx: SqlTransaction): RuntimeTransaction {
     const self = this;
+    const preCommitHooks: Array<() => Promise<void>> = [];
     return {
+      registerPreCommitHook(hook: () => Promise<void>): void {
+        preCommitHooks.push(hook);
+      },
+      async runPreCommitHooks(): Promise<void> {
+        let hook = preCommitHooks.shift();
+        while (hook !== undefined) {
+          await hook();
+          hook = preCommitHooks.shift();
+        }
+      },
       async commit(): Promise<void> {
+        let hook = preCommitHooks.shift();
+        while (hook !== undefined) {
+          await hook();
+          hook = preCommitHooks.shift();
+        }
         await driverTx.commit();
       },
       async rollback(): Promise<void> {
@@ -808,6 +876,12 @@ export async function withTransaction<R>(
         guardedStream(transaction.executePrepared(ps, params, options)),
       );
     },
+    registerPreCommitHook(hook: () => Promise<void>): void {
+      if (invalidated) {
+        throw transactionClosedError();
+      }
+      transaction.registerPreCommitHook(hook);
+    },
   };
 
   let connectionDisposed = false;
@@ -822,6 +896,7 @@ export async function withTransaction<R>(
     let result: R;
     try {
       result = await fn(txContext);
+      await transaction.runPreCommitHooks();
     } catch (error) {
       try {
         await transaction.rollback();
@@ -864,5 +939,24 @@ export async function withTransaction<R>(
     if (!connectionDisposed) {
       await connection.release();
     }
+  }
+}
+
+export async function withConnection<R>(
+  runtime: ConnectionProvider,
+  fn: (conn: ConnectionContext) => PromiseLike<R>,
+): Promise<R> {
+  const connection = await runtime.connection();
+  let released = false;
+  try {
+    const result = await fn(connection);
+    released = true;
+    await connection.release();
+    return result;
+  } catch (err) {
+    if (!released) {
+      await connection.destroy(err).catch(() => undefined);
+    }
+    throw err;
   }
 }
