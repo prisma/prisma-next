@@ -233,7 +233,7 @@ interpret stage.
 
 ### Implement M5: Config-failure surfacing + last-good retention
 
-**Status:** ► In progress — slice 06, branch `tml-2984-slice-06-config-failure`
+**Status:** ► In progress — slice 06 delivered (`353e5d4e7`, 4/4 SDoD), PR open; complete on merge
 
 _Outcomes_
 A throwing `loadConfig`/`createControlStack` surfaces as a push diagnostic on the

@@ -43,18 +43,29 @@ either a diagnostic for a state we still destroy, or retention nobody can observ
 
 ## Slice Definition of Done (beyond CI / reviewer / project-DoD)
 
-- [ ] SDoD1 (TC-13) — first-load failure: push diagnostic on the config-file URI at
-      (0,0)–(0,1) with the error message; published even when the client supports
-      pull diagnostics; exactly once per failed load with multiple awaiting
-      documents; next successful load clears it (empty publish).
-- [ ] SDoD2 (TC-14) — reload failure with a previously loaded project: last-good
-      project keeps serving (schema diagnostics — including interpreter findings —
-      still returned on pull/push), config diagnostic alongside; a subsequent
-      successful reload swaps in the new project and clears the config diagnostic.
-- [ ] SDoD3 — first-load failure keeps today's no-project behavior (documents
-      unmanaged; existing regression pins hold); success path behavior-identical
-      (existing server suite untouched and green).
-- [ ] SDoD4 — zero new casts; no new dependency edges.
+- [x] SDoD1 (TC-13) — push diagnostic on the config URI at (0,0)–(0,1)
+      (`PRISMA_NEXT_CONFIG_LOAD_FAILED`, error message); exactly-once is structural
+      (single shared load promise); published for pull-capable clients; cleared on
+      next successful load. ✓ `353e5d4e7`
+- [x] SDoD2 (TC-14) — break→retain→fix cycle pinned: last-good serves full schema
+      diagnostics incl. interpreter findings, config diagnostic alongside;
+      successful reload swaps + clears. Reload-failure resolves with last-good
+      (funnels untouched). ✓
+- [x] SDoD3 — first-load failure = today's behavior (217 existing tests untouched;
+      1 test re-pinned by charter — it encoded the destroy-on-reload behavior this
+      slice replaces; reviewer confirmed everything it legitimately protected
+      survives in other pins). ✓
+- [x] SDoD4 — zero casts; no new edges; `lint:framework-vocabulary` at threshold. ✓
+
+**Slice-close ritual (2026-07-14):** single dispatch SATISFIED R1, zero findings;
+4/4 SDoD PASS; clear-site relocated from the brief's letter (`stopManagingProject` —
+whose only callers are the failure funnels) to the genuine stops-caring seam
+(`dropProjectWithoutManagedDocuments`), reviewer-blessed. Accepted residual for M6
+QA: after a failed *first* load with all schema docs closed, the marker persists
+until a doc reopens (lazy lifecycle by design) — QA script must exercise break→fix
+with and without open documents. Pre-existing superseded-failed-awaiter hazard
+recorded for backlog (blast radius narrowed by this slice). Manual QA: config
+break/fix cycle is in the M6 playground script by project DoD.
 
 ## Edge cases (pre-investigated)
 
