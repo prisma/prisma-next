@@ -438,7 +438,9 @@ async function executeDbVerifyCommand(
       schema: {
         summary: combined.result.summary,
         strict: combined.result.meta?.strict ?? false,
-        warnings: (combined.result.schema.warnings?.issues ?? []).map((issue) => issue.message),
+        warnings: (combined.result.schema.warnings?.issues ?? []).map((issue) =>
+          issue.path.join('/'),
+        ),
       },
       unclaimed: combined.unclaimed,
       meta: {

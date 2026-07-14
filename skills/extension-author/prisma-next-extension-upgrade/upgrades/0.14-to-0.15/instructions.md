@@ -272,6 +272,47 @@ changes:
         - "pg.enum("
         - "nativeEnum("
       anyMatch: true
+  - id: native-enum-entry-keyed-by-physical-type-name
+    summary: |
+      A serialized `native_enum` entry is now keyed by its physical Postgres type name — the `@@map`
+      value, or the declared type name when unmapped — not the TS-facing PascalCase name it previously
+      used (`entries.native_enum.aal_level`, not `entries.native_enum.AalLevel`). This aligns the
+      `native_enum` key with every other storage entry (a table keys by its physical name) per ADR 221.
+      If your extension declares native Postgres enums, re-emit your bundled contract
+      (`prisma-next contract emit`) and commit the result so the re-keyed `entries.native_enum` map and
+      the recomputed `storageHash` land in your checked-in `contract.{json,d.ts}`. If your extension code
+      addresses a `native_enum` entry by key
+      (`contract.storage.namespaces[<ns>].entries.native_enum[<name>]`), switch that key from the
+      PascalCase type name to the physical type name.
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "native_enum"
+        - "pg.enum("
+        - "nativeEnum("
+      anyMatch: true
+  - id: scalar-field-state-descriptor-generic
+    summary: |
+      `ScalarFieldState` (from `@prisma-next/sql-contract-ts/contract-builder`) changes its first
+      type parameter from the codec-id string (`CodecId extends string = string`) to the full column
+      descriptor type (`Descriptor extends ColumnTypeDescriptor = ColumnTypeDescriptor`), so field
+      states preserve the whole descriptor type — including a native-enum entity's member literal
+      tuple — instead of only the codec id. If your extension names `ScalarFieldState<...>` with
+      positional generics, wrap the codec id in the descriptor type: `ScalarFieldState<'pg/text@1',
+      ...>` becomes `ScalarFieldState<ColumnTypeDescriptor<'pg/text@1'>, ...>` (import
+      `ColumnTypeDescriptor` from `@prisma-next/framework-components/codec`); the remaining six
+      parameters are unchanged. Two narrowing ride-alongs can surface in exact-type test assertions:
+      built contract types now keep a descriptor's literal `nativeType`/`typeParams` (previously
+      widened to `string`), and `pg.enum(handle)` (from `@prisma-next/postgres`) returns a descriptor
+      whose `entityRef` is non-optional and whose `entityRef.entity` is `PostgresNativeEnum<Members>`
+      instead of `unknown`. Both remain assignable everywhere the old types were accepted — update
+      `expectTypeOf`-style equality assertions to the narrowed types; do not re-widen production
+      types to satisfy them.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "ScalarFieldState"
+      anyMatch: true
   - id: schema-ir-fk-unbound-referenced-schema-absent
     summary: |
       The family's `contractToSchemaIR` (from `@prisma-next/family-sql/control`) no longer stamps
@@ -290,6 +331,43 @@ changes:
       contains:
         - "SqlForeignKeyIR"
         - "referencedSchema"
+      anyMatch: true
+  - id: psl-role-block
+    summary: |
+      PSL gains a standalone `role` block on the postgres target, authored inside the explicit
+      unbound namespace: `namespace unbound { role anon {} }` (name-only, no parameters) lowers to a
+      first-class `PostgresRole` entity in the contract's `__unbound__` storage slot
+      (`control: 'external'` — roles are referenced, never owned; the planner emits no role DDL and
+      `db verify` checks existence via `pg_roles`). The unbound namespace's purpose is late binding
+      (search_path-resolved tables); roles are declared there because they are cluster-scoped and
+      belong to no schema. To make this authorable, the "no `namespace unbound { }` alongside named
+      namespaces" restriction is narrowed to models: a blocks-only unbound namespace is legal next
+      to named namespaces, while one containing models next to named namespaces stays rejected
+      (`PSL_RESERVED_NAMESPACE_NAME`). A `role` block anywhere else — a named namespace or the
+      document top level — is rejected with `PSL_ROLE_BLOCK_OUTSIDE_UNBOUND_NAMESPACE`. Purely
+      additive for existing contracts.
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "role "
+        - "AuthoringPslBlockDescriptor"
+      anyMatch: true
+  - id: supabase-pack-contract-declares-roles
+    summary: |
+      The `@prisma-next/extension-supabase` shipped contract now declares Supabase's three standard
+      Postgres roles (`anon`, `authenticated`, `service_role`) as first-class `role` entities with
+      `control: 'external'`. `db verify` on a project composing the pack now fails with a `not-found`
+      schema issue naming each declared role the live database lacks. Real Supabase databases always
+      have these roles, so hosted projects need no change; a local or CI database that stands in for
+      Supabase must create them — `bootstrapSupabaseShim` from
+      `@prisma-next/extension-supabase/test/utils` already does. The public
+      `SupabaseRoleBinding['role']` type is unchanged (`'anon' | 'authenticated' | 'service_role'`);
+      it is now derived from the `SupabaseRole` Prisma Next enum handle's values; the contract declares the roles via the
+      new PSL `role` blocks inside `namespace unbound { }` (see the `psl-role-block` entry).
+    detection:
+      glob: "**/*.{ts,mts,cts,tsx,prisma,json}"
+      contains:
+        - "@prisma-next/extension-supabase"
       anyMatch: true
   - id: scalar-type-descriptors-channel-removed
     summary: |
@@ -533,6 +611,22 @@ changed or removed. No extension-author action required. Incidental substrate di
 -->
 
 <!--
+TML-2960 (no-emit native-enum column typing): a `field.column(pg.enum(handle))`
+column now types as its member-value literal union in `typeof contract` (the
+no-emit path), matching what the emit path already produced. The
+`packages/3-extensions/` diff is the feature itself plus its type test:
+`postgres/src/contract/native-enum.ts` makes `pg.enum()` generic over the
+handle's members (returning a descriptor whose `entityRef.entity` is
+`PostgresNativeEnum<Members>`), and
+`postgres/test/contract-builder/native-enum-typeof.test-d.ts` pins the
+resulting `typeof contract` types. Runtime values and emitted
+`contract.{json,d.ts}` are byte-identical. The extension-author-facing type
+reshape this rides on (`ScalarFieldState`'s first generic) is recorded in the
+`scalar-field-state-descriptor-generic` entry above; beyond that, no
+extension-author action. Incidental substrate diff only.
+-->
+
+<!--
 TML-2828 (variant relations on the narrowed accessor, PR #933): the
 `packages/3-extensions/` diff is confined to `@prisma-next/sql-orm-client` (itself an
 extension). The `.variant('X')`-narrowed predicate accessor now surfaces relations the
@@ -544,4 +638,25 @@ coordinates (variant table for MTI, base table for STI), and
 EXISTS. Purely additive to the ORM client's query surface; no extension-author SPI
 (`@prisma-next/contract`, `@prisma-next/framework-components`, …) changed. No
 extension-author action required. Incidental substrate diff only.
+-->
+
+<!--
+Dependabot runtime-deps group bump (PR #962): the packages/3-extensions/
+diff is package.json dependency version ranges only (arktype ^2.2.2 /
+~2.2.2). No extension-facing API, contract shape, or emitted artefact
+changes. No user action required. Incidental substrate diff only.
+-->
+
+<!--
+pg binding resolution by structure, not instanceof (PR #969): the
+`packages/3-extensions/` diff is a bug fix plus additive exports. The postgres
+extension (`@prisma-next/postgres`) gains two net-new `/runtime` exports —
+`isPgPool` / `isPgClient`, structural type guards that identify a `pg`
+Pool/Client by shape instead of `instanceof`. `resolvePostgresBinding` and the
+`@prisma-next/extension-supabase` `toPool` helper now use them, so a
+caller-supplied pool that came from a duplicated `pg` copy in an app bundle
+resolves correctly instead of throwing `Unable to determine pg binding type`
+at boot. The change only accepts inputs the old `instanceof` check rejected —
+nothing that resolved before resolves differently — and the two guards are
+additive. No extension-author action required. Incidental substrate diff only.
 -->

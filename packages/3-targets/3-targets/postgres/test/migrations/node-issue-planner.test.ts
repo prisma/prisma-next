@@ -68,7 +68,6 @@ function rootOf(tables: Record<string, PostgresTableSchemaNode>): PostgresDataba
       public: new PostgresNamespaceSchemaNode({
         schemaName: 'public',
         tables,
-        nativeEnumTypeNames: [],
       }),
     },
     roles: [],
@@ -282,12 +281,10 @@ describe('mapNodeIssueToCall — synthesized namespace issue', () => {
     const namespace = new PostgresNamespaceSchemaNode({
       schemaName: 'auth',
       tables: {},
-      nativeEnumTypeNames: [],
     });
     const issue: SchemaDiffIssue = {
       path: ['database', 'auth'],
       reason: 'not-found',
-      message: 'missing: database/auth',
       expected: namespace,
     };
     const ctx = {
@@ -341,7 +338,6 @@ describe('mapNodeIssueToCall — table rlsEnabled drift', () => {
     return {
       path: ['database', 'public', 'user'],
       reason: 'not-equal',
-      message: 'table user drifted',
       expected,
       actual,
     };

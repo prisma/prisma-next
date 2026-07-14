@@ -25,9 +25,19 @@ const ledgerColumns = [
   col('origin_profile_hash', 'text'),
   col('destination_core_hash', 'text', { notNull: true }),
   col('destination_profile_hash', 'text'),
-  col('contract_json_before', 'jsonb'),
-  col('contract_json_after', 'jsonb'),
   col('operations', 'jsonb', { notNull: true }),
+] as const;
+
+// Content-addressed contract store: one row per distinct contract,
+// keyed by its storage hash. The ledger's `origin_core_hash` /
+// `destination_core_hash` are contract identifiers that resolve here by
+// hash equality (no FK — a baseline origin has no stored contract by
+// definition), so both endpoints of every edge are direct lookups and a
+// contract revisited by a rollback cycle is stored exactly once.
+const contractColumns = [
+  col('core_hash', 'text', { notNull: true, primaryKey: true }),
+  col('created_at', 'timestamptz', { notNull: true, default: fn('now()') }),
+  col('contract_json', 'jsonb', { notNull: true }),
 ] as const;
 
 const markerTable = createTable({
@@ -44,6 +54,13 @@ const ledgerTable = createTable({
   columns: ledgerColumns,
 });
 
+const contractTable = createTable({
+  schema: 'prisma_contract',
+  table: 'contract',
+  ifNotExists: true,
+  columns: contractColumns,
+});
+
 const controlSchema = createSchema({ schema: 'prisma_contract', ifNotExists: true });
 
 export function buildSignMarkerBootstrapQueries(): readonly DdlNode[] {
@@ -51,5 +68,5 @@ export function buildSignMarkerBootstrapQueries(): readonly DdlNode[] {
 }
 
 export function buildControlTableBootstrapQueries(): readonly DdlNode[] {
-  return [controlSchema, markerTable, ledgerTable];
+  return [controlSchema, markerTable, ledgerTable, contractTable];
 }

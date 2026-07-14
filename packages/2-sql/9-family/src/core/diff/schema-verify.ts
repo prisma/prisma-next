@@ -215,9 +215,9 @@ export interface StorageTypeVerdictInput {
 /**
  * Runs the codec `verifyType` hooks the way the legacy walk did: once per
  * contract namespace with tables, against that namespace's paired actual
- * node (the hook reads namespace-scoped state such as
- * `nativeEnumTypeNames` off it). Issue dispositions grade against the
- * contract default policy, matching the legacy `pushTypeNode` semantics.
+ * node (the hook reads namespace-scoped state such as `enums` off it).
+ * Issue dispositions grade against the contract default policy, matching
+ * the legacy `pushTypeNode` semantics.
  */
 export interface StorageTypeVerdict {
   readonly failures: readonly SchemaDiffIssue[];

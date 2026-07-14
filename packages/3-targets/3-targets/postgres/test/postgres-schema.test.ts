@@ -261,6 +261,8 @@ describe('PostgresSchema — unknown entity kind', () => {
 });
 
 describe('PostgresSchema — native_enum entries', () => {
+  // Keyed by the author handle on input; the constructor re-keys the slot by
+  // the entity's physical type name (`aal_level`, ADR 221 coordinate).
   const nativeEnumInput = {
     AalLevel: {
       kind: 'postgres-enum',
@@ -275,7 +277,7 @@ describe('PostgresSchema — native_enum entries', () => {
       id: 'auth',
       entries: { table: {}, native_enum: nativeEnumInput },
     });
-    const nativeEnum = schema.entries.native_enum?.['AalLevel'];
+    const nativeEnum = schema.entries.native_enum?.['aal_level'];
     expect(nativeEnum).toBeInstanceOf(PostgresNativeEnum);
     expect(nativeEnum?.typeName).toBe('aal_level');
     expect(nativeEnum?.members).toEqual(['aal1', 'aal2', 'aal3']);
@@ -299,7 +301,7 @@ describe('PostgresSchema — native_enum entries', () => {
       entries: Record<string, unknown>;
     };
     expect(parsed.entries['native_enum']).toEqual({
-      AalLevel: {
+      aal_level: {
         kind: 'postgres-enum',
         typeName: 'aal_level',
         members: ['aal1', 'aal2', 'aal3'],
@@ -311,6 +313,19 @@ describe('PostgresSchema — native_enum entries', () => {
   it('is absent from entries when no native_enum input is given', () => {
     const schema = new PostgresSchema({ id: 'auth', entries: { table: {} } });
     expect(schema.entries.native_enum).toBeUndefined();
+  });
+
+  it('rejects two native enums that resolve to the same physical type name', () => {
+    // Two distinct handles, same `@@map` type name — no upstream validation
+    // stops this, and the physical-name re-key would otherwise silently drop one
+    // enum's members. Fail loud instead.
+    const collidingInput = {
+      RoleA: { kind: 'postgres-enum', typeName: 'app_role', members: ['a'] },
+      RoleB: { kind: 'postgres-enum', typeName: 'app_role', members: ['b'] },
+    };
+    expect(
+      () => new PostgresSchema({ id: 'auth', entries: { table: {}, native_enum: collidingInput } }),
+    ).toThrow(/app_role.*auth|auth.*app_role/);
   });
 });
 

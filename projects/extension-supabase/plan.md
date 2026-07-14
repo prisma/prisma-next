@@ -34,36 +34,40 @@ Ungated. Reconciles spec.md, plan.md, and `decisions.md` (C5) to as-built realit
 `@prisma-next/extension-supabase` package with real `/pack`, `/contract` (model handles), and `/runtime` subpaths. PSL-authored Supabase contract (`defaultControl: 'external'`). `examples/supabase` walking skeleton: proves `external` migrate/verify claim, `Profile → auth.AuthUser` FK cascade, and RLS enforcement through the runtime.
 
 Current state of the example:
-- RLS policies are hand-authored raw SQL in `applyRlsFixture` (a test fixture). The `TODO(TML-2501)` marks role literals as hardcoded. Both are remaining work.
+- RLS policies now author in `contract.prisma` and apply via `dbInit` (Slice B). The role literals are no longer hardcoded: Slice C moved the role vocabulary to the pack contract.
 
 ### ✅ Runtime facade — done (ADR 230)
 
 `SupabaseRuntimeImpl`, the async `supabase<TContract>()` factory, `asUser` (async) / `asAnon()` / `asServiceRole()`, `SupabaseDb`/`RoleBoundDb`, JWT validation (`InvalidJwtError`), and session-coupled connection role binding (`set_config(role/claims)` + `RESET ALL` on release). See [ADR 230](../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md).
 
-### Slice B — RLS through the framework authoring surface
+### Slice B — RLS through the framework authoring surface ✅ done
 
 **Gate:** postgres-rls #771 (SELECT policy) + the UPDATE-own vertical landed.
 
 **Goal:** swap `examples/supabase`'s `applyRlsFixture` raw SQL onto the framework authoring surface. The `Profile` model's RLS policies are declared via `.rls(...)` in TS or `policy_select`/`policy_update` blocks in PSL, emitted through the framework, applied by `dbInit` — no hand-authored `CREATE POLICY` in the test fixture.
 
 **DoD tasks:**
-- [ ] Express the `profile_owner_select` policy and the `profile_owner_update`-own-with-check policy through the framework authoring surface (TS `.rls(...)` or PSL `policy` blocks).
-- [ ] Remove `applyRlsFixture`'s hand-authored `CREATE POLICY` / `ENABLE ROW LEVEL SECURITY` SQL. The framework migration handles it.
-- [ ] Keep the RLS enforcement integration tests green.
+- [x] Express the `profile_owner_select` policy and the `profile_owner_update`-own-with-check policy through the framework authoring surface (TS `.rls(...)` or PSL `policy` blocks).
+- [x] Remove `applyRlsFixture`'s hand-authored `CREATE POLICY` / `ENABLE ROW LEVEL SECURITY` SQL. The framework migration handles it.
+- [x] Keep the RLS enforcement integration tests green.
 
 **Note:** B and C may merge into one postgres-rls-integration slice if the `PostgresRole` IR and the `.rls(...)` authoring surface land together — check when postgres-rls closes out.
 
-### Slice C — Roles first-class
+**As-built:** policies author in `examples/supabase/src/contract.prisma` (PSL `policy_select`/`policy_update` blocks) and apply via `dbInit`; the test fixture retains only grants (`applyGrantsFixture`) — no hand-authored `CREATE POLICY`/`ENABLE ROW LEVEL SECURITY` remains under `examples/supabase/`.
+
+### Slice C — Roles first-class ✅
 
 **Gate:** postgres-rls's `PostgresRole` IR merged.
 
 **Goal:** replace the hardcoded role literals in `SupabaseRoleBinding` (`'anon'|'authenticated'|'service_role'` with `TODO(TML-2501)`) with postgres-rls's `PostgresRole` IR. Declare Supabase's standard roles in the shipped contract (`anon`, `authenticated`, `service_role` as `control: 'external'`). The verifier confirms their existence via `pg_roles` introspection.
 
+**As built:** PSL gained a standalone `role` block for this slice, authored inside the explicit unbound namespace: the pack's `contract.prisma` declares `namespace unbound { role anon {} role authenticated {} role service_role {} }`, and the blocks lower into the contract's `__unbound__` storage slot like blocks in any namespace. The unbound namespace's purpose is late binding (search_path-resolved tables); roles are declared there because they are cluster-scoped and belong to no schema. To make this authorable the "no `namespace unbound { }` alongside named namespaces" restriction was narrowed to models (a blocks-only unbound namespace is legal next to named namespaces; one containing models stays rejected). The postgres role lowering rejects a `role` block anywhere else — a named namespace or the document top level — with `PSL_ROLE_BLOCK_OUTSIDE_UNBOUND_NAMESPACE`, and stamps the `__unbound__` coordinate on every entity. The diff-tree projection was fixed alongside: roles hoist to the database root from whichever slot carries them, and a roles-only unbound slot no longer materializes a physical `public` namespace node (nor clobbers a bound `public` namespace's node). The runtime derives `SupabaseRoleBinding['role']` from the `SupabaseRole` Prisma Next enum handle (`src/contract/roles.ts`); a type test pins the public union unchanged. Verify reports a missing role as a `not-found` schema issue naming it (framework's shape, not a `missing_role` code). An earlier approach that injected the entities via a `createNamespace` wrapper in `prisma-next.config.ts` was rejected in review — the emitted contract must not carry entities the PSL source doesn't declare.
+
 **DoD tasks:**
-- [ ] Add role declarations to the shipped contract (PSL or contract.json).
-- [ ] Replace the hardcoded role literal union in `SupabaseRoleBinding.role` with the `PostgresRole` IR type.
-- [ ] Verifier integration test: pointing the runtime at a vanilla Postgres DB (no Supabase setup) raises `missing_role` for `anon`/`authenticated`/`service_role`.
-- [ ] Keep the RLS enforcement integration tests green.
+- [x] Add role declarations to the shipped contract (PSL or contract.json).
+- [x] Replace the hardcoded role literal union in `SupabaseRoleBinding.role` with the `PostgresRole` IR type.
+- [x] Verifier integration test: pointing the runtime at a vanilla Postgres DB (no Supabase setup) raises `missing_role` for `anon`/`authenticated`/`service_role`.
+- [x] Keep the RLS enforcement integration tests green.
 
 **Non-blocking follow-on:** enum-typed `auth.*` columns (enums-as-domain-concept project) can attach to this slice or land later.
 

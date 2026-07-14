@@ -62,6 +62,36 @@ changes:
 ---
 
 <!--
+TML-2501 (extension-supabase slice B close-out, this PR): test-only. The only
+`examples/` touch is `examples/supabase/test/rls-role-binding.integration.test.ts`:
+the acceptance test's fixture no longer hand-applies `ENABLE ROW LEVEL SECURITY` /
+`CREATE POLICY` SQL — the test now exercises exactly the policies `dbInit` applies
+from `contract.prisma`, and gains a WITH CHECK assertion (reassigning an owned row
+to another owner is rejected). No framework surface, contract shape, or emitted
+artefact changes. No user action required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2870 (Postgres RLS slice 4: all policy operations + roles): additive. The
+PSL RLS surface gains the non-select policy keywords `policy_insert`,
+`policy_update`, `policy_delete`, and `policy_all`, each with an optional
+`withCheck` predicate (per-operation predicate matrix enforced at load time),
+alongside the existing `policy_select`. Postgres database roles also enter
+`db verify`: a role a contract declares but the live cluster lacks fails verify
+under every control policy, while an undeclared live role is tolerated
+unconditionally (the framework references but does not own the cluster's role
+list). Both are opt-in and additive — existing schemas that use only
+`policy_select` (or no `policy_*` blocks) emit and verify byte-identically, and
+no contract declares a role today unless authored to. The only `examples/`
+touch is the `examples/supabase` walking skeleton: `Profile` gains an `anon`
+public-read policy and an `authenticated` UPDATE-own policy (`using` +
+`withCheck`), its `contract.json`/`contract.d.ts` regenerate, and the
+integration tests extend to prove WITH CHECK enforcement under `SET ROLE` and
+role verify. No user upgrade action — a re-emit picks up any contract shape.
+Incidental substrate diff only.
+-->
+
+<!--
 Postgres-RLS slice 2.5 (one-differ-two-ir-planner), final unit: retires the
 coordinate-based issue vocabulary (`BaseSchemaIssue` / `SchemaIssue` /
 `EnumValuesChangedIssue` / the legacy `outcome` field) now that the migration
@@ -274,4 +304,15 @@ entity, typed as a value union, and read at runtime through a Postgres-only
 Native enums are opt-in — existing schemas without a `native_enum` emit and run
 unchanged, and a re-emit picks up any contract shape. No user action required.
 Incidental substrate diff only.
+-->
+
+<!--
+Dependabot runtime-deps group bump (PR #962): runtime dependency version
+bumps only (arktype 2.2.x, prettier 3.9.4, pg 8.22, pg-cursor 2.21, next
+16.2.10, react-router 7.18, radix/tailwind patches and friends), plus a
+`pnpm dedupe arktype` so every workspace package resolves the same arktype
+instance (the split 2.2.2/2.2.3 resolution broke cross-package `Type`
+assignability). The `examples/` diff is package.json dependency version
+ranges only — no framework surface, contract shape, or emitted artefact
+changes. No user action required. Incidental substrate diff only.
 -->

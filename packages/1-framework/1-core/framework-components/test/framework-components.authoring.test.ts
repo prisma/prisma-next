@@ -578,7 +578,14 @@ describe('classifyEnumMemberType', () => {
   };
 
   function testBlock(parameters: Record<string, PslExtensionBlockParamValue>): PslExtensionBlock {
-    return { kind: 'enum', name: 'TestEnum', parameters, blockAttributes: [], span: testSpan };
+    return {
+      kind: 'enum',
+      keyword: 'enum',
+      name: 'TestEnum',
+      parameters,
+      blockAttributes: [],
+      span: testSpan,
+    };
   }
 
   const bare: PslExtensionBlockParamValue = { kind: 'bare', span: testSpan };

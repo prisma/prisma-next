@@ -192,11 +192,11 @@ describe('family instance introspect', () => {
     );
 
     it(
-      'carries per-namespace native enum type names',
+      'carries per-namespace native enum nodes',
       async () => {
         await withIntrospection(connectionString!, (schemaIR) => {
           const ns = schemaIR.namespaces['public']!;
-          expect(Array.isArray(ns.nativeEnumTypeNames)).toBe(true);
+          expect(Array.isArray(ns.nativeEnums)).toBe(true);
         });
       },
       timeouts.spinUpPpgDev,

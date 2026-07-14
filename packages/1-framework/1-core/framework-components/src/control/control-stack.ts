@@ -1,4 +1,4 @@
-import type { JsonValue } from '@prisma-next/contract/types';
+import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { CapabilityMatrix } from '../shared/capabilities';
 import { mergeCapabilityMatrices } from '../shared/capabilities';
@@ -56,6 +56,8 @@ export interface ControlStack<
   readonly adapter?: ControlAdapterDescriptor<TFamilyId, TTargetId> | undefined;
   readonly driver?: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
   readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+
+  readonly extensionContracts: ReadonlyMap<string, Contract>;
 
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly queryOperationTypeImports: ReadonlyArray<TypesImportSpec>;
@@ -436,6 +438,19 @@ interface DependencyDeclaringDescriptor {
   };
 }
 
+function assembleExtensionContracts(
+  extensions: ReadonlyArray<
+    Pick<ControlExtensionDescriptor<string, string>, 'id' | 'contractSpace'>
+  >,
+): ReadonlyMap<string, Contract> {
+  const result = new Map<string, Contract>();
+  for (const ext of extensions) {
+    if (ext.contractSpace === undefined) continue;
+    result.set(ext.id, ext.contractSpace.contractJson);
+  }
+  return result;
+}
+
 function readDeclaredDependencyIds(descriptor: DependencyDeclaringDescriptor): readonly string[] {
   const packs = descriptor.contractSpace?.contractJson?.extensionPacks;
   if (packs === null || typeof packs !== 'object') return [];
@@ -538,6 +553,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     adapter,
     driver,
     extensionPacks: orderedExtensionPacks,
+    extensionContracts: assembleExtensionContracts(orderedExtensionPacks),
 
     codecTypeImports: extractCodecTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),

@@ -20,11 +20,7 @@ import {
   toModelName,
   toNamedTypeName,
 } from '@prisma-next/family-sql/psl-infer';
-import {
-  coordinateKey,
-  elementCoordinates,
-  isPlainRecord,
-} from '@prisma-next/framework-components/ir';
+import { coordinateKey, elementCoordinates } from '@prisma-next/framework-components/ir';
 import type {
   PslAttribute,
   PslAttributeArgument,
@@ -50,7 +46,6 @@ import type { SqlColumnIR, SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/ty
 import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { PostgresNativeEnum } from '../postgres-native-enum';
 import type { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { createPostgresDefaultMapping } from './postgres-default-mapping';
 import { createPostgresTypeMap } from './postgres-type-map';
@@ -298,33 +293,24 @@ export function inferPostgresPslContract(
 ): PslDocumentAst {
   const namespaces = Object.values(tree.namespaces);
   const owners = describedContractOwners(describedContracts ?? []);
-  const enumOwners = describedNativeEnumOwnersByTypeName(describedContracts ?? []);
 
-  // Native enum adoption: each namespace's introspected `{ typeName, values }`
-  // entries become `native_enum` blocks + `pg.enum(<Name>)` columns, minus the
-  // types a described pack contract already declares (matched by TYPE NAME —
-  // see describedNativeEnumOwnersByTypeName). Transitional grade gap: an
-  // inferred block carries no explicit `control` and inherits the contract's
-  // `defaultControl`; under `defaultControl: 'managed'` the planner does not
-  // yet enforce the native enum lifecycle (CREATE TYPE / DROP TYPE / ADD
-  // VALUE) — that lands with Phase 2 of projects/native-postgres-enums/spec.md,
-  // making the grade true retroactively with no contract change.
+  // Native enum adoption: each namespace's introspected `enums` nodes become
+  // `native_enum` blocks + `pg.enum(<Name>)` columns, minus the types a
+  // described pack contract already declares (resolved through the same
+  // `owners` / `describedContractOwners` coordinate map as table subtraction —
+  // `elementCoordinates` keys `entries.native_enum` by physical type name, no
+  // enum-specific index). An inferred block carries no explicit `control` and
+  // inherits the contract's `defaultControl`; under `defaultControl: 'managed'`
+  // the planner owns the type's create/drop lifecycle and `db verify` reports
+  // member drift (#949). A suffix-appended member plans `ALTER TYPE ... ADD
+  // VALUE`; any other member change (rename, removal, reorder) is refused
+  // with a named diagnostic — see `docs/reference/postgres-native-enums.md`.
   const enumDefinitions = new Map<string, readonly string[]>();
   const packOwnedEnumTypesByNamespace = new Map<string, Map<string, string>>();
   const enumNamespaceNames = new Set<string>();
   for (const namespace of namespaces) {
-    const definitionsForNamespace = new Set(namespace.nativeEnums.map((e) => e.typeName));
-    for (const typeName of namespace.nativeEnumTypeNames) {
-      if (!definitionsForNamespace.has(typeName)) {
-        throw new Error(
-          `contract infer: introspection reported native enum type "${typeName}" in schema ` +
-            `"${namespace.schemaName}" without member values — the introspected tree's ` +
-            '`nativeEnumTypeNames` and `nativeEnums` are out of sync (internal invariant).',
-        );
-      }
-    }
-    for (const { typeName, values } of namespace.nativeEnums) {
-      const owner = enumOwners.get(
+    for (const { typeName, members } of namespace.nativeEnums) {
+      const owner = owners.get(
         coordinateKey({
           namespaceId: namespace.schemaName,
           entityKind: 'native_enum',
@@ -341,7 +327,7 @@ export function inferPostgresPslContract(
         packOwnedEnumTypesByNamespace.set(namespace.schemaName, owned);
         continue;
       }
-      enumDefinitions.set(typeName, values);
+      enumDefinitions.set(typeName, members);
       enumNamespaceNames.add(namespace.schemaName);
     }
   }
@@ -454,45 +440,6 @@ export function inferPostgresPslContract(
     },
     wrapNamespaceName,
   );
-}
-
-/**
- * Native-enum ownership index for pack subtraction, keyed by TYPE NAME
- * coordinate. A pack contract keys `entries.native_enum` by HANDLE name
- * (`AalLevel`) while introspection sees the Postgres type name (`aal_level`);
- * the entity's `typeName` field carries the mapping, so this walk indexes by
- * it rather than reusing {@link describedContractOwners}' entries-key
- * coordinates.
- *
- * Reads `entries.native_enum` directly: the kind map is carried
- * non-enumerable on `PostgresSchema.entries`, so the generic
- * `elementCoordinates` walk never yields it. Serialized pack contracts do
- * not carry `native_enum` entries at all (`PostgresContractSerializer`
- * strips them; only the derived `valueSet` survives), so this subtraction
- * currently matches in-memory described contracts only.
- */
-function describedNativeEnumOwnersByTypeName(
-  describedContracts: readonly SqlDescribedContractSpace[],
-): ReadonlyMap<string, SqlDescribedContractSpace> {
-  const owners = new Map<string, SqlDescribedContractSpace>();
-  for (const entry of describedContracts) {
-    for (const [namespaceId, ns] of Object.entries(entry.contract.storage.namespaces)) {
-      const kindMap = ns.entries['native_enum'];
-      if (!isPlainRecord(kindMap)) continue;
-      for (const entity of Object.values(kindMap)) {
-        if (!PostgresNativeEnum.is(entity)) continue;
-        owners.set(
-          coordinateKey({
-            namespaceId,
-            entityKind: 'native_enum',
-            entityName: entity.typeName,
-          }),
-          entry,
-        );
-      }
-    }
-  }
-  return owners;
 }
 
 export function buildPslDocumentAst(
@@ -663,6 +610,7 @@ function buildNativeEnumBlock(
 
   return {
     kind: 'native_enum',
+    keyword: 'native_enum',
     name,
     parameters,
     blockAttributes:

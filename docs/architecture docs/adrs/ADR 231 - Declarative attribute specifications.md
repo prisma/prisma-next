@@ -160,12 +160,13 @@ Two combinators express choice and nesting.
 
 `oneOf(...alts)` is a sum: it tries each alternative's `parse` in order and the first success wins; if all fail it emits one `expected <labels>` diagnostic. This works because of principle #6 — each leaf returns its diagnostics in the `Result` rather than pushing them, so a failed branch leaves no trace and `oneOf` can backtrack cleanly. Ordered try-each is chosen over a separate recognition step: it keeps the leaf contract small (one `parse` method, plus a static `label` for the aggregate message). The cost is coarser diagnostics for malformed-but-clearly-intended input, an acceptable trade for a small, closed grammar.
 
-`funcCall` parses a function-call argument. A function call is structurally a named node with its own positional and named arguments — the same shape as an attribute — so `funcCall` **reuses the positional/named argument model recursively**, and its arguments may themselves be any combinator, including a nested `funcCall`. It comes in two flavours: `funcCall(sig)` for a single fixed signature, and `funcCallFrom(registry)` for an open, contributed set dispatched on the callee name (the shape behind PSL default functions). The output carries an `fn` discriminant so a `oneOf` over several functions, or downstream code, can switch on which one matched.
+`funcCall(name, sig)` parses a function-call argument. A function call is structurally a named node with its own positional and named arguments — the same shape as an attribute — so `funcCall` **reuses the positional/named argument model recursively**, and its arguments may themselves be any combinator, including a nested `funcCall`. It pins the callee `name` and parses that call's arguments through `sig`; the output carries an `fn` discriminant so a `oneOf` over several functions, or downstream code, can switch on which one matched. An **open, contributed set** of functions — the shape behind PSL default functions — needs no dedicated combinator: it is expressed by composing `oneOf(funcCall(name, sig)…)` over the registered names (principle #4, compose don't special-case).
 
-These two compose the attribute arguments that are neither a plain scalar nor a plain collection. A field default is "a literal that matches the field's type, or a registry function call":
+These two compose the attribute arguments that are neither a plain scalar nor a plain collection. A field default is "a literal that matches the field's type, or one of the default-function registry's calls" — composed per field from the registry:
 
 ```ts
-const defaultValue = () => oneOf(matchingScalarLiteral(), funcCallFrom(defaultFnRegistry));
+const defaultValue = (registry: ControlMutationDefaultRegistry) =>
+  oneOf(matchingScalarLiteral(), ...[...registry].map(([name, entry]) => funcCall(name, entry.signature)));
 ```
 
 `matchingScalarLiteral()` is named to state its contract: it parses a scalar literal *and* checks it against the annotated field's type. It is constructible only inside `fieldAttribute(...)`, where the field is guaranteed in context. A Mongo index element — a bare field, a sorted field, or a wildcard — is likewise a `oneOf`:
@@ -186,7 +187,6 @@ interface InterpretCtx {
   resolveReferencedModel(): ModelSymbol | undefined; // a relation's target; for fieldRef('referenced')
   field?: ResolvedFieldDescriptor;                   // resolved declaring field; for matchingScalarLiteral
   codecLookup: CodecLookup;                          // for codecRef
-  defaultFnRegistry: ControlMutationDefaultRegistry; // for funcCallFrom
   sourceId: string;
 }
 ```

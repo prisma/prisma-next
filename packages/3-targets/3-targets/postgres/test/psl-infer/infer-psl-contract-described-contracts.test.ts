@@ -37,7 +37,7 @@ function idColumnTable(name: string, foreignKeys: PostgresTableSchemaNode['forei
 }
 
 function namespaceNode(schemaName: string, tables: Record<string, PostgresTableSchemaNode>) {
-  return new PostgresNamespaceSchemaNode({ schemaName, tables, nativeEnumTypeNames: [] });
+  return new PostgresNamespaceSchemaNode({ schemaName, tables });
 }
 
 function tree(namespaces: Record<string, PostgresNamespaceSchemaNode>) {

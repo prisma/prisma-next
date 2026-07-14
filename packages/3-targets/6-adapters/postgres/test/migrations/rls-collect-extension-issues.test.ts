@@ -86,7 +86,6 @@ function schemaWithPolicies(policies: PostgresRlsPolicy[]): PostgresDatabaseSche
             rlsEnabled: false,
           }),
         },
-        nativeEnumTypeNames: [],
       }),
     },
     pgVersion: 'unknown',

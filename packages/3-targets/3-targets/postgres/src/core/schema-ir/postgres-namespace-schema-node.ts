@@ -1,20 +1,20 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { assertNode, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import type { PostgresNativeEnumSchemaNode } from './postgres-native-enum-schema-node';
 import type { PostgresTableSchemaNode } from './postgres-table-schema-node';
 import { PostgresSchemaNodeKind } from './schema-node-kinds';
-
-/** One introspected native Postgres enum type, in `pg_enum.enumsortorder` (declaration) order. */
-export interface PostgresNativeEnumIntrospection {
-  readonly typeName: string;
-  readonly values: readonly string[];
-}
 
 export interface PostgresNamespaceSchemaNodeInput {
   readonly schemaName: string;
   readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
-  readonly nativeEnumTypeNames: readonly string[];
-  readonly nativeEnums?: readonly PostgresNativeEnumIntrospection[];
+  /**
+   * The native-enum diff nodes belonging to this namespace, member values in
+   * `pg_enum.enumsortorder` (declaration) order. The expected
+   * (contract-projected) side attaches each node's `control` (the contract
+   * entity's grade); introspection builds nodes with no `control`.
+   */
+  readonly nativeEnums?: readonly PostgresNativeEnumSchemaNode[];
 }
 
 /**
@@ -22,38 +22,29 @@ export interface PostgresNamespaceSchemaNodeInput {
  * single namespace. Per-schema consumers (the relational planner,
  * toSchemaView) read this node's `tables` field structurally via
  * `blindCast`/`SqlSchemaIRNode` — not through a static `SqlSchemaIR`
- * assignment — because `nodeKind` now carries this node's own literal
+ * assignment — because `nodeKind` carries this node's own literal
  * (`postgres-namespace`), distinct from `SqlSchemaIR`'s own (`sql-schema`).
  *
- * `id` is the schema name. `isEqualTo` is identity — two namespace nodes are
- * equal iff their ids (schema names) match. `children()` returns the table
- * nodes. Per-schema metadata is carried on the typed `nativeEnumTypeNames`
- * field, not an annotations bag.
+ * `id` is the schema name; `isEqualTo` is identity on it; `children()` returns
+ * the table nodes plus `nativeEnums`.
  *
- * `nativeEnums` carries the same enum types with their ordered member
- * values (`{ typeName, values }`), for consumers that need the values
- * (PSL inference, the printer). `nativeEnumTypeNames` stays a plain name
- * list read independently by existing consumers (codec `planTypeOperations`
- * hooks, the infer throw) so none of them need the values to keep working.
+ * `nativeEnums` is the diff-tree representation of native enum types the
+ * differ pairs — the sole enum carrier, built directly by both sides: the
+ * expected (contract-projected) side and introspection alike hand in
+ * `PostgresNativeEnumSchemaNode`s.
  */
 export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.namespace;
 
   readonly schemaName: string;
   readonly tables: Readonly<Record<string, PostgresTableSchemaNode>>;
-  readonly nativeEnumTypeNames: readonly string[];
-  readonly nativeEnums: readonly PostgresNativeEnumIntrospection[];
+  readonly nativeEnums: readonly PostgresNativeEnumSchemaNode[];
 
   constructor(input: PostgresNamespaceSchemaNodeInput) {
     super();
     this.schemaName = input.schemaName;
     this.tables = Object.freeze({ ...input.tables });
-    this.nativeEnumTypeNames = Object.freeze([...input.nativeEnumTypeNames]);
-    this.nativeEnums = Object.freeze(
-      (input.nativeEnums ?? []).map((entry) =>
-        Object.freeze({ typeName: entry.typeName, values: Object.freeze([...entry.values]) }),
-      ),
-    );
+    this.nativeEnums = Object.freeze([...(input.nativeEnums ?? [])]);
     freezeNode(this);
   }
 
@@ -66,7 +57,7 @@ export class PostgresNamespaceSchemaNode extends SqlSchemaIRNode implements Diff
   }
 
   children(): readonly DiffableNode[] {
-    return Object.values(this.tables);
+    return [...Object.values(this.tables), ...this.nativeEnums];
   }
 
   static is(node: SqlSchemaIRNode): node is PostgresNamespaceSchemaNode {

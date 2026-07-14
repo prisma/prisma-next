@@ -79,9 +79,9 @@ export function hasOperationPreview<TFamilyId extends string, TSchemaIR>(
  * - `entity`: a whole top-level entity (the thing a namespace contains).
  * - `field`: a field of an entity.
  * - `auxiliary`: a secondary part of an entity (an index, a default, a key).
- * - `structural`: a cross-cutting object (an access policy, a role, a tree
- *   root) that is the owning space's own concern, never a sibling's
- *   unclaimed entity.
+ * - `structural`: a cross-cutting object (an access policy, a tree root) that
+ *   is the owning space's own concern, never a sibling's unclaimed entity —
+ *   its extras fail verify in both modes.
  */
 export type DiffSubjectGranularity = 'namespace' | 'entity' | 'field' | 'auxiliary' | 'structural';
 

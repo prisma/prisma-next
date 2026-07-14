@@ -954,9 +954,7 @@ describe('differ verdict — storage types (verifyType hook)', () => {
     });
 
   it('a verifyType failure fails the verdict in both modes', () => {
-    const components = [
-      typeComponent([{ path: ['user_status'], reason: 'not-equal', message: 'enum drift' }]),
-    ];
+    const components = [typeComponent([{ path: ['user_status'], reason: 'not-equal' }])];
     const { strict, lenient } = runBothModes({
       contract: contractWithType(),
       schema: matchingSchema(),

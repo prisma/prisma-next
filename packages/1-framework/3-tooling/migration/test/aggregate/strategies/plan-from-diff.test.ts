@@ -113,6 +113,7 @@ describe('planFromDiff', () => {
         from: '',
         to: 'sha256:synth',
         operationCount: 1,
+        destinationContractJson: appSpace.contract(),
       },
     ]);
 

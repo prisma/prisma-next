@@ -49,9 +49,11 @@ import type {
   PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
+  PostgresCreateType,
   PostgresDdlNode,
   PostgresDisableRowLevelSecurity,
   PostgresDropPolicy,
+  PostgresDropType,
   RlsPolicyOperation,
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
@@ -61,6 +63,7 @@ import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql
 import {
   PostgresDatabaseSchemaNode,
   PostgresNamespaceSchemaNode,
+  PostgresNativeEnumSchemaNode,
   PostgresPolicySchemaNode,
   PostgresRoleSchemaNode,
   PostgresTableSchemaNode,
@@ -72,6 +75,7 @@ import {
   execute,
   infoSchemaTables,
   ledger,
+  ledgerContract,
   ledgerReadShape,
   marker,
   mergeInvariants,
@@ -441,7 +445,11 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   /**
-   * Appends a ledger entry for `space`. See the
+   * Appends a ledger entry for `space`. When the edge carries a
+   * destination contract snapshot, the content-addressed
+   * `prisma_contract.contract` store is populated first (keyed by the
+   * destination hash, DO NOTHING on revisit) so a reader never sees a
+   * ledger row whose stored destination contract is missing. See the
    * `SqlControlAdapter.writeLedgerEntry` contract.
    */
   async writeLedgerEntry(
@@ -454,10 +462,23 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       readonly migrationName: string;
       readonly migrationHash: string;
       readonly operations: readonly unknown[];
+      readonly destinationContractJson?: unknown;
     },
   ): Promise<void> {
+    const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
+    if (entry.destinationContractJson !== undefined) {
+      await execute(
+        lower,
+        driver,
+        ledgerContract
+          .upsert({ core_hash: entry.to, contract_json: entry.destinationContractJson })
+          .onConflict(ledgerContract.core_hash)
+          .doNothing()
+          .build(),
+      );
+    }
     await execute(
-      (query) => this.lower(query, { contract: undefined }),
+      lower,
       driver,
       ledger
         .insert({
@@ -1137,11 +1158,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          ORDER BY t.typname`,
       [schema],
     );
-    const nativeEnums = nativeEnumResult.rows.map((r) => ({
-      typeName: r.typname,
-      values: parsePgNameArray(r.enumvalues),
-    }));
-    const nativeEnumTypeNames = nativeEnums.map((e) => e.typeName);
+    const enums = nativeEnumResult.rows.map(
+      (r) =>
+        new PostgresNativeEnumSchemaNode({
+          typeName: r.typname,
+          namespaceId: schema,
+          members: parsePgNameArray(r.enumvalues),
+        }),
+    );
     const policiesResult = await driver.query<{
       schemaname: string;
       tablename: string;
@@ -1224,8 +1248,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const namespace = new PostgresNamespaceSchemaNode({
       schemaName: schema,
       tables,
-      nativeEnumTypeNames,
-      nativeEnums,
+      nativeEnums: enums,
     });
     return { namespace, pgVersion: await this.getPostgresVersion(driver) };
   }
@@ -1758,6 +1781,27 @@ function pgRenderCreateSchema(node: PostgresCreateSchema): SqlExecuteRequest {
   };
 }
 
+function pgRenderCreateType(node: PostgresCreateType): SqlExecuteRequest {
+  const typeRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.name)}`
+    : quoteIdentifier(node.name);
+  const values = node.values.map((value) => `'${escapeLiteral(value)}'`).join(', ');
+  return {
+    sql: `CREATE TYPE ${typeRef} AS ENUM (${values})`,
+    params: [],
+  };
+}
+
+function pgRenderDropType(node: PostgresDropType): SqlExecuteRequest {
+  const typeRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.name)}`
+    : quoteIdentifier(node.name);
+  return {
+    sql: `DROP TYPE ${typeRef}`,
+    params: [],
+  };
+}
+
 async function pgRenderAlterTable(
   node: PostgresAlterTable,
   codecLookup: CodecLookup,
@@ -1835,6 +1879,8 @@ async function pgRenderDdlExecuteRequest(
   const visitor = {
     createTable: (node: PostgresCreateTable) => pgRenderCreateTable(node, codecLookup),
     createSchema: (node: PostgresCreateSchema) => Promise.resolve(pgRenderCreateSchema(node)),
+    createType: (node: PostgresCreateType) => Promise.resolve(pgRenderCreateType(node)),
+    dropType: (node: PostgresDropType) => Promise.resolve(pgRenderDropType(node)),
     alterTable: (node: PostgresAlterTable) => pgRenderAlterTable(node, codecLookup),
     createPolicy: (node: PostgresCreatePolicy) => Promise.resolve(pgRenderCreatePolicy(node)),
     dropPolicy: (node: PostgresDropPolicy) => Promise.resolve(pgRenderDropPolicy(node)),

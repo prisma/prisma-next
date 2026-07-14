@@ -317,10 +317,37 @@
   },
   "storage": {
     "namespaces": {
+      "__unbound__": {
+        "entries": {
+          "role": {
+            "anon": {
+              "control": "external",
+              "kind": "role",
+              "name": "anon",
+              "namespaceId": "__unbound__"
+            },
+            "authenticated": {
+              "control": "external",
+              "kind": "role",
+              "name": "authenticated",
+              "namespaceId": "__unbound__"
+            },
+            "service_role": {
+              "control": "external",
+              "kind": "role",
+              "name": "service_role",
+              "namespaceId": "__unbound__"
+            }
+          },
+          "table": {}
+        },
+        "id": "__unbound__",
+        "kind": "postgres-unbound-schema"
+      },
       "auth": {
         "entries": {
           "native_enum": {
-            "AalLevel": {
+            "aal_level": {
               "kind": "postgres-enum",
               "members": [
                 "aal1",
@@ -556,7 +583,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:01edbb5adbbc0711bed516ea61b0585de2aa906f9aebacedbead613eff89f194",
+    "storageHash": "sha256:a5fe76b96ff56aff07eb0f48336aac7f9eb9dd4c37171751f793197a03d3b4c7",
     "types": {
       "Timestamptz": {
         "codecId": "pg/timestamptz@1",

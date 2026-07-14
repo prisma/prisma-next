@@ -85,6 +85,45 @@ namespace public {
 }
 `;
 
+// A `policy_insert` (WITH CHECK only, no USING) on its own table. INSERT is the
+// operation that takes WITH CHECK exclusively, and it needs no SELECT
+// visibility to exercise — so it is the cleanest DB-level proof that the
+// rendered WITH CHECK clause actually enforces. PSL_INSERT_B changes only the
+// predicate, so the edit produces a different content hash → drop+create.
+const PSL_INSERT_A = `
+namespace public {
+  model note {
+    id       Int @id
+    owner_id Int
+
+    @@rls
+  }
+
+  policy_insert n_ins {
+    target    = note
+    roles     = [app_user]
+    withCheck = "owner_id = current_setting('app.uid')::int"
+  }
+}
+`;
+
+const PSL_INSERT_B = `
+namespace public {
+  model note {
+    id       Int @id
+    owner_id Int
+
+    @@rls
+  }
+
+  policy_insert n_ins {
+    target    = note
+    roles     = [app_user]
+    withCheck = "owner_id = current_setting('app.uid')::int AND owner_id > 0"
+  }
+}
+`;
+
 // ============================================================================
 // PSL → contract helpers
 // ============================================================================
@@ -345,8 +384,104 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
       const extraIssues = verifyResult.schema.issues.filter((i) => i.reason === 'not-expected');
       expect(extraIssues.length).toBeGreaterThan(0);
 
-      const issueMessages = extraIssues.map((i) => i.message);
-      expect(issueMessages.some((m) => m.includes(nameB))).toBe(true);
+      const issuePaths = extraIssues.map((i) => i.path.join('/'));
+      expect(issuePaths.some((p) => p.includes(nameB))).toBe(true);
+    },
+    testTimeout,
+  );
+});
+
+// ============================================================================
+// policy_insert WITH CHECK — DB-level enforcement + edit lifecycle
+// ============================================================================
+
+describe.sequential('RLS policy_insert WITH CHECK — enforcement + edit replaces', () => {
+  let database: Awaited<ReturnType<typeof createTestDatabase>>;
+  let driver: PostgresControlDriver;
+
+  beforeAll(async () => {
+    database = await createTestDatabase();
+    driver = await createDriver(database.connectionString);
+    await driver.query('CREATE ROLE app_user');
+  }, testTimeout);
+
+  afterAll(async () => {
+    if (driver) await driver.close();
+    if (database) await database.close();
+  }, testTimeout);
+
+  it(
+    'step 1: applies the INSERT policy; pg_policies shows cmd INSERT with with_check and no qual',
+    async () => {
+      const contractA = buildContractFromPsl(PSL_INSERT_A);
+      await applyContract(driver, contractA, emptySchema);
+
+      const nsA = contractA.storage.namespaces['public'];
+      if (!isPostgresSchema(nsA)) throw new Error('expected PostgresSchema for public');
+      const nameA = Object.values(nsA.policy)[0]?.name ?? '';
+      expect(nameA).toMatch(/^n_ins_[0-9a-f]{8}$/);
+
+      const rows = await driver.query<{
+        policyname: string;
+        cmd: string;
+        qual: string | null;
+        with_check: string | null;
+      }>(
+        `SELECT policyname, cmd, qual, with_check FROM pg_policies WHERE tablename = 'note' AND schemaname = 'public'`,
+      );
+      expect(rows.rows).toHaveLength(1);
+      const row = rows.rows[0]!;
+      expect(row.policyname).toBe(nameA);
+      expect(row.cmd).toBe('INSERT');
+      expect(row.qual).toBeNull();
+      expect(row.with_check).not.toBeNull();
+      expect(row.with_check).toContain('app.uid');
+    },
+    testTimeout,
+  );
+
+  it(
+    'step 2: editing the WITH CHECK predicate plans create <hashB> + drop <hashA> (per-operation lifecycle)',
+    async () => {
+      const contractA = buildContractFromPsl(PSL_INSERT_A);
+      const contractB = buildContractFromPsl(PSL_INSERT_B);
+
+      const nsA = contractA.storage.namespaces['public'];
+      const nsB = contractB.storage.namespaces['public'];
+      if (!isPostgresSchema(nsA)) throw new Error('expected PostgresSchema for public (A)');
+      if (!isPostgresSchema(nsB)) throw new Error('expected PostgresSchema for public (B)');
+      const nameA = Object.values(nsA.policy)[0]?.name ?? '';
+      const nameB = Object.values(nsB.policy)[0]?.name ?? '';
+      // Predicate change → different content hash → different wire name.
+      expect(nameA).not.toBe(nameB);
+
+      const introspected = await familyInstance.introspect({ driver, contract: contractA });
+
+      const planner = postgresTargetDescriptor.createPlanner(controlAdapter);
+      const planResult = planner.plan({
+        contract: contractB,
+        schema: introspected,
+        policy: ALLOW_DESTRUCTIVE,
+        fromContract: null,
+        frameworkComponents,
+        spaceId: APP_SPACE_ID,
+      });
+
+      expect(planResult.kind).toBe('success');
+      if (planResult.kind !== 'success') return;
+
+      const resolvedOps = await Promise.all(planResult.plan.operations);
+      const allSql = resolvedOps
+        .flatMap((op) => [...op.precheck, ...op.execute, ...op.postcheck])
+        .map((step) => step.sql);
+
+      expect(allSql.some((s) => s.includes(`CREATE POLICY "${nameB}"`))).toBe(true);
+      expect(allSql.some((s) => s.includes(`DROP POLICY "${nameA}"`))).toBe(true);
+      // The new CREATE renders FOR INSERT with WITH CHECK.
+      const createB = allSql.find((s) => s.includes(`CREATE POLICY "${nameB}"`)) ?? '';
+      expect(createB).toContain('FOR INSERT');
+      expect(createB).toContain('WITH CHECK');
+      expect(createB).not.toContain('USING (');
     },
     testTimeout,
   );

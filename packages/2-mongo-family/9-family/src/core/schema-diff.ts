@@ -86,7 +86,6 @@ export function diffMongoSchemas(
         {
           path: [name],
           reason: 'not-found',
-          message: `Collection "${name}" is missing from the database`,
           expected: expectedColl,
         },
         'fail',
@@ -102,7 +101,6 @@ export function diffMongoSchemas(
         {
           path: [name],
           reason: 'not-expected',
-          message: `Extra collection "${name}" exists in the database but not in the contract`,
           actual: liveColl,
         },
         strict ? 'fail' : 'warn',
@@ -167,7 +165,6 @@ function diffIndexes(
         {
           path: [collName, `index:${formatIndexName(idx)}`],
           reason: 'not-equal',
-          message: `Index ${formatIndexName(idx)} missing on collection "${collName}"`,
           expected: idx,
         },
         'fail',
@@ -184,7 +181,6 @@ function diffIndexes(
         {
           path: [collName, `index:${formatIndexName(idx)}`],
           reason: 'not-expected',
-          message: `Extra index ${formatIndexName(idx)} on collection "${collName}"`,
           actual: idx,
         },
         strict ? 'fail' : 'warn',
@@ -212,7 +208,6 @@ function diffValidator(
       {
         path: [collName, 'validator'],
         reason: 'not-found',
-        message: `Validator missing on collection "${collName}"`,
         expected: expected.validator,
       },
       'fail',
@@ -228,7 +223,6 @@ function diffValidator(
       {
         path: [collName, 'validator'],
         reason: 'not-expected',
-        message: `Extra validator on collection "${collName}"`,
         actual: live.validator,
       },
       strict ? 'fail' : 'warn',
@@ -253,7 +247,6 @@ function diffValidator(
       {
         path: [collName, 'validator'],
         reason: 'not-equal',
-        message: `Validator mismatch on collection "${collName}"`,
         expected: expectedVal,
         actual: liveVal,
       },
@@ -281,7 +274,6 @@ function diffOptions(
       {
         path: [collName, 'options'],
         reason: 'not-equal',
-        message: `Extra collection options on "${collName}"`,
         actual: live.options,
       },
       strict ? 'fail' : 'warn',
@@ -300,7 +292,6 @@ function diffOptions(
     {
       path: [collName, 'options'],
       reason: 'not-equal',
-      message: `Collection options mismatch on "${collName}"`,
       ...ifDefined('expected', expected.options),
       ...ifDefined('actual', live.options),
     },

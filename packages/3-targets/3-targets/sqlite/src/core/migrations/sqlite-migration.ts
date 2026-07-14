@@ -56,8 +56,8 @@ export abstract class SqliteMigration<
   /**
    * Materialized SQLite control adapter, created once per migration
    * instance from the injected stack. `undefined` only when the migration
-   * was instantiated without a stack (test fixtures); the operation methods
-   * throw in that case to surface the misuse.
+   * was instantiated without a stack (test fixtures); `controlAdapterFor`
+   * throws a PN-MIG-2008 in that case to surface the misuse.
    */
   protected readonly controlAdapter: SqlControlAdapter<'sqlite'> | undefined;
 
@@ -78,6 +78,18 @@ export abstract class SqliteMigration<
           'The SQLite descriptor create() returns SqlControlAdapter<sqlite>; typed as wider ControlAdapterInstance at the framework boundary'
         >(stack.adapter.create(stack))
       : undefined;
+  }
+
+  /**
+   * Returns the materialized control adapter, or throws a PN-MIG-2008 naming
+   * `operation` when the migration was constructed without a `ControlStack`.
+   * Single home for the null-check that every DDL/DML method shares.
+   */
+  private controlAdapterFor(operation: string): SqlControlAdapter<'sqlite'> {
+    if (!this.controlAdapter) {
+      throw errorSqliteMigrationStackMissing(operation);
+    }
+    return this.controlAdapter;
   }
 
   /**
@@ -103,36 +115,28 @@ export abstract class SqliteMigration<
     readonly columns: readonly DdlColumn[];
     readonly constraints?: readonly DdlTableConstraint[];
   }): Promise<Op> {
-    if (!this.controlAdapter) {
-      throw errorSqliteMigrationStackMissing();
-    }
     return new CreateTableCall(options.table, options.columns, options.constraints).toOp(
-      this.controlAdapter,
+      this.controlAdapterFor('createTable'),
     );
   }
 
   protected dropTable(options: { readonly table: string }): Promise<Op> {
-    if (!this.controlAdapter) {
-      throw errorSqliteMigrationStackMissing();
-    }
-    return new DropTableCall(options.table).toOp(this.controlAdapter);
+    return new DropTableCall(options.table).toOp(this.controlAdapterFor('dropTable'));
   }
 
   protected addColumn(options: {
     readonly table: string;
     readonly column: SqliteColumnSpec;
   }): Promise<Op> {
-    if (!this.controlAdapter) {
-      throw errorSqliteMigrationStackMissing();
-    }
-    return new AddColumnCall(options.table, options.column).toOp(this.controlAdapter);
+    return new AddColumnCall(options.table, options.column).toOp(
+      this.controlAdapterFor('addColumn'),
+    );
   }
 
   protected dropColumn(options: { readonly table: string; readonly column: string }): Promise<Op> {
-    if (!this.controlAdapter) {
-      throw errorSqliteMigrationStackMissing();
-    }
-    return new DropColumnCall(options.table, options.column).toOp(this.controlAdapter);
+    return new DropColumnCall(options.table, options.column).toOp(
+      this.controlAdapterFor('dropColumn'),
+    );
   }
 
   protected createIndex(options: {
@@ -140,19 +144,15 @@ export abstract class SqliteMigration<
     readonly index: string;
     readonly columns: readonly string[];
   }): Promise<Op> {
-    if (!this.controlAdapter) {
-      throw errorSqliteMigrationStackMissing();
-    }
     return new CreateIndexCall(options.table, options.index, options.columns).toOp(
-      this.controlAdapter,
+      this.controlAdapterFor('createIndex'),
     );
   }
 
   protected dropIndex(options: { readonly table: string; readonly index: string }): Promise<Op> {
-    if (!this.controlAdapter) {
-      throw errorSqliteMigrationStackMissing();
-    }
-    return new DropIndexCall(options.table, options.index).toOp(this.controlAdapter);
+    return new DropIndexCall(options.table, options.index).toOp(
+      this.controlAdapterFor('dropIndex'),
+    );
   }
 
   protected recreateTable(options: {
@@ -164,9 +164,6 @@ export abstract class SqliteMigration<
     readonly postchecks: readonly { readonly description: string; readonly sql: string }[];
     readonly operationClass: MigrationOperationClass;
   }): Promise<Op> {
-    if (!this.controlAdapter) {
-      throw errorSqliteMigrationStackMissing();
-    }
-    return new RecreateTableCall(options).toOp(this.controlAdapter);
+    return new RecreateTableCall(options).toOp(this.controlAdapterFor('recreateTable'));
   }
 }

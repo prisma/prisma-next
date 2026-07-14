@@ -19,30 +19,36 @@ import type { PrinterField, PrinterNamedType } from './types';
  */
 const PSL_INDENT_UNIT = '  ';
 
-type PslBlockDispatchMap = ReadonlyMap<string, AuthoringPslBlockDescriptor>;
+/**
+ * Maps each block keyword to its descriptor, keyed by keyword rather than
+ * discriminator because several keywords can share one discriminator but
+ * each keyword resolves to exactly one descriptor.
+ */
+interface PslBlockDispatchMap {
+  readonly byKeyword: ReadonlyMap<string, AuthoringPslBlockDescriptor>;
+}
 
 function buildPslBlockDispatchMap(
   namespace: AuthoringPslBlockDescriptorNamespace | undefined,
 ): PslBlockDispatchMap {
-  const entries = new Map<string, AuthoringPslBlockDescriptor>();
-  if (!namespace) {
-    return entries;
+  const byKeyword = new Map<string, AuthoringPslBlockDescriptor>();
+  if (namespace) {
+    collectBlockDescriptors(namespace, byKeyword);
   }
-  collectBlockDescriptors(namespace, entries);
-  return entries;
+  return { byKeyword };
 }
 
 function collectBlockDescriptors(
   namespace: AuthoringPslBlockDescriptorNamespace,
-  out: Map<string, AuthoringPslBlockDescriptor>,
+  byKeyword: Map<string, AuthoringPslBlockDescriptor>,
 ): void {
   for (const value of Object.values(namespace)) {
     if (isAuthoringPslBlockDescriptor(value)) {
-      out.set(value.discriminator, value);
+      byKeyword.set(value.keyword, value);
       continue;
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      collectBlockDescriptors(value, out);
+      collectBlockDescriptors(value, byKeyword);
     }
   }
 }
@@ -117,13 +123,18 @@ function serializeExtensionBlock(
   blockDispatchMap: PslBlockDispatchMap,
   codecLookup: CodecLookup | undefined,
 ): string {
-  const descriptor = blockDispatchMap.get(extensionBlock.kind);
+  const descriptor = blockDispatchMap.byKeyword.get(extensionBlock.keyword);
   if (!descriptor) {
     throw new Error(
-      `No pslBlockDescriptors contribution registered for extension-contributed block discriminator "${extensionBlock.kind}". Provide a matching pslBlockDescriptors contribution to serializePrintDocument, or remove the block from the input AST.`,
+      `No pslBlockDescriptors contribution registered for extension-contributed block keyword "${extensionBlock.keyword}". Provide a matching pslBlockDescriptors contribution to serializePrintDocument, or remove the block from the input AST.`,
     );
   }
-  const lines: string[] = [`${descriptor.keyword} ${extensionBlock.name} {`];
+  if (descriptor.discriminator !== extensionBlock.kind) {
+    throw new Error(
+      `The pslBlockDescriptors contribution for keyword "${extensionBlock.keyword}" owns discriminator "${descriptor.discriminator}", but the block carries kind "${extensionBlock.kind}". Provide a matching pslBlockDescriptors contribution to serializePrintDocument, or remove the block from the input AST.`,
+    );
+  }
+  const lines: string[] = [`${extensionBlock.keyword} ${extensionBlock.name} {`];
   for (const [paramName, paramDescriptor] of Object.entries(descriptor.parameters)) {
     const paramValue = extensionBlock.parameters[paramName];
     if (paramValue === undefined) {

@@ -67,7 +67,6 @@ describe('PostgresMigrationPlanner - unique constraints vs indexes (structural n
               rlsEnabled: false,
             }),
           },
-          nativeEnumTypeNames: [],
         }),
       },
       pgVersion: '',

@@ -11,6 +11,7 @@ import { PostgresRole } from '../../src/core/postgres-role';
 import { type PostgresContract, PostgresSchema } from '../../src/core/postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresRoleSchemaNode } from '../../src/core/schema-ir/postgres-role-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
 import type { SqlSchemaDiffNode } from '../../src/core/schema-ir/schema-node-kinds';
 import { postgresRenderDefault } from '../../src/exports/control';
@@ -168,15 +169,22 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
     expect(root.existingSchemas).toEqual([SCHEMA_NAME]);
   });
 
-  it('puts roles on the root, not in children()', () => {
+  it('puts roles on the root and yields them as role children of the root', () => {
     const role = new PostgresRole({ name: 'app_user', namespaceId: 'public' });
     const root = contractToPostgresDatabaseSchemaNode(
       makeContract({ roles: [role] }),
       projectionOptions,
     );
     expect(root.roles).toContainEqual(expect.objectContaining({ name: 'app_user' }));
+    const roleChildren = root
+      .children()
+      .filter((child) => PostgresRoleSchemaNode.is(child as SqlSchemaDiffNode));
+    expect(roleChildren).toContainEqual(expect.objectContaining({ name: 'app_user' }));
+    // Every non-role child is a namespace node.
     for (const child of root.children()) {
-      expect(PostgresNamespaceSchemaNode.is(child as SqlSchemaDiffNode)).toBe(true);
+      const isRole = PostgresRoleSchemaNode.is(child as SqlSchemaDiffNode);
+      const isNamespace = PostgresNamespaceSchemaNode.is(child as SqlSchemaDiffNode);
+      expect(isRole || isNamespace).toBe(true);
     }
   });
 
@@ -338,5 +346,149 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespac
       name: 'profiles_user_id_fkey',
     });
     expect(expectedFk?.id).toBe(introspectedFk.id);
+  });
+});
+
+describe('contractToPostgresDatabaseSchemaNode — unbound-slot projection', () => {
+  function contractWithNamespaces(namespaces: Record<string, PostgresSchema>): PostgresContract {
+    return {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:unbound-slot-projection-test'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:unbound-slot-projection-test'),
+        namespaces,
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+  }
+
+  it('a roles-only unbound slot alongside named namespaces contributes no "public" node', () => {
+    const role = new PostgresRole({ name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID });
+    const unboundSchema = new PostgresSchema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: {}, role: { anon: role } },
+    });
+    const authSchema = new PostgresSchema({
+      id: 'auth',
+      entries: { table: { [TABLE_NAME]: profilesTable() } },
+    });
+    const root = contractToPostgresDatabaseSchemaNode(
+      contractWithNamespaces({ [UNBOUND_NAMESPACE_ID]: unboundSchema, auth: authSchema }),
+      projectionOptions,
+    );
+
+    expect(Object.keys(root.namespaces)).toEqual(['auth']);
+    expect(root.namespaces['public']).toBeUndefined();
+    expect(root.existingSchemas).toEqual(['auth']);
+    expect(root.roles).toContainEqual(expect.objectContaining({ name: 'anon' }));
+  });
+
+  it('a single-namespace unbound contract with tables and roles keeps its "public" node with tables (unchanged)', () => {
+    const role = new PostgresRole({ name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID });
+    const unboundSchema = new PostgresSchema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: { [TABLE_NAME]: profilesTable() }, role: { anon: role } },
+    });
+    const root = contractToPostgresDatabaseSchemaNode(
+      contractWithNamespaces({ [UNBOUND_NAMESPACE_ID]: unboundSchema }),
+      projectionOptions,
+    );
+
+    expect(Object.keys(root.namespaces)).toEqual(['public']);
+    expect(Object.keys(root.namespaces['public']!.tables)).toEqual([TABLE_NAME]);
+    expect(root.existingSchemas).toEqual(['public']);
+    expect(root.roles).toContainEqual(expect.objectContaining({ name: 'anon' }));
+  });
+
+  it('a bound "public" namespace with tables plus a roles-only unbound slot keeps the public tables (no clobber)', () => {
+    const role = new PostgresRole({ name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID });
+    const unboundSchema = new PostgresSchema({
+      id: UNBOUND_NAMESPACE_ID,
+      entries: { table: {}, role: { anon: role } },
+    });
+    const publicSchema = new PostgresSchema({
+      id: 'public',
+      entries: { table: { [TABLE_NAME]: profilesTable() } },
+    });
+    const root = contractToPostgresDatabaseSchemaNode(
+      contractWithNamespaces({ [UNBOUND_NAMESPACE_ID]: unboundSchema, public: publicSchema }),
+      projectionOptions,
+    );
+
+    expect(Object.keys(root.namespaces)).toEqual(['public']);
+    expect(Object.keys(root.namespaces['public']!.tables)).toEqual([TABLE_NAME]);
+    expect(root.existingSchemas).toEqual(['public']);
+    expect(root.roles).toContainEqual(expect.objectContaining({ name: 'anon' }));
+  });
+});
+
+describe('contractToPostgresDatabaseSchemaNode — native_enum projection', () => {
+  function contractWithEnum(): PostgresContract {
+    const schema = new PostgresSchema({
+      id: 'auth',
+      entries: {
+        table: { [TABLE_NAME]: profilesTable() },
+        native_enum: {
+          AalLevel: {
+            kind: 'postgres-enum',
+            typeName: 'aal_level',
+            members: ['aal1', 'aal2', 'aal3'],
+            control: 'external',
+          },
+          FactorType: {
+            kind: 'postgres-enum',
+            typeName: 'factor_type',
+            members: ['totp', 'webauthn'],
+          },
+        },
+      },
+    });
+    return {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:native-enum-projection-test'),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:native-enum-projection-test'),
+        namespaces: { auth: schema },
+      }),
+      roots: {},
+      domain: applicationDomainOf({ models: {} }),
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
+  }
+
+  it('projects entries.native_enum into namespace-node enum children (all grades)', () => {
+    const root = contractToPostgresDatabaseSchemaNode(contractWithEnum(), projectionOptions);
+    const ns = root.namespaces['auth'];
+    const enumChildren = ns!.children().filter((child) => child.id.startsWith('native_enum:'));
+    expect(enumChildren).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          typeName: 'aal_level',
+          namespaceId: 'auth',
+          members: ['aal1', 'aal2', 'aal3'],
+          control: 'external',
+        }),
+        expect.objectContaining({
+          typeName: 'factor_type',
+          members: ['totp', 'webauthn'],
+        }),
+      ]),
+    );
+    expect(enumChildren).toHaveLength(2);
+  });
+
+  it('an enum-free contract projects no enum children and empty plain fields (regression pin)', () => {
+    const root = contractToPostgresDatabaseSchemaNode(makeContract({}), projectionOptions);
+    const ns = root.namespaces[SCHEMA_NAME];
+    expect(ns?.nativeEnums).toEqual([]);
+    expect(ns?.children().every((child) => !child.id.startsWith('native_enum:'))).toBe(true);
   });
 });

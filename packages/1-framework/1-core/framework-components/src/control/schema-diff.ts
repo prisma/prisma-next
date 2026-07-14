@@ -5,7 +5,6 @@ export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   readonly path: readonly string[];
   /** Why the actual state fails the expectation. Consumers filter on this field. */
   readonly reason: ExpectationFailureReason;
-  readonly message: string;
   /** The expected (desired-side) node, when available. Absent for `not-expected` issues. */
   readonly expected?: TNode;
   /** The actual (current-side) node, when available. Absent for `not-found` issues. */
@@ -15,34 +14,37 @@ export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
 /**
  * A node in the schema tree. Every node in the tree implements this interface.
  *
- * `id` must be unique among sibling nodes at the same level — the differ keys
- * on it and treats a collision as the same entity (enforced by a duplicate-id
- * throw). The differ accumulates these ids into a path that stamps every emitted
- * issue.
+ * The differ pairs siblings by the combination of `nodeKind` and `id`, not by
+ * `id` alone: `id` needs only be unique among siblings of the same
+ * `nodeKind` at the same level, not globally unique at that level. Two
+ * distinct kinds of child in distinct slots (e.g. a role and a namespace) may
+ * legitimately share a name — they are never paired against each other, so
+ * the collision is harmless. A node never folds its kind into its id string
+ * to route around this; `nodeKind` is the discriminant that does that job.
+ * A same-`nodeKind`/same-`id` collision among siblings is a genuine
+ * duplicate and is enforced by a throw. The differ accumulates ids (not
+ * nodeKind) into a path that stamps every emitted issue.
  */
 export interface DiffableNode {
   readonly id: string;
+  readonly nodeKind: string;
   isEqualTo(other: DiffableNode): boolean;
   children(): readonly DiffableNode[];
 }
 
-function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
-  const key = node.id;
-  if (map.has(key)) {
-    throw new Error(`diffSchemas: duplicate id among siblings: ${key}`);
-  }
-  map.set(key, node);
+/** Delimiter joining `nodeKind` and `id` into one sibling-map key. Every `nodeKind` is a code-defined literal (kebab-case-style), so a null character can never appear in one. */
+const SIBLING_KEY_DELIMITER = '\u0000';
+
+function siblingKey(node: DiffableNode): string {
+  return `${node.nodeKind}${SIBLING_KEY_DELIMITER}${node.id}`;
 }
 
-/**
- * The issue's own default message: the path, nothing else. `reason` already
- * carries why the node is flagged as structured data; turning that into a
- * human label ("missing: …" / "extra: …" / "mismatch: …") is a presentation
- * concern for whoever renders the issue (the CLI verify formatter), not the
- * differ's.
- */
-function pathMessage(path: readonly string[]): string {
-  return path.join('/');
+function insertNode(map: Map<string, DiffableNode>, node: DiffableNode): void {
+  const key = siblingKey(node);
+  if (map.has(key)) {
+    throw new Error(`diffSchemas: duplicate id among siblings: ${node.nodeKind}/${node.id}`);
+  }
+  map.set(key, node);
 }
 
 function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): SchemaDiffIssue[] {
@@ -51,7 +53,6 @@ function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): 
     {
       path,
       reason: 'not-found',
-      message: pathMessage(path),
       expected: node,
     },
     ...node.children().flatMap((c) => emitMissingSubtree(c, path)),
@@ -64,7 +65,6 @@ function emitExtraSubtree(node: DiffableNode, parentPath: readonly string[]): Sc
     {
       path,
       reason: 'not-expected',
-      message: pathMessage(path),
       actual: node,
     },
     ...node.children().flatMap((c) => emitExtraSubtree(c, path)),
@@ -98,7 +98,6 @@ function diffPair(
     issues.push({
       path,
       reason: 'not-equal',
-      message: pathMessage(path),
       expected,
       actual,
     });
@@ -108,7 +107,8 @@ function diffPair(
 }
 
 /**
- * Align one level of nodes by id; emit issues in input order and recurse.
+ * Align one level of nodes by `(nodeKind, id)`; emit issues in input order
+ * and recurse.
  *
  * A missing node emits one issue for itself and one for every node in its
  * subtree (total descent). Same for extra nodes. A matched pair recurses via

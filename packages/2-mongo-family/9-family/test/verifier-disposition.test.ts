@@ -7,12 +7,12 @@ import {
 
 /** A whole-collection issue: path is exactly the collection name. */
 function collectionIssue(reason: SchemaDiffIssue['reason']): SchemaDiffIssue {
-  return { path: ['users'], reason, message: 'test' };
+  return { path: ['users'], reason };
 }
 
 /** An auxiliary (index/validator/options) issue: path is one segment deeper. */
 function auxiliaryIssue(reason: SchemaDiffIssue['reason']): SchemaDiffIssue {
-  return { path: ['users', 'index:email'], reason, message: 'test' };
+  return { path: ['users', 'index:email'], reason };
 }
 
 describe('classifyMongoDiffIssue', () => {

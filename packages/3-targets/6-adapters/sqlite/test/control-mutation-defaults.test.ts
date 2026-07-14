@@ -20,12 +20,8 @@ const stubContext = {
   fieldName: 'testField',
 } as const;
 
-function makeCall(name: string, args: Array<{ raw: string; span: typeof stubSpan }> = []) {
-  return { name, raw: `${name}(${args.map((a) => a.raw).join(', ')})`, args, span: stubSpan };
-}
-
-function arg(raw: string) {
-  return { raw, span: stubSpan };
+function makeCall(fn: string, args: Record<string, unknown> = {}) {
+  return { fn, span: stubSpan, args };
 }
 
 describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization', () => {
@@ -40,7 +36,7 @@ describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization',
   // just produced.
   it('canonicalizes dbgenerated("CURRENT_TIMESTAMP") to { function "now()" }', () => {
     const result = dbgenerated.lower({
-      call: makeCall('dbgenerated', [arg('"CURRENT_TIMESTAMP"')]),
+      call: makeCall('dbgenerated', { expression: 'CURRENT_TIMESTAMP' }),
       context: stubContext,
     });
     expect(result).toMatchObject({
@@ -51,7 +47,7 @@ describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization',
 
   it('canonicalizes dbgenerated("current_timestamp") (lowercase) to { function "now()" }', () => {
     const result = dbgenerated.lower({
-      call: makeCall('dbgenerated', [arg('"current_timestamp"')]),
+      call: makeCall('dbgenerated', { expression: 'current_timestamp' }),
       context: stubContext,
     });
     expect(result).toMatchObject({
@@ -62,7 +58,7 @@ describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization',
 
   it('canonicalizes dbgenerated("datetime(\'now\')") to { function "now()" }', () => {
     const result = dbgenerated.lower({
-      call: makeCall('dbgenerated', [arg('"datetime(\'now\')"')]),
+      call: makeCall('dbgenerated', { expression: "datetime('now')" }),
       context: stubContext,
     });
     expect(result).toMatchObject({
@@ -73,7 +69,7 @@ describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization',
 
   it('preserves unknown expressions verbatim', () => {
     const result = dbgenerated.lower({
-      call: makeCall('dbgenerated', [arg('"random()"')]),
+      call: makeCall('dbgenerated', { expression: 'random()' }),
       context: stubContext,
     });
     expect(result).toMatchObject({

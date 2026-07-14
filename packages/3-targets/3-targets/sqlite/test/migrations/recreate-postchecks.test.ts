@@ -37,12 +37,14 @@ function tableSpec(overrides: Partial<SqliteTableSpec> = {}): SqliteTableSpec {
 }
 
 describe('buildRecreateSummary', () => {
-  it('joins each issue message', () => {
+  it('joins each issue path', () => {
     const summary = buildRecreateSummary('users', [
-      issue({ path: ['database', 'users', 'column:a'], reason: 'not-equal', message: 'a drifted' }),
-      issue({ path: ['database', 'users', 'column:b'], reason: 'not-equal', message: 'b drifted' }),
+      issue({ path: ['database', 'users', 'column:a'], reason: 'not-equal' }),
+      issue({ path: ['database', 'users', 'column:b'], reason: 'not-equal' }),
     ]);
-    expect(summary).toBe('Recreates table users to apply schema changes: a drifted; b drifted');
+    expect(summary).toBe(
+      'Recreates table users to apply schema changes: database/users/column:a; database/users/column:b',
+    );
   });
 });
 

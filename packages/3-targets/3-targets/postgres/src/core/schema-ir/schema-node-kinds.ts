@@ -29,6 +29,7 @@ export const PostgresSchemaNodeKind = {
   table: 'postgres-table',
   policy: 'postgres-policy',
   role: 'postgres-role',
+  nativeEnum: 'postgres-native-enum',
 } as const;
 
 export type PostgresSchemaNodeKind =
@@ -45,8 +46,16 @@ const POSTGRES_NODE_GRANULARITY: Readonly<Record<PostgresSchemaNodeKind, DiffSub
     [PostgresSchemaNodeKind.database]: 'structural',
     [PostgresSchemaNodeKind.namespace]: 'namespace',
     [PostgresSchemaNodeKind.table]: 'entity',
+    // A policy set is owned by the managed table it attaches to; a role is
+    // referenced by the contract but not owned (the framework names it in a
+    // policy but never owns the cluster's role list). Both classify as
+    // `structural`. The asymmetry for roles — a missing declared one fails, an
+    // undeclared live one is tolerated unconditionally — comes from the
+    // control policy the diff resolves a role issue against (`external`),
+    // not from the granularity.
     [PostgresSchemaNodeKind.policy]: 'structural',
     [PostgresSchemaNodeKind.role]: 'structural',
+    [PostgresSchemaNodeKind.nativeEnum]: 'entity',
   };
 
 function isPostgresSchemaNodeKind(nodeKind: string): nodeKind is PostgresSchemaNodeKind {
@@ -75,15 +84,22 @@ export function postgresDiffSubjectGranularity(nodeKind: string): DiffSubjectGra
 }
 
 /**
- * The one real map from a Postgres-specific `nodeKind` to its storage
- * `entityKind` — the same vocabulary the contract storage's `entries`
- * dictionary keys use. Only the whole-table kind has an entity of its own;
+ * The map from a Postgres-specific `nodeKind` to its storage `entityKind` — the
+ * same vocabulary the contract storage's `entries` dictionary keys use. The
+ * whole-table and native-enum kinds each have an entity of their own;
  * database/namespace/policy/role nodes map to nothing here (a namespace is
  * addressed by id, not by an `entries` kind; policies and roles are
  * structural, never a sibling space's unclaimed entity).
+ *
+ * The native enum keys under its PHYSICAL type name in `entries.native_enum`
+ * (ADR 221), so its diff node's `typeName` addresses the entity on the generic
+ * coordinate directly — no by-type-name walk needed. This lets the framework's
+ * unclaimed-elements sweep classify enum ownership the same coordinate way it
+ * classifies tables.
  */
 const POSTGRES_NODE_ENTITY_KIND: Partial<Readonly<Record<PostgresSchemaNodeKind, string>>> = {
   [PostgresSchemaNodeKind.table]: 'table',
+  [PostgresSchemaNodeKind.nativeEnum]: 'native_enum',
 };
 
 /** Looks up the storage entityKind for a Postgres-specific `nodeKind`. */

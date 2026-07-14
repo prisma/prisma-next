@@ -17,8 +17,22 @@ import type { MongoSchemaVisitor } from './visitor';
  * `children`) the generic differ actually pairs and recurses over.
  */
 export abstract class MongoSchemaIRNode extends IRNodeBase implements DiffableNode {
+  declare readonly kind: string;
+
   abstract readonly id: string;
+  /** Per-node discriminant `DiffableNode` requires: collection / index / validator / collectionOptions / schema. */
+  abstract readonly nodeKind: string;
   abstract accept<R>(visitor: MongoSchemaVisitor<R>): R;
+
+  constructor() {
+    super();
+    Object.defineProperty(this, 'kind', {
+      value: 'mongo-schema-ir',
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    });
+  }
 
   isEqualTo(other: DiffableNode): boolean {
     return this.id === other.id;

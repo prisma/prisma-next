@@ -40,6 +40,13 @@ describe('PostgresRole', () => {
     expect(json['name']).toBe('authenticated');
     expect(json['namespaceId']).toBe(UNBOUND_NAMESPACE_ID);
   });
+
+  it('defaults control to external when not provided', () => {
+    const role = new PostgresRole({ name: 'authenticated', namespaceId: UNBOUND_NAMESPACE_ID });
+    expect(role.control).toBe('external');
+    const json = JSON.parse(JSON.stringify(role)) as Record<string, unknown>;
+    expect(json['control']).toBe('external');
+  });
 });
 
 describe('PostgresRlsPolicy', () => {

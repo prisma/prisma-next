@@ -1,6 +1,6 @@
 import type {
   DefaultFunctionLoweringContext,
-  ParsedDefaultFunctionCall,
+  TypedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
@@ -35,7 +35,7 @@ describe('composed mutation default registries', () => {
       ...input,
     });
 
-  it('rejects known default functions when no components contribute handlers', () => {
+  it('rejects a default function call as invalid syntax when no components contribute handlers', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model User {
   id Int @id
@@ -53,8 +53,8 @@ describe('composed mutation default registries', () => {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-          message: expect.stringContaining('uuid'),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Expected one of'),
         }),
       ]),
     );
@@ -77,8 +77,9 @@ describe('composed mutation default registries', () => {
           [
             'slugid',
             {
+              signature: {},
               lower: (input: {
-                call: ParsedDefaultFunctionCall;
+                call: TypedDefaultFunctionCall;
                 context: DefaultFunctionLoweringContext;
               }) => {
                 void input;
@@ -134,6 +135,7 @@ describe('composed mutation default registries', () => {
           [
             'slugid',
             {
+              signature: {},
               lower: () => ({
                 ok: true as const,
                 value: {

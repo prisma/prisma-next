@@ -45,6 +45,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
+import type { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
 import type { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
 import { quoteIdentifier } from '../sql-utils';
@@ -57,10 +58,12 @@ import { resolveNamespaceIdForDdlSchema } from './control-policy';
 import {
   AddColumnCall,
   AddForeignKeyCall,
+  AddNativeEnumValueCall,
   AddPrimaryKeyCall,
   AddUniqueCall,
   AlterColumnTypeCall,
   CreateIndexCall,
+  CreateNativeEnumTypeCall,
   CreateSchemaCall,
   CreateTableCall,
   DisableRowLevelSecurityCall,
@@ -69,6 +72,7 @@ import {
   DropConstraintCall,
   DropDefaultCall,
   DropIndexCall,
+  DropNativeEnumTypeCall,
   DropNotNullCall,
   DropTableCall,
   EnableRowLevelSecurityCall,
@@ -152,8 +156,11 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
   switch (call.factoryName) {
     case 'createExtension':
     case 'createSchema':
+    case 'createNativeEnumType':
+    case 'addNativeEnumValue':
       return 'dep';
     case 'dropTable':
+    case 'dropNativeEnumType':
     case 'dropColumn':
     case 'dropConstraint':
     case 'dropCheckConstraint':
@@ -250,17 +257,22 @@ function locationForCall(call: PostgresOpFactoryCall): SqlPlannerConflict['locat
     typeName?: string;
   };
   const location: {
-    table?: string;
+    entityKind?: string;
+    entityName?: string;
     column?: string;
     index?: string;
     constraint?: string;
-    type?: string;
   } = {};
-  if (anyCall.tableName) location.table = anyCall.tableName;
+  if (anyCall.tableName) {
+    location.entityKind = 'table';
+    location.entityName = anyCall.tableName;
+  } else if (anyCall.typeName) {
+    location.entityKind = 'native_enum';
+    location.entityName = anyCall.typeName;
+  }
   if (anyCall.columnName) location.column = anyCall.columnName;
   if (anyCall.indexName) location.index = anyCall.indexName;
   if (anyCall.constraintName) location.constraint = anyCall.constraintName;
-  if (anyCall.typeName) location.type = anyCall.typeName;
   return Object.keys(location).length > 0 ? (location as SqlPlannerConflictLocation) : undefined;
 }
 
@@ -374,6 +386,11 @@ export function nodeIssueOrder(issue: SchemaDiffIssue): number {
   switch (node.nodeKind) {
     case PostgresSchemaNodeKind.namespace:
       return 1;
+    case PostgresSchemaNodeKind.nativeEnum:
+      // Creates order right after namespace creates within the 'dep' bucket
+      // (CREATE SCHEMA before CREATE TYPE); drops order after table drops
+      // within the 'drop' bucket (DROP TYPE only after its dependents left).
+      return issue.reason === 'not-expected' ? 17 : 2;
     case RelationalSchemaNodeKind.foreignKey:
       return issue.reason === 'not-expected' ? 10 : 60;
     case RelationalSchemaNodeKind.unique:
@@ -525,6 +542,106 @@ function buildCreateTableCallsFromNode(
 
 function nodeConflict(kind: SqlPlannerConflict['kind'], message: string): SqlPlannerConflict {
   return issueConflict(kind, message);
+}
+
+/**
+ * True when `actualMembers` (the live database's ordered members) is a
+ * strict, order-preserving prefix of `expectedMembers` (the contract's) —
+ * the database already carries every contract member, in declaration
+ * order, and the contract declares at least one member the database still
+ * lacks. Any other relationship — a renamed value, a removed value, a
+ * reordering, or the database holding members the contract lacks — is not
+ * a suffix append.
+ */
+function isNativeEnumSuffixAppend(
+  actualMembers: readonly string[],
+  expectedMembers: readonly string[],
+): boolean {
+  if (actualMembers.length >= expectedMembers.length) return false;
+  return actualMembers.every((member, index) => member === expectedMembers[index]);
+}
+
+/** Operator-worded refusal for a native-enum member change beyond a suffix append (design ruling — tests match this verbatim). */
+function nativeEnumMemberChangeRefusal(options: {
+  readonly ddlSchemaName: string;
+  readonly typeName: string;
+  readonly expectedMembers: readonly string[];
+  readonly actualMembers: readonly string[];
+}): string {
+  return (
+    `Native enum type "${options.ddlSchemaName}"."${options.typeName}" changed beyond appending new values ` +
+    `(contract declares [${options.expectedMembers.join(', ')}], database has [${options.actualMembers.join(', ')}]). ` +
+    "Prisma Next does not modify a native enum's existing values (rename, removal, reorder) — " +
+    'see https://pris.ly/d/postgres-native-enums. Author the change manually with `migration new`.'
+  );
+}
+
+/**
+ * Managed native-enum issue -> op lowering. A missing declared type creates
+ * it; an unclaimed live type drops it (ownership-scoped upstream by
+ * `retainUnownedExtras`, destructiveness gated by the operation-class
+ * policy); a paired member-value mismatch lowers to one `ALTER TYPE ... ADD
+ * VALUE` per appended member when the database's members are a strict,
+ * order-preserving prefix of the contract's — any other change (rename,
+ * removal, reorder, or the database holding members the contract lacks) is
+ * refused with a NAMED diagnostic, never a silent no-op and never a
+ * drop-and-recreate.
+ */
+function mapNativeEnumNodeIssue(
+  issue: SchemaDiffIssue,
+  ctx: StrategyContext,
+): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
+  const ddlSchemaName = issueSchemaName(issue);
+  if (ddlSchemaName === undefined) {
+    return notOk(
+      nodeConflict(
+        'unsupportedOperation',
+        `Enum issue has no schema in its path: ${issue.path.join('/')}`,
+      ),
+    );
+  }
+  const schemaName = emissionSchemaName(ctx, ddlSchemaName);
+  if (issue.reason === 'not-found') {
+    const expected = blindCast<
+      PostgresNativeEnumSchemaNode,
+      'a not-found native-enum issue always carries the expected PostgresNativeEnumSchemaNode'
+    >(issue.expected);
+    return ok([new CreateNativeEnumTypeCall(schemaName, expected.typeName, expected.members)]);
+  }
+  if (issue.reason === 'not-expected') {
+    const actual = blindCast<
+      PostgresNativeEnumSchemaNode,
+      'a not-expected native-enum issue always carries the actual PostgresNativeEnumSchemaNode'
+    >(issue.actual);
+    return ok([new DropNativeEnumTypeCall(schemaName, actual.typeName)]);
+  }
+  const expected = blindCast<
+    PostgresNativeEnumSchemaNode,
+    'a not-equal native-enum issue carries both sides; the expected node names the type'
+  >(issue.expected);
+  const actual = blindCast<
+    PostgresNativeEnumSchemaNode,
+    'a not-equal native-enum issue carries both sides'
+  >(issue.actual);
+  if (isNativeEnumSuffixAppend(actual.members, expected.members)) {
+    const appendedValues = expected.members.slice(actual.members.length);
+    return ok(
+      appendedValues.map(
+        (value) => new AddNativeEnumValueCall(schemaName, expected.typeName, value),
+      ),
+    );
+  }
+  return notOk(
+    nodeConflict(
+      'unsupportedOperation',
+      nativeEnumMemberChangeRefusal({
+        ddlSchemaName,
+        typeName: expected.typeName,
+        expectedMembers: expected.members,
+        actualMembers: actual.members,
+      }),
+    ),
+  );
 }
 
 function mapTableNodeIssue(
@@ -682,7 +799,7 @@ function mapPrimaryKeyNodeIssue(
       new DropConstraintCall(schemaName, tableName, pk.name ?? `${tableName}_pkey`, 'primaryKey'),
     ]);
   }
-  return notOk(nodeConflict('indexIncompatible', issue.message));
+  return notOk(nodeConflict('indexIncompatible', issue.path.join('/')));
 }
 
 function mapForeignKeyNodeIssue(
@@ -705,7 +822,7 @@ function mapForeignKeyNodeIssue(
     const name = fk.name ?? `${tableName}_${fk.columns.join('_')}_fkey`;
     return ok([new DropConstraintCall(schemaName, tableName, name, 'foreignKey')]);
   }
-  return notOk(nodeConflict('foreignKeyConflict', issue.message));
+  return notOk(nodeConflict('foreignKeyConflict', issue.path.join('/')));
 }
 
 function mapUniqueNodeIssue(
@@ -729,7 +846,7 @@ function mapUniqueNodeIssue(
     const name = unique.name ?? `${tableName}_${unique.columns.join('_')}_key`;
     return ok([new DropConstraintCall(schemaName, tableName, name, 'unique')]);
   }
-  return notOk(nodeConflict('indexIncompatible', issue.message));
+  return notOk(nodeConflict('indexIncompatible', issue.path.join('/')));
 }
 
 function mapIndexNodeIssue(
@@ -756,7 +873,7 @@ function mapIndexNodeIssue(
     const indexName = index.name ?? defaultIndexName(tableName, index.columns);
     return ok([new DropIndexCall(schemaName, tableName, indexName)]);
   }
-  return notOk(nodeConflict('indexIncompatible', issue.message));
+  return notOk(nodeConflict('indexIncompatible', issue.path.join('/')));
 }
 
 function mapCheckNodeIssue(
@@ -778,7 +895,7 @@ function mapCheckNodeIssue(
   return notOk(
     nodeConflict(
       'unsupportedOperation',
-      `Check constraint drift on "${tableName}" — handled by checkConstraintPlanCallStrategy: ${issue.message}`,
+      `Check constraint drift on "${tableName}" — handled by checkConstraintPlanCallStrategy: ${issue.path.join('/')}`,
     ),
   );
 }
@@ -797,14 +914,14 @@ export function mapNodeIssueToCall(
     return notOk(
       nodeConflict(
         'unsupportedOperation',
-        `Issue carries neither an expected nor an actual node: ${issue.message}`,
+        `Issue carries neither an expected nor an actual node: ${issue.path.join('/')}`,
       ),
     );
   }
   if (node.nodeKind === PostgresSchemaNodeKind.namespace) {
     if (issue.reason !== 'not-found') {
       return notOk(
-        nodeConflict('unsupportedOperation', `Unexpected namespace drift: ${issue.message}`),
+        nodeConflict('unsupportedOperation', `Unexpected namespace drift: ${issue.path.join('/')}`),
       );
     }
     const namespace = blindCast<
@@ -814,13 +931,17 @@ export function mapNodeIssueToCall(
     return ok([new CreateSchemaCall(namespace.schemaName)]);
   }
 
+  if (node.nodeKind === PostgresSchemaNodeKind.nativeEnum) {
+    return mapNativeEnumNodeIssue(issue, ctx);
+  }
+
   const ddlSchemaName = issueSchemaName(issue);
   const tableName = issueTableName(issue);
   if (ddlSchemaName === undefined || tableName === undefined) {
     return notOk(
       nodeConflict(
         'unsupportedOperation',
-        `Issue has no schema/table in its path: ${issue.message}`,
+        `Issue has no schema/table in its path: ${issue.path.join('/')}`,
       ),
     );
   }
@@ -837,7 +958,7 @@ export function mapNodeIssueToCall(
         return notOk(
           nodeConflict(
             'unsupportedOperation',
-            `Default issue has no column in its path: ${issue.message}`,
+            `Default issue has no column in its path: ${issue.path.join('/')}`,
           ),
         );
       }

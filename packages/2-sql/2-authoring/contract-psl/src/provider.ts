@@ -5,6 +5,8 @@ import type { ControlPolicy } from '@prisma-next/contract/types';
 import { collectScalarTypeConstructors } from '@prisma-next/framework-components/authoring';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
+import type { PslInterpretCapable } from '@prisma-next/psl-parser/interpret';
+import { withSeedDiagnostics } from '@prisma-next/psl-parser/interpret';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceBase, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
@@ -60,89 +62,94 @@ function mapParseDiagnostics(
 }
 
 export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
-  return {
-    source: {
-      sourceFormat: 'psl',
-      inputs: [schemaPath],
-      load: async (context) => {
-        const [absoluteSchemaPath] = context.resolvedInputs;
-        if (absoluteSchemaPath === undefined) {
-          throw new Error(
-            'prismaContract: context.resolvedInputs is empty. The CLI config loader should populate it positional-matched with source.inputs.',
-          );
-        }
-        let schema: string;
-        try {
-          schema = await readFile(absoluteSchemaPath, 'utf-8');
-        } catch (error) {
-          const message = String(error);
-          return notOk({
-            summary: `Failed to read Prisma schema at "${schemaPath}"`,
-            diagnostics: [
-              {
-                code: 'PSL_SCHEMA_READ_FAILED',
-                message,
-                sourceId: schemaPath,
-              },
-            ],
-            meta: { schemaPath, absoluteSchemaPath, cause: message },
-          });
-        }
-
-        const scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor> =
-          collectScalarTypeConstructors(context.authoringContributions.type);
-
-        const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
-        const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
-          document,
-          sourceFile,
-          scalarTypes: [...scalarColumnDescriptors.keys()],
-          pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
-        });
-
-        // Do not short-circuit on provider-level diagnostics; recovered CST can
-        // still produce interpreter diagnostics in the same response.
-        const seedDiagnostics = [
-          ...mapParseDiagnostics(parseDiagnostics, sourceFile, schemaPath),
-          ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),
-        ];
-
-        const interpreted = interpretPslDocumentToSqlContract({
-          symbolTable,
-          sourceFile,
-          sourceId: schemaPath,
-          seedDiagnostics,
-          target: options.target,
-          authoringContributions: context.authoringContributions,
-          scalarColumnDescriptors,
-          ...ifDefined(
-            'composedExtensionPacks',
-            context.composedExtensionPacks.length > 0
-              ? [...context.composedExtensionPacks]
-              : undefined,
-          ),
-          composedExtensionContracts: context.composedExtensionContracts,
-          ...ifDefined(
-            'composedExtensionPackRefs',
-            options.composedExtensionPackRefs?.length
-              ? options.composedExtensionPackRefs
-              : undefined,
-          ),
-          controlMutationDefaults: context.controlMutationDefaults,
-          createNamespace: options.createNamespace,
-          capabilities: context.capabilities,
-          codecLookup: context.codecLookup,
-          ...ifDefined('enumInferenceCodecs', options.enumInferenceCodecs),
-        });
-        if (!interpreted.ok) {
-          return interpreted;
-        }
-
-        return ok(
-          applySpecifierDefaultControlPolicy(interpreted.value, options.defaultControlPolicy),
-        );
-      },
+  const source: PslInterpretCapable = {
+    sourceFormat: 'psl',
+    inputs: [schemaPath],
+    interpret(input, context) {
+      const scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor> =
+        collectScalarTypeConstructors(context.authoringContributions.type);
+      return interpretPslDocumentToSqlContract({
+        symbolTable: input.symbolTable,
+        sourceFile: input.sourceFile,
+        sourceId: input.sourceId,
+        seedDiagnostics: [],
+        target: options.target,
+        authoringContributions: context.authoringContributions,
+        scalarColumnDescriptors,
+        ...ifDefined(
+          'composedExtensionPacks',
+          context.composedExtensionPacks.length > 0
+            ? [...context.composedExtensionPacks]
+            : undefined,
+        ),
+        composedExtensionContracts: context.composedExtensionContracts,
+        ...ifDefined(
+          'composedExtensionPackRefs',
+          options.composedExtensionPackRefs?.length ? options.composedExtensionPackRefs : undefined,
+        ),
+        controlMutationDefaults: context.controlMutationDefaults,
+        createNamespace: options.createNamespace,
+        capabilities: context.capabilities,
+        codecLookup: context.codecLookup,
+        ...ifDefined('enumInferenceCodecs', options.enumInferenceCodecs),
+      });
     },
+    async load(context) {
+      const [absoluteSchemaPath] = context.resolvedInputs;
+      if (absoluteSchemaPath === undefined) {
+        throw new Error(
+          'prismaContract: context.resolvedInputs is empty. The CLI config loader should populate it positional-matched with source.inputs.',
+        );
+      }
+      let schema: string;
+      try {
+        schema = await readFile(absoluteSchemaPath, 'utf-8');
+      } catch (error) {
+        const message = String(error);
+        return notOk({
+          summary: `Failed to read Prisma schema at "${schemaPath}"`,
+          diagnostics: [
+            {
+              code: 'PSL_SCHEMA_READ_FAILED',
+              message,
+              sourceId: schemaPath,
+            },
+          ],
+          meta: { schemaPath, absoluteSchemaPath, cause: message },
+        });
+      }
+
+      const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
+      const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
+        document,
+        sourceFile,
+        scalarTypes: [...scalarColumnDescriptors.keys()],
+        pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
+      });
+
+      // Do not short-circuit on provider-level diagnostics; recovered CST can
+      // still produce interpreter diagnostics in the same response.
+      const seedDiagnostics = [
+        ...mapParseDiagnostics(parseDiagnostics, sourceFile, schemaPath),
+        ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),
+      ];
+
+      const interpreted = withSeedDiagnostics(
+        this.interpret({ document, sourceFile, symbolTable, sourceId: schemaPath }, context),
+        seedDiagnostics,
+      );
+      if (!interpreted.ok) {
+        return interpreted;
+      }
+
+      return ok(
+        applySpecifierDefaultControlPolicy(interpreted.value, options.defaultControlPolicy),
+      );
+    },
+  };
+
+  return {
+    source,
     output: options.output ?? defaultOutputFromSchemaPath(schemaPath),
   };
 }

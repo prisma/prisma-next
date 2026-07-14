@@ -330,7 +330,7 @@ describe('family instance introspect', () => {
     );
 
     it(
-      'carries per-namespace native enum type names',
+      'carries per-namespace native enum nodes',
       async () => {
         if (!connectionString) {
           throw new Error('Connection string not set');
@@ -354,7 +354,7 @@ describe('family instance introspect', () => {
           PostgresDatabaseSchemaNode.assert(schemaIR);
           const ns = schemaIR.namespaces['public']!;
 
-          expect(Array.isArray(ns.nativeEnumTypeNames)).toBe(true);
+          expect(Array.isArray(ns.nativeEnums)).toBe(true);
         } finally {
           await driver.close();
         }

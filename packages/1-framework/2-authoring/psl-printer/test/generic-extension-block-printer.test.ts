@@ -136,6 +136,7 @@ describe('generic extension-block printer (P2)', () => {
     it('renders all four parameter kinds to the expected PSL text', () => {
       const block: PslExtensionBlock = {
         kind: 'fixture-policy-select',
+        keyword: 'policy_select',
         name: 'ProfilesSelect',
         parameters: {
           target: refParam('Post'),
@@ -170,6 +171,7 @@ describe('generic extension-block printer (P2)', () => {
     it('renders a block with only required parameters (omits absent optional params)', () => {
       const block: PslExtensionBlock = {
         kind: 'fixture-policy-select',
+        keyword: 'policy_select',
         name: 'MinimalSelect',
         parameters: {
           target: refParam('User'),
@@ -250,6 +252,7 @@ describe('generic extension-block printer (P2)', () => {
     function printUsing(raw: string): string {
       const block: PslExtensionBlock = {
         kind: 'fixture-policy-select',
+        keyword: 'policy_select',
         name: 'NumericPolicy',
         parameters: {
           target: refParam('Post'),
@@ -286,6 +289,7 @@ describe('generic extension-block printer (P2)', () => {
     it('throws when the value parameter references an unregistered codec', () => {
       const block: PslExtensionBlock = {
         kind: 'fixture-policy-select',
+        keyword: 'policy_select',
         name: 'NumericPolicy',
         parameters: { target: refParam('Post'), using: valueParam('42') },
         blockAttributes: [],
@@ -314,6 +318,7 @@ describe('generic extension-block printer (P2)', () => {
     it('emits target, as, roles, using even when the node lists them reversed', () => {
       const block: PslExtensionBlock = {
         kind: 'fixture-policy-select',
+        keyword: 'policy_select',
         name: 'ScrambledOrder',
         // Deliberately reversed relative to the descriptor's declared order.
         parameters: {
@@ -352,6 +357,7 @@ describe('generic extension-block printer (P2)', () => {
     function astWith(parameters: PslExtensionBlock['parameters']) {
       const block: PslExtensionBlock = {
         kind: 'fixture-policy-select',
+        keyword: 'policy_select',
         name: 'EdgeCase',
         parameters,
         blockAttributes: [],
@@ -436,6 +442,7 @@ describe('generic extension-block printer (P2)', () => {
     it('renders variadic value parameters in insertion order with a @@ block attribute', () => {
       const block: PslExtensionBlock = {
         kind: 'native_enum',
+        keyword: 'native_enum',
         name: 'AalLevel',
         parameters: {
           aal1: valueParam('"aal1"'),
@@ -469,6 +476,7 @@ describe('generic extension-block printer (P2)', () => {
     it('renders a variadic block without block attributes', () => {
       const block: PslExtensionBlock = {
         kind: 'native_enum',
+        keyword: 'native_enum',
         name: 'Status',
         parameters: { draft: valueParam('"draft"'), done: valueParam('"done"') },
         blockAttributes: [],
@@ -491,6 +499,7 @@ describe('generic extension-block printer (P2)', () => {
     it('renders a variadic member named like an Object.prototype key', () => {
       const block: PslExtensionBlock = {
         kind: 'native_enum',
+        keyword: 'native_enum',
         name: 'Reserved',
         parameters: {
           toString: valueParam('"toString"'),
@@ -518,6 +527,7 @@ describe('generic extension-block printer (P2)', () => {
     it('renders each variadic value kind: value, ref, option, and a nested list', () => {
       const block: PslExtensionBlock = {
         kind: 'native_enum',
+        keyword: 'native_enum',
         name: 'Mixed',
         parameters: {
           scalar: valueParam('"lit"'),
@@ -555,6 +565,7 @@ describe('generic extension-block printer (P2)', () => {
     it('renders block attributes with and without args', () => {
       const block: PslExtensionBlock = {
         kind: 'native_enum',
+        keyword: 'native_enum',
         name: 'Attrs',
         parameters: { a: valueParam('"a"') },
         blockAttributes: [
@@ -583,6 +594,7 @@ describe('generic extension-block printer (P2)', () => {
     it('renders a bare variadic member as its bare name, and a bare inside a list', () => {
       const block: PslExtensionBlock = {
         kind: 'native_enum',
+        keyword: 'native_enum',
         name: 'Bares',
         parameters: {
           Low: { kind: 'bare', span: STUB_SPAN },
@@ -624,6 +636,7 @@ describe('generic extension-block printer (P2)', () => {
       };
       const block: PslExtensionBlock = {
         kind: 'native_enum',
+        keyword: 'native_enum',
         name: 'Mix',
         parameters: { label: valueParam('"declared"'), extra: valueParam('"variadic"') },
         blockAttributes: [],
@@ -645,10 +658,11 @@ describe('generic extension-block printer (P2)', () => {
     });
   });
 
-  describe('block with unregistered discriminator', () => {
-    it('throws naming the unrecognised discriminator', () => {
+  describe('block with unregistered keyword', () => {
+    it('throws naming the unrecognised keyword', () => {
       const block: PslExtensionBlock = {
         kind: 'no-such-discriminator',
+        keyword: 'no_such_keyword',
         name: 'OrphanBlock',
         parameters: {},
         blockAttributes: [],
@@ -667,7 +681,101 @@ describe('generic extension-block printer (P2)', () => {
           pslBlockDescriptors: assembled.pslBlockDescriptors,
           codecLookup,
         }),
-      ).toThrow('no-such-discriminator');
+      ).toThrow('no_such_keyword');
+    });
+  });
+
+  describe('block whose keyword resolves to a descriptor owning a different discriminator', () => {
+    const shapeDescriptors = {
+      shape_circle: {
+        kind: 'pslBlock' as const,
+        keyword: 'shape_circle',
+        discriminator: 'circle',
+        name: { required: true },
+        parameters: {},
+      },
+      shape_square: {
+        kind: 'pslBlock' as const,
+        keyword: 'shape_square',
+        discriminator: 'square',
+        name: { required: true },
+        parameters: {},
+      },
+    };
+
+    it('throws naming the keyword and the mismatched kind, not the unregistered-keyword message', () => {
+      const block: PslExtensionBlock = {
+        // The "shape_circle" keyword resolves to the descriptor that owns
+        // discriminator "circle" — but this block carries kind "square",
+        // which is registered too, just under a different descriptor.
+        kind: 'square',
+        keyword: 'shape_circle',
+        name: 'Mismatched',
+        parameters: {},
+        blockAttributes: [],
+        span: STUB_SPAN,
+      };
+
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [makeNs([], [block])],
+        span: STUB_SPAN,
+      };
+
+      expect(() => printPslFromAst(ast, { pslBlockDescriptors: shapeDescriptors })).toThrow(
+        /shape_circle.*circle.*square/s,
+      );
+    });
+  });
+
+  describe('N:1 — two keywords sharing one discriminator print back to their own keyword', () => {
+    const shapeDescriptors = {
+      shape_circle: {
+        kind: 'pslBlock' as const,
+        keyword: 'shape_circle',
+        discriminator: 'shape',
+        name: { required: true },
+        parameters: {},
+      },
+      shape_square: {
+        kind: 'pslBlock' as const,
+        keyword: 'shape_square',
+        discriminator: 'shape',
+        name: { required: true },
+        parameters: {},
+      },
+    };
+
+    it('renders each block under its own keyword, not the other one sharing its kind', () => {
+      const circle: PslExtensionBlock = {
+        kind: 'shape',
+        keyword: 'shape_circle',
+        name: 'Round',
+        parameters: {},
+        blockAttributes: [],
+        span: STUB_SPAN,
+      };
+      const square: PslExtensionBlock = {
+        kind: 'shape',
+        keyword: 'shape_square',
+        name: 'Boxy',
+        parameters: {},
+        blockAttributes: [],
+        span: STUB_SPAN,
+      };
+
+      const ast = {
+        kind: 'document' as const,
+        sourceId: 'test',
+        namespaces: [makeNs([], [circle, square])],
+        span: STUB_SPAN,
+      };
+
+      const output = printPslFromAst(ast, { pslBlockDescriptors: shapeDescriptors });
+
+      expect(output).toContain('shape_circle Round {');
+      expect(output).toContain('shape_square Boxy {');
     });
   });
 

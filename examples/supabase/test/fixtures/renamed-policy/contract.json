@@ -92,6 +92,33 @@
               ],
               "tableName": "profile",
               "using": "\"userId\"::uuid = auth.uid()"
+            },
+            "profile_owner_write": {
+              "kind": "policy",
+              "name": "profile_owner_write_b674cdea",
+              "namespaceId": "public",
+              "operation": "update",
+              "permissive": true,
+              "prefix": "profile_owner_write",
+              "roles": [
+                "authenticated"
+              ],
+              "tableName": "profile",
+              "using": "\"userId\"::uuid = auth.uid()",
+              "withCheck": "\"userId\"::uuid = auth.uid()"
+            },
+            "profile_public_read": {
+              "kind": "policy",
+              "name": "profile_public_read_16dd15e0",
+              "namespaceId": "public",
+              "operation": "select",
+              "permissive": true,
+              "prefix": "profile_public_read",
+              "roles": [
+                "anon"
+              ],
+              "tableName": "profile",
+              "using": "true"
             }
           },
           "rls": {
@@ -164,7 +191,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:0e1bb0876c78cf5a2f29b81344170cd2d8b7f31500a78bdfabb9de35abb85368",
+    "storageHash": "sha256:4a7066df2fa2d2c2bbc46ee511a06e2dde7eb08cd3abf51ff773e6577752d3f7",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",
