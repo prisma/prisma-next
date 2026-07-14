@@ -1,7 +1,11 @@
 import { pathToFileURL } from 'node:url';
+import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
+import type { PslInterpretCapable } from '@prisma-next/psl-parser/interpret';
 import { parse } from '@prisma-next/psl-parser/syntax';
+import { notOk, ok } from '@prisma-next/utils/result';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ProjectInterpretation } from '../src/config-resolution';
 import { mapParseDiagnostics } from '../src/diagnostic-mapping';
 import type { PipelineInputs } from '../src/pipeline';
 import { createProjectArtifacts, type ProjectArtifacts } from '../src/project-artifacts';
@@ -35,7 +39,7 @@ const controlStack: PipelineInputs = {
 const cleanSource = 'model User {\n  id Int @id\n}\n';
 const twoModelSource = 'model User {\n  id Int @id\n}\n\nmodel Post {\n  id Int @id\n}\n';
 
-function projectWithMirror(): {
+function projectWithMirror(interpretation?: ProjectInterpretation): {
   readonly texts: Map<string, string>;
   readonly store: ProjectArtifacts;
 } {
@@ -44,8 +48,24 @@ function projectWithMirror(): {
     inputs,
     controlStack,
     getText: (uri) => texts.get(uri),
+    ...(interpretation === undefined ? {} : { interpretation }),
   });
   return { texts, store };
+}
+
+const interpretContext = { composedExtensionPacks: [] } as unknown as ContractSourceContext;
+
+function interpretationDouble(interpret: PslInterpretCapable['interpret']): {
+  readonly interpretation: ProjectInterpretation;
+  readonly spy: ReturnType<typeof vi.fn>;
+} {
+  const spy = vi.fn(interpret);
+  const source = {
+    sourceFormat: 'psl',
+    load: async () => ok({} as never),
+    interpret: spy,
+  } as unknown as PslInterpretCapable;
+  return { interpretation: { source, context: interpretContext }, spy };
 }
 
 describe('createProjectArtifacts', () => {
@@ -179,5 +199,92 @@ describe('createProjectArtifacts', () => {
     const { texts, store } = projectWithMirror();
     texts.set(schemaUri, 'model User {\n  id ');
     expect(() => store.document(schemaUri)).not.toThrow();
+  });
+});
+
+describe('interpret slot', () => {
+  const spanned = {
+    code: 'PSL_UNRESOLVED_RELATION',
+    message: 'relation target not found',
+    span: { start: { offset: 15, line: 2, column: 3 }, end: { offset: 21, line: 2, column: 9 } },
+  };
+
+  it('does not interpret on document reads, only when the slot is pulled', () => {
+    const { interpretation, spy } = interpretationDouble(() => ok({} as never));
+    const { texts, store } = projectWithMirror(interpretation);
+    texts.set(schemaUri, cleanSource);
+
+    const artifacts = store.document(schemaUri);
+    store.symbolTable();
+    expect(spy).not.toHaveBeenCalled();
+
+    artifacts?.interpretDiagnostics();
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('memoizes: repeated pulls interpret once, an edit interprets once more', () => {
+    const { interpretation, spy } = interpretationDouble(() => ok({} as never));
+    const { texts, store } = projectWithMirror(interpretation);
+    texts.set(schemaUri, cleanSource);
+
+    store.document(schemaUri)?.interpretDiagnostics();
+    store.document(schemaUri)?.interpretDiagnostics();
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    texts.set(schemaUri, twoModelSource);
+    store.documentChanged(schemaUri);
+    store.document(schemaUri)?.interpretDiagnostics();
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('unwraps a failing interpretation into mapped diagnostics', () => {
+    const { interpretation } = interpretationDouble(() =>
+      notOk({ summary: 'Schema has 1 error', diagnostics: [spanned] }),
+    );
+    const { texts, store } = projectWithMirror(interpretation);
+    texts.set(schemaUri, cleanSource);
+
+    expect(store.document(schemaUri)?.interpretDiagnostics()).toEqual([
+      {
+        range: { start: { line: 1, character: 2 }, end: { line: 1, character: 8 } },
+        message: 'relation target not found',
+        code: 'PSL_UNRESOLVED_RELATION',
+        severity: 1,
+      },
+    ]);
+  });
+
+  it('returns no diagnostics for a successful interpretation', () => {
+    const { interpretation } = interpretationDouble(() => ok({} as never));
+    const { texts, store } = projectWithMirror(interpretation);
+    texts.set(schemaUri, cleanSource);
+
+    expect(store.document(schemaUri)?.interpretDiagnostics()).toEqual([]);
+  });
+
+  it('returns no diagnostics when the project carries no interpretation', () => {
+    const { texts, store } = projectWithMirror();
+    texts.set(schemaUri, cleanSource);
+
+    expect(store.document(schemaUri)?.interpretDiagnostics()).toEqual([]);
+  });
+
+  it('invokes interpret as a method with the document uri as sourceId and cached artifacts', () => {
+    const { interpretation, spy } = interpretationDouble(() => ok({} as never));
+    const { texts, store } = projectWithMirror(interpretation);
+    texts.set(schemaUri, cleanSource);
+
+    const artifacts = store.document(schemaUri);
+    artifacts?.interpretDiagnostics();
+
+    expect(spy.mock.contexts[0]).toBe(interpretation.source);
+    const [input, context] = spy.mock.calls[0] ?? [];
+    expect(input).toMatchObject({
+      sourceId: schemaUri,
+      document: artifacts?.document,
+      sourceFile: artifacts?.sourceFile,
+    });
+    expect(input?.symbolTable).toBeDefined();
+    expect(context).toBe(interpretation.context);
   });
 });

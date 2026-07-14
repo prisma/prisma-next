@@ -46,13 +46,6 @@ export async function resolveConfigInputs(configPath: string): Promise<ConfigRes
   };
 }
 
-export function resolveControlStackInputs(config: PrismaNextConfig): PipelineInputs | undefined {
-  if (!hasPslInputs(config)) {
-    return undefined;
-  }
-  return pipelineInputsFromStack(createControlStack(config));
-}
-
 function pipelineInputsFromStack(stack: ControlStack): PipelineInputs {
   return {
     scalarTypes: [...stack.scalarTypeDescriptors.keys()],

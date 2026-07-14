@@ -1,3 +1,7 @@
+import type {
+  ContractSourceDiagnostic,
+  ContractSourceDiagnosticSpan,
+} from '@prisma-next/config/config-types';
 import type { ParseDiagnostic, Range } from '@prisma-next/psl-parser/syntax';
 
 export const ParseDiagnosticSeverity = {
@@ -23,4 +27,31 @@ export function mapParseDiagnostics(
     code: diagnostic.code,
     severity: ParseDiagnosticSeverity.Error,
   }));
+}
+
+// LSP has no span-less diagnostics; the tsserver convention anchors them at
+// the top of the document rather than dropping them.
+const documentStartRange: Range = {
+  start: { line: 0, character: 0 },
+  end: { line: 0, character: 1 },
+};
+
+export function mapInterpreterDiagnostics(
+  diagnostics: readonly ContractSourceDiagnostic[],
+): readonly LspDiagnostic[] {
+  return diagnostics.map((diagnostic) => ({
+    range: diagnostic.span === undefined ? documentStartRange : pslSpanToRange(diagnostic.span),
+    message: diagnostic.message,
+    code: diagnostic.code,
+    severity: ParseDiagnosticSeverity.Error,
+  }));
+}
+
+// Inverse of psl-parser's rangeToPslSpan: spans carry 1-based line/column,
+// LSP ranges are 0-based line/character.
+function pslSpanToRange(span: ContractSourceDiagnosticSpan): Range {
+  return {
+    start: { line: span.start.line - 1, character: span.start.column - 1 },
+    end: { line: span.end.line - 1, character: span.end.column - 1 },
+  };
 }

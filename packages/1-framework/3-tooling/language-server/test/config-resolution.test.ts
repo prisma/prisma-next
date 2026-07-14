@@ -10,7 +10,7 @@ import * as control from '@prisma-next/framework-components/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolveConfigInputs, resolveControlStackInputs } from '../src/config-resolution';
+import { resolveConfigInputs } from '../src/config-resolution';
 
 vi.mock('@prisma-next/config-loader', { spy: true });
 vi.mock('@prisma-next/framework-components/control', { spy: true });
@@ -118,22 +118,25 @@ describe('resolveConfigInputs', { timeout: timeouts.coldTransformImport }, () =>
   });
 });
 
-describe('resolveControlStackInputs', () => {
+describe('control-stack input derivation', () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
   });
 
-  it('returns undefined and never builds a stack for a non-psl source', () => {
+  it('never builds a stack for a non-psl source and derives empty pipeline inputs', async () => {
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(
+      loadedConfig('typescript', ['/abs/schema.psl']),
+    );
     const createControlStack = vi.spyOn(control, 'createControlStack');
 
-    const result = resolveControlStackInputs(loadedConfig('typescript', ['/abs/schema.psl']));
+    const result = await resolveConfigInputs('/abs/prisma-next.config.ts');
 
-    expect(result).toBeUndefined();
+    expect(result.controlStack).toEqual({ scalarTypes: [], pslBlockDescriptors: {} });
     expect(createControlStack).not.toHaveBeenCalled();
   });
 
-  it('returns control-stack-derived scalarTypes and pslBlockDescriptors for a psl source', () => {
+  it('derives control-stack scalarTypes and pslBlockDescriptors for a psl source', async () => {
     const pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {
       enum: {
         kind: 'pslBlock',
@@ -144,6 +147,9 @@ describe('resolveControlStackInputs', () => {
         variadicParameters: true,
       },
     };
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(
+      loadedConfig('psl', ['/abs/schema.psl']),
+    );
     vi.spyOn(control, 'createControlStack').mockReturnValue(
       stubStack(
         new Map([
@@ -154,19 +160,20 @@ describe('resolveControlStackInputs', () => {
       ),
     );
 
-    const result = resolveControlStackInputs(loadedConfig('psl', ['/abs/schema.psl']));
+    const result = await resolveConfigInputs('/abs/prisma-next.config.ts');
 
-    expect(result).toEqual({ scalarTypes: ['Int', 'String'], pslBlockDescriptors });
+    expect(result.controlStack).toEqual({ scalarTypes: ['Int', 'String'], pslBlockDescriptors });
   });
 
-  it('propagates createControlStack failures for a psl source', () => {
+  it('propagates createControlStack failures for a psl source', async () => {
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(
+      loadedConfig('psl', ['/abs/schema.psl']),
+    );
     vi.spyOn(control, 'createControlStack').mockImplementation(() => {
       throw new Error('boom');
     });
 
-    expect(() => resolveControlStackInputs(loadedConfig('psl', ['/abs/schema.psl']))).toThrow(
-      'boom',
-    );
+    await expect(resolveConfigInputs('/abs/prisma-next.config.ts')).rejects.toThrow('boom');
   });
 });
 
