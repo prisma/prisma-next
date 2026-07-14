@@ -53,11 +53,13 @@ test only means something when at least one real provider narrows true.
       Mirror asymmetries verified against each provider's removed inline code —
       family differences, not drift. ✓
 
-**Amendment (2026-07-14, operator review on PR #971):** capability signature widened
-— `interpret(input, context, seedDiagnostics?)` returns
-`Result<Contract, ContractSourceDiagnostics>`; each provider's `load` now calls
-`this.interpret` literally (no private inner function). Dispatch S4-D3 executes;
-SDoD items re-verified under the new shape.
+**Amendment (2026-07-14, operator review on PR #971, two steps):** capability
+returns the full `Result<Contract, ContractSourceDiagnostics>`; each provider's
+`load` calls `this.interpret` literally (S4-D3). Then the transitional
+`seedDiagnostics?` parameter was dropped (S4-D4): the capability is two-parameter;
+`load` merges seeds externally via `withSeedDiagnostics(result, seeds)` exported from
+`psl-parser/interpret` — seeds prepend on failure, force failure on ok, helper
+authors a uniform headline. SDoD items re-verified per round.
 
 **Slice-close ritual (2026-07-13):** both dispatches SATISFIED R1, zero findings;
 4/4 SDoD PASS; `origin/main` rebased (one unrelated native-enums commit) + gates
