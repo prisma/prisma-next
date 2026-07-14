@@ -35,7 +35,7 @@ function interpretCapableConfig(inputs: readonly string[]): PrismaNextConfig {
 function stubStackWithContext(): ControlStack {
   return {
     extensionPacks: [{ id: 'ext-a' }, { id: 'ext-b' }],
-    extensionContracts: new Map([['ext-a', { targetFamily: 'sql' }]]),
+    extensionContracts: new Map([['ext-a', { targetFamily: 'demo' }]]),
     scalarTypeDescriptors: new Map([['Int', 'int']]),
     authoringContributions: {
       field: {},
@@ -49,7 +49,7 @@ function stubStackWithContext(): ControlStack {
       defaultFunctionRegistry: new Map(),
       generatorDescriptors: [],
     },
-    capabilities: { sql: { scalarList: true } },
+    capabilities: { demo: { scalarList: true } },
   } as unknown as ControlStack;
 }
 

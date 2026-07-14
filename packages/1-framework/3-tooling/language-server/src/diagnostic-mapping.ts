@@ -2,7 +2,7 @@ import type {
   ContractSourceDiagnostic,
   ContractSourceDiagnosticSpan,
 } from '@prisma-next/config/config-types';
-import type { ParseDiagnostic, Range } from '@prisma-next/psl-parser/syntax';
+import type { ParseDiagnostic, Range, SourceFile } from '@prisma-next/psl-parser/syntax';
 
 export const ParseDiagnosticSeverity = {
   Error: 1,
@@ -38,20 +38,25 @@ const documentStartRange: Range = {
 
 export function mapInterpreterDiagnostics(
   diagnostics: readonly ContractSourceDiagnostic[],
+  sourceFile: SourceFile,
 ): readonly LspDiagnostic[] {
   return diagnostics.map((diagnostic) => ({
-    range: diagnostic.span === undefined ? documentStartRange : pslSpanToRange(diagnostic.span),
+    range:
+      diagnostic.span === undefined
+        ? documentStartRange
+        : pslSpanToRange(diagnostic.span, sourceFile),
     message: diagnostic.message,
     code: diagnostic.code,
     severity: ParseDiagnosticSeverity.Error,
   }));
 }
 
-// Inverse of psl-parser's rangeToPslSpan: spans carry 1-based line/column,
-// LSP ranges are 0-based line/character.
-function pslSpanToRange(span: ContractSourceDiagnosticSpan): Range {
+// Inverse of psl-parser's rangeToPslSpan, which derives every span position
+// from a source offset: recovering the 0-based LSP position from that same
+// offset round-trips exactly.
+function pslSpanToRange(span: ContractSourceDiagnosticSpan, sourceFile: SourceFile): Range {
   return {
-    start: { line: span.start.line - 1, character: span.start.column - 1 },
-    end: { line: span.end.line - 1, character: span.end.column - 1 },
+    start: sourceFile.positionAt(span.start.offset),
+    end: sourceFile.positionAt(span.end.offset),
   };
 }

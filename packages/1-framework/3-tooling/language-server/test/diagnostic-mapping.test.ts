@@ -34,20 +34,25 @@ describe('mapParseDiagnostics', () => {
 });
 
 describe('mapInterpreterDiagnostics', () => {
-  it('maps a 1-based span to a 0-based LSP range (hand-computed)', () => {
+  const text = 'model User {\n  id Int @id\n  posts Post[]\n}\n';
+  const sourceFile = new SourceFile(text);
+
+  it('maps a span to a 0-based LSP range (hand-computed)', () => {
+    // Offsets 28..33 sit on the third line ("  posts Post[]"), landing on
+    // "posts": 0-based positions {2,2}..{2,7}.
     const diagnostic: ContractSourceDiagnostic = {
       code: 'PSL_UNRESOLVED_RELATION',
       message: 'relation target not found',
       span: {
-        start: { offset: 20, line: 3, column: 3 },
-        end: { offset: 27, line: 3, column: 10 },
+        start: { offset: 28, line: 3, column: 3 },
+        end: { offset: 33, line: 3, column: 8 },
       },
     };
 
-    const [mapped] = mapInterpreterDiagnostics([diagnostic]);
+    const [mapped] = mapInterpreterDiagnostics([diagnostic], sourceFile);
 
     expect(mapped).toEqual({
-      range: { start: { line: 2, character: 2 }, end: { line: 2, character: 9 } },
+      range: { start: { line: 2, character: 2 }, end: { line: 2, character: 7 } },
       message: 'relation target not found',
       code: 'PSL_UNRESOLVED_RELATION',
       severity: ParseDiagnosticSeverity.Error,
@@ -55,20 +60,22 @@ describe('mapInterpreterDiagnostics', () => {
   });
 
   it('inverts rangeToPslSpan for a span produced from a real source file', () => {
-    const text = 'model User {\n  id Int @id\n  posts Post[]\n}\n';
-    const sourceFile = new SourceFile(text);
     const range = { start: { line: 2, character: 2 }, end: { line: 2, character: 7 } };
     const span = rangeToPslSpan(range, sourceFile);
 
-    const [mapped] = mapInterpreterDiagnostics([{ code: 'PSL_DEMO', message: 'demo', span }]);
+    const [mapped] = mapInterpreterDiagnostics(
+      [{ code: 'PSL_DEMO', message: 'demo', span }],
+      sourceFile,
+    );
 
     expect(mapped?.range).toEqual(range);
   });
 
   it('anchors a span-less diagnostic at document start instead of dropping it', () => {
-    const [mapped] = mapInterpreterDiagnostics([
-      { code: 'PSL_SPANLESS', message: 'no span available' },
-    ]);
+    const [mapped] = mapInterpreterDiagnostics(
+      [{ code: 'PSL_SPANLESS', message: 'no span available' }],
+      sourceFile,
+    );
 
     expect(mapped).toEqual({
       range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },

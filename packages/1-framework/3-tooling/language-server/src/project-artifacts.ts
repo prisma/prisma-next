@@ -67,7 +67,10 @@ export function createProjectArtifacts(options: ProjectArtifactsOptions): Projec
           },
           interpretation.context,
         );
-        memo = mapInterpreterDiagnostics(result.ok ? [] : result.failure.diagnostics);
+        memo = mapInterpreterDiagnostics(
+          result.ok ? [] : result.failure.diagnostics,
+          computed.sourceFile,
+        );
       }
       return memo;
     };
