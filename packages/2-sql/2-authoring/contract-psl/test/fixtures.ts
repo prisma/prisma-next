@@ -286,7 +286,6 @@ export function buildSymbolTableInput(
   schema: string,
   options?: {
     readonly sourceId?: string;
-    readonly scalarTypes?: readonly string[];
     readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
   },
 ): {
@@ -297,13 +296,11 @@ export function buildSymbolTableInput(
   enumInferenceCodecs: { readonly text: string; readonly int: string };
 } {
   const sourceId = options?.sourceId ?? 'schema.prisma';
-  const scalarTypes = options?.scalarTypes ?? [...postgresScalarTypeDescriptors.keys()];
   const pslBlockDescriptors = options?.pslBlockDescriptors ?? {};
   const { document, sourceFile } = parse(schema);
   const { table, diagnostics } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes,
     pslBlockDescriptors,
   });
   const seedDiagnostics: ContractSourceDiagnostic[] = diagnostics.map((diagnostic) => ({

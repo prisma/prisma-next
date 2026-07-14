@@ -85,15 +85,14 @@ export type {
   CompositeTypeSymbol,
   FieldSymbol,
   ModelSymbol,
+  NamedTypeSymbol,
   NamespaceSymbol,
   ResolvedAttribute,
   ResolvedAttributeArg,
   ResolvedNamedTypeBinding,
   ResolvedTypeConstructorCall,
-  ScalarSymbol,
   SymbolTable,
   SymbolTableResult,
   TopLevelScope,
-  TypeAliasSymbol,
 } from '../symbol-table';
 export { buildSymbolTable } from '../symbol-table';

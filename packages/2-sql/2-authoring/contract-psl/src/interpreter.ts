@@ -49,12 +49,11 @@ import {
   findBlockDescriptor,
   keywordPslSpan,
   type ModelSymbol,
+  type NamedTypeSymbol,
   type NamespaceSymbol,
   nodePslSpan,
   type ResolvedAttribute,
-  type ScalarSymbol,
   type SymbolTable,
-  type TypeAliasSymbol,
 } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type {
@@ -115,8 +114,6 @@ import {
   interpretModelAttribute,
   uniqueModelSpec,
 } from './sql-attribute-specs';
-
-type NamedTypeSymbol = ScalarSymbol | TypeAliasSymbol;
 
 export interface InterpretPslDocumentToSqlContractInput {
   readonly symbolTable: SymbolTable;
@@ -2160,9 +2157,17 @@ export function interpretPslDocumentToSqlContract(
   // ready for field resolution. The checkpoint after field resolution catches
   // this pass's failures too.
 
+  // Resolve scalar-refinement bindings ahead of alias/constructor bindings,
+  // preserving the emission order the retired scalar/alias symbol-table split
+  // induced — emitted artifacts stay byte-identical across that refactor.
+  const isScalarRefinement = (symbol: NamedTypeSymbol): boolean =>
+    !symbol.isConstructor &&
+    symbol.baseType !== undefined &&
+    input.scalarColumnDescriptors.has(symbol.baseType);
+  const allNamedTypes = Object.values(topLevel.namedTypes);
   const namedTypeSymbols: readonly NamedTypeSymbol[] = [
-    ...Object.values(topLevel.scalars),
-    ...Object.values(topLevel.typeAliases),
+    ...allNamedTypes.filter(isScalarRefinement),
+    ...allNamedTypes.filter((symbol) => !isScalarRefinement(symbol)),
   ];
 
   const namedTypeResult = resolveNamedTypeDeclarations({

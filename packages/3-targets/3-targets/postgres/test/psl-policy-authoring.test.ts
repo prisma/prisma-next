@@ -102,17 +102,6 @@ namespace public {
     const { table, diagnostics } = buildSymbolTable({
       document,
       sourceFile,
-      scalarTypes: [
-        'String',
-        'Int',
-        'Boolean',
-        'BigInt',
-        'Float',
-        'Decimal',
-        'DateTime',
-        'Json',
-        'Bytes',
-      ],
       pslBlockDescriptors: assembled.pslBlockDescriptors,
     });
     return { symbolTable: table, sourceFile, diagnostics };
@@ -235,7 +224,6 @@ namespace public {
     const { table: symbolTable, diagnostics } = buildSymbolTable({
       document,
       sourceFile,
-      scalarTypes: [...scalarColumnDescriptors.keys()],
       pslBlockDescriptors: assembled.pslBlockDescriptors,
     });
 

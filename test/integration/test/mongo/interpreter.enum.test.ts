@@ -64,7 +64,6 @@ function interpret(
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
     pslBlockDescriptors: descriptors ?? {},
   });
   return interpretPslDocumentToMongoContract({

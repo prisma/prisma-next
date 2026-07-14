@@ -18,7 +18,6 @@ function interpret(schema: string) {
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarColumnDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   return interpretPslDocumentToSqlContract({

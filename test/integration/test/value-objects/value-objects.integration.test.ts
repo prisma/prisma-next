@@ -77,7 +77,6 @@ function interpretMongoPsl(schema: string) {
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   return interpretPslDocumentToMongoContract({
@@ -93,7 +92,6 @@ function interpretSqlPsl(schema: string) {
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...postgresScalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   return interpretPslDocumentToSqlContract({

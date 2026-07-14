@@ -161,7 +161,6 @@ function parseAndSymbolTableDiagnostics(source: string): {
   const { diagnostics: symbolTableDiagnostics } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypes],
     pslBlockDescriptors: {},
   });
   return { parseDiagnostics, symbolTableDiagnostics };

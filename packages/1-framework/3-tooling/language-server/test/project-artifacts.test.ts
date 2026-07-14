@@ -166,7 +166,6 @@ describe('createProjectArtifacts', () => {
     const { diagnostics: symbolTableDiagnostics } = buildSymbolTable({
       document,
       sourceFile,
-      scalarTypes: controlStack.scalarTypes,
       pslBlockDescriptors: controlStack.pslBlockDescriptors,
     });
 
