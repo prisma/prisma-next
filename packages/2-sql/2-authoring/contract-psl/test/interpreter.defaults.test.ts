@@ -8,7 +8,7 @@ import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
   postgresTarget,
-  sqliteScalarTypeDescriptors,
+  sqliteScalarColumnDescriptors,
   sqliteTarget,
   symbolTableInputFromParseArgs,
   temporalCodecPresetMirrors,
@@ -23,7 +23,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
       | 'target'
-      | 'scalarTypeDescriptors'
+      | 'scalarColumnDescriptors'
       | 'composedExtensionContracts'
       | 'createNamespace'
       | 'capabilities'
@@ -32,7 +32,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
   ) =>
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
       capabilities: { sql: { scalarList: true } },
@@ -461,7 +461,7 @@ model UuidNativeBad {
     const result = interpretPslDocumentToSqlContractInternal({
       ...document,
       target: sqliteTarget,
-      scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+      scalarColumnDescriptors: sqliteScalarColumnDescriptors,
       composedExtensionContracts: new Map(),
       controlMutationDefaults: builtinControlMutationDefaults,
       authoringContributions: sqliteTemporalContributions,

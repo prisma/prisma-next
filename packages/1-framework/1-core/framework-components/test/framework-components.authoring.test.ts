@@ -8,6 +8,7 @@ import type {
 import {
   assertNoCrossRegistryCollisions,
   classifyEnumMemberType,
+  collectScalarTypeConstructors,
   hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
@@ -835,6 +836,77 @@ describe('authoring template resolution', () => {
     expect(instantiateAuthoringFieldPreset(descriptor, [123]).default).toEqual({
       kind: 'function',
       expression: '123',
+    });
+  });
+});
+
+describe('collectScalarTypeConstructors', () => {
+  it('collects top-level zero-arg constructors with explicit nativeType as {codecId, nativeType}', () => {
+    const namespace = {
+      String: { kind: 'typeConstructor', output: { codecId: 'pg/text@1', nativeType: 'text' } },
+      Int: { kind: 'typeConstructor', output: { codecId: 'pg/int4@1', nativeType: 'int4' } },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(Object.fromEntries(collectScalarTypeConstructors(namespace))).toEqual({
+      String: { codecId: 'pg/text@1', nativeType: 'text' },
+      Int: { codecId: 'pg/int4@1', nativeType: 'int4' },
+    });
+  });
+
+  it('excludes namespaced constructors from the scalar view', () => {
+    const namespace = {
+      String: { kind: 'typeConstructor', output: { codecId: 'pg/text@1', nativeType: 'text' } },
+      sql: {
+        String: {
+          kind: 'typeConstructor',
+          args: [{ kind: 'number', name: 'length' }],
+          output: { codecId: 'sql/varchar@1', nativeType: 'character varying' },
+        },
+      },
+    } satisfies AuthoringTypeNamespace;
+
+    expect([...collectScalarTypeConstructors(namespace).keys()]).toEqual(['String']);
+  });
+
+  it('excludes top-level constructors that declare args', () => {
+    const namespace = {
+      Vector: {
+        kind: 'typeConstructor',
+        args: [{ kind: 'number', name: 'length', integer: true, minimum: 1 }],
+        output: { codecId: 'pg/vector@1', nativeType: 'vector' },
+      },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(collectScalarTypeConstructors(namespace).size).toBe(0);
+  });
+
+  it('excludes top-level constructors that declare an entityRefArg', () => {
+    const namespace = {
+      enum: {
+        kind: 'typeConstructor',
+        entityRefArg: { index: 0, entityKind: 'native_enum' },
+        output: { codecId: 'pg/enum@1' },
+      },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(collectScalarTypeConstructors(namespace).size).toBe(0);
+  });
+
+  it('excludes zero-arg constructors without a literal nativeType', () => {
+    const namespace = {
+      Odd: { kind: 'typeConstructor', output: { codecId: 'pg/odd@1' } },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(collectScalarTypeConstructors(namespace).size).toBe(0);
+  });
+
+  it('treats an explicit empty args array as zero-arg', () => {
+    const namespace = {
+      Plain: { kind: 'typeConstructor', args: [], output: { codecId: 'a@1', nativeType: 'text' } },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(Object.fromEntries(collectScalarTypeConstructors(namespace))).toEqual({
+      Plain: { codecId: 'a@1', nativeType: 'text' },
     });
   });
 });

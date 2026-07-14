@@ -13,6 +13,7 @@ import {
   type AuthoringEntityTypeNamespace,
   type AuthoringFieldPresetDescriptor,
   type AuthoringPslBlockDescriptorNamespace,
+  type AuthoringTypeNamespace,
   type PslExtensionBlock,
   resolveEnumCodecId,
 } from '@prisma-next/framework-components/authoring';
@@ -236,6 +237,26 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
   version: '1.2.3-test',
 };
 
+export const postgresScalarTypeDescriptors = new Map([
+  ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
+  ['Boolean', { codecId: 'pg/bool@1', nativeType: 'bool' }],
+  ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
+  ['BigInt', { codecId: 'pg/int8@1', nativeType: 'int8' }],
+  ['Float', { codecId: 'pg/float8@1', nativeType: 'float8' }],
+  ['Decimal', { codecId: 'pg/numeric@1', nativeType: 'numeric' }],
+  ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
+  ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
+  ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
+] as const);
+
+/** The postgres base scalars in unified-namespace form: top-level zero-arg type constructors. */
+export const postgresScalarAuthoringTypes: AuthoringTypeNamespace = Object.fromEntries(
+  [...postgresScalarTypeDescriptors].map(([name, output]) => [
+    name,
+    { kind: 'typeConstructor' as const, output },
+  ]),
+);
+
 /**
  * Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather than importing the real pgvector pack, so interpreter unit tests stay layer-isolated. Real-pack parity is covered by `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`.
  */
@@ -245,6 +266,7 @@ export const pgvectorAuthoringContributions = {
   pslBlockDescriptors: {},
   modelAttributes: {},
   type: {
+    ...postgresScalarAuthoringTypes,
     pgvector: {
       Vector: {
         kind: 'typeConstructor',
@@ -259,19 +281,7 @@ export const pgvectorAuthoringContributions = {
       },
     },
   },
-} as const satisfies AuthoringContributions;
-
-export const postgresScalarTypeDescriptors = new Map([
-  ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
-  ['Boolean', { codecId: 'pg/bool@1', nativeType: 'bool' }],
-  ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
-  ['BigInt', { codecId: 'pg/int8@1', nativeType: 'int8' }],
-  ['Float', { codecId: 'pg/float8@1', nativeType: 'float8' }],
-  ['Decimal', { codecId: 'pg/numeric@1', nativeType: 'numeric' }],
-  ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
-  ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
-  ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
-] as const);
+} satisfies AuthoringContributions;
 
 export function buildSymbolTableInput(
   schema: string,
@@ -331,7 +341,7 @@ export function symbolTableInputFromParseArgs(args: {
   });
 }
 
-export const sqliteScalarTypeDescriptors = new Map([
+export const sqliteScalarColumnDescriptors = new Map([
   ['String', { codecId: 'sqlite/text@1', nativeType: 'text' }],
   ['Boolean', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
   ['Int', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
@@ -342,18 +352,6 @@ export const sqliteScalarTypeDescriptors = new Map([
   ['Json', { codecId: 'sqlite/json@1', nativeType: 'text' }],
   ['Bytes', { codecId: 'sqlite/blob@1', nativeType: 'blob' }],
 ] as const);
-
-export const postgresCodecIdOnlyDescriptors = new Map<string, string>([
-  ['String', 'pg/text@1'],
-  ['Boolean', 'pg/bool@1'],
-  ['Int', 'pg/int4@1'],
-  ['BigInt', 'pg/int8@1'],
-  ['Float', 'pg/float8@1'],
-  ['Decimal', 'pg/numeric@1'],
-  ['DateTime', 'pg/timestamptz@1'],
-  ['Json', 'pg/jsonb@1'],
-  ['Bytes', 'pg/bytea@1'],
-]);
 
 const targetTypesByCodecId: Record<string, readonly string[]> = {
   'pg/text@1': ['text'],
@@ -393,10 +391,9 @@ export function createPostgresTestContext(
   return {
     composedExtensionPacks: [],
     composedExtensionContracts: new Map(),
-    scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
     authoringContributions: {
       field: {},
-      type: {},
+      type: postgresScalarAuthoringTypes,
       entityTypes: {},
       pslBlockDescriptors: {},
       modelAttributes: {},

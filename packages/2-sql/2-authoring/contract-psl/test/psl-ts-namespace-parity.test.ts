@@ -54,7 +54,7 @@ namespace public {
     const pslResult = interpretPslDocumentToSqlContract({
       ...pslDocument,
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       createNamespace: createTestSqlNamespace,
@@ -179,7 +179,7 @@ namespace public {
     const pslResult = interpretPslDocumentToSqlContract({
       ...pslDocument,
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map([['supabase', syntheticExtensionContract]]),
@@ -251,7 +251,7 @@ namespace public {
     const result = interpretPslDocumentToSqlContract({
       ...pslDocument,
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionPacks: ['supabase'],
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,

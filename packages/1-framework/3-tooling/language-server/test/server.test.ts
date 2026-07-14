@@ -420,8 +420,14 @@ function startHarness(
     getDocumentAst: (uri) => server.getDocumentAst(uri),
     getProjectSymbolTable: (uri) => server.getProjectSymbolTable(uri),
     dispose: () => {
-      client.dispose();
+      // Dispose the server first: this sets its `disposed` flag before the
+      // transport dies, so an in-flight `publish` rejection is swallowed by
+      // the guard in `publishSafely` instead of being logged through a
+      // connection that the client has already torn down (which would throw
+      // "Connection is disposed" inside a fire-and-forget notification and
+      // surface as an unhandled rejection).
       server.dispose();
+      client.dispose();
       clientToServer.end();
       serverToClient.end();
     },
@@ -556,11 +562,12 @@ function deferredSettleable<T>(): {
 let harness: Harness | undefined;
 
 afterEach(async () => {
-  // The server's `disposed` guard (see `createServer`) is what prevents an
-  // in-flight `publish` from sending on a disposed connection. This tick is a
-  // separate concern: it lets any in-flight JSON-RPC request/response write
-  // flush before the streams are torn down, so vscode-jsonrpc's own internal
-  // error logging doesn't reject a notification mid-transmission.
+  // The harness disposes the server before the client (see `dispose` above),
+  // so the server's `disposed` guard is raised before the transport dies and
+  // an in-flight `publish` can never log through a dead connection. This tick
+  // is a separate concern: it lets any in-flight JSON-RPC request/response
+  // write flush before the streams are torn down, so vscode-jsonrpc's own
+  // internal error logging doesn't reject a notification mid-transmission.
   await new Promise((resolve) => setTimeout(resolve, 0));
   harness?.dispose();
   harness = undefined;

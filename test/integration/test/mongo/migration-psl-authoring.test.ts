@@ -65,7 +65,7 @@ const mongoCodecLookup: CodecLookup = {
 };
 
 function pslToContract(schema: string): MongoContract {
-  const scalarTypeDescriptors = new Map([
+  const scalarTypeCodecIds = new Map([
     ['String', 'mongo/string@1'],
     ['Int', 'mongo/int32@1'],
     ['Boolean', 'mongo/bool@1'],
@@ -77,14 +77,14 @@ function pslToContract(schema: string): MongoContract {
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypeDescriptors.keys()],
+    scalarTypes: [...scalarTypeCodecIds.keys()],
     pslBlockDescriptors: {},
   });
   const result = interpretPslDocumentToMongoContract({
     symbolTable,
     sourceFile,
     sourceId: 'test.prisma',
-    scalarTypeDescriptors,
+    scalarTypeCodecIds,
     codecLookup: mongoCodecLookup,
   });
   if (!result.ok) {

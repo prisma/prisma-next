@@ -97,7 +97,7 @@ const authoringContributions = {
   },
 } as const satisfies AuthoringContributions;
 
-const scalarTypeDescriptors = new Map([
+const scalarColumnDescriptors = new Map([
   ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
   ['String', { codecId: 'sql/text@1', nativeType: 'text' }],
   ['DateTime', { codecId: 'sql/timestamp@1', nativeType: 'timestamp' }],
@@ -348,7 +348,7 @@ describe('TS and PSL authoring parity', () => {
   function expectTimestampParity(target: {
     readonly buildTsContract: () => unknown;
     readonly targetPack: TargetPackRef<'sql', string>;
-    readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnTypeDescriptor>;
+    readonly scalarColumnDescriptors: ReadonlyMap<string, ColumnTypeDescriptor>;
     readonly authoringContributions: AuthoringContributions;
   }): void {
     const tsContract = target.buildTsContract();
@@ -360,7 +360,7 @@ describe('TS and PSL authoring parity', () => {
     const interpreted = interpretPslDocumentToSqlContract({
       ...pslDocument,
       target: target.targetPack,
-      scalarTypeDescriptors: target.scalarTypeDescriptors,
+      scalarColumnDescriptors: target.scalarColumnDescriptors,
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions: target.authoringContributions,
@@ -377,7 +377,7 @@ describe('TS and PSL authoring parity', () => {
     expectTimestampParity({
       buildTsContract: buildSqliteTimestampTsContract,
       targetPack: sqliteTimestampTargetPack,
-      scalarTypeDescriptors: sqliteTimestampScalarTypeDescriptors,
+      scalarColumnDescriptors: sqliteTimestampScalarTypeDescriptors,
       authoringContributions: sqliteTimestampAuthoringContributions,
     });
   });
@@ -386,7 +386,7 @@ describe('TS and PSL authoring parity', () => {
     expectTimestampParity({
       buildTsContract: buildPostgresTimestampTsContract,
       targetPack: postgresTimestampTargetPack,
-      scalarTypeDescriptors: postgresTimestampScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresTimestampScalarTypeDescriptors,
       authoringContributions: postgresTimestampAuthoringContributions,
     });
   });
@@ -412,7 +412,7 @@ model Post {
     const pslContract = interpretPslDocumentToSqlContract({
       ...pslDocument,
       target: portablePostgresTargetPack,
-      scalarTypeDescriptors,
+      scalarColumnDescriptors,
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions,

@@ -758,6 +758,62 @@ export function mergeAuthoringNamespaces(
 }
 
 /**
+ * Collects the full dotted paths of every well-formed descriptor of
+ * `descriptorKind` in a raw contribution tree, using the same boundary
+ * classification as {@link mergeAuthoringNamespaces}. Lets assembly-level
+ * callers attribute each contributed path to its contributing component
+ * before merging, so a same-path collision can be reported naming both
+ * contributors.
+ */
+export function collectContributedDescriptorPaths(
+  namespace: Record<string, unknown>,
+  descriptorKind: string,
+  path: readonly string[] = [],
+): string[] {
+  const paths: string[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isWellFormedDescriptor(value, descriptorKind)) {
+      paths.push(currentPath.join('.'));
+      continue;
+    }
+    if (isCopyableNamespaceObject(value)) {
+      paths.push(...collectContributedDescriptorPaths(value, descriptorKind, currentPath));
+    }
+  }
+  return paths;
+}
+
+export interface ScalarTypeConstructorOutput {
+  readonly codecId: string;
+  readonly nativeType: string;
+}
+
+/**
+ * Derives the scalar view of an assembled authoring type namespace: every
+ * **top-level** zero-arg type constructor whose output declares an explicit
+ * literal storage type name. A bare type name `T` in a schema is
+ * semantically the zero-arg instantiation `T()`, so these entries are
+ * exactly the base scalars a target registers. Constructors registered
+ * under a namespace segment, constructors declaring args, and entity-ref
+ * constructors are not scalars and are excluded.
+ */
+export function collectScalarTypeConstructors(
+  namespace: AuthoringTypeNamespace,
+): ReadonlyMap<string, ScalarTypeConstructorOutput> {
+  const result = new Map<string, ScalarTypeConstructorOutput>();
+  for (const [name, value] of Object.entries(namespace)) {
+    if (!isAuthoringTypeConstructorDescriptor(value)) continue;
+    if (value.args !== undefined && value.args.length > 0) continue;
+    if (value.entityRefArg !== undefined) continue;
+    const nativeType = value.output.nativeType;
+    if (typeof nativeType !== 'string') continue;
+    result.set(name, { codecId: value.output.codecId, nativeType });
+  }
+  return result;
+}
+
+/**
  * Shape shared by every `Authoring*Namespace` type: a tree whose leaves are
  * descriptors of type `D` and whose internal nodes are sub-namespaces of the
  * same shape. `collectDescriptorPaths` and `collectDescriptorEntries` are

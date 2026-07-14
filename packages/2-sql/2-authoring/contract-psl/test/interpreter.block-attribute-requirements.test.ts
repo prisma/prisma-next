@@ -53,7 +53,7 @@ function interpretWith(schema: string) {
   return interpretPslDocumentToSqlContract({
     ...document,
     target: postgresTarget,
-    scalarTypeDescriptors: postgresScalarTypeDescriptors,
+    scalarColumnDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),
     createNamespace: createTestSqlNamespace,
     capabilities: { sql: { scalarList: true } },

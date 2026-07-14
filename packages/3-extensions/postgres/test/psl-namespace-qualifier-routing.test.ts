@@ -67,7 +67,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
     const result = interpretPslDocumentToSqlContract({
       ...document,
       target: postgresTargetPackRef,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: postgresCreateNamespace,
       capabilities: { sql: { scalarList: true } },
@@ -104,7 +104,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
     const result = interpretPslDocumentToSqlContract({
       ...document,
       target: postgresTargetPackRef,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: postgresCreateNamespace,
       capabilities: { sql: { scalarList: true } },
@@ -134,7 +134,7 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
     const result = interpretPslDocumentToSqlContract({
       ...document,
       target: postgresTargetPackRef,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: postgresCreateNamespace,
       capabilities: { sql: { scalarList: true } },

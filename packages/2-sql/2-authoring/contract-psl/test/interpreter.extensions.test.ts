@@ -13,7 +13,7 @@ import {
 
 const baseInput = {
   target: postgresTarget,
-  scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  scalarColumnDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
   capabilities: { sql: { scalarList: true } },
@@ -582,7 +582,7 @@ namespace public {
     const result = interpretPslDocumentToSqlContract({
       ...symbolTableInput,
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       authoringContributions,
       createNamespace,

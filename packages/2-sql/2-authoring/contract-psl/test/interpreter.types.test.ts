@@ -13,7 +13,7 @@ import {
 
 const baseInput = {
   target: postgresTarget,
-  scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  scalarColumnDescriptors: postgresScalarTypeDescriptors,
   authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,

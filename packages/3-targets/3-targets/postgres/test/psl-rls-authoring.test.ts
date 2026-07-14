@@ -70,7 +70,7 @@ function interpret(source: string, options?: { readonly withoutModelAttributes?:
     sourceFile,
     sourceId: 'schema.prisma',
     target: postgresTarget,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors: scalarTypeDescriptors,
     authoringContributions: options?.withoutModelAttributes
       ? { ...assembled, modelAttributes: {} }
       : assembled,

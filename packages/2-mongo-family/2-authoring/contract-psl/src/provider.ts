@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
+import { collectScalarTypeConstructors } from '@prisma-next/framework-components/authoring';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { PslInterpretCapable } from '@prisma-next/psl-parser/interpret';
 import { withSeedDiagnostics } from '@prisma-next/psl-parser/interpret';
@@ -40,7 +41,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         sourceFile: input.sourceFile,
         sourceId: input.sourceId,
         seedDiagnostics: [],
-        scalarTypeDescriptors: context.scalarTypeDescriptors,
+        scalarTypeCodecIds,
         codecLookup: context.codecLookup,
         authoringContributions: context.authoringContributions,
         ...ifDefined('enumInferenceCodecs', options?.enumInferenceCodecs),

@@ -48,7 +48,7 @@ export async function resolveConfigInputs(configPath: string): Promise<ConfigRes
 
 function pipelineInputsFromStack(stack: ControlStack): PipelineInputs {
   return {
-    scalarTypes: [...stack.scalarTypeDescriptors.keys()],
+    scalarTypes: [...stack.scalarTypes],
     pslBlockDescriptors: stack.authoringContributions.pslBlockDescriptors,
   };
 }
