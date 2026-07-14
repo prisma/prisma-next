@@ -528,12 +528,111 @@ describe('collectScalarTypeConstructors', () => {
     expect([...collectScalarTypeConstructors(namespace).keys()]).toEqual(['String']);
   });
 
-  it('excludes top-level constructors that declare args', () => {
+  it('excludes top-level constructors that declare required args', () => {
     const namespace = {
       Vector: {
         kind: 'typeConstructor',
         args: [{ kind: 'number', name: 'length', integer: true, minimum: 1 }],
         output: { codecId: 'pg/vector@1', nativeType: 'vector' },
+      },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(collectScalarTypeConstructors(namespace).size).toBe(0);
+  });
+
+  it('includes an all-optional-args constructor with exactly its zero-arg instantiation output', () => {
+    const VarCharish = {
+      kind: 'typeConstructor',
+      args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+      output: {
+        codecId: 'sql/varchar@1',
+        nativeType: 'character varying',
+        typeParams: { length: { kind: 'arg', index: 0 } },
+      },
+    } satisfies AuthoringTypeConstructorDescriptor;
+    const namespace = { VarCharish } satisfies AuthoringTypeNamespace;
+
+    const bare = collectScalarTypeConstructors(namespace).get('VarCharish');
+    expect(bare).toEqual(instantiateAuthoringTypeConstructor(VarCharish, []));
+    expect(bare).toEqual({
+      codecId: 'sql/varchar@1',
+      nativeType: 'character varying',
+      typeParams: {},
+    });
+  });
+
+  it('applies a template default in bare form, same as the zero-arg call', () => {
+    const Defaulted = {
+      kind: 'typeConstructor',
+      args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+      output: {
+        codecId: 'sql/varchar@1',
+        nativeType: 'character varying',
+        typeParams: { length: { kind: 'arg', index: 0, default: 191 } },
+      },
+    } satisfies AuthoringTypeConstructorDescriptor;
+    const namespace = { Defaulted } satisfies AuthoringTypeNamespace;
+
+    const bare = collectScalarTypeConstructors(namespace).get('Defaulted');
+    expect(bare).toEqual(instantiateAuthoringTypeConstructor(Defaulted, []));
+    expect(bare).toEqual({
+      codecId: 'sql/varchar@1',
+      nativeType: 'character varying',
+      typeParams: { length: 191 },
+    });
+  });
+
+  it('excludes an all-optional constructor whose nativeType references an absent arg with no default', () => {
+    const namespace = {
+      Custom: {
+        kind: 'typeConstructor',
+        args: [{ kind: 'string', name: 'name', optional: true }],
+        output: { codecId: 'pg/custom@1', nativeType: { kind: 'arg', index: 0 } },
+      },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(collectScalarTypeConstructors(namespace).size).toBe(0);
+  });
+
+  it('resolves a defaulted nativeType arg-ref in bare form', () => {
+    const namespace = {
+      Aliased: {
+        kind: 'typeConstructor',
+        args: [{ kind: 'string', name: 'name', optional: true }],
+        output: {
+          codecId: 'pg/custom@1',
+          nativeType: { kind: 'arg', index: 0, default: 'custom' },
+        },
+      },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(Object.fromEntries(collectScalarTypeConstructors(namespace))).toEqual({
+      Aliased: { codecId: 'pg/custom@1', nativeType: 'custom' },
+    });
+  });
+
+  it('excludes constructors mixing an optional arg with a required one', () => {
+    const namespace = {
+      Mixed: {
+        kind: 'typeConstructor',
+        args: [
+          { kind: 'number', name: 'precision', integer: true },
+          { kind: 'number', name: 'scale', integer: true, optional: true },
+        ],
+        output: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
+      },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(collectScalarTypeConstructors(namespace).size).toBe(0);
+  });
+
+  it('excludes all-optional constructors that declare an entityRefArg', () => {
+    const namespace = {
+      Ref: {
+        kind: 'typeConstructor',
+        args: [{ kind: 'string', name: 'entity', optional: true }],
+        entityRefArg: { index: 0, entityKind: 'native_enum' },
+        output: { codecId: 'pg/enum@1', nativeType: 'enum' },
       },
     } satisfies AuthoringTypeNamespace;
 

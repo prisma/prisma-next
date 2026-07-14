@@ -732,16 +732,20 @@ export function collectContributedDescriptorPaths(
 export interface ScalarTypeConstructorOutput {
   readonly codecId: string;
   readonly nativeType: string;
+  readonly typeParams?: Record<string, unknown>;
 }
 
 /**
  * Derives the scalar view of an assembled authoring type namespace: every
- * **top-level** zero-arg type constructor whose output declares an explicit
- * literal storage type name. A bare type name `T` in a schema is
- * semantically the zero-arg instantiation `T()`, so these entries are
- * exactly the base scalars a target registers. Constructors registered
- * under a namespace segment, constructors declaring args, and entity-ref
- * constructors are not scalars and are excluded.
+ * **top-level** type constructor that is instantiable with an empty argument
+ * list — all declared args optional, no entity-ref argument, and an output
+ * template that resolves without arguments. A bare type name `T` in a schema
+ * is semantically the zero-arg instantiation `T()`, so each entry is exactly
+ * what that call produces (defaulted template values applied, absent
+ * optional-arg typeParams keys omitted). Constructors registered under a
+ * namespace segment, constructors with required args, entity-ref
+ * constructors, and constructors whose template needs an argument (e.g. an
+ * arg-ref `nativeType` with no default) are not scalars and are excluded.
  */
 export function collectScalarTypeConstructors(
   namespace: AuthoringTypeNamespace,
@@ -749,11 +753,14 @@ export function collectScalarTypeConstructors(
   const result = new Map<string, ScalarTypeConstructorOutput>();
   for (const [name, value] of Object.entries(namespace)) {
     if (!isAuthoringTypeConstructorDescriptor(value)) continue;
-    if (value.args !== undefined && value.args.length > 0) continue;
     if (value.entityRefArg !== undefined) continue;
-    const nativeType = value.output.nativeType;
-    if (typeof nativeType !== 'string') continue;
-    result.set(name, { codecId: value.output.codecId, nativeType });
+    if (value.args?.some((arg) => arg.optional !== true)) continue;
+    try {
+      result.set(name, instantiateAuthoringTypeConstructor(value, []));
+    } catch {
+      // The output template does not resolve with an empty argument list,
+      // so the constructor is not bare-eligible.
+    }
   }
   return result;
 }

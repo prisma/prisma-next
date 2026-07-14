@@ -241,7 +241,7 @@ export function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarations
         kind: 'codec-instance',
         codecId: baseDescriptor.codecId,
         nativeType: baseDescriptor.nativeType,
-        typeParams: {},
+        typeParams: baseDescriptor.typeParams ?? {},
       },
     ]);
   }
