@@ -6,7 +6,7 @@ This guide describes the canonical authoring shape for codecs in Prisma Next: **
 
 A codec is **three artifacts**:
 
-1. A **codec class** that extends `CodecImpl<Id, TTraits, TWire, TInput>` and implements `encode` / `decode` (and `encodeJson` / `decodeJson` when the wire is not already JSON-safe).
+1. A **codec class** that extends `CodecImpl<Id, TTraits, TWire, TInput>` and implements all four conversion methods: `encode`, `decode`, `encodeJson`, and `decodeJson`.
 2. A **descriptor class** that extends `CodecDescriptorImpl<P>` and declares the codec id, traits, target types, params schema, and the curried factory that materializes codec instances.
 3. A **per-codec column helper function** that calls `descriptor.factory(...)` directly and packages the result into a `ColumnSpec` via the framework-supplied `column(...)` packager. The helper carries a `satisfies ColumnHelperFor<D>` clause that ties it to its descriptor at compile time.
 
@@ -50,7 +50,12 @@ class PgTextCodec extends CodecImpl<
   async encode(value: string, _ctx: CodecCallContext) { return value; }
   async decode(wire: string, _ctx: CodecCallContext) { return wire; }
   encodeJson(value: string) { return value; }
-  decodeJson(json: JsonValue) { return String(json); }
+  decodeJson(json: JsonValue) {
+    if (typeof json !== 'string') {
+      throw new TypeError('Expected a string JSON value');
+    }
+    return json;
+  }
 }
 
 class PgTextDescriptor extends CodecDescriptorImpl<void> {

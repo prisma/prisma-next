@@ -54,7 +54,7 @@ export interface Codec<
 /**
  * Abstract base class for concrete codec implementations.
  *
- * Codec authors extend this class with their typed `Id`, `TTraits`, `TWire`, `TInput` and override `encode`/`decode` (and optionally `encodeJson`/`decodeJson`). The runtime instance carries only its `id` (proxied through the descriptor so alias subclasses inherit the descriptor's id automatically) and the conversion methods — static metadata lives on the {@link CodecDescriptor}.
+ * Codec authors extend this class with their typed `Id`, `TTraits`, `TWire`, `TInput` and override all four abstract conversion methods: `encode`, `decode`, `encodeJson`, and `decodeJson`. The runtime instance carries only its `id` (proxied through the descriptor so alias subclasses inherit the descriptor's id automatically) and the conversion methods — static metadata lives on the {@link CodecDescriptor}.
  */
 export abstract class CodecImpl<
   Id extends string = string,
