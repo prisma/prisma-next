@@ -20,11 +20,11 @@ function loadedConfig(sourceFormat: string, inputs: readonly string[]): PrismaNe
 }
 
 function stubStack(
-  scalarTypeDescriptors: ReadonlyMap<string, string>,
+  scalarTypes: readonly string[],
   pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace,
 ): ControlStack {
   return {
-    scalarTypeDescriptors,
+    scalarTypes,
     authoringContributions: { pslBlockDescriptors },
   } as unknown as ControlStack;
 }
@@ -73,9 +73,7 @@ describe('resolveConfigInputs', { timeout: timeouts.coldTransformImport }, () =>
     vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(
       loadedConfig('psl', ['/abs/schema.psl']),
     );
-    vi.spyOn(control, 'createControlStack').mockReturnValue(
-      stubStack(new Map([['Int', 'int']]), {}),
-    );
+    vi.spyOn(control, 'createControlStack').mockReturnValue(stubStack(['Int'], {}));
 
     const result = await resolveConfigInputs('/abs/prisma-next.config.ts');
 
@@ -111,13 +109,7 @@ describe('resolveControlStackInputs', () => {
       },
     };
     vi.spyOn(control, 'createControlStack').mockReturnValue(
-      stubStack(
-        new Map([
-          ['Int', 'int'],
-          ['String', 'string'],
-        ]),
-        pslBlockDescriptors,
-      ),
+      stubStack(['Int', 'String'], pslBlockDescriptors),
     );
 
     const result = resolveControlStackInputs(loadedConfig('psl', ['/abs/schema.psl']));

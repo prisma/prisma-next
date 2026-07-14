@@ -3387,6 +3387,9 @@ importers:
       '@prisma-next/mongo-emitter':
         specifier: workspace:0.14.0
         version: link:../../2-mongo-family/3-tooling/emitter
+      '@prisma-next/psl-parser':
+        specifier: workspace:0.14.0
+        version: link:../../1-framework/2-authoring/psl-parser
       '@prisma-next/test-utils':
         specifier: workspace:0.14.0
         version: link:../../../test/utils
@@ -3849,6 +3852,9 @@ importers:
         specifier: ^2.0.3
         version: 2.0.3
     devDependencies:
+      '@prisma-next/psl-parser':
+        specifier: workspace:0.14.0
+        version: link:../../1-framework/2-authoring/psl-parser
       '@prisma-next/test-utils':
         specifier: workspace:0.14.0
         version: link:../../../test/utils

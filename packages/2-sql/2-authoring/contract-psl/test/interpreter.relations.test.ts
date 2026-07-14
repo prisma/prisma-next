@@ -14,7 +14,7 @@ import { unboundTables } from './unbound-tables';
 
 const baseInput = {
   target: postgresTarget,
-  scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  scalarColumnDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
   capabilities: { sql: { scalarList: true } },

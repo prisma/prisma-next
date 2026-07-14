@@ -1,5 +1,6 @@
 import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import { timestampNowControlDescriptor } from '@prisma-next/family-sql/control';
+import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
 import type {
   ControlMutationDefaultEntry,
   MutationDefaultGeneratorDescriptor,
@@ -308,16 +309,36 @@ const sqliteDefaultFunctionRegistryEntries = [
   ['dbgenerated', { lower: lowerDbgenerated, usageSignatures: ['dbgenerated("...")'] }],
 ] satisfies ReadonlyArray<readonly [string, ControlMutationDefaultEntry]>;
 
-const sqliteScalarTypeDescriptors = new Map<string, string>([
-  ['String', SQLITE_TEXT_CODEC_ID],
-  ['Int', SQLITE_INTEGER_CODEC_ID],
-  ['BigInt', SQLITE_BIGINT_CODEC_ID],
-  ['Float', SQLITE_REAL_CODEC_ID],
-  ['Decimal', SQLITE_TEXT_CODEC_ID],
-  ['DateTime', SQLITE_DATETIME_CODEC_ID],
-  ['Json', SQLITE_JSON_CODEC_ID],
-  ['Bytes', SQLITE_BLOB_CODEC_ID],
-]);
+/**
+ * The base PSL scalars as zero-arg type constructors in the unified authoring
+ * channel, with explicit `nativeType` values pinned to the codec manifests
+ * (`codecLookup.targetTypesFor(codecId)[0]`).
+ */
+export const sqliteScalarAuthoringTypes = {
+  String: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_TEXT_CODEC_ID, nativeType: 'text' },
+  },
+  Int: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_INTEGER_CODEC_ID, nativeType: 'integer' },
+  },
+  BigInt: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_BIGINT_CODEC_ID, nativeType: 'integer' },
+  },
+  Float: { kind: 'typeConstructor', output: { codecId: SQLITE_REAL_CODEC_ID, nativeType: 'real' } },
+  Decimal: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_TEXT_CODEC_ID, nativeType: 'text' },
+  },
+  DateTime: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_DATETIME_CODEC_ID, nativeType: 'text' },
+  },
+  Json: { kind: 'typeConstructor', output: { codecId: SQLITE_JSON_CODEC_ID, nativeType: 'text' } },
+  Bytes: { kind: 'typeConstructor', output: { codecId: SQLITE_BLOB_CODEC_ID, nativeType: 'blob' } },
+} as const satisfies AuthoringTypeNamespace;
 
 export function createSqliteDefaultFunctionRegistry(): ReadonlyMap<
   string,
@@ -351,8 +372,4 @@ export function createSqliteMutationDefaultGeneratorDescriptors(): readonly Muta
     ),
     timestampNowControlDescriptor(),
   ];
-}
-
-export function createSqliteScalarTypeDescriptors(): ReadonlyMap<string, string> {
-  return new Map(sqliteScalarTypeDescriptors);
 }

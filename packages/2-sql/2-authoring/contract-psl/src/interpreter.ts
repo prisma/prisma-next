@@ -122,7 +122,7 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly sourceFile: SourceFile;
   readonly sourceId: string;
   readonly target: TargetPackRef<'sql', string>;
-  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly composedExtensionPacks?: readonly string[];
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
   readonly controlMutationDefaults?: ControlMutationDefaults;
@@ -553,7 +553,7 @@ interface BuildModelNodeInput {
   readonly authoringContributions: AuthoringContributions | undefined;
   readonly defaultFunctionRegistry: ControlMutationDefaultRegistry;
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
-  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly sourceId: string;
   readonly sourceFile: SourceFile;
   readonly symbolTable: SymbolTable;
@@ -617,7 +617,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     diagnostics,
     sourceId,
     sourceFile: input.sourceFile,
-    scalarTypeDescriptors: input.scalarTypeDescriptors,
+    scalarColumnDescriptors: input.scalarColumnDescriptors,
     ...ifDefined('enumHandles', input.enumHandles),
     capabilities: input.capabilities,
     ...ifDefined('namespaceId', modelNamespaceId),
@@ -1333,7 +1333,7 @@ interface BuildValueObjectsInput {
   readonly compositeTypes: readonly CompositeTypeSymbol[];
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
-  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly composedExtensions: ReadonlySet<string>;
   readonly familyId: string;
   readonly targetId: string;
@@ -1347,7 +1347,7 @@ function buildValueObjects(input: BuildValueObjectsInput): Record<string, Contra
     compositeTypes,
     enumTypeDescriptors,
     namedTypeDescriptors,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors,
     composedExtensions,
     familyId,
     targetId,
@@ -1373,7 +1373,7 @@ function buildValueObjects(input: BuildValueObjectsInput): Record<string, Contra
         field,
         enumTypeDescriptors,
         namedTypeDescriptors,
-        scalarTypeDescriptors,
+        scalarColumnDescriptors,
         authoringContributions,
         composedExtensions,
         familyId,
@@ -1854,7 +1854,7 @@ export function interpretPslDocumentToSqlContract(
       ],
     });
   }
-  if (!input.scalarTypeDescriptors) {
+  if (!input.scalarColumnDescriptors) {
     return notOk({
       summary: 'PSL to SQL contract interpretation failed',
       diagnostics: [
@@ -2085,7 +2085,7 @@ export function interpretPslDocumentToSqlContract(
     declarations: namedTypeSymbols,
     sourceId,
     enumTypeDescriptors: allEnumTypeDescriptors,
-    scalarTypeDescriptors: input.scalarTypeDescriptors,
+    scalarColumnDescriptors: input.scalarColumnDescriptors,
     composedExtensions,
     familyId: input.target.familyId,
     targetId: input.target.targetId,
@@ -2147,7 +2147,7 @@ export function interpretPslDocumentToSqlContract(
       authoringContributions: input.authoringContributions,
       defaultFunctionRegistry,
       generatorDescriptorById,
-      scalarTypeDescriptors: input.scalarTypeDescriptors,
+      scalarColumnDescriptors: input.scalarColumnDescriptors,
       sourceId,
       sourceFile,
       symbolTable: input.symbolTable,
@@ -2242,7 +2242,7 @@ export function interpretPslDocumentToSqlContract(
     compositeTypes,
     enumTypeDescriptors: allEnumTypeDescriptors,
     namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,
-    scalarTypeDescriptors: input.scalarTypeDescriptors,
+    scalarColumnDescriptors: input.scalarColumnDescriptors,
     composedExtensions,
     familyId: input.target.familyId,
     targetId: input.target.targetId,

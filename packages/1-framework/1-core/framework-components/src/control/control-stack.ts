@@ -15,6 +15,8 @@ import type {
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
+  collectContributedDescriptorPaths,
+  collectScalarTypeConstructors,
   mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
@@ -60,7 +62,8 @@ export interface ControlStack<
   readonly extensionIds: ReadonlyArray<string>;
   readonly codecLookup: CodecRegistry;
   readonly authoringContributions: AssembledAuthoringContributions;
-  readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
+  /** Names of the top-level zero-arg type constructors in the assembled authoring namespace — the base scalars of the composed stack. */
+  readonly scalarTypes: ReadonlyArray<string>;
   readonly controlMutationDefaults: ControlMutationDefaults;
   readonly capabilities: CapabilityMatrix;
 }
@@ -158,7 +161,7 @@ export function extractComponentIds(
 }
 
 export function assembleAuthoringContributions(
-  descriptors: ReadonlyArray<{ readonly authoring?: AuthoringContributions }>,
+  descriptors: ReadonlyArray<{ readonly id?: string; readonly authoring?: AuthoringContributions }>,
 ): AssembledAuthoringContributions {
   const field = {} as Record<string, unknown>;
   const type = {} as Record<string, unknown>;
@@ -166,14 +169,38 @@ export function assembleAuthoringContributions(
   const pslBlockDescriptors: Record<string, unknown> = {};
   const modelAttributes: Record<string, unknown> = {};
 
+  const pathOwners = new Map<string, string>();
+  const claimContributedPaths = (
+    namespace: Record<string, unknown>,
+    descriptorKind: string,
+    label: string,
+    descriptorId: string,
+  ): void => {
+    for (const path of collectContributedDescriptorPaths(namespace, descriptorKind)) {
+      const key = `${label}:${path}`;
+      const existingOwner = pathOwners.get(key);
+      if (existingOwner !== undefined) {
+        throw new Error(
+          `Duplicate authoring ${label} helper "${path}". ` +
+            `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
+        );
+      }
+      pathOwners.set(key, descriptorId);
+    }
+  };
+
   for (const descriptor of descriptors) {
+    const descriptorId = descriptor.id ?? '<unknown>';
     if (descriptor.authoring?.field) {
+      claimContributedPaths(descriptor.authoring.field, 'fieldPreset', 'field', descriptorId);
       mergeAuthoringNamespaces(field, descriptor.authoring.field, [], 'fieldPreset', 'field');
     }
     if (descriptor.authoring?.type) {
+      claimContributedPaths(descriptor.authoring.type, 'typeConstructor', 'type', descriptorId);
       mergeAuthoringNamespaces(type, descriptor.authoring.type, [], 'typeConstructor', 'type');
     }
     if (descriptor.authoring?.entityTypes) {
+      claimContributedPaths(descriptor.authoring.entityTypes, 'entity', 'entity', descriptorId);
       mergeAuthoringNamespaces(
         entityTypes,
         descriptor.authoring.entityTypes,
@@ -183,6 +210,12 @@ export function assembleAuthoringContributions(
       );
     }
     if (descriptor.authoring?.pslBlockDescriptors) {
+      claimContributedPaths(
+        descriptor.authoring.pslBlockDescriptors,
+        'pslBlock',
+        'pslBlock',
+        descriptorId,
+      );
       mergeAuthoringNamespaces(
         pslBlockDescriptors,
         descriptor.authoring.pslBlockDescriptors,
@@ -228,34 +261,6 @@ export function assembleAuthoringContributions(
     pslBlockDescriptors: pslBlockDescriptorNamespace,
     modelAttributes: modelAttributeNamespace,
   };
-}
-
-export function assembleScalarTypeDescriptors(
-  descriptors: ReadonlyArray<
-    Pick<ComponentMetadata, 'scalarTypeDescriptors'> & { readonly id?: string }
-  >,
-): ReadonlyMap<string, string> {
-  const result = new Map<string, string>();
-  const owners = new Map<string, string>();
-
-  for (const descriptor of descriptors) {
-    const descriptorMap = descriptor.scalarTypeDescriptors;
-    if (!descriptorMap) continue;
-    const descriptorId = descriptor.id ?? '<unknown>';
-    for (const [typeName, codecId] of descriptorMap) {
-      const existingOwner = owners.get(typeName);
-      if (existingOwner !== undefined) {
-        throw new Error(
-          `Duplicate scalar type descriptor "${typeName}". ` +
-            `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
-        );
-      }
-      result.set(typeName, codecId);
-      owners.set(typeName, descriptorId);
-    }
-  }
-
-  return result;
 }
 
 export function assembleControlMutationDefaults(
@@ -408,14 +413,14 @@ export function extractCodecLookup(
 }
 
 export function validateScalarTypeCodecIds(
-  scalarTypeDescriptors: ReadonlyMap<string, string>,
+  typeNamespace: AuthoringTypeNamespace,
   codecLookup: CodecLookup,
 ): string[] {
   const errors: string[] = [];
-  for (const [typeName, codecId] of scalarTypeDescriptors) {
-    if (!codecLookup.get(codecId)) {
+  for (const [typeName, output] of collectScalarTypeConstructors(typeNamespace)) {
+    if (!codecLookup.get(output.codecId)) {
       errors.push(
-        `Scalar type "${typeName}" references codec "${codecId}" which is not registered by any component.`,
+        `Scalar type "${typeName}" references codec "${output.codecId}" which is not registered by any component.`,
       );
     }
   }
@@ -525,7 +530,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
   const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...orderedExtensionPacks];
 
   const codecLookup = extractCodecLookup(allDescriptors);
-  const scalarTypeDescriptors = assembleScalarTypeDescriptors(allDescriptors);
+  const authoringContributions = assembleAuthoringContributions(allDescriptors);
 
   return {
     family,
@@ -538,8 +543,8 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
     extensionIds: extractComponentIds(family, target, adapter, orderedExtensionPacks),
     codecLookup,
-    authoringContributions: assembleAuthoringContributions(allDescriptors),
-    scalarTypeDescriptors,
+    authoringContributions,
+    scalarTypes: [...collectScalarTypeConstructors(authoringContributions.type).keys()],
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
     capabilities: mergeCapabilityMatrices({}, [
       target,

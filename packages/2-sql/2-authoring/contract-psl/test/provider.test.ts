@@ -735,7 +735,7 @@ model Document {
   });
 
   describe('given a broken codec configuration', () => {
-    it('returns diagnostics when a field uses a type with no codec', async () => {
+    it('returns diagnostics when a field uses a type with no registered constructor', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
       tempDirs.push(tempDir);
       const schemaPath = join(tempDir, 'schema.prisma');
@@ -743,26 +743,21 @@ model Document {
 
       process.chdir(tempDir);
       const contract = prismaContract('./schema.prisma', baseOptions);
-      const brokenContext = createPostgresTestContext({
-        scalarTypeDescriptors: new Map([
-          ['Int', 'pg/int4@1'],
-          ['Bytes', 'bogus/missing@1'],
-        ]),
-        codecLookup: {
-          get: (id: string) =>
-            id === 'pg/int4@1' ? createPostgresTestContext().codecLookup.get(id) : undefined,
-          targetTypesFor: (id: string) =>
-            id === 'pg/int4@1'
-              ? createPostgresTestContext().codecLookup.targetTypesFor(id)
-              : undefined,
-          metaFor: () => undefined,
-          renderOutputTypeFor: () => undefined,
-        },
-      });
 
       const result = await contract.source.load(
         createPostgresTestContext({
-          ...brokenContext,
+          authoringContributions: {
+            field: {},
+            type: {
+              Int: {
+                kind: 'typeConstructor',
+                output: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              },
+            },
+            entityTypes: {},
+            pslBlockDescriptors: {},
+            modelAttributes: {},
+          },
           resolvedInputs: [schemaPath],
         }),
       );
@@ -775,6 +770,35 @@ model Document {
           }),
         ]),
       );
+    });
+  });
+
+  describe('scalar derivation from the unified namespace', () => {
+    it('resolves base scalars from top-level zero-arg constructors', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));
+      tempDirs.push(tempDir);
+      const schemaPath = join(tempDir, 'schema.prisma');
+      await writeFile(schemaPath, 'model User {\n  id Int @id\n  name String\n}\n', 'utf-8');
+
+      process.chdir(tempDir);
+      const contract = prismaContract('./schema.prisma', baseOptions);
+      const result = await contract.source.load(
+        createPostgresTestContext({
+          resolvedInputs: [schemaPath],
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      expect(unboundTables(storage)).toMatchObject({
+        user: {
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4' },
+            name: { codecId: 'pg/text@1', nativeType: 'text' },
+          },
+        },
+      });
     });
   });
 

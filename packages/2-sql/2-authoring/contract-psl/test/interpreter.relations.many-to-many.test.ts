@@ -15,7 +15,7 @@ import {
 
 const baseInput = {
   target: postgresTarget,
-  scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  scalarColumnDescriptors: postgresScalarTypeDescriptors,
   controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,

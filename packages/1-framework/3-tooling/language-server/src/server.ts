@@ -312,7 +312,15 @@ export function createServer(connection: Connection): LanguageServer {
       if (disposed) {
         return;
       }
-      connection.console.error(error instanceof Error ? error.message : String(error));
+      // The connection can die between the `disposed` check and this log call
+      // (e.g. the client tears down the transport before `dispose()` runs);
+      // `console.error` sends a notification, which then throws on the dead
+      // connection. Swallow it — there is nowhere left to report to.
+      try {
+        connection.console.error(error instanceof Error ? error.message : String(error));
+      } catch {
+        // Connection already disposed; nothing to do.
+      }
     });
   }
 

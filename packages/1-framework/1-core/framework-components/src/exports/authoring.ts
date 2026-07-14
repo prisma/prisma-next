@@ -23,10 +23,12 @@ export type {
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeConstructorEntityRef,
   AuthoringTypeNamespace,
+  ScalarTypeConstructorOutput,
 } from '../shared/framework-authoring';
 export {
   assertNoCrossRegistryCollisions,
   classifyEnumMemberType,
+  collectScalarTypeConstructors,
   hasRegisteredFieldNamespace,
   instantiateAuthoringEntityType,
   instantiateAuthoringFieldPreset,

@@ -20,7 +20,7 @@ import {
   postgresScalarTypeDescriptors,
   postgresTarget,
   sqliteEnumInferenceCodecs,
-  sqliteScalarTypeDescriptors,
+  sqliteScalarColumnDescriptors,
   sqliteTarget,
   symbolTableInputFromParseArgs,
   testEnumEntityContributions,
@@ -112,7 +112,7 @@ function interpret(schema: string, overrides?: Partial<InterpretPslDocumentToSql
   return interpretPslDocumentToSqlContract({
     ...document,
     target: postgresTarget,
-    scalarTypeDescriptors: postgresScalarTypeDescriptors,
+    scalarColumnDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),
     controlMutationDefaults: builtinControlMutationDefaults,
     authoringContributions: contributions,
@@ -606,18 +606,18 @@ describe.each([
   {
     targetName: 'postgres',
     target: postgresTarget,
-    scalarTypeDescriptors: postgresScalarTypeDescriptors,
+    scalarColumnDescriptors: postgresScalarTypeDescriptors,
     enumInferenceCodecs: postgresEnumInferenceCodecs,
   },
   {
     targetName: 'sqlite',
     target: sqliteTarget,
-    scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+    scalarColumnDescriptors: sqliteScalarColumnDescriptors,
     enumInferenceCodecs: sqliteEnumInferenceCodecs,
   },
 ])('enum @@type inference ($targetName)', ({
   target,
-  scalarTypeDescriptors,
+  scalarColumnDescriptors,
   enumInferenceCodecs,
 }) => {
   const namespaceId = target.defaultNamespaceId;
@@ -634,7 +634,7 @@ model Post {
   role Role
 }
 `,
-      { target, scalarTypeDescriptors, enumInferenceCodecs },
+      { target, scalarColumnDescriptors, enumInferenceCodecs },
     );
 
     expect(result.ok).toBe(true);
@@ -660,7 +660,7 @@ model Post {
   role Role
 }
 `,
-      { target, scalarTypeDescriptors, enumInferenceCodecs },
+      { target, scalarColumnDescriptors, enumInferenceCodecs },
     );
 
     expect(result.ok).toBe(true);
@@ -686,7 +686,7 @@ model Post {
   priority Priority
 }
 `,
-      { target, scalarTypeDescriptors, enumInferenceCodecs },
+      { target, scalarColumnDescriptors, enumInferenceCodecs },
     );
 
     expect(result.ok).toBe(true);
@@ -713,7 +713,7 @@ model Post {
   priority Priority
 }
 `,
-      { target, scalarTypeDescriptors, enumInferenceCodecs },
+      { target, scalarColumnDescriptors, enumInferenceCodecs },
     );
 
     expect(result.ok).toBe(true);
@@ -734,7 +734,7 @@ model Post {
   mixed Mixed
 }
 `,
-      { target, scalarTypeDescriptors, enumInferenceCodecs },
+      { target, scalarColumnDescriptors, enumInferenceCodecs },
     );
 
     expect(result.ok).toBe(false);
@@ -763,7 +763,7 @@ model Post {
   priority Priority
 }
 `,
-      { target, scalarTypeDescriptors, enumInferenceCodecs },
+      { target, scalarColumnDescriptors, enumInferenceCodecs },
     );
 
     expect(result.ok).toBe(false);
@@ -784,7 +784,7 @@ model Post {
   flag Flag
 }
 `,
-      { target, scalarTypeDescriptors, enumInferenceCodecs },
+      { target, scalarColumnDescriptors, enumInferenceCodecs },
     );
 
     expect(result.ok).toBe(false);

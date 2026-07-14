@@ -98,7 +98,7 @@ function makeSupabaseExtensionContractUnbound(): Contract {
 
 const baseInput = {
   target: postgresTarget,
-  scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  scalarColumnDescriptors: postgresScalarTypeDescriptors,
   controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,

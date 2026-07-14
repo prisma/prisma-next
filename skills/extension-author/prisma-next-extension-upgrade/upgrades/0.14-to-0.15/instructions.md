@@ -291,6 +291,27 @@ changes:
         - "SqlForeignKeyIR"
         - "referencedSchema"
       anyMatch: true
+  - id: scalar-type-descriptors-channel-removed
+    summary: |
+      `ComponentMetadata.scalarTypeDescriptors` is retired — the unified authoring type namespace
+      is now the single channel for scalar types. If your extension/adapter descriptor declared
+      `scalarTypeDescriptors: new Map([['String', 'pg/text@1'], ...])`, move each entry to a
+      zero-arg type-constructor contribution in the descriptor's `authoring.type` namespace:
+      `String: { kind: 'typeConstructor', output: { codecId: 'pg/text@1', nativeType: 'text' } }`.
+      The `nativeType` is now explicit — it was previously derived from the codec's first target
+      type, so check the codec manifest for the value to inline. Code that read
+      `ControlStack.scalarTypeDescriptors` / `ContractSourceContext.scalarTypeDescriptors` should
+      read `stack.scalarTypes` (the scalar type names) or derive the name ->
+      `{ codecId, nativeType }` map via `collectScalarTypeConstructors(stack.authoringContributions.type)`
+      from `@prisma-next/framework-components/authoring`. `assembleScalarTypeDescriptors` is
+      deleted, and `validateScalarTypeCodecIds` now takes the authoring type namespace instead of
+      a descriptor map.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "scalarTypeDescriptors"
+        - "assembleScalarTypeDescriptors"
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in

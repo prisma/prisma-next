@@ -216,7 +216,6 @@ export async function executeContractEmit(
     const sourceContext = {
       composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
       composedExtensionContracts,
-      scalarTypeDescriptors: stack.scalarTypeDescriptors,
       authoringContributions: stack.authoringContributions,
       codecLookup: stack.codecLookup,
       controlMutationDefaults: stack.controlMutationDefaults,

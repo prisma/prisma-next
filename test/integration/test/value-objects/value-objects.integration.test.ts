@@ -84,7 +84,7 @@ function interpretMongoPsl(schema: string) {
     symbolTable: table,
     sourceFile,
     sourceId: 'test.prisma',
-    scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    scalarTypeCodecIds: mongoScalarTypeDescriptors,
   });
 }
 
@@ -101,7 +101,7 @@ function interpretSqlPsl(schema: string) {
     sourceFile,
     sourceId: 'test.prisma',
     target: postgresTarget,
-    scalarTypeDescriptors: postgresScalarTypeDescriptors,
+    scalarColumnDescriptors: postgresScalarTypeDescriptors,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,
     capabilities: { sql: { scalarList: true } },
