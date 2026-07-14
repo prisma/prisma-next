@@ -25,6 +25,7 @@ import {
   resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
 import {
+  buildEnumDefaultSpec,
   findFieldAttributeNode,
   findModelAttributeNode,
   idFieldSpec,
@@ -43,49 +44,36 @@ type LoweredFieldDefault = {
 function lowerEnumDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
-  readonly defaultAttribute: ResolvedAttribute;
+  readonly field: FieldSymbol;
+  readonly model: ModelSymbol;
+  readonly sourceFile: SourceFile;
   readonly enumHandle: EnumTypeHandle;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): LoweredFieldDefault {
-  const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'positional');
-  const hasNamedEntries = input.defaultAttribute.args.some((arg) => arg.kind === 'named');
-  const expressionEntry = positionalEntries[0];
-  if (hasNamedEntries || positionalEntries.length !== 1 || expressionEntry === undefined) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-      message: `Field "${input.modelName}.${input.fieldName}" @default on an enum field expects exactly one positional enum member argument.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
-
-  const raw = expressionEntry.value.trim();
-  const isQuotedString = /^(['"]).*\1$/.test(raw);
-  const isFunctionCall = raw.includes('(') && raw.endsWith(')');
-
-  if (isQuotedString || isFunctionCall) {
-    input.diagnostics.push({
-      code: 'PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME',
-      message: `Field "${input.modelName}.${input.fieldName}" @default on an enum field must name a member (e.g. @default(Low)), not a raw value or function.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
-
-  const match = input.enumHandle.enumMembers.find((m) => m.name === raw);
-  if (!match) {
-    const validNames = input.enumHandle.enumMembers.map((m) => m.name).join(', ');
-    input.diagnostics.push({
-      code: 'PSL_ENUM_UNKNOWN_DEFAULT_MEMBER',
-      message: `Field "${input.modelName}.${input.fieldName}" @default(${raw}) does not name a member of ${input.enumHandle.enumName}. Valid members: ${validNames}.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
+  const { field, model, sourceFile, enumHandle, sourceId, diagnostics } = input;
+  const node = findFieldAttributeNode(field, 'default');
+  if (node === undefined) return {};
+  const [firstMember, ...restMembers] = enumHandle.enumMembers.map((m) => m.name);
+  // A memberless enum is already a contract error at its declaration; there is no member a
+  // `@default` could name, so skip lowering rather than invent a grammar for it.
+  if (firstMember === undefined) return {};
+  const spec = buildEnumDefaultSpec([firstMember, ...restMembers]);
+  const interpreted = interpretFieldAttribute({
+    node,
+    spec,
+    model,
+    field,
+    sourceFile,
+    sourceId,
+    diagnostics,
+  });
+  if (interpreted === undefined) return {};
+  const member = interpreted.member;
+  // The grammar (one `identifier(member)` arm per enum member) guarantees a match; the guard
+  // keeps the narrowing total without a diagnostic — an unknown member already failed as syntax.
+  const match = enumHandle.enumMembers.find((m) => m.name === member);
+  if (!match) return {};
 
   return {
     defaultValue: {
@@ -471,7 +459,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         ? lowerEnumDefaultForField({
             modelName: model.name,
             fieldName: field.name,
-            defaultAttribute,
+            field,
+            model,
+            sourceFile: input.sourceFile,
             enumHandle,
             sourceId,
             diagnostics,
@@ -479,7 +469,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         : lowerDefaultForField({
             modelName: model.name,
             fieldName: field.name,
-            defaultAttribute,
+            field,
+            model,
+            sourceFile: input.sourceFile,
             columnDescriptor: descriptor,
             generatorDescriptorById,
             sourceId,

@@ -1,19 +1,26 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
+import type { ControlMutationDefaultRegistry } from '@prisma-next/framework-components/control';
 import type {
+  ArgType,
   AttributeSpec,
   FieldSymbol,
+  FuncCallSig,
   InterpretCtx,
   ModelSymbol,
+  TypedFuncCall,
 } from '@prisma-next/psl-parser';
 import {
+  bool,
   entityRef,
   fieldAttribute,
   fieldRef,
+  funcCall,
   identifier,
   interpretAttribute,
   leafDiagnostic,
   list,
   modelAttribute,
+  num,
   oneOf,
   optional,
   record,
@@ -24,6 +31,7 @@ import type {
   ModelAttributeAst,
   SourceFile,
 } from '@prisma-next/psl-parser/syntax';
+import { blindCast } from '@prisma-next/utils/casts';
 
 export function findModelAttributeNode(
   model: ModelSymbol,
@@ -136,6 +144,44 @@ export function interpretFieldAttribute<Out>(input: {
 
 export const mapModelSpec = modelAttribute('map', { positional: [{ key: 'name', type: str() }] });
 export const mapFieldSpec = fieldAttribute('map', { positional: [{ key: 'name', type: str() }] });
+
+type DefaultArgValue = string | number | boolean | (string | number | boolean)[] | TypedFuncCall;
+
+// Compose the non-enum `@default` value grammar for a single field: flexible literal arms
+// (string/number/boolean), a list arm only for list fields, and one typed `funcCall(name, signature)`
+// arm per registered default function. Field kind maps to shape, so an array on a scalar field
+// (or a scalar on a list field) is invalid syntax.
+export function buildDefaultSpec(input: {
+  readonly isList: boolean;
+  readonly registry: ControlMutationDefaultRegistry;
+}) {
+  const literal = () => oneOf(str(), num(), bool());
+  const funcArms = [...input.registry.entries()].map(([name, entry]) =>
+    funcCall(
+      name,
+      blindCast<
+        FuncCallSig,
+        'The registry stores each signature opaquely as `unknown` because FuncCallSig lives in the authoring layer that core cannot name; the SQL family owns these entries and guarantees every one declares a FuncCallSig.'
+      >(entry.signature),
+    ),
+  );
+  const valueArms: readonly [ArgType<DefaultArgValue>, ...ArgType<DefaultArgValue>[]] = input.isList
+    ? [list(literal()), ...funcArms]
+    : [str(), num(), bool(), ...funcArms];
+  return fieldAttribute('default', { positional: [{ key: 'value', type: oneOf(...valueArms) }] });
+}
+
+// Compose the enum `@default` value grammar from the enum's own member names: one
+// `identifier(member)` arm per member, so member-validity is a grammar concern — a non-member
+// identifier fails `oneOf` as invalid attribute syntax.
+export function buildEnumDefaultSpec(memberNames: readonly [string, ...string[]]) {
+  const [first, ...rest] = memberNames;
+  const arms: readonly [ArgType<string>, ...ArgType<string>[]] = [
+    identifier(first),
+    ...rest.map((name) => identifier(name)),
+  ];
+  return fieldAttribute('default', { positional: [{ key: 'member', type: oneOf(...arms) }] });
+}
 
 export const idFieldSpec = fieldAttribute('id', { named: { map: optional(str()) } });
 export const uniqueFieldSpec = fieldAttribute('unique', { named: { map: optional(str()) } });
