@@ -54,7 +54,11 @@ function lowerEnumDefaultForField(input: {
   const { field, model, sourceFile, enumHandle, sourceId, diagnostics } = input;
   const node = findFieldAttributeNode(field, 'default');
   if (node === undefined) return {};
-  const spec = buildEnumDefaultSpec(enumHandle.enumMembers.map((m) => m.name));
+  const [firstMember, ...restMembers] = enumHandle.enumMembers.map((m) => m.name);
+  // A memberless enum is already a contract error at its declaration; there is no member a
+  // `@default` could name, so skip lowering rather than invent a grammar for it.
+  if (firstMember === undefined) return {};
+  const spec = buildEnumDefaultSpec([firstMember, ...restMembers]);
   const interpreted = interpretFieldAttribute({
     node,
     spec,

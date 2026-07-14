@@ -174,11 +174,12 @@ export function buildDefaultSpec(input: {
 // Compose the enum `@default` value grammar from the enum's own member names: one
 // `identifier(member)` arm per member, so member-validity is a grammar concern — a non-member
 // identifier fails `oneOf` as invalid attribute syntax.
-export function buildEnumDefaultSpec(memberNames: readonly string[]) {
-  const [first, ...rest] = memberNames.map((name) => identifier(name));
-  // memberNames is non-empty for any real enum; guard defensively so typing stays total.
-  const arms: readonly [ArgType<string>, ...ArgType<string>[]] =
-    first === undefined ? [identifier('')] : [first, ...rest];
+export function buildEnumDefaultSpec(memberNames: readonly [string, ...string[]]) {
+  const [first, ...rest] = memberNames;
+  const arms: readonly [ArgType<string>, ...ArgType<string>[]] = [
+    identifier(first),
+    ...rest.map((name) => identifier(name)),
+  ];
   return fieldAttribute('default', { positional: [{ key: 'member', type: oneOf(...arms) }] });
 }
 
