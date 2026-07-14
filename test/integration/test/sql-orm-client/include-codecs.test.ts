@@ -24,8 +24,10 @@ import {
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { describe, expect, it } from 'vitest';
 import { timeouts, withCollectionRuntime } from './integration-helpers';
+import type { PgIntegrationRuntime } from './runtime-helpers';
 
 const TEST_INCLUDED_TEXT_CODEC_ID = 'test/included-text@1' as const;
+const SENSITIVE_DATABASE_VALUE = 'credential=do-not-expose';
 
 class IncludedTextCodec extends CodecImpl<
   typeof TEST_INCLUDED_TEXT_CODEC_ID,
@@ -48,6 +50,9 @@ class IncludedTextCodec extends CodecImpl<
   decodeJson(json: JsonValue): string {
     if (typeof json !== 'string') {
       throw new TypeError(`expected included text database JSON value, got ${typeof json}`);
+    }
+    if (json === SENSITIVE_DATABASE_VALUE) {
+      throw new Error('intentional included text decode failure');
     }
     return `decoded-json:${json}`;
   }
@@ -112,29 +117,33 @@ const context = createExecutionContext({
   }),
 });
 
+async function setupCodecTables(runtime: PgIntegrationRuntime): Promise<void> {
+  await runtime.query('drop table if exists codec_branches');
+  await runtime.query('drop table if exists codec_projects');
+  await runtime.query(`
+    create table codec_projects (
+      id integer primary key,
+      wrapped_dek bytea,
+      deleted_at timestamp,
+      deleted_at_tz timestamptz,
+      custom_text text
+    )
+  `);
+  await runtime.query(`
+    create table codec_branches (
+      id integer primary key,
+      project_id integer not null
+    )
+  `);
+}
+
 describe('integration/include codecs', () => {
   it(
     'delegates database JSON values to codec.decodeJson',
     async () => {
       await withCollectionRuntime(
         async (runtime) => {
-          await runtime.query('drop table if exists codec_branches');
-          await runtime.query('drop table if exists codec_projects');
-          await runtime.query(`
-          create table codec_projects (
-            id integer primary key,
-            wrapped_dek bytea,
-            deleted_at timestamp,
-            deleted_at_tz timestamptz,
-            custom_text text
-          )
-        `);
-          await runtime.query(`
-          create table codec_branches (
-            id integer primary key,
-            project_id integer not null
-          )
-        `);
+          await setupCodecTables(runtime);
           await runtime.query(`
           insert into codec_projects (id, wrapped_dek, deleted_at, deleted_at_tz, custom_text)
           values (
@@ -192,6 +201,49 @@ describe('integration/include codecs', () => {
               },
             },
           ]);
+        },
+        contract,
+        [includedTextExtension],
+      );
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'omits raw database values from include decode errors',
+    async () => {
+      await withCollectionRuntime(
+        async (runtime) => {
+          await setupCodecTables(runtime);
+          await runtime.query(`
+            insert into codec_projects (id, custom_text)
+            values (10, '${SENSITIVE_DATABASE_VALUE}')
+          `);
+          await runtime.query('insert into codec_branches (id, project_id) values (1, 10)');
+
+          const branches = new Collection({ runtime, context }, 'Branch', {
+            namespaceId: 'public',
+          });
+          let decodeError: unknown;
+          try {
+            await branches
+              .select('id')
+              .include('project', (project) => project.select('customText'))
+              .all();
+          } catch (error) {
+            decodeError = error;
+          }
+
+          expect(decodeError).toMatchObject({
+            code: 'RUNTIME.DECODE_FAILED',
+            details: {
+              table: 'codec_projects',
+              column: 'custom_text',
+              codec: TEST_INCLUDED_TEXT_CODEC_ID,
+            },
+          });
+          expect(decodeError).not.toHaveProperty('details.wirePreview');
+          expect(JSON.stringify(decodeError)).not.toContain(SENSITIVE_DATABASE_VALUE);
         },
         contract,
         [includedTextExtension],

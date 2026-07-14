@@ -501,7 +501,6 @@ async function decodeIncludedColumnValue(
         ),
         ref,
         codecId,
-        value,
       );
     }
 
@@ -531,23 +530,11 @@ function decodeIncludedJsonValue(
     );
   } catch (error) {
     if (isRuntimeError(error)) throw error;
-    wrapIncludedDecodeFailure(error, ref, codecId, value);
+    wrapIncludedDecodeFailure(error, ref, codecId);
   }
 }
 
-function previewWireValue(wireValue: unknown): string {
-  if (typeof wireValue === 'string') {
-    return wireValue.length > 120 ? `${wireValue.substring(0, 120)}...` : wireValue;
-  }
-  return String(wireValue).substring(0, 120);
-}
-
-function wrapIncludedDecodeFailure(
-  error: unknown,
-  ref: IncludedColumnRef,
-  codecId: string,
-  wireValue: unknown,
-): never {
+function wrapIncludedDecodeFailure(error: unknown, ref: IncludedColumnRef, codecId: string): never {
   const message = error instanceof Error ? error.message : String(error);
   const wrapped = runtimeError(
     'RUNTIME.DECODE_FAILED',
@@ -556,7 +543,6 @@ function wrapIncludedDecodeFailure(
       table: ref.table,
       column: ref.column,
       codec: codecId,
-      wirePreview: previewWireValue(wireValue),
     },
   );
   wrapped.cause = error;
