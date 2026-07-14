@@ -95,6 +95,33 @@ class Reader {
   }
 }
 
+class Writer {
+  private readonly bytes: number[] = [];
+
+  writeUint8(value: number): void {
+    this.bytes.push(value);
+  }
+
+  writeUint32(value: number): void {
+    const buffer = new ArrayBuffer(4);
+    new DataView(buffer).setUint32(0, value, true);
+    this.bytes.push(...new Uint8Array(buffer));
+  }
+
+  writeFloat64(value: number): void {
+    const buffer = new ArrayBuffer(8);
+    new DataView(buffer).setFloat64(0, value, true);
+    this.bytes.push(...new Uint8Array(buffer));
+  }
+
+  toHex(): string {
+    return this.bytes
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase();
+  }
+}
+
 type Header = {
   readonly geomType: number;
   readonly littleEndian: boolean;
@@ -224,6 +251,83 @@ export function decodeEWKBHex(hex: string): Geometry {
     );
   }
   return geometry;
+}
+
+export function encodeEWKBHex(value: Geometry): string {
+  const writer = new Writer();
+  writeGeometry(writer, value);
+  return writer.toHex();
+}
+
+function writeHeader(writer: Writer, geomType: number, srid?: number): void {
+  writer.writeUint8(1);
+  writer.writeUint32(srid === undefined ? geomType : geomType | FLAG_SRID);
+  if (srid !== undefined) {
+    writer.writeUint32(srid);
+  }
+}
+
+function writePosition(writer: Writer, position: Position): void {
+  if (!Number.isFinite(position[0]) || !Number.isFinite(position[1])) {
+    throw new Error('Geometry encode: coordinates must be finite numbers');
+  }
+  writer.writeFloat64(position[0]);
+  writer.writeFloat64(position[1]);
+}
+
+function writeLineStringBody(writer: Writer, positions: ReadonlyArray<Position>): void {
+  writer.writeUint32(positions.length);
+  for (const position of positions) {
+    writePosition(writer, position);
+  }
+}
+
+function writePolygonBody(writer: Writer, rings: ReadonlyArray<ReadonlyArray<Position>>): void {
+  writer.writeUint32(rings.length);
+  for (const ring of rings) {
+    writeLineStringBody(writer, ring);
+  }
+}
+
+function writeGeometry(writer: Writer, value: Geometry): void {
+  switch (value.type) {
+    case 'Point':
+      writeHeader(writer, TYPE_POINT, value.srid);
+      writePosition(writer, value.coordinates);
+      break;
+    case 'LineString':
+      writeHeader(writer, TYPE_LINESTRING, value.srid);
+      writeLineStringBody(writer, value.coordinates);
+      break;
+    case 'Polygon':
+      writeHeader(writer, TYPE_POLYGON, value.srid);
+      writePolygonBody(writer, value.coordinates);
+      break;
+    case 'MultiPoint':
+      writeHeader(writer, TYPE_MULTIPOINT, value.srid);
+      writer.writeUint32(value.coordinates.length);
+      for (const position of value.coordinates) {
+        writeHeader(writer, TYPE_POINT);
+        writePosition(writer, position);
+      }
+      break;
+    case 'MultiLineString':
+      writeHeader(writer, TYPE_MULTILINESTRING, value.srid);
+      writer.writeUint32(value.coordinates.length);
+      for (const line of value.coordinates) {
+        writeHeader(writer, TYPE_LINESTRING);
+        writeLineStringBody(writer, line);
+      }
+      break;
+    case 'MultiPolygon':
+      writeHeader(writer, TYPE_MULTIPOLYGON, value.srid);
+      writer.writeUint32(value.coordinates.length);
+      for (const polygon of value.coordinates) {
+        writeHeader(writer, TYPE_POLYGON);
+        writePolygonBody(writer, polygon);
+      }
+      break;
+  }
 }
 
 function readGeometryBody(reader: Reader, header: Header): Geometry {

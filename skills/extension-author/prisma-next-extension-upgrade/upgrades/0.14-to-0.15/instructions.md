@@ -54,6 +54,24 @@ changes:
         - "renderValueTypeFor"
         - "renderOutputType"
       anyMatch: true
+  - id: sql-codec-json-result-decoding
+    summary: |
+      SQL `encodeJson` / `decodeJson` now use the exact scalar shape produced by the corresponding
+      database inside JSON values. SQL include decoding calls `decodeJson`; ordinary column decoding
+      continues to call `decode`. Update custom SQL codecs whose database JSON representation differs
+      from their normal driver wire representation, then re-emit committed contracts and defaults.
+      Built-in representation changes are: `pg/bytea@1` base64 -> `\\x`-prefixed hex,
+      `pg/numeric@1` string -> JSON number, `pg/timestamp@1` UTC `Z` suffix -> no timezone suffix,
+      `pg/timestamptz@1` UTC `Z` suffix -> `+00:00`, `sqlite/bigint@1` string -> JSON number,
+      `pg/vector@1` JSON array -> Postgres vector text, and `pg/geometry@1` GeoJSON object -> HEXEWKB
+      text. SQLite cannot represent BLOB values inside its native JSON values; such queries still fail
+      at the database boundary rather than receiving a synthetic codec representation.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "encodeJson"
+        - "decodeJson"
+      anyMatch: true
   - id: mongo-derive-json-schema-value-sets-param
     summary: |
       `deriveJsonSchema` / `derivePolymorphicJsonSchema` (from `@prisma-next/mongo-contract-psl`) now
