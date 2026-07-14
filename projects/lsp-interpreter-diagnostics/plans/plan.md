@@ -170,7 +170,7 @@ Behavior identical by construction (same values, typed instead of cast).
 
 ### Implement M3: Providers implement the capability (sql + mongo)
 
-**Status:** ► In progress — slice 04 delivered (`b1ffecafe` + `cdd1ffb21`, 4/4 SDoD), PR open; complete on merge
+**Status:** ✓ Complete — merged to main as PR #971 (2026-07-14; incl. review rounds: `interpret` returns the full Result, `load` delegates via `this.interpret`, seeds merge externally via `withSeedDiagnostics`)
 
 _Outcomes_
 Both `prismaContract()` factories return providers satisfying `PslInterpretCapable`
@@ -196,7 +196,7 @@ behavior is unchanged (same inner function, same seed diagnostics). No consumer 
 
 ### Implement M4: LSP interpreter diagnostics (lazy, mapped, degrading)
 
-**Status:** ☐ Not started
+**Status:** ► In progress — slice 05, branch `tml-2984-slice-05-lsp-interpret`
 
 _Outcomes_
 The LSP serves interpreter diagnostics on pull and push for capability-bearing
