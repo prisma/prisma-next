@@ -1,6 +1,5 @@
-import type { ResolvedAttribute, ResolvedAttributeArg } from '@prisma-next/psl-parser';
+import type { ResolvedAttribute } from '@prisma-next/psl-parser';
 import { parseQuotedStringLiteral } from '@prisma-next/psl-parser';
-import { ifDefined } from '@prisma-next/utils/defined';
 
 export { parseQuotedStringLiteral };
 
@@ -81,49 +80,4 @@ export function getAttribute(
   name: string,
 ): ResolvedAttribute | undefined {
   return attributes.find((attr) => attr.name === name);
-}
-
-export interface ParsedRelationAttribute {
-  readonly relationName?: string;
-  readonly fields?: readonly string[];
-  readonly references?: readonly string[];
-}
-
-export function parseRelationAttribute(
-  attributes: readonly ResolvedAttribute[],
-): ParsedRelationAttribute | undefined {
-  const relationAttr = getAttribute(attributes, 'relation');
-  if (!relationAttr) return undefined;
-
-  let relationName: string | undefined;
-  let fieldsArg: ResolvedAttributeArg | undefined;
-  let referencesArg: ResolvedAttributeArg | undefined;
-
-  for (const arg of relationAttr.args) {
-    if (arg.kind === 'positional') {
-      relationName = stripQuotes(arg.value);
-    } else if (arg.name === 'name') {
-      relationName = stripQuotes(arg.value);
-    } else if (arg.name === 'fields') {
-      fieldsArg = arg;
-    } else if (arg.name === 'references') {
-      referencesArg = arg;
-    }
-  }
-
-  const fields = fieldsArg ? parseFieldList(fieldsArg.value) : undefined;
-  const references = referencesArg ? parseFieldList(referencesArg.value) : undefined;
-
-  return {
-    ...ifDefined('relationName', relationName),
-    ...ifDefined('fields', fields),
-    ...ifDefined('references', references),
-  };
-}
-
-function stripQuotes(value: string): string {
-  if (value.startsWith('"') && value.endsWith('"')) {
-    return value.slice(1, -1);
-  }
-  return value;
 }
