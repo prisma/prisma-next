@@ -650,7 +650,7 @@ model Foo {
       const result = interpretPslDocumentToSqlContract({
         ...symbolTableInput,
         target: postgresTarget,
-        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+        scalarColumnDescriptors: postgresScalarTypeDescriptors,
         composedExtensionContracts: new Map(),
         authoringContributions: topThingAuthoringContributions,
         createNamespace,
@@ -697,7 +697,7 @@ namespace auth {
       const result = interpretPslDocumentToSqlContract({
         ...symbolTableInput,
         target: postgresTarget,
-        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+        scalarColumnDescriptors: postgresScalarTypeDescriptors,
         composedExtensionContracts: new Map(),
         authoringContributions: topThingAuthoringContributions,
         createNamespace,
@@ -745,7 +745,7 @@ namespace auth {
       const result = interpretPslDocumentToSqlContract({
         ...symbolTableInput,
         target: postgresTarget,
-        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+        scalarColumnDescriptors: postgresScalarTypeDescriptors,
         composedExtensionContracts: new Map(),
         authoringContributions: topThingAuthoringContributions,
         createNamespace,

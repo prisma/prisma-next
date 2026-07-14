@@ -22,7 +22,7 @@ function buildInterpretInput(schema: string, context: ContractSourceContext): Ps
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...context.scalarTypeDescriptors.keys()],
+    scalarTypes: Object.keys(context.authoringContributions.type),
     pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
   });
   return { document, sourceFile, symbolTable, sourceId: SOURCE_ID };

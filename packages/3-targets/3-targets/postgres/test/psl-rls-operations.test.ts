@@ -66,7 +66,7 @@ function interpret(source: string) {
     sourceFile,
     sourceId: 'schema.prisma',
     target: postgresTarget,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors: scalarTypeDescriptors,
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,
