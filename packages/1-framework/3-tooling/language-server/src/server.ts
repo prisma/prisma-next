@@ -27,7 +27,11 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { classifyPslCompletionContext } from './completion-context';
 import { providePslCompletionItems } from './completion-provider';
-import { CONFIG_FILENAME, resolveConfigInputs } from './config-resolution';
+import {
+  CONFIG_FILENAME,
+  type ProjectInterpretation,
+  resolveConfigInputs,
+} from './config-resolution';
 import { type LspDiagnostic, ParseDiagnosticSeverity } from './diagnostic-mapping';
 import { computeFoldingRanges } from './folding-ranges';
 import type { PipelineInputs } from './pipeline';
@@ -58,6 +62,7 @@ interface ProjectState {
    * rebuilt per document.
    */
   readonly controlStack: PipelineInputs;
+  readonly interpretation?: ProjectInterpretation;
   readonly artifacts: ProjectArtifacts;
 }
 
@@ -249,21 +254,16 @@ export function createServer(connection: Connection): LanguageServer {
       controlStack: resolution.controlStack,
       getText: (uri) => documents.get(uri)?.getText(),
     });
-    const project: ProjectState =
-      resolution.formatter === undefined
-        ? {
-            configPath,
-            inputs: resolution.inputs,
-            controlStack: resolution.controlStack,
-            artifacts,
-          }
-        : {
-            configPath,
-            inputs: resolution.inputs,
-            formatter: resolution.formatter,
-            controlStack: resolution.controlStack,
-            artifacts,
-          };
+    const project: ProjectState = {
+      configPath,
+      inputs: resolution.inputs,
+      controlStack: resolution.controlStack,
+      artifacts,
+      ...(resolution.formatter === undefined ? {} : { formatter: resolution.formatter }),
+      ...(resolution.interpretation === undefined
+        ? {}
+        : { interpretation: resolution.interpretation }),
+    };
     return project;
   }
 

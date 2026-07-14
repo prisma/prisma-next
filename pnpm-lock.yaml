@@ -1931,6 +1931,9 @@ importers:
 
   packages/1-framework/3-tooling/language-server:
     dependencies:
+      '@prisma-next/config':
+        specifier: workspace:0.14.0
+        version: link:../../1-core/config
       '@prisma-next/config-loader':
         specifier: workspace:0.14.0
         version: link:../config-loader
