@@ -511,23 +511,23 @@ async function decodeIncludedColumnValue(
         decoded.push(null);
         continue;
       }
-      try {
-        decoded.push(
-          codec.decodeJson(
-            blindCast<JsonValue, 'SQL JSON aggregate elements are JSON values'>(element),
-          ),
-        );
-      } catch (error) {
-        if (isRuntimeError(error)) throw error;
-        wrapIncludedDecodeFailure(error, ref, codecId, element);
-      }
+      decoded.push(decodeIncludedJsonValue(ref, codecId, codec, element));
     }
     return decoded;
   }
 
+  return decodeIncludedJsonValue(ref, codecId, codec, value);
+}
+
+function decodeIncludedJsonValue(
+  ref: IncludedColumnRef,
+  codecId: string,
+  codec: Codec,
+  value: unknown,
+): unknown {
   try {
     return codec.decodeJson(
-      blindCast<JsonValue, 'SQL JSON aggregate fields are JSON values'>(value),
+      blindCast<JsonValue, 'SQL JSON aggregate values are JSON values'>(value),
     );
   } catch (error) {
     if (isRuntimeError(error)) throw error;
