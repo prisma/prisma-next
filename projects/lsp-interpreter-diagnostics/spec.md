@@ -36,7 +36,11 @@ export interface PslInterpretInput {
 }
 export interface PslInterpretCapable {
   readonly sourceFormat: 'psl';
-  interpret(input: PslInterpretInput, context: ContractSourceContext): readonly ContractSourceDiagnostic[];
+  interpret(
+    input: PslInterpretInput,
+    context: ContractSourceContext,
+    seedDiagnostics?: readonly ContractSourceDiagnostic[],
+  ): Result<Contract, ContractSourceDiagnostics>;
 }
 export function hasPslInterpreter(
   source: ContractSourceProvider,
@@ -179,12 +183,15 @@ graph TD
 
 ## Cross-cutting requirements
 
-- **Build/editor parity by construction.** The provider's `load` and `interpret` must
-  share one interpretation code path; a diagnostic produced by `contract emit` for a
-  given schema is produced by the LSP for the same buffer content, and vice versa
-  (parse + symbol-table diagnostics excluded — the LSP already owns those, so
-  `interpret` receives empty `seedDiagnostics` and returns interpreter-stage findings
-  only; no double-reporting).
+- **Build/editor parity by construction.** `interpret` IS the interpretation code
+  path: it returns the full `Result<Contract, ContractSourceDiagnostics>` and accepts
+  optional `seedDiagnostics`; `load` literally delegates to `this.interpret` (adding
+  only file reading, parsing, seed mapping, and post-ok policy). A diagnostic produced
+  by `contract emit` for a given schema is produced by the LSP for the same buffer
+  content, and vice versa (parse + symbol-table diagnostics excluded — the LSP
+  already owns those, so it omits `seedDiagnostics` and unwraps `notOk → diagnostics`,
+  `ok → none`; no double-reporting). _(Signature widened from diagnostics-only by
+  operator decision, 2026-07-14 — PR #971 review: "use `this.interpret`".)_
 - **Zero re-work on the live path.** The LSP never re-parses or rebuilds a symbol table
   to obtain interpreter diagnostics; `interpret` consumes the artifacts the LSP already
   caches.
@@ -301,6 +308,12 @@ construction pure property-picking everywhere; alternatives rejected: shared
 function in `@prisma-next/config`, helper in config-loader, inline-in-both (adds a
 Also settled: tracked as Linear issue TML-2984 (not a Linear Project);
 done when merged to `main`, no release cut._
+
+_Settled by operator (2026-07-14, PR #971 review): `interpret` returns the full
+`Result<Contract, ContractSourceDiagnostics>` with optional `seedDiagnostics`, so
+`load` delegates to `this.interpret` literally — one public method, no private inner
+function. Supersedes the diagnostics-only return settled 2026-07-09; the LSP unwraps
+the failure side and discards the ok value._
 
 _Settled by operator (2026-07-10, mid-flight): scope addition — lift the
 `contractSpace` member declaration to core `ControlExtensionDescriptor`. Triggered by

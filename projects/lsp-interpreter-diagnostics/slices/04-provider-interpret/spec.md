@@ -53,6 +53,12 @@ test only means something when at least one real provider narrows true.
       Mirror asymmetries verified against each provider's removed inline code —
       family differences, not drift. ✓
 
+**Amendment (2026-07-14, operator review on PR #971):** capability signature widened
+— `interpret(input, context, seedDiagnostics?)` returns
+`Result<Contract, ContractSourceDiagnostics>`; each provider's `load` now calls
+`this.interpret` literally (no private inner function). Dispatch S4-D3 executes;
+SDoD items re-verified under the new shape.
+
 **Slice-close ritual (2026-07-13):** both dispatches SATISFIED R1, zero findings;
 4/4 SDoD PASS; `origin/main` rebased (one unrelated native-enums commit) + gates
 re-verified (typecheck 143/143, sql 352/352, mongo 152/152); manual QA: **N/A — no
