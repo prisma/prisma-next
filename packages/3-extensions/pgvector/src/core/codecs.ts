@@ -79,6 +79,9 @@ export class PgVectorCodec extends CodecImpl<
     if (!value.every((v) => typeof v === 'number')) {
       throw new Error('Vector value must contain only numbers');
     }
+    if (!value.every(Number.isFinite)) {
+      throw new Error('Vector value must contain only finite numbers');
+    }
     if (value.length !== this.length) {
       throw new Error(`Vector length mismatch: expected ${this.length}, got ${value.length}`);
     }

@@ -77,6 +77,28 @@ describe('pgvector codecs', () => {
     );
   });
 
+  it('rejects non-finite values across wire and database JSON paths', async () => {
+    const vectorCodec = asAsyncCodec(3);
+
+    for (const nonFinite of [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      const value = [1, nonFinite, 3];
+      const wire = `[1,${nonFinite},3]`;
+
+      await expect(vectorCodec.encode(value)).rejects.toThrow(
+        'Vector value must contain only finite numbers',
+      );
+      await expect(vectorCodec.decode(wire)).rejects.toThrow(
+        'Vector value must contain only finite numbers',
+      );
+      expect(() => vectorCodec.encodeJson(value)).toThrow(
+        'Vector value must contain only finite numbers',
+      );
+      expect(() => vectorCodec.decodeJson(wire)).toThrow(
+        'Vector value must contain only finite numbers',
+      );
+    }
+  });
+
   it('rejects when decoding invalid string format', async () => {
     const vectorCodec = asAsyncCodec(4);
     await expect(vectorCodec.decode('not a vector format')).rejects.toThrow(
