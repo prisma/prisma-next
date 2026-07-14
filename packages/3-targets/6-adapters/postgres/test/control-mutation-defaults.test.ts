@@ -322,6 +322,9 @@ describe('postgresNativeAuthoringTypes', () => {
       validateAuthoringHelperArguments('VarChar', postgresNativeAuthoringTypes.VarChar.args, [0]),
     ).toThrow('must be >= 1');
     expect(() =>
+      validateAuthoringHelperArguments('Numeric', postgresNativeAuthoringTypes.Numeric.args, [0]),
+    ).toThrow('must be >= 1');
+    expect(() =>
       validateAuthoringHelperArguments(
         'Timestamp',
         postgresNativeAuthoringTypes.Timestamp.args,

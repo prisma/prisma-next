@@ -203,7 +203,7 @@ export const postgresNativeAuthoringTypes = {
   Numeric: {
     kind: 'typeConstructor',
     args: [
-      { kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true },
+      { kind: 'number', name: 'precision', integer: true, minimum: 1, optional: true },
       { kind: 'number', name: 'scale', integer: true, minimum: 0, optional: true },
     ],
     output: {

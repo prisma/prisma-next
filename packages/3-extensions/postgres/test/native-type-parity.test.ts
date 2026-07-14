@@ -312,6 +312,46 @@ model sample {
     );
   });
 
+  it('rejects Numeric(0) in field position, matching @db.Numeric\u2019s positive-precision rule', () => {
+    const result = emit(`model sample {
+  id Int @id
+  amount Numeric(0)
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining('must be >= 1'),
+        }),
+      ]),
+    );
+  });
+
+  it('rejects Numeric(0) in named-type position, matching @db.Numeric\u2019s positive-precision rule', () => {
+    const result = emit(`types {
+  Bad = Numeric(0)
+}
+
+model sample {
+  id Int @id
+  amount Bad
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining('must be >= 1'),
+        }),
+      ]),
+    );
+  });
+
   it('rejects a non-integer precision via the declarative integer constraint', () => {
     const result = emit(`model sample {
   id Int @id
