@@ -1,7 +1,8 @@
 import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
 import type { DocumentAst, SourceFile } from '@prisma-next/psl-parser/syntax';
-import type { LspDiagnostic } from './diagnostic-mapping';
-import { computeDocumentDiagnostics } from './document-diagnostics';
+import type { ProjectInterpretation } from './config-resolution';
+import { type LspDiagnostic, mapInterpreterDiagnostics } from './diagnostic-mapping';
+import { computeDocumentDiagnostics, type DocumentDiagnostics } from './document-diagnostics';
 import type { PipelineInputs } from './pipeline';
 import type { SchemaInputSet } from './schema-inputs';
 
@@ -9,12 +10,19 @@ export interface DocumentArtifacts {
   readonly document: DocumentAst;
   readonly sourceFile: SourceFile;
   readonly diagnostics: readonly LspDiagnostic[];
+  /**
+   * Interpreter findings, computed on first pull at diagnostics-assembly time
+   * and memoized on this artifacts instance — the store drops the instance on
+   * `documentChanged` / `documentClosed`, which is the invalidation.
+   */
+  interpretDiagnostics(): readonly LspDiagnostic[];
 }
 
 export interface ProjectArtifactsOptions {
   readonly inputs: SchemaInputSet;
   readonly controlStack: PipelineInputs;
   readonly getText: (uri: string) => string | undefined;
+  readonly interpretation?: ProjectInterpretation;
 }
 
 /**
@@ -36,9 +44,37 @@ export interface ProjectArtifacts {
 }
 
 export function createProjectArtifacts(options: ProjectArtifactsOptions): ProjectArtifacts {
-  const { inputs, controlStack, getText } = options;
+  const { inputs, controlStack, getText, interpretation } = options;
   const documents = new Map<string, DocumentArtifacts>();
   let symbolTable: SymbolTable | undefined;
+
+  function createInterpretSlot(
+    uri: string,
+    computed: DocumentDiagnostics,
+  ): () => readonly LspDiagnostic[] {
+    if (interpretation === undefined) {
+      return () => [];
+    }
+    let memo: readonly LspDiagnostic[] | undefined;
+    return () => {
+      if (memo === undefined) {
+        const result = interpretation.source.interpret(
+          {
+            document: computed.document,
+            sourceFile: computed.sourceFile,
+            symbolTable: computed.symbolTable,
+            sourceId: uri,
+          },
+          interpretation.context,
+        );
+        memo = mapInterpreterDiagnostics(
+          result.ok ? [] : result.failure.diagnostics,
+          computed.sourceFile,
+        );
+      }
+      return memo;
+    };
+  }
 
   function drop(uri: string): void {
     if (documents.delete(uri)) {
@@ -63,6 +99,7 @@ export function createProjectArtifacts(options: ProjectArtifactsOptions): Projec
       document: computed.document,
       sourceFile: computed.sourceFile,
       diagnostics: computed.diagnostics,
+      interpretDiagnostics: createInterpretSlot(uri, computed),
     };
     documents.set(uri, artifacts);
     // Single-input by design: the project-wide symbolTable is rebuilt from the
