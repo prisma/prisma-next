@@ -48,23 +48,30 @@ transitional-shape constraint: never publish without position mapping).
 
 ## Slice Definition of Done (beyond CI / reviewer / project-DoD)
 
-- [ ] SDoD1 — For a `prismaContract` config and a schema with an interpreter error
-      (e.g. unresolvable relation), the LSP's diagnostics response contains the
-      interpreter diagnostic with the correct LSP range (span-mapping base pinned by
-      test); fixing the schema clears it on the next pull (TC-9).
-- [ ] SDoD2 — A span-less interpreter diagnostic surfaces anchored at document start,
-      not dropped (TC-10; construct via a real span-less producer or a
-      capability-shaped test double — implementer's choice, documented).
-- [ ] SDoD3 — Graceful degradation (TC-11): a config whose provider lacks the
-      capability (typescript source, opaque provider, absent contract) produces LSP
-      behavior byte-for-byte identical to pre-slice — regression test comparing
-      full diagnostic responses.
-- [ ] SDoD4 — Laziness (TC-12): semantic-token, folding-range, and completion
-      requests never invoke `interpret` (spy); repeated diagnostic pulls on unchanged
-      content interpret at most once; an edit invalidates the memo (spy count
-      increments exactly once after change).
-- [ ] SDoD5 — Zero new casts; `pnpm lint:deps` green (language-server already
-      depends on psl-parser and config; no new edges expected — flag if one appears).
+- [x] SDoD1 — interpreter diagnostic in the response at a hand-verifiable mapped
+      range (1-based PslSpan → 0-based LSP, base pinned against the real
+      `rangeToPslSpan` via roundtrip inversion); fix clears on next pull. ✓
+      `e1f1f584d` (server tests; doubles typed `PslInterpretCapable['interpret']` —
+      compiler-enforced fidelity; real-provider integration pinned in slice 04;
+      end-to-end closes in M6 playground QA).
+- [x] SDoD2 — span-less → document-start anchor (0,0→0,1), never dropped. ✓
+      (capability-shaped double, choice documented).
+- [x] SDoD3 — degradation byte-for-byte on both channels (full diagnostic objects
+      deep-equaled; absent-capability slot is a constant `[]`). ✓
+- [x] SDoD4 — laziness matrix through real harness request paths: semantic
+      tokens/folding/completion → 0 interpret calls; two pulls → 1; edit + pull → 2;
+      memo rides the existing document-drop lifecycle. ✓
+- [x] SDoD5 — zero production casts; one new dependency edge flagged as instructed
+      (language-server → config, direct instead of transitive — honest, downward,
+      lint:deps green); no D2 edges. ✓
+
+**Slice-close ritual (2026-07-14):** D1+D2 SATISFIED R1, zero findings; 5/5 SDoD
+PASS; `origin/main` rebased (one attribute-specs commit) + gates re-verified
+(typecheck 143/143, LSP 218/218, psl-parser 625/625); manual QA: covered by M6
+playground script (reviewer directive: include one real `prismaContract` project
+with an interpreter error — the last un-doubled link). Grep gate: zero `projects/`
+references in long-lived files. Method-detachment hazard converted to a failing
+test (`spy.mock.contexts[0]`).
 
 ## Edge cases (pre-investigated)
 

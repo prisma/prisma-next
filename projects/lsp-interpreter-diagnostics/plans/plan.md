@@ -196,7 +196,7 @@ behavior is unchanged (same inner function, same seed diagnostics). No consumer 
 
 ### Implement M4: LSP interpreter diagnostics (lazy, mapped, degrading)
 
-**Status:** ► In progress — slice 05, branch `tml-2984-slice-05-lsp-interpret`
+**Status:** ► In progress — slice 05 delivered (`958c1fbd0` + `e1f1f584d`, 5/5 SDoD), PR open; complete on merge
 
 _Outcomes_
 The LSP serves interpreter diagnostics on pull and push for capability-bearing
