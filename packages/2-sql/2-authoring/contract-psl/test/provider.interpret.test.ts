@@ -173,31 +173,41 @@ model Other {
     expect(typeof result?.ok).toBe('boolean');
   });
 
-  it('prepends caller seeds and excludes them when absent', () => {
-    const schema = `model Other {
+  it('load merges parse and symbol-table seeds ahead of interpreter findings', async () => {
+    const schema = `model Dup {
+  id Int @id
+}
+model Dup {
+  id Int @id
+}
+model Other {
   id Int @id
   bad Mystery
 }
 `;
-    const seed = {
-      code: 'PSL_CALLER_SEED',
-      message: 'seeded by the caller',
-      sourceId: SOURCE_ID,
-    };
+    const tempDir = await mkdtemp(join(tmpdir(), 'psl-interpret-'));
+    tempDirs.push(tempDir);
+    const schemaPath = join(tempDir, 'schema.prisma');
+    await writeFile(schemaPath, schema, 'utf-8');
+
+    process.chdir(tempDir);
     const source = interpretCapableSource(SOURCE_ID);
-    const context = createPostgresTestContext();
-    const input = buildInterpretInput(schema, context);
-
-    const unseeded = source.interpret(input, context);
-    const seeded = source.interpret(input, context, [seed]);
-
-    expect(unseeded.ok).toBe(false);
-    expect(seeded.ok).toBe(false);
-    if (unseeded.ok || seeded.ok) return;
-
-    expect(unseeded.failure.diagnostics).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'PSL_CALLER_SEED' })]),
+    const loadResult = await source.load(
+      createPostgresTestContext({ resolvedInputs: [schemaPath] }),
     );
-    expect(seeded.failure.diagnostics).toEqual([seed, ...unseeded.failure.diagnostics]);
+    expect(loadResult.ok).toBe(false);
+    if (loadResult.ok) return;
+
+    const context = createPostgresTestContext();
+    const interpretResult = source.interpret(buildInterpretInput(schema, context), context);
+    expect(interpretResult.ok).toBe(false);
+    if (interpretResult.ok) return;
+
+    const merged = loadResult.failure.diagnostics;
+    const interpreterFindings = interpretResult.failure.diagnostics;
+    expect(merged[0]).toMatchObject({ code: 'PSL_DUPLICATE_DECLARATION' });
+    expect(merged.length).toBeGreaterThan(interpreterFindings.length);
+    expect(merged.slice(merged.length - interpreterFindings.length)).toEqual(interpreterFindings);
+    expect(loadResult.failure.summary).toBe(`Schema has ${merged.length} errors`);
   });
 });

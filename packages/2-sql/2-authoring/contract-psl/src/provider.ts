@@ -6,6 +6,7 @@ import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { PslInterpretCapable } from '@prisma-next/psl-parser/interpret';
+import { withSeedDiagnostics } from '@prisma-next/psl-parser/interpret';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceBase, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
@@ -77,7 +78,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
   const source: PslInterpretCapable = {
     sourceFormat: 'psl',
     inputs: [schemaPath],
-    interpret(input, context, seedDiagnostics = []) {
+    interpret(input, context) {
       const scalarTypeDescriptors = buildColumnDescriptorMap(
         context.scalarTypeDescriptors,
         context.codecLookup,
@@ -86,7 +87,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         symbolTable: input.symbolTable,
         sourceFile: input.sourceFile,
         sourceId: input.sourceId,
-        seedDiagnostics,
+        seedDiagnostics: [],
         target: options.target,
         authoringContributions: context.authoringContributions,
         scalarTypeDescriptors,
@@ -148,9 +149,8 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),
       ];
 
-      const interpreted = this.interpret(
-        { document, sourceFile, symbolTable, sourceId: schemaPath },
-        context,
+      const interpreted = withSeedDiagnostics(
+        this.interpret({ document, sourceFile, symbolTable, sourceId: schemaPath }, context),
         seedDiagnostics,
       );
       if (!interpreted.ok) {

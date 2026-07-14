@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { PslInterpretCapable } from '@prisma-next/psl-parser/interpret';
+import { withSeedDiagnostics } from '@prisma-next/psl-parser/interpret';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -32,12 +33,12 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
   const source: PslInterpretCapable = {
     sourceFormat: 'psl',
     inputs: [schemaPath],
-    interpret(input, context, seedDiagnostics = []) {
+    interpret(input, context) {
       return interpretPslDocumentToMongoContract({
         symbolTable: input.symbolTable,
         sourceFile: input.sourceFile,
         sourceId: input.sourceId,
-        seedDiagnostics,
+        seedDiagnostics: [],
         scalarTypeDescriptors: context.scalarTypeDescriptors,
         codecLookup: context.codecLookup,
         authoringContributions: context.authoringContributions,
@@ -84,9 +85,8 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         ...mapParseDiagnostics(symbolTableDiagnostics, sourceFile, schemaPath),
       ];
 
-      return this.interpret(
-        { document, sourceFile, symbolTable, sourceId: schemaPath },
-        context,
+      return withSeedDiagnostics(
+        this.interpret({ document, sourceFile, symbolTable, sourceId: schemaPath }, context),
         seedDiagnostics,
       );
     },

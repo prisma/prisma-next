@@ -1,6 +1,5 @@
 import type {
   ContractSourceContext,
-  ContractSourceDiagnostic,
   ContractSourceDiagnostics,
   ContractSourceProvider,
   PslContractSourceProvider,
@@ -26,7 +25,7 @@ test('guard narrows the union to expose a fully typed interpret method', () => {
   if (hasPslInterpreter(source)) {
     expectTypeOf(source).toExtend<PslInterpretCapable>();
     expectTypeOf(source.interpret).parameters.toEqualTypeOf<
-      [PslInterpretInput, ContractSourceContext, (readonly ContractSourceDiagnostic[])?]
+      [PslInterpretInput, ContractSourceContext]
     >();
     expectTypeOf(source.interpret).returns.toEqualTypeOf<
       Result<Contract, ContractSourceDiagnostics>
