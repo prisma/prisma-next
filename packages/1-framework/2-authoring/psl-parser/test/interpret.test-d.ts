@@ -1,10 +1,11 @@
 import type {
   ContractSourceContext,
-  ContractSourceDiagnostic,
+  ContractSourceDiagnostics,
   ContractSourceProvider,
   PslContractSourceProvider,
 } from '@prisma-next/config/config-types';
-import { ok } from '@prisma-next/utils/result';
+import type { Contract } from '@prisma-next/contract/types';
+import { ok, type Result } from '@prisma-next/utils/result';
 import { expectTypeOf, test } from 'vitest';
 import {
   hasPslInterpreter,
@@ -26,7 +27,9 @@ test('guard narrows the union to expose a fully typed interpret method', () => {
     expectTypeOf(source.interpret).parameters.toEqualTypeOf<
       [PslInterpretInput, ContractSourceContext]
     >();
-    expectTypeOf(source.interpret).returns.toEqualTypeOf<readonly ContractSourceDiagnostic[]>();
+    expectTypeOf(source.interpret).returns.toEqualTypeOf<
+      Result<Contract, ContractSourceDiagnostics>
+    >();
     expectTypeOf(source.load).toEqualTypeOf<PslContractSourceProvider['load']>();
     expectTypeOf(source.inputs).toEqualTypeOf<readonly string[] | undefined>();
     expectTypeOf(source.sourceFormat).toEqualTypeOf<'psl'>();
