@@ -46,7 +46,7 @@ import type { ExtractCodecTypes } from '@prisma-next/sql-relational-core/ast';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import { POSTGIS_GEOMETRY_CODEC_ID } from './constants';
-import { decodeEWKBHex, encodeEWKT } from './ewkb';
+import { decodeEWKBHex, encodeEWKBHex, encodeEWKT } from './ewkb';
 import type { Geometry } from './geojson';
 
 type GeometryParams = { readonly srid: number };
@@ -116,12 +116,14 @@ export class PostgisGeometryCodec extends CodecImpl<
 
   encodeJson(value: Geometry): JsonValue {
     assertGeometry(value);
-    return value as unknown as JsonValue;
+    return encodeEWKBHex(value);
   }
 
   decodeJson(json: JsonValue): Geometry {
-    assertGeometry(json);
-    return json;
+    if (typeof json !== 'string') {
+      throw new Error('Geometry database JSON value must be a HEXEWKB string');
+    }
+    return decodeEWKBHex(json);
   }
 }
 

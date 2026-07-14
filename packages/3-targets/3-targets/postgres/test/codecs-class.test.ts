@@ -168,10 +168,10 @@ describe('codecs-class', () => {
       expect(await codec.decode(instant, callCtx)).toBe(instant);
     });
 
-    it('serializes Date to ISO 8601 string for JSON', () => {
+    it('uses the Postgres JSON timestamp representation', () => {
       const instant = new Date('2024-01-15T10:30:00Z');
-      expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000Z');
-      expect(codec.decodeJson('2024-01-15T10:30:00.000Z')).toEqual(instant);
+      expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000');
+      expect(codec.decodeJson('2024-01-15T10:30:00.000')).toEqual(instant);
     });
 
     it('throws on invalid JSON input', () => {
@@ -201,10 +201,10 @@ describe('codecs-class', () => {
       expect(await codec.decode(instant, callCtx)).toBe(instant);
     });
 
-    it('round-trips through JSON via ISO 8601', () => {
+    it('uses the Postgres JSON timestamptz representation', () => {
       const instant = new Date('2024-01-15T10:30:00Z');
-      expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000Z');
-      expect(codec.decodeJson('2024-01-15T10:30:00.000Z')).toEqual(instant);
+      expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000+00:00');
+      expect(codec.decodeJson('2024-01-15T10:30:00.000+00:00')).toEqual(instant);
     });
 
     it('throws on invalid JSON input with pg/timestamptz@1 label', () => {

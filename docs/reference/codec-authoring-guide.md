@@ -6,7 +6,7 @@ This guide describes the canonical authoring shape for codecs in Prisma Next: **
 
 A codec is **three artifacts**:
 
-1. A **codec class** that extends `CodecImpl<Id, TTraits, TWire, TInput>` and implements `encode` / `decode` (and `encodeJson` / `decodeJson` when the wire is not already JSON-safe).
+1. A **codec class** that extends `CodecImpl<Id, TTraits, TWire, TInput>` and implements all four conversion methods: `encode`, `decode`, `encodeJson`, and `decodeJson`.
 2. A **descriptor class** that extends `CodecDescriptorImpl<P>` and declares the codec id, traits, target types, params schema, and the curried factory that materializes codec instances.
 3. A **per-codec column helper function** that calls `descriptor.factory(...)` directly and packages the result into a `ColumnSpec` via the framework-supplied `column(...)` packager. The helper carries a `satisfies ColumnHelperFor<D>` clause that ties it to its descriptor at compile time.
 
@@ -19,6 +19,10 @@ The framework imports live at `@prisma-next/framework-components/codec`:
 - `voidParamsSchema` — Standard Schema validator for `P = void` (non-parameterized codecs).
 - `Codec<...>`, `CodecDescriptor<P>`, `AnyCodecDescriptor` — consumer-facing interfaces (consumers depend on these; authors extend the `*Impl` classes).
 
+SQL codecs use the same framework `CodecImpl` base. Their `encodeJson` and `decodeJson` methods must use the exact scalar representation produced by the corresponding database inside JSON values. SQL include decoding calls `decodeJson`; `decode` remains responsible for the driver's ordinary column wire value. This distinction is essential for types such as Postgres `bytea` and extension-defined types whose database JSON representation differs from their normal driver representation.
+
+When a target has no native JSON facility, its codecs may choose any JSON-safe representation for contract values. That representation must be stable, and `encodeJson` and `decodeJson` must be mutually consistent so an encoded contract value decodes to the original application value.
+
 ## Three case studies
 
 The same three artifacts express the full spectrum: non-parameterized, parameterized with literal preservation, and parameterized with a typed schema.
@@ -26,11 +30,12 @@ The same three artifacts express the full spectrum: non-parameterized, parameter
 ### Case 1 — Non-parameterized codec (`pg/text@1`)
 
 ```ts
+import type { JsonValue } from '@prisma-next/contract/types';
 import {
   type CodecCallContext,
   type CodecInstanceContext,
-  CodecImpl,
   CodecDescriptorImpl,
+  CodecImpl,
   type ColumnHelperFor,
   column,
   voidParamsSchema,
@@ -44,6 +49,13 @@ class PgTextCodec extends CodecImpl<
 > {
   async encode(value: string, _ctx: CodecCallContext) { return value; }
   async decode(wire: string, _ctx: CodecCallContext) { return wire; }
+  encodeJson(value: string) { return value; }
+  decodeJson(json: JsonValue) {
+    if (typeof json !== 'string') {
+      throw new TypeError('Expected a string JSON value');
+    }
+    return json;
+  }
 }
 
 class PgTextDescriptor extends CodecDescriptorImpl<void> {

@@ -12,7 +12,7 @@ import { executeQueryPlan } from './execute-query-plan';
 import type { CollectionContext, IncludeExpr } from './types';
 
 interface DispatchMutationRowsOptions<Row> {
-  readonly contract: Contract<SqlStorage>;
+  readonly context: CollectionContext<Contract<SqlStorage>>['context'];
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
   readonly tableName: string;
@@ -28,7 +28,7 @@ export function dispatchMutationRows<Row>(
   options: DispatchMutationRowsOptions<Row>,
 ): AsyncIterableResult<Row> {
   const {
-    contract,
+    context,
     runtime,
     compiled,
     tableName,
@@ -39,6 +39,7 @@ export function dispatchMutationRows<Row>(
     hiddenColumns,
     mapRow,
   } = options;
+  const { contract } = context;
 
   if (includes.length === 0) {
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
@@ -63,7 +64,7 @@ export function dispatchMutationRows<Row>(
       compiled,
     ).toArray();
     yield* reloadMutationRowsByIdentities<Row>({
-      contract,
+      context,
       runtime,
       tableName,
       modelName,
@@ -78,7 +79,7 @@ export function dispatchMutationRows<Row>(
 }
 
 interface DispatchSplitMutationRowsOptions<Row> {
-  readonly contract: Contract<SqlStorage>;
+  readonly context: CollectionContext<Contract<SqlStorage>>['context'];
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly plans: ReadonlyArray<SqlQueryPlan<Record<string, unknown>>>;
   readonly tableName: string;
@@ -94,7 +95,7 @@ export function dispatchSplitMutationRows<Row>(
   options: DispatchSplitMutationRowsOptions<Row>,
 ): AsyncIterableResult<Row> {
   const {
-    contract,
+    context,
     runtime,
     plans,
     tableName,
@@ -105,6 +106,7 @@ export function dispatchSplitMutationRows<Row>(
     hiddenColumns,
     mapRow,
   } = options;
+  const { contract } = context;
 
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     if (includes.length > 0) {
@@ -115,7 +117,7 @@ export function dispatchSplitMutationRows<Row>(
         );
       }
       yield* reloadMutationRowsByIdentities<Row>({
-        contract,
+        context,
         runtime,
         tableName,
         modelName,
@@ -142,7 +144,7 @@ export function dispatchSplitMutationRows<Row>(
 }
 
 interface ExecuteSingleMutationOptions<Row> {
-  readonly contract: Contract<SqlStorage>;
+  readonly context: CollectionContext<Contract<SqlStorage>>['context'];
   readonly runtime: CollectionContext<Contract<SqlStorage>>['runtime'];
   readonly compiled: SqlQueryPlan<Record<string, unknown>>;
   readonly tableName: string;
@@ -159,7 +161,7 @@ export async function executeMutationReturningSingleRow<Row>(
   options: ExecuteSingleMutationOptions<Row>,
 ): Promise<Row | null> {
   const {
-    contract,
+    context,
     runtime,
     compiled,
     tableName,
@@ -171,6 +173,7 @@ export async function executeMutationReturningSingleRow<Row>(
     mapRow,
     onMissingRowMessage,
   } = options;
+  const { contract } = context;
 
   if (includes.length === 0) {
     const rows = await executeQueryPlan<Record<string, unknown>>(runtime, compiled).toArray();
@@ -194,7 +197,7 @@ export async function executeMutationReturningSingleRow<Row>(
   // Pull only the first reloaded row — a single mutated identity reloads
   // to a single row, so the stream is advanced once rather than drained.
   for await (const row of reloadMutationRowsByIdentities<Row>({
-    contract,
+    context,
     runtime,
     tableName,
     modelName,

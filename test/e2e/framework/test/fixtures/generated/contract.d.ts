@@ -36,7 +36,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:981fe037ca7e692e66fe348947d9338b2e42349e1c266482ace81da4800646fa'>;
+  StorageHashBase<'sha256:d64442fe8210ea01567a1ffe02af5d3b0bb5af0fba4173b1dd7ba48bf145b1fd'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:055d44fe135482983abba0b4d9fab946a7e9587034dbb6c241317ef6021452ff'>;
 export type ProfileHash =
@@ -404,7 +404,7 @@ type ContractBase = Omit<
                     readonly kind: 'literal';
                     readonly value: DefaultLiteralValue<
                       'pg/timestamptz@1',
-                      '2024-01-15T10:30:00.000Z'
+                      '2024-01-15T10:30:00.000+00:00'
                     >;
                   };
                 };

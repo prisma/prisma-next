@@ -26,7 +26,8 @@ export interface PslInterpretInput {
 /**
  * Declared here — the authoring layer that owns `DocumentAst` / `SourceFile` /
  * `SymbolTable` — because `@prisma-next/config` (core) cannot name authoring
- * types.
+ * types. `interpret` must not read disk or `context.resolvedInputs` — those
+ * are load-path concerns.
  */
 export interface PslInterpretCapable extends PslContractSourceProvider {
   interpret(
