@@ -7,18 +7,15 @@ import {
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { JsonValue } from '@prisma-next/contract/types';
 import {
+  type CodecCallContext,
   CodecDescriptorImpl,
+  CodecImpl,
   type CodecInstanceContext,
   type ColumnTypeDescriptor,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
 import { Collection } from '@prisma-next/sql-orm-client';
-import {
-  type CodecCallContext,
-  type SqlCodecCallContext,
-  SqlCodecImpl,
-} from '@prisma-next/sql-relational-core/ast';
 import {
   createExecutionContext,
   createSqlExecutionStack,
@@ -30,7 +27,7 @@ import { timeouts, withCollectionRuntime } from './integration-helpers';
 
 const TEST_INCLUDED_TEXT_CODEC_ID = 'test/included-text@1' as const;
 
-class IncludedTextCodec extends SqlCodecImpl<
+class IncludedTextCodec extends CodecImpl<
   typeof TEST_INCLUDED_TEXT_CODEC_ID,
   readonly ['textual'],
   string,
@@ -44,22 +41,15 @@ class IncludedTextCodec extends SqlCodecImpl<
     return wire;
   }
 
-  override async decodeFromJson(value: unknown, _ctx: SqlCodecCallContext): Promise<string> {
-    if (typeof value !== 'string') {
-      throw new TypeError(`expected included text JSON value, got ${typeof value}`);
-    }
-    return `decoded-from-json:${value}`;
-  }
-
   encodeJson(value: string): JsonValue {
     return value;
   }
 
   decodeJson(json: JsonValue): string {
     if (typeof json !== 'string') {
-      throw new TypeError(`expected included text contract value, got ${typeof json}`);
+      throw new TypeError(`expected included text database JSON value, got ${typeof json}`);
     }
-    return json;
+    return `decoded-json:${json}`;
   }
 }
 
@@ -124,7 +114,7 @@ const context = createExecutionContext({
 
 describe('integration/include codecs', () => {
   it(
-    'delegates child JSON values to codecs and preserves timestamp JSON text',
+    'delegates database JSON values to codec.decodeJson',
     async () => {
       await withCollectionRuntime(
         async (runtime) => {
@@ -157,6 +147,30 @@ describe('integration/include codecs', () => {
         `);
           await runtime.query('insert into codec_branches (id, project_id) values (1, 10)');
 
+          const [databaseJson] = await runtime.query<{
+            value: {
+              wrappedDek: string;
+              deletedAt: string;
+              deletedAtTz: string;
+              customText: string;
+            };
+          }>(`
+            select json_build_object(
+              'wrappedDek', wrapped_dek,
+              'deletedAt', deleted_at,
+              'deletedAtTz', deleted_at_tz,
+              'customText', custom_text
+            ) as value
+            from codec_projects
+            where id = 10
+          `);
+          expect(databaseJson?.value).toEqual({
+            wrappedDek: '\\x01020304',
+            deletedAt: '2026-07-09T15:23:33.037',
+            deletedAtTz: '2026-07-09T15:23:33.037+00:00',
+            customText: 'extension value',
+          });
+
           const branches = new Collection({ runtime, context }, 'Branch', {
             namespaceId: 'public',
           });
@@ -172,9 +186,9 @@ describe('integration/include codecs', () => {
               id: 1,
               project: {
                 wrappedDek: new Uint8Array([1, 2, 3, 4]),
-                deletedAt: '2026-07-09T15:23:33.037',
-                deletedAtTz: '2026-07-09T15:23:33.037+00:00',
-                customText: 'decoded-from-json:extension value',
+                deletedAt: new Date('2026-07-09T15:23:33.037Z'),
+                deletedAtTz: new Date('2026-07-09T15:23:33.037Z'),
+                customText: 'decoded-json:extension value',
               },
             },
           ]);

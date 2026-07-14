@@ -11,10 +11,7 @@ import {
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
-import type {
-  ContractCodecRegistry,
-  Codec as SqlCodec,
-} from '@prisma-next/sql-relational-core/ast';
+import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import { jsonb, pgTable, text } from '@prisma-next/target-postgres/contract-free';
@@ -213,14 +210,11 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — guards', () => {
 
 const TEST_CODEC_ID = 'test/transform@1';
 
-const queryTransformingCodec: SqlCodec = {
+const queryTransformingCodec = {
   id: TEST_CODEC_ID,
   encode: async (value: unknown) => `ENC:${String(value).toUpperCase()}`,
   decode: async (wire: unknown) => wire,
-  decodeFromJson: async (value: unknown) => value,
-  encodeJson: (value) => value as never,
-  decodeJson: (value) => value,
-};
+} as unknown as Codec;
 
 const testRegistry: ContractCodecRegistry = {
   forColumn: () => undefined,

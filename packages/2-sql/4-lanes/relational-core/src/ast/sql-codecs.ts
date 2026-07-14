@@ -3,7 +3,7 @@
  *
  * Each codec ships as three artifacts:
  *
- * 1. A `SqlXCodec` class extending {@link SqlCodecImpl} that wraps the module-level encode/decode constants exported from `sql-codec-helpers.ts` (the single source of truth for runtime behaviour). 2. A `SqlXDescriptor` class extending {@link CodecDescriptorImpl} declaring the codec id, traits, target types, params schema, and (where applicable) the emit-path `renderOutputType`. 3. A per-codec column helper (`sqlXColumn`)
+ * 1. A `SqlXCodec` class extending {@link CodecImpl} that wraps the module-level encode/decode constants exported from `sql-codec-helpers.ts` (the single source of truth for runtime behaviour). 2. A `SqlXDescriptor` class extending {@link CodecDescriptorImpl} declaring the codec id, traits, target types, params schema, and (where applicable) the emit-path `renderOutputType`. 3. A per-codec column helper (`sqlXColumn`)
  * that calls `descriptor.factory(...)` directly and packages the result into a {@link ColumnSpec} via the framework {@link column} packager. The helper is tied to its descriptor with `satisfies ColumnHelperFor`.
  *
  * After TML-2357 this file is the canonical source of SQL base codec metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec` carriers retired with the deletion sweep.
@@ -13,6 +13,7 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import {
   type CodecCallContext,
   CodecDescriptorImpl,
+  CodecImpl,
   type CodecInstanceContext,
   type ColumnHelperFor,
   type ColumnHelperForStrict,
@@ -21,7 +22,6 @@ import {
 } from '@prisma-next/framework-components/codec';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
-import { SqlCodecImpl } from './codec-types';
 import {
   SQL_CHAR_CODEC_ID,
   SQL_FLOAT_CODEC_ID,
@@ -59,7 +59,7 @@ const precisionParamsSchema = arktype({
   'precision?': 'number.integer >= 0 & number.integer <= 6',
 }) satisfies StandardSchemaV1<PrecisionParams>;
 
-export class SqlTextCodec extends SqlCodecImpl<
+export class SqlTextCodec extends CodecImpl<
   typeof SQL_TEXT_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -97,7 +97,7 @@ export const sqlTextColumn = () =>
 sqlTextColumn satisfies ColumnHelperFor<SqlTextDescriptor>;
 sqlTextColumn satisfies ColumnHelperForStrict<SqlTextDescriptor>;
 
-export class SqlIntCodec extends SqlCodecImpl<
+export class SqlIntCodec extends CodecImpl<
   typeof SQL_INT_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -135,7 +135,7 @@ export const sqlIntColumn = () =>
 sqlIntColumn satisfies ColumnHelperFor<SqlIntDescriptor>;
 sqlIntColumn satisfies ColumnHelperForStrict<SqlIntDescriptor>;
 
-export class SqlFloatCodec extends SqlCodecImpl<
+export class SqlFloatCodec extends CodecImpl<
   typeof SQL_FLOAT_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -173,7 +173,7 @@ export const sqlFloatColumn = () =>
 sqlFloatColumn satisfies ColumnHelperFor<SqlFloatDescriptor>;
 sqlFloatColumn satisfies ColumnHelperForStrict<SqlFloatDescriptor>;
 
-export class SqlCharCodec extends SqlCodecImpl<
+export class SqlCharCodec extends CodecImpl<
   typeof SQL_CHAR_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -214,7 +214,7 @@ export const sqlCharColumn = (params: LengthParams = {}) =>
 sqlCharColumn satisfies ColumnHelperFor<SqlCharDescriptor>;
 sqlCharColumn satisfies ColumnHelperForStrict<SqlCharDescriptor>;
 
-export class SqlVarcharCodec extends SqlCodecImpl<
+export class SqlVarcharCodec extends CodecImpl<
   typeof SQL_VARCHAR_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -255,7 +255,7 @@ export const sqlVarcharColumn = (params: LengthParams = {}) =>
 sqlVarcharColumn satisfies ColumnHelperFor<SqlVarcharDescriptor>;
 sqlVarcharColumn satisfies ColumnHelperForStrict<SqlVarcharDescriptor>;
 
-export class SqlTimestampCodec extends SqlCodecImpl<
+export class SqlTimestampCodec extends CodecImpl<
   typeof SQL_TIMESTAMP_CODEC_ID,
   readonly ['equality', 'order'],
   Date,

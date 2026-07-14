@@ -116,17 +116,14 @@ describe('pgvector codecs', () => {
   });
 
   describe('encodeJson / decodeJson', () => {
-    it('returns the value array unchanged on encodeJson when length matches', () => {
+    it('encodes the PostgreSQL JSON string representation', () => {
       const codec = asAsyncCodec(3);
-      const value = [0.1, 0.2, 0.3];
-      const encoded = codec.encodeJson(value);
-      expect(encoded).toEqual(value);
+      expect(codec.encodeJson([0.1, 0.2, 0.3])).toBe('[0.1,0.2,0.3]');
     });
 
-    it('round-trips through decodeJson back to the same array', () => {
+    it('decodes the PostgreSQL JSON string representation', () => {
       const codec = asAsyncCodec(3);
-      const json = codec.encodeJson([0.1, 0.2, 0.3]);
-      expect(codec.decodeJson(json)).toEqual([0.1, 0.2, 0.3]);
+      expect(codec.decodeJson('[0.1,0.2,0.3]')).toEqual([0.1, 0.2, 0.3]);
     });
 
     it('rejects encodeJson when the value is not an array', () => {
@@ -136,14 +133,10 @@ describe('pgvector codecs', () => {
       );
     });
 
-    it('rejects decodeJson when the JSON payload is not a number array of the declared length', () => {
+    it('rejects decodeJson when the PostgreSQL JSON string has invalid values or length', () => {
       const codec = asAsyncCodec(3);
-      expect(() => codec.decodeJson([1, 2] as unknown as JsonValue)).toThrow(
-        /Vector length mismatch/,
-      );
-      expect(() => codec.decodeJson([1, 'two', 3] as unknown as JsonValue)).toThrow(
-        'Vector value must contain only numbers',
-      );
+      expect(() => codec.decodeJson('[1,2]')).toThrow(/Vector length mismatch/);
+      expect(() => codec.decodeJson('[1,two,3]')).toThrow(/Invalid vector value/);
     });
   });
 

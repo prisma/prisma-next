@@ -1,12 +1,12 @@
 # Codec authoring guide
 
-This guide describes the canonical authoring shape for codecs in Prisma Next: **class-based codecs and descriptors** (`CodecImpl` / `SqlCodecImpl`, `CodecDescriptorImpl`), per-codec column helpers, and `satisfies` for compile-time wiring. The design rationale and the broader codec model live in [ADR 208 — Higher-order codecs for parameterized types](../architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md); this document is the practical "how to write a codec" reference for contributors.
+This guide describes the canonical authoring shape for codecs in Prisma Next: **class-based codecs and descriptors** (`CodecImpl`, `CodecDescriptorImpl`), per-codec column helpers, and `satisfies` for compile-time wiring. The design rationale and the broader codec model live in [ADR 208 — Higher-order codecs for parameterized types](../architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md); this document is the practical "how to write a codec" reference for contributors.
 
 ## At a glance
 
 A codec is **three artifacts**:
 
-1. A **codec class** that extends its family authoring base (`SqlCodecImpl<Id, TTraits, TWire, TInput>` for SQL) and implements `encode` / `decode` (and `encodeJson` / `decodeJson` when the input is not already JSON-safe).
+1. A **codec class** that extends `CodecImpl<Id, TTraits, TWire, TInput>` and implements `encode`, `decode`, `encodeJson`, and `decodeJson`.
 2. A **descriptor class** that extends `CodecDescriptorImpl<P>` and declares the codec id, traits, target types, params schema, and the curried factory that materializes codec instances.
 3. A **per-codec column helper function** that calls `descriptor.factory(...)` directly and packages the result into a `ColumnSpec` via the framework-supplied `column(...)` packager. The helper carries a `satisfies ColumnHelperFor<D>` clause that ties it to its descriptor at compile time.
 
@@ -19,7 +19,7 @@ The framework imports live at `@prisma-next/framework-components/codec`:
 - `voidParamsSchema` — Standard Schema validator for `P = void` (non-parameterized codecs).
 - `Codec<...>`, `CodecDescriptor<P>`, `AnyCodecDescriptor` — consumer-facing interfaces (consumers depend on these; authors extend the `*Impl` classes).
 
-SQL codec authors import `SqlCodecImpl`, `Codec`, `CodecDescriptor`, and `AnyCodecDescriptor` from `@prisma-next/sql-relational-core/ast`. `SqlCodecImpl` adds the query-time `decodeFromJson(value, ctx)` path used for scalar values embedded in SQL JSON results. Its default forwards the value to `decode`; override it when the database's JSON representation differs from the driver's ordinary wire representation.
+SQL codecs use the same framework `CodecImpl` base. Their `encodeJson` and `decodeJson` methods must use the exact scalar representation produced by the corresponding database inside JSON values. SQL include decoding calls `decodeJson`; `decode` remains responsible for the driver's ordinary column wire value. This distinction is essential for types such as Postgres `bytea` and extension-defined types whose database JSON representation differs from their normal driver representation.
 
 ## Three case studies
 
@@ -28,17 +28,18 @@ The same three artifacts express the full spectrum: non-parameterized, parameter
 ### Case 1 — Non-parameterized codec (`pg/text@1`)
 
 ```ts
+import type { JsonValue } from '@prisma-next/contract/types';
 import {
   type CodecCallContext,
   type CodecInstanceContext,
   CodecDescriptorImpl,
+  CodecImpl,
   type ColumnHelperFor,
   column,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
-import { SqlCodecImpl } from '@prisma-next/sql-relational-core/ast';
 
-class PgTextCodec extends SqlCodecImpl<
+class PgTextCodec extends CodecImpl<
   'pg/text@1',
   readonly ['equality', 'order', 'textual'],
   string,
@@ -46,6 +47,8 @@ class PgTextCodec extends SqlCodecImpl<
 > {
   async encode(value: string, _ctx: CodecCallContext) { return value; }
   async decode(wire: string, _ctx: CodecCallContext) { return wire; }
+  encodeJson(value: string) { return value; }
+  decodeJson(json: JsonValue) { return String(json); }
 }
 
 class PgTextDescriptor extends CodecDescriptorImpl<void> {
@@ -73,7 +76,7 @@ The factory is **constant**: every call returns the same shared codec instance. 
 ```ts
 import { type } from 'arktype';
 
-class VectorCodec<N extends number> extends SqlCodecImpl<
+class VectorCodec<N extends number> extends CodecImpl<
   'pg/vector@1',
   readonly ['equality'],
   string,
@@ -127,7 +130,7 @@ The schema's TypeScript-level inferred type `S['infer']` is only available at th
 import { type } from 'arktype';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 
-class ArktypeJsonCodecClass<TInferred> extends SqlCodecImpl<
+class ArktypeJsonCodecClass<TInferred> extends CodecImpl<
   'arktype/json@1',
   readonly ['equality'],
   string,

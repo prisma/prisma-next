@@ -1,16 +1,15 @@
 import type {
   Codec as BaseCodec,
-  CodecDescriptor as BaseCodecDescriptor,
   CodecCallContext,
+  CodecDescriptor,
   CodecInstanceContext,
   CodecRef,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
-import { CodecImpl as BaseCodecImpl } from '@prisma-next/framework-components/codec';
-import { blindCast } from '@prisma-next/utils/casts';
 
 export type {
   CodecCallContext,
+  CodecDescriptor,
   CodecRef,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
@@ -63,7 +62,7 @@ export interface CodecMeta {
 /**
  * SQL codec — extends the framework codec base by narrowing the per-call context to the SQL-family {@link SqlCodecCallContext} (adds `column?: SqlColumnRef`). TypeScript treats method-syntax declarations bivariantly, so the SQL narrowing is structurally compatible with the framework {@link BaseCodec} super-interface.
  *
- * Codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`, `paramsSchema`, `renderOutputType`) lives on the unified {@link import('@prisma-next/framework-components/codec').CodecDescriptor} — the codec instance itself carries the framework conversion methods plus {@link decodeFromJson} for values embedded in SQL JSON results.
+ * Codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`, `paramsSchema`, `renderOutputType`) lives on the unified {@link import('@prisma-next/framework-components/codec').CodecDescriptor} — the codec instance itself only carries `id` plus the four conversion methods.
  *
  * See `Codec` in `@prisma-next/framework-components/codec` for the codec contract that this interface extends.
  */
@@ -75,44 +74,6 @@ export interface Codec<
 > extends BaseCodec<Id, TTraits, TWire, TInput> {
   encode(value: TInput, ctx: SqlCodecCallContext): Promise<TWire>;
   decode(wire: TWire, ctx: SqlCodecCallContext): Promise<TInput>;
-  /** Decodes one scalar value embedded in a SQL JSON result. Database JSON construction may represent a type differently from the driver's ordinary wire format, so the codec that owns the type also owns this conversion. */
-  decodeFromJson(value: unknown, ctx: SqlCodecCallContext): Promise<TInput>;
-}
-
-/**
- * SQL codec authoring base. The default JSON-result path forwards the value to
- * the ordinary wire decoder; codecs whose database JSON representation differs
- * from their driver wire representation override {@link decodeFromJson}.
- */
-export abstract class SqlCodecImpl<
-    Id extends string = string,
-    TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
-    TWire = unknown,
-    TInput = unknown,
-  >
-  extends BaseCodecImpl<Id, TTraits, TWire, TInput>
-  implements Codec<Id, TTraits, TWire, TInput>
-{
-  abstract override encode(value: TInput, ctx: SqlCodecCallContext): Promise<TWire>;
-  abstract override decode(wire: TWire, ctx: SqlCodecCallContext): Promise<TInput>;
-
-  decodeFromJson(value: unknown, ctx: SqlCodecCallContext): Promise<TInput> {
-    return this.decode(
-      blindCast<
-        TWire,
-        'SQL JSON result values are wire-compatible unless the concrete codec overrides decodeFromJson'
-      >(value),
-      ctx,
-    );
-  }
-}
-
-/**
- * SQL codec descriptor. It refines the framework descriptor factory so every
- * codec contributed to a SQL execution stack implements the SQL codec contract.
- */
-export interface CodecDescriptor<P = void> extends Omit<BaseCodecDescriptor<P>, 'factory'> {
-  readonly factory: (params: P) => (ctx: CodecInstanceContext) => Codec;
 }
 
 /**

@@ -6,12 +6,13 @@ import {
   type Contract as FrameworkContract,
 } from '@prisma-next/contract/types';
 import type {
+  CodecDescriptor,
   CodecInstanceContext,
   ColumnTypeDescriptor,
 } from '@prisma-next/framework-components/codec';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { Codec, CodecDescriptor, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { Codec, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {

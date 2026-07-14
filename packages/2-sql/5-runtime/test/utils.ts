@@ -4,7 +4,11 @@ import {
   coreHash,
   profileHash,
 } from '@prisma-next/contract/types';
-import type { CodecMeta, CodecTrait } from '@prisma-next/framework-components/codec';
+import type {
+  CodecDescriptor,
+  CodecMeta,
+  CodecTrait,
+} from '@prisma-next/framework-components/codec';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import {
   instantiateExecutionStack,
@@ -25,7 +29,6 @@ import type {
   Adapter,
   AnyQueryAst,
   Codec,
-  CodecDescriptor,
   ContractCodecRegistry,
   LoweredStatement,
   SelectAst,

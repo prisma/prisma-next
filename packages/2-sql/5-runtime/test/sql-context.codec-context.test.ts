@@ -1,12 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
-import type {
-  Codec,
-  CodecDescriptor,
-  SqlCodecInstanceContext,
-} from '@prisma-next/sql-relational-core/ast';
+import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
@@ -36,7 +33,6 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
           id: 'test/captures-ctx@1',
           encode: (v: unknown) => Promise.resolve(v),
           decode: (w: unknown) => Promise.resolve(w),
-          decodeFromJson: (value: unknown) => Promise.resolve(value),
           encodeJson: (v) => v as never,
           decodeJson: (j) => j as never,
         };
@@ -148,7 +144,6 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
           id: 'pgvector/vector@1',
           encode: (v: unknown) => Promise.resolve(v),
           decode: (w: unknown) => Promise.resolve(w),
-          decodeFromJson: (value: unknown) => Promise.resolve(value),
           encodeJson: (v) => v as never,
           decodeJson: (j) => j as never,
         };
@@ -397,7 +392,6 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
           id: 'test/shared@1',
           encode: (v: unknown) => Promise.resolve(v),
           decode: (w: unknown) => Promise.resolve(w),
-          decodeFromJson: (value: unknown) => Promise.resolve(value),
           encodeJson: (v) => v as never,
           decodeJson: (j) => j as never,
         };

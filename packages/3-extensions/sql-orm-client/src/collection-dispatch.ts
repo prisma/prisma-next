@@ -14,7 +14,7 @@
  * `test/integration/codec-async.test.ts` and `test/codec-async.types.test-d.ts`.
  */
 
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import {
   AsyncIterableResult,
   isRuntimeError,
@@ -30,7 +30,6 @@ import {
   ListExpression,
   LiteralExpr,
   OrExpr,
-  type SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import { blindCast } from '@prisma-next/utils/casts';
 import {
@@ -494,10 +493,6 @@ async function decodeIncludedColumnValue(
   codec: Codec,
   value: unknown,
 ): Promise<unknown> {
-  const cellCtx: SqlCodecCallContext = {
-    column: { table: ref.table, name: ref.column },
-  };
-
   if (ref.storageColumn.many === true) {
     if (!Array.isArray(value)) {
       wrapIncludedDecodeFailure(
@@ -517,7 +512,11 @@ async function decodeIncludedColumnValue(
         continue;
       }
       try {
-        decoded.push(await codec.decodeFromJson(element, cellCtx));
+        decoded.push(
+          codec.decodeJson(
+            blindCast<JsonValue, 'SQL JSON aggregate elements are JSON values'>(element),
+          ),
+        );
       } catch (error) {
         if (isRuntimeError(error)) throw error;
         wrapIncludedDecodeFailure(error, ref, codecId, element);
@@ -527,7 +526,9 @@ async function decodeIncludedColumnValue(
   }
 
   try {
-    return await codec.decodeFromJson(value, cellCtx);
+    return codec.decodeJson(
+      blindCast<JsonValue, 'SQL JSON aggregate fields are JSON values'>(value),
+    );
   } catch (error) {
     if (isRuntimeError(error)) throw error;
     wrapIncludedDecodeFailure(error, ref, codecId, value);

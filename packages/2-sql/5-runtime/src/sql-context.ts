@@ -3,7 +3,11 @@ import type {
   ExecutionMutationDefaultValue,
   JsonValue,
 } from '@prisma-next/contract/types';
-import type { CodecRef } from '@prisma-next/framework-components/codec';
+import type {
+  AnyCodecDescriptor,
+  CodecDescriptor,
+  CodecRef,
+} from '@prisma-next/framework-components/codec';
 import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import {
   checkContractComponentRequirements,
@@ -41,9 +45,7 @@ import {
 } from '@prisma-next/sql-operations';
 import type {
   Adapter,
-  AnyCodecDescriptor,
   AnyQueryAst,
-  CodecDescriptor,
   ContractCodecRegistry,
   LoweredStatement,
   SqlCodecInstanceContext,

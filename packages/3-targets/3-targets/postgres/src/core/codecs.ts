@@ -3,7 +3,7 @@
  *
  * Each codec ships as three artifacts:
  *
- * 1. A `PgXCodec` class extending {@link SqlCodecImpl} that wraps the module-level encode/decode/encodeJson/decodeJson constants exported from `codec-helpers.ts` (the single source of truth for non-trivial runtime conversions; trivial identity passthroughs are inlined). 2. A `PgXDescriptor` class extending {@link CodecDescriptorImpl} declaring the codec id, traits, target types, params schema, meta, and (where applicable)
+ * 1. A `PgXCodec` class extending {@link CodecImpl} that wraps the module-level encode/decode/encodeJson/decodeJson constants exported from `codec-helpers.ts` (the single source of truth for non-trivial runtime conversions; trivial identity passthroughs are inlined). 2. A `PgXDescriptor` class extending {@link CodecDescriptorImpl} declaring the codec id, traits, target types, params schema, meta, and (where applicable)
  * the emit-path `renderOutputType`. 3. A per-codec column helper (`pgXColumn`) that calls `descriptor.factory(...)` directly and packages the result into a framework `ColumnSpec` via the framework {@link column} packager. The helper is tied to its descriptor with `satisfies ColumnHelperFor` (and `ColumnHelperForStrict` where the resolved codec type is well-defined).
  *
  * After TML-2357 this is the canonical source of Postgres codec metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec` carriers (and the parallel `byScalar`/`codecDescriptorDefinitions`/ `codecDescriptorList` collection exports) retired with the deletion sweep.
@@ -14,8 +14,10 @@
 
 import type { JsonValue } from '@prisma-next/contract/types';
 import {
+  type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
+  CodecImpl,
   type CodecInstanceContext,
   type CodecMeta,
   type ColumnHelperFor,
@@ -26,9 +28,7 @@ import {
 } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  type AnyCodecDescriptor,
   SqlCharCodec,
-  SqlCodecImpl,
   SqlFloatCodec,
   SqlIntCodec,
   SqlVarcharCodec,
@@ -43,7 +43,8 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import {
-  pgByteaDecodeFromJson,
+  pgByteaDecodeJson,
+  pgByteaEncodeJson,
   pgIntervalDecode,
   pgJsonbDecode,
   pgJsonbEncode,
@@ -129,7 +130,7 @@ const PG_INTERVAL_META = { db: { sql: { postgres: { nativeType: 'interval' } } }
 const PG_JSON_META = { db: { sql: { postgres: { nativeType: 'json' } } } } as const;
 const PG_JSONB_META = { db: { sql: { postgres: { nativeType: 'jsonb' } } } } as const;
 
-export class PgTextCodec extends SqlCodecImpl<
+export class PgTextCodec extends CodecImpl<
   typeof PG_TEXT_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -187,7 +188,7 @@ pgTextColumn satisfies ColumnHelperForStrict<PgTextDescriptor>;
  * the managed (DDL) phase needs to target `CREATE TYPE`/`ALTER TYPE`
  * operations at exactly the columns that use one.
  */
-export class PgEnumCodec extends SqlCodecImpl<
+export class PgEnumCodec extends CodecImpl<
   typeof PG_ENUM_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -318,7 +319,7 @@ export function postgresQualifyColumnType(
  * the marker's `invariants` column. Not a user-facing scalar — it is not part
  * of the authorable `CodecTypes` surface, only the runtime codec registry.
  */
-export class PgTextArrayCodec extends SqlCodecImpl<
+export class PgTextArrayCodec extends CodecImpl<
   typeof PG_TEXT_ARRAY_CODEC_ID,
   readonly ['equality'],
   readonly string[],
@@ -351,7 +352,7 @@ export class PgTextArrayDescriptor extends CodecDescriptorImpl<void> {
 
 export const pgTextArrayDescriptor = new PgTextArrayDescriptor();
 
-export class PgInt4Codec extends SqlCodecImpl<
+export class PgInt4Codec extends CodecImpl<
   typeof PG_INT4_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -393,7 +394,7 @@ export const pgInt4Column = () =>
 pgInt4Column satisfies ColumnHelperFor<PgInt4Descriptor>;
 pgInt4Column satisfies ColumnHelperForStrict<PgInt4Descriptor>;
 
-export class PgInt2Codec extends SqlCodecImpl<
+export class PgInt2Codec extends CodecImpl<
   typeof PG_INT2_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -435,7 +436,7 @@ export const pgInt2Column = () =>
 pgInt2Column satisfies ColumnHelperFor<PgInt2Descriptor>;
 pgInt2Column satisfies ColumnHelperForStrict<PgInt2Descriptor>;
 
-export class PgInt8Codec extends SqlCodecImpl<
+export class PgInt8Codec extends CodecImpl<
   typeof PG_INT8_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -477,7 +478,7 @@ export const pgInt8Column = () =>
 pgInt8Column satisfies ColumnHelperFor<PgInt8Descriptor>;
 pgInt8Column satisfies ColumnHelperForStrict<PgInt8Descriptor>;
 
-export class PgFloat4Codec extends SqlCodecImpl<
+export class PgFloat4Codec extends CodecImpl<
   typeof PG_FLOAT4_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -519,7 +520,7 @@ export const pgFloat4Column = () =>
 pgFloat4Column satisfies ColumnHelperFor<PgFloat4Descriptor>;
 pgFloat4Column satisfies ColumnHelperForStrict<PgFloat4Descriptor>;
 
-export class PgFloat8Codec extends SqlCodecImpl<
+export class PgFloat8Codec extends CodecImpl<
   typeof PG_FLOAT8_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -561,7 +562,7 @@ export const pgFloat8Column = () =>
 pgFloat8Column satisfies ColumnHelperFor<PgFloat8Descriptor>;
 pgFloat8Column satisfies ColumnHelperForStrict<PgFloat8Descriptor>;
 
-export class PgBoolCodec extends SqlCodecImpl<
+export class PgBoolCodec extends CodecImpl<
   typeof PG_BOOL_CODEC_ID,
   readonly ['equality', 'boolean'],
   boolean,
@@ -603,7 +604,7 @@ export const pgBoolColumn = () =>
 pgBoolColumn satisfies ColumnHelperFor<PgBoolDescriptor>;
 pgBoolColumn satisfies ColumnHelperForStrict<PgBoolDescriptor>;
 
-export class PgNumericCodec extends SqlCodecImpl<
+export class PgNumericCodec extends CodecImpl<
   typeof PG_NUMERIC_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   string | number,
@@ -616,10 +617,17 @@ export class PgNumericCodec extends SqlCodecImpl<
     return pgNumericDecode(wire);
   }
   encodeJson(value: string): JsonValue {
-    return value;
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      throw new TypeError('pg/numeric@1 database JSON value must be a finite number');
+    }
+    return number;
   }
   decodeJson(json: JsonValue): string {
-    return json as string;
+    if (typeof json !== 'number') {
+      throw new TypeError('pg/numeric@1 database JSON value must be a number');
+    }
+    return pgNumericDecode(json);
   }
 }
 
@@ -645,7 +653,7 @@ export const pgNumericColumn = (params: NumericParams) =>
 pgNumericColumn satisfies ColumnHelperFor<PgNumericDescriptor>;
 pgNumericColumn satisfies ColumnHelperForStrict<PgNumericDescriptor>;
 
-export class PgTimestampCodec extends SqlCodecImpl<
+export class PgTimestampCodec extends CodecImpl<
   typeof PG_TIMESTAMP_CODEC_ID,
   readonly ['equality', 'order'],
   Date,
@@ -688,7 +696,7 @@ export const pgTimestampColumn = (params: PrecisionParams = {}) =>
 pgTimestampColumn satisfies ColumnHelperFor<PgTimestampDescriptor>;
 pgTimestampColumn satisfies ColumnHelperForStrict<PgTimestampDescriptor>;
 
-export class PgTimestamptzCodec extends SqlCodecImpl<
+export class PgTimestamptzCodec extends CodecImpl<
   typeof PG_TIMESTAMPTZ_CODEC_ID,
   readonly ['equality', 'order'],
   Date,
@@ -736,7 +744,7 @@ export const pgTimestamptzColumn = (params: PrecisionParams = {}) =>
 pgTimestamptzColumn satisfies ColumnHelperFor<PgTimestamptzDescriptor>;
 pgTimestamptzColumn satisfies ColumnHelperForStrict<PgTimestamptzDescriptor>;
 
-export class PgTimeCodec extends SqlCodecImpl<
+export class PgTimeCodec extends CodecImpl<
   typeof PG_TIME_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -779,7 +787,7 @@ export const pgTimeColumn = (params: PrecisionParams = {}) =>
 pgTimeColumn satisfies ColumnHelperFor<PgTimeDescriptor>;
 pgTimeColumn satisfies ColumnHelperForStrict<PgTimeDescriptor>;
 
-export class PgTimetzCodec extends SqlCodecImpl<
+export class PgTimetzCodec extends CodecImpl<
   typeof PG_TIMETZ_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -822,7 +830,7 @@ export const pgTimetzColumn = (params: PrecisionParams = {}) =>
 pgTimetzColumn satisfies ColumnHelperFor<PgTimetzDescriptor>;
 pgTimetzColumn satisfies ColumnHelperForStrict<PgTimetzDescriptor>;
 
-export class PgBitCodec extends SqlCodecImpl<
+export class PgBitCodec extends CodecImpl<
   typeof PG_BIT_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -864,7 +872,7 @@ export const pgBitColumn = (params: LengthParams = {}) =>
 pgBitColumn satisfies ColumnHelperFor<PgBitDescriptor>;
 pgBitColumn satisfies ColumnHelperForStrict<PgBitDescriptor>;
 
-export class PgVarbitCodec extends SqlCodecImpl<
+export class PgVarbitCodec extends CodecImpl<
   typeof PG_VARBIT_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -906,7 +914,7 @@ export const pgVarbitColumn = (params: LengthParams = {}) =>
 pgVarbitColumn satisfies ColumnHelperFor<PgVarbitDescriptor>;
 pgVarbitColumn satisfies ColumnHelperForStrict<PgVarbitDescriptor>;
 
-export class PgByteaCodec extends SqlCodecImpl<
+export class PgByteaCodec extends CodecImpl<
   typeof PG_BYTEA_CODEC_ID,
   readonly ['equality'],
   Uint8Array,
@@ -921,21 +929,11 @@ export class PgByteaCodec extends SqlCodecImpl<
       ? wire
       : new Uint8Array(wire.buffer, wire.byteOffset, wire.byteLength);
   }
-  override async decodeFromJson(value: unknown, ctx: CodecCallContext): Promise<Uint8Array> {
-    return this.decode(pgByteaDecodeFromJson(value), ctx);
-  }
   encodeJson(value: Uint8Array): JsonValue {
-    return Buffer.from(value).toString('base64');
+    return pgByteaEncodeJson(value);
   }
   decodeJson(json: JsonValue): Uint8Array {
-    if (typeof json !== 'string') {
-      throw new Error(`Expected base64 string for pg/bytea@1, got ${typeof json}`);
-    }
-    const decoded = Buffer.from(json, 'base64');
-    if (decoded.toString('base64') !== json) {
-      throw new Error(`Invalid base64 string for pg/bytea@1 (length: ${json.length})`);
-    }
-    return new Uint8Array(decoded);
+    return pgByteaDecodeJson(json);
   }
 }
 
@@ -960,7 +958,7 @@ pgByteaColumn satisfies ColumnHelperForStrict<PgByteaDescriptor>;
 
 const PG_UUID_META = { db: { sql: { postgres: { nativeType: 'uuid' } } } } as const;
 
-export class PgUuidCodec extends SqlCodecImpl<
+export class PgUuidCodec extends CodecImpl<
   typeof PG_UUID_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -999,7 +997,7 @@ export const pgUuidColumn = () =>
 pgUuidColumn satisfies ColumnHelperFor<PgUuidDescriptor>;
 pgUuidColumn satisfies ColumnHelperForStrict<PgUuidDescriptor>;
 
-export class PgIntervalCodec extends SqlCodecImpl<
+export class PgIntervalCodec extends CodecImpl<
   typeof PG_INTERVAL_CODEC_ID,
   readonly ['equality', 'order'],
   string | Record<string, unknown>,
@@ -1042,7 +1040,7 @@ export const pgIntervalColumn = (params: PrecisionParams = {}) =>
 pgIntervalColumn satisfies ColumnHelperFor<PgIntervalDescriptor>;
 pgIntervalColumn satisfies ColumnHelperForStrict<PgIntervalDescriptor>;
 
-export class PgJsonCodec extends SqlCodecImpl<
+export class PgJsonCodec extends CodecImpl<
   typeof PG_JSON_CODEC_ID,
   readonly [],
   string | JsonValue,
@@ -1081,7 +1079,7 @@ export const pgJsonColumn = () =>
 pgJsonColumn satisfies ColumnHelperFor<PgJsonDescriptor>;
 pgJsonColumn satisfies ColumnHelperForStrict<PgJsonDescriptor>;
 
-export class PgJsonbCodec extends SqlCodecImpl<
+export class PgJsonbCodec extends CodecImpl<
   typeof PG_JSONB_CODEC_ID,
   readonly ['equality'],
   string | JsonValue,

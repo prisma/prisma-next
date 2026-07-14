@@ -1,6 +1,6 @@
-import type { CodecRef } from '@prisma-next/framework-components/codec';
+import type { CodecDescriptor, CodecRef } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { AnyCodecDescriptor, CodecDescriptor } from './ast/codec-types';
+import type { AnyCodecDescriptor } from './ast/codec-types';
 import { codecRefForStorageColumn } from './codec-ref-for-column';
 import type { CodecDescriptorRegistry } from './query-lane-context';
 

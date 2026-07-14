@@ -2,8 +2,7 @@
  * Constructive type tests for the sqlite per-target descriptor record layer (TML-2357). Mirrors the postgres test (`packages/3-targets/3-targets/postgres/test/typed-descriptor-flow.test-d.ts`).
  */
 
-import type { CodecTrait } from '@prisma-next/framework-components/codec';
-import type { AnyCodecDescriptor } from '@prisma-next/sql-relational-core/ast';
+import type { AnyCodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
 import { expectTypeOf, test } from 'vitest';
 import {
   codecDescriptors,

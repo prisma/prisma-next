@@ -4,7 +4,7 @@
  * Mirrors the descriptor + class pattern used by other codec-shipping
  * packages (e.g. pgvector). Three artefacts:
  *
- * 1. `PostgisGeometryCodec` extends {@link SqlCodecImpl} with the runtime
+ * 1. `PostgisGeometryCodec` extends {@link CodecImpl} with the runtime
  *    encode/decode conversions. Wire formats:
  *    - encode: EWKT (`'SRID=4326;POINT(...)'`) — PostgreSQL parses
  *      this when cast to `::geometry`.
@@ -33,22 +33,20 @@
 
 import type { JsonValue } from '@prisma-next/contract/types';
 import {
+  type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
+  CodecImpl,
   type CodecInstanceContext,
   type ColumnHelperFor,
   type ColumnHelperForStrict,
   column,
 } from '@prisma-next/framework-components/codec';
-import {
-  type AnyCodecDescriptor,
-  type ExtractCodecTypes,
-  SqlCodecImpl,
-} from '@prisma-next/sql-relational-core/ast';
+import type { ExtractCodecTypes } from '@prisma-next/sql-relational-core/ast';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import { POSTGIS_GEOMETRY_CODEC_ID } from './constants';
-import { decodeEWKBHex, encodeEWKT } from './ewkb';
+import { decodeEWKBHex, encodeEWKBHex, encodeEWKT } from './ewkb';
 import type { Geometry } from './geojson';
 
 type GeometryParams = { readonly srid: number };
@@ -94,7 +92,7 @@ function assertGeometry(value: unknown): asserts value is Geometry {
   }
 }
 
-export class PostgisGeometryCodec extends SqlCodecImpl<
+export class PostgisGeometryCodec extends CodecImpl<
   typeof POSTGIS_GEOMETRY_CODEC_ID,
   readonly ['equality'],
   string,
@@ -118,12 +116,14 @@ export class PostgisGeometryCodec extends SqlCodecImpl<
 
   encodeJson(value: Geometry): JsonValue {
     assertGeometry(value);
-    return value as unknown as JsonValue;
+    return encodeEWKBHex(value);
   }
 
   decodeJson(json: JsonValue): Geometry {
-    assertGeometry(json);
-    return json;
+    if (typeof json !== 'string') {
+      throw new Error('Geometry database JSON value must be a HEXEWKB string');
+    }
+    return decodeEWKBHex(json);
   }
 }
 

@@ -56,21 +56,21 @@ changes:
       anyMatch: true
   - id: sql-codec-json-result-decoding
     summary: |
-      SQL codecs now own decoding for scalar values embedded in database-produced JSON results
-      through the required `SqlCodec.decodeFromJson(value, ctx)` method. Change SQL codec classes
-      from the framework `CodecImpl` base to `SqlCodecImpl` from
-      `@prisma-next/sql-relational-core/ast`; its default forwards JSON values to the ordinary
-      `decode` method. Override `decodeFromJson` when the database JSON representation differs from
-      the driver's normal wire representation. If a SQL codec descriptor list is explicitly typed
-      as `AnyCodecDescriptor[]` or `CodecDescriptor[]`, import those SQL-refined types from
-      `@prisma-next/sql-relational-core/ast` so the contributor's `codecs()` slot verifies that every
-      factory returns a SQL codec.
+      SQL `encodeJson` / `decodeJson` now use the exact scalar shape produced by the corresponding
+      database inside JSON values. SQL include decoding calls `decodeJson`; ordinary column decoding
+      continues to call `decode`. Update custom SQL codecs whose database JSON representation differs
+      from their normal driver wire representation, then re-emit committed contracts and defaults.
+      Built-in representation changes are: `pg/bytea@1` base64 -> `\\x`-prefixed hex,
+      `pg/numeric@1` string -> JSON number, `pg/timestamp@1` UTC `Z` suffix -> no timezone suffix,
+      `pg/timestamptz@1` UTC `Z` suffix -> `+00:00`, `sqlite/bigint@1` string -> JSON number,
+      `pg/vector@1` JSON array -> Postgres vector text, and `pg/geometry@1` GeoJSON object -> HEXEWKB
+      text. SQLite cannot represent BLOB values inside its native JSON values; such queries still fail
+      at the database boundary rather than receiving a synthetic codec representation.
     detection:
       glob: "**/*.{ts,mts,cts}"
       contains:
-        - "extends CodecImpl"
-        - "AnyCodecDescriptor"
-        - "CodecDescriptor"
+        - "encodeJson"
+        - "decodeJson"
       anyMatch: true
   - id: mongo-derive-json-schema-value-sets-param
     summary: |
@@ -656,15 +656,4 @@ resolves correctly instead of throwing `Unable to determine pg binding type`
 at boot. The change only accepts inputs the old `instanceof` check rejected —
 nothing that resolved before resolves differently — and the two guards are
 additive. No extension-author action required. Incidental substrate diff only.
--->
-
-<!--
-TML-2990 (decode included ORM child rows): the `packages/3-extensions/` diff is
-confined to `@prisma-next/sql-orm-client` and its tests. Single-query ORM includes
-now decode child-row storage values through the same column codecs used for top-level
-rows, including Postgres `bytea` / timestamp values that arrive from JSON aggregation
-as text. The follow-up keeps include decode metadata keyed by the resolved column
-codec ref, so adapter runtime codec instances do not need to expose descriptor-backed
-`codec.id` during include normalization. No extension-author SPI changed; existing
-extensions do not need migration work. Incidental substrate diff only.
 -->

@@ -11,10 +11,7 @@ import {
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
-import type {
-  ContractCodecRegistry,
-  Codec as SqlCodec,
-} from '@prisma-next/sql-relational-core/ast';
+import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
 import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
 import { jsonText, sqliteTable, text } from '@prisma-next/target-sqlite/contract-free';
@@ -212,11 +209,10 @@ describe('SqliteControlAdapter.lowerToExecuteRequest — codec routing + DDL sha
 
 const TEST_CODEC_ID = 'test/transform@1';
 
-const transformingQueryCodec: SqlCodec = {
+const transformingQueryCodec: Codec = {
   id: TEST_CODEC_ID,
   encode: async (value: unknown) => `ENC:${String(value).toUpperCase()}`,
   decode: async (wire: unknown) => wire,
-  decodeFromJson: async (value: unknown) => value,
   encodeJson: (v) => v as never,
   decodeJson: (v) => v as never,
 };

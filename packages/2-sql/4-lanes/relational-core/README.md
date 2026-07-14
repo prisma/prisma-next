@@ -93,7 +93,7 @@ flowchart TD
 
 ### Codec authoring (class form)
 
-SQL codec authors extend `SqlCodecImpl` (and pair the codec with a framework `CodecDescriptorImpl` registration) per [ADR 208 — Higher-order codecs for parameterized types](../../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md). Each codec class declares the framework conversions (`encode`, `decode`, `encodeJson`, `decodeJson`); `SqlCodecImpl` also supplies `decodeFromJson`, the query-time path for scalar values embedded in SQL JSON results. Its default forwards to `decode`; codecs override it when the database JSON representation differs from the normal driver wire representation.
+SQL codec authors extend the framework `CodecImpl` base (and pair the codec with a `CodecDescriptorImpl` registration) per [ADR 208 — Higher-order codecs for parameterized types](../../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md). Each codec class declares `encode`, `decode`, `encodeJson`, and `decodeJson`. The JSON methods use the exact scalar shape produced by the corresponding database inside JSON values; include decoding calls `decodeJson`, while ordinary column decoding calls `decode`.
 
 - Query-time methods (`encode` / `decode`) are typed as `Promise<…>`-returning at the public boundary; sync method bodies are accepted via TypeScript bivariance and the runtime always awaits.
 - Build-time methods (`encodeJson` / `decodeJson` / `renderOutputType?`) stay synchronous so contract validation and client construction stay synchronous.
@@ -104,13 +104,13 @@ SQL codec authors extend `SqlCodecImpl` (and pair the codec with a framework `Co
 // for the production form.
 import {
   CodecDescriptorImpl,
+  CodecImpl,
   voidParamsSchema,
   type CodecCallContext,
   type CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
-import { SqlCodecImpl } from '@prisma-next/sql-relational-core/ast';
 
-class PgTextCodec extends SqlCodecImpl<'pg/text@1', readonly ['equality'], string, string> {
+class PgTextCodec extends CodecImpl<'pg/text@1', readonly ['equality'], string, string> {
   override readonly id = 'pg/text@1';
   override readonly traits = ['equality'] as const;
   encode(v: string, _ctx: CodecCallContext): Promise<string> { return Promise.resolve(v); }
@@ -137,7 +137,7 @@ Codecs receive a second `ctx` options argument; you may ignore it. The runtime a
 
 ```ts
 // Forward ctx.signal to a network call so aborted queries stop the SDK.
-class PgKmsSecretCodec extends SqlCodecImpl<'pg/kms-secret@1', readonly [], string, string> {
+class PgKmsSecretCodec extends CodecImpl<'pg/kms-secret@1', readonly [], string, string> {
   override readonly id = 'pg/kms-secret@1';
   override readonly traits = [] as const;
   override async encode(v: string, ctx: SqlCodecCallContext): Promise<string> {
