@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
+import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
 import { collectScalarTypeConstructors } from '@prisma-next/framework-components/authoring';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { PslInterpretCapable } from '@prisma-next/psl-parser/interpret';
@@ -16,6 +17,12 @@ export interface MongoContractOptions {
   readonly output?: string;
   /** The target's default codec ids for an `enum` block that omits `@@type`. */
   readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
+}
+
+function collectScalarTypeCodecIds(namespace: AuthoringTypeNamespace): ReadonlyMap<string, string> {
+  return new Map(
+    [...collectScalarTypeConstructors(namespace)].map(([name, output]) => [name, output.codecId]),
+  );
 }
 
 function mapParseDiagnostics(
@@ -41,7 +48,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         sourceFile: input.sourceFile,
         sourceId: input.sourceId,
         seedDiagnostics: [],
-        scalarTypeCodecIds,
+        scalarTypeCodecIds: collectScalarTypeCodecIds(context.authoringContributions.type),
         codecLookup: context.codecLookup,
         authoringContributions: context.authoringContributions,
         ...ifDefined('enumInferenceCodecs', options?.enumInferenceCodecs),
@@ -72,11 +79,13 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         });
       }
 
+      const scalarTypeCodecIds = collectScalarTypeCodecIds(context.authoringContributions.type);
+
       const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
       const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
         document,
         sourceFile,
-        scalarTypes: [...context.scalarTypeDescriptors.keys()],
+        scalarTypes: [...scalarTypeCodecIds.keys()],
         pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
       });
 

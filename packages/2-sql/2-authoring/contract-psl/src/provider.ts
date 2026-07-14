@@ -120,6 +120,9 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         });
       }
 
+      const scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor> =
+        collectScalarTypeConstructors(context.authoringContributions.type);
+
       const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
       const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
         document,
