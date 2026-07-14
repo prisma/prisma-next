@@ -339,7 +339,7 @@ async function decodeIncludePayload(
   if (include.combine) {
     return decodeCombineIncludePayload(contract, context, include, include.combine, raw);
   }
-  const rawChildren = parseIncludedRows(raw);
+  const rawChildren = parseIncludedRows(include, raw);
   const polyInfo = resolvePolymorphismInfo(
     contract,
     include.relatedNamespaceId,
@@ -683,7 +683,7 @@ function decodeScalarIncludePayload(
   return parsed['value'];
 }
 
-function parseIncludedRows(value: unknown): Record<string, unknown>[] {
+function parseIncludedRows(include: IncludeExpr, value: unknown): Record<string, unknown>[] {
   if (value === null || value === undefined) {
     return [];
   }
@@ -696,7 +696,9 @@ function parseIncludedRows(value: unknown): Record<string, unknown>[] {
   const rows: Record<string, unknown>[] = [];
   for (const item of parsed) {
     if (!isPlainObjectEnvelope(item)) {
-      continue;
+      throw new Error(
+        `Include row envelope for relation "${include.relationName}" has unexpected shape (expected object, got ${describeEnvelopeShape(item)}); this indicates a planner or decoder bug.`,
+      );
     }
     rows.push({ ...item });
   }

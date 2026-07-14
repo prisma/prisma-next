@@ -286,7 +286,7 @@ describe('collection-dispatch', () => {
         {
           id: 1,
           name: 'Alice',
-          posts: '[{"id":10,"title":"Post A","user_id":1,"views":3},42,null]',
+          posts: '[{"id":10,"title":"Post A","user_id":1,"views":3}]',
         },
         {
           id: 2,
@@ -333,6 +333,34 @@ describe('collection-dispatch', () => {
         posts: [],
       },
     ]);
+  });
+
+  it('dispatchCollectionRows() rejects malformed child row entries', async () => {
+    const contract = withSingleQueryCapabilities(getTestContract());
+    const { collection, runtime } = createCollectionFor('User', contract);
+    const scoped = collection.select('name').include('posts');
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Alice',
+          posts: '[{"id":10,"title":"Post A","user_id":1,"views":3},42]',
+        },
+      ],
+    ]);
+
+    await expect(
+      dispatchCollectionRows<Record<string, unknown>>({
+        context: collection.ctx.context,
+        runtime,
+        state: scoped.state,
+        tableName: scoped.tableName,
+        namespaceId: 'public',
+        modelName: scoped.modelName,
+      }).toArray(),
+    ).rejects.toThrow(
+      'Include row envelope for relation "posts" has unexpected shape (expected object, got number); this indicates a planner or decoder bug.',
+    );
   });
 
   it('dispatchCollectionRows() single-query to-one include returns mapped row or null', async () => {
