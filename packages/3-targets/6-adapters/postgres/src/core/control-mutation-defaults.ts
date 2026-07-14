@@ -174,6 +174,95 @@ export const postgresScalarAuthoringTypes = {
   Bytes: { kind: 'typeConstructor', output: { codecId: 'pg/bytea@1', nativeType: 'bytea' } },
 } as const satisfies AuthoringTypeNamespace;
 
+/**
+ * The former `@db.*` native types as first-class top-level type constructors
+ * (TML-2986). Codec ids, native types, and typeParams key shapes mirror the
+ * legacy `@db.*` attribute path (`NATIVE_TYPE_SPECS` in sql-contract-psl)
+ * exactly; every argument is optional, so each name is also authorable bare
+ * (`VarChar` ≡ `VarChar()`), and omitted arguments omit their typeParams keys.
+ */
+export const postgresNativeAuthoringTypes = {
+  VarChar: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+    output: {
+      codecId: 'sql/varchar@1',
+      nativeType: 'character varying',
+      typeParams: { length: { kind: 'arg', index: 0 } },
+    },
+  },
+  Char: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+    output: {
+      codecId: 'sql/char@1',
+      nativeType: 'character',
+      typeParams: { length: { kind: 'arg', index: 0 } },
+    },
+  },
+  Numeric: {
+    kind: 'typeConstructor',
+    args: [
+      { kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true },
+      { kind: 'number', name: 'scale', integer: true, minimum: 0, optional: true },
+    ],
+    output: {
+      codecId: 'pg/numeric@1',
+      nativeType: 'numeric',
+      typeParams: {
+        precision: { kind: 'arg', index: 0 },
+        scale: { kind: 'arg', index: 1 },
+      },
+    },
+  },
+  Timestamp: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/timestamp@1',
+      nativeType: 'timestamp',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+  Timestamptz: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/timestamptz@1',
+      nativeType: 'timestamptz',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+  Time: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/time@1',
+      nativeType: 'time',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+  Timetz: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/timetz@1',
+      nativeType: 'timetz',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+  Uuid: { kind: 'typeConstructor', output: { codecId: 'pg/uuid@1', nativeType: 'uuid' } },
+  SmallInt: { kind: 'typeConstructor', output: { codecId: 'pg/int2@1', nativeType: 'int2' } },
+  Real: { kind: 'typeConstructor', output: { codecId: 'pg/float4@1', nativeType: 'float4' } },
+  Date: { kind: 'typeConstructor', output: { codecId: 'pg/timestamptz@1', nativeType: 'date' } },
+} as const satisfies AuthoringTypeNamespace;
+
+/** Every authoring type the postgres adapter contributes: base scalars plus native types. */
+export const postgresAuthoringTypes = {
+  ...postgresScalarAuthoringTypes,
+  ...postgresNativeAuthoringTypes,
+} as const satisfies AuthoringTypeNamespace;
+
 export function createPostgresDefaultFunctionRegistry(): ReadonlyMap<
   string,
   ControlMutationDefaultEntry

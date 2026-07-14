@@ -60,7 +60,7 @@ function emit(scalarColumnDescriptors: ReadonlyMap<string, ScalarTypeConstructor
 // below carry the parity claim forward — they are the exact
 // {codecId, nativeType} pairs the retired map + codecLookup derivation produced.
 describe('postgres scalar types derived from the unified namespace', () => {
-  it('pins every base scalar to its {codecId, nativeType}', () => {
+  it('pins every bare-eligible scalar to its zero-arg instantiation', () => {
     const derived = collectScalarTypeConstructors(stack.authoringContributions.type);
 
     expect(Object.fromEntries(derived)).toEqual({
@@ -73,6 +73,17 @@ describe('postgres scalar types derived from the unified namespace', () => {
       DateTime: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
       Json: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
       Bytes: { codecId: 'pg/bytea@1', nativeType: 'bytea' },
+      VarChar: { codecId: 'sql/varchar@1', nativeType: 'character varying', typeParams: {} },
+      Char: { codecId: 'sql/char@1', nativeType: 'character', typeParams: {} },
+      Numeric: { codecId: 'pg/numeric@1', nativeType: 'numeric', typeParams: {} },
+      Timestamp: { codecId: 'pg/timestamp@1', nativeType: 'timestamp', typeParams: {} },
+      Timestamptz: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz', typeParams: {} },
+      Time: { codecId: 'pg/time@1', nativeType: 'time', typeParams: {} },
+      Timetz: { codecId: 'pg/timetz@1', nativeType: 'timetz', typeParams: {} },
+      Uuid: { codecId: 'pg/uuid@1', nativeType: 'uuid' },
+      SmallInt: { codecId: 'pg/int2@1', nativeType: 'int2' },
+      Real: { codecId: 'pg/float4@1', nativeType: 'float4' },
+      Date: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
     });
   });
 
@@ -81,12 +92,23 @@ describe('postgres scalar types derived from the unified namespace', () => {
       'BigInt',
       'Boolean',
       'Bytes',
+      'Char',
+      'Date',
       'DateTime',
       'Decimal',
       'Float',
       'Int',
       'Json',
+      'Numeric',
+      'Real',
+      'SmallInt',
       'String',
+      'Time',
+      'Timestamp',
+      'Timestamptz',
+      'Timetz',
+      'Uuid',
+      'VarChar',
     ]);
   });
 
