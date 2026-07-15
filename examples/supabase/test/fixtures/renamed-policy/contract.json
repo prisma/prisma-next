@@ -151,8 +151,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "onDelete": "cascade",
                   "source": {
                     "columns": [
@@ -191,7 +189,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:4a7066df2fa2d2c2bbc46ee511a06e2dde7eb08cd3abf51ff773e6577752d3f7",
+    "storageHash": "sha256:169d4f45f11d35d0f5e2128121049573c0c92a93c0b4d3e641cb45d4b1a31543",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",
