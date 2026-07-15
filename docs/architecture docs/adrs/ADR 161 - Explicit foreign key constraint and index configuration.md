@@ -1,5 +1,48 @@
 # ADR 161 — Explicit foreign key constraint and index configuration
 
+> **Status: superseded — foreign keys and indexes are discrete contract entities.** The per-FK `constraint` and `index` booleans decided below are retained as the record of the original design; the corrected decision and its rationale are in [Foreign keys and indexes are discrete entities](#foreign-keys-and-indexes-are-discrete-entities) immediately below. Implementation is tracked as a follow-up.
+
+## Foreign keys and indexes are discrete entities
+
+A foreign key is a referential constraint; an index is an index. The contract carries each as its own entity, and if one is absent it is simply absent — never a boolean on the other.
+
+```jsonc
+// A FK whose columns have a backing index — two discrete facts:
+"foreignKeys": [
+  { "name": "identities_user_id_fkey", "source": { "columns": ["user_id"] },
+    "target": { "tableName": "users", "columns": ["id"] }, "onDelete": "cascade" }
+],
+"indexes": [
+  { "name": "identities_user_id_idx", "columns": ["user_id"] }
+]
+
+// A FK with no backing index — the index entity is simply absent:
+"foreignKeys": [
+  { "name": "mfa_amr_claims_session_id_fkey", "source": { "columns": ["session_id"] },
+    "target": { "tableName": "sessions", "columns": ["id"] }, "onDelete": "cascade" }
+]
+```
+
+### Why the boolean cannot stand
+
+Ask the emitted contract one question: *a foreign key has a backing index — what is that index's name?* The `index: true` boolean cannot answer. It can only ever mean "the index this FK would be given by deterministic naming ([ADR 009](ADR%20009%20-%20Deterministic%20naming.md))"; it is structurally unable to name an index called anything else — such as a real database's `identities_user_id_idx`. The contract asserts a named database object exists and cannot tell you its name. That is not a fact about what exists; it is a lossy encoding that discards the object's identity, recoverable only by re-running a naming algorithm that lives outside the contract.
+
+The boolean also contradicts this ADR's own self-containment claim. The decision below states "every FK is self-contained and interpretable without consulting any other part of the contract," yet [§5](#5-deterministic-planner-behavior) makes the index conditional on *the rest of the table* — "emit `CREATE INDEX` … **if no covering index**." So a reader cannot tell from the FK node whether a distinct index exists; they must scan the table's other indexes and apply the covering rule. `index: true` on a FK already backed by an explicit index is the same fact stated twice, reconciled by a rule — not a self-contained value.
+
+This is the contract's *facts, not instructions* principle ([Data Contract subsystem](../subsystems/1.%20Data%20Contract.md), design principle #4): `constraint` and `index` are directives to the planner ("emit this DDL") and verifier ("check for this"), not statements of what exists. The statements of what exist are: this referential constraint, and this named index.
+
+### The corrected model
+
+Emit **materializes** the authoring sugar into discrete entities. A storage foreign-key entity is the referential constraint only (source, target, `onDelete`/`onUpdate`). Every index — including one that happens to back a FK — is a discrete index entry carrying its own name. The `constraint`/`index` knobs survive only as *authoring input* (`foreignKeyDefaults`, per-FK overrides); they are lowered at emit and never appear in `contract.json`.
+
+Every environment case the original decision raised is expressed by presence or absence of a discrete entity, which is *more* faithful, not less:
+
+- **Managed services that omit FK constraints but keep the index** (e.g. PlanetScale): the domain relation is present (the ORM still knows the relationship), the storage foreign-key entity is absent (no physical constraint), and the index entity is present. The relation/constraint split already models exactly "a logical relationship with no enforced constraint" — cleaner than `constraint: false`.
+- **Intentionally skipping a FK's index**: no index entity for those columns.
+- **Postgres not auto-indexing FKs**: the presence or absence of a named index entity *is* the fact — nothing is inferred from a flag.
+
+The original per-FK boolean design, its authoring sugar, and its planner/verifier behavior are recorded unchanged below as the superseded approach.
+
 ## Context
 
 Prisma Next expresses every schema intent through the data contract. Foreign keys are already modeled in the contract as structural facts — they declare which columns reference which table. However, the control plane today always emits both the FK constraint DDL **and** a supporting index for every declared FK, with no user override.
