@@ -426,6 +426,94 @@ describe('contract definition constraint support', () => {
       ]);
       expect(post.indexes).toEqual([]);
     });
+
+    it('does not synthesize a backing index when the FK columns are already covered by a declared @@index', () => {
+      const User = buildUserModel();
+      const Post = model('Post', {
+        fields: {
+          id: field.column(int4Column).id(),
+          userId: field.column(int4Column),
+        },
+        relations: {
+          user: rel.belongsTo(User, { from: 'userId', to: 'id' }).sql({ fk: {} }),
+        },
+      }).sql(({ cols, constraints }) => ({
+        table: 'post',
+        indexes: [constraints.index([cols.userId])],
+      }));
+      const contract = defineTestContract({
+        models: { User, Post },
+      });
+
+      const post = unboundTables(contract.storage)['post']!;
+      expect(post.indexes).toEqual([{ columns: ['userId'] }]);
+      expect(post.foreignKeys).toEqual([
+        {
+          source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
+          target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
+        },
+      ]);
+    });
+
+    it('does not synthesize a backing index when the FK columns match the primary key', () => {
+      const User = buildUserModel();
+      const Profile = model('Profile', {
+        fields: {
+          userId: field.column(int4Column).id(),
+        },
+        relations: {
+          user: rel.belongsTo(User, { from: 'userId', to: 'id' }).sql({ fk: {} }),
+        },
+      }).sql({ table: 'profile' });
+      const contract = defineTestContract({
+        models: { User, Profile },
+      });
+
+      const profile = unboundTables(contract.storage)['profile']!;
+      expect(profile.primaryKey).toEqual({ columns: ['userId'] });
+      expect(profile.foreignKeys).toEqual([
+        {
+          source: { namespaceId: 'public', tableName: 'profile', columns: ['userId'] },
+          target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
+        },
+      ]);
+      expect(profile.indexes).toEqual([]);
+    });
+
+    it('synthesizes the backing index once when two FKs share the same source columns', () => {
+      const TargetA = model('TargetA', {
+        fields: { id: field.column(int4Column).id() },
+      }).sql({ table: 'target_a' });
+      const TargetB = model('TargetB', {
+        fields: { id: field.column(int4Column).id() },
+      }).sql({ table: 'target_b' });
+      const Link = model('Link', {
+        fields: {
+          id: field.column(int4Column).id(),
+          sourceId: field.column(int4Column),
+        },
+        relations: {
+          a: rel.belongsTo(TargetA, { from: 'sourceId', to: 'id' }).sql({ fk: {} }),
+          b: rel.belongsTo(TargetB, { from: 'sourceId', to: 'id' }).sql({ fk: {} }),
+        },
+      }).sql({ table: 'link' });
+      const contract = defineTestContract({
+        models: { TargetA, TargetB, Link },
+      });
+
+      const link = unboundTables(contract.storage)['link']!;
+      expect(link.foreignKeys).toEqual([
+        {
+          source: { namespaceId: 'public', tableName: 'link', columns: ['sourceId'] },
+          target: { namespaceId: 'public', tableName: 'target_a', columns: ['id'] },
+        },
+        {
+          source: { namespaceId: 'public', tableName: 'link', columns: ['sourceId'] },
+          target: { namespaceId: 'public', tableName: 'target_b', columns: ['id'] },
+        },
+      ]);
+      expect(link.indexes).toEqual([{ columns: ['sourceId'], name: 'link_sourceId_idx' }]);
+    });
   });
 
   it('supports compound ids and uniques through attributes', () => {
