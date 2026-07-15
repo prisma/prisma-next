@@ -686,3 +686,13 @@ additive. No extension-author action required. Incidental substrate diff only.
 <!--
 TML-2980 (variant-declared SQL ORM includes, PR #976): the `packages/3-extensions/` diff fixes the existing `.variant().include()` API inside `@prisma-next/sql-orm-client` so singleton variant narrowing can include relations declared by that variant, with union-valued narrowing rejecting shadowed ambiguous names. Mutation `RETURNING` rows now also map variant-owned physical columns back to their domain field names, matching reads and the existing static row type. No extension-author SPI, contract shape, syntax, or configuration changed, and existing consumers need no code migration. Incidental substrate diff only.
 -->
+
+<!--
+postgres-rls project close-out (PR #979): the packages/3-extensions/ diff is
+one documentation link in the supabase README — the RLS pointer into the
+now-deleted projects/postgres-rls/ directory re-pointed at the promoted
+ADR 234 and the Adapters & Targets subsystem doc, with the surface names
+updated to the shipped forms. No code, API, contract shape, or emitted
+artefact changes. No extension-author action required. Incidental docs-only
+diff.
+-->

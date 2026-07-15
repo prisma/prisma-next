@@ -60,7 +60,7 @@ See [`examples/supabase`](../../../examples/supabase) for the full runnable walk
 These belong to sibling Supabase-integration projects:
 
 - **Role-binding runtime** (`asUser(jwt)` / `asAnon()` / `asServiceRole()`) — `extension-supabase` M2 (real `SupabaseRuntime` extends `PostgresRuntime`; issues `SET LOCAL role` below user middleware).
-- **RLS authoring + policies** — [`postgres-rls`](../../../projects/postgres-rls/spec.md) (`.rls(...)` builder, PSL `policy { … }` blocks, content-addressed wire names, `pg_policies` verifier).
+- **RLS authoring + policies** — PSL `policy_*` blocks + `@@rls`, TS `policySelect(...)` helpers, content-addressed wire names, `pg_policies` verifier. See [ADR 234](../../../docs/architecture%20docs/adrs/ADR%20234%20-%20Content-addressed%20wire%20names%20for%20Postgres-normalized%20objects.md) and the RLS section of the [Adapters & Targets subsystem doc](../../../docs/architecture%20docs/subsystems/5.%20Adapters%20%26%20Targets.md).
 - **Cross-contract FK to `auth.users`** — [cross-contract FK references](../../../docs/architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20%26%20Packs.md) (`supabase:auth.AuthUser` PSL grammar; cross-space references in the TS builder). See also [ADR 226](../../../docs/architecture%20docs/adrs/ADR%20226%20-%20Cross-contract%20foreign-key%20references.md).
 - **Explicit namespace-qualified queries** (`db.sql.auth.users`) — [`explicit-namespace-dsl`](../../../projects/explicit-namespace-dsl/spec.md).
 - **Roles as first-class IR** (`anon` / `authenticated` / `service_role` / `authenticator`) — `postgres-rls` (`PostgresRole`).

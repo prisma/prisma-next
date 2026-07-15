@@ -1,12 +1,12 @@
-# ADR — Content-addressed wire names for Postgres-normalized objects
+# ADR 234 — Content-addressed wire names for Postgres-normalized objects
 
 Status: **Accepted**.
 
-Related: [ADR 004 — Storage Hash vs Profile Hash](../../../docs/architecture%20docs/adrs/ADR%20004%20-%20Storage%20Hash%20vs%20Profile%20Hash.md), [ADR 009 — Deterministic Naming Scheme for Constraints](../../../docs/architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md).
+Related: [ADR 004 — Storage Hash vs Profile Hash](ADR%20004%20-%20Storage%20Hash%20vs%20Profile%20Hash.md), [ADR 009 — Deterministic Naming Scheme for Constraints](ADR%20009%20-%20Deterministic%20Naming%20Scheme.md), [ADR 224 — Control Policy](ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md), [ADR 235 — The schema differ walks two derived schema IRs](ADR%20235%20-%20The%20schema%20differ%20walks%20two%20derived%20schema%20IRs.md).
 
 ## Decision
 
-Postgres-normalized database objects — starting with RLS policies — carry **content-addressed wire names**. The name a user authors is a *prefix*; the framework appends a short hash of the object's canonical content. Equivalence is then a wire-name match, not a body comparison.
+Postgres-normalized database objects — starting with RLS policies — carry **content-addressed wire names**. The name a user authors is a *prefix*; the Postgres target appends a short hash of the object's canonical content at lowering time. Equivalence is then a wire-name match, not a body comparison.
 
 The format is:
 
@@ -14,42 +14,52 @@ The format is:
 <user_prefix>_<8 hex chars of SHA-256(canonical(content))>
 ```
 
-The framework computes the suffix at lowering time. The full wire name lives in `contract.json` and in the database's catalog (e.g. `pg_policies.policyname`). The user only ever types the prefix.
+One shared hash assembly in the target serves both authoring surfaces (PSL and TypeScript), so the same policy authored either way gets the same wire name. The full wire name lives in `contract.json` and in the database's catalog (e.g. `pg_policies.policyname`). The user only ever types the prefix.
 
 ## A worked example
 
-A user authors an RLS policy that lets authenticated users update their own profile rows:
+A user authors an RLS policy that lets authenticated users update their own profile rows. In TypeScript:
 
 ```ts
-.rls([{
-  name: 'profiles_update_own',
-  operation: 'update',
+policyUpdate(Profile, {
+  name: 'profile_owner_write',
   roles: [authenticated],
-  using:     'user_id = (auth.uid())::uuid',
-  withCheck: 'user_id = (auth.uid())::uuid',
-}])
+  using: '"userId"::uuid = auth.uid()',
+  withCheck: '"userId"::uuid = auth.uid()',
+})
 ```
 
-The emitter normalizes the body, hashes it, and stores the full wire name in the IR:
+or equivalently in PSL:
 
-```ts
+```prisma
+policy_update profile_owner_write {
+  target    = Profile
+  roles     = [authenticated]
+  using     = "\"userId\"::uuid = auth.uid()"
+  withCheck = "\"userId\"::uuid = auth.uid()"
+}
+```
+
+The lowering normalizes the content, hashes it, and stores the full wire name in the IR:
+
+```jsonc
 // In contract.json
-{ kind: 'PostgresRlsPolicy',
-  name: 'profiles_update_own_a3f1c8b2',  // ← prefix + 8-hex suffix
-  …
+{ "kind": "PostgresRlsPolicy",
+  "name": "profile_owner_write_a3f1c8b2",  // ← prefix + 8-hex suffix
+  // …
 }
 ```
 
 The planner emits:
 
 ```sql
-CREATE POLICY profiles_update_own_a3f1c8b2 ON profile
+CREATE POLICY profile_owner_write_a3f1c8b2 ON profile
   AS PERMISSIVE FOR UPDATE TO authenticated
-  USING      (user_id = (auth.uid())::uuid)
-  WITH CHECK (user_id = (auth.uid())::uuid);
+  USING      ("userId"::uuid = auth.uid())
+  WITH CHECK ("userId"::uuid = auth.uid());
 ```
 
-When the verifier later introspects `pg_policies`, it finds a row with `policyname = 'profiles_update_own_a3f1c8b2'`. Verification is exact-string identity on the wire name — no body comparison. If the user renames the policy in TS to `profiles_can_update_self`, the suffix is unchanged (the body didn't change), so the verifier sees `(profiles_can_update_self_a3f1c8b2, profiles_update_own_a3f1c8b2)` — same suffix, different prefix — and treats it as a rename. The planner answers with `ALTER POLICY ... RENAME TO …`.
+When the verifier later introspects `pg_policies`, it finds a row with `policyname = 'profile_owner_write_a3f1c8b2'`. Verification is exact-string identity on the wire name — no body comparison. If the user renames the policy to `profile_can_update_self`, the suffix is unchanged (the body didn't change), so the two sides show `profile_can_update_self_a3f1c8b2` declared and `profile_owner_write_a3f1c8b2` live — same suffix, different prefix — which the planner recognizes as a rename and answers with `ALTER POLICY ... RENAME TO …`.
 
 ## Why content addressing
 
@@ -64,7 +74,7 @@ The natural design — identify a policy by `(schema, table, policy_name)` and c
 
 A verifier that compares bodies byte-for-byte would produce a false positive on nearly every realistic predicate. A verifier with a cheap normalizer (whitespace, outer parens, casing) still produces false positives on cast forms and paren-grouping. A normalizer thorough enough to canonicalize across Postgres's rendering would need a Postgres-grammar parser running in JS — heavy dependency, high implementation risk, outsized for the problem.
 
-Content addressing sidesteps the comparison entirely. The framework normalizes the *authored* body once and encodes the hash into the name. The verifier never inspects `pg_policies.qual`; it only checks names. The wire name *is* the equivalence relation.
+Content addressing sidesteps the comparison entirely. The target normalizes the *authored* body once and encodes the hash into the name. The verifier never inspects `pg_policies.qual`; it only checks names. The wire name *is* the equivalence relation.
 
 ## Design
 
@@ -74,7 +84,7 @@ Content addressing sidesteps the comparison entirely. The framework normalizes t
 <user_prefix>_<8 hex chars of SHA-256(canonical(content))>
 ```
 
-- **User prefix.** What the user types in the authoring DSL. The TS DSL takes a `name` field on the policy descriptor; PSL takes the head identifier on the `policy <name> { … }` declaration. Required; the framework does not synthesize names.
+- **User prefix.** What the user types in the authoring DSL. The TS helpers take a `name` field on the policy descriptor; PSL takes the head identifier on the per-operation `policy_<op> <name> { … }` block. Required; the target does not synthesize names.
 - **Hash suffix.** First 8 hex characters (32 bits) of SHA-256 over the canonical content tuple. Truncation precedent is git short hashes. 32 bits is comfortable headroom for the per-table policy count any realistic contract reaches; the collision analysis is in [Consequences](#consequences).
 - **Length budget.** Postgres `name` type is 63 chars. The suffix is 9 chars (underscore + 8 hex). User prefix is bounded at 54 chars at lowering time; exceeding the cap is a lowering error with a clear message.
 - **No version marker.** Versioning is unnecessary — see [Normalizer stability](#normalizer-stability) below.
@@ -94,31 +104,36 @@ Excluded inputs:
 - **Schema and table identity.** `pg_policies.schemaname` and `pg_policies.tablename` carry these independently. They're orthogonal to "is this the same policy content."
 - **The user prefix itself.** The prefix is the human-readable label, not part of equivalence. Renaming `posts_select_published → posts_read_open` keeps the suffix stable and signals a rename, not a content change.
 
-### Verifier semantics
+### Verifier and planner semantics
 
-The verifier compares declared and introspected policies by full wire name. It produces these outcomes through the generic differ:
+Declared and introspected policies meet in the schema differ ([ADR 235](ADR%20235%20-%20The%20schema%20differ%20walks%20two%20derived%20schema%20IRs.md)), where a policy node's identity is its full wire name. Because the wire name is the equivalence relation, every situation reduces to name presence:
 
-- **rename** — declared and introspected sides have a policy whose names share a suffix but differ in prefix, and neither full name appears on the other side. Planner emits `ALTER POLICY ... RENAME TO`. No body inspection.
-- **missing** — declared, not introspected, no rename match. Severity governed by the table's [control policy](../../control-policy/spec.md).
-- **extra** — introspected, not declared, no rename match. Severity governed by the table's control policy (managed → error, tolerated → warn, external → ignored, observed → silent). An out-of-band `ALTER POLICY` body change produces an extra (old wire name) + missing (none, since the new name is unknown) — treated as extra → drop on next migrate, not as a tamper signal.
-- **mismatch on RLS-enabled state** — a policy is declared for a table but `pg_class.relrowsecurity = false`. The planner auto-enables RLS on tables with declared policies, so this only fires on drift.
+- **Declared, not live** — the differ emits a `not-found` issue for the policy. The planner answers `CREATE POLICY`. Severity in verify is governed by the table's control policy ([ADR 224](ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md)).
+- **Live, not declared** — a `not-expected` issue. Verify severity per the control policy (managed → error, tolerated → warn, external → ignored, observed → silent); on a managed table the planner drops it. An out-of-band `ALTER POLICY` body change lands here: the old wire name is still live but no longer matches anything declared, so it is an ordinary extra → dropped on the next migrate, not a tamper signal.
+- **Rename** — a `not-found` and a `not-expected` whose wire names share the hash suffix but differ in prefix. The planner pairs the two and emits `ALTER POLICY ... RENAME TO` instead of a drop + create. No body inspection.
+- **RLS-enabled drift** — a policy is declared for a table but `pg_class.relrowsecurity = false`. The planner auto-enables RLS on tables with declared policies, so this only fires on out-of-band drift.
 
 ### IR shape implications
 
-The `PostgresRlsPolicy` IR node carries the **full wire name** in its `name` field. The authoring DSL accepts the prefix; the emitter promotes it to the full name at lowering time.
+The `PostgresRlsPolicy` IR node carries the **full wire name** in its `name` field; the authoring surfaces accept the prefix and the lowering promotes it:
+
+```jsonc
+// contract.json — full wire name
+{ "kind": "PostgresRlsPolicy", "name": "profile_owner_read_a3f1c8b2", /* … */ }
+```
 
 ```ts
-// IR (post-lowering, in contract.json)
-class PostgresRlsPolicy {
-  readonly name: string;  // 'profiles_select_anon_a3f1c8b2'
-  …
+// TS authoring — prefix only
+policySelect(Profile, { name: 'profile_owner_read', roles: [authenticated], using: 'true' })
+```
+
+```prisma
+// PSL authoring — prefix only
+policy_select profile_owner_read {
+  target = Profile
+  roles  = [authenticated]
+  using  = "true"
 }
-
-// Authoring (TS) — prefix only
-.rls([{ name: 'profiles_select_anon', … }])
-
-// Authoring (PSL) — prefix only
-policy profiles_select_anon { … }
 ```
 
 **Duplicate prefixes within `(schema, table)` are a lowering error**, even when the resulting wire names would differ by hash. The prefix is the user's logical identity for the policy; allowing two policies to share a prefix would produce a confusing footgun ("why are both of my policies still active?" — answer: because their bodies differ, so they hashed differently, so both are present in the database).
@@ -145,6 +160,8 @@ The normalizer is a **stability commitment** with the same status as the contrac
 
 This works without an explicit version marker because the contract-hash machinery already signals the change. A normalizer update re-emits different `contract.json`; the storage hash changes; `VERIFY_CODE_HASH_MISMATCH` fires; the user re-emits and re-applies migrations. A `_v1_` marker in the name would carry the same information twice.
 
+The normalizer is also **deliberately minimal** (trim + internal-whitespace collapse of the authored input, nothing else). The wire name is only ever compared against other wire names — the hash is never recomputed from an introspected policy body — so there is no need to match Postgres's reprinted form. Minimal normalization also protects the no-collision property: aggressive rewriting (lowercasing, paren-stripping, cast-alias folding) risks collapsing two distinct predicates onto one hash.
+
 The escape hatch we deliberately do *not* build is an intentionally hash-invariant normalizer change — e.g. "the new normalizer treats `TRUE` and `1 = 1` as equivalent, but existing wire names should keep their suffixes." If that need ever arises, the moment to introduce a version marker is then; paying for it up front buys nothing.
 
 ## Consequences
@@ -158,7 +175,7 @@ The escape hatch we deliberately do *not* build is an intentionally hash-invaria
 ### Negative
 
 - **Normalizer changes are user-visible.** Any change to the canonicalization invalidates all existing wire names. The contract hash signals the change but the user has to re-emit and re-apply migrations to converge the database.
-- **DBA-visible names are uglier.** `profiles_select_anon_a3f1c8b2` in `pg_policies` rather than `profiles_select_anon`. The prefix carries the human-readable intent; the suffix is data the user is asked to ignore in DB inspection.
+- **DBA-visible names are uglier.** `profile_owner_read_a3f1c8b2` in `pg_policies` rather than `profile_owner_read`. The prefix carries the human-readable intent; the suffix is data the user is asked to ignore in DB inspection.
 - **The user's `name` is not the wire name.** The authoring DSL's `name` field and the IR's `name` field have different shapes (prefix vs. full). A small but real semantic gap to surface in developer-facing docs.
 - **Collision probability.** 32 bits of suffix gives a 50% collision probability at roughly 65,000 distinct-bodied policies on the *same table* (birthday paradox on a 2^32 space). No realistic contract reaches that density. If it ever happens in practice, the verifier falls back to comparing canonical bodies directly as a tiebreaker and surfaces a diagnostic asking the user to rename one prefix.
 
