@@ -6,7 +6,7 @@
  * transactions suite. `runMigrations` uses the framework CLI path (emit →
  * plan → db init; idempotent at head) — no manual SQL, no ORM-side DDL.
  *
- * Disabled tests fall into exactly four documented categories, each
+ * Disabled tests fall into exactly three documented categories, each
  * through the harness's own `disableTests` mechanism with per-test
  * reasons below:
  *
@@ -16,11 +16,7 @@
  *    errors instead.
  * 2. Harness `generateId` leak — upstream harness bug precedent (the
  *    shipped joins suite omits the test for the same reason).
- * 3. Decode-dependent joins (TML-3015) — to-many include payloads
- *    currently bypass the codec decode boundary in `sql-orm-client`, so
- *    joined rows carry raw JSON strings for timestamptz cells. These
- *    re-enable once the TML-3015 fix lands on main.
- * 4. Upstream transaction-wrapper bug — the harness's suite wrapper
+ * 3. Upstream transaction-wrapper bug — the harness's suite wrapper
  *    nulls `adapter.transaction` after its first wrap and re-wraps per
  *    property access, dropping a provided transaction implementation
  *    (reference adapters skip via `transaction: false`; our own
@@ -89,25 +85,6 @@ const AUTH_FLOW_NON_GOAL_TESTS = {
 } as const;
 
 /**
- * Decode-dependent joins (TML-3015): to-many include payloads bypass the
- * codec decode boundary, so the native join path surfaces timestamptz
- * cells as raw JSON strings (`2026-…+00:00`) where BetterAuth expects
- * `Date`s. Applied to the joins suite only — the same-named tests in the
- * normal suite run the fallback join path, which decodes at top level and
- * passes. Re-enable when the TML-3015 fix merges.
- */
-const DECODE_DEPENDENT_JOIN_TESTS = {
-  'findOne - should find a model with join': true,
-  'findOne - should select fields with one-to-many join': true,
-  'findOne - should select fields with multiple joins': true,
-  'findOne - should perform backwards joins': true,
-  'findOne - should return an array for one-to-many joins': true,
-  'findMany - should find many models with join': true,
-  'findMany - should select fields with one-to-many join': true,
-  'findMany - should select fields with multiple joins': true,
-} as const;
-
-/**
  * Upstream @better-auth/test-utils bug: the suite wrapper nulls
  * `adapter.transaction` after its first wrap and re-wraps per property
  * access, dropping the provided transaction implementation — the handler
@@ -126,7 +103,7 @@ const { execute } = await testAdapter({
   },
   tests: [
     normalTestSuite({ disableTests: NON_GOAL_TESTS }),
-    joinsTestSuite({ disableTests: { ...NON_GOAL_TESTS, ...DECODE_DEPENDENT_JOIN_TESTS } }),
+    joinsTestSuite({ disableTests: NON_GOAL_TESTS }),
     authFlowTestSuite({ disableTests: AUTH_FLOW_NON_GOAL_TESTS }),
     transactionsTestSuite({ disableTests: UPSTREAM_TRANSACTION_WRAPPER_TESTS }),
   ],
