@@ -13,8 +13,8 @@
     },
     {
       "package": "3-targets/3-targets/postgres",
-      "reason": "operation-resolver.ts and runner.ts have descriptor-pipeline coverage gaps. The legacy planner is exhaustively integration-tested but bypasses the new resolver. Targeted tests added for dataTransform lifecycle and addColumn/alterColumnType options; per-kind glue coverage deferred until the descriptor pipeline replaces the legacy planner.",
-      "addedDate": "2026-04-15",
+      "reason": "operation-resolver.ts and runner.ts have descriptor-pipeline coverage gaps. The legacy planner is exhaustively integration-tested but bypasses the new resolver. Targeted tests added for dataTransform lifecycle and addColumn/alterColumnType options; per-kind glue coverage deferred until the descriptor pipeline replaces the legacy planner. Renewed 2026-07-15 (originally added 2026-04-15): the deferral condition still holds — the descriptor pipeline has not yet replaced the legacy planner, so the coverage recovers only when that migration lands.",
+      "addedDate": "2026-07-15",
       "expiryDays": 90,
       "assignee": null,
       "linear": null,
