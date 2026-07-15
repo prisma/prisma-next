@@ -19,7 +19,7 @@ Machine-readable versions of these lists live in `scripts/generate-contract.ts` 
 | `storage.buckets.allowed_mime_types` | `text[]` nullable | PSL has no nullable-list syntax (`String[]?` is invalid) |
 | `storage.objects.path_tokens` | `text[]` nullable | Same; also `GENERATED ALWAYS`, so not user-writable regardless |
 
-**Column defaults (8):** `auth.users.phone` (`DEFAULT NULL` no-op), `auth.custom_oauth_providers.acceptable_client_ids`/`scopes` (list defaults have no PSL execution-default form), and `auth.custom_oauth_providers.attribute_mapping`/`authorization_params`, `auth.webauthn_credentials.transports`, `storage.iceberg_namespaces.metadata` (JSON-literal defaults resolve to different shapes on the authored vs introspected side). Column types are declared in full; only the `@default` is dropped.
+**Column defaults (7):** `auth.users.phone` (`DEFAULT NULL` no-op), `auth.custom_oauth_providers.acceptable_client_ids`/`scopes` (list defaults have no PSL execution-default form), and `auth.custom_oauth_providers.attribute_mapping`/`authorization_params`, `auth.webauthn_credentials.transports`, `storage.iceberg_namespaces.metadata` (JSON-literal defaults resolve to different shapes on the authored vs introspected side). Column types are declared in full; only the `@default` is dropped.
 
 **Indexes:**
 
@@ -31,4 +31,4 @@ Machine-readable versions of these lists live in `scripts/generate-contract.ts` 
 
 ## What is complete
 
-Every `auth` (23) and `storage` (10) table of the reference version, all 10 native enum types, and the three platform roles. Schemas the pack does not own (`realtime`, `vault`, `pgsodium`, `extensions`, `graphql*`, `net`, `supabase_functions`, `_realtime`) are deliberately undeclared — see the scope decision in [`projects/supabase-integration/deferred.md`](../../../../../projects/supabase-integration/deferred.md).
+Every `auth` (23) and `storage` (10) table of the reference version, all 10 native enum types, and the three platform roles. Schemas the pack does not own (`realtime`, `vault`, `pgsodium`, `extensions`, `graphql*`, `net`, `supabase_functions`, `_realtime`) are deliberately undeclared: they belong to Supabase subsystems and Postgres extensions this pack does not model, and under `external` control an undeclared live schema is a tolerated extra (the safety asymmetry above), so declaring them would add surface without changing what verifies.

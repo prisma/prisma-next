@@ -6,6 +6,8 @@
 
 A foreign key is a referential constraint; an index is an index. The contract carries each as its own entity, and if one is absent it is simply absent — never a boolean on the other.
 
+The JSON below illustrates the shape this model proposes; the exact field layout is settled when the follow-up implements it (this ADR is superseded and the work deferred), so it is conceptual notation, not a literal of today's `contract.json`.
+
 ```jsonc
 // A FK whose columns have a backing index — two discrete facts:
 "foreignKeys": [
