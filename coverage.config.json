@@ -12,15 +12,6 @@
       "notes": "Recovery via dedicated canonicalization.ts branch tests covering the domain-plane ordering and typeParams preservation paths."
     },
     {
-      "package": "3-targets/3-targets/postgres",
-      "reason": "operation-resolver.ts and runner.ts have descriptor-pipeline coverage gaps. The legacy planner is exhaustively integration-tested but bypasses the new resolver. Targeted tests added for dataTransform lifecycle and addColumn/alterColumnType options; per-kind glue coverage deferred until the descriptor pipeline replaces the legacy planner. Renewed 2026-07-15 (originally added 2026-04-15): the deferral condition still holds — the descriptor pipeline has not yet replaced the legacy planner, so the coverage recovers only when that migration lands.",
-      "addedDate": "2026-07-15",
-      "expiryDays": 90,
-      "assignee": null,
-      "linear": null,
-      "notes": "See packages/3-targets/3-targets/postgres/test/migrations/operation-resolver.integration.test.ts for the targeted coverage. Coverage will recover naturally when existing legacy-planner integration tests migrate to the descriptor pipeline."
-    },
-    {
       "package": "3-targets/3-targets/sqlite",
       "reason": "runner.ts, statement-builders.ts, codecs.ts, default-normalizer.ts, and other foundational files moved into target-sqlite to break a workspace cycle. They are exhaustively exercised by full target↔adapter↔driver tests in adapter-sqlite/test/migrations and the e2e framework's sqlite migrations suite, but those run in a separate vitest config so the per-package coverage report doesn't see them. Mirrors the equivalent Postgres situation.",
       "addedDate": "2026-04-27",
