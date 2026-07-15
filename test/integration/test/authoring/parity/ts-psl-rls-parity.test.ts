@@ -5,8 +5,9 @@
  * identical `entries.policy` / `entries.rls` keys, identical content-hash
  * wire names, JSON-equal entities. Roles are referenced via the supabase
  * pack's `anon`/`authenticated` handles on the TS side and bare identifiers
- * on the PSL side. TS-only: a `role(...)` declared in `entities` lands in
- * `entries.role` (PSL has no role block, so that half is asserted directly).
+ * on the PSL side. A declared role is authored in BOTH surfaces — TS
+ * `role('app_role')` in `entities` vs PSL `namespace unbound { role app_role {} }`
+ * — and lands the same `PostgresRole` in `__unbound__.entries.role`.
  */
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
@@ -136,6 +137,9 @@ function buildTsEntities(models: ReturnType<typeof buildTsModels>) {
     }),
     // Policy on the @@map'd model (storage name not derivable from the name).
     policySelect(AuditLog, { name: 'audit_read', roles: [authenticated], using: 'true' }),
+    // A declared role — lands in `__unbound__.entries.role`, identical to the
+    // PSL `namespace unbound { role app_role {} }` block below.
+    role('app_role'),
   ];
 }
 
@@ -205,6 +209,10 @@ const PSL_SOURCE = `namespace public {
     using  = "true"
   }
 }
+
+namespace unbound {
+  role app_role {}
+}
 `;
 
 const EXPECTED_POLICY_PREFIXES = [
@@ -223,6 +231,14 @@ function publicNamespace(contract: {
 }): PostgresSchema {
   const ns = contract.storage.namespaces['public'] as PostgresSchema | undefined;
   if (ns === undefined) throw new Error('expected the public namespace to be declared');
+  return ns;
+}
+
+function unboundNamespace(contract: {
+  storage: { namespaces: Record<string, unknown> };
+}): PostgresSchema {
+  const ns = contract.storage.namespaces['__unbound__'] as PostgresSchema | undefined;
+  if (ns === undefined) throw new Error('expected the __unbound__ namespace to be declared');
   return ns;
 }
 
@@ -284,22 +300,31 @@ describe('TS and PSL RLS authoring parity with real packs', () => {
     ).toBeUndefined();
   });
 
-  it('TS-only: a role declared in entities lands in entries.role', () => {
-    const declaredModels = buildTsModels();
-    const contract = defineContract({
-      models: declaredModels,
-      entities: [...buildTsEntities(declaredModels), role('app_user')],
-    });
+  it('a declared role lands in __unbound__.entries.role identically from both surfaces', () => {
+    expect(interpreted.ok).toBe(true);
+    if (!interpreted.ok) return;
 
-    const ns = publicNamespace(contract);
-    expect(Object.keys(ns.role)).toEqual(['app_user']);
-    expect(JSON.parse(JSON.stringify(ns.role['app_user']))).toEqual({
+    const tsUnbound = unboundNamespace(tsContract);
+    const pslUnbound = unboundNamespace(interpreted.value);
+
+    // TS `role('app_role')` and PSL `namespace unbound { role app_role {} }`
+    // land the same PostgresRole in the same slot.
+    expect(Object.keys(tsUnbound.role)).toEqual(['app_role']);
+    expect(Object.keys(pslUnbound.role)).toEqual(['app_role']);
+    const expectedRole = {
       kind: 'role',
-      name: 'app_user',
-      namespaceId: 'public',
+      name: 'app_role',
+      namespaceId: '__unbound__',
       control: 'external',
-    });
+    };
+    expect(JSON.parse(JSON.stringify(tsUnbound.role['app_role']))).toEqual(expectedRole);
+    expect(JSON.parse(JSON.stringify(pslUnbound.role['app_role']))).toEqual(expectedRole);
+
+    // No role leaks into the model's own namespace.
+    expect(Object.keys(publicNamespace(tsContract).role)).toEqual([]);
     // Referenced-but-undeclared roles stay bare names on the policies.
-    expect(ns.policy['profile_owner_read']?.roles).toEqual(['authenticated']);
+    expect(publicNamespace(tsContract).policy['profile_owner_read']?.roles).toEqual([
+      'authenticated',
+    ]);
   });
 });

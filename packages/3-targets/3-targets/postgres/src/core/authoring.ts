@@ -771,9 +771,14 @@ export function postgresLowerEntityHandles(
             `defineContract: role "${roleHandle.name}" is declared more than once in the entities list.`,
           );
         }
+        // Roles are cluster-scoped in Postgres, so they always land in the
+        // `__unbound__` namespace — identical to a PSL `role` block
+        // (`lowerRoleFromBlock`) and matching the `PostgresRole` class's own
+        // contract. The declaring surface (TS entities vs PSL) does not move
+        // the slot.
         roles.set(
           roleHandle.name,
-          new PostgresRole({ name: roleHandle.name, namespaceId: input.defaultNamespaceId }),
+          new PostgresRole({ name: roleHandle.name, namespaceId: UNBOUND_NAMESPACE_ID }),
         );
         break;
       }
@@ -843,7 +848,7 @@ export function postgresLowerEntityHandles(
     });
   }
   for (const [name, entity] of roles) {
-    rows.push({ namespaceId: input.defaultNamespaceId, entityKind: 'role', key: name, entity });
+    rows.push({ namespaceId: UNBOUND_NAMESPACE_ID, entityKind: 'role', key: name, entity });
   }
   return rows;
 }

@@ -95,6 +95,9 @@ describe('entities lowering: every helper lands in entries with PSL-matching key
   });
 
   const ns = () => namespace(contract, 'public');
+  // Roles are cluster-scoped, so they land in `__unbound__`, not the model's
+  // namespace — identical to a PSL `role` block.
+  const unbound = () => namespace(contract, '__unbound__');
 
   it('keys entries.policy by prefix, entries.rls by tableName, entries.role by name', () => {
     expect(Object.keys(ns().policy).sort()).toEqual([
@@ -106,7 +109,8 @@ describe('entities lowering: every helper lands in entries with PSL-matching key
       'p_write_using_only',
     ]);
     expect(Object.keys(ns().rls)).toEqual(['profile']);
-    expect(Object.keys(ns().role)).toEqual(['app_user']);
+    expect(Object.keys(ns().role)).toEqual([]);
+    expect(Object.keys(unbound().role)).toEqual(['app_user']);
   });
 
   it('lowers policySelect to the same entity shape and wire name as the PSL path', () => {
@@ -182,20 +186,20 @@ describe('entities lowering: every helper lands in entries with PSL-matching key
     });
   });
 
-  it('lowers a declared role to a PostgresRole entity', () => {
-    const declared = ns().role['app_user'];
+  it('lowers a declared role to a PostgresRole entity under __unbound__', () => {
+    const declared = unbound().role['app_user'];
     expect(declared).toBeInstanceOf(PostgresRole);
     expect(JSON.parse(JSON.stringify(declared))).toEqual({
       kind: 'role',
       name: 'app_user',
-      namespaceId: 'public',
+      namespaceId: '__unbound__',
       control: 'external',
     });
   });
 
   it('referenced-but-undeclared roles flow into policy roles as sorted deduped bare names', () => {
     // anon is referenced in p_all but never declared in entities.
-    expect(Object.keys(ns().role)).toEqual(['app_user']);
+    expect(Object.keys(unbound().role)).toEqual(['app_user']);
     expect(ns().policy['p_all']?.roles).toEqual(['anon', 'app_user']);
   });
 });
@@ -217,6 +221,7 @@ describe('round-trip through the contract serializer', () => {
     const roundTripped = serializer.deserializeContract(json);
 
     const ns = roundTripped.storage.namespaces['public'] as PostgresSchema;
+    const unbound = roundTripped.storage.namespaces['__unbound__'] as PostgresSchema;
     const original = namespace(contract, 'public');
 
     expect(ns.policy['p_read']).toBeInstanceOf(PostgresRlsPolicy);
@@ -224,7 +229,7 @@ describe('round-trip through the contract serializer', () => {
       JSON.parse(JSON.stringify(original.policy['p_read'])),
     );
     expect(ns.rls['profile']).toBeInstanceOf(PostgresRlsEnablement);
-    expect(ns.role['app_user']).toBeInstanceOf(PostgresRole);
+    expect(unbound.role['app_user']).toBeInstanceOf(PostgresRole);
   });
 });
 

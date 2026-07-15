@@ -66,3 +66,7 @@ namespace public {
     using  = "true"
   }
 }
+
+namespace unbound {
+  role app_role {}
+}

@@ -75,6 +75,20 @@
   },
   "storage": {
     "namespaces": {
+      "__unbound__": {
+        "entries": {
+          "role": {
+            "app_role": {
+              "control": "external",
+              "kind": "role",
+              "name": "app_role",
+              "namespaceId": "__unbound__"
+            }
+          },
+          "table": {}
+        },
+        "id": "__unbound__"
+      },
       "public": {
         "entries": {
           "policy": {
@@ -222,7 +236,7 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:833d53edc383ecda52392d1123b71080c2749803fbd97e038df82d1c5ae5395d"
+    "storageHash": "sha256:baa5da17b0dde0c3c9063c4d3c11b1dbd4f73873fb2733b9bb73a2751070c13f"
   },
   "capabilities": {
     "postgres": {

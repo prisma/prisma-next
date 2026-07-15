@@ -69,5 +69,6 @@ export const contract = defineContract({
       using: ownerPredicate,
     }),
     policySelect(AuditLog, { name: 'audit_read', roles: [authenticated], using: 'true' }),
+    role('app_role'),
   ],
 });
