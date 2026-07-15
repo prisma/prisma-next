@@ -303,7 +303,9 @@ describe('inferPostgresPslContract — described-contract omission', () => {
 
     const printed = printPsl(ast);
     expect(printed).toContain('supabase:auth.AuthUser');
-    expect(printed).toContain('@relation(fields: [userId], references: [id], onDelete: Cascade)');
+    expect(printed).toContain(
+      '@relation(fields: [userId], references: [id], onDelete: Cascade, index: false)',
+    );
   });
 
   it('resolves the cross-space FK even when a same-bare-named local table survives (pack-owned coordinate wins over the local shadow)', () => {

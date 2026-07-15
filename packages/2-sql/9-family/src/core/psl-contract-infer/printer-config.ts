@@ -58,4 +58,6 @@ export type RelationField = {
   readonly references?: readonly string[] | undefined;
   readonly onDelete?: string | undefined;
   readonly onUpdate?: string | undefined;
+  /** `false` when the FK's source columns have no live backing index; omitted (the default) otherwise. */
+  readonly index?: boolean | undefined;
 };

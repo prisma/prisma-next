@@ -31,6 +31,7 @@ const PRESERVED_NATIVE_TYPES: Record<
   char: { pslType: 'String', attributeName: 'db.Char' },
   varchar: { pslType: 'String', attributeName: 'db.VarChar' },
   uuid: { pslType: 'String', attributeName: 'db.Uuid' },
+  inet: { pslType: 'String', attributeName: 'db.Inet' },
   int2: { pslType: 'Int', attributeName: 'db.SmallInt' },
   smallint: { pslType: 'Int', attributeName: 'db.SmallInt' },
   float4: { pslType: 'Float', attributeName: 'db.Real' },

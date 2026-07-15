@@ -1091,8 +1091,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           options: Record<string, string> | undefined;
         }
       >();
+      // An index with an expression key (e.g. `lower(email)`) reports that
+      // key's row with `attname = null` (Postgres attribute numbers are
+      // <= 0 for expressions, which the LEFT JOIN above can't resolve to a
+      // real column). Every row for that index name is skipped below
+      // rather than only the expression row, so the index never enters
+      // `indexesMap` with a collapsed, misleading column list — a
+      // two-column expression index silently reduced to its one real
+      // column can coincide with an unrelated real single-column index,
+      // and the schema differ's diff-tree node id is derived from the
+      // column tuple (`sql-index/index:<columns>`), so two indexes
+      // colliding on that tuple abort the diff with "duplicate id among
+      // siblings" instead of a normal drift report.
+      const indexNamesWithExpressionKey = new Set<string>();
       for (const idxRow of indexesByTable.get(tableName) ?? []) {
         if (!idxRow.attname) {
+          indexNamesWithExpressionKey.add(idxRow.indexname);
           continue;
         }
         const existing = indexesMap.get(idxRow.indexname);
@@ -1113,13 +1127,40 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           });
         }
       }
-      const indexes: readonly SqlIndexIRInput[] = Array.from(indexesMap.values()).map((idx) => ({
-        columns: Object.freeze([...idx.columns]) as readonly string[],
-        name: idx.name,
-        unique: idx.unique,
-        ...(idx.type !== undefined && { type: idx.type }),
-        ...(idx.options !== undefined && { options: idx.options }),
-      }));
+      // Two real indexes can legitimately share the exact same column tuple
+      // on one table (e.g. a unique index and a redundant plain index) —
+      // valid in Postgres, but the schema differ's diff-tree node id for an
+      // index is the column tuple alone (`SqlIndexIR#id`, deliberately —
+      // see its doc comment), so two same-tuple siblings from one
+      // introspection abort the diff with "duplicate id among siblings"
+      // rather than a normal drift report. Keep only one per column tuple:
+      // the unique one when there is a unique/non-unique pair (a unique
+      // index is a strict superset of what a plain index on the same
+      // columns would add), otherwise the first by name for determinism.
+      const survivingIndexes = Array.from(indexesMap.values()).filter(
+        (idx) => !indexNamesWithExpressionKey.has(idx.name),
+      );
+      const bestByColumnTuple = new Map<string, (typeof survivingIndexes)[number]>();
+      for (const idx of survivingIndexes) {
+        const tupleKey = idx.columns.join(',');
+        const existing = bestByColumnTuple.get(tupleKey);
+        if (
+          !existing ||
+          (idx.unique && !existing.unique) ||
+          (idx.unique === existing.unique && idx.name < existing.name)
+        ) {
+          bestByColumnTuple.set(tupleKey, idx);
+        }
+      }
+      const indexes: readonly SqlIndexIRInput[] = Array.from(bestByColumnTuple.values()).map(
+        (idx) => ({
+          columns: Object.freeze([...idx.columns]),
+          name: idx.name,
+          unique: idx.unique,
+          ...(idx.type !== undefined && { type: idx.type }),
+          ...(idx.options !== undefined && { options: idx.options }),
+        }),
+      );
 
       // Process check constraints — parse each predicate into column + value set.
       // Only the two shapes emitted by this slice are recognised; free-form

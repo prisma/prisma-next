@@ -298,3 +298,21 @@ assignability). The `examples/` diff is package.json dependency version
 ranges only — no framework surface, contract shape, or emitted artefact
 changes. No user action required. Incidental substrate diff only.
 -->
+
+<!--
+TML-2503 (extension-supabase: the complete, introspected Supabase contract, this
+PR): additive + test-only. The pack's emitted `contract.json` / `contract.d.ts`
+grow from a partial hand-scoped shape to the full contract introspected from a
+Supabase reference instance (every `auth`/`storage` table, native enum, and
+platform role), so consumers re-import a now-complete set of types — additive;
+nothing previously shipped is renamed or removed except two internal named-type
+aliases (`Uuid` / `Timestamptz`) folded into the canonicalized named-type set.
+Back-relation field names are corrected from the inferrer's double-pluralized
+form (`sessionses` → `sessions`, `identitieses` → `identities`, …); those names
+were introduced by this PR's full regeneration and never shipped, so there is no
+rename for existing consumers (the general inferrer fix is TML-3024). The
+`examples/` diff is the `examples/supabase` walking-skeleton test plus a CI-only
+vitest `retry` config that absorbs a known intermittent PGlite (WASM) abort. A
+re-emit picks up any contract shape. No user action required. Incidental
+substrate diff only.
+-->

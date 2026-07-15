@@ -4,16 +4,21 @@ Supabase extension pack for Prisma Next.
 
 ## Overview
 
-This extension pack ships a Supabase-shaped contract — the `auth.*` and `storage.*` namespaces as `external` tables — so an application contract can compose them via `extensionPacks: [supabasePack]` and have the framework treat them correctly: the migration planner emits no DDL for them (they're Supabase-managed), and the verifier confirms they exist in the live database.
+This extension pack ships a **complete, faithful contract of everything Supabase owns in the database** — every `auth` (23) and `storage` (10) table of the reference platform version, their native enum types, and the three platform roles (`anon`, `authenticated`, `service_role`) — all `external`: an application contract composes them via `extensionPacks: [supabasePack]`, the migration planner emits no DDL for them (they're Supabase-managed), and `db verify` confirms they exist in the live database while tolerating the Supabase-internal schemas the pack doesn't declare (`realtime`, `vault`, …).
 
-This is **M1 of the Supabase integration** — the walking-skeleton starter. Later milestones add the role-binding runtime (`asUser()` / `asAnon()` / `asServiceRole()`); RLS, cross-contract foreign keys into `auth.users`, and explicit `auth.*` queries arrive with their respective sibling projects. See [`projects/supabase-integration/README.md`](../../../projects/supabase-integration/README.md) for the integration's full delivery plan.
+It also ships the role-binding runtime: `supabase({...})` returns a db whose `asUser(jwt)` / `asAnon()` / `asServiceRole()` bind the Postgres role + JWT claims per session, and `asServiceRole().supabase.{sql,orm}` exposes the pack's own `auth`/`storage` tables as a secondary root for admin reads. See [`projects/supabase-integration/README.md`](../../../projects/supabase-integration/README.md) for the integration's delivery plan.
+
+## Contract generation
+
+The contract is **introspected, not hand-authored**: `pnpm contract:generate` restores the checked-in reference fixture (`test/fixtures/supabase-reference/`, captured from **supabase/postgres:17.6.1.106** — PostgreSQL 17.6, gotrue v2.188.1, storage-api v1.54.1, supabase CLI 2.95.4, 2026-07-12) into a fresh PGlite database, introspects `auth` + `storage`, writes `src/contract/contract.prisma`, and emits. Reruns are byte-identical. The honest boundary of "faithful" — the handful of columns/defaults/indexes deliberately not declared, and why that's verify-safe under `external` — is recorded in [`src/contract/CONTRACT-FIDELITY.md`](./src/contract/CONTRACT-FIDELITY.md). To track a newer Supabase platform version, re-capture the fixture from a newer stack (record the new version pins in the fixture header) and rerun `contract:generate`.
 
 ## Responsibilities
 
-- **Supabase contract**: ships a PSL-authored contract describing the `auth.*` (`AuthUser`, `AuthIdentity`) and `storage.*` (`StorageBucket`, `StorageObject`) tables with `defaultControlPolicy: 'external'`, so the framework verifies them as present without managing their DDL.
+- **Supabase contract**: the complete introspection-generated contract described above, `defaultControlPolicy: 'external'`, roles contributed as first-class `role` entities during emit (`prisma-next.config.ts`).
 - **`/pack` subpath**: an `ExtensionPack` value (`supabasePack` default + `supabasePackWith(options)` factory) that an app composes into its config via `extensionPacks`. Tree-shaking-clean — `/pack` imports no runtime code.
-- **`/runtime` subpath**: a minimal runtime descriptor so the stock Postgres runtime's pack-requirements check passes when an app composes this pack. This is **not** the role-binding `SupabaseRuntime` yet — that lands in M2.
-- **`/test/utils` subpath**: exports `bootstrapSupabaseShim(connectionString)` — the shared PGlite test fixture that seeds the external `auth`/`storage` schemas + their tables. Used by this package's classification e2e and by `examples/supabase`; downstream constituents (`postgres-rls`, `cross-contract-refs`) extend it.
+- **`/runtime` subpath**: the `SupabaseRuntime` role-binding runtime and `supabase({...})` facade (session-coupled `set_config` role + claims binding, per [ADR 230](../../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md)), plus the `service_role`-only `.supabase` secondary root.
+- **`/contract` subpath**: branded model handles for the commonly-referenced models (`AuthUser`, `AuthIdentity`, `AuthSession`, `StorageBucket`, `StorageObject`) used for cross-space FK references from app contracts. The handle set is deliberately curated, not one-per-table.
+- **`/test/utils` subpath**: exports `bootstrapSupabaseShim(client)` — restores the full reference fixture (all Supabase schemas, tables, roles) into a test database and layers the grants/`auth.uid()`-style functions tests need. Used by this package's tests and by `examples/supabase`.
 
 ## Dependencies
 
@@ -55,7 +60,7 @@ export default defineConfig({
 
 See [`examples/supabase`](../../../examples/supabase) for the full runnable walking-skeleton app.
 
-## What this pack does *not* ship (yet)
+## What this pack does *not* ship
 
 These belong to sibling Supabase-integration projects:
 

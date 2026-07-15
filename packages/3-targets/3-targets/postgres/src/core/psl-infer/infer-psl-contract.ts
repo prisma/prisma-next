@@ -231,7 +231,7 @@ function resolveForeignKeys(
             (columnName) => table.columns[columnName]?.nullable ?? false,
           );
           const relationField: RelationField = {
-            ...buildChildRelationField(fieldName, target.modelName, fk, optional),
+            ...buildChildRelationField(fieldName, target.modelName, fk, optional, undefined, table),
             typeNamespaceId: target.namespaceId,
             typeContractSpaceId: target.spaceId,
           };
@@ -709,7 +709,9 @@ function buildModel(
       const indexFieldNames = index.columns.map((columnName) =>
         resolveColumnFieldName(fieldNamesByTable, table.name, columnName),
       );
-      modelAttributes.push(buildModelConstraintAttribute('index', indexFieldNames, index.name));
+      modelAttributes.push(
+        buildModelConstraintAttribute('index', indexFieldNames, index.name, index.type),
+      );
     }
   }
 
@@ -874,6 +876,9 @@ function buildRelationField(
     if (rel.fkName) {
       args.push(namedArg('map', `"${escapePslString(rel.fkName)}"`));
     }
+    if (rel.index === false) {
+      args.push(namedArg('index', 'false'));
+    }
   } else if (rel.relationName) {
     args.push(namedArg('name', `"${escapePslString(rel.relationName)}"`));
   }
@@ -894,14 +899,26 @@ function buildRelationField(
   };
 }
 
+/**
+ * `indexType` carries a non-default index access method (e.g. `hash`) —
+ * introspection already drops `btree` (the Postgres default) to `undefined`
+ * (see the postgres control adapter), so this only ever fires for a real
+ * non-default index, matching the same `@@index(type: "...")` argument
+ * `contract-to-schema-ir.ts` reads back into the FK-backing-index
+ * expectation `db verify` checks against the live database.
+ */
 function buildModelConstraintAttribute(
   name: 'id' | 'unique' | 'index',
   fields: readonly string[],
   constraintName?: string,
+  indexType?: string,
 ): PslModelAttribute {
   const args: PslAttributeArgument[] = [positionalArg(`[${fields.join(', ')}]`)];
   if (constraintName !== undefined) {
     args.push(namedArg('map', `"${escapePslString(constraintName)}"`));
+  }
+  if (indexType !== undefined) {
+    args.push(namedArg('type', `"${escapePslString(indexType)}"`));
   }
   return buildAttribute('model', name, args);
 }
