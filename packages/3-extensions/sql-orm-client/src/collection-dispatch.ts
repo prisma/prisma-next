@@ -43,11 +43,9 @@ import {
   mapResultRows,
   mapStorageRowToModelFields,
   type RowEnvelope,
-  stripHiddenMappedFields,
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { compileSelect, compileSelectWithIncludes } from './query-plan';
-import { augmentSelectionForJoinColumns } from './selection-shaping';
 import {
   type CollectionContext,
   type CollectionState,
@@ -117,19 +115,11 @@ function dispatchWithIncludes<Row>(
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     const { scope, release } = await acquireRuntimeScope(runtime);
     try {
-      const parentJoinColumns = state.includes.flatMap((include) =>
-        include.through !== undefined ? include.through.parentLocalColumns : [include.localColumn],
-      );
-      const { selectedForQuery: parentSelectedForQuery, hiddenColumns: hiddenParentColumns } =
-        augmentSelectionForJoinColumns(state.selectedFields, parentJoinColumns);
       const compiled = compileSelectWithIncludes(
         contract,
         namespaceId,
         tableName,
-        {
-          ...state,
-          selectedFields: parentSelectedForQuery,
-        },
+        state,
         modelName,
       );
 
@@ -158,16 +148,6 @@ function dispatchWithIncludes<Row>(
             parent.raw[include.relationName],
           );
         }
-
-        if (hiddenParentColumns.length > 0) {
-          stripHiddenMappedFields(
-            contract,
-            namespaceId,
-            modelName,
-            parent.mapped,
-            hiddenParentColumns,
-          );
-        }
       }
 
       for (const row of parentRows) {
@@ -190,8 +170,8 @@ function dispatchWithIncludes<Row>(
  * Reload the rows a mutation just wrote (create / createAll / update /
  * updateAll / upsert) through the read-path dispatch, so `.include()`
  * relations resolve via the exact same correlated-subquery builder,
- * decode, hidden-column stripping, and polymorphism mapping a read
- * query uses — there is no parallel mutation read-back implementation.
+ * decoding, and polymorphism mapping a read query uses — there is no
+ * parallel mutation read-back implementation.
  *
  * The mutation returns only its identity columns (PK / unique); this
  * re-selects those rows with the caller's projection + includes, keyed

@@ -650,3 +650,128 @@ test('createModelAccessor without a selected variant returns the base accessor',
   // @ts-expect-error priority is an MTI variant field, absent without a selected variant
   task.priority;
 });
+
+// ---------------------------------------------------------------------------
+// Variant-declared includes: a singleton variant owns its declared relations,
+// while union-valued narrowing exposes only base relations safe for every
+// possible runtime variant.
+// ---------------------------------------------------------------------------
+
+test('include after variant("Feature") uses the MTI variant relation owner', () => {
+  const included = tasks.variant('Feature').include('assignee');
+  type Assignee = RowOfCollection<typeof included>['assignee'];
+  expectTypeOf<Assignee>().toEqualTypeOf<DefaultModelRow<PolyContract, 'Assignee'> | null>();
+});
+
+test('include after variant("Bug") uses the STI variant relation owner', () => {
+  const included = tasks.variant('Bug').include('assignee');
+  type Assignee = RowOfCollection<typeof included>['assignee'];
+  expectTypeOf<Assignee>().toEqualTypeOf<DefaultModelRow<PolyContract, 'Assignee'> | null>();
+});
+
+test('include after variant("Feature") keeps an unshadowed base relation', () => {
+  const included = tasks.variant('Feature').include('subtasks');
+  type Subtasks = RowOfCollection<typeof included>['subtasks'];
+  expectTypeOf<Subtasks>().toExtend<readonly unknown[]>();
+  expectTypeOf<Subtasks[number]['type']>().toEqualTypeOf<'bug' | 'feature'>();
+});
+
+test('include without narrowing rejects a variant-declared relation', () => {
+  // @ts-expect-error assignee is declared only by Task variants
+  tasks.include('assignee');
+});
+
+declare const taskVariantName: 'Bug' | 'Feature';
+
+test('include after union-valued narrowing keeps an unshadowed base relation', () => {
+  const included = tasks.variant(taskVariantName).include('subtasks');
+  type Subtasks = RowOfCollection<typeof included>['subtasks'];
+  expectTypeOf<Subtasks>().toExtend<readonly unknown[]>();
+});
+
+test('include after union-valued narrowing rejects variant-owned relations', () => {
+  // @ts-expect-error union-valued variant state exposes no variant-owned includes
+  tasks.variant(taskVariantName).include('assignee');
+});
+
+type CollisionModels = Omit<PolyModels, 'Task' | 'Bug' | 'Feature'> & {
+  readonly Task: Omit<PolyModels['Task'], 'relations'> & {
+    readonly relations: PolyModels['Task']['relations'] & {
+      readonly owner: {
+        readonly to: {
+          readonly namespace: '__unbound__' & NamespaceId;
+          readonly model: 'Assignee';
+        };
+        readonly cardinality: '1:N';
+        readonly on: {
+          readonly localFields: readonly ['id'];
+          readonly targetFields: readonly ['id'];
+        };
+      };
+      readonly blocked: {
+        readonly to: {
+          readonly namespace: '__unbound__' & NamespaceId;
+          readonly model: 'Assignee';
+        };
+        readonly cardinality: '1:N';
+        readonly on: {
+          readonly localFields: readonly ['id'];
+          readonly targetFields: readonly ['id'];
+        };
+      };
+    };
+  };
+  readonly Feature: Omit<PolyModels['Feature'], 'relations'> & {
+    readonly relations: PolyModels['Feature']['relations'] & {
+      readonly owner: {
+        readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+        readonly cardinality: 'N:1';
+        readonly on: {
+          readonly localFields: readonly ['assigneeId'];
+          readonly targetFields: readonly ['id'];
+        };
+      };
+    };
+  };
+  readonly Bug: Omit<PolyModels['Bug'], 'relations'> & {
+    readonly relations: PolyModels['Bug']['relations'] & {
+      readonly blocked: never;
+    };
+  };
+};
+
+type CollisionContract = Omit<PolyContract, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: { readonly models: CollisionModels };
+    };
+  };
+};
+
+declare const collisionTasks: Collection<CollisionContract, 'Task'>;
+
+test('singleton variant include chooses its shadowing target and cardinality', () => {
+  const included = collisionTasks.variant('Feature').include('owner');
+  type Owner = RowOfCollection<typeof included>['owner'];
+  expectTypeOf<Owner>().not.toExtend<readonly unknown[]>();
+  expectTypeOf<NonNullable<Owner>>().toHaveProperty('title');
+});
+
+test('union-valued narrowing rejects a base relation shadowed by one possible variant', () => {
+  // @ts-expect-error Feature shadows owner, so the base owner relation is not common-safe
+  collisionTasks.variant(taskVariantName).include('owner');
+});
+
+test('non-navigable variant declaration shadows a same-named base relation', () => {
+  // @ts-expect-error Bug declares blocked as non-navigable and must not fall back to Task.blocked
+  collisionTasks.variant('Bug').include('blocked');
+});
+
+test('singleton variant keeps a base relation not declared by that variant', () => {
+  collisionTasks.variant('Feature').include('blocked');
+});
+
+test('union-valued narrowing rejects a base relation shadowed by a non-navigable member', () => {
+  // @ts-expect-error Bug shadows blocked, so it is unsafe for Bug | Feature state
+  collisionTasks.variant(taskVariantName).include('blocked');
+});
