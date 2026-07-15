@@ -317,7 +317,7 @@ A contract-level default can be set via `defaultControlPolicy` on `prismaContrac
 
 ## Workflow — `@prisma-next/extension-supabase`
 
-The concept: the Supabase extension provides the `supabase` contract space (containing `auth.AuthUser` and related auth models) and a runtime extension. It does not expose a `/control` subpath so it cannot be registered via the user-facing `defineConfig({ extensions: [...] })` façade. Instead it is wired via `extensionPacks` in the low-level config and `extensions` in the runtime factory. See `examples/supabase` for the full working pattern.
+The concept: the Supabase extension provides the `supabase` contract space (the `auth` / `storage` schemas as `external` tables, plus the platform roles) and its own role-first runtime factory. It does not expose a `/control` subpath so it cannot be registered via the user-facing `defineConfig({ extensions: [...] })` façade — it is wired via `extensionPacks` in the low-level config. See `examples/supabase` for the full working pattern.
 
 `prisma-next.config.ts` (mirrors the example):
 
@@ -332,19 +332,9 @@ export default defineConfig({
 });
 ```
 
-`src/prisma/db.ts`:
+`db.ts` does **not** use the stock `postgres()` factory — a Supabase app builds its client with the `supabase()` factory from `@prisma-next/extension-supabase/runtime` (role-first: `asUser(jwt)` / `asAnon()` / `asServiceRole()`, JWT validation, RLS). That runtime — and RLS policy authoring (`policy_select` / `@@rls`) — is covered by **`prisma-next-supabase`**; load it for anything past the config wiring.
 
-```typescript
-import supabaseExtension from '@prisma-next/extension-supabase/runtime';
-import postgres from '@prisma-next/postgres/runtime';
-
-export const db = postgres<Contract>({
-  contractJson,
-  extensions: [supabaseExtension],
-});
-```
-
-Export subpaths: `@prisma-next/extension-supabase/pack`, `@prisma-next/extension-supabase/runtime`, `@prisma-next/extension-supabase/contract`. Canonical worked example: `examples/supabase`.
+Export subpaths: `@prisma-next/extension-supabase/pack`, `@prisma-next/extension-supabase/runtime`, `@prisma-next/extension-supabase/contract`, `@prisma-next/extension-supabase/test/utils`. Canonical worked example: `examples/supabase`.
 
 ## Workflow — Brownfield introspection
 
