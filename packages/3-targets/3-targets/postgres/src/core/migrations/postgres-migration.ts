@@ -12,6 +12,7 @@ import {
   AddCheckConstraintCall,
   AddColumnCall,
   AddForeignKeyCall,
+  AddNativeEnumValueCall,
   AddPrimaryKeyCall,
   AddUniqueCall,
   AlterColumnTypeCall,
@@ -199,6 +200,22 @@ export abstract class PostgresMigration<
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     return new DropNativeEnumTypeCall(options.schema, options.typeName).toOp(
       this.controlAdapterFor('dropNativeEnumType'),
+    );
+  }
+
+  /**
+   * Emit an `ALTER TYPE ... ADD VALUE` migration operation appending one
+   * member to a managed native enum, lowered through the stored control
+   * adapter. Throws if no adapter is present. Every appended value is its
+   * own operation — call this once per value to append more than one.
+   */
+  protected addNativeEnumValue(options: {
+    readonly schema: string;
+    readonly typeName: string;
+    readonly value: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    return new AddNativeEnumValueCall(options.schema, options.typeName, options.value).toOp(
+      this.controlAdapterFor('addNativeEnumValue'),
     );
   }
 

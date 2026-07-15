@@ -1325,7 +1325,7 @@ export class Collection<
         selectedForInsert,
       ).map((plan) => mergeAnnotations(plan, annotationsMap));
       return dispatchSplitMutationRows<Row>({
-        contract: this.contract,
+        context: this.ctx.context,
         runtime: this.ctx.runtime,
         plans,
         tableName: this.tableName,
@@ -1349,7 +1349,7 @@ export class Collection<
       annotationsMap,
     );
     return dispatchMutationRows<Row>({
-      contract: this.contract,
+      context: this.ctx.context,
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
@@ -1674,7 +1674,7 @@ export class Collection<
       annotationsMap,
     );
     const row = await executeMutationReturningSingleRow<Row>({
-      contract: this.contract,
+      context: this.ctx.context,
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
@@ -1866,7 +1866,7 @@ export class Collection<
       annotationsMap,
     );
     return dispatchMutationRows<Row>({
-      contract: this.contract,
+      context: this.ctx.context,
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
@@ -2040,7 +2040,7 @@ export class Collection<
       annotationsMap,
     );
     return dispatchMutationRows<Row>({
-      contract: this.contract,
+      context: this.ctx.context,
       runtime: this.ctx.runtime,
       compiled,
       tableName: this.tableName,
@@ -2073,7 +2073,7 @@ export class Collection<
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       const snapshot = await withMutationScope(collection.ctx.runtime, async (scope) => {
         const rows = await dispatchCollectionRows<Row>({
-          contract: collection.contract,
+          context: collection.ctx.context,
           runtime: scope,
           state: collection.state,
           tableName: collection.tableName,
@@ -2269,7 +2269,7 @@ export class Collection<
     };
 
     const rows = await dispatchCollectionRows<Row>({
-      contract: this.contract,
+      context: this.ctx.context,
       runtime: this.ctx.runtime,
       state: resultState,
       tableName: this.tableName,
@@ -2353,7 +2353,7 @@ export class Collection<
 
   #dispatch(): AsyncIterableResult<Row> {
     return dispatchCollectionRows<Row>({
-      contract: this.contract,
+      context: this.ctx.context,
       runtime: this.ctx.runtime,
       state: this.state,
       tableName: this.tableName,

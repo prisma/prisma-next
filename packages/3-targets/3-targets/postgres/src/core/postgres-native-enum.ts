@@ -1,13 +1,21 @@
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from '@prisma-next/sql-contract/types';
+import { blindCast } from '@prisma-next/utils/casts';
 
-export interface PostgresNativeEnumInput {
+export interface PostgresNativeEnumInput<Members extends readonly string[] = readonly string[]> {
   /** The Postgres type name (`CREATE TYPE <typeName> AS ENUM (…)`). */
   readonly typeName: string;
   /** Member values in declaration order — this is the Postgres enum sort order. */
-  readonly members: readonly string[];
+  readonly members: Members;
   readonly control?: ControlPolicy;
+}
+
+function freezeMembers<Members extends readonly string[]>(members: Members): Members {
+  return blindCast<
+    Members,
+    'Object.freeze clones+freezes the tuple for immutability; the clone widens to readonly string[], but it holds exactly the values of members (already typed Members)'
+  >(Object.freeze([...members]));
 }
 
 /**
@@ -29,7 +37,9 @@ export interface PostgresNativeEnumInput {
  * node's own `kind` literal — the same shape as `table`/`StorageTable` and
  * `valueSet`/`StorageValueSet`.
  */
-export class PostgresNativeEnum extends SqlNode {
+export class PostgresNativeEnum<
+  Members extends readonly string[] = readonly string[],
+> extends SqlNode {
   static is(node: unknown): node is PostgresNativeEnum {
     return (
       typeof node === 'object' && node !== null && 'kind' in node && node.kind === 'postgres-enum'
@@ -38,13 +48,13 @@ export class PostgresNativeEnum extends SqlNode {
 
   override readonly kind = 'postgres-enum' as const;
   readonly typeName: string;
-  readonly members: readonly string[];
+  readonly members: Members;
   declare readonly control?: ControlPolicy;
 
-  constructor(input: PostgresNativeEnumInput) {
+  constructor(input: PostgresNativeEnumInput<Members>) {
     super();
     this.typeName = input.typeName;
-    this.members = Object.freeze([...input.members]);
+    this.members = freezeMembers(input.members);
     if (input.control !== undefined) this.control = input.control;
     freezeNode(this);
   }

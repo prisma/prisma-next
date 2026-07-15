@@ -695,6 +695,31 @@ type EnumValueUnion<FieldState> = [FieldTypeRefOf<FieldState>] extends [
     : Values[number]
   : never;
 
+// The member-value literal tuple carried on a descriptor's `entityRef.entity`
+// (e.g. a target's native-enum entity), or `never` when the descriptor has no
+// entityRef, its entity has no `members`, or `members` is widened to
+// `readonly string[]` — this is checked with non-optional property shapes so
+// a descriptor genuinely lacking `entityRef` fails the structural match
+// instead of matching vacuously through the framework type's optional slot.
+type DescriptorEntityMembers<Descriptor> = Descriptor extends {
+  readonly entityRef: {
+    readonly entity: { readonly members: infer Members extends readonly string[] };
+  };
+}
+  ? Members
+  : never;
+
+// The value-set member union for a descriptor-carried entity (the type-level
+// mirror of the runtime's generic `deriveValueSetFromEntity` fold), or
+// `never` for a field with no descriptor, a descriptor with no entityRef.entity,
+// or a widened (non-literal) members tuple — mirroring `EnumValueUnion`'s
+// erasure guard.
+type DescriptorValueSetUnion<FieldState> = [FieldDescriptorOf<FieldState>] extends [never]
+  ? never
+  : readonly string[] extends DescriptorEntityMembers<FieldDescriptorOf<FieldState>>
+    ? never
+    : DescriptorEntityMembers<FieldDescriptorOf<FieldState>>[number];
+
 // The codec's `output` / `input` JS type for a field's column, before
 // nullability. `unknown` when the codec is not in the definition's codec map.
 type CodecChannelType<
@@ -711,19 +736,27 @@ type CodecChannelType<
     : unknown
   : unknown;
 
-// A field's read/write JS type: the enum value union when the field is
-// enum-typed, otherwise the codec channel type, with column nullability applied.
+// The literal value union for a field: the enum-typed union takes precedence
+// (matching today's behavior), falling back to the descriptor-carried
+// value-set union; `never` when neither applies.
+type FieldValueUnion<FieldState> = [EnumValueUnion<FieldState>] extends [never]
+  ? DescriptorValueSetUnion<FieldState>
+  : EnumValueUnion<FieldState>;
+
+// A field's read/write JS type: the value union (enum or descriptor value-set)
+// when the field carries one, otherwise the codec channel type, with column
+// nullability applied.
 type FieldChannelType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
   Channel extends 'output' | 'input',
 > =
-  | ([EnumValueUnion<ModelFieldState<Definition, ModelName, FieldName>>] extends [never]
+  | ([FieldValueUnion<ModelFieldState<Definition, ModelName, FieldName>>] extends [never]
       ? CodecChannelType<Definition, ModelName, FieldName, Channel>
       : StorageColumnManyOf<ModelStorageColumn<Definition, ModelName, FieldName>> extends true
-        ? ReadonlyArray<EnumValueUnion<ModelFieldState<Definition, ModelName, FieldName>>>
-        : EnumValueUnion<ModelFieldState<Definition, ModelName, FieldName>>)
+        ? ReadonlyArray<FieldValueUnion<ModelFieldState<Definition, ModelName, FieldName>>>
+        : FieldValueUnion<ModelFieldState<Definition, ModelName, FieldName>>)
   | (FieldNullableOf<ModelFieldState<Definition, ModelName, FieldName>> extends true
       ? null
       : never);

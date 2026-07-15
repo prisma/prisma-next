@@ -17,12 +17,8 @@ const stubContext = {
   fieldName: 'testField',
 } as const;
 
-function makeCall(name: string, args: Array<{ raw: string; span: typeof stubSpan }> = []) {
-  return { name, raw: `${name}(${args.map((a) => a.raw).join(', ')})`, args, span: stubSpan };
-}
-
-function arg(raw: string) {
-  return { raw, span: stubSpan };
+function makeCall(fn: string, args: Record<string, unknown> = {}) {
+  return { fn, span: stubSpan, args };
 }
 
 describe('createPostgresDefaultFunctionRegistry', () => {
@@ -72,7 +68,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('lowers uuid(7) to uuidv7 execution generator', () => {
     const handler = registry.get('uuid')!;
     const result = handler.lower({
-      call: makeCall('uuid', [arg('7')]),
+      call: makeCall('uuid', { version: 7 }),
       context: stubContext,
     });
     expect(result).toMatchObject({
@@ -81,16 +77,10 @@ describe('createPostgresDefaultFunctionRegistry', () => {
     });
   });
 
-  it('rejects cuid() without version', () => {
-    const handler = registry.get('cuid')!;
-    const result = handler.lower({ call: makeCall('cuid'), context: stubContext });
-    expect(result).toMatchObject({ ok: false });
-  });
-
   it('lowers cuid(2) to cuid2 execution generator', () => {
     const handler = registry.get('cuid')!;
     const result = handler.lower({
-      call: makeCall('cuid', [arg('2')]),
+      call: makeCall('cuid', { version: 2 }),
       context: stubContext,
     });
     expect(result).toMatchObject({
@@ -120,7 +110,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('lowers nanoid(16) with size param', () => {
     const handler = registry.get('nanoid')!;
     const result = handler.lower({
-      call: makeCall('nanoid', [arg('16')]),
+      call: makeCall('nanoid', { size: 16 }),
       context: stubContext,
     });
     expect(result).toMatchObject({
@@ -135,7 +125,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('lowers dbgenerated("expr") to storage default', () => {
     const handler = registry.get('dbgenerated')!;
     const result = handler.lower({
-      call: makeCall('dbgenerated', [arg('"gen_random_uuid()"')]),
+      call: makeCall('dbgenerated', { expression: 'gen_random_uuid()' }),
       context: stubContext,
     });
     expect(result).toMatchObject({
@@ -147,106 +137,10 @@ describe('createPostgresDefaultFunctionRegistry', () => {
     });
   });
 
-  it('rejects dbgenerated() without argument', () => {
-    const handler = registry.get('dbgenerated')!;
-    const result = handler.lower({ call: makeCall('dbgenerated'), context: stubContext });
-    expect(result).toMatchObject({ ok: false });
-  });
-
   it('rejects dbgenerated with empty string', () => {
     const handler = registry.get('dbgenerated')!;
     const result = handler.lower({
-      call: makeCall('dbgenerated', [arg('""')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  it('rejects uuid with invalid version', () => {
-    const handler = registry.get('uuid')!;
-    const result = handler.lower({
-      call: makeCall('uuid', [arg('3')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  it('rejects uuid with too many arguments', () => {
-    const handler = registry.get('uuid')!;
-    const result = handler.lower({
-      call: makeCall('uuid', [arg('4'), arg('7')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  it('rejects nanoid with out-of-range size', () => {
-    const handler = registry.get('nanoid')!;
-    const result = handler.lower({
-      call: makeCall('nanoid', [arg('1')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  it('rejects autoincrement with arguments', () => {
-    const handler = registry.get('autoincrement')!;
-    const result = handler.lower({
-      call: makeCall('autoincrement', [arg('1')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  it('rejects cuid with invalid version', () => {
-    const handler = registry.get('cuid')!;
-    const result = handler.lower({
-      call: makeCall('cuid', [arg('1')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  it('rejects cuid with too many arguments', () => {
-    const handler = registry.get('cuid')!;
-    const result = handler.lower({
-      call: makeCall('cuid', [arg('2'), arg('3')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  it('rejects nanoid with too many arguments', () => {
-    const handler = registry.get('nanoid')!;
-    const result = handler.lower({
-      call: makeCall('nanoid', [arg('16'), arg('32')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  it('rejects dbgenerated with non-string argument', () => {
-    const handler = registry.get('dbgenerated')!;
-    const result = handler.lower({
-      call: makeCall('dbgenerated', [arg('notAString')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  it('rejects now() with arguments', () => {
-    const handler = registry.get('now')!;
-    const result = handler.lower({
-      call: makeCall('now', [arg('1')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  it('rejects ulid() with arguments', () => {
-    const handler = registry.get('ulid')!;
-    const result = handler.lower({
-      call: makeCall('ulid', [arg('1')]),
+      call: makeCall('dbgenerated', { expression: '' }),
       context: stubContext,
     });
     expect(result).toMatchObject({ ok: false });
@@ -255,88 +149,13 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   it('lowers uuid(4) explicitly to uuidv4 execution generator', () => {
     const handler = registry.get('uuid')!;
     const result = handler.lower({
-      call: makeCall('uuid', [arg('4')]),
+      call: makeCall('uuid', { version: 4 }),
       context: stubContext,
     });
     expect(result).toMatchObject({
       ok: true,
       value: { kind: 'execution', generated: { kind: 'generator', id: 'uuidv4' } },
     });
-  });
-
-  it('rejects uuid with non-numeric version literal', () => {
-    const handler = registry.get('uuid')!;
-    const result = handler.lower({
-      call: makeCall('uuid', [arg('foo')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  it('rejects nanoid with non-integer size literal', () => {
-    const handler = registry.get('nanoid')!;
-    const result = handler.lower({
-      call: makeCall('nanoid', [arg('"sixteen"')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false });
-  });
-
-  // The arg-rejection diagnostics use `input.call.args[0]?.span ?? input.call.span`
-  // so a missing arg-side span falls back to the call-side span. Pin the
-  // fallback path for each lowerer that has it so the per-file branch
-  // coverage stays above 87%. We construct a "spanless" arg by deleting
-  // the property after construction — TypeScript otherwise enforces
-  // `span` as required.
-  function spanlessArg(raw: string) {
-    const a: { raw: string; span?: typeof stubSpan } = { raw, span: stubSpan };
-    delete a.span;
-    return a as { raw: string; span: typeof stubSpan };
-  }
-
-  it("uuid: invalid-version diagnostic falls back to the call's span when the arg lacks one", () => {
-    const handler = registry.get('uuid')!;
-    const result = handler.lower({
-      call: makeCall('uuid', [spanlessArg('5')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false, diagnostic: { span: stubSpan } });
-  });
-
-  it("cuid: invalid-version diagnostic falls back to the call's span when the arg lacks one", () => {
-    const handler = registry.get('cuid')!;
-    const result = handler.lower({
-      call: makeCall('cuid', [spanlessArg('3')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false, diagnostic: { span: stubSpan } });
-  });
-
-  it("nanoid: out-of-range diagnostic falls back to the call's span when the arg lacks one", () => {
-    const handler = registry.get('nanoid')!;
-    const result = handler.lower({
-      call: makeCall('nanoid', [spanlessArg('1')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false, diagnostic: { span: stubSpan } });
-  });
-
-  it("dbgenerated: non-string-literal diagnostic falls back to the call's span when the arg lacks one", () => {
-    const handler = registry.get('dbgenerated')!;
-    const result = handler.lower({
-      call: makeCall('dbgenerated', [spanlessArg('NOW()')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false, diagnostic: { span: stubSpan } });
-  });
-
-  it("dbgenerated: empty-string diagnostic falls back to the call's span when the arg lacks one", () => {
-    const handler = registry.get('dbgenerated')!;
-    const result = handler.lower({
-      call: makeCall('dbgenerated', [spanlessArg('"   "')]),
-      context: stubContext,
-    });
-    expect(result).toMatchObject({ ok: false, diagnostic: { span: stubSpan } });
   });
 });
 

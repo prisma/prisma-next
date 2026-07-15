@@ -11,8 +11,6 @@ vi.mock('pg', () => {
   class Pool {
     static _connectSpy = vi.fn();
 
-    constructor(_options?: unknown) {}
-
     connect = Pool._connectSpy;
     end = vi.fn().mockResolvedValue(undefined);
   }

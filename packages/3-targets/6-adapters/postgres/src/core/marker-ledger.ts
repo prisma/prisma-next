@@ -49,6 +49,21 @@ export const ledger = pgTable(
 );
 
 /**
+ * Content-addressed contract store: one row per distinct contract, keyed
+ * by its storage hash. The ledger's `origin_core_hash` /
+ * `destination_core_hash` resolve here by hash equality, so both
+ * endpoints of every edge are direct lookups and a contract revisited by
+ * a rollback cycle is stored exactly once (upsert DO NOTHING).
+ */
+export const ledgerContract = pgTable(
+  { name: 'contract', schema: 'prisma_contract' },
+  {
+    core_hash: text(),
+    contract_json: jsonb(),
+  },
+);
+
+/**
  * Read-side handle covering every column of `prisma_contract.ledger`,
  * including the DB-generated `id` (for ORDER BY) and `created_at`.
  */

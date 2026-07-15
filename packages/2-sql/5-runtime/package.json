@@ -24,7 +24,7 @@
     "@prisma-next/sql-contract": "workspace:0.14.0",
     "@prisma-next/sql-operations": "workspace:0.14.0",
     "@prisma-next/sql-relational-core": "workspace:0.14.0",
-    "arktype": "^2.2.0"
+    "arktype": "^2.2.2"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:0.14.0",

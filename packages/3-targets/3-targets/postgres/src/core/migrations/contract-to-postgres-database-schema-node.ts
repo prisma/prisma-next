@@ -67,6 +67,28 @@ export function contractToPostgresDatabaseSchemaNode(
 
   for (const ns of Object.values(contract.storage.namespaces)) {
     if (!isPostgresSchema(ns)) continue;
+
+    // Role entries are root-level diff subjects: they hoist to the database
+    // root from every slot and never count toward whether a namespace
+    // materializes a schema node.
+    for (const role of Object.values(ns.role)) {
+      roles.push(new PostgresRoleSchemaNode({ name: role.name, namespaceId: role.namespaceId }));
+    }
+
+    // The unbound slot resolves its DDL schema to 'public', so it
+    // materializes a schema node exactly when it has non-role content — a
+    // late-binding contract keeps today's behavior (the slot carries the
+    // tables), while a roles-only unbound slot alongside named namespaces
+    // contributes only root roles and no node (which would otherwise be a
+    // spurious empty 'public' node, clobbering a real bound 'public'
+    // namespace's node keyed by the same resolved schema name).
+    if (ns.id === UNBOUND_NAMESPACE_ID) {
+      const hasNonRoleContent = Object.entries(ns.entries).some(
+        ([entriesKey, slot]) => entriesKey !== 'role' && Object.keys(slot).length > 0,
+      );
+      if (!hasNonRoleContent) continue;
+    }
+
     const ddlSchema = resolveDdlSchemaForNamespaceStorage(contract.storage, ns.id);
     ownedSchemas.push(ddlSchema);
 
@@ -156,10 +178,6 @@ export function contractToPostgresDatabaseSchemaNode(
       tables,
       nativeEnums,
     });
-
-    for (const role of Object.values(ns.role)) {
-      roles.push(new PostgresRoleSchemaNode({ name: role.name, namespaceId: role.namespaceId }));
-    }
   }
 
   return new PostgresDatabaseSchemaNode({

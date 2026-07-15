@@ -5,6 +5,17 @@ types {
   Timestamptz = DateTime @db.Timestamptz
 }
 
+namespace unbound {
+  role anon {
+  }
+
+  role authenticated {
+  }
+
+  role service_role {
+  }
+}
+
 namespace auth {
   model AuthUser {
     id         Uuid        @id

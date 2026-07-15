@@ -40,6 +40,7 @@ import type {
   ControlMutationDefaults,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type AttributeSpec,
   type BlockSymbol,
@@ -247,9 +248,20 @@ function resolveNamespaceIdForSqlTarget(input: {
     return 'public';
   }
   if (input.bucketName === 'unbound') {
-    return '__unbound__';
+    return UNBOUND_NAMESPACE_ID;
   }
   return input.bucketName;
+}
+
+/**
+ * A namespace block is the unbound block when its name RESOLVES to the
+ * unbound id — both the `namespace unbound { }` spelling (mapped by
+ * {@link resolveNamespaceIdForSqlTarget}) and the raw sentinel spelling
+ * `namespace __unbound__ { }` (passed through verbatim) behave identically:
+ * same models-sibling restriction, same block-lowering bucket.
+ */
+function isUnboundNamespaceBlock(ns: NamespaceSymbol, targetId: string): boolean {
+  return resolveNamespaceIdForSqlTarget({ bucketName: ns.name, targetId }) === UNBOUND_NAMESPACE_ID;
 }
 
 function validateNamespaceBlocksForSqlTarget(input: {
@@ -272,19 +284,30 @@ function validateNamespaceBlocksForSqlTarget(input: {
   }
 
   if (input.targetId === 'postgres') {
-    const hasUnbound = input.namespaces.some((ns) => ns.name === 'unbound');
-    const hasSibling = input.namespaces.some((ns) => ns.name !== 'unbound');
-    if (hasUnbound && hasSibling) {
-      const unboundBlock = input.namespaces.find((ns) => ns.name === 'unbound');
+    // Both the `namespace unbound { }` spelling and the raw `namespace
+    // __unbound__ { }` spelling resolve to the same storage id, so a
+    // document can declare BOTH as separate blocks. Find the one that
+    // actually carries models — not just the first block that resolves to
+    // the unbound id — otherwise a blocks-only unbound alias declared before
+    // a model-carrying one under the other spelling would hide the
+    // model-carrying one from this check.
+    const unboundBlock = input.namespaces.find(
+      (ns) => isUnboundNamespaceBlock(ns, input.targetId) && Object.keys(ns.models).length > 0,
+    );
+    const hasSibling = input.namespaces.some((ns) => !isUnboundNamespaceBlock(ns, input.targetId));
+    // Late binding is a MODEL story: a model in `namespace unbound { }` gets
+    // its schema resolved by the connection's search_path, which contradicts
+    // sibling namespaces that pin schemas explicitly. Extension blocks (e.g.
+    // `role`) carry no such conflict — a blocks-only unbound namespace is
+    // legal next to named namespaces and lowers into the unbound bucket.
+    if (unboundBlock !== undefined && hasSibling) {
       input.diagnostics.push({
         code: 'PSL_RESERVED_NAMESPACE_NAME',
         message:
-          'Namespace "unbound" is reserved for the late-binding sentinel mapping and cannot appear alongside other named namespace blocks. ' +
+          'Namespace "unbound" is reserved for the late-binding sentinel mapping; a `namespace unbound { … }` containing models cannot appear alongside other named namespace blocks. ' +
           'Use `namespace unbound { … }` alone (no sibling named namespaces) for late-binding multi-tenant contracts.',
         sourceId: input.sourceId,
-        ...(unboundBlock !== undefined
-          ? { span: nodePslSpan(unboundBlock.node.syntax, input.sourceFile) }
-          : {}),
+        span: nodePslSpan(unboundBlock.node.syntax, input.sourceFile),
       });
     }
   }
@@ -404,8 +427,8 @@ function buildModelAttributesByName(
 }
 
 /**
- * For a single PSL namespace, lowers all extension blocks (parsed by
- * `namespacePslExtensionBlocks`) into IR entities via the registered
+ * For a single lexical scope (a named PSL namespace, or the document top
+ * level), lowers all extension blocks into IR entities via the registered
  * factory for each block's discriminator. Groups results by discriminator
  * (the entries key — one-string rule: discriminator === entries key).
  *
@@ -432,14 +455,14 @@ function buildModelAttributesByName(
  * does not resolve is this pass's diagnostic; the factory is skipped.
  */
 function lowerExtensionBlocksForNamespace(
-  ns: NamespaceSymbol,
+  blocks: Readonly<Record<string, BlockSymbol>>,
   nsId: string,
   entityTypesByDiscriminator: ReadonlyMap<string, AuthoringEntityTypeDescriptor>,
   entityContext: AuthoringEntityContext,
   pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace,
   resolveModelTable: (modelName: string) => string | undefined,
 ): Readonly<Record<string, Readonly<Record<string, unknown>>>> {
-  const blockSymbols = Object.values(ns.blocks);
+  const blockSymbols = Object.values(blocks);
   if (blockSymbols.length === 0) return {};
 
   const result: Record<string, Record<string, unknown>> = {};
@@ -2001,15 +2024,23 @@ export function interpretPslDocumentToSqlContract(
     });
   };
 
-  const topLevelEnums = Object.values(topLevel.blocks)
-    .filter((block) => {
-      if (!legitimateBlockKeywords.has(block.keyword)) {
-        reportUnsupportedTopLevelBlock(block);
-        return false;
-      }
-      return isEnumBlock(block);
-    })
-    .map((block) => block.block);
+  const topLevelEnums: PslExtensionBlock[] = [];
+  // Registered non-enum top-level blocks lower through the same generic
+  // extension pass as namespace blocks (see the top-level
+  // `lowerExtensionBlocksForNamespace` call below); collected here so
+  // keyword validation happens in one place.
+  const topLevelExtensionBlocks: Record<string, BlockSymbol> = {};
+  for (const [blockName, block] of Object.entries(topLevel.blocks)) {
+    if (!legitimateBlockKeywords.has(block.keyword)) {
+      reportUnsupportedTopLevelBlock(block);
+      continue;
+    }
+    if (isEnumBlock(block)) {
+      topLevelEnums.push(block.block);
+    } else {
+      topLevelExtensionBlocks[blockName] = block;
+    }
+  }
   for (const namespace of namespaceSymbols) {
     for (const block of Object.values(namespace.blocks)) {
       if (isEnumBlock(block)) {
@@ -2054,12 +2085,13 @@ export function interpretPslDocumentToSqlContract(
 
   const enumHandlesByName = new Map(Object.entries(validEnumHandles));
 
-  // Generic extension-block lowering pass: per named namespace, lower all
-  // parsed extension blocks into IR entities via the registered factory for
-  // each block's discriminator, then collect by entrySlotName. The pass
-  // names no specific discriminator value — all target-specific logic lives
-  // in the factory contributed by the target pack, and value-set derivation
-  // rides the generic `deriveValueSet` descriptor hook (see
+  // Generic extension-block lowering pass: per lexical scope (each named
+  // namespace, plus the document top level), lower all parsed extension
+  // blocks into IR entities via the registered factory for each block's
+  // discriminator, then collect by entrySlotName. The pass names no specific
+  // discriminator value — all target-specific logic lives in the factory
+  // contributed by the target pack, and value-set derivation rides the
+  // generic `deriveValueSet` descriptor hook (see
   // `lowerExtensionBlocksForNamespace`).
   //
   // This runs before model/field resolution (not just before contract
@@ -2102,6 +2134,39 @@ export function interpretPslDocumentToSqlContract(
     string,
     Readonly<Record<string, Readonly<Record<string, unknown>>>>
   >();
+  const mergeNamespaceExtensionEntities = (
+    nsId: string,
+    entities: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+  ): void => {
+    if (Object.keys(entities).length === 0) return;
+    const existing = namespaceExtensionEntities.get(nsId);
+    if (existing === undefined) {
+      namespaceExtensionEntities.set(nsId, entities);
+      return;
+    }
+    // A top-level block and a `namespace public { … }` block both land in
+    // the default bucket — merge per entries slot rather than overwrite. Two
+    // reopened namespace spellings declaring the same entity name under the
+    // same entries kind is a genuine authoring collision (last-write-wins
+    // would silently drop one), so flag it rather than merge over it.
+    const merged: Record<string, Readonly<Record<string, unknown>>> = { ...existing };
+    for (const [entriesKey, slot] of Object.entries(entities)) {
+      const existingSlot = existing[entriesKey];
+      if (existingSlot !== undefined) {
+        for (const name of Object.keys(slot)) {
+          if (Object.hasOwn(existingSlot, name)) {
+            diagnostics.push({
+              code: 'PSL_DUPLICATE_EXTENSION_ENTITY',
+              message: `entries slot "${entriesKey}" in namespace "${nsId}": entity "${name}" is declared more than once in the same namespace.`,
+              sourceId,
+            });
+          }
+        }
+      }
+      merged[entriesKey] = { ...existingSlot, ...slot };
+    }
+    namespaceExtensionEntities.set(nsId, merged);
+  };
   for (const ns of namespaceSymbols) {
     if (ns.name === UNSPECIFIED_PSL_NAMESPACE_NAME) continue;
     const nsId = resolveNamespaceIdForSqlTarget({
@@ -2109,18 +2174,41 @@ export function interpretPslDocumentToSqlContract(
       targetId: input.target.targetId,
     });
     if (nsId === undefined) continue;
-    const entities = lowerExtensionBlocksForNamespace(
-      ns,
+    mergeNamespaceExtensionEntities(
       nsId,
-      entityTypesByDiscriminator,
-      extensionEntityContext,
-      composedPslBlockDescriptors,
-      (modelName: string) =>
-        earlyModelMappingsByCoordinate.get(modelCoordinateKey(nsId, modelName))?.tableName,
+      lowerExtensionBlocksForNamespace(
+        ns.blocks,
+        nsId,
+        entityTypesByDiscriminator,
+        extensionEntityContext,
+        composedPslBlockDescriptors,
+        (modelName: string) =>
+          earlyModelMappingsByCoordinate.get(modelCoordinateKey(nsId, modelName))?.tableName,
+      ),
     );
-    if (Object.keys(entities).length > 0) {
-      namespaceExtensionEntities.set(nsId, entities);
-    }
+  }
+
+  // Top-level extension blocks lower into the default namespace bucket, the
+  // same resolution top-level models get.
+  if (Object.keys(topLevelExtensionBlocks).length > 0) {
+    const topLevelNsId =
+      resolveNamespaceIdForSqlTarget({
+        bucketName: UNSPECIFIED_PSL_NAMESPACE_NAME,
+        targetId: input.target.targetId,
+      }) ?? defaultNamespaceId;
+    mergeNamespaceExtensionEntities(
+      topLevelNsId,
+      lowerExtensionBlocksForNamespace(
+        topLevelExtensionBlocks,
+        topLevelNsId,
+        entityTypesByDiscriminator,
+        extensionEntityContext,
+        composedPslBlockDescriptors,
+        (modelName: string) =>
+          earlyModelMappingsByCoordinate.get(modelCoordinateKey(topLevelNsId, modelName))
+            ?.tableName,
+      ),
+    );
   }
 
   // A domain `enum` and an extension-derived value-set (e.g. from a
@@ -2381,6 +2469,13 @@ export function interpretPslDocumentToSqlContract(
       ),
       ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
       ...(Object.keys(validEnumHandles).length > 0 ? { enums: validEnumHandles } : {}),
+      // A namespace that carries extension entities but no models (e.g.
+      // `namespace unbound { role anon {} }`) would otherwise never enter
+      // `SqlStorage.namespaces` — declare every entity-carrying coordinate;
+      // model-derived coordinates dedupe downstream.
+      ...(namespaceExtensionEntities.size > 0
+        ? { namespaces: [...namespaceExtensionEntities.keys()] }
+        : {}),
       createNamespace: createNamespaceWithExtensions,
       models: stiColumnModelNodes.map((model) => ({
         ...model,

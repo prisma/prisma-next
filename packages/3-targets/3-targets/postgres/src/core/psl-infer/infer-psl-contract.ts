@@ -299,12 +299,12 @@ export function inferPostgresPslContract(
   // described pack contract already declares (resolved through the same
   // `owners` / `describedContractOwners` coordinate map as table subtraction —
   // `elementCoordinates` keys `entries.native_enum` by physical type name, no
-  // enum-specific index). Transitional grade gap: an
-  // inferred block carries no explicit `control` and inherits the contract's
-  // `defaultControl`; under `defaultControl: 'managed'` the planner does not
-  // yet enforce the native enum lifecycle (CREATE TYPE / DROP TYPE / ADD
-  // VALUE) — that lands with Phase 2 of projects/native-postgres-enums/spec.md,
-  // making the grade true retroactively with no contract change.
+  // enum-specific index). An inferred block carries no explicit `control` and
+  // inherits the contract's `defaultControl`; under `defaultControl: 'managed'`
+  // the planner owns the type's create/drop lifecycle and `db verify` reports
+  // member drift (#949). A suffix-appended member plans `ALTER TYPE ... ADD
+  // VALUE`; any other member change (rename, removal, reorder) is refused
+  // with a named diagnostic — see `docs/reference/postgres-native-enums.md`.
   const enumDefinitions = new Map<string, readonly string[]>();
   const packOwnedEnumTypesByNamespace = new Map<string, Map<string, string>>();
   const enumNamespaceNames = new Set<string>();

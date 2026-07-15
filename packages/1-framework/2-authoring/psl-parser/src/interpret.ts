@@ -1,9 +1,12 @@
 import type {
   ContractSourceContext,
   ContractSourceDiagnostic,
+  ContractSourceDiagnostics,
   ContractSourceProvider,
   PslContractSourceProvider,
 } from '@prisma-next/config/config-types';
+import type { Contract } from '@prisma-next/contract/types';
+import { notOk, type Result } from '@prisma-next/utils/result';
 import type { SourceFile } from './source-file';
 import type { SymbolTable } from './symbol-table';
 import type { DocumentAst } from './syntax/ast/declarations';
@@ -23,13 +26,37 @@ export interface PslInterpretInput {
 /**
  * Declared here — the authoring layer that owns `DocumentAst` / `SourceFile` /
  * `SymbolTable` — because `@prisma-next/config` (core) cannot name authoring
- * types.
+ * types. `interpret` must not read disk or `context.resolvedInputs` — those
+ * are load-path concerns.
  */
 export interface PslInterpretCapable extends PslContractSourceProvider {
   interpret(
     input: PslInterpretInput,
     context: ContractSourceContext,
-  ): readonly ContractSourceDiagnostic[];
+  ): Result<Contract, ContractSourceDiagnostics>;
+}
+
+/**
+ * Merges caller-side diagnostics (e.g. parse / symbol-table findings) into an
+ * interpretation result. The authored headline is deliberately uniform — it
+ * reports how many errors the schema has, never which pipeline stage found
+ * them.
+ */
+export function withSeedDiagnostics(
+  result: Result<Contract, ContractSourceDiagnostics>,
+  seedDiagnostics: readonly ContractSourceDiagnostic[],
+): Result<Contract, ContractSourceDiagnostics> {
+  if (seedDiagnostics.length === 0) {
+    return result;
+  }
+  const diagnostics = result.ok
+    ? seedDiagnostics
+    : [...seedDiagnostics, ...result.failure.diagnostics];
+  return notOk({
+    summary: `Schema has ${diagnostics.length} error${diagnostics.length === 1 ? '' : 's'}`,
+    diagnostics,
+    ...(result.ok || result.failure.meta === undefined ? {} : { meta: result.failure.meta }),
+  });
 }
 
 /** The single seam that narrows a contract source to the interpret capability. */

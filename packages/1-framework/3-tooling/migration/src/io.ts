@@ -3,6 +3,7 @@ import type {
   MigrationMetadata,
   MigrationPackage,
 } from '@prisma-next/framework-components/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { basename, dirname, join, resolve } from 'pathe';
 import {
@@ -23,6 +24,7 @@ import type { MigrationOps, OnDiskMigrationPackage } from './package';
 
 export const MANIFEST_FILE = 'migration.json';
 const OPS_FILE = 'ops.json';
+const END_CONTRACT_FILE = 'end-contract.json';
 const MAX_SLUG_LENGTH = 64;
 
 function hasErrnoCode(error: unknown, code: string): boolean {
@@ -176,6 +178,32 @@ export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise
   await writeFile(join(dir, OPS_FILE), `${JSON.stringify(ops, null, 2)}\n`);
 }
 
+/**
+ * Reads the optional `end-contract.json` snapshot next to a migration
+ * manifest — the contract IR of the migration's destination state.
+ * Snapshots are author-time conveniences (ADR 197), never structural
+ * runner inputs, so a missing or unparseable file is treated as absent
+ * (`undefined`) — a package holding only `migration.json` + `ops.json`
+ * must keep loading (pinned regression in this package). A file holding
+ * the JSON literal `null` is also treated as absent: `undefined` is the
+ * single "no snapshot" sentinel downstream, and a null contract is not
+ * a storable state (the contract store's `contract_json` is NOT NULL).
+ */
+async function readEndContractJson(dir: string): Promise<unknown> {
+  let raw: string;
+  try {
+    raw = await readFile(join(dir, END_CONTRACT_FILE), 'utf-8');
+  } catch {
+    return undefined;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed === null ? undefined : parsed;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function readMigrationPackage(dir: string): Promise<OnDiskMigrationPackage> {
   const absoluteDir = resolve(dir);
   const manifestPath = join(absoluteDir, MANIFEST_FILE);
@@ -229,11 +257,13 @@ export async function readMigrationPackage(dir: string): Promise<OnDiskMigration
     );
   }
 
+  const endContractJson = await readEndContractJson(absoluteDir);
   const pkg: OnDiskMigrationPackage = {
     dirName: basename(absoluteDir),
     dirPath: absoluteDir,
     metadata,
     ops,
+    ...ifDefined('endContractJson', endContractJson),
   };
 
   const verification = verifyMigrationHash(pkg);
@@ -294,6 +324,9 @@ async function readMigrationPackageRaw(dir: string): Promise<OnDiskMigrationPack
   const opsResult = MigrationOpsSchema(ops);
   if (opsResult instanceof type.errors) return null;
 
+  // Deliberately no `endContractJson`: this loader only runs for packages
+  // that failed hash / invariants verification, and a snapshot from an
+  // unverifiable package must never reach the ledger's contract store.
   return {
     dirName: basename(absoluteDir),
     dirPath: absoluteDir,

@@ -11,7 +11,7 @@ import {
   dispatchSplitMutationRows,
   executeMutationReturningSingleRow,
 } from '../src/collection-mutation-dispatch';
-import { createMockRuntime, getTestContract } from './helpers';
+import { buildTestContextFromContract, createMockRuntime, getTestContract } from './helpers';
 
 // These helpers own the no-include mutation read-back: execute the
 // `RETURNING` plan, map storage rows to model fields, and strip hidden
@@ -37,11 +37,12 @@ function makeCompiled(sqlText = 'select 1'): SqlQueryPlan<Record<string, unknown
 describe('collection-mutation-dispatch', () => {
   it('dispatchMutationRows() maps rows and strips hidden fields', async () => {
     const contract = getTestContract();
+    const context = buildTestContextFromContract(contract);
     const runtime = createMockRuntime();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
     const rows = await dispatchMutationRows<Record<string, unknown>>({
-      contract,
+      context,
       runtime,
       compiled: makeCompiled('insert into users ... returning *'),
       tableName: 'users',
@@ -58,11 +59,12 @@ describe('collection-mutation-dispatch', () => {
 
   it('executeMutationReturningSingleRow() returns null when no rows are returned', async () => {
     const contract = getTestContract();
+    const context = buildTestContextFromContract(contract);
     const runtime = createMockRuntime();
     runtime.setNextResults([[]]);
 
     const result = await executeMutationReturningSingleRow<Record<string, unknown>>({
-      contract,
+      context,
       runtime,
       compiled: makeCompiled('delete from users returning *'),
       tableName: 'users',
@@ -80,11 +82,12 @@ describe('collection-mutation-dispatch', () => {
 
   it('executeMutationReturningSingleRow() strips hidden fields', async () => {
     const contract = getTestContract();
+    const context = buildTestContextFromContract(contract);
     const runtime = createMockRuntime();
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
     const result = await executeMutationReturningSingleRow<Record<string, unknown>>({
-      contract,
+      context,
       runtime,
       compiled: makeCompiled('update users set ... returning *'),
       tableName: 'users',
@@ -103,6 +106,7 @@ describe('collection-mutation-dispatch', () => {
   describe('dispatchSplitMutationRows()', () => {
     it('maps rows from multiple plans', async () => {
       const contract = getTestContract();
+      const context = buildTestContextFromContract(contract);
       const runtime = createMockRuntime();
       runtime.setNextResults([
         [{ id: 1, name: 'Alice', email: 'alice@example.com' }],
@@ -110,7 +114,7 @@ describe('collection-mutation-dispatch', () => {
       ]);
 
       const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
-        contract,
+        context,
         runtime,
         plans: [makeCompiled('insert batch 1'), makeCompiled('insert batch 2')],
         tableName: 'users',
@@ -131,11 +135,12 @@ describe('collection-mutation-dispatch', () => {
 
     it('strips hidden fields', async () => {
       const contract = getTestContract();
+      const context = buildTestContextFromContract(contract);
       const runtime = createMockRuntime();
       runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
 
       const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
-        contract,
+        context,
         runtime,
         plans: [makeCompiled('insert ...')],
         tableName: 'users',
@@ -152,11 +157,12 @@ describe('collection-mutation-dispatch', () => {
 
     it('yields nothing when all plans return empty', async () => {
       const contract = getTestContract();
+      const context = buildTestContextFromContract(contract);
       const runtime = createMockRuntime();
       runtime.setNextResults([[], []]);
 
       const rows = await dispatchSplitMutationRows<Record<string, unknown>>({
-        contract,
+        context,
         runtime,
         plans: [makeCompiled('insert batch 1'), makeCompiled('insert batch 2')],
         tableName: 'users',

@@ -4,13 +4,11 @@ import type { Contract } from '@prisma-next/contract/types';
 import { emit, getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
-import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { dirname, join } from 'pathe';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { queueEmitByOutput } from '../../utils/emit-queue';
-import { toExtensionInputs } from '../../utils/extension-pack-inputs';
 import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
 import { publishContractArtifactPair } from '../../utils/publish-contract-artifact-pair';
 import { validateContractDeps } from '../../utils/validate-contract-deps';
@@ -196,26 +194,9 @@ export async function executeContractEmit(
   return queueEmitByOutput(outputJsonPath, async () => {
     const stack = createControlStack(config);
 
-    const extensionInputs = toExtensionInputs(
-      blindCast<
-        readonly unknown[],
-        'toExtensionInputs accepts readonly unknown[] per its documented structural cast boundary'
-      >(stack.extensionPacks),
-    );
-    const composedExtensionContracts = new Map<string, Contract>(
-      extensionInputs
-        .filter((p) => p.contractSpace !== undefined)
-        .map((p) => [
-          p.id,
-          blindCast<
-            Contract,
-            'contractSpace.contractJson is the typed contract for this extension space'
-          >(p.contractSpace!.contractJson),
-        ]),
-    );
     const sourceContext = {
       composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
-      composedExtensionContracts,
+      composedExtensionContracts: stack.extensionContracts,
       scalarTypeDescriptors: stack.scalarTypeDescriptors,
       authoringContributions: stack.authoringContributions,
       codecLookup: stack.codecLookup,

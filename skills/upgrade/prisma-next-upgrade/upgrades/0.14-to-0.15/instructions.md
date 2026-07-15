@@ -2,6 +2,9 @@
 from: "0.14"
 to: "0.15"
 changes:
+  - id: sql-orm-includes-decode-codec-values
+    summary: |
+      SQL ORM includes now decode every scalar child field through its contract-bound codec, matching top-level query results. Update application code and tests that relied on included fields retaining the database's JSON representation: for example, Postgres `bytea` include fields now return `Uint8Array` instead of `\\x`-prefixed hex text, and timestamp include fields return `Date` instead of timestamp strings. Custom codec-backed include fields likewise return the value produced by the codec's `decodeJson` method.
   - id: db-verify-json-single-issue-list
     summary: |
       `prisma-next db verify --json` (and `db verify --schema-only --json`) now report a single
@@ -283,4 +286,15 @@ entity, typed as a value union, and read at runtime through a Postgres-only
 Native enums are opt-in — existing schemas without a `native_enum` emit and run
 unchanged, and a re-emit picks up any contract shape. No user action required.
 Incidental substrate diff only.
+-->
+
+<!--
+Dependabot runtime-deps group bump (PR #962): runtime dependency version
+bumps only (arktype 2.2.x, prettier 3.9.4, pg 8.22, pg-cursor 2.21, next
+16.2.10, react-router 7.18, radix/tailwind patches and friends), plus a
+`pnpm dedupe arktype` so every workspace package resolves the same arktype
+instance (the split 2.2.2/2.2.3 resolution broke cross-package `Type`
+assignability). The `examples/` diff is package.json dependency version
+ranges only — no framework surface, contract shape, or emitted artefact
+changes. No user action required. Incidental substrate diff only.
 -->

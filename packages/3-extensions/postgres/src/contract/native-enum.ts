@@ -22,7 +22,7 @@ export interface NativeEnumHandle<
   readonly name: Name;
   readonly typeName: TypeName;
   readonly members: Members;
-  readonly entity: PostgresNativeEnum;
+  readonly entity: PostgresNativeEnum<Members>;
   /**
    * Overrides the Postgres type name (PSL's `@@map("type_name")`), keeping the
    * entity `name` unchanged. `nativeEnum('AalLevel', …).map('aal_level')` →
@@ -46,7 +46,7 @@ function buildNativeEnumHandle<
     name,
     typeName,
     members,
-    entity: new PostgresNativeEnum({ typeName, members: [...members] }),
+    entity: new PostgresNativeEnum<Members>({ typeName, members }),
     map: (mappedTypeName) => buildNativeEnumHandle(name, mappedTypeName, members),
   };
 }
@@ -102,6 +102,21 @@ export function nativeEnum<
 }
 
 /**
+ * The descriptor `pg.enum(handle)` returns: an `entityRef.entity` typed to the
+ * handle's own `PostgresNativeEnum<Members>`, so the member-value literal
+ * tuple survives on the descriptor type instead of widening to `unknown`.
+ */
+type PgEnumColumnDescriptor<Members extends readonly [string, ...string[]]> = ColumnTypeDescriptor<
+  typeof PG_ENUM_CODEC_ID
+> & {
+  readonly entityRef: {
+    readonly entityKind: 'native_enum';
+    readonly entityName: string;
+    readonly entity: PostgresNativeEnum<Members>;
+  };
+};
+
+/**
  * Builds the deferred column descriptor for `handle`: the bare Postgres type
  * name and `typeParams` come from `pgEnumDescriptor.columnFromEntity` (the same
  * authoring hook the PSL `pg.enum(Ref)` type constructor resolves through),
@@ -112,7 +127,11 @@ export function nativeEnum<
  * associates a namespace, so `buildSqlContractFromDefinition` resolves both
  * once the field's namespace is known.
  */
-function pgEnumColumn(handle: NativeEnumHandle): ColumnTypeDescriptor<typeof PG_ENUM_CODEC_ID> {
+function pgEnumColumn<
+  const Name extends string,
+  const TypeName extends string,
+  const Members extends readonly [string, ...string[]],
+>(handle: NativeEnumHandle<Name, TypeName, Members>): PgEnumColumnDescriptor<Members> {
   const resolved = pgEnumDescriptor.columnFromEntity(handle.entity);
   if (resolved === undefined) {
     throw new Error(

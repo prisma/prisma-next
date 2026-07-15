@@ -43,6 +43,8 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import {
+  pgByteaDecodeJson,
+  pgByteaEncodeJson,
   pgIntervalDecode,
   pgJsonbDecode,
   pgJsonbEncode,
@@ -615,10 +617,17 @@ export class PgNumericCodec extends CodecImpl<
     return pgNumericDecode(wire);
   }
   encodeJson(value: string): JsonValue {
-    return value;
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      throw new TypeError('pg/numeric@1 database JSON value must be a finite number');
+    }
+    return number;
   }
   decodeJson(json: JsonValue): string {
-    return json as string;
+    if (typeof json !== 'number') {
+      throw new TypeError('pg/numeric@1 database JSON value must be a number');
+    }
+    return pgNumericDecode(json);
   }
 }
 
@@ -921,17 +930,10 @@ export class PgByteaCodec extends CodecImpl<
       : new Uint8Array(wire.buffer, wire.byteOffset, wire.byteLength);
   }
   encodeJson(value: Uint8Array): JsonValue {
-    return Buffer.from(value).toString('base64');
+    return pgByteaEncodeJson(value);
   }
   decodeJson(json: JsonValue): Uint8Array {
-    if (typeof json !== 'string') {
-      throw new Error(`Expected base64 string for pg/bytea@1, got ${typeof json}`);
-    }
-    const decoded = Buffer.from(json, 'base64');
-    if (decoded.toString('base64') !== json) {
-      throw new Error(`Invalid base64 string for pg/bytea@1 (length: ${json.length})`);
-    }
-    return new Uint8Array(decoded);
+    return pgByteaDecodeJson(json);
   }
 }
 

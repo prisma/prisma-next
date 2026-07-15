@@ -36,8 +36,13 @@ export interface PslInterpretInput {
 }
 export interface PslInterpretCapable {
   readonly sourceFormat: 'psl';
-  interpret(input: PslInterpretInput, context: ContractSourceContext): readonly ContractSourceDiagnostic[];
+  interpret(input: PslInterpretInput, context: ContractSourceContext): Result<Contract, ContractSourceDiagnostics>;
 }
+/** Prepends seeds; forces failure when seeds exist on an ok result (uniform headline). */
+export function withSeedDiagnostics(
+  result: Result<Contract, ContractSourceDiagnostics>,
+  seedDiagnostics: readonly ContractSourceDiagnostic[],
+): Result<Contract, ContractSourceDiagnostics>;
 export function hasPslInterpreter(
   source: ContractSourceProvider,
 ): source is ContractSourceProvider & PslInterpretCapable;
@@ -146,8 +151,11 @@ graph TD
   `PslInterpretInput` as cheap future-proofing even though neither consumes it today
   (symbols embed their AST nodes).
 - **CLI emit path** (`packages/1-framework/3-tooling/cli/src/control-api/operations/contract-emit.ts`
-  lines 196–225): the only place that assembles a `ContractSourceContext` today
-  (control stack + `toExtensionInputs`-derived `composedExtensionContracts`). Rather
+  lines 196–225): assembles a `ContractSourceContext` (control stack +
+  `toExtensionInputs`-derived `composedExtensionContracts`). _Corrected during slice
+  02 (falsified assumption, 2026-07-10): this was **not** the only assembly site — a
+  byte-identical twin lived in the CLI's `client.ts` (`ControlClient.emit`); both
+  were collapsed._ Rather
   than extracting that assembly into a shared helper, the root cause is fixed:
   `ControlStack` exposes `extensionContracts: ReadonlyMap<string, Contract>`, built
   inside `createControlStack` beside its existing structural read of
@@ -156,6 +164,16 @@ graph TD
   module needed; the CLI's inline blindCasts are deleted and the one unavoidable
   `contractJson → Contract` cast lives in framework-components only (settled by
   operator, 2026-07-09).
+- **Contract-space declaration lift** _(scope addition, operator-authorized 2026-07-10)_:
+  `ContractSpace<TContract>` is already a framework-level type
+  (`framework-components/control/control-spaces.ts:77`, "contract-space identity is a
+  framework concept"), yet core's `ControlExtensionDescriptor` never declared the
+  member — both families declare identical `contractSpace?: ContractSpace<…>` overrides,
+  and every consumer bridges the gap with structural casts. The core descriptor gains
+  `contractSpace?: ContractSpace`; family overrides stay as covariant narrowings; the
+  `assembleExtensionContracts` blindCast and `control-stack.ts` structural views are
+  deleted (typed access). Verify in-slice: descriptors' shipped migrations satisfy
+  `MigrationPackage`; whether the load-order dependency view can go typed.
 - **Language server** (`packages/1-framework/3-tooling/language-server/`): consumes the
   guard + capability; `config-resolution.ts` grows the context construction (property
   picks off the control stack), `pipeline.ts` grows the interpret stage,
@@ -166,12 +184,19 @@ graph TD
 
 ## Cross-cutting requirements
 
-- **Build/editor parity by construction.** The provider's `load` and `interpret` must
-  share one interpretation code path; a diagnostic produced by `contract emit` for a
-  given schema is produced by the LSP for the same buffer content, and vice versa
-  (parse + symbol-table diagnostics excluded — the LSP already owns those, so
-  `interpret` receives empty `seedDiagnostics` and returns interpreter-stage findings
-  only; no double-reporting).
+- **Build/editor parity by construction.** `interpret(input, context)` IS the
+  interpretation code path: it returns the full
+  `Result<Contract, ContractSourceDiagnostics>`. `load` literally delegates to
+  `this.interpret`, then merges its parse/symbol-table findings **externally** via the
+  shared `withSeedDiagnostics(result, seeds)` helper (exported beside the capability):
+  seeds prepend on failure; seeds force failure on an ok result; the helper authors a
+  uniform headline (operator: users don't care which pipeline stage produced an
+  error). A diagnostic produced by `contract emit` for a given schema is produced by
+  the LSP for the same buffer content, and vice versa (parse + symbol-table
+  diagnostics excluded — the LSP owns those, never calls the helper, and unwraps
+  `notOk → diagnostics`, `ok → none`; no double-reporting). _(Shape settled through
+  PR #971 review, 2026-07-14: "use `this.interpret`" → Result-returning capability →
+  external seed merge with helper-authored headline.)_
 - **Zero re-work on the live path.** The LSP never re-parses or rebuilds a symbol table
   to obtain interpreter diagnostics; `interpret` consumes the artifacts the LSP already
   caches.
@@ -262,6 +287,10 @@ durable and reusable. Commit: author an ADR (or a pattern doc under
       test).
 - [ ] ADR / pattern doc for the capability-intersection pattern authored and linked
       from `docs/architecture docs/`.
+- [ ] Core `ControlExtensionDescriptor` declares `contractSpace?: ContractSpace`;
+      family overrides compile as narrowings; zero `contractJson` casts remain
+      anywhere in the repo (grep gate tightened accordingly). _(Scope addition,
+      operator-authorized 2026-07-10.)_
 
 ## Open Questions
 
@@ -284,6 +313,24 @@ construction pure property-picking everywhere; alternatives rejected: shared
 function in `@prisma-next/config`, helper in config-loader, inline-in-both (adds a
 Also settled: tracked as Linear issue TML-2984 (not a Linear Project);
 done when merged to `main`, no release cut._
+
+_Settled by operator (2026-07-14, PR #971 review, two steps): `interpret` returns the
+full `Result<Contract, ContractSourceDiagnostics>` so `load` delegates to
+`this.interpret` literally (supersedes the diagnostics-only return settled
+2026-07-09); then the transitional `seedDiagnostics?` parameter was dropped — seeds
+merge externally in `load` via a shared `withSeedDiagnostics` helper that also
+authors a uniform failure headline ("users don't care what part of the pipeline
+errors come from"). The capability is two-parameter; the LSP unwraps the failure side
+and discards the ok value._
+
+_Settled by operator (2026-07-10, mid-flight): scope addition — lift the
+`contractSpace` member declaration to core `ControlExtensionDescriptor`. Triggered by
+the operator's design challenge ("contract spaces should be framework-level"); code
+review confirmed `ContractSpace` already lives in core and only the declaration site
+was family-level — the orchestrator's earlier "hoisting family shape into core"
+framing during OF1 was overstated and is corrected. Runs as its own slice stacked on
+slice 02; `extensionContracts` (M2) remains the consumer surface — the lift makes its
+construction cast-free._
 
 _Settled by operator (2026-07-09, plan refinement): the end-to-end parity-test DoD
 item ("LSP diagnostic set equals `contract emit` diagnostic set, demonstrated by a

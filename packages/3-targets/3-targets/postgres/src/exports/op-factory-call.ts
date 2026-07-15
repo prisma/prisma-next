@@ -2,6 +2,7 @@ export {
   AddCheckConstraintCall,
   AddColumnCall,
   AddForeignKeyCall,
+  AddNativeEnumValueCall,
   AddNotNullColumnWithTempDefaultCall,
   AddPrimaryKeyCall,
   AddUniqueCall,

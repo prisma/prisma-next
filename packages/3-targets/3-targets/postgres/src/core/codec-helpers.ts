@@ -71,30 +71,32 @@ export const pgNumericRenderOutputType = (typeParams: {
   return `Numeric<${precision}, ${scale}>`;
 };
 
-// ISO 8601 UTC: `YYYY-MM-DDTHH:MM:SS[.mmm…]Z`. Trailing `Z` is required; fractional seconds are optional. Other `Date`-parseable formats (`January 15, 2024`, `01/15/2024`, etc.) are intentionally rejected because those formats are implementation-defined and not the documented contract for `pg/timestamp@1` / `pg/timestamptz@1`.
-const ISO_8601_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
+const ISO_8601_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/;
+const ISO_8601_TIMESTAMPTZ =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 
-export const pgTimestampEncodeJson = (value: Date): JsonValue => value.toISOString();
+export const pgTimestampEncodeJson = (value: Date): JsonValue => value.toISOString().slice(0, -1);
 export const pgTimestampDecodeJson = (json: JsonValue): Date => {
   if (typeof json !== 'string') {
     throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
   }
-  if (!ISO_8601_UTC.test(json)) {
+  if (!ISO_8601_TIMESTAMP.test(json)) {
     throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
   }
-  const date = new Date(json);
+  const date = new Date(`${json}Z`);
   if (Number.isNaN(date.getTime())) {
     throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
   }
   return date;
 };
 
-export const pgTimestamptzEncodeJson = (value: Date): JsonValue => value.toISOString();
+export const pgTimestamptzEncodeJson = (value: Date): JsonValue =>
+  value.toISOString().replace(/Z$/, '+00:00');
 export const pgTimestamptzDecodeJson = (json: JsonValue): Date => {
   if (typeof json !== 'string') {
     throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);
   }
-  if (!ISO_8601_UTC.test(json)) {
+  if (!ISO_8601_TIMESTAMPTZ.test(json)) {
     throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
   }
   const date = new Date(json);
@@ -107,6 +109,30 @@ export const pgTimestamptzDecodeJson = (json: JsonValue): Date => {
 export const pgIntervalDecode = (wire: string | Record<string, unknown>): string => {
   if (typeof wire === 'string') return wire;
   return JSON.stringify(wire);
+};
+
+export const pgByteaEncodeJson = (value: Uint8Array): JsonValue =>
+  `\\x${Buffer.from(value).toString('hex')}`;
+
+export const pgByteaDecodeJson = (value: JsonValue): Uint8Array => {
+  if (typeof value !== 'string' || !value.startsWith('\\x')) {
+    throw new Error(`Expected Postgres bytea hex text to start with "\\x"`);
+  }
+
+  const hex = value.slice(2);
+  if (hex.length % 2 !== 0) {
+    throw new Error(`Invalid Postgres bytea hex text length: ${hex.length}`);
+  }
+
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let offset = 0; offset < hex.length; offset += 2) {
+    const pair = hex.slice(offset, offset + 2);
+    if (!/^[0-9a-fA-F]{2}$/.test(pair)) {
+      throw new Error(`Invalid Postgres bytea hex pair "${pair}" at offset ${offset}`);
+    }
+    bytes[offset / 2] = Number.parseInt(pair, 16);
+  }
+  return bytes;
 };
 
 export const pgJsonEncode = (value: string | JsonValue): string => JSON.stringify(value);
