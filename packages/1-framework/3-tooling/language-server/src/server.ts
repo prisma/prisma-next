@@ -212,8 +212,13 @@ export function createServer(connection: Connection): LanguageServer {
     try {
       return await resolveProject(configPath);
     } catch {
-      // Unmanage documents only when the failure is the config's current
-      // state — a stale load's rejection must not touch a newer entry.
+      // Queuing orders load execution, not rejection delivery: (1) a read
+      // awaits load1; (2) a config change synchronously replaces the entry
+      // with load2, which executes chained behind load1; (3) load1 rejects
+      // and this catch runs while load2 is still current and in flight.
+      // Ungated, it would delete load2's entry and de-associate its
+      // documents. Only a failure recorded as the config's current state
+      // ('failed') unmanages documents.
       if (managedProjects.get(configPath)?.status === 'failed') {
         stopManagingProject(configPath);
       }
@@ -237,9 +242,7 @@ export function createServer(connection: Connection): LanguageServer {
 
   // A load replaces the entry with `loading` immediately, so reads during a
   // config reload await the fresh resolution instead of the pre-reload
-  // project. A failed reload restores the last-good project so open
-  // documents keep being served; a failed first load records a `failed`
-  // entry and its awaiters unmanage the documents.
+  // project.
   function startProjectLoad(configPath: string): Promise<ProjectState> {
     const existing = managedProjects.get(configPath);
     const previousLoad = existing?.status === 'loading' ? existing.load : undefined;
@@ -343,11 +346,8 @@ export function createServer(connection: Connection): LanguageServer {
     return project;
   }
 
-  // Callers are the failed-load funnels — the config-failure marker must
-  // survive this drop so a broken config stays visible; it clears on the
-  // next successful load or when the config's project is dropped for
-  // document-lifecycle reasons (dropProjectWithoutManagedDocuments). The
-  // `failed` entry itself stays: it is the record of the published marker.
+  // The `failed` entry survives this drop: it is the record of the published
+  // config marker, which must outlive the failed load that produced it.
   function stopManagingProject(configPath: string): void {
     const entry = managedProjects.get(configPath);
     const hadProject = lastGoodProject(entry) !== undefined;
