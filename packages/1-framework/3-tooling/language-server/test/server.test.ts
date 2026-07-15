@@ -2421,6 +2421,8 @@ describe('language server config failure surfacing', {
     await settle();
     expect(harness.nonEmptyPublishCount(configUri)).toBe(0);
     expect(harness.getDocumentAst(schemaUri)).toBeDefined();
+    // The newer load's result serves directly — no rediscovery reload churn.
+    expect(calls).toBe(2);
   });
 
   it('stays silent for a superseded load failure', async () => {

@@ -173,11 +173,7 @@ export function createServer(connection: Connection): LanguageServer {
   async function projectForNearestConfig(uri: string): Promise<ProjectState | undefined> {
     const knownConfigPath = documentConfigPaths.get(uri);
     if (knownConfigPath !== undefined) {
-      const project = await resolveProjectIfLoadable(knownConfigPath);
-      if (project === undefined) {
-        documentConfigPaths.delete(uri);
-      }
-      return project;
+      return resolveProjectIfLoadable(knownConfigPath);
     }
 
     const filePath = filePathFromUri(uri);
@@ -197,27 +193,15 @@ export function createServer(connection: Connection): LanguageServer {
     }
 
     documentConfigPaths.set(uri, configPath);
-    const project = await resolveProjectIfLoadable(configPath);
-    if (project === undefined) {
-      documentConfigPaths.delete(uri);
-    }
-    return project;
+    return resolveProjectIfLoadable(configPath);
   }
 
   async function resolveProjectIfLoadable(configPath: string): Promise<ProjectState | undefined> {
     try {
       return await resolveProject(configPath);
     } catch {
-      // Queuing orders load execution, not rejection delivery: (1) a read
-      // awaits load1; (2) a config change synchronously replaces the entry
-      // with load2, which executes chained behind load1; (3) load1 rejects
-      // and this catch runs while load2 is still current and in flight.
-      // Ungated, it would delete load2's entry and de-associate its
-      // documents. Only a failure recorded as the config's current state
-      // ('failed') unmanages documents.
-      if (managedProjects.get(configPath)?.status === 'failed') {
-        stopManagingProject(configPath);
-      }
+      // Failure consequences run in the load chain itself, strictly ordered
+      // before any successor load; awaiters never mutate.
       return undefined;
     }
   }
@@ -248,11 +232,8 @@ export function createServer(connection: Connection): LanguageServer {
       .then(() => loadProject(configPath))
       .then(
         (project) => {
-          // Loads execute in order (each chains on its predecessor), but
-          // `startProjectLoad` replaces the entry synchronously when a newer
-          // load starts — so a superseded load's continuation still runs
-          // after the replacement. The guard protects entry writes and
-          // publishes, not execution order.
+          // Entry replacement is synchronous, so a superseded load's own
+          // continuation stays silent.
           if (isCurrentLoad(configPath, load)) {
             if (hasManagedDocuments(configPath)) {
               managedProjects.set(configPath, { status: 'loaded', project });
@@ -268,7 +249,8 @@ export function createServer(connection: Connection): LanguageServer {
           return project;
         },
         (error: unknown) => {
-          // Same guard as above.
+          // Same guard as above. All failure consequences live here — the
+          // queue orders this handler strictly before any successor load.
           if (isCurrentLoad(configPath, load)) {
             if (!hasManagedDocuments(configPath)) {
               // No resurrection of the last-good project, no zombie marker.
@@ -281,6 +263,7 @@ export function createServer(connection: Connection): LanguageServer {
                 return lastGood;
               }
               managedProjects.set(configPath, { status: 'failed' });
+              unmanageDocuments(configPath);
             }
           }
           throw error;
@@ -340,20 +323,12 @@ export function createServer(connection: Connection): LanguageServer {
     return project;
   }
 
-  // The `failed` entry survives this drop: it is the record of the published
-  // config marker, which must outlive the failed load that produced it.
-  function stopManagingProject(configPath: string): void {
-    const entry = managedProjects.get(configPath);
-    const hadProject = lastGoodProject(entry) !== undefined;
-    if (entry !== undefined && entry.status !== 'failed') {
-      managedProjects.delete(configPath);
-    }
+  // A failed first load serves no project: its documents drop their
+  // association and re-resolve (and retry the load) on their next read.
+  function unmanageDocuments(configPath: string): void {
     for (const document of documents.all()) {
       if (documentConfigPaths.get(document.uri) === configPath) {
         documentConfigPaths.delete(document.uri);
-        if (hadProject && !clientCapabilities.pullDiagnostics) {
-          sendDiagnostics({ uri: document.uri, diagnostics: [] });
-        }
       }
     }
   }
@@ -556,11 +531,7 @@ export function createServer(connection: Connection): LanguageServer {
         try {
           await refreshProject(configPath);
         } catch {
-          // Same currency rule as resolveProjectIfLoadable: only a failure
-          // recorded as the config's current state unmanages documents.
-          if (managedProjects.get(configPath)?.status === 'failed') {
-            stopManagingProject(configPath);
-          }
+          // Failure consequences live in the load chain; nothing to do here.
           continue;
         }
       }
