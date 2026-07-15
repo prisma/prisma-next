@@ -45,6 +45,15 @@ changes:
 ---
 
 <!--
+TML-2503 (extension-supabase Slice E — launch close-out, PR #985): docs + test only.
+The `examples/` touch is `examples/supabase/README.md` (new) plus
+`examples/supabase/test/real-supabase.acceptance.test.ts` — an env-guarded (`skipIf`
+on DATABASE_URL / SUPABASE_JWT_SECRET) real-Supabase acceptance test, skipped on the
+normal CI path. No framework surface, contract shape, or emitted artefact change.
+Incidental substrate diff only.
+-->
+
+<!--
 TML-2501 (extension-supabase slice B close-out, this PR): test-only. The only
 `examples/` touch is `examples/supabase/test/rls-role-binding.integration.test.ts`:
 the acceptance test's fixture no longer hand-applies `ENABLE ROW LEVEL SECURITY` /

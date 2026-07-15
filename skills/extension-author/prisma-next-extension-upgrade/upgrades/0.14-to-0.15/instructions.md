@@ -467,6 +467,14 @@ changes:
       anyMatch: true
 ---
 <!--
+TML-2503 (extension-supabase Slice E — launch close-out, PR #985): docs only.
+The `packages/3-extensions/` touch is `packages/3-extensions/supabase/README.md` —
+the package README corrected to as-built (runtime usage, JWT validation modes, the
+service_role admin root, unsupported scope). No SPI, contract shape, or emitted
+artefact change. Incidental substrate diff only.
+-->
+
+<!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
 `@prisma-next/sql-orm-client` (nested writes through a junction, the
 required-payload gate, and the namespace-keyed `ExecutionMutationDefault.ref`).
