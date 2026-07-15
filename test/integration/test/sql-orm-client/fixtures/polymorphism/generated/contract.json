@@ -115,6 +115,13 @@
               "namespace": "public"
             },
             "fields": {
+              "assigneeId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "severity": {
                 "nullable": false,
                 "type": {
@@ -123,9 +130,28 @@
                 }
               }
             },
-            "relations": {},
+            "relations": {
+              "assignee": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "assigneeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Person",
+                  "namespace": "public"
+                }
+              }
+            },
             "storage": {
               "fields": {
+                "assigneeId": {
+                  "column": "bug_assignee_person_id"
+                },
                 "severity": {
                   "column": "severity"
                 }
@@ -165,6 +191,13 @@
               "namespace": "public"
             },
             "fields": {
+              "assigneeId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "priority": {
                 "nullable": false,
                 "type": {
@@ -173,9 +206,28 @@
                 }
               }
             },
-            "relations": {},
+            "relations": {
+              "assignee": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "assigneeId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Person",
+                  "namespace": "public"
+                }
+              }
+            },
             "storage": {
               "fields": {
+                "assigneeId": {
+                  "column": "feature_assignee_person_id"
+                },
                 "priority": {
                   "column": "priority"
                 }
@@ -705,6 +757,11 @@
             },
             "features": {
               "columns": {
+                "feature_assignee_person_id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/int4@1",
                   "nativeType": "int4",
@@ -717,6 +774,24 @@
                 }
               },
               "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "source": {
+                    "columns": [
+                      "feature_assignee_person_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "features"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "people"
+                  }
+                },
                 {
                   "constraint": true,
                   "index": false,
@@ -849,6 +924,11 @@
             },
             "tasks": {
               "columns": {
+                "bug_assignee_person_id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/int4@1",
                   "default": {
@@ -1056,7 +1136,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:e9c4781cc6e826298109a5f96b633553fc9c7fe6d0cd7bacb7baec90e79e7d6a"
+    "storageHash": "sha256:ea9e5b95b94f3d46d47d844c49de223e91a838de6c7a07105b0d2b292ee9aeb4"
   },
   "capabilities": {
     "postgres": {

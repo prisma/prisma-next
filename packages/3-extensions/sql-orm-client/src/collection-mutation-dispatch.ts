@@ -2,14 +2,28 @@ import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { resolvePolymorphismInfo } from './collection-contract';
 import { reloadMutationRowsByIdentities } from './collection-dispatch';
 import {
+  mapPolymorphicRow,
   mapResultRows,
   mapStorageRowToModelFields,
   stripHiddenMappedFields,
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import type { CollectionContext, IncludeExpr } from './types';
+
+function createMutationRowMapper(
+  contract: Contract<SqlStorage>,
+  namespaceId: string,
+  modelName: string,
+  variantName: string | undefined,
+): (row: Record<string, unknown>) => Record<string, unknown> {
+  const polyInfo = resolvePolymorphismInfo(contract, namespaceId, modelName);
+  return polyInfo
+    ? (row) => mapPolymorphicRow(contract, namespaceId, modelName, polyInfo, row, variantName)
+    : (row) => mapStorageRowToModelFields(contract, namespaceId, modelName, row);
+}
 
 interface DispatchMutationRowsOptions<Row> {
   readonly context: CollectionContext<Contract<SqlStorage>>['context'];
@@ -18,6 +32,7 @@ interface DispatchMutationRowsOptions<Row> {
   readonly tableName: string;
   readonly modelName: string;
   readonly namespaceId: string;
+  readonly variantName?: string | undefined;
   readonly includes: readonly IncludeExpr[];
   readonly selectedFields: readonly string[] | undefined;
   readonly hiddenColumns: readonly string[];
@@ -34,18 +49,20 @@ export function dispatchMutationRows<Row>(
     tableName,
     modelName,
     namespaceId,
+    variantName,
     includes,
     selectedFields,
     hiddenColumns,
     mapRow,
   } = options;
   const { contract } = context;
+  const mapStorageRow = createMutationRowMapper(contract, namespaceId, modelName, variantName);
 
   if (includes.length === 0) {
     const source = executeQueryPlan<Record<string, unknown>>(runtime, compiled);
 
     return mapResultRows(source, (rawRow) => {
-      const mapped = mapStorageRowToModelFields(contract, namespaceId, modelName, rawRow);
+      const mapped = mapStorageRow(rawRow);
       if (hiddenColumns.length > 0) {
         stripHiddenMappedFields(contract, namespaceId, modelName, mapped, hiddenColumns);
       }
@@ -85,6 +102,7 @@ interface DispatchSplitMutationRowsOptions<Row> {
   readonly tableName: string;
   readonly modelName: string;
   readonly namespaceId: string;
+  readonly variantName?: string | undefined;
   readonly includes: readonly IncludeExpr[];
   readonly selectedFields: readonly string[] | undefined;
   readonly hiddenColumns: readonly string[];
@@ -101,12 +119,14 @@ export function dispatchSplitMutationRows<Row>(
     tableName,
     modelName,
     namespaceId,
+    variantName,
     includes,
     selectedFields,
     hiddenColumns,
     mapRow,
   } = options;
   const { contract } = context;
+  const mapStorageRow = createMutationRowMapper(contract, namespaceId, modelName, variantName);
 
   const generator = async function* (): AsyncGenerator<Row, void, unknown> {
     if (includes.length > 0) {
@@ -131,7 +151,7 @@ export function dispatchSplitMutationRows<Row>(
 
     for (const plan of plans) {
       for await (const rawRow of executeQueryPlan<Record<string, unknown>>(runtime, plan)) {
-        const mapped = mapStorageRowToModelFields(contract, namespaceId, modelName, rawRow);
+        const mapped = mapStorageRow(rawRow);
         if (hiddenColumns.length > 0) {
           stripHiddenMappedFields(contract, namespaceId, modelName, mapped, hiddenColumns);
         }
@@ -150,6 +170,7 @@ interface ExecuteSingleMutationOptions<Row> {
   readonly tableName: string;
   readonly modelName: string;
   readonly namespaceId: string;
+  readonly variantName?: string | undefined;
   readonly includes: readonly IncludeExpr[];
   readonly selectedFields: readonly string[] | undefined;
   readonly hiddenColumns: readonly string[];
@@ -167,6 +188,7 @@ export async function executeMutationReturningSingleRow<Row>(
     tableName,
     modelName,
     namespaceId,
+    variantName,
     includes,
     selectedFields,
     hiddenColumns,
@@ -174,6 +196,7 @@ export async function executeMutationReturningSingleRow<Row>(
     onMissingRowMessage,
   } = options;
   const { contract } = context;
+  const mapStorageRow = createMutationRowMapper(contract, namespaceId, modelName, variantName);
 
   if (includes.length === 0) {
     const rows = await executeQueryPlan<Record<string, unknown>>(runtime, compiled).toArray();
@@ -182,7 +205,7 @@ export async function executeMutationReturningSingleRow<Row>(
       return null;
     }
 
-    const mapped = mapStorageRowToModelFields(contract, namespaceId, modelName, first);
+    const mapped = mapStorageRow(first);
     if (hiddenColumns.length > 0) {
       stripHiddenMappedFields(contract, namespaceId, modelName, mapped, hiddenColumns);
     }

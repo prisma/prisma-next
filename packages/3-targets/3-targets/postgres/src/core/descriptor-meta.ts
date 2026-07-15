@@ -5,6 +5,7 @@ import {
   postgresAuthoringModelAttributes,
   postgresAuthoringPslBlockDescriptors,
   postgresAuthoringTypes,
+  postgresLowerEntityHandles,
 } from './authoring';
 import { postgresQualifyColumnType } from './codecs';
 import { postgresTargetDescriptorMetaRuntime } from './descriptor-meta-runtime';
@@ -22,6 +23,7 @@ const postgresTargetDescriptorMetaBase = {
     modelAttributes: postgresAuthoringModelAttributes,
     createNamespace: postgresCreateNamespace,
     qualifyColumnType: postgresQualifyColumnType,
+    lowerEntityHandles: postgresLowerEntityHandles,
   },
 } as const;
 

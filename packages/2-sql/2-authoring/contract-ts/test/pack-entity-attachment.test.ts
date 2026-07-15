@@ -5,24 +5,43 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
+import type {
+  EntityHandleLoweringInput,
+  LoweredPackEntity,
+} from '@prisma-next/sql-contract/entity-handle-lowering-hook';
 import type { SqlValueSetDerivingEntityTypeOutput } from '@prisma-next/sql-contract/value-set-derivation-hook';
+import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { defineContract } from '../src/contract-builder';
 
 /**
- * TML-2965 (native-enum-ts-authoring): a generic, namespace-scoped
- * pack-entity attachment through `defineContract`. `contract-ts` names no
- * specific entity kind, so this test stands up a synthetic pack entity that
- * mirrors the shape of Postgres's real `native_enum` (a value-set-deriving
- * entity registered under `AuthoringContributions.entityTypes`) without
- * depending on the postgres target package — `contract-ts` (sql/authoring)
- * cannot import from the targets domain (see architecture.config.json).
+ * TML-2965 (native-enum-ts-authoring): a generic, namespace-scoped pack-entity
+ * attachment through `defineContract`'s `entities` channel. `contract-ts`
+ * names no specific entity kind, so this test stands up a synthetic pack that
+ * mirrors Postgres's real `native_enum` (a value-set-deriving entity
+ * registered under `AuthoringContributions.entityTypes`, plus a batch
+ * `lowerEntityHandles` hook) without depending on the postgres target package
+ * — `contract-ts` (sql/authoring) cannot import from the targets domain (see
+ * architecture.config.json).
  */
 
 interface TestNativeEnumInput {
   readonly typeName: string;
   readonly members: readonly string[];
+}
+
+/**
+ * The synthetic pack's authored handle: its batch hook reads these fields to
+ * emit an entry row. `emitKind` (default: `entityKind`) lets a test target a
+ * framework-managed slot to exercise the managed-kind guard.
+ */
+interface TestEntityHandle {
+  readonly entityKind: 'native_enum';
+  readonly namespaceId?: string;
+  readonly emitKind?: string;
+  readonly name: string;
+  readonly entity: TestNativeEnum;
 }
 
 class TestNativeEnum extends IRNodeBase {
@@ -68,6 +87,26 @@ const postgresTargetPack = {
   defaultNamespaceId: 'public',
 } as const satisfies TargetPackRef<'sql', 'postgres'>;
 
+// `lowerEntityHandles` is a SQL-family contributions extension (structurally
+// probed via `providesEntityHandleLowering`), not a field on the framework
+// `AuthoringContributions` type — spread it in so `satisfies ExtensionPackRef`
+// does not excess-property-reject it, mirroring the real target pack.
+const nativeEnumLowering = {
+  lowerEntityHandles: (input: EntityHandleLoweringInput): readonly LoweredPackEntity[] =>
+    input.handles.map(({ handle }) => {
+      const h = blindCast<
+        TestEntityHandle,
+        'the synthetic native-enum pack authors only TestEntityHandle'
+      >(handle);
+      return {
+        namespaceId: h.namespaceId ?? input.defaultNamespaceId,
+        entityKind: h.emitKind ?? h.entityKind,
+        key: h.name,
+        entity: h.entity,
+      };
+    }),
+};
+
 const nativeEnumExtensionPack = {
   kind: 'extension',
   id: 'native-enum-demo',
@@ -82,10 +121,19 @@ const nativeEnumExtensionPack = {
         output: nativeEnumEntityTypeOutput,
       },
     },
+    ...nativeEnumLowering,
   },
 } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
 
-describe('generic pack-entity attachment (packEntities)', () => {
+function nativeEnumHandle(
+  name: string,
+  entity: TestNativeEnum,
+  extra?: { readonly namespaceId?: string; readonly emitKind?: string },
+): TestEntityHandle {
+  return { entityKind: 'native_enum', name, entity, ...extra };
+}
+
+describe('generic pack-entity attachment via the entities channel', () => {
   it('lands an attached entity under entries.<kind> and its derived value-set under entries.valueSet, in the default namespace', () => {
     const aalLevel = new TestNativeEnum({
       typeName: 'aal_level',
@@ -97,9 +145,7 @@ describe('generic pack-entity attachment (packEntities)', () => {
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
       extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
-      packEntities: {
-        public: { native_enum: { AalLevel: aalLevel } },
-      },
+      entities: [nativeEnumHandle('AalLevel', aalLevel)],
     });
 
     const publicNamespace = contract.storage.namespaces['public'];
@@ -126,10 +172,10 @@ describe('generic pack-entity attachment (packEntities)', () => {
       createNamespace: createTestSqlNamespace,
       namespaces: ['auth'],
       extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
-      packEntities: {
-        public: { native_enum: { AalLevel: publicAalLevel } },
-        auth: { native_enum: { AalLevel: authAalLevel } },
-      },
+      entities: [
+        nativeEnumHandle('AalLevel', publicAalLevel, { namespaceId: 'public' }),
+        nativeEnumHandle('AalLevel', authAalLevel, { namespaceId: 'auth' }),
+      ],
     });
 
     const publicNamespace = contract.storage.namespaces['public'];
@@ -147,25 +193,24 @@ describe('generic pack-entity attachment (packEntities)', () => {
     });
   });
 
-  it('rejects a pack entity declared under a framework-managed entry kind (table/valueSet)', () => {
+  it('rejects an attached entity landing under a framework-managed entry kind (table/valueSet)', () => {
+    const entity = new TestNativeEnum({ typeName: 'aal_level', members: ['aal1'] });
     expect(() =>
       defineContract({
         family: sqlFamilyPack,
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
         extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
-        packEntities: {
-          public: { table: {} },
-        },
+        entities: [nativeEnumHandle('AalLevel', entity, { emitKind: 'table' })],
       }),
     ).toThrow(/entry kind "table"/);
   });
 
-  it('rejects a factory-returned pack entity colliding with a different scaffold-declared one', () => {
-    // Scaffold and factory both attach `native_enum.AalLevel` in `public`, but
-    // with different entity instances. A shallow merge would let the factory
-    // silently clobber the scaffold entity; the identity-checked merge rejects
-    // it (mirroring `mergeCollectedPackEntities` in build-contract).
+  it('rejects two attached entities colliding on name+kind in one namespace with different instances', () => {
+    // Scaffold and factory each attach `native_enum.AalLevel` in `public`, but
+    // with different entity instances. The `entities` lists concatenate; the
+    // identity-checked walk rejects the collision (the emitted
+    // `entries.valueSet.AalLevel` could only reflect one).
     const scaffoldEntity = new TestNativeEnum({ typeName: 'aal_level', members: ['aal1'] });
     const factoryEntity = new TestNativeEnum({ typeName: 'aal_level', members: ['aal1', 'aal2'] });
 
@@ -176,16 +221,14 @@ describe('generic pack-entity attachment (packEntities)', () => {
           target: postgresTargetPack,
           createNamespace: createTestSqlNamespace,
           extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
-          packEntities: { public: { native_enum: { AalLevel: scaffoldEntity } } },
+          entities: [nativeEnumHandle('AalLevel', scaffoldEntity)],
         },
-        () => ({ packEntities: { public: { native_enum: { AalLevel: factoryEntity } } } }),
+        () => ({ entities: [nativeEnumHandle('AalLevel', factoryEntity)] }),
       ),
-    ).toThrow(
-      /two different "native_enum" entities named "AalLevel" in namespace "public" — a factory-returned pack entity conflicts with a scaffold-declared one/,
-    );
+    ).toThrow(/two different "native_enum" entities named "AalLevel" in namespace "public"/);
   });
 
-  it('allows the identical pack-entity instance declared on both scaffold and factory', () => {
+  it('allows the identical attached-entity instance from both scaffold and factory', () => {
     const shared = new TestNativeEnum({ typeName: 'aal_level', members: ['aal1', 'aal2'] });
 
     const contract = defineContract(
@@ -194,9 +237,9 @@ describe('generic pack-entity attachment (packEntities)', () => {
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
         extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
-        packEntities: { public: { native_enum: { AalLevel: shared } } },
+        entities: [nativeEnumHandle('AalLevel', shared)],
       },
-      () => ({ packEntities: { public: { native_enum: { AalLevel: shared } } } }),
+      () => ({ entities: [nativeEnumHandle('AalLevel', shared)] }),
     );
 
     expect(contract.storage.namespaces['public']?.entries).toEqual({

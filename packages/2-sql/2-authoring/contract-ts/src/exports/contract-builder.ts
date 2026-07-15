@@ -16,6 +16,7 @@ export {
   rel,
 } from '../contract-builder';
 export type {
+  AttachedEntities,
   ContractDefinition,
   FieldNode,
   ForeignKeyNode,
@@ -26,6 +27,7 @@ export type {
   UniqueConstraintNode,
 } from '../contract-definition';
 export type { TargetFieldRef } from '../contract-dsl';
+export { buildContractDefinition } from '../contract-lowering';
 export type { ExtractCodecTypesFromPack } from '../contract-types';
 export type {
   BoundEnumType,

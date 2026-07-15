@@ -4781,6 +4781,9 @@ importers:
       '@prisma-next/extension-pgvector':
         specifier: workspace:0.14.0
         version: link:../../packages/3-extensions/pgvector
+      '@prisma-next/extension-supabase':
+        specifier: workspace:0.14.0
+        version: link:../../packages/3-extensions/supabase
       '@prisma-next/family-mongo':
         specifier: workspace:0.14.0
         version: link:../../packages/2-mongo-family/9-family
@@ -4862,6 +4865,9 @@ importers:
       '@prisma-next/sql-schema-ir':
         specifier: workspace:0.14.0
         version: link:../../packages/2-sql/1-core/schema-ir
+      '@prisma-next/sqlite':
+        specifier: workspace:0.14.0
+        version: link:../../packages/3-extensions/sqlite
       '@prisma-next/target-mongo':
         specifier: workspace:0.14.0
         version: link:../../packages/3-mongo-target/1-mongo-target
