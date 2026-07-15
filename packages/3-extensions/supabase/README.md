@@ -6,7 +6,7 @@ Supabase extension pack for Prisma Next.
 
 This extension pack ships a **complete, faithful contract of everything Supabase owns in the database** — every `auth` (23) and `storage` (10) table of the reference platform version, their native enum types, and the three platform roles (`anon`, `authenticated`, `service_role`) — all `external`: an application contract composes them via `extensionPacks: [supabasePack]`, the migration planner emits no DDL for them (they're Supabase-managed), and `db verify` confirms they exist in the live database while tolerating the Supabase-internal schemas the pack doesn't declare (`realtime`, `vault`, …).
 
-It also ships the role-binding runtime: `supabase({...})` returns a db whose `asUser(jwt)` / `asAnon()` / `asServiceRole()` bind the Postgres role + JWT claims per session, and `asServiceRole().supabase.{sql,orm}` exposes the pack's own `auth`/`storage` tables as a secondary root for admin reads. See [`projects/supabase-integration/README.md`](../../../projects/supabase-integration/README.md) for the integration's delivery plan.
+It also ships the role-binding runtime: `supabase({...})` returns a db whose `asUser(jwt)` / `asAnon()` / `asServiceRole()` bind the Postgres role + JWT claims per session, and `asServiceRole().supabase.{sql,orm}` exposes the pack's own `auth`/`storage` tables as a secondary root for admin reads. See [`Supabase Integration`](../../../docs/architecture%20docs/Supabase%20Integration.md) for the integration's design history.
 
 ## Contract generation
 
@@ -109,7 +109,7 @@ Supplying both, or neither, throws `SupabaseConfigError`. A malformed / expired 
 
 ### Admin reads of `auth.*` / `storage.*`
 
-Only `service_role` holds grants on the Supabase-internal schemas over a direct connection, so the `.supabase` secondary root exists **only** on `asServiceRole()` — `asUser` / `asAnon` have no `.supabase`. It is the extension's own contract surface, never merged into the app contract. Prefer the GoTrue Admin API for user *management*; direct `service_role` SQL is for ad-hoc admin reads (Supabase-internal schemas can drift across platform upgrades). See [decision C15](../../../projects/supabase-integration/decisions.md).
+Only `service_role` holds grants on the Supabase-internal schemas over a direct connection, so the `.supabase` secondary root exists **only** on `asServiceRole()` — `asUser` / `asAnon` have no `.supabase`. It is the extension's own contract surface, never merged into the app contract. Prefer the GoTrue Admin API for user *management*; direct `service_role` SQL is for ad-hoc admin reads (Supabase-internal schemas can drift across platform upgrades). See [decision C15](../../../docs/architecture%20docs/Supabase%20Integration.md).
 
 ### Authoring RLS in TypeScript
 
@@ -122,7 +122,7 @@ The example authors its RLS policies in PSL (`policy_select` / `policy_update` +
 - **Storage uploads** — `storage.*` tables are declared for reference/reads; file upload/download helpers are out of scope (use `@supabase/storage-js`).
 - **PostgREST / `@supabase/supabase-js` interop** — Prisma Next connects directly to Postgres; there is no `serviceRoleKey` / PostgREST path.
 - **Edge runtimes** — the runtime needs a Postgres driver; Cloudflare Workers / Deno / Vercel Edge are out of scope (Node.js + Bun for v0.1).
-- **Triggers & functions as first-class IR** — the "create a profile on signup" trigger is a documented raw-SQL recipe, not contract-authored (functions are not v0.1 contract elements; [decision C4](../../../projects/supabase-integration/decisions.md)). `auth.uid()` etc. live inside opaque RLS predicate strings.
+- **Triggers & functions as first-class IR** — the "create a profile on signup" trigger is a documented raw-SQL recipe, not contract-authored (functions are not v0.1 contract elements; [decision C4](../../../docs/architecture%20docs/Supabase%20Integration.md)). `auth.uid()` etc. live inside opaque RLS predicate strings.
 
 ## Known gaps (deferred to post-launch)
 
@@ -131,7 +131,7 @@ The example authors its RLS policies in PSL (`policy_select` / `policy_update` +
 
 ## References
 
-- [Supabase integration umbrella](../../../projects/supabase-integration/README.md) — § "Walking skeleton" + the canonical decisions log.
+- [Supabase Integration — design history](../../../docs/architecture%20docs/Supabase%20Integration.md) — the integration's decision log, deferred directions, and follow-on work.
 - [ADR 230 — Runtime target layer](../../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) — the role-binding model.
 - [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md) — the package layout this extension follows.
 - [ADR 224 — Control Policy](../../../docs/architecture%20docs/adrs/ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md) — `external` dispatch.

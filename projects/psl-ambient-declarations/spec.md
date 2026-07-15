@@ -1,6 +1,6 @@
 # PSL ambient declarations — the `environment` block
 
-**Status: deferred indefinitely.** Recorded 2026-07-13 out of the Supabase Slice C review (roles as first-class contract entities); tracked as offcut [OC4](../supabase-integration/decisions.md). **Pickup trigger:** the second ambient entity kind — the likely candidate is a planner that owns `CREATE EXTENSION`. Nothing in the shipped role-block design blocks this; it layers on top.
+**Status: deferred indefinitely.** Recorded 2026-07-13 out of the Supabase Slice C review (roles as first-class contract entities); tracked as offcut [OC4](../../docs/architecture%20docs/Supabase%20Integration.md). **Pickup trigger:** the second ambient entity kind — the likely candidate is a planner that owns `CREATE EXTENSION`. Nothing in the shipped role-block design blocks this; it layers on top.
 
 ## At a glance
 
@@ -40,7 +40,7 @@ whose entities carry the unbound coordinate, stamped by the target's block facto
 ### Grammar
 
 - `environment { … }` is a top-level block, a sibling of `namespace`. It may not appear inside a namespace, and namespaces may not appear inside it.
-- Members use the statement form per [OC1's two-body-form pattern](../supabase-integration/decisions.md): `role anon;` for bare declarations, with the block form available when a member kind grows configuration (`role admin { bypassRls = true }`).
+- Members use the statement form per [OC1's two-body-form pattern](../../docs/architecture%20docs/Supabase%20Integration.md): `role anon;` for bare declarations, with the block form available when a member kind grows configuration (`role admin { bypassRls = true }`).
 - Multiple `environment` blocks in one document merge, the same way repeated declarations of anything else are handled today (duplicate member names within a kind are an error).
 
 ### Contents are pack-contributed
@@ -58,7 +58,7 @@ Either way the runtime plane is untouched: ambient entities are not queryable su
 
 ### Control policy and the planner
 
-Ambient members default to the same control-policy story as everything else. Roles stay invariantly `external` (referenced, never owned). The interesting growth path is **managed** ambient objects: `extension vector;` under `managed` control would let the planner emit `CREATE EXTENSION` and the verifier check `pg_extension` — the currently-deferred "CREATE EXTENSION statements" item ([deferred.md](../supabase-integration/deferred.md)) gets its authoring surface from this block. The postgres-rls cross-space-roles work would resolve `policy` blocks' `roles = [...]` references against environment entries.
+Ambient members default to the same control-policy story as everything else. Roles stay invariantly `external` (referenced, never owned). The interesting growth path is **managed** ambient objects: `extension vector;` under `managed` control would let the planner emit `CREATE EXTENSION` and the verifier check `pg_extension` — the currently-deferred "CREATE EXTENSION statements" item ([the integration's deferred directions](../../docs/architecture%20docs/Supabase%20Integration.md)) gets its authoring surface from this block. The postgres-rls cross-space-roles work would resolve `policy` blocks' `roles = [...]` references against environment entries.
 
 ### Migration from the interim
 

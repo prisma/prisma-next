@@ -20,3 +20,10 @@ surface) — those fields are gone; read the discrete `indexes[]` entry instead.
 migration or DDL change: the schema the planner and `db verify` derive is
 identical.
 -->
+
+<!--
+Supabase integration close-out (TML-2503): docs-only. The `examples/` touch is
+`examples/supabase/README.md` — a link into the deleted
+`projects/supabase-integration/` workspace removed. No framework surface,
+contract shape, or emitted artefact change. Incidental substrate diff only.
+-->
