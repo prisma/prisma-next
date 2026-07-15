@@ -36,6 +36,7 @@ Once the contract is emitted and the DB is up to date, this skill covers everyth
 
 - User wants to add / change a model → `prisma-next-contract`.
 - User wants to wire `db.ts` or add middleware → `prisma-next-runtime`.
+- User is querying through a Supabase role-bound db (`asUser` / `asAnon` / `asServiceRole`, RLS, `auth.*` admin reads) → `prisma-next-supabase` for the role-binding surface; everything in this skill then applies to the returned `RoleBoundDb`.
 - User wants to debug a query failure (structured error envelope) → `prisma-next-debug`.
 
 ## Pick your target

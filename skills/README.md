@@ -18,6 +18,7 @@ One package, ten skills. Each skill is a `SKILL.md` with its own `description` f
 | `prisma-next-migrations` | Migration authoring — `db update`, `migration plan`, data transforms. |
 | `prisma-next-migration-review` | Deployment + concurrency — "what runs on merge?", diamond convergence. |
 | `prisma-next-queries` | Queries — SQL DSL, Raw SQL, ORM client, TypedSQL. |
+| `prisma-next-supabase` | Supabase — the extension pack, RLS policy authoring, role-bound runtime (`asUser` / `asAnon` / `asServiceRole`), `auth.*` admin reads. |
 | `prisma-next-runtime` | Wiring `db.ts` — middleware, connection, environment. |
 | `prisma-next-build` | Build-system / dev-server integration — Vite plugin today, Next.js / Webpack / esbuild / Rollup are gaps named instead of fabricated. |
 | `prisma-next-debug` | Debugging — error envelopes, signal-routing to error-code references. |
