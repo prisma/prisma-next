@@ -41,3 +41,7 @@ internal, not an extension-authoring SPI. The `packages/3-extensions/` diff is
 supabase-extension TEST assertions updated from `.reason` to presence — no runtime,
 contract, SPI, or DDL change. Incidental test-only diff.
 -->
+
+<!--
+TML-2783 (explicit MTI selections): `changes: []`. The `packages/3-extensions/sql-orm-client` diff is limited to internal polymorphic projection planning and regression tests; it changes no public API, contract/emitted artifact, extension-authoring surface, adapter API, or downstream source translation.
+-->
