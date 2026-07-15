@@ -8,6 +8,25 @@ When a decision changes, **update this file**. When a new design hole surfaces, 
 
 ---
 
+## ✅ Shipped — launch status (2026-07-15)
+
+The Supabase integration is delivered end-to-end. The decisions that turned into shipped code:
+
+| Decision | Realized by |
+|---|---|
+| C5 — roles first-class via `PostgresRole` IR | [#957](https://github.com/prisma/prisma-next/pull/957); declared-role verify [#950](https://github.com/prisma/prisma-next/pull/950) |
+| C8 — introspection-generated extension contract + round-trip | [#960](https://github.com/prisma/prisma-next/pull/960) (complete, faithful contract) |
+| C9 / C10 — content-addressed RLS wire names + verifier | postgres-rls (ADR 234) |
+| C12 — runtime target layer; Supabase extends it | [#792](https://github.com/prisma/prisma-next/pull/792) (ADR 230) |
+| C13 — walking skeleton (`examples/supabase`) | grown across every constituent; complete |
+| C14 — two-lane tests (PGlite shim + real-Supabase acceptance) | hermetic lane in CI; acceptance harness in `examples/supabase` |
+| C15 — `service_role` `.supabase` secondary root | [#845](https://github.com/prisma/prisma-next/pull/845) |
+| C16 — extension-aware `contract infer` | [#919](https://github.com/prisma/prisma-next/pull/919) |
+
+RLS authoring in TypeScript (A2/A3), wire-identical to PSL: [#959](https://github.com/prisma/prisma-next/pull/959).
+
+---
+
 ## Contract authoring — TypeScript surface
 
 - **A1. No RLS capability flag.** Target presence is the gate. The Postgres target's `pack` carries RLS support; pack-aware typing makes the `.rls(...)` slot visible on `ContractModelBuilder` only when targeting Postgres. Non-Postgres targets do not see the method. (See [postgres-rls spec](../postgres-rls/spec.md), [`example/design-holes.md` #1](example/design-holes.md).)

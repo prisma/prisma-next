@@ -29,6 +29,8 @@ The contract is **introspected, not hand-authored**: `pnpm contract:generate` re
 - **`@prisma-next/sql-contract-psl`**: `prismaContract` provider used by `prisma-next.config.ts` to emit the PSL-authored contract.
 - **`@prisma-next/utils`**: `blindCast` helper for narrowing the imported `contract.json` to the emitted `Contract` type.
 
+The `/runtime` subpath additionally pulls in the Postgres runtime stack (`@prisma-next/postgres`, `@prisma-next/sql-runtime`, `@prisma-next/sql-builder`, `@prisma-next/sql-orm-client`) plus `jose` (JWT verification) and `pg` (Postgres client/pool). It does **not** depend on `@supabase/supabase-js` — the framework speaks Postgres directly.
+
 ## Installation
 
 ```bash
@@ -60,20 +62,76 @@ export default defineConfig({
 
 See [`examples/supabase`](../../../examples/supabase) for the full runnable walking-skeleton app.
 
-## What this pack does *not* ship
+## Runtime usage
 
-These belong to sibling Supabase-integration projects:
+The `/runtime` subpath exports the `supabase(...)` factory. It returns a `SupabaseDb` that has **no top-level query surface** — you bind a role first. That is deliberate: a Supabase app has no meaningful "no role" execution context, and defaulting to the connection's login role is exactly the silent-RLS-bypass footgun the design removes.
 
-- **Role-binding runtime** (`asUser(jwt)` / `asAnon()` / `asServiceRole()`) — `extension-supabase` M2 (real `SupabaseRuntime` extends `PostgresRuntime`; issues `SET LOCAL role` below user middleware).
-- **RLS authoring + policies** — PSL `policy_*` blocks + `@@rls`, TS `policySelect(...)` helpers, content-addressed wire names, `pg_policies` verifier. See [ADR 234](../../../docs/architecture%20docs/adrs/ADR%20234%20-%20Content-addressed%20wire%20names%20for%20Postgres-normalized%20objects.md) and the RLS section of the [Adapters & Targets subsystem doc](../../../docs/architecture%20docs/subsystems/5.%20Adapters%20%26%20Targets.md).
-- **Cross-contract FK to `auth.users`** — [cross-contract FK references](../../../docs/architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20%26%20Packs.md) (`supabase:auth.AuthUser` PSL grammar; cross-space references in the TS builder). See also [ADR 226](../../../docs/architecture%20docs/adrs/ADR%20226%20-%20Cross-contract%20foreign-key%20references.md).
-- **Explicit namespace-qualified queries** (`db.sql.auth.users`) — [`explicit-namespace-dsl`](../../../projects/explicit-namespace-dsl/spec.md).
-- **Roles as first-class IR** (`anon` / `authenticated` / `service_role` / `authenticator`) — `postgres-rls` (`PostgresRole`).
-- **`auth.uid()` / `auth.jwt()` / `auth.role()` session-GUC functions** — `postgres-rls` extends `bootstrapSupabaseShim` to seed them when its RLS tests need them.
+```ts
+// db.ts
+import { supabase } from '@prisma-next/extension-supabase/runtime';
+import type { Contract } from './contract';
+import contractJson from './contract.json' with { type: 'json' };
+
+export const db = await supabase<Contract>({
+  contractJson,
+  url: process.env['DATABASE_URL']!, // direct Postgres connection
+  jwtSecret: process.env['SUPABASE_JWT_SECRET']!, // xor jwksUrl — see "JWT validation"
+});
+```
+
+Bind each request to the role that should run it. `asUser` is async (it verifies the JWT); `asAnon` / `asServiceRole` are sync:
+
+```ts
+// A signed-in user — RLS scopes rows to auth.uid().
+const userDb = await db.asUser(jwt); // throws InvalidJwtError on a bad token
+const mine = await userDb.orm.public.Profile.select('id', 'username').all().toArray();
+
+// The anon role — sees only what anon RLS policies permit.
+const publicRows = await db.asAnon().orm.public.Profile.select('id', 'username').all().toArray();
+
+// service_role — BYPASSRLS. Its .sql / .orm stay app-only; .supabase reaches auth.*/storage.*.
+const admin = db.asServiceRole();
+const users = await admin.supabase
+  .execute(admin.supabase.sql.auth.users.select('id', 'email').build())
+  .toArray();
+```
+
+**Role binding is structurally unbypassable.** Each role-bound query runs on a connection that has had `set_config('role', …, false)` and `set_config('request.jwt.claims', …, false)` applied *below* the user-middleware chain, with `RESET ALL` on release — user middleware can neither observe nor suppress it, and no role leaks across pool checkouts. See [ADR 230](../../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md).
+
+### JWT validation
+
+`asUser(jwt)` verifies the token with [`jose`](https://github.com/panva/jose) *before* any connection is acquired, then derives the Postgres role from the token's `role` claim (defaulting to `authenticated`). Configure exactly one key source:
+
+- **`jwtSecret`** — the symmetric HS256 secret (the classic Supabase JWT secret).
+- **`jwksUrl`** — a JWKS endpoint, for projects on asymmetric signing keys.
+
+Supplying both, or neither, throws `SupabaseConfigError`. A malformed / expired / mis-signed token throws `InvalidJwtError` with a typed `reason`.
+
+### Admin reads of `auth.*` / `storage.*`
+
+Only `service_role` holds grants on the Supabase-internal schemas over a direct connection, so the `.supabase` secondary root exists **only** on `asServiceRole()` — `asUser` / `asAnon` have no `.supabase`. It is the extension's own contract surface, never merged into the app contract. Prefer the GoTrue Admin API for user *management*; direct `service_role` SQL is for ad-hoc admin reads (Supabase-internal schemas can drift across platform upgrades). See [decision C15](../../../projects/supabase-integration/decisions.md).
+
+### Authoring RLS in TypeScript
+
+The example authors its RLS policies in PSL (`policy_select` / `policy_update` + `@@rls`). The same policies can be authored in TypeScript via the model builder's `.rls([...])` stage; the emitted wire policy names are identical to the PSL form ([TML-2883](https://github.com/prisma/prisma-next/pull/959)). See [ADR 234](../../../docs/architecture%20docs/adrs/ADR%20234%20-%20Content-addressed%20wire%20names%20for%20Postgres-normalized%20objects.md) for the content-addressed wire-name scheme and the [Adapters & Targets subsystem doc](../../../docs/architecture%20docs/subsystems/5.%20Adapters%20%26%20Targets.md) for the RLS surface.
+
+## Not supported (out of v0.1 scope)
+
+- **Direct merged cross-space queries** — `db.sql.auth.users` off the app db does not exist by design (cross-space *querying* was not built; only FK *references* cross the boundary). Use `db.asServiceRole().supabase.sql.auth.users` for Supabase-internal tables.
+- **Supabase Realtime** — the WebSocket change feed is a separate subsystem.
+- **Storage uploads** — `storage.*` tables are declared for reference/reads; file upload/download helpers are out of scope (use `@supabase/storage-js`).
+- **PostgREST / `@supabase/supabase-js` interop** — Prisma Next connects directly to Postgres; there is no `serviceRoleKey` / PostgREST path.
+- **Edge runtimes** — the runtime needs a Postgres driver; Cloudflare Workers / Deno / Vercel Edge are out of scope (Node.js + Bun for v0.1).
+- **Triggers & functions as first-class IR** — the "create a profile on signup" trigger is a documented raw-SQL recipe, not contract-authored (functions are not v0.1 contract elements; [decision C4](../../../projects/supabase-integration/decisions.md)). `auth.uid()` etc. live inside opaque RLS predicate strings.
+
+## Known gaps (deferred to post-launch)
+
+- **Performance benchmarks** (role-bound-query overhead, JWT-validation timing) are not yet published.
+- **Per-subpath bundle-size thresholds** (`/pack`, `/contract`, `/runtime`) are not yet enforced in CI.
 
 ## References
 
 - [Supabase integration umbrella](../../../projects/supabase-integration/README.md) — § "Walking skeleton" + the canonical decisions log.
-- [`extension-supabase` project spec](../../../projects/extension-supabase/spec.md) — full design (M1–M4).
+- [ADR 230 — Runtime target layer](../../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) — the role-binding model.
 - [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md) — the package layout this extension follows.
 - [ADR 224 — Control Policy](../../../docs/architecture%20docs/adrs/ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md) — `external` dispatch.
