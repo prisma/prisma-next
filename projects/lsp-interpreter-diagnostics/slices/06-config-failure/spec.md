@@ -31,8 +31,13 @@ project-load lifecycle):
    shown. (rust-analyzer `switch_workspaces` precedent: "it only makes sense to
    switch to a partially broken workspace if we don't have any workspace at all
    yet.")
-3. **The success path is untouched** — a healthy config never executes new code
-   beyond the clear-if-previously-failed check.
+3. **The success path adds only an unconditional clear** — every current-load
+   success (and every settled-entry drop) publishes `[]` on the config URI,
+   fire-and-forget. _(Amended by operator, 2026-07-15: publish-tracking bits
+   (`configFailed`) removed — LSP clients keep per-server diagnostic collections,
+   so empty publishes are harmless; the `failed` status alone carries the
+   no-servable-project state and keeps broken configs on the watched-refresh
+   radar.)_
 
 ## Coherence rationale
 
