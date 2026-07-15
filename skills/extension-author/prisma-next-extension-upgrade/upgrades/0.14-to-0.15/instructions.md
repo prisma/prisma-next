@@ -657,3 +657,7 @@ at boot. The change only accepts inputs the old `instanceof` check rejected —
 nothing that resolved before resolves differently — and the two guards are
 additive. No extension-author action required. Incidental substrate diff only.
 -->
+
+<!--
+TML-2980 (variant-declared SQL ORM includes, PR #976): the `packages/3-extensions/` diff fixes the existing `.variant().include()` API inside `@prisma-next/sql-orm-client` so singleton variant narrowing can include relations declared by that variant, with union-valued narrowing rejecting shadowed ambiguous names. No extension-author SPI, contract shape, syntax, or configuration changed, and existing consumers need no code migration. Incidental substrate diff only.
+-->
