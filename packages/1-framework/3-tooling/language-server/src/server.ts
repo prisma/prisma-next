@@ -87,6 +87,14 @@ type ManagedProject =
   | { readonly status: 'loaded'; readonly project: ProjectState }
   | { readonly status: 'failed' };
 
+/** The project a new load of this config could fall back to, if any. */
+function lastGoodProject(entry: ManagedProject | undefined): ProjectState | undefined {
+  if (entry === undefined || entry.status === 'failed') {
+    return undefined;
+  }
+  return entry.status === 'loaded' ? entry.project : entry.lastGood;
+}
+
 export const CONFIG_LOAD_FAILED_CODE = 'PRISMA_NEXT_CONFIG_LOAD_FAILED';
 
 const semanticTokenSourceLimit = 100_000;
@@ -235,12 +243,7 @@ export function createServer(connection: Connection): LanguageServer {
   function startProjectLoad(configPath: string): Promise<ProjectState> {
     const existing = managedProjects.get(configPath);
     const previousLoad = existing?.status === 'loading' ? existing.load : undefined;
-    const lastGood =
-      existing?.status === 'loaded'
-        ? existing.project
-        : existing?.status === 'loading'
-          ? existing.lastGood
-          : undefined;
+    const lastGood = lastGoodProject(existing);
     const load: Promise<ProjectState> = (previousLoad ?? Promise.resolve(undefined))
       .catch(() => undefined)
       .then(() => loadProject(configPath))
@@ -347,8 +350,7 @@ export function createServer(connection: Connection): LanguageServer {
   // `failed` entry itself stays: it is the record of the published marker.
   function stopManagingProject(configPath: string): void {
     const entry = managedProjects.get(configPath);
-    const hadProject =
-      entry?.status === 'loaded' || (entry?.status === 'loading' && entry.lastGood !== undefined);
+    const hadProject = lastGoodProject(entry) !== undefined;
     if (entry !== undefined && entry.status !== 'failed') {
       managedProjects.delete(configPath);
     }
