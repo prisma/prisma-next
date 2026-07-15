@@ -84,7 +84,8 @@ describe('canonicalization of literal column defaults', () => {
 
   const canonicalize = (contract: Contract) =>
     canonicalizeContractToObject(contract, {
-      serializeContract: (c) => blindCast<JsonObject>(c),
+      serializeContract: (c) =>
+        blindCast<JsonObject, 'test contract literal is already plain JSON data'>(c),
       shouldPreserveEmpty,
     });
 
