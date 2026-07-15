@@ -291,6 +291,68 @@ namespace public {
   });
 });
 
+describe('a policy whose target does not resolve to a declared model', () => {
+  it('emits PSL_EXTENSION_MODEL_REF_UNRESOLVED naming the prefix and the model, without throwing', () => {
+    const result = interpret(`
+namespace public {
+  model profile {
+    id Int @id
+
+    @@rls
+  }
+
+  policy_select p_read {
+    target = porfile
+    roles  = [app_user]
+    using  = "true"
+  }
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const diagnostic = result.failure.diagnostics.find(
+      (d) => d.code === 'PSL_EXTENSION_MODEL_REF_UNRESOLVED',
+    );
+    expect(diagnostic).toMatchObject({
+      code: 'PSL_EXTENSION_MODEL_REF_UNRESOLVED',
+      message: expect.stringContaining('"p_read"'),
+    });
+    expect(diagnostic?.message).toContain('"porfile"');
+    expect(diagnostic?.message).not.toMatch(/p_read_[0-9a-f]{8}/);
+  });
+});
+
+describe("a policy's tableName resolves to the target model's declared storage name", () => {
+  it('keys the policy by the @@map storage name, agreeing with the rls marker', () => {
+    const result = interpret(`
+namespace public {
+  model Profile {
+    id       Int @id
+    owner_id Int
+
+    @@map("profile_rows")
+    @@rls
+  }
+
+  policy_select p_read {
+    target = Profile
+    roles  = [app_user]
+    using  = "owner_id = current_setting('app.uid')::int"
+  }
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const ns = result.value.storage.namespaces['public'] as PostgresSchema;
+    expect(Object.keys(ns.rls)).toEqual(['profile_rows']);
+    const [policyKey] = Object.keys(ns.policy);
+    const policy = ns.policy[policyKey!]!;
+    expect(policy.tableName).toBe('profile_rows');
+    expect(policy.tableName).toBe(Object.keys(ns.rls)[0]);
+  });
+});
+
 describe('PostgresContractSerializer rls round-trip survives serialize → deserialize', () => {
   function makeContractWithAllThreeKinds() {
     const base = createSqlContract({

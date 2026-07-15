@@ -638,6 +638,31 @@ extension-author action required. Incidental substrate diff only.
 -->
 
 <!--
+TML-2883 (rls-ts-authoring): Postgres RLS is now authorable in the TypeScript DSL,
+producing contracts wire-name-identical to the PSL `policy_*` / `@@rls` equivalents.
+The `packages/3-extensions/` diff is additive: `@prisma-next/postgres` gains
+`src/contract/rls.ts` (frozen branded handles from `policySelect` / `policyInsert` /
+`policyUpdate` / `policyDelete` / `policyAll` / `rlsEnabled(model)` / `role(name)`;
+predicates are opaque strings); its `defineContract` accepts an optional
+`entities?: readonly RlsEntityHandle[]` input. The lowering is target-side: the
+generic contract build groups `entities` handles by the pack that registered each
+`entityKind` and calls the pack's batch hook (`lowerEntityHandles`, a SQL-family
+contributions extension exported from
+`@prisma-next/sql-contract/entity-handle-lowering-hook`), which target-postgres
+implements beside its PSL lowering. A TS-declared `role(name)` lands in
+`entries.role` under the `__unbound__` namespace, identical to a PSL `role` block
+(roles are cluster-scoped). `@prisma-next/extension-supabase` gains `anon` /
+`authenticated` role-handle exports from `/contract`. Supporting additive exports
+only elsewhere: `buildContractDefinition` from
+`@prisma-next/sql-contract-ts/contract-builder`; `formatRlsPolicyWireName` +
+`POLICY_OPERATION_PREDICATES` from `@prisma-next/target-postgres/rls-canonicalize`.
+`entities` is the sole public channel for attaching pack entities; the internal
+`packEntities` input never had a real author and was removed (test-only, never
+documented as user-facing), so no extension-author action is required. Incidental
+substrate diff only.
+-->
+
+<!--
 Dependabot runtime-deps group bump (PR #962): the packages/3-extensions/
 diff is package.json dependency version ranges only (arktype ^2.2.2 /
 ~2.2.2). No extension-facing API, contract shape, or emitted artefact
