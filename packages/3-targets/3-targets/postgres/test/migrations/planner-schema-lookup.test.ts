@@ -22,8 +22,6 @@ function makeTable(overrides: Partial<SqlTableIRInput> = {}): SqlSchemaIR['table
 
 function fk(overrides: Partial<ForeignKey> & Pick<ForeignKey, 'source' | 'target'>): ForeignKey {
   return {
-    constraint: true,
-    index: true,
     ...overrides,
   };
 }

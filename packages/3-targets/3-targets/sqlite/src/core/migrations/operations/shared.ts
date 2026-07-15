@@ -60,7 +60,6 @@ export interface SqliteForeignKeySpec {
   readonly name?: string;
   readonly onDelete?: ReferentialAction;
   readonly onUpdate?: ReferentialAction;
-  readonly constraint: boolean;
 }
 
 /**
@@ -103,12 +102,11 @@ export function renderColumnDefinition(column: SqliteColumnSpec): string {
 
 /**
  * Renders an inline FOREIGN KEY constraint clause for a `CREATE TABLE`
- * body. Returns the empty string when `constraint` is false (the FK is
- * tracked at the contract level for index-creation purposes only and must
- * not produce DDL).
+ * body. Every `SqliteForeignKeySpec` is constraint-bearing by construction
+ * (`tableSpecFromNode` only ever builds specs from schema-IR FK nodes, which
+ * are themselves constraint-only — a non-constraint FK contributes no node).
  */
 export function renderForeignKeyClause(fk: SqliteForeignKeySpec): string {
-  if (!fk.constraint) return '';
   const name = fk.name ? `CONSTRAINT ${quoteIdentifier(fk.name)} ` : '';
   let sql = `${name}FOREIGN KEY (${fk.columns.map(quoteIdentifier).join(', ')}) REFERENCES ${quoteIdentifier(fk.references.table)} (${fk.references.columns.map(quoteIdentifier).join(', ')})`;
   if (fk.onDelete !== undefined) {

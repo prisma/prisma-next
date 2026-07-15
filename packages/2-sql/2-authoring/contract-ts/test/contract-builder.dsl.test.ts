@@ -185,8 +185,6 @@ describe('contract DSL authoring surface', () => {
         target: { namespaceId: 'public', tableName: 'app_user', columns: ['id'] },
         name: 'blog_post_user_id_fkey',
         onDelete: 'cascade',
-        constraint: true,
-        index: false,
       },
     ]);
     expect(contract.execution?.mutations.defaults).toEqual([
@@ -298,8 +296,6 @@ describe('contract DSL authoring surface', () => {
         target: { namespaceId: 'public', tableName: 'app_user', columns: ['id'] },
         name: 'blog_post_author_id_fkey',
         onDelete: 'cascade',
-        constraint: true,
-        index: false,
       },
     ]);
     expect(models['Post']?.storage.fields['authorId']).toEqual({ column: 'author_id' });

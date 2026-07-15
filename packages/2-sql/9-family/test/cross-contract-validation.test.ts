@@ -133,8 +133,6 @@ function buildExtensionWithCrossSpaceFK(opts: {
         columns: ['id'],
         spaceId: opts.targetSpaceId,
       },
-      constraint: false,
-      index: true,
     },
   ];
 
@@ -267,8 +265,6 @@ describe('cross-space FK reverse-reference rejection', () => {
         {
           source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'posts', columns: ['user_id'] },
           target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'users', columns: ['id'] },
-          constraint: true,
-          index: true,
         },
       ],
     });

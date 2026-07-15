@@ -150,7 +150,7 @@ describe('contract definition constraint support', () => {
     });
   });
 
-  it('emits foreign keys in the contract', () => {
+  it('emits foreign keys in the contract as a constraint-only entity', () => {
     const User = buildUserModel();
     const Post = buildPostModel(User);
     const contract = defineTestContract({
@@ -161,8 +161,6 @@ describe('contract definition constraint support', () => {
     expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
       source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
       target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
-      constraint: true,
-      index: true,
     });
   });
 
@@ -177,8 +175,6 @@ describe('contract definition constraint support', () => {
     expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
       source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
       target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
-      constraint: true,
-      index: true,
       name: 'post_userId_fkey',
     });
   });
@@ -315,50 +311,120 @@ describe('contract definition constraint support', () => {
     expect(unboundTables(contract.storage)['user']!.indexes).toHaveLength(2);
   });
 
-  it('defaults per-FK constraint=true, index=true', () => {
-    const User = buildUserModel();
-    const Post = buildPostModel(User);
-    const contract = defineTestContract({
-      models: { User, Post },
+  describe('FK1: constraint/index materialize into discrete entities', () => {
+    it('a default FK (constraint=true, index=true) emits a constraint-only entry plus a named backing index', () => {
+      const User = buildUserModel();
+      const Post = buildPostModel(User);
+      const contract = defineTestContract({
+        models: { User, Post },
+      });
+
+      const post = unboundTables(contract.storage)['post']!;
+      expect(post.foreignKeys).toEqual([
+        {
+          source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
+          target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
+        },
+      ]);
+      expect(post.indexes).toEqual([{ columns: ['userId'], name: 'post_userId_idx' }]);
     });
 
-    expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
-      source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
-      target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
-      constraint: true,
-      index: true,
-    });
-  });
+    it('index=false emits the FK constraint entry and no backing index', () => {
+      const User = buildUserModel();
+      const Post = buildPostModel(User, { index: false });
+      const contract = defineTestContract({
+        models: { User, Post },
+      });
 
-  it('materializes foreignKeyDefaults into per-FK fields', () => {
-    const User = buildUserModel();
-    const Post = buildPostModel(User);
-    const contract = defineTestContract({
-      foreignKeyDefaults: { constraint: false, index: true },
-      models: { User, Post },
-    });
-
-    expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
-      source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
-      target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
-      constraint: false,
-      index: true,
-    });
-  });
-
-  it('per-FK override takes precedence over foreignKeyDefaults', () => {
-    const User = buildUserModel();
-    const Post = buildPostModel(User, { constraint: true, index: false });
-    const contract = defineTestContract({
-      foreignKeyDefaults: { constraint: false, index: false },
-      models: { User, Post },
+      const post = unboundTables(contract.storage)['post']!;
+      expect(post.foreignKeys).toEqual([
+        {
+          source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
+          target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
+        },
+      ]);
+      expect(post.indexes).toEqual([]);
     });
 
-    expect(unboundTables(contract.storage)['post']!.foreignKeys[0]).toEqual({
-      source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
-      target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
-      constraint: true,
-      index: false,
+    it('constraint=false emits no foreignKeys entry but keeps the backing index (index defaults true)', () => {
+      const User = buildUserModel();
+      const Post = buildPostModel(User, { constraint: false });
+      const contract = defineTestContract({
+        models: { User, Post },
+      });
+
+      const post = unboundTables(contract.storage)['post']!;
+      expect(post.foreignKeys).toEqual([]);
+      expect(post.indexes).toEqual([{ columns: ['userId'], name: 'post_userId_idx' }]);
+    });
+
+    it('constraint=false and index=false emits neither a foreignKeys entry nor an index', () => {
+      const User = buildUserModel();
+      const Post = buildPostModel(User, { constraint: false, index: false });
+      const contract = defineTestContract({
+        models: { User, Post },
+      });
+
+      const post = unboundTables(contract.storage)['post']!;
+      expect(post.foreignKeys).toEqual([]);
+      expect(post.indexes).toEqual([]);
+    });
+
+    it('does not synthesize a backing index when the FK columns are already covered by a declared unique constraint', () => {
+      const User = buildUserModel();
+      const Post = model('Post', {
+        fields: {
+          id: field.column(int4Column).id(),
+          userId: field.column(int4Column).unique(),
+        },
+        relations: {
+          user: rel.belongsTo(User, { from: 'userId', to: 'id' }).sql({ fk: {} }),
+        },
+      }).sql({ table: 'post' });
+      const contract = defineTestContract({
+        models: { User, Post },
+      });
+
+      const post = unboundTables(contract.storage)['post']!;
+      expect(post.uniques).toEqual([{ columns: ['userId'] }]);
+      expect(post.foreignKeys).toEqual([
+        {
+          source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
+          target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
+        },
+      ]);
+      expect(post.indexes).toEqual([]);
+    });
+
+    it('foreignKeyDefaults materializes the same way as a per-FK override', () => {
+      const User = buildUserModel();
+      const Post = buildPostModel(User);
+      const contract = defineTestContract({
+        foreignKeyDefaults: { constraint: false, index: true },
+        models: { User, Post },
+      });
+
+      const post = unboundTables(contract.storage)['post']!;
+      expect(post.foreignKeys).toEqual([]);
+      expect(post.indexes).toEqual([{ columns: ['userId'], name: 'post_userId_idx' }]);
+    });
+
+    it('per-FK override takes precedence over foreignKeyDefaults', () => {
+      const User = buildUserModel();
+      const Post = buildPostModel(User, { constraint: true, index: false });
+      const contract = defineTestContract({
+        foreignKeyDefaults: { constraint: false, index: false },
+        models: { User, Post },
+      });
+
+      const post = unboundTables(contract.storage)['post']!;
+      expect(post.foreignKeys).toEqual([
+        {
+          source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
+          target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
+        },
+      ]);
+      expect(post.indexes).toEqual([]);
     });
   });
 

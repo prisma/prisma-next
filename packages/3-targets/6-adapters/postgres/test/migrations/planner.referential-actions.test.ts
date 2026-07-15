@@ -36,8 +36,6 @@ function createRefActionContract(
       tableName: 'user',
       columns: ['id'],
     },
-    constraint: true,
-    index: true,
     ...(onDelete !== undefined && { onDelete }),
     ...(onUpdate !== undefined && { onUpdate }),
   };
