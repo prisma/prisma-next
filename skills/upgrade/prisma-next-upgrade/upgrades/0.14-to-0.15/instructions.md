@@ -45,6 +45,16 @@ changes:
 ---
 
 <!--
+Release bump to 0.15.0 (PR #988): the version bump itself. Every workspace
+`package.json` advances to 0.15.0 (version field + `workspace:` specifier
+lockstep), and the `examples/supabase` contract artifacts regenerate because the
+emitted contract embeds the composed extension pack's version
+(`packs.supabase.version: '0.14.0' → '0.15.0'` in `contract.json` /
+`contract.d.ts`) — no structural contract change. No user action beyond the
+normal dependency upgrade this recipe covers. Incidental substrate diff only.
+-->
+
+<!--
 TML-2503 (extension-supabase Slice E — launch close-out, PR #985): docs + test only.
 The `examples/` touch is `examples/supabase/README.md` (new) plus
 `examples/supabase/test/real-supabase.acceptance.test.ts` — an env-guarded (`skipIf`
