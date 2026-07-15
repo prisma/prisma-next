@@ -100,6 +100,32 @@ describe('orderIssuesByDependencies', () => {
     );
   });
 
+  it('own-column edge up: a column-backed object follows the column it is built on', () => {
+    // A unique/index/fk on `total`, created alongside the column → column first.
+    const column = up(['database', 's', 'orders', 'column:total']);
+    const index = up(
+      ['database', 's', 'orders', 'index:total'],
+      [['database', 's', 'orders', 'column:total']],
+    );
+    const order = orderedPaths([index, column]);
+    expect(positionOf(order, 'database/s/orders/column:total')).toBeLessThan(
+      positionOf(order, 'database/s/orders/index:total'),
+    );
+  });
+
+  it('own-column edge down: a column-backed object is dropped before its column', () => {
+    // Dropping the column auto-drops the object, so the object drops first.
+    const column = down(['database', 's', 'orders', 'column:total']);
+    const index = down(
+      ['database', 's', 'orders', 'index:total'],
+      [['database', 's', 'orders', 'column:total']],
+    );
+    const order = orderedPaths([column, index]);
+    expect(positionOf(order, 'database/s/orders/index:total')).toBeLessThan(
+      positionOf(order, 'database/s/orders/column:total'),
+    );
+  });
+
   it('containment on the way up: a parent entity precedes its contained child', () => {
     const table = up(['database', 's', 'orders']); // an altered table (has expected)
     const column = up(['database', 's', 'orders', 'column:total']);

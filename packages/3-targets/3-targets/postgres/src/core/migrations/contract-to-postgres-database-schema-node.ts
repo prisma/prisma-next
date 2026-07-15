@@ -2,7 +2,13 @@ import type { ContractToSchemaIROptions } from '@prisma-next/family-sql/control'
 import { contractNamespaceToSchemaIR } from '@prisma-next/family-sql/control';
 import type { SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
+import {
+  PrimaryKey,
+  RelationalSchemaNodeKind,
+  SqlForeignKeyIR,
+  SqlIndexIR,
+  SqlUniqueIR,
+} from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresContract } from '../postgres-schema';
@@ -31,6 +37,23 @@ function tableDependsOn(namespaceId: string, tableName: string): SchemaNodeRef {
 
 function roleDependsOn(role: string): SchemaNodeRef {
   return [databaseStep(), { nodeKind: PostgresSchemaNodeKind.role, id: role }];
+}
+
+/**
+ * The chains from a table-child object (foreign key, index, unique, primary
+ * key) to each of the own columns it is built on, in the Postgres tree.
+ * Dropping a covered column auto-drops the object, so the object's drop must
+ * precede the column's; the graph derives that direction from these edges.
+ */
+function columnDependsOn(
+  namespaceId: string,
+  tableName: string,
+  columns: readonly string[],
+): readonly SchemaNodeRef[] {
+  return columns.map((column) => [
+    ...tableDependsOn(namespaceId, tableName),
+    { nodeKind: RelationalSchemaNodeKind.column, id: `column:${column}` },
+  ]);
 }
 
 function toPolicyNode(policy: PostgresRlsPolicy, namespaceId: string): PostgresPolicySchemaNode {
@@ -150,16 +173,52 @@ export function contractToPostgresDatabaseSchemaNode(
           ...ifDefined('onUpdate', fk.onUpdate),
           ...ifDefined('annotations', fk.annotations),
           resolvedReferencedNamespace,
-          dependsOn: [tableDependsOn(resolvedReferencedNamespace, fk.referencedTable)],
+          dependsOn: [
+            tableDependsOn(resolvedReferencedNamespace, fk.referencedTable),
+            ...columnDependsOn(ddlSchema, tableName, fk.columns),
+          ],
         });
       });
+      // The family stamped these children's own-column `dependsOn` with the
+      // flat (single-schema) chain; the Postgres tree nests them under a
+      // namespace, so re-stamp with the multi-schema chain that matches this
+      // tree's paths. Every other field is carried through unchanged.
+      const uniques = sqlTable.uniques.map(
+        (u) =>
+          new SqlUniqueIR({
+            columns: u.columns,
+            ...ifDefined('name', u.name),
+            ...ifDefined('annotations', u.annotations),
+            dependsOn: columnDependsOn(ddlSchema, tableName, u.columns),
+          }),
+      );
+      const indexes = sqlTable.indexes.map(
+        (i) =>
+          new SqlIndexIR({
+            columns: i.columns,
+            unique: i.unique,
+            ...ifDefined('name', i.name),
+            ...ifDefined('type', i.type),
+            ...ifDefined('options', i.options),
+            ...ifDefined('annotations', i.annotations),
+            dependsOn: columnDependsOn(ddlSchema, tableName, i.columns),
+          }),
+      );
+      const primaryKey =
+        sqlTable.primaryKey !== undefined
+          ? new PrimaryKey({
+              columns: sqlTable.primaryKey.columns,
+              ...ifDefined('name', sqlTable.primaryKey.name),
+              dependsOn: columnDependsOn(ddlSchema, tableName, sqlTable.primaryKey.columns),
+            })
+          : undefined;
       tables[tableName] = new PostgresTableSchemaNode({
         name: sqlTable.name,
         columns: sqlTable.columns,
         foreignKeys,
-        uniques: sqlTable.uniques,
-        indexes: sqlTable.indexes,
-        ...ifDefined('primaryKey', sqlTable.primaryKey),
+        uniques,
+        indexes,
+        ...ifDefined('primaryKey', primaryKey),
         ...ifDefined('annotations', sqlTable.annotations),
         ...ifDefined('checks', sqlTable.checks),
         policies: policiesByTable.get(tableName) ?? [],

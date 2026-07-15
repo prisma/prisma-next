@@ -699,6 +699,12 @@ describe('PostgresControlAdapter', () => {
           { nodeKind: 'postgres-namespace', id: 'public' },
           { nodeKind: 'postgres-table', id: 'user' },
         ],
+        [
+          { nodeKind: 'postgres-database', id: 'database' },
+          { nodeKind: 'postgres-namespace', id: 'public' },
+          { nodeKind: 'postgres-table', id: 'post' },
+          { nodeKind: 'sql-column', id: 'column:user_id' },
+        ],
       ]);
     });
 

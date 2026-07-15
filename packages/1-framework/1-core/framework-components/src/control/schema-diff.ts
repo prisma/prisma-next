@@ -119,6 +119,10 @@ function issuePathKey(path: readonly string[]): string {
   return path.join(SIBLING_KEY_DELIMITER);
 }
 
+function terminalNodeKind(issue: SchemaDiffIssue): string | undefined {
+  return (issue.expected ?? issue.actual)?.nodeKind;
+}
+
 /**
  * Copies each issue's node's `dependsOn` refs onto the issue itself, as
  * issue-to-issue path references. A ref is kept only when some emitted issue
@@ -126,11 +130,19 @@ function issuePathKey(path: readonly string[]): string {
  * last step — otherwise the ref is dropped (its target either didn't
  * change, or was never part of either tree; either way the dependency is
  * satisfied by reality, not by an operation this diff will produce).
+ *
+ * The path index is a multimap: two siblings may share an `id` under
+ * different `nodeKind`s (a role and a namespace named alike), so an id-path
+ * alone is ambiguous. The ref's terminal `nodeKind` disambiguates — the ref
+ * resolves only against a same-path issue whose own node carries that kind.
  */
 function mirrorDependsOnOntoIssues(issues: readonly SchemaDiffIssue[]): readonly SchemaDiffIssue[] {
-  const issuesByPath = new Map<string, SchemaDiffIssue>();
+  const issuesByPath = new Map<string, SchemaDiffIssue[]>();
   for (const issue of issues) {
-    issuesByPath.set(issuePathKey(issue.path), issue);
+    const key = issuePathKey(issue.path);
+    const bucket = issuesByPath.get(key);
+    if (bucket === undefined) issuesByPath.set(key, [issue]);
+    else bucket.push(issue);
   }
 
   return issues.map((issue) => {
@@ -141,10 +153,9 @@ function mirrorDependsOnOntoIssues(issues: readonly SchemaDiffIssue[]): readonly
     const dependsOn = refs.flatMap((ref) => {
       const lastStep = ref[ref.length - 1];
       if (lastStep === undefined) return [];
-      const targetIssue = issuesByPath.get(schemaNodeRefKey(ref));
-      if (targetIssue === undefined) return [];
-      const targetNode = targetIssue.expected ?? targetIssue.actual;
-      if (targetNode?.nodeKind !== lastStep.nodeKind) return [];
+      const candidates = issuesByPath.get(schemaNodeRefKey(ref)) ?? [];
+      const resolved = candidates.some((c) => terminalNodeKind(c) === lastStep.nodeKind);
+      if (!resolved) return [];
       return [ref.map((step) => step.id)];
     });
 

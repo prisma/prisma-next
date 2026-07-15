@@ -1081,7 +1081,7 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
     expect(fk.resolvedReferencedNamespace).toBe('other_contract_ns');
   });
 
-  it('stamps dependsOn as the chain to the referenced table in the flat tree', () => {
+  it('stamps dependsOn as the referenced table plus its own columns in the flat tree', () => {
     const storage = new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       namespaces: {
@@ -1098,7 +1098,48 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
         { nodeKind: 'sql-schema', id: 'database' },
         { nodeKind: 'sql-table', id: 'User' },
       ],
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'Post' },
+        { nodeKind: 'sql-column', id: 'column:authorId' },
+      ],
     ]);
+  });
+
+  it('stamps own-column dependsOn on index, unique, and primary key in the flat tree', () => {
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: {
+            table: {
+              Widget: table({
+                columns: { id: col({ nativeType: 'text' }), slug: col({ nativeType: 'text' }) },
+                primaryKey: { columns: ['id'] },
+                uniques: [{ columns: ['slug'] }],
+                indexes: [{ columns: ['slug'] }],
+              }),
+            },
+          },
+        }),
+      },
+    });
+
+    const widget = contractToSchemaIR(wrap(storage)).tables['Widget']!;
+    const pkCol = [
+      { nodeKind: 'sql-schema', id: 'database' },
+      { nodeKind: 'sql-table', id: 'Widget' },
+      { nodeKind: 'sql-column', id: 'column:id' },
+    ];
+    const slugCol = [
+      { nodeKind: 'sql-schema', id: 'database' },
+      { nodeKind: 'sql-table', id: 'Widget' },
+      { nodeKind: 'sql-column', id: 'column:slug' },
+    ];
+    expect(widget.primaryKey?.dependsOn).toEqual([pkCol]);
+    expect(widget.uniques[0]?.dependsOn).toEqual([slugCol]);
+    expect(widget.indexes[0]?.dependsOn).toEqual([slugCol]);
   });
 });
 

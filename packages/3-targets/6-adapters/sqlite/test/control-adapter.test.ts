@@ -96,6 +96,11 @@ describe('SqliteControlAdapter.introspect', () => {
         { nodeKind: 'sql-schema', id: 'database' },
         { nodeKind: 'sql-table', id: 'authors' },
       ],
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'posts' },
+        { nodeKind: 'sql-column', id: 'column:author_id' },
+      ],
     ]);
     await driver.close();
   });

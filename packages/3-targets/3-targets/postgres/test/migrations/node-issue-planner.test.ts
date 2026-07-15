@@ -376,6 +376,81 @@ describe('planNodeIssues — dependency-graph ordering', () => {
     expect(factoryNames).toContain('dropTable');
     expect(factoryNames.indexOf('dropConstraint')).toBeLessThan(factoryNames.indexOf('dropTable'));
   });
+
+  const legacyColumnChain = [
+    { nodeKind: 'postgres-database', id: 'database' },
+    { nodeKind: 'postgres-namespace', id: 'public' },
+    { nodeKind: 'postgres-table', id: 'account' },
+    { nodeKind: 'sql-column', id: 'column:legacy' },
+  ];
+
+  // A surviving table whose `legacy` column — plus the FK, unique, and index
+  // built on it — are all dropped. Postgres auto-drops the constraint/index
+  // when the column goes, so each object's `DROP` (no `IF EXISTS`) must run
+  // before the `DROP COLUMN`; the own-column edges reverse on the way down to
+  // enforce that. Without the edges the topo tiebreak sorts `column:legacy`
+  // first and the plan errors at apply time.
+  it('drops a column-backed FK, unique, and index before the column itself', () => {
+    const contract = makeContract({
+      account: {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      },
+    });
+    const actual = rootOf({
+      account: new PostgresTableSchemaNode({
+        name: 'account',
+        columns: {
+          id: { name: 'id', nativeType: 'uuid', nullable: false, resolvedNativeType: 'uuid' },
+          email: { name: 'email', nativeType: 'text', nullable: false, resolvedNativeType: 'text' },
+          legacy: {
+            name: 'legacy',
+            nativeType: 'uuid',
+            nullable: true,
+            resolvedNativeType: 'uuid',
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [
+          {
+            columns: ['legacy'],
+            referencedTable: 'org',
+            referencedColumns: ['id'],
+            referencedSchema: 'public',
+            name: 'account_legacy_fkey',
+            dependsOn: [legacyColumnChain],
+          },
+        ],
+        uniques: [
+          { columns: ['legacy'], name: 'account_legacy_key', dependsOn: [legacyColumnChain] },
+        ],
+        indexes: [
+          {
+            columns: ['legacy'],
+            unique: false,
+            name: 'account_legacy_idx',
+            dependsOn: [legacyColumnChain],
+          },
+        ],
+        policies: [],
+        rlsEnabled: false,
+      }),
+    });
+    const factoryNames = planFor(contract, actual).map((c) => c.factoryName);
+    const dropColumnAt = factoryNames.indexOf('dropColumn');
+    expect(dropColumnAt).toBeGreaterThanOrEqual(0);
+    // The FK and the unique both lower to `dropConstraint`.
+    expect(factoryNames.filter((n) => n === 'dropConstraint')).toHaveLength(2);
+    expect(factoryNames.lastIndexOf('dropConstraint')).toBeLessThan(dropColumnAt);
+    expect(factoryNames.indexOf('dropIndex')).toBeGreaterThanOrEqual(0);
+    expect(factoryNames.indexOf('dropIndex')).toBeLessThan(dropColumnAt);
+  });
 });
 
 describe('mapNodeIssueToCall — table rlsEnabled drift', () => {

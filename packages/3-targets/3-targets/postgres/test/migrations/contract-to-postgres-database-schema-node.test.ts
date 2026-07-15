@@ -353,7 +353,7 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespac
     expect(fk?.resolvedReferencedNamespace).toBe('public');
   });
 
-  it('stamps dependsOn as the chain to the referenced table, resolved namespace included', () => {
+  it('stamps dependsOn as the referenced table (resolved namespace) plus own columns', () => {
     const root = contractToPostgresDatabaseSchemaNode(
       contractWithFk(UNBOUND_NAMESPACE_ID),
       projectionOptions,
@@ -364,6 +364,12 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespac
         { nodeKind: 'postgres-database', id: 'database' },
         { nodeKind: 'postgres-namespace', id: 'public' },
         { nodeKind: 'postgres-table', id: 'users' },
+      ],
+      [
+        { nodeKind: 'postgres-database', id: 'database' },
+        { nodeKind: 'postgres-namespace', id: 'public' },
+        { nodeKind: 'postgres-table', id: TABLE_NAME },
+        { nodeKind: 'sql-column', id: 'column:user_id' },
       ],
     ]);
   });

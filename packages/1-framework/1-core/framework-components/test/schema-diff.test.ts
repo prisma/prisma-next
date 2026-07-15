@@ -372,6 +372,36 @@ describe('diffSchemas', () => {
       const issues = diffSchemas(rootOf([a, b]), rootOf([]));
       expect(issues.map((i) => i.path[i.path.length - 1])).toEqual(['a', 'b']);
     });
+
+    it('resolves to the right sibling when a role and a namespace share an id', () => {
+      // Two siblings "public" — a role and a namespace — occupy the same
+      // id-path. A ref whose terminal kind is `role` must resolve to the role,
+      // not be defeated by the namespace sharing the path.
+      const role = makeNode('public', 'role-body', [], 'role');
+      const namespace = makeNode('public', 'namespace-body', [], 'namespace');
+      const policy = makeNode('policy1', 'body', [], 'policy', [
+        [
+          { nodeKind: 'root', id: 'root' },
+          { nodeKind: 'role', id: 'public' },
+        ],
+      ]);
+      const issues = diffSchemas(rootOf([role, namespace, policy]), rootOf([]));
+      expect(findIssue(issues, 'policy1').dependsOn).toEqual([['root', 'public']]);
+    });
+
+    it('a ref to a kind absent among same-id siblings is dropped', () => {
+      // Only a namespace "public" exists; a ref whose terminal kind is `role`
+      // finds no matching sibling and is dropped (satisfied by reality).
+      const namespace = makeNode('public', 'namespace-body', [], 'namespace');
+      const policy = makeNode('policy1', 'body', [], 'policy', [
+        [
+          { nodeKind: 'root', id: 'root' },
+          { nodeKind: 'role', id: 'public' },
+        ],
+      ]);
+      const issues = diffSchemas(rootOf([namespace, policy]), rootOf([]));
+      expect(findIssue(issues, 'policy1')).not.toHaveProperty('dependsOn');
+    });
   });
 });
 

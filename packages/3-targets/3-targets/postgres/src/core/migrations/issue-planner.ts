@@ -137,6 +137,7 @@ export interface IssuePlannerValue {
 type CallCategory =
   | 'dep'
   | 'drop'
+  | 'dropType'
   | 'table'
   | 'rlsEnable'
   | 'rlsPolicy'
@@ -152,6 +153,13 @@ type CallCategory =
  * legacy walk-schema planner's emission order so `db init` and `db update`
  * produce byte-identical plans for the shared shape (deps → drops → tables
  * → columns → alters → PKs → uniques → indexes → FKs).
+ *
+ * `dropType` (DROP TYPE for a managed native enum) is its own bucket, ordered
+ * after the general drop bucket: a type can only be dropped once every table
+ * whose column uses it is gone. A column→enum edge would make this precise,
+ * but `coalesceSubtreeIssues` removes the column issue under a whole-table
+ * drop, so the edge never reaches the graph; the coarse bucket stands in until
+ * that edge lands (the coordinate work is a later slice).
  */
 function classifyCall(call: PostgresOpFactoryCall): CallCategory {
   switch (call.factoryName) {
@@ -160,8 +168,9 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
     case 'createNativeEnumType':
     case 'addNativeEnumValue':
       return 'dep';
-    case 'dropTable':
     case 'dropNativeEnumType':
+      return 'dropType';
+    case 'dropTable':
     case 'dropColumn':
     case 'dropConstraint':
     case 'dropCheckConstraint':
@@ -1055,6 +1064,9 @@ export function planIssues(
   const calls: PostgresOpFactoryCall[] = [
     ...byCategory('dep'),
     ...byCategory('drop'),
+    // DROP TYPE after every table drop — a managed enum type can only go once
+    // no live column still uses it.
+    ...byCategory('dropType'),
     ...byCategory('table'),
     ...byCategory('column'),
     ...gatedRecipe,
