@@ -100,7 +100,7 @@ export interface AuthoringTypeConstructorDescriptor {
    * family's portable logical type, and `output` is the target's *default*
    * storage choice for it rather than an explicit user storage opinion.
    * Authoring layers use this provenance to decide when a mutation-default
-   * generator (`@default(uuid())`) may re-pick a column's concrete storage:
+   * generator (`@default(uuid())`) may re-pick a field's concrete storage:
    * only base-scalar-typed fields may be overridden. A type that explicitly
    * names its storage — native scalars like `Uuid`, constructor calls like
    * `Char(36)`, named types — always keeps it.
