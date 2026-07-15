@@ -200,6 +200,70 @@ function applyIndexOmissions(
   });
 }
 
+// --- Back-relation field-name corrections (declarative, field-name keyed) --
+//
+// Fidelity note:
+//   - The framework inferrer's `pluralize()`
+//     (packages/2-sql/9-family/src/core/psl-contract-infer/name-transforms.ts)
+//     unconditionally appends `es` to a name that already ends in `s`, `x`,
+//     `z`, `ch`, or `sh`. Supabase's `auth`/`storage` table names are already
+//     plural (e.g. `sessions`, `identities`), so the back-relation field
+//     derived from them comes out double-pluralized (`sessionses`,
+//     `identitieses`). A general inflection fix is deferred to a follow-up
+//     ticket; this table corrects the known-affected names here so the pack
+//     does not ship double-plural public relation names.
+const DOUBLE_PLURALIZED_FIELD_NAMES: ReadonlySet<string> = new Set([
+  'icebergNamespaceses',
+  'icebergTableses',
+  'identitieses',
+  'mfaAmrClaimses',
+  'mfaChallengeses',
+  'mfaFactorses',
+  'oauthAuthorizationses',
+  'oauthConsentses',
+  'objectses',
+  'oneTimeTokenses',
+  'refreshTokenses',
+  's3MultipartUploadsPartses',
+  's3MultipartUploadses',
+  'samlProviderses',
+  'samlRelayStateses',
+  'sessionses',
+  'ssoDomainses',
+  'vectorIndexeses',
+  'webauthnChallengeses',
+  'webauthnCredentialses',
+]);
+
+/** Strips the erroneous trailing `es` from double-pluralized back-relation field names. */
+function applyDoublePluralizationFix(namespace: PslNamespace): PslNamespace {
+  let changed = false;
+  const models = namespace.models.map((model) => {
+    let modelChanged = false;
+    const fields = model.fields.map((field) => {
+      if (!DOUBLE_PLURALIZED_FIELD_NAMES.has(field.name)) return field;
+      modelChanged = true;
+      return { ...field, name: field.name.slice(0, -2) };
+    });
+    if (!modelChanged) return model;
+    changed = true;
+    return { ...model, fields };
+  });
+
+  if (!changed) return namespace;
+
+  return makePslNamespace({
+    kind: 'namespace',
+    name: namespace.name,
+    entries: makePslNamespaceEntries(
+      models,
+      namespace.compositeTypes,
+      namespacePslExtensionBlocks(namespace),
+    ),
+    span: namespace.span,
+  });
+}
+
 // --- Model renames (legacy names referenced by examples + cross-space FKs) -
 
 const MODEL_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
@@ -561,7 +625,8 @@ async function introspectSchema(
   const defaultsFixed = applyDefaultOmissions(namespace, DEFAULT_OMISSIONS[schemaName] ?? {});
   const indexesFixed = applyIndexOmissions(defaultsFixed, INDEX_OMISSIONS[schemaName] ?? []);
   const rlsFixed = applyRlsEnablement(indexesFixed, rlsEnabledTables);
-  return { namespace: rlsFixed, types: ast.types?.declarations ?? [] };
+  const pluralizationFixed = applyDoublePluralizationFix(rlsFixed);
+  return { namespace: pluralizationFixed, types: ast.types?.declarations ?? [] };
 }
 
 async function main(): Promise<void> {

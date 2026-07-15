@@ -4947,7 +4947,7 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
-              readonly mfaAmrClaimses: {
+              readonly mfaAmrClaims: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'MfaAmrClaims';
@@ -4969,7 +4969,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['id'];
                 };
               };
-              readonly refreshTokenses: {
+              readonly refreshTokens: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'RefreshTokens';
@@ -5158,7 +5158,7 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
-              readonly identitieses: {
+              readonly identities: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'AuthIdentity';
@@ -5169,7 +5169,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['userId'];
                 };
               };
-              readonly mfaFactorses: {
+              readonly mfaFactors: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'MfaFactors';
@@ -5180,7 +5180,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['userId'];
                 };
               };
-              readonly oauthAuthorizationses: {
+              readonly oauthAuthorizations: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'OauthAuthorizations';
@@ -5191,7 +5191,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['userId'];
                 };
               };
-              readonly oauthConsentses: {
+              readonly oauthConsents: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'OauthConsents';
@@ -5202,7 +5202,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['userId'];
                 };
               };
-              readonly oneTimeTokenses: {
+              readonly oneTimeTokens: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'OneTimeTokens';
@@ -5213,7 +5213,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['userId'];
                 };
               };
-              readonly sessionses: {
+              readonly sessions: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'AuthSession';
@@ -5224,7 +5224,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['userId'];
                 };
               };
-              readonly webauthnChallengeses: {
+              readonly webauthnChallenges: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'WebauthnChallenges';
@@ -5235,7 +5235,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['userId'];
                 };
               };
-              readonly webauthnCredentialses: {
+              readonly webauthnCredentials: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'WebauthnCredentials';
@@ -5500,7 +5500,7 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
-              readonly samlRelayStateses: {
+              readonly samlRelayStates: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'SamlRelayStates';
@@ -5742,7 +5742,7 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
-              readonly mfaChallengeses: {
+              readonly mfaChallenges: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'MfaChallenges';
@@ -5982,7 +5982,7 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
-              readonly oauthAuthorizationses: {
+              readonly oauthAuthorizations: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'OauthAuthorizations';
@@ -5993,7 +5993,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['clientId'];
                 };
               };
-              readonly oauthConsentses: {
+              readonly oauthConsents: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'OauthConsents';
@@ -6004,7 +6004,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['clientId'];
                 };
               };
-              readonly sessionses: {
+              readonly sessions: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'AuthSession';
@@ -6489,7 +6489,7 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
-              readonly samlProviderses: {
+              readonly samlProviders: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'SamlProviders';
@@ -6500,7 +6500,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['ssoProviderId'];
                 };
               };
-              readonly samlRelayStateses: {
+              readonly samlRelayStates: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'SamlRelayStates';
@@ -6511,7 +6511,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['ssoProviderId'];
                 };
               };
-              readonly ssoDomainses: {
+              readonly ssoDomains: {
                 readonly to: {
                   readonly namespace: 'auth' & NamespaceId;
                   readonly model: 'SsoDomains';
@@ -6721,7 +6721,7 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
-              readonly icebergNamespaceses: {
+              readonly icebergNamespaces: {
                 readonly to: {
                   readonly namespace: 'storage' & NamespaceId;
                   readonly model: 'IcebergNamespaces';
@@ -6732,7 +6732,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['catalogId'];
                 };
               };
-              readonly icebergTableses: {
+              readonly icebergTables: {
                 readonly to: {
                   readonly namespace: 'storage' & NamespaceId;
                   readonly model: 'IcebergTables';
@@ -6782,7 +6782,7 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
-              readonly vectorIndexeses: {
+              readonly vectorIndexes: {
                 readonly to: {
                   readonly namespace: 'storage' & NamespaceId;
                   readonly model: 'VectorIndexes';
@@ -6848,7 +6848,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['id'];
                 };
               };
-              readonly icebergTableses: {
+              readonly icebergTables: {
                 readonly to: {
                   readonly namespace: 'storage' & NamespaceId;
                   readonly model: 'IcebergTables';
@@ -7049,7 +7049,7 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['id'];
                 };
               };
-              readonly s3MultipartUploadsPartses: {
+              readonly s3MultipartUploadsParts: {
                 readonly to: {
                   readonly namespace: 'storage' & NamespaceId;
                   readonly model: 'S3MultipartUploadsParts';
@@ -7210,7 +7210,7 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
-              readonly objectses: {
+              readonly objects: {
                 readonly to: {
                   readonly namespace: 'storage' & NamespaceId;
                   readonly model: 'StorageObject';
@@ -7221,10 +7221,10 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['bucketId'];
                 };
               };
-              readonly s3MultipartUploadsPartses: {
+              readonly s3MultipartUploads: {
                 readonly to: {
                   readonly namespace: 'storage' & NamespaceId;
-                  readonly model: 'S3MultipartUploadsParts';
+                  readonly model: 'S3MultipartUploads';
                 };
                 readonly cardinality: '1:N';
                 readonly on: {
@@ -7232,10 +7232,10 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['bucketId'];
                 };
               };
-              readonly s3MultipartUploadses: {
+              readonly s3MultipartUploadsParts: {
                 readonly to: {
                   readonly namespace: 'storage' & NamespaceId;
-                  readonly model: 'S3MultipartUploads';
+                  readonly model: 'S3MultipartUploadsParts';
                 };
                 readonly cardinality: '1:N';
                 readonly on: {

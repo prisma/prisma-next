@@ -62,14 +62,14 @@ namespace auth {
     isSsoUser                Boolean                   @default(false) @map("is_sso_user")
     deletedAt                DateTime?                 @map("deleted_at")
     isAnonymous              Boolean                   @default(false) @map("is_anonymous")
-    identitieses             AuthIdentity[]
-    mfaFactorses             MfaFactors[]
-    oauthAuthorizationses    OauthAuthorizations[]
-    oauthConsentses          OauthConsents[]
-    oneTimeTokenses          OneTimeTokens[]
-    sessionses               AuthSession[]
-    webauthnChallengeses     WebauthnChallenges[]
-    webauthnCredentialses    WebauthnCredentials[]
+    identities               AuthIdentity[]
+    mfaFactors               MfaFactors[]
+    oauthAuthorizations      OauthAuthorizations[]
+    oauthConsents            OauthConsents[]
+    oneTimeTokens            OneTimeTokens[]
+    sessions                 AuthSession[]
+    webauthnChallenges       WebauthnChallenges[]
+    webauthnCredentials      WebauthnCredentials[]
 
     @@index([instanceId], map: "users_instance_id_idx")
     @@index([isAnonymous], map: "users_is_anonymous_idx")
@@ -110,9 +110,9 @@ namespace auth {
     deletedAt               DateTime?                      @map("deleted_at")
     clientType              pg.enum(OauthClientType)       @default(dbgenerated("'confidential'::auth.oauth_client_type")) @map("client_type")
     tokenEndpointAuthMethod String                         @map("token_endpoint_auth_method")
-    oauthAuthorizationses   OauthAuthorizations[]
-    oauthConsentses         OauthConsents[]
-    sessionses              AuthSession[]
+    oauthAuthorizations     OauthAuthorizations[]
+    oauthConsents           OauthConsents[]
+    sessions                AuthSession[]
 
     @@index([deletedAt], map: "oauth_clients_deleted_at_idx")
     @@map("oauth_clients")
@@ -134,8 +134,8 @@ namespace auth {
     refreshTokenHmacKey String?            @map("refresh_token_hmac_key")
     refreshTokenCounter BigInt?            @map("refresh_token_counter")
     scopes              String?
-    mfaAmrClaimses      MfaAmrClaims[]
-    refreshTokenses     RefreshTokens[]
+    mfaAmrClaims        MfaAmrClaims[]
+    refreshTokens       RefreshTokens[]
     oauthClient         OauthClients?      @relation(fields: [oauthClientId], references: [id], onDelete: Cascade, map: "sessions_oauth_client_id_fkey")
     user                AuthUser           @relation(fields: [userId], references: [id], onDelete: Cascade, map: "sessions_user_id_fkey")
 
@@ -198,7 +198,7 @@ namespace auth {
     oauthClientStateId   Id?                           @map("oauth_client_state_id")
     linkingTargetId      Id?                           @map("linking_target_id")
     emailOptional        Boolean                       @default(false) @map("email_optional")
-    samlRelayStateses    SamlRelayStates[]
+    samlRelayStates      SamlRelayStates[]
 
     @@index([createdAt], map: "flow_state_created_at_idx")
     @@index([authCode], map: "idx_auth_code")
@@ -245,7 +245,7 @@ namespace auth {
     webAuthnCredential        Json?                 @map("web_authn_credential")
     webAuthnAaguid            Id?                   @map("web_authn_aaguid")
     lastWebauthnChallengeData Json?                 @map("last_webauthn_challenge_data")
-    mfaChallengeses           MfaChallenges[]
+    mfaChallenges             MfaChallenges[]
     user                      AuthUser              @relation(fields: [userId], references: [id], onDelete: Cascade, map: "mfa_factors_user_id_fkey")
 
     @@index([userId, createdAt], map: "factor_id_created_at_idx")
@@ -357,14 +357,14 @@ namespace auth {
   }
 
   model SsoProviders {
-    id                Id                @id(map: "sso_providers_pkey")
-    resourceId        String?           @map("resource_id")
-    createdAt         DateTime?         @map("created_at")
-    updatedAt         DateTime?         @map("updated_at")
-    disabled          Boolean?
-    samlProviderses   SamlProviders[]
-    samlRelayStateses SamlRelayStates[]
-    ssoDomainses      SsoDomains[]
+    id              Id                @id(map: "sso_providers_pkey")
+    resourceId      String?           @map("resource_id")
+    createdAt       DateTime?         @map("created_at")
+    updatedAt       DateTime?         @map("updated_at")
+    disabled        Boolean?
+    samlProviders   SamlProviders[]
+    samlRelayStates SamlRelayStates[]
+    ssoDomains      SsoDomains[]
 
     @@index([resourceId], map: "sso_providers_resource_id_pattern_idx")
     @@rls
@@ -526,41 +526,41 @@ namespace auth {
 
 namespace storage {
   model BucketsAnalytics {
-    id                  Id                  @id(map: "buckets_analytics_pkey") @default(dbgenerated("gen_random_uuid()"))
-    name                String
-    _type               pg.enum(Buckettype) @default(dbgenerated("'ANALYTICS'::storage.buckettype")) @map("type")
-    format              String              @default("ICEBERG")
-    createdAt           DateTime            @default(now()) @map("created_at")
-    updatedAt           DateTime            @default(now()) @map("updated_at")
-    deletedAt           DateTime?           @map("deleted_at")
-    icebergNamespaceses IcebergNamespaces[]
-    icebergTableses     IcebergTables[]
+    id                Id                  @id(map: "buckets_analytics_pkey") @default(dbgenerated("gen_random_uuid()"))
+    name              String
+    _type             pg.enum(Buckettype) @default(dbgenerated("'ANALYTICS'::storage.buckettype")) @map("type")
+    format            String              @default("ICEBERG")
+    createdAt         DateTime            @default(now()) @map("created_at")
+    updatedAt         DateTime            @default(now()) @map("updated_at")
+    deletedAt         DateTime?           @map("deleted_at")
+    icebergNamespaces IcebergNamespaces[]
+    icebergTables     IcebergTables[]
 
     @@rls
     @@map("buckets_analytics")
   }
 
   model BucketsVectors {
-    id              String              @id(map: "buckets_vectors_pkey")
-    _type           pg.enum(Buckettype) @default(dbgenerated("'VECTOR'::storage.buckettype")) @map("type")
-    createdAt       DateTime            @default(now()) @map("created_at")
-    updatedAt       DateTime            @default(now()) @map("updated_at")
-    vectorIndexeses VectorIndexes[]
+    id            String              @id(map: "buckets_vectors_pkey")
+    _type         pg.enum(Buckettype) @default(dbgenerated("'VECTOR'::storage.buckettype")) @map("type")
+    createdAt     DateTime            @default(now()) @map("created_at")
+    updatedAt     DateTime            @default(now()) @map("updated_at")
+    vectorIndexes VectorIndexes[]
 
     @@rls
     @@map("buckets_vectors")
   }
 
   model IcebergNamespaces {
-    id              Id               @id(map: "iceberg_namespaces_pkey") @default(dbgenerated("gen_random_uuid()"))
-    bucketName      String           @map("bucket_name")
-    name            String
-    createdAt       DateTime         @default(now()) @map("created_at")
-    updatedAt       DateTime         @default(now()) @map("updated_at")
-    metadata        Json
-    catalogId       Id               @map("catalog_id")
-    icebergTableses IcebergTables[]
-    catalog         BucketsAnalytics @relation(fields: [catalogId], references: [id], onDelete: Cascade, map: "iceberg_namespaces_catalog_id_fkey", index: false)
+    id            Id               @id(map: "iceberg_namespaces_pkey") @default(dbgenerated("gen_random_uuid()"))
+    bucketName    String           @map("bucket_name")
+    name          String
+    createdAt     DateTime         @default(now()) @map("created_at")
+    updatedAt     DateTime         @default(now()) @map("updated_at")
+    metadata      Json
+    catalogId     Id               @map("catalog_id")
+    icebergTables IcebergTables[]
+    catalog       BucketsAnalytics @relation(fields: [catalogId], references: [id], onDelete: Cascade, map: "iceberg_namespaces_catalog_id_fkey", index: false)
 
     @@rls
     @@map("iceberg_namespaces")
@@ -596,37 +596,37 @@ namespace storage {
   }
 
   model StorageBucket {
-    id                        String                    @id(map: "buckets_pkey")
-    name                      String
-    owner                     Id?
-    createdAt                 DateTime?                 @default(now()) @map("created_at")
-    updatedAt                 DateTime?                 @default(now()) @map("updated_at")
-    public                    Boolean?                  @default(false)
-    avifAutodetection         Boolean?                  @default(false) @map("avif_autodetection")
-    fileSizeLimit             BigInt?                   @map("file_size_limit")
-    ownerId                   String?                   @map("owner_id")
-    _type                     pg.enum(Buckettype)       @default(dbgenerated("'STANDARD'::storage.buckettype")) @map("type")
-    objectses                 StorageObject[]
-    s3MultipartUploadses      S3MultipartUploads[]
-    s3MultipartUploadsPartses S3MultipartUploadsParts[]
+    id                      String                    @id(map: "buckets_pkey")
+    name                    String
+    owner                   Id?
+    createdAt               DateTime?                 @default(now()) @map("created_at")
+    updatedAt               DateTime?                 @default(now()) @map("updated_at")
+    public                  Boolean?                  @default(false)
+    avifAutodetection       Boolean?                  @default(false) @map("avif_autodetection")
+    fileSizeLimit           BigInt?                   @map("file_size_limit")
+    ownerId                 String?                   @map("owner_id")
+    _type                   pg.enum(Buckettype)       @default(dbgenerated("'STANDARD'::storage.buckettype")) @map("type")
+    objects                 StorageObject[]
+    s3MultipartUploads      S3MultipartUploads[]
+    s3MultipartUploadsParts S3MultipartUploadsParts[]
 
     @@rls
     @@map("buckets")
   }
 
   model S3MultipartUploads {
-    id                        String                    @id(map: "s3_multipart_uploads_pkey")
-    inProgressSize            BigInt                    @default(0) @map("in_progress_size")
-    uploadSignature           String                    @map("upload_signature")
-    bucketId                  String                    @map("bucket_id")
-    key                       String
-    version                   String
-    ownerId                   String?                   @map("owner_id")
-    createdAt                 DateTime                  @default(now()) @map("created_at")
-    userMetadata              Json?                     @map("user_metadata")
-    metadata                  Json?
-    s3MultipartUploadsPartses S3MultipartUploadsParts[]
-    bucket                    StorageBucket             @relation(fields: [bucketId], references: [id], map: "s3_multipart_uploads_bucket_id_fkey", index: false)
+    id                      String                    @id(map: "s3_multipart_uploads_pkey")
+    inProgressSize          BigInt                    @default(0) @map("in_progress_size")
+    uploadSignature         String                    @map("upload_signature")
+    bucketId                String                    @map("bucket_id")
+    key                     String
+    version                 String
+    ownerId                 String?                   @map("owner_id")
+    createdAt               DateTime                  @default(now()) @map("created_at")
+    userMetadata            Json?                     @map("user_metadata")
+    metadata                Json?
+    s3MultipartUploadsParts S3MultipartUploadsParts[]
+    bucket                  StorageBucket             @relation(fields: [bucketId], references: [id], map: "s3_multipart_uploads_bucket_id_fkey", index: false)
 
     @@index([bucketId, key, createdAt], map: "idx_multipart_uploads_list")
     @@rls

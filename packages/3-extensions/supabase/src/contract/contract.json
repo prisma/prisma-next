@@ -431,7 +431,7 @@
               }
             },
             "relations": {
-              "mfaAmrClaimses": {
+              "mfaAmrClaims": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -461,7 +461,7 @@
                   "namespace": "auth"
                 }
               },
-              "refreshTokenses": {
+              "refreshTokens": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -793,7 +793,7 @@
               }
             },
             "relations": {
-              "identitieses": {
+              "identities": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -808,7 +808,7 @@
                   "namespace": "auth"
                 }
               },
-              "mfaFactorses": {
+              "mfaFactors": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -823,7 +823,7 @@
                   "namespace": "auth"
                 }
               },
-              "oauthAuthorizationses": {
+              "oauthAuthorizations": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -838,7 +838,7 @@
                   "namespace": "auth"
                 }
               },
-              "oauthConsentses": {
+              "oauthConsents": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -853,7 +853,7 @@
                   "namespace": "auth"
                 }
               },
-              "oneTimeTokenses": {
+              "oneTimeTokens": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -868,7 +868,7 @@
                   "namespace": "auth"
                 }
               },
-              "sessionses": {
+              "sessions": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -883,7 +883,7 @@
                   "namespace": "auth"
                 }
               },
-              "webauthnChallengeses": {
+              "webauthnChallenges": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -898,7 +898,7 @@
                   "namespace": "auth"
                 }
               },
-              "webauthnCredentialses": {
+              "webauthnCredentials": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -1405,7 +1405,7 @@
               }
             },
             "relations": {
-              "samlRelayStateses": {
+              "samlRelayStates": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -1815,7 +1815,7 @@
               }
             },
             "relations": {
-              "mfaChallengeses": {
+              "mfaChallenges": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -2265,7 +2265,7 @@
               }
             },
             "relations": {
-              "oauthAuthorizationses": {
+              "oauthAuthorizations": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -2280,7 +2280,7 @@
                   "namespace": "auth"
                 }
               },
-              "oauthConsentses": {
+              "oauthConsents": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -2295,7 +2295,7 @@
                   "namespace": "auth"
                 }
               },
-              "sessionses": {
+              "sessions": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -3052,7 +3052,7 @@
               }
             },
             "relations": {
-              "samlProviderses": {
+              "samlProviders": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -3067,7 +3067,7 @@
                   "namespace": "auth"
                 }
               },
-              "samlRelayStateses": {
+              "samlRelayStates": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -3082,7 +3082,7 @@
                   "namespace": "auth"
                 }
               },
-              "ssoDomainses": {
+              "ssoDomains": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -3434,7 +3434,7 @@
               }
             },
             "relations": {
-              "icebergNamespaceses": {
+              "icebergNamespaces": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -3449,7 +3449,7 @@
                   "namespace": "storage"
                 }
               },
-              "icebergTableses": {
+              "icebergTables": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -3528,7 +3528,7 @@
               }
             },
             "relations": {
-              "vectorIndexeses": {
+              "vectorIndexes": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -3631,7 +3631,7 @@
                   "namespace": "storage"
                 }
               },
-              "icebergTableses": {
+              "icebergTables": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -3967,7 +3967,7 @@
                   "namespace": "storage"
                 }
               },
-              "s3MultipartUploadsPartses": {
+              "s3MultipartUploadsParts": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -4239,7 +4239,7 @@
               }
             },
             "relations": {
-              "objectses": {
+              "objects": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -4254,22 +4254,7 @@
                   "namespace": "storage"
                 }
               },
-              "s3MultipartUploadsPartses": {
-                "cardinality": "1:N",
-                "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "bucketId"
-                  ]
-                },
-                "to": {
-                  "model": "S3MultipartUploadsParts",
-                  "namespace": "storage"
-                }
-              },
-              "s3MultipartUploadses": {
+              "s3MultipartUploads": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -4281,6 +4266,21 @@
                 },
                 "to": {
                   "model": "S3MultipartUploads",
+                  "namespace": "storage"
+                }
+              },
+              "s3MultipartUploadsParts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "bucketId"
+                  ]
+                },
+                "to": {
+                  "model": "S3MultipartUploadsParts",
                   "namespace": "storage"
                 }
               }
