@@ -1085,6 +1085,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
       relatedModelName: relation.relatedModelName,
       relatedTableName: relation.relatedTableName,
       relatedNamespaceId: relation.relatedNamespaceId,
+      localTableName: relation.localTableName,
       targetColumn: relation.targetColumn,
       localColumn: relation.localColumn,
       cardinality: relation.cardinality,

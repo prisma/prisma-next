@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ProjectionItem, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { resolveIncludeRelation } from '../src/collection-contract';
 import { dispatchCollectionRows } from '../src/collection-dispatch';
@@ -12,6 +13,7 @@ import {
   buildTestContextFromContract,
   createMockRuntime,
   getTestContract,
+  isSelectAst,
   withCapabilities,
 } from './helpers';
 
@@ -28,6 +30,7 @@ function includeFor(
     relatedModelName: relation.relatedModelName,
     relatedTableName: relation.relatedTableName,
     relatedNamespaceId: relation.relatedNamespaceId,
+    localTableName: relation.localTableName,
     targetColumn: relation.targetColumn,
     localColumn: relation.localColumn,
     cardinality: relation.cardinality,
@@ -117,7 +120,7 @@ describe('collection-dispatch', () => {
     const { collection, runtime } = createCollectionFor('User', contract);
     const scoped = collection.select('name').include('posts');
     runtime.setNextResults([
-      [{ id: 1, name: 'Alice', posts: '[{"id":10,"title":"Post A","user_id":1,"views":3}]' }],
+      [{ name: 'Alice', posts: '[{"id":10,"title":"Post A","user_id":1,"views":3}]' }],
     ]);
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
@@ -163,7 +166,6 @@ describe('collection-dispatch', () => {
     runtime.setNextResults([
       [
         {
-          id: 1,
           name: 'Alice',
           posts:
             '[{"title":"Post A","comments":[{"id":100,"body":"hi","post_id":10},{"id":101,"body":"there","post_id":10}]},{"title":"Post B","comments":[]}]',
@@ -215,7 +217,6 @@ describe('collection-dispatch', () => {
     runtime.setNextResults([
       [
         {
-          id: 1,
           name: 'Alice',
           posts:
             '[{"title":"Post A","author":[{"id":1,"name":"Alice","email":"alice@example.com","invited_by_id":null,"address":null}]},{"title":"Post B","author":[]}]',
@@ -277,29 +278,25 @@ describe('collection-dispatch', () => {
     expect(released).toBe(true);
   });
 
-  it('dispatchCollectionRows() single-query path parses include payloads and strips hidden join columns', async () => {
+  it('dispatchCollectionRows() keeps correlated parent join keys out of the projection', async () => {
     const contract = withSingleQueryCapabilities(getTestContract());
     const { collection, runtime } = createCollectionFor('User', contract);
     const scoped = collection.select('name').include('posts');
     runtime.setNextResults([
       [
         {
-          id: 1,
           name: 'Alice',
           posts: '[{"id":10,"title":"Post A","user_id":1,"views":3}]',
         },
         {
-          id: 2,
           name: 'Bob',
           posts: 'not-json',
         },
         {
-          id: 3,
           name: 'Cara',
           posts: null,
         },
         {
-          id: 4,
           name: 'Drew',
           posts: '{"id":99}',
         },
@@ -332,6 +329,12 @@ describe('collection-dispatch', () => {
         name: 'Drew',
         posts: [],
       },
+    ]);
+    const ast = runtime.executions[0]?.plan.ast;
+    expect(isSelectAst(ast)).toBe(true);
+    expect((ast as SelectAst).projection.map((item: ProjectionItem) => item.alias)).toEqual([
+      'name',
+      'posts',
     ]);
   });
 
@@ -370,12 +373,10 @@ describe('collection-dispatch', () => {
     runtime.setNextResults([
       [
         {
-          user_id: 1,
           title: 'Has Author',
           author: '[{"id":1,"name":"Alice","email":"alice@example.com"}]',
         },
         {
-          user_id: null,
           title: 'No Author',
           author: '[]',
         },

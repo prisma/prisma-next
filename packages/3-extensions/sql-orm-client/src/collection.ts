@@ -16,8 +16,10 @@ import {
   type ToWhereExpr,
   type WhereArg,
 } from '@prisma-next/sql-relational-core/ast';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
+import type { Simplify } from '@prisma-next/utils/types';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
 import { mapCursorValuesToColumns, mapFieldsToColumns } from './collection-column-mapping';
@@ -28,6 +30,7 @@ import {
   isToOneCardinality,
   modelOf,
   type PolymorphismInfo,
+  type PolymorphismVariantInfo,
   resolveFieldToColumn,
   resolveIncludeRelation,
   resolveModelTableName,
@@ -103,6 +106,7 @@ import {
   type IncludeCombine,
   type IncludeCombineBranch,
   type IncludeExpr,
+  type IncludeRelationOwner,
   type IncludeScalar,
   type InferRootRow,
   type MutationCreateInput,
@@ -110,12 +114,12 @@ import {
   type MutationUpdateInput,
   type NumericFieldNames,
   type RelatedModelName,
-  type RelationNames,
   type RelationTargetNamespace,
   type ResolvedCreateInput,
   type RuntimeQueryable,
   type ShorthandWhereFilter,
   type UniqueConstraintCriterion,
+  type VariantAwareIncludeRelationNames,
   type VariantAwareModelAccessor,
   type VariantModelRow,
   type VariantNames,
@@ -171,20 +175,30 @@ function isToWhereExprInput(value: unknown): value is ToWhereExpr {
     typeof value === 'object' &&
     value !== null &&
     'toWhereExpr' in value &&
-    typeof (value as { toWhereExpr?: unknown }).toWhereExpr === 'function'
+    typeof value.toWhereExpr === 'function'
   );
 }
 
 function isWhereDirectInput(value: unknown): value is WhereDirectInput {
   return (
-    (isWhereExpr(value) && typeof (value as { accept?: unknown }).accept === 'function') ||
+    (isWhereExpr(value) &&
+      typeof value === 'object' &&
+      value !== null &&
+      'accept' in value &&
+      typeof value.accept === 'function') ||
     isToWhereExprInput(value)
   );
 }
 
+type MtiVariantInfo = Simplify<PolymorphismVariantInfo & { readonly strategy: 'mti' }>;
+
+function isMtiVariantInfo(variant: PolymorphismVariantInfo | undefined): variant is MtiVariantInfo {
+  return variant?.strategy === 'mti';
+}
+
 interface MtiCreateContext {
   polyInfo: PolymorphismInfo;
-  variant: { modelName: string; value: string; table: string; strategy: 'mti' };
+  variant: MtiVariantInfo;
   baseFieldToColumn: Record<string, string>;
   variantFieldToColumn: Record<string, string>;
   pkColumn: string;
@@ -304,7 +318,10 @@ export class Collection<
     });
 
     if (!filter) {
-      return this as Collection<TContract, ModelName, Row, WithWhereState<State>>;
+      return blindCast<
+        Collection<TContract, ModelName, Row, WithWhereState<State>>,
+        'where() records its static state even when normalization produces no filter'
+      >(this);
     }
 
     return this.#clone<WithWhereState<State>>({
@@ -340,29 +357,23 @@ export class Collection<
     WithVariantState<WithWhereState<State>, V>
   > {
     type ReturnState = WithVariantState<WithWhereState<State>, V>;
-    const model = modelOf(this.contract, this.namespaceId, this.modelName) as
-      | Record<string, unknown>
-      | undefined;
-    const discriminator = model?.['discriminator'] as { field: string } | undefined;
-    const variants = model?.['variants'] as Record<string, { value: string }> | undefined;
+    const model = modelOf(this.contract, this.namespaceId, this.modelName);
+    const discriminator = model?.discriminator;
+    const variants = model?.variants;
 
     if (!discriminator || !variants) {
-      return this as unknown as Collection<
-        TContract,
-        ModelName,
-        VariantModelRow<TContract, ModelName, V>,
-        ReturnState
-      >;
+      return blindCast<
+        Collection<TContract, ModelName, VariantModelRow<TContract, ModelName, V>, ReturnState>,
+        'variant() preserves its declared static narrowing when runtime polymorphism metadata is absent'
+      >(this);
     }
 
     const variantEntry = variants[variantName];
     if (!variantEntry) {
-      return this as unknown as Collection<
-        TContract,
-        ModelName,
-        VariantModelRow<TContract, ModelName, V>,
-        ReturnState
-      >;
+      return blindCast<
+        Collection<TContract, ModelName, VariantModelRow<TContract, ModelName, V>, ReturnState>,
+        'variant() preserves its declared static narrowing when runtime metadata lacks the selected variant'
+      >(this);
     }
 
     const columnName = resolveFieldToColumn(
@@ -390,7 +401,7 @@ export class Collection<
 
     return this.#cloneWithRow<VariantModelRow<TContract, ModelName, V>, ReturnState>({
       filters: [...filtersWithoutPreviousVariant, filter],
-      variantName: variantName as string,
+      variantName,
     });
   }
 
@@ -423,11 +434,29 @@ export class Collection<
    * ```
    */
   include<
-    RelName extends RelationNames<TContract, ModelName, State['nsId']>,
-    RelatedName extends RelatedModelName<TContract, ModelName, RelName, State['nsId']> &
-      string = RelatedModelName<TContract, ModelName, RelName, State['nsId']> & string,
-    TargetNs extends string = RelationTargetNamespace<TContract, ModelName, RelName, State['nsId']>,
-    IsToMany extends boolean = IsToManyRelation<TContract, ModelName, RelName, State['nsId']>,
+    RelName extends VariantAwareIncludeRelationNames<
+      TContract,
+      ModelName,
+      State['variantName'],
+      State['nsId']
+    >,
+    RelationOwner extends string = IncludeRelationOwner<
+      TContract,
+      ModelName,
+      State['variantName'],
+      RelName,
+      State['nsId']
+    > &
+      string,
+    RelatedName extends RelatedModelName<TContract, RelationOwner, RelName, State['nsId']> &
+      string = RelatedModelName<TContract, RelationOwner, RelName, State['nsId']> & string,
+    TargetNs extends string = RelationTargetNamespace<
+      TContract,
+      RelationOwner,
+      RelName,
+      State['nsId']
+    >,
+    IsToMany extends boolean = IsToManyRelation<TContract, RelationOwner, RelName, State['nsId']>,
     RefinedResult extends IncludeRefinementResult<
       TContract,
       RelatedName,
@@ -457,7 +486,7 @@ export class Collection<
       Row & {
         [K in RelName]: IncludeRefinementValue<
           TContract,
-          ModelName,
+          RelationOwner,
           K,
           SimplifyDeep<InferRootRow<TContract, RelatedName, TargetNs>>,
           RefinedResult,
@@ -471,7 +500,8 @@ export class Collection<
       this.contract,
       this.namespaceId,
       this.modelName,
-      relationName as string,
+      relationName,
+      this.state.variantName,
     );
 
     let nestedState = emptyState();
@@ -483,26 +513,23 @@ export class Collection<
         RelatedName,
         SimplifyDeep<InferRootRow<TContract, RelatedName, TargetNs>>,
         DefaultCollectionTypeState
-      >(relation.relatedModelName as RelatedName, {
-        tableName: relation.relatedTableName,
-        namespaceId: relation.relatedNamespaceId,
-        state: emptyState(),
-        includeRefinementMode: true,
-      });
-      const refined = refineFn(
-        nestedCollection as unknown as IncludeRefinementCollection<
-          TContract,
-          RelatedName,
-          SimplifyDeep<InferRootRow<TContract, RelatedName, TargetNs>>,
-          DefaultCollectionTypeState,
-          IsToMany
-        >,
+      >(
+        blindCast<RelatedName, 'resolved include target matches the type-level relation owner'>(
+          relation.relatedModelName,
+        ),
+        {
+          tableName: relation.relatedTableName,
+          namespaceId: relation.relatedNamespaceId,
+          state: emptyState(),
+          includeRefinementMode: true,
+        },
       );
+      const refined = refineFn(nestedCollection);
 
       if (isIncludeScalar(refined)) {
         if (isToOneCardinality(relation.cardinality)) {
           throw new Error(
-            `include('${relationName as string}') scalar aggregations are only supported for to-many relations`,
+            `include('${relationName}') scalar aggregations are only supported for to-many relations`,
           );
         }
         scalarSelector = refined;
@@ -510,7 +537,7 @@ export class Collection<
       } else if (isIncludeCombine(refined)) {
         if (isToOneCardinality(relation.cardinality)) {
           throw new Error(
-            `include('${relationName as string}') combine() is only supported for to-many relations`,
+            `include('${relationName}') combine() is only supported for to-many relations`,
           );
         }
         combineBranches = refined.branches;
@@ -518,16 +545,17 @@ export class Collection<
         nestedState = refined.state;
       } else {
         throw new Error(
-          `include('${relationName as string}') refinement must return a collection, include scalar selector, or combine() descriptor`,
+          `include('${relationName}') refinement must return a collection, include scalar selector, or combine() descriptor`,
         );
       }
     }
 
     const includeExpr: IncludeExpr = {
-      relationName: relationName as string,
+      relationName,
       relatedModelName: relation.relatedModelName,
       relatedNamespaceId: relation.relatedNamespaceId,
       relatedTableName: relation.relatedTableName,
+      localTableName: relation.localTableName,
       targetColumn: relation.targetColumn,
       localColumn: relation.localColumn,
       cardinality: relation.cardinality,
@@ -542,7 +570,7 @@ export class Collection<
         Row & {
           [K in RelName]: IncludeRefinementValue<
             TContract,
-            ModelName,
+            RelationOwner,
             K,
             SimplifyDeep<InferRootRow<TContract, RelatedName, TargetNs>>,
             RefinedResult,
@@ -714,12 +742,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('sum()');
-    const columnName = resolveFieldToColumn(
-      this.contract,
-      this.namespaceId,
-      this.modelName,
-      field as string,
-    );
+    const columnName = resolveFieldToColumn(this.contract, this.namespaceId, this.modelName, field);
     return createIncludeScalar<number | null>('sum', this.state, columnName);
   }
 
@@ -738,12 +761,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('avg()');
-    const columnName = resolveFieldToColumn(
-      this.contract,
-      this.namespaceId,
-      this.modelName,
-      field as string,
-    );
+    const columnName = resolveFieldToColumn(this.contract, this.namespaceId, this.modelName, field);
     return createIncludeScalar<number | null>('avg', this.state, columnName);
   }
 
@@ -761,12 +779,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('min()');
-    const columnName = resolveFieldToColumn(
-      this.contract,
-      this.namespaceId,
-      this.modelName,
-      field as string,
-    );
+    const columnName = resolveFieldToColumn(this.contract, this.namespaceId, this.modelName, field);
     return createIncludeScalar<number | null>('min', this.state, columnName);
   }
 
@@ -784,12 +797,7 @@ export class Collection<
     field: FieldName,
   ): IncludeScalar<number | null> {
     this.#assertIncludeRefinementMode('max()');
-    const columnName = resolveFieldToColumn(
-      this.contract,
-      this.namespaceId,
-      this.modelName,
-      field as string,
-    );
+    const columnName = resolveFieldToColumn(this.contract, this.namespaceId, this.modelName, field);
     return createIncludeScalar<number | null>('max', this.state, columnName);
   }
 
@@ -851,13 +859,13 @@ export class Collection<
       throw new Error(`include().combine() branch "${name}" is invalid`);
     }
 
-    return createIncludeCombine(branches) as IncludeCombine<{
+    return createIncludeCombine<{
       [K in keyof Spec]: Spec[K] extends IncludeScalar<infer ScalarResult>
         ? ScalarResult
         : Spec[K] extends Collection<TContract, ModelName, infer BranchRow, CollectionTypeState>
           ? BranchRow[]
           : never;
-    }>;
+    }>(branches);
   }
 
   /**
@@ -889,7 +897,7 @@ export class Collection<
       this.contract,
       this.namespaceId,
       this.modelName,
-      cursorValues as Readonly<Record<string, unknown>>,
+      cursorValues,
     );
 
     if (Object.keys(mappedCursor).length === 0) {
@@ -954,7 +962,7 @@ export class Collection<
       this.contract,
       this.namespaceId,
       this.modelName,
-      fields as readonly string[],
+      fields,
     );
 
     return this.#clone({
@@ -1223,7 +1231,10 @@ export class Collection<
         this.contract,
         this.namespaceId,
         this.modelName,
-        data as Record<string, unknown>,
+        blindCast<
+          Record<string, unknown>,
+          'create overload inputs are model-field records inspected for relation callbacks'
+        >(data),
       )
     ) {
       const createdRow = await executeNestedCreateMutation({
@@ -1231,7 +1242,10 @@ export class Collection<
         runtime: this.ctx.runtime,
         namespaceId: this.namespaceId,
         modelName: this.modelName,
-        data: data as MutationCreateInput<Contract<SqlStorage>, string>,
+        data: blindCast<
+          MutationCreateInput<Contract<SqlStorage>, string>,
+          'nested callback detection selects the relation-mutation create input'
+        >(data),
       });
 
       const pkCriterion = buildPrimaryKeyFilterFromRow(
@@ -1248,7 +1262,12 @@ export class Collection<
     }
 
     const rows = await this.#createAllWithAnnotations(
-      [data as ResolvedCreateInput<TContract, ModelName, State['variantName'], State['nsId']>],
+      [
+        blindCast<
+          ResolvedCreateInput<TContract, ModelName, State['variantName'], State['nsId']>,
+          'absence of nested callbacks selects the scalar create overload input'
+        >(data),
+      ],
       annotationsMap,
     );
     const created = rows[0];
@@ -1307,7 +1326,10 @@ export class Collection<
 
     assertReturningCapability(this.contract, 'createAll()');
 
-    const rows = data as readonly Record<string, unknown>[];
+    const rows = blindCast<
+      readonly Record<string, unknown>[],
+      'resolved create inputs are model-field records for storage mapping'
+    >(data);
     const mtiContext = this.#resolveMtiCreateContext();
     if (mtiContext) {
       return this.#executeMtiCreate(rows, mtiContext);
@@ -1334,7 +1356,8 @@ export class Collection<
         includes: this.state.includes,
         selectedFields: this.state.selectedFields,
         hiddenColumns,
-        mapRow: (mapped) => mapped as Row,
+        mapRow: (mapped) =>
+          blindCast<Row, 'mapped mutation storage row matches the collection generic row'>(mapped),
       });
     }
 
@@ -1358,7 +1381,8 @@ export class Collection<
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       hiddenColumns,
-      mapRow: (mapped) => mapped as Row,
+      mapRow: (mapped) =>
+        blindCast<Row, 'mapped mutation storage row matches the collection generic row'>(mapped),
     });
   }
 
@@ -1379,7 +1403,7 @@ export class Collection<
     if (!polyInfo) return null;
 
     const variant = polyInfo.variants.get(variantName);
-    if (!variant || variant.strategy !== 'mti') return null;
+    if (!isMtiVariantInfo(variant)) return null;
 
     const baseFieldToColumn = getFieldToColumnMap(this.contract, this.namespaceId, this.modelName);
     const variantFieldToColumn = getFieldToColumnMap(
@@ -1391,7 +1415,7 @@ export class Collection<
 
     return {
       polyInfo,
-      variant: variant as typeof variant & { strategy: 'mti' },
+      variant,
       baseFieldToColumn,
       variantFieldToColumn,
       pkColumn,
@@ -1417,7 +1441,7 @@ export class Collection<
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       for (const row of data) {
         const allMapped: Record<string, unknown> = {};
-        for (const [fieldName, value] of Object.entries(row as Record<string, unknown>)) {
+        for (const [fieldName, value] of Object.entries(row)) {
           if (value === undefined) continue;
           const columnName = mergedFieldToColumn[fieldName] ?? fieldName;
           allMapped[columnName] = value;
@@ -1490,7 +1514,7 @@ export class Collection<
           );
         });
 
-        yield merged as Row;
+        yield blindCast<Row, 'polymorphic storage rows map to the collection generic row'>(merged);
       }
     };
 
@@ -1529,7 +1553,7 @@ export class Collection<
 
     return data.map((row) => {
       const mapped: Record<string, unknown> = {};
-      for (const [fieldName, value] of Object.entries(row as Record<string, unknown>)) {
+      for (const [fieldName, value] of Object.entries(row)) {
         if (value === undefined) continue;
         const columnName = mergedFieldToColumn[fieldName] ?? fieldName;
         mapped[columnName] = value;
@@ -1568,7 +1592,10 @@ export class Collection<
     this.#assertNotMtiVariant('createCount()');
     const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'createCount');
 
-    const rows = data as readonly Record<string, unknown>[];
+    const rows = blindCast<
+      readonly Record<string, unknown>[],
+      'resolved create-count inputs are model-field records for storage mapping'
+    >(data);
     const mappedRows = this.#mapCreateRows(rows);
     applyCreateDefaults(this.ctx, this.namespaceId, this.tableName, mappedRows);
 
@@ -1637,7 +1664,12 @@ export class Collection<
     this.#assertNotMtiVariant('upsert()');
     const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'upsert');
 
-    const mappedCreateRows = this.#mapCreateRows([input.create as Record<string, unknown>]);
+    const mappedCreateRows = this.#mapCreateRows([
+      blindCast<
+        Record<string, unknown>,
+        'resolved upsert create input is a model-field record for storage mapping'
+      >(input.create),
+    ]);
     const createValues = mappedCreateRows[0] ?? {};
     applyCreateDefaults(this.ctx, this.namespaceId, this.tableName, [createValues]);
     const updateValues = mapModelDataToStorageRow(
@@ -1654,7 +1686,10 @@ export class Collection<
       this.contract,
       this.namespaceId,
       this.modelName,
-      input.conflictOn as Record<string, unknown> | undefined,
+      blindCast<
+        Record<string, unknown> | undefined,
+        'typed unique criterion is read as a field-value record by conflict resolution'
+      >(input.conflictOn),
     );
     if (conflictColumns.length === 0) {
       throw new Error(`upsert() for model "${this.modelName}" requires conflict columns`);
@@ -1683,7 +1718,8 @@ export class Collection<
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       hiddenColumns,
-      mapRow: (mapped) => mapped as Row,
+      mapRow: (mapped) =>
+        blindCast<Row, 'mapped upsert storage row matches the collection generic row'>(mapped),
       onMissingRowMessage: `upsert() for model "${this.modelName}" did not return a row`,
     });
     if (row) {
@@ -1754,7 +1790,10 @@ export class Collection<
         this.contract,
         this.namespaceId,
         this.modelName,
-        data as Record<string, unknown>,
+        blindCast<
+          Record<string, unknown>,
+          'update input is a model-field record inspected for relation callbacks'
+        >(data),
       )
     ) {
       const updatedRow = await executeNestedUpdateMutation({
@@ -1763,7 +1802,10 @@ export class Collection<
         namespaceId: this.namespaceId,
         modelName: this.modelName,
         filters: this.state.filters,
-        data: data as MutationUpdateInput<Contract<SqlStorage>, string>,
+        data: blindCast<
+          MutationUpdateInput<Contract<SqlStorage>, string>,
+          'nested callback detection selects the relation-mutation update input'
+        >(data),
       });
       if (!updatedRow) {
         return null;
@@ -1786,9 +1828,12 @@ export class Collection<
       }
       const narrowed = scoped.#clone({ filters: [identityWhere] });
       const rows = await narrowed.#updateAllWithAnnotations(
-        data as State['hasWhere'] extends true
-          ? Partial<DefaultModelRow<TContract, ModelName, State['nsId']>>
-          : never,
+        blindCast<
+          State['hasWhere'] extends true
+            ? Partial<DefaultModelRow<TContract, ModelName, State['nsId']>>
+            : never,
+          'absence of nested callbacks selects the scalar update input'
+        >(data),
         annotationsMap,
       );
       return rows[0] ?? null;
@@ -1875,7 +1920,8 @@ export class Collection<
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       hiddenColumns,
-      mapRow: (mapped) => mapped as Row,
+      mapRow: (mapped) =>
+        blindCast<Row, 'mapped update storage row matches the collection generic row'>(mapped),
     });
   }
 
@@ -2009,7 +2055,10 @@ export class Collection<
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
     configure?: (meta: MetaBuilder<'write'>) => void,
   ): AsyncIterableResult<Row> {
-    return (this as Collection<TContract, ModelName, Row, State>).#deleteAllWithAnnotations(
+    return blindCast<
+      Collection<TContract, ModelName, Row, State>,
+      'deleteAll() conditional this parameter is a filtered collection at runtime'
+    >(this).#deleteAllWithAnnotations(
       this.#collectAnnotationsFromMeta(configure, 'write', 'deleteAll'),
     );
   }
@@ -2049,7 +2098,8 @@ export class Collection<
       includes: this.state.includes,
       selectedFields: this.state.selectedFields,
       hiddenColumns,
-      mapRow: (mapped) => mapped as Row,
+      mapRow: (mapped) =>
+        blindCast<Row, 'mapped delete storage row matches the collection generic row'>(mapped),
     });
   }
 
@@ -2222,7 +2272,10 @@ export class Collection<
     const criterion: Record<string, unknown> = {};
     for (const column of identityColumns) {
       const fieldName = columnToField[column] ?? column;
-      const value = (firstRow as Record<string, unknown>)[fieldName];
+      const value = blindCast<
+        Record<string, unknown>,
+        'selected collection rows are model-field records used for identity lookup'
+      >(firstRow)[fieldName];
       if (value === undefined) {
         throw new Error(
           `Missing identity field "${fieldName}" while resolving single-row scope for model "${this.modelName}"`,
@@ -2235,7 +2288,10 @@ export class Collection<
         this.ctx.context,
         this.namespaceId,
         this.modelName,
-        criterion as ShorthandWhereFilter<TContract, ModelName>,
+        blindCast<
+          ShorthandWhereFilter<TContract, ModelName>,
+          'identity columns were resolved from this model before building the shorthand filter'
+        >(criterion),
       ) ?? null
     );
   }
@@ -2252,7 +2308,10 @@ export class Collection<
       this.ctx.context,
       this.namespaceId,
       this.modelName,
-      criterion as ShorthandWhereFilter<TContract, ModelName>,
+      blindCast<
+        ShorthandWhereFilter<TContract, ModelName>,
+        'mutation reload criterion contains resolved fields for this model'
+      >(criterion),
     );
     if (!whereExpr) {
       throw new Error(
@@ -2297,14 +2356,22 @@ export class Collection<
   }
 
   #withRuntime(runtime: RuntimeQueryable): Collection<TContract, ModelName, Row, State> {
-    const Ctor = this.constructor as CollectionConstructor<TContract>;
-    return new Ctor({ ...this.ctx, runtime }, this.modelName, {
-      tableName: this.tableName,
-      namespaceId: this.namespaceId,
-      state: this.state,
-      registry: this.registry,
-      includeRefinementMode: this.includeRefinementMode,
-    }) as unknown as Collection<TContract, ModelName, Row, State>;
+    const Ctor = blindCast<
+      CollectionConstructor<TContract>,
+      'runtime collection subclasses preserve the Collection constructor contract'
+    >(this.constructor);
+    return blindCast<
+      Collection<TContract, ModelName, Row, State>,
+      'runtime collection construction erases model row and state generics'
+    >(
+      new Ctor({ ...this.ctx, runtime }, this.modelName, {
+        tableName: this.tableName,
+        namespaceId: this.namespaceId,
+        state: this.state,
+        registry: this.registry,
+        includeRefinementMode: this.includeRefinementMode,
+      }),
+    );
   }
 
   #cloneWithRow<NextRow, NextState extends CollectionTypeState = State>(
@@ -2319,14 +2386,22 @@ export class Collection<
   #createSelf<NextRow, NextState extends CollectionTypeState>(
     state: CollectionState,
   ): Collection<TContract, ModelName, NextRow, NextState> {
-    const Ctor = this.constructor as CollectionConstructor<TContract>;
-    return new Ctor(this.ctx, this.modelName, {
-      tableName: this.tableName,
-      namespaceId: this.namespaceId,
-      state,
-      registry: this.registry,
-      includeRefinementMode: this.includeRefinementMode,
-    }) as unknown as Collection<TContract, ModelName, NextRow, NextState>;
+    const Ctor = blindCast<
+      CollectionConstructor<TContract>,
+      'runtime collection subclasses preserve the Collection constructor contract'
+    >(this.constructor);
+    return blindCast<
+      Collection<TContract, ModelName, NextRow, NextState>,
+      'runtime collection cloning erases projected row and state generics'
+    >(
+      new Ctor(this.ctx, this.modelName, {
+        tableName: this.tableName,
+        namespaceId: this.namespaceId,
+        state,
+        registry: this.registry,
+        includeRefinementMode: this.includeRefinementMode,
+      }),
+    );
   }
 
   #createCollection<
@@ -2338,17 +2413,23 @@ export class Collection<
     options: CollectionInit<TContract>,
   ): Collection<TContract, ModelNameInner, RowInner, StateInner> {
     const Ctor =
-      (this.registry.get(modelName) as CollectionConstructor<TContract> | undefined) ??
-      (Collection as unknown as CollectionConstructor<TContract>);
-    return new Ctor(this.ctx, modelName, {
-      tableName: options.tableName,
-      namespaceId: options.namespaceId,
-      state: options.state,
-      registry:
-        options.registry ??
-        (this.registry as ReadonlyMap<string, CollectionConstructor<TContract>>),
-      includeRefinementMode: options.includeRefinementMode ?? this.includeRefinementMode,
-    }) as unknown as Collection<TContract, ModelNameInner, RowInner, StateInner>;
+      this.registry.get(modelName) ??
+      blindCast<
+        CollectionConstructor<TContract>,
+        'base Collection constructor is generic over the runtime contract'
+      >(Collection);
+    return blindCast<
+      Collection<TContract, ModelNameInner, RowInner, StateInner>,
+      'runtime related collection construction erases model row and state generics'
+    >(
+      new Ctor(this.ctx, modelName, {
+        tableName: options.tableName,
+        namespaceId: options.namespaceId,
+        state: options.state,
+        registry: options.registry ?? this.registry,
+        includeRefinementMode: options.includeRefinementMode ?? this.includeRefinementMode,
+      }),
+    );
   }
 
   #dispatch(): AsyncIterableResult<Row> {
@@ -2390,7 +2471,10 @@ export class Collection<
     for (const [namespace, value] of meta.annotations) {
       next.set(namespace, value);
     }
-    return this.#clone({ annotations: next }) as this;
+    return blindCast<
+      this,
+      'annotation cloning preserves the concrete collection subclass runtime type'
+    >(this.#clone({ annotations: next }));
   }
 
   /**
