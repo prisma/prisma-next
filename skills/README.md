@@ -8,7 +8,7 @@ Agent skills for [Prisma Next](https://github.com/prisma/prisma-next) — a smal
 
 ## What's in the box
 
-One package, ten skills. Each skill is a `SKILL.md` with its own `description` field that an agent runtime matches against the user's prompt:
+One package, eleven skills. Each skill is a `SKILL.md` with its own `description` field that an agent runtime matches against the user's prompt:
 
 | Skill | Scope |
 |---|---|

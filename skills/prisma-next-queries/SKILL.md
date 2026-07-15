@@ -47,6 +47,7 @@ Prisma Next ships **two query lanes per target** on the same `db` value from `sr
 |---|---|
 | `@prisma-next/postgres/runtime` | [`postgres.md`](./postgres.md) — `db.orm.<Model>` + `db.sql.<table>` |
 | `@prisma-next/mongo/runtime` | [`mongo.md`](./mongo.md) — `db.orm.<root>` + `db.query.from(...)` |
+| `@prisma-next/extension-supabase/runtime` | [`postgres.md`](./postgres.md) — a Supabase `RoleBoundDb` is a Postgres surface (`db.orm.<Model>` + `db.sql.<table>`); bind a role first via `prisma-next-supabase` |
 
 Both targets share the contract and connection on one `db` value. Reach for the ORM first; drop to the lower-level lane when the ORM can't express the shape. Lane choice is local — one query function picks one lane, not the whole app.
 

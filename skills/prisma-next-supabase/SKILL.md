@@ -218,7 +218,7 @@ The concept: RLS, roles, and JWT-claim session vars are plain Postgres mechanism
 5. **Expecting `.supabase` on `asUser` / `asAnon`.** Admin access to `auth.*` is `service_role`-only by construction.
 6. **A `policy_*` block whose target lacks `@@rls`.** Emit fails with `PSL_EXTENSION_TARGET_MODEL_MISSING_ATTRIBUTE` — add `@@rls` to the model.
 7. **Unquoted camelCase columns or missing casts in predicates.** Predicates are verbatim SQL: `"userId"` needs quotes; compare uuid to `auth.uid()` with a `::uuid` cast where the column isn't already `uuid`.
-8. **Passing both `jwtSecret` and `jwksUrl`** (or neither) — `SupabaseConfigError`, synchronously.
+8. **Passing both `jwtSecret` and `jwksUrl`** (or neither) — the `supabase()` promise rejects with `SupabaseConfigError`. It's an async factory, so the misconfiguration surfaces as a rejection (`await` / `.catch`), not a synchronous throw.
 9. **Treating an RLS-filtered write as an error.** An `UPDATE` against a row the role can't see affects **0 rows** (no exception); only `withCheck` violations raise.
 
 ## What Prisma Next doesn't do yet
