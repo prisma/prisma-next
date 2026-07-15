@@ -197,16 +197,11 @@ function createProjectCollection(runtime: PgIntegrationRuntime): PolyIncludePare
   }) as unknown as PolyIncludeParent;
 }
 
-// Root-level Task collection over the MTI poly contract, exposing the
-// `.variant(...).orderBy(...)` surface this file exercises. `priority` lives
-// on the joined `features` table, so ordering by it proves the variant-aware
-// orderBy resolves the MTI variant column against the variant table.
 interface RootTaskCollection {
-  variant(name: string): {
-    orderBy(selector: (row: TaskRefinementRow) => unknown): {
-      all(): { toArray(): Promise<Record<string, unknown>[]> };
-    };
-  };
+  variant(name: string): RootTaskCollection;
+  select(...fields: string[]): RootTaskCollection;
+  orderBy(selector: (row: TaskRefinementRow) => unknown): RootTaskCollection;
+  all(): { toArray(): Promise<Record<string, unknown>[]> };
 }
 
 function createTaskCollection(runtime: PgIntegrationRuntime): RootTaskCollection {
@@ -344,21 +339,62 @@ describe('integration/polymorphism-include', () => {
   );
 
   it(
-    'MTI-target include returns rows with the variant table column present',
+    'MTI-target include applies explicit selection and preserves the implicit default',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         await setupMtiIncludeSchema(runtime);
         await seedMtiIncludeData(runtime);
 
         const projects = createProjectCollection(runtime);
-        // The MTI variant column (`features.priority`) is joined+projected by
-        // the poly machinery regardless of `select`; the base columns are
-        // controlled by `select`. So a bug row carries only the selected base
-        // fields, a feature row additionally carries `priority`.
-        // TML-2783: explicit `.select('id', 'title', 'type')` does NOT restrict
-        // the poly variant columns — `priority` leaks in despite not being
-        // selected. This asserts the current (buggy) shape, not the post-fix one.
-        const rows = await projects
+        const implicitRows = await projects
+          .select('id', 'name')
+          .orderBy((project) => project.id.asc())
+          .include('tasks', (tasks) => tasks.orderBy((task) => task.id.asc()))
+          .all()
+          .toArray();
+
+        expect(implicitRows).toEqual([
+          {
+            id: 1,
+            name: 'Roadmap',
+            tasks: [
+              {
+                id: 1,
+                title: 'Crash on login',
+                type: 'bug',
+                severity: 'critical',
+                projectId: 1,
+              },
+              { id: 2, title: 'Null ref', type: 'bug', severity: 'low', projectId: 1 },
+              { id: 3, title: 'Dark mode', type: 'feature', priority: 1, projectId: 1 },
+              { id: 4, title: 'Export PDF', type: 'feature', priority: 3, projectId: 1 },
+            ],
+          },
+          { id: 2, name: 'Empty', tasks: [] },
+        ]);
+
+        const selectedRows = await projects
+          .select('id', 'name')
+          .orderBy((project) => project.id.asc())
+          .include('tasks', (tasks) => tasks.select('id', 'title').orderBy((task) => task.id.asc()))
+          .all()
+          .toArray();
+
+        expect(selectedRows).toEqual([
+          {
+            id: 1,
+            name: 'Roadmap',
+            tasks: [
+              { id: 1, title: 'Crash on login' },
+              { id: 2, title: 'Null ref' },
+              { id: 3, title: 'Dark mode' },
+              { id: 4, title: 'Export PDF' },
+            ],
+          },
+          { id: 2, name: 'Empty', tasks: [] },
+        ]);
+
+        const selectedWithDiscriminatorRows = await projects
           .select('id', 'name')
           .orderBy((project) => project.id.asc())
           .include('tasks', (tasks) =>
@@ -367,16 +403,34 @@ describe('integration/polymorphism-include', () => {
           .all()
           .toArray();
 
-        expect(rows).toEqual([
+        expect(selectedWithDiscriminatorRows).toEqual([
           {
             id: 1,
             name: 'Roadmap',
             tasks: [
               { id: 1, title: 'Crash on login', type: 'bug' },
               { id: 2, title: 'Null ref', type: 'bug' },
-              { id: 3, title: 'Dark mode', type: 'feature', priority: 1 },
-              { id: 4, title: 'Export PDF', type: 'feature', priority: 3 },
+              { id: 3, title: 'Dark mode', type: 'feature' },
+              { id: 4, title: 'Export PDF', type: 'feature' },
             ],
+          },
+          { id: 2, name: 'Empty', tasks: [] },
+        ]);
+
+        const selectedMtiRows = await projects
+          .select('id', 'name')
+          .orderBy((project) => project.id.asc())
+          .include('tasks', (tasks) =>
+            tasks.select('id', 'priority').orderBy((task) => task.id.asc()),
+          )
+          .all()
+          .toArray();
+
+        expect(selectedMtiRows).toEqual([
+          {
+            id: 1,
+            name: 'Roadmap',
+            tasks: [{ id: 1 }, { id: 2 }, { id: 3, priority: 1 }, { id: 4, priority: 3 }],
           },
           { id: 2, name: 'Empty', tasks: [] },
         ]);
@@ -430,12 +484,8 @@ describe('integration/polymorphism-include', () => {
         await seedMtiIncludeData(runtime);
 
         const projects = createProjectCollection(runtime);
-        // `priority` is the Feature (MTI) variant column — it lives on the
-        // joined `features` table, not the base `tasks` table. Filtering on it
-        // confirms the predicate accessor names the variant column against the
-        // joined variant table inside the correlated child SELECT. The MTI
-        // variant column projects regardless of select; seed has Feature id=3
-        // (priority 1) and id=4 (priority 3), only id=4 passes priority >= 3.
+        // The filter still requires the joined MTI table, but the explicit
+        // selection controls which fields reach the returned row.
         const rows = await projects
           .select('id', 'name')
           .orderBy((project) => project.id.asc())
@@ -453,7 +503,7 @@ describe('integration/polymorphism-include', () => {
           {
             id: 1,
             name: 'Roadmap',
-            tasks: [{ id: 4, title: 'Export PDF', type: 'feature', priority: 3 }],
+            tasks: [{ id: 4, title: 'Export PDF', type: 'feature' }],
           },
           { id: 2, name: 'Empty', tasks: [] },
         ]);
@@ -463,7 +513,7 @@ describe('integration/polymorphism-include', () => {
   );
 
   it(
-    'an MTI variant-narrowed include returns only that variant',
+    'an MTI variant-narrowed include returns only that variant with the selected shape',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         await setupMtiIncludeSchema(runtime);
@@ -487,11 +537,80 @@ describe('integration/polymorphism-include', () => {
             id: 1,
             name: 'Roadmap',
             tasks: [
-              { id: 3, title: 'Dark mode', type: 'feature', priority: 1 },
-              { id: 4, title: 'Export PDF', type: 'feature', priority: 3 },
+              { id: 3, title: 'Dark mode', type: 'feature' },
+              { id: 4, title: 'Export PDF', type: 'feature' },
             ],
           },
           { id: 2, name: 'Empty', tasks: [] },
+        ]);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'root MTI collection applies explicit selection and preserves the implicit default',
+    async () => {
+      await withCollectionRuntime(async (runtime) => {
+        await setupMtiIncludeSchema(runtime);
+        await seedMtiIncludeData(runtime);
+
+        const tasks = createTaskCollection(runtime);
+        const implicitRows = await tasks
+          .orderBy((task) => task.id.asc())
+          .all()
+          .toArray();
+
+        expect(implicitRows).toEqual([
+          {
+            id: 1,
+            title: 'Crash on login',
+            type: 'bug',
+            severity: 'critical',
+            projectId: 1,
+          },
+          { id: 2, title: 'Null ref', type: 'bug', severity: 'low', projectId: 1 },
+          { id: 3, title: 'Dark mode', type: 'feature', priority: 1, projectId: 1 },
+          { id: 4, title: 'Export PDF', type: 'feature', priority: 3, projectId: 1 },
+        ]);
+
+        const selectedRows = await tasks
+          .select('id', 'title')
+          .orderBy((task) => task.id.asc())
+          .all()
+          .toArray();
+
+        expect(selectedRows).toEqual([
+          { id: 1, title: 'Crash on login' },
+          { id: 2, title: 'Null ref' },
+          { id: 3, title: 'Dark mode' },
+          { id: 4, title: 'Export PDF' },
+        ]);
+
+        const selectedWithDiscriminatorRows = await tasks
+          .select('id', 'title', 'type')
+          .orderBy((task) => task.id.asc())
+          .all()
+          .toArray();
+
+        expect(selectedWithDiscriminatorRows).toEqual([
+          { id: 1, title: 'Crash on login', type: 'bug' },
+          { id: 2, title: 'Null ref', type: 'bug' },
+          { id: 3, title: 'Dark mode', type: 'feature' },
+          { id: 4, title: 'Export PDF', type: 'feature' },
+        ]);
+
+        const selectedMtiRows = await tasks
+          .select('id', 'priority')
+          .orderBy((task) => task.id.asc())
+          .all()
+          .toArray();
+
+        expect(selectedMtiRows).toEqual([
+          { id: 1 },
+          { id: 2 },
+          { id: 3, priority: 1 },
+          { id: 4, priority: 3 },
         ]);
       });
     },
