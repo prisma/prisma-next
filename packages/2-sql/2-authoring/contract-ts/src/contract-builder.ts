@@ -6,6 +6,7 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import type { PackEntityHandle } from '@prisma-next/sql-contract/entity-handle-lowering-hook';
 import type {
   SqlNamespaceBase,
   SqlNamespaceInput,
@@ -18,7 +19,6 @@ import {
   type ComposedAuthoringHelpers,
   createComposedAuthoringHelpers,
 } from './composed-authoring-helpers';
-import type { PackEntitiesInput } from './contract-definition';
 import {
   type ContractInput,
   type ContractModelBuilder,
@@ -77,7 +77,7 @@ type ContractDefinition<
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
   readonly enums?: Enums;
-  readonly packEntities?: PackEntitiesInput;
+  readonly entities?: readonly PackEntityHandle[];
 };
 
 type ContractScaffold<
@@ -103,7 +103,7 @@ type ContractScaffold<
   readonly models?: never;
   readonly codecLookup?: CodecLookup;
   readonly enums?: Enums;
-  readonly packEntities?: PackEntitiesInput;
+  readonly entities?: readonly PackEntityHandle[];
 };
 
 type ContractFactory<
@@ -117,7 +117,7 @@ type ContractFactory<
   readonly types?: Types;
   readonly models?: Models;
   readonly enums?: Enums;
-  readonly packEntities?: PackEntitiesInput;
+  readonly entities?: readonly PackEntityHandle[];
 };
 
 function validateTargetPackRef(
@@ -326,7 +326,7 @@ type BoundDefinitionInput<
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
   readonly enums?: Record<string, EnumTypeHandle>;
-  readonly packEntities?: PackEntitiesInput;
+  readonly entities?: readonly PackEntityHandle[];
 };
 
 // A bare `Record<string, EnumTypeHandle>` (no literal keys) is the widened
@@ -349,60 +349,6 @@ type WithFamilyTarget<
   F extends FamilyPackRef<string>,
   T extends TargetPackRef<'sql', string>,
 > = Input & { readonly family: F; readonly target: T };
-
-// Deep-merges packEntities authored on the scaffold definition with those
-// returned from the factory callback — three levels deep (namespace, kind,
-// name), unlike `enums`' flat shallow merge, since a factory-declared
-// namespace/kind must not silently drop a scaffold-declared sibling entry
-// under the same namespace or kind. A same-name key present on both sides is
-// only merged when it is the identical entity instance; two *different*
-// entities of the same namespace/kind/name is a collision (the emitted
-// entry could reflect only one), rejected here the same way
-// `mergeCollectedPackEntities` in `build-contract.ts` rejects it.
-function mergePackEntityNames(
-  namespaceId: string,
-  kind: string,
-  a: Readonly<Record<string, unknown>> | undefined,
-  b: Readonly<Record<string, unknown>> | undefined,
-): Readonly<Record<string, unknown>> {
-  if (a !== undefined && b !== undefined) {
-    for (const [name, entity] of Object.entries(b)) {
-      const existing = a[name];
-      if (existing !== undefined && existing !== entity) {
-        throw new Error(
-          `defineContract: two different "${kind}" entities named "${name}" in namespace "${namespaceId}" — a factory-returned pack entity conflicts with a scaffold-declared one; pack-entity names must be unique per namespace.`,
-        );
-      }
-    }
-  }
-  return { ...(a ?? {}), ...(b ?? {}) };
-}
-
-function mergePackEntityKinds(
-  namespaceId: string,
-  a: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
-  b: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
-): Readonly<Record<string, Readonly<Record<string, unknown>>>> {
-  const kinds = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
-  const result: Record<string, Readonly<Record<string, unknown>>> = {};
-  for (const kind of kinds) {
-    result[kind] = mergePackEntityNames(namespaceId, kind, a?.[kind], b?.[kind]);
-  }
-  return result;
-}
-
-function mergePackEntities(
-  a: PackEntitiesInput | undefined,
-  b: PackEntitiesInput | undefined,
-): PackEntitiesInput | undefined {
-  if (a === undefined && b === undefined) return undefined;
-  const namespaces = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
-  const result: Record<string, Readonly<Record<string, Readonly<Record<string, unknown>>>>> = {};
-  for (const namespaceId of namespaces) {
-    result[namespaceId] = mergePackEntityKinds(namespaceId, a?.[namespaceId], b?.[namespaceId]);
-  }
-  return result;
-}
 
 /**
  * Shared builder that assembles a SqlContract with pre-bound family and target.
@@ -449,7 +395,7 @@ export function buildBoundContract<
     readonly types?: Record<string, StorageTypeInstance>;
     readonly models?: Record<string, ModelLike>;
     readonly enums?: Record<string, EnumTypeHandle>;
-    readonly packEntities?: PackEntitiesInput;
+    readonly entities?: readonly PackEntityHandle[];
   },
 >(
   family: F,
@@ -475,7 +421,7 @@ export function buildBoundContract(
         readonly types?: Record<string, StorageTypeInstance>;
         readonly models?: Record<string, ModelLike>;
         readonly enums?: Record<string, EnumTypeHandle>;
-        readonly packEntities?: PackEntitiesInput;
+        readonly entities?: readonly PackEntityHandle[];
       })
     | undefined,
 ) {
@@ -490,13 +436,13 @@ export function buildBoundContract(
       }),
     );
     const mergedEnums = { ...(definition.enums ?? {}), ...built.enums };
-    const mergedPackEntities = mergePackEntities(definition.packEntities, built.packEntities);
+    const mergedEntities = [...(definition.entities ?? []), ...(built.entities ?? [])];
     return buildContractFromDsl({
       ...full,
       ...ifDefined('types', built.types),
       ...ifDefined('models', built.models),
       ...ifDefined('enums', Object.keys(mergedEnums).length > 0 ? mergedEnums : undefined),
-      ...ifDefined('packEntities', mergedPackEntities),
+      ...ifDefined('entities', mergedEntities.length > 0 ? mergedEntities : undefined),
     });
   }
 

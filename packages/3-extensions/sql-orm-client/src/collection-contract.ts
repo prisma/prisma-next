@@ -295,6 +295,7 @@ export interface ResolvedIncludeRelation {
   readonly relatedModelName: string;
   readonly relatedNamespaceId: string;
   readonly relatedTableName: string;
+  readonly localTableName: string;
   readonly targetColumn: string;
   readonly localColumn: string;
   readonly cardinality: RelationCardinalityTag | undefined;
@@ -304,24 +305,39 @@ export interface ResolvedIncludeRelation {
 export function resolveIncludeRelation(
   contract: Contract<SqlStorage>,
   namespaceId: string,
-  modelName: string,
+  baseModelName: string,
   relationName: string,
+  variantName?: string,
 ): ResolvedIncludeRelation {
-  const relations = resolveModelRelations(contract, namespaceId, modelName);
-  const relation = relations[relationName];
+  const polymorphism = resolvePolymorphismInfo(contract, namespaceId, baseModelName);
+  const variant = variantName === undefined ? undefined : polymorphism?.variants.get(variantName);
+  let declaringModelName = baseModelName;
+  let localTableName = resolveModelTableName(contract, namespaceId, baseModelName);
+  let relation: ResolvedRelation | undefined;
+
+  if (variant !== undefined) {
+    const candidate = resolveModelRelations(contract, namespaceId, variant.modelName)[relationName];
+    if (candidate !== undefined) {
+      relation = candidate;
+      declaringModelName = variant.modelName;
+      localTableName = variant.table;
+    }
+  }
+
+  relation ??= resolveModelRelations(contract, namespaceId, baseModelName)[relationName];
   if (!relation) {
-    throw new Error(`Relation '${relationName}' not found on model '${modelName}'`);
+    throw new Error(`Relation '${relationName}' not found on model '${baseModelName}'`);
   }
   const localField = relation.on.localFields[0];
   const targetField = relation.on.targetFields[0];
   if (!localField || !targetField) {
     throw new Error(
-      `Relation '${relationName}' on model '${modelName}' has incomplete join metadata (missing localFields or targetFields)`,
+      `Relation '${relationName}' on model '${declaringModelName}' has incomplete join metadata (missing localFields or targetFields)`,
     );
   }
 
   const relatedTableName = resolveModelTableName(contract, relation.toNamespace, relation.to);
-  const localColumn = resolveFieldToColumn(contract, namespaceId, modelName, localField);
+  const localColumn = resolveFieldToColumn(contract, namespaceId, declaringModelName, localField);
   const targetColumn = resolveFieldToColumn(
     contract,
     relation.toNamespace,
@@ -332,7 +348,7 @@ export function resolveIncludeRelation(
   let through: IncludeThroughDescriptor | undefined;
   if (relation.through !== undefined) {
     const parentLocalColumns = relation.on.localFields.map((field) =>
-      resolveFieldToColumn(contract, namespaceId, modelName, field),
+      resolveFieldToColumn(contract, namespaceId, declaringModelName, field),
     );
     through = {
       table: relation.through.table,
@@ -348,6 +364,7 @@ export function resolveIncludeRelation(
     relatedModelName: relation.to,
     relatedNamespaceId: relation.toNamespace,
     relatedTableName,
+    localTableName,
     targetColumn,
     localColumn,
     cardinality: relation.cardinality,

@@ -1615,14 +1615,14 @@ export type ContractInput<
    */
   readonly enums?: Record<string, import('./enum-type').EnumTypeHandle>;
   /**
-   * Author-declared pack entities, keyed by namespace id then entity kind
-   * then name — e.g. `{ auth: { native_enum: { AalLevel: <entity> } } }`.
-   * Each entity lowers into `storage.namespaces[ns].entries.<kind>`; when its
-   * registered entity-type descriptor derives a value-set, that also folds
-   * into `entries.valueSet`, mirroring how `enums` flows there. Generic on
-   * purpose — neither this type nor the assembler names a specific kind.
+   * Author-declared pack-entity handles, lowered by the pack that registered
+   * each handle's `entityKind` (through the SQL-family batch lowering hook)
+   * into namespace-scoped entry attachments at build time. Generic on
+   * purpose — neither this type nor the walk names a specific kind; a handle
+   * whose kind no composed pack registers is a build error. This is the only
+   * public channel for attaching pack entities.
    */
-  readonly packEntities?: import('./contract-definition').PackEntitiesInput;
+  readonly entities?: readonly import('@prisma-next/sql-contract/entity-handle-lowering-hook').PackEntityHandle[];
 };
 
 export function model<
@@ -1744,7 +1744,7 @@ type CrossSpaceHandle = {
   readonly stageOne: { readonly namespace?: string };
 };
 
-function isCrossSpaceHandle(value: unknown): value is CrossSpaceHandle {
+export function isCrossSpaceHandle(value: unknown): value is CrossSpaceHandle {
   if (typeof value !== 'object' || value === null) {
     return false;
   }

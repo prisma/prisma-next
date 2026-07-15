@@ -13,21 +13,21 @@ import type { CodecDescriptor } from './codec-descriptor';
 import type { CodecCallContext, CodecTrait } from './codec-types';
 
 /**
- * A codec is the contract between an application value and its on-wire and on-contract-disk representations.
+ * A codec is the contract between an application value and its driver-wire and JSON representations.
  *
- * The author's mental model is two JS-side types — `TInput` (the application JS type) and `TWire` (the database driver wire format) — plus `JsonValue` for build-time contract artifacts. The codec translates `TInput` to `TWire` on writes and back on reads, and to/from `JsonValue` during contract emission and loading.
+ * The author's mental model is two JS-side types — `TInput` (the application JS type) and `TWire` (the database driver wire format) — plus a target-defined `JsonValue`. The codec translates `TInput` to `TWire` on writes and back on ordinary reads, and to/from the target's JSON representation for contract artifacts and database-produced JSON values.
  *
  * Three representations participate:
  * - **Input** (`TInput`): the JS type at the application boundary.
  * - **Wire** (`TWire`): the format exchanged with the database driver.
- * - **JSON** (`JsonValue`): a JSON-safe form used in contract artifacts.
+ * - **JSON** (`JsonValue`): the target-defined JSON-safe form used in contract artifacts. It uses the exact scalar shape the target produces inside JSON values, which can differ from the ordinary wire format.
  *
  * The runtime instance carries only its `id` (the descriptor's `codecId`, set by the factory) and the four conversion methods. Static metadata (`traits`, `targetTypes`, `meta`) and the build-time `renderOutputType` renderer live on the {@link CodecDescriptor} keyed by `codecId` — the read-surface single source of truth. Consumers that need them resolve through `descriptorFor(codecId)`.
  *
  * Codec methods split into two groups:
  *
  * - **Query-time** methods (`encode`, `decode`) run per row/parameter at the IO boundary; they are required and Promise-returning. The per-family codec factory accepts sync or async author functions and lifts sync ones to Promise-shaped methods automatically.
- * - **Build-time** methods (`encodeJson`, `decodeJson`) run when the contract is serialized or loaded. They stay synchronous so contract validation and client construction are synchronous.
+ * - **JSON** methods (`encodeJson`, `decodeJson`) run when the contract is serialized or loaded. Runtimes may also use `decodeJson` for values embedded in database-produced JSON results. They stay synchronous so contract validation and client construction are synchronous.
  *
  * Target-family codec interfaces extend this base; family-specific concerns (e.g. the SQL `column?` per-call context) layer on through the `CodecCallContext` extension pattern.
  */
@@ -45,16 +45,16 @@ export interface Codec<
   encode(value: TInput, ctx: CodecCallContext): Promise<TWire>;
   /** Converts a wire value from the database driver into the JS application type. Always Promise-returning at the boundary. The {@link CodecCallContext} is supplied by the runtime on every call (allocated once per `runtime.execute()`); family layers may narrow the ctx to extend it (e.g. SQL adds `column`). Author-side single-arg `(wire) => …` functions remain legal via TypeScript's bivariance for trailing parameters. */
   decode(wire: TWire, ctx: CodecCallContext): Promise<TInput>;
-  /** Converts a JS value to a JSON-safe representation for contract serialization. Synchronous; called during contract emission. */
+  /** Converts a JS value to the target-defined JSON representation used for contract serialization. This must match the scalar shape produced by the target inside JSON values. Synchronous; called during contract emission. */
   encodeJson(value: TInput): JsonValue;
-  /** Converts a JSON representation back to the JS input type. Synchronous; called during contract loading via `family.deserializeContract`. */
+  /** Converts the target-defined JSON representation back to the JS input type. Synchronous; called during contract loading via `family.deserializeContract` and may be called by runtimes for embedded JSON values. */
   decodeJson(json: JsonValue): TInput;
 }
 
 /**
  * Abstract base class for concrete codec implementations.
  *
- * Codec authors extend this class with their typed `Id`, `TTraits`, `TWire`, `TInput` and override `encode`/`decode` (and optionally `encodeJson`/`decodeJson`). The runtime instance carries only its `id` (proxied through the descriptor so alias subclasses inherit the descriptor's id automatically) and the conversion methods — static metadata lives on the {@link CodecDescriptor}.
+ * Codec authors extend this class with their typed `Id`, `TTraits`, `TWire`, `TInput` and override all four abstract conversion methods: `encode`, `decode`, `encodeJson`, and `decodeJson`. The runtime instance carries only its `id` (proxied through the descriptor so alias subclasses inherit the descriptor's id automatically) and the conversion methods — static metadata lives on the {@link CodecDescriptor}.
  */
 export abstract class CodecImpl<
   Id extends string = string,

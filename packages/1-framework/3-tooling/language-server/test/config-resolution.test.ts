@@ -10,13 +10,47 @@ import * as control from '@prisma-next/framework-components/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolveConfigInputs, resolveControlStackInputs } from '../src/config-resolution';
+import { resolveConfigInputs } from '../src/config-resolution';
 
 vi.mock('@prisma-next/config-loader', { spy: true });
 vi.mock('@prisma-next/framework-components/control', { spy: true });
 
 function loadedConfig(sourceFormat: string, inputs: readonly string[]): PrismaNextConfig {
   return { contract: { source: { sourceFormat, inputs } } } as unknown as PrismaNextConfig;
+}
+
+function interpretCapableConfig(inputs: readonly string[]): PrismaNextConfig {
+  return {
+    contract: {
+      source: {
+        sourceFormat: 'psl',
+        inputs,
+        load: async () => ({}) as never,
+        interpret: () => ({}) as never,
+      },
+    },
+  } as unknown as PrismaNextConfig;
+}
+
+function stubStackWithContext(): ControlStack {
+  return {
+    extensionPacks: [{ id: 'ext-a' }, { id: 'ext-b' }],
+    extensionContracts: new Map([['ext-a', { targetFamily: 'demo' }]]),
+    scalarTypeDescriptors: new Map([['Int', 'int']]),
+    authoringContributions: {
+      field: {},
+      type: {},
+      entityTypes: {},
+      pslBlockDescriptors: {},
+      modelAttributes: {},
+    },
+    codecLookup: { get: () => undefined },
+    controlMutationDefaults: {
+      defaultFunctionRegistry: new Map(),
+      generatorDescriptors: [],
+    },
+    capabilities: { demo: { scalarList: true } },
+  } as unknown as ControlStack;
 }
 
 function stubStack(
@@ -82,22 +116,25 @@ describe('resolveConfigInputs', { timeout: timeouts.coldTransformImport }, () =>
   });
 });
 
-describe('resolveControlStackInputs', () => {
+describe('control-stack input derivation', () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
   });
 
-  it('returns undefined and never builds a stack for a non-psl source', () => {
+  it('never builds a stack for a non-psl source and derives empty pipeline inputs', async () => {
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(
+      loadedConfig('typescript', ['/abs/schema.psl']),
+    );
     const createControlStack = vi.spyOn(control, 'createControlStack');
 
-    const result = resolveControlStackInputs(loadedConfig('typescript', ['/abs/schema.psl']));
+    const result = await resolveConfigInputs('/abs/prisma-next.config.ts');
 
-    expect(result).toBeUndefined();
+    expect(result.controlStack).toEqual({ scalarTypes: [], pslBlockDescriptors: {} });
     expect(createControlStack).not.toHaveBeenCalled();
   });
 
-  it('returns control-stack-derived scalarTypes and pslBlockDescriptors for a psl source', () => {
+  it('derives control-stack scalarTypes and pslBlockDescriptors for a psl source', async () => {
     const pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {
       enum: {
         kind: 'pslBlock',
@@ -108,22 +145,97 @@ describe('resolveControlStackInputs', () => {
         variadicParameters: true,
       },
     };
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(
+      loadedConfig('psl', ['/abs/schema.psl']),
+    );
     vi.spyOn(control, 'createControlStack').mockReturnValue(
       stubStack(['Int', 'String'], pslBlockDescriptors),
     );
 
-    const result = resolveControlStackInputs(loadedConfig('psl', ['/abs/schema.psl']));
+    const result = await resolveConfigInputs('/abs/prisma-next.config.ts');
 
-    expect(result).toEqual({ scalarTypes: ['Int', 'String'], pslBlockDescriptors });
+    expect(result.controlStack).toEqual({ scalarTypes: ['Int', 'String'], pslBlockDescriptors });
   });
 
-  it('propagates createControlStack failures for a psl source', () => {
+  it('propagates createControlStack failures for a psl source', async () => {
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(
+      loadedConfig('psl', ['/abs/schema.psl']),
+    );
     vi.spyOn(control, 'createControlStack').mockImplementation(() => {
       throw new Error('boom');
     });
 
-    expect(() => resolveControlStackInputs(loadedConfig('psl', ['/abs/schema.psl']))).toThrow(
-      'boom',
+    await expect(resolveConfigInputs('/abs/prisma-next.config.ts')).rejects.toThrow('boom');
+  });
+});
+
+describe('interpretation resolution', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it('carries the guarded source and a stack-assembled context for a capable psl config', async () => {
+    const config = interpretCapableConfig(['/abs/schema.prisma']);
+    const stack = stubStackWithContext();
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(config);
+    vi.spyOn(control, 'createControlStack').mockReturnValue(stack);
+
+    const result = await resolveConfigInputs('/abs/prisma-next.config.ts');
+
+    expect(result.interpretation).toBeDefined();
+    expect(result.interpretation?.source).toBe(config.contract?.source);
+    const context = result.interpretation?.context;
+    expect(context?.composedExtensionPacks).toEqual(['ext-a', 'ext-b']);
+    expect(context?.composedExtensionContracts).toBe(stack.extensionContracts);
+    expect(context?.scalarTypeDescriptors).toBe(stack.scalarTypeDescriptors);
+    expect(context?.authoringContributions).toBe(stack.authoringContributions);
+    expect(context?.codecLookup).toBe(stack.codecLookup);
+    expect(context?.controlMutationDefaults).toBe(stack.controlMutationDefaults);
+    expect(context?.capabilities).toBe(stack.capabilities);
+    expect(context?.resolvedInputs).toEqual([pathToFileURL('/abs/schema.prisma').toString()]);
+  });
+
+  it('creates the control stack once per resolution', async () => {
+    const config = interpretCapableConfig(['/abs/schema.prisma']);
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(config);
+    const createControlStack = vi
+      .spyOn(control, 'createControlStack')
+      .mockReturnValue(stubStackWithContext());
+
+    await resolveConfigInputs('/abs/prisma-next.config.ts');
+
+    expect(createControlStack).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries no interpretation for a typescript source', async () => {
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(
+      loadedConfig('typescript', ['/abs/contract.ts']),
     );
+
+    const result = await resolveConfigInputs('/abs/prisma-next.config.ts');
+
+    expect(result.interpretation).toBeUndefined();
+  });
+
+  it('carries no interpretation for a psl source without the interpret capability', async () => {
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(
+      loadedConfig('psl', ['/abs/schema.prisma']),
+    );
+    vi.spyOn(control, 'createControlStack').mockReturnValue(
+      stubStack(new Map([['Int', 'int']]), {}),
+    );
+
+    const result = await resolveConfigInputs('/abs/prisma-next.config.ts');
+
+    expect(result.interpretation).toBeUndefined();
+  });
+
+  it('carries no interpretation when the config has no contract', async () => {
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue({} as unknown as PrismaNextConfig);
+
+    const result = await resolveConfigInputs('/abs/prisma-next.config.ts');
+
+    expect(result.interpretation).toBeUndefined();
   });
 });

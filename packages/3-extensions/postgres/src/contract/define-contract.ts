@@ -15,6 +15,7 @@ import type {
 import { buildBoundContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
+import type { RlsEntityHandle } from './rls';
 
 type SqlFamily = typeof sqlFamilyPack;
 type PostgresPack = typeof postgresPack;
@@ -52,8 +53,17 @@ type PostgresBaseScaffold<
     Record<never, never>,
     ExtensionPacks
   >,
-  'family' | 'target' | 'types' | 'models' | 'enums' | 'createNamespace'
->;
+  'family' | 'target' | 'types' | 'models' | 'enums' | 'createNamespace' | 'entities'
+> & {
+  /**
+   * RLS handles (`policy*`, `rlsEnabled`, `role`), lowered by the generic
+   * contract build through the postgres pack's entity-handle hook —
+   * mirroring the PSL `policy_*` / `@@rls` lowering key-for-key and
+   * wire-name-for-wire-name. This wrapper only narrows the element type;
+   * it contains no entity-kind logic.
+   */
+  readonly entities?: readonly RlsEntityHandle[];
+};
 
 type PostgresDefinition<
   Types extends TypesConstraint,
@@ -104,7 +114,8 @@ export function defineContract<
 ): PostgresResult<Types, Models, ExtensionPacks, MergeEnums<ScaffoldEnums, FactoryEnums>>;
 
 // Implementation — delegates to buildBoundContract which pre-binds family/target,
-// carrying zero casts at this layer.
+// carrying zero casts and zero entity-kind logic at this layer: the generic
+// build lowers `entities` through the pack-registered entity-handle hook.
 export function defineContract(
   definition: PostgresDefinition<TypesConstraint, ModelsConstraint, undefined, EnumsConstraint>,
   factory?: (helpers: ComposedAuthoringHelpers<SqlFamily, PostgresPack, undefined>) => {

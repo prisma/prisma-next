@@ -9,7 +9,8 @@
  *      value-set lands in `entries.valueSet` keyed by the entity NAME (the two
  *      keys differ when `.map()` is used), in both the default namespace
  *      (`public`) and a named schema (`auth`) — proving the deferred column
- *      descriptor's entity is harvested into `packEntities` at build time.
+ *      descriptor's entity is harvested into the namespace's entries at build
+ *      time.
  *   2. The column resolves to `{ codecId: 'pg/enum@1', nativeType,
  *      typeParams.typeName, valueSet ref }`, with `nativeType` from the mapped
  *      Postgres type name (schema-qualified for `auth`, bare for `public`) and

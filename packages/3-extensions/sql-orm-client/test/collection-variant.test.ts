@@ -380,10 +380,14 @@ describe('STI variant create (discriminator auto-injection)', () => {
 
   it('maps variant fields through merged base+variant column map', async () => {
     const { collection, runtime } = createReturningMixedPolyCollection();
-    runtime.setNextResults([[{ id: 1, title: 'Crash', type: 'bug', severity: 'critical' }]]);
+    runtime.setNextResults([
+      [{ id: 1, title: 'Crash', type: 'bug', severity: 'critical', assignee_id: 7 }],
+    ]);
 
     const narrowed = collection.variant('Bug' as never) as typeof collection;
-    await narrowed.createAll([{ title: 'Crash', severity: 'critical' } as never]).toArray();
+    const rows = await narrowed
+      .createAll([{ title: 'Crash', severity: 'critical', assigneeId: 7 } as never])
+      .toArray();
 
     const execution = runtime.executions[0]!;
     const ast = execution.plan.ast as InsertAst;
@@ -391,7 +395,11 @@ describe('STI variant create (discriminator auto-injection)', () => {
 
     expect(firstRow['title']).toBeDefined();
     expect(firstRow['severity']).toBeDefined();
+    expect(firstRow['assignee_id']).toBeDefined();
     expect(firstRow['type']).toBeDefined();
+    expect(rows).toEqual([
+      { id: 1, title: 'Crash', type: 'bug', severity: 'critical', assigneeId: 7 },
+    ]);
   });
 });
 

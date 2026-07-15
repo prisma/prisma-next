@@ -281,14 +281,14 @@ function qualifyColumnDescriptor(
   };
 }
 
-type CollectedPackEntities = Record<string, Record<string, Record<string, unknown>>>;
+type CollectedColumnEntities = Record<string, Record<string, Record<string, unknown>>>;
 
 /**
  * Records a deferred column's entity-ref into the namespace-scoped collection
- * accumulator, keyed the same way author-declared `packEntities` are
- * (`namespaceId → entityKind → entityName`) — folded into the same namespace
- * assembly `derivePackEntityValueSets`/`entries.<kind>` step, so a collected
- * entity gets its value-set the same way an author-declared one does.
+ * accumulator (`namespaceId → entityKind → entityName`) — folded into the same
+ * namespace assembly `deriveEntityValueSets`/`entries.<kind>` step as the
+ * entities-channel attachments, so a column-collected entity gets its
+ * value-set the same way an entities-channel one does.
  *
  * The same handle reused by many columns in one namespace is normal (a native
  * enum type backs any number of columns) and records the identical entity once.
@@ -297,8 +297,8 @@ type CollectedPackEntities = Record<string, Record<string, Record<string, unknow
  * of them, silently mismatching the other column's type/cast. PSL hard-errors
  * on the equivalent (`PSL_DUPLICATE_DECLARATION`); the TS path rejects it too.
  */
-function collectPackEntityFromColumn(
-  collected: CollectedPackEntities,
+function collectEntityFromColumn(
+  collected: CollectedColumnEntities,
   namespaceId: string,
   entityRef: NonNullable<ColumnTypeDescriptor['entityRef']>,
 ): void {
@@ -316,34 +316,36 @@ function collectPackEntityFromColumn(
 }
 
 /**
- * Merges the author-declared `packEntities` for one namespace with the entities
- * collected from that namespace's deferred entity-ref columns. A collected
- * entity that shadows a *different* declared entity of the same kind+name (or
- * vice-versa) is the same name-collision bug `collectPackEntityFromColumn`
- * guards against across columns, so it is rejected the same way — by entity
- * identity, so the same handle declared and used by a column does not throw.
+ * Merges a namespace's entities-channel attachments (lowered from the
+ * `entities` handle list, carried on `ContractDefinition.attachedEntities`)
+ * with the entities collected from that namespace's deferred entity-ref
+ * columns. A column-collected entity that shadows a *different* attached
+ * entity of the same kind+name (or vice-versa) is the same name-collision bug
+ * `collectEntityFromColumn` guards against across columns, so it is rejected
+ * the same way — by entity identity, so the same handle attached and used by
+ * a column does not throw.
  */
-function mergeCollectedPackEntities(
+function mergeColumnAndAttachedEntities(
   namespaceId: string,
-  declared: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
-  collected: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
+  attached: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
+  columnCollected: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
 ): Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined {
-  if (declared === undefined) return collected;
-  if (collected === undefined) return declared;
-  const kinds = new Set([...Object.keys(declared), ...Object.keys(collected)]);
+  if (attached === undefined) return columnCollected;
+  if (columnCollected === undefined) return attached;
+  const kinds = new Set([...Object.keys(attached), ...Object.keys(columnCollected)]);
   const result: Record<string, Readonly<Record<string, unknown>>> = {};
   for (const kind of kinds) {
-    const declaredForKind = declared[kind];
-    const collectedForKind = collected[kind];
-    for (const [name, entity] of Object.entries(collectedForKind ?? {})) {
-      const existing = declaredForKind?.[name];
+    const attachedForKind = attached[kind];
+    const columnForKind = columnCollected[kind];
+    for (const [name, entity] of Object.entries(columnForKind ?? {})) {
+      const existing = attachedForKind?.[name];
       if (existing !== undefined && existing !== entity) {
         throw new Error(
-          `buildSqlContractFromDefinition: two different "${kind}" entities named "${name}" in namespace "${namespaceId}" — a collected pack entity conflicts with an author-declared one; pack-entity names must be unique per namespace.`,
+          `buildSqlContractFromDefinition: two different "${kind}" entities named "${name}" in namespace "${namespaceId}" — a column-referenced entity conflicts with an attached one; pack-entity names must be unique per namespace.`,
         );
       }
     }
-    result[kind] = { ...declaredForKind, ...collectedForKind };
+    result[kind] = { ...attachedForKind, ...columnForKind };
   }
   return result;
 }
@@ -486,7 +488,7 @@ function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): S
       ids.add(model.namespaceId);
     }
   }
-  for (const id of Object.keys(definition.packEntities ?? {})) {
+  for (const id of Object.keys(definition.attachedEntities ?? {})) {
     if (id.length > 0) {
       ids.add(id);
     }
@@ -496,21 +498,21 @@ function collectStorageNamespaceCoordinateIds(definition: ContractDefinition): S
 
 /**
  * Entry kinds the framework assembler itself manages (`table` from models,
- * `valueSet` from `enums` and pack-entity value-set derivation). An
- * author-declared pack entity claiming one of these would silently clobber
- * or be clobbered by the managed slot, so it is rejected outright.
+ * `valueSet` from `enums` and attached-entity value-set derivation). A
+ * pack-attached entity claiming one of these would silently clobber or be
+ * clobbered by the managed slot, so it is rejected outright.
  */
 const MANAGED_ENTRY_KINDS = new Set([tableEntityKind.kind, valueSetEntityKind.kind]);
 
-function assertNoManagedPackEntityKinds(
+function assertNoManagedEntityKinds(
   namespaceId: string,
-  packEntitiesForNs: Readonly<Record<string, unknown>> | undefined,
+  entitiesForNs: Readonly<Record<string, unknown>> | undefined,
 ): void {
-  if (packEntitiesForNs === undefined) return;
-  for (const kind of Object.keys(packEntitiesForNs)) {
+  if (entitiesForNs === undefined) return;
+  for (const kind of Object.keys(entitiesForNs)) {
     if (MANAGED_ENTRY_KINDS.has(kind)) {
       throw new Error(
-        `buildSqlContractFromDefinition: packEntities in namespace "${namespaceId}" declares entry kind "${kind}", which is managed by the framework (table/valueSet) and cannot be supplied via packEntities.`,
+        `buildSqlContractFromDefinition: attached entity in namespace "${namespaceId}" declares entry kind "${kind}", which is managed by the framework (table/valueSet) and cannot be attached.`,
       );
     }
   }
@@ -557,13 +559,13 @@ function collectEntityTypeDescriptorsByDiscriminator(
  * registered descriptor, or whose descriptor output doesn't derive a
  * value-set, contribute nothing.
  */
-function derivePackEntityValueSets(
-  packEntitiesForNs: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
+function deriveEntityValueSets(
+  entitiesForNs: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined,
   entityTypesByDiscriminator: ReadonlyMap<string, AuthoringEntityTypeDescriptor>,
 ): Record<string, StorageValueSetInput> | undefined {
-  if (packEntitiesForNs === undefined) return undefined;
+  if (entitiesForNs === undefined) return undefined;
   let result: Record<string, StorageValueSetInput> | undefined;
-  for (const [kind, entitiesByName] of Object.entries(packEntitiesForNs)) {
+  for (const [kind, entitiesByName] of Object.entries(entitiesForNs)) {
     const descriptor = entityTypesByDiscriminator.get(kind);
     if (descriptor === undefined) continue;
     for (const [name, entity] of Object.entries(entitiesByName)) {
@@ -582,7 +584,7 @@ function derivePackEntityValueSets(
  * which drives value-set → codec typing and the domain-enum CHECK — so a
  * same-named entry in both would let one silently overwrite the other and
  * corrupt whichever column resolves against it. The same collision class the
- * `mergeCollectedPackEntities` guard rejects; the PSL path already hard-errors
+ * `mergeColumnAndAttachedEntities` guard rejects; the PSL path already hard-errors
  * on the equivalent (`interpretPslDocumentToSqlContract`). Reject it here too.
  */
 function mergeNamespaceValueSets(
@@ -645,7 +647,7 @@ export function buildSqlContractFromDefinition(
   const modelNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];
   const modelsByNamespace: Record<string, Record<string, ContractModel>> = {};
-  const collectedPackEntities: CollectedPackEntities = {};
+  const collectedColumnEntities: CollectedColumnEntities = {};
   const rootEntries: Array<{
     readonly tableName: string;
     readonly namespaceId: string;
@@ -720,9 +722,9 @@ export function buildSqlContractFromDefinition(
 
       // A field authored through a deferred entity-ref column helper (e.g.
       // `pg.enum(handle)`) carries `descriptor.entityRef`: the referenced
-      // entity is collected into `collectedPackEntities` (folded into the
-      // same `entries.<kind>` + `entries.valueSet` assembly an author-declared
-      // `packEntities` entry goes through) and the descriptor is resolved
+      // entity is collected into `collectedColumnEntities` (folded into the
+      // same `entries.<kind>` + `entries.valueSet` assembly an entities-channel
+      // attachment goes through) and the descriptor is resolved
       // against this field's now-known `namespaceId` — the builder call that
       // produced it ran before the enclosing model associated one. The
       // descriptor is then handed to the target's `qualifyColumnType` hook,
@@ -738,7 +740,7 @@ export function buildSqlContractFromDefinition(
         let descriptor = field.descriptor;
         const entityRef = descriptor.entityRef;
         if (entityRef !== undefined) {
-          collectPackEntityFromColumn(collectedPackEntities, namespaceId, entityRef);
+          collectEntityFromColumn(collectedColumnEntities, namespaceId, entityRef);
           descriptor = resolveEntityRefDescriptor(descriptor, namespaceId);
         }
         descriptor = qualifyColumnDescriptor(descriptor, namespaceId, qualifyColumnType);
@@ -1072,18 +1074,15 @@ export function buildSqlContractFromDefinition(
   const entityTypesByDiscriminator = collectEntityTypeDescriptorsByDiscriminator(definition);
   const namespaces: SqlStorageInput['namespaces'] = Object.fromEntries(
     [...namespaceCoordinateIds].sort().map((id) => {
-      const packEntitiesForNs = mergeCollectedPackEntities(
+      const entitiesForNs = mergeColumnAndAttachedEntities(
         id,
-        definition.packEntities?.[id],
-        collectedPackEntities[id],
+        definition.attachedEntities?.[id],
+        collectedColumnEntities[id],
       );
-      assertNoManagedPackEntityKinds(id, packEntitiesForNs);
+      assertNoManagedEntityKinds(id, entitiesForNs);
 
       const enumValueSetEntries = storageValueSetsByNs[id];
-      const packValueSetEntries = derivePackEntityValueSets(
-        packEntitiesForNs,
-        entityTypesByDiscriminator,
-      );
+      const packValueSetEntries = deriveEntityValueSets(entitiesForNs, entityTypesByDiscriminator);
       const valueSetEntries =
         enumValueSetEntries !== undefined || packValueSetEntries !== undefined
           ? mergeNamespaceValueSets(id, enumValueSetEntries, packValueSetEntries)
@@ -1093,7 +1092,7 @@ export function buildSqlContractFromDefinition(
         id,
         entries: {
           table: tablesByNamespace[id] ?? {},
-          ...packEntitiesForNs,
+          ...entitiesForNs,
           ...(valueSetEntries !== undefined && Object.keys(valueSetEntries).length > 0
             ? { valueSet: valueSetEntries }
             : {}),

@@ -93,14 +93,18 @@ function buildLexicographicCursorWhere(
 
     branchExprs.push(createBoundaryExpr(tableName, entry));
     if (branchExprs.length === 1) {
-      return branchExprs[0] as AnyExpression;
+      const branch = branchExprs[0];
+      assertDefined(branch, 'cursor branch contains its boundary expression');
+      return branch;
     }
 
     return AndExpr.of(branchExprs);
   });
 
   if (branches.length === 1) {
-    return branches[0] as AnyExpression;
+    const branch = branches[0];
+    assertDefined(branch, 'cursor expression contains its single branch');
+    return branch;
   }
 
   return OrExpr.of(branches);
@@ -279,6 +283,42 @@ function wrapWithRowNumberDedup(options: {
     .withWhere(BinaryExpr.eq(ColumnRef.of(rankedAlias, rnAlias), LiteralExpr.of(1)));
 }
 
+interface IncludeParentSource {
+  readonly baseTableName: string;
+  readonly tableRef: string;
+  readonly variantColumnsProjected: boolean;
+}
+
+function localColumnsForRowInclude(include: IncludeExpr): readonly string[] {
+  return include.through?.parentLocalColumns ?? [include.localColumn];
+}
+
+function resolveParentLocalRefs(
+  parentSource: IncludeParentSource,
+  include: IncludeExpr,
+  localColumns: readonly string[],
+): readonly ColumnRef[] {
+  return localColumns.map((column) => {
+    if (include.localTableName === parentSource.baseTableName) {
+      return ColumnRef.of(parentSource.tableRef, column);
+    }
+    if (parentSource.variantColumnsProjected) {
+      return ColumnRef.of(parentSource.tableRef, `${include.localTableName}__${column}`);
+    }
+    return ColumnRef.of(include.localTableName, column);
+  });
+}
+
+function resolveChildTableSource(
+  include: IncludeExpr,
+  parentLocalRefs: readonly ColumnRef[],
+): { readonly alias: string | undefined; readonly tableRef: string } {
+  const alias = parentLocalRefs.some((ref) => ref.table === include.relatedTableName)
+    ? `${include.relationName}__child`
+    : undefined;
+  return { alias, tableRef: alias ?? include.relatedTableName };
+}
+
 /**
  * Recursively build the correlated-subquery projections for the nested
  * includes attached to a child SELECT. Used by `buildIncludeChildRowsSelect`
@@ -289,11 +329,11 @@ function wrapWithRowNumberDedup(options: {
  */
 function buildNestedIncludeProjections(
   contract: Contract<SqlStorage>,
-  parentTableRef: string,
+  parentSource: IncludeParentSource,
   includes: readonly IncludeExpr[],
 ): ReadonlyArray<ProjectionItem> {
   return includes.map(
-    (nested) => buildCorrelatedIncludeProjection(contract, parentTableRef, nested).projection,
+    (nested) => buildCorrelatedIncludeProjection(contract, parentSource, nested).projection,
   );
 }
 
@@ -349,29 +389,22 @@ function buildChildPolymorphismJoinsAndProjection(
  * connects child rows to the junction via the child columns.
  */
 function buildManyToManyJunctionArtifacts(
-  parentTableName: string,
+  parentLocalRefs: readonly ColumnRef[],
   childTableRef: string,
   through: NonNullable<IncludeExpr['through']>,
 ): {
   readonly whereExpr: AnyExpression;
   readonly junctionJoin: JoinAst;
 } {
-  const {
-    table: junctionTable,
-    parentColumns,
-    childColumns,
-    targetColumns,
-    parentLocalColumns,
-    namespaceId,
-  } = through;
+  const { table: junctionTable, parentColumns, childColumns, targetColumns, namespaceId } = through;
 
   invariant(
     childColumns.length === targetColumns.length,
     `M:N junction '${junctionTable}': childColumns (${childColumns.length}) and targetColumns (${targetColumns.length}) must have equal length`,
   );
   invariant(
-    parentColumns.length === parentLocalColumns.length,
-    `M:N junction '${junctionTable}': parentColumns (${parentColumns.length}) and parentLocalColumns (${parentLocalColumns.length}) must have equal length`,
+    parentColumns.length === parentLocalRefs.length,
+    `M:N junction '${junctionTable}': parentColumns (${parentColumns.length}) and parentLocalColumns (${parentLocalRefs.length}) must have equal length`,
   );
 
   const joinOnPairs = childColumns.map((junctionCol, i) => {
@@ -390,15 +423,12 @@ function buildManyToManyJunctionArtifacts(
     joinOnPairs.length === 1 && firstJoinPair ? firstJoinPair : AndExpr.of(joinOnPairs);
 
   const correlationPairs = parentColumns.map((junctionCol, i) => {
-    const parentLocalCol = parentLocalColumns[i];
+    const parentLocalRef = parentLocalRefs[i];
     assertDefined(
-      parentLocalCol,
-      `M:N junction '${junctionTable}': missing parent-local column at index ${i}`,
+      parentLocalRef,
+      `M:N junction '${junctionTable}': missing parent-local column ref at index ${i}`,
     );
-    return BinaryExpr.eq(
-      ColumnRef.of(junctionTable, junctionCol),
-      ColumnRef.of(parentTableName, parentLocalCol),
-    );
+    return BinaryExpr.eq(ColumnRef.of(junctionTable, junctionCol), parentLocalRef);
   });
   const firstCorrelationPair = correlationPairs[0];
   const whereExpr: AnyExpression =
@@ -417,7 +447,7 @@ function buildManyToManyJunctionArtifacts(
 
 function buildIncludeChildRowsSelect(
   contract: Contract<SqlStorage>,
-  parentTableName: string,
+  parentSource: IncludeParentSource,
   include: IncludeExpr,
 ): {
   readonly childRows: SelectAst;
@@ -426,9 +456,14 @@ function buildIncludeChildRowsSelect(
   readonly aggregateOrderBy: ReadonlyArray<OrderByItem> | undefined;
 } {
   const childState = include.nested;
-  const childTableAlias =
-    include.relatedTableName === parentTableName ? `${include.relationName}__child` : undefined;
-  const childTableRef = childTableAlias ?? include.relatedTableName;
+  const parentLocalRefs = resolveParentLocalRefs(
+    parentSource,
+    include,
+    localColumnsForRowInclude(include),
+  );
+  const childSource = resolveChildTableSource(include, parentLocalRefs);
+  const childTableAlias = childSource.alias;
+  const childTableRef = childSource.tableRef;
   const rowsAlias = `${include.relationName}__rows`;
   // Self-relations rename the inner table source via `childTableAlias`,
   // so any ColumnRef the user-supplied `orderBy` carries against the
@@ -457,16 +492,21 @@ function buildIncludeChildRowsSelect(
 
   if (include.through !== undefined) {
     const artifacts = buildManyToManyJunctionArtifacts(
-      parentTableName,
+      parentLocalRefs,
       childTableRef,
       include.through,
     );
     whereExpr = childWhere ? AndExpr.of([artifacts.whereExpr, childWhere]) : artifacts.whereExpr;
     junctionJoins = [artifacts.junctionJoin];
   } else {
+    const parentLocalRef = parentLocalRefs[0];
+    assertDefined(
+      parentLocalRef,
+      `Include '${include.relationName}' has no parent-local column ref`,
+    );
     const joinExpr = BinaryExpr.eq(
       ColumnRef.of(childTableRef, include.targetColumn),
-      ColumnRef.of(parentTableName, include.localColumn),
+      parentLocalRef,
     );
     whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
   }
@@ -527,7 +567,11 @@ function buildIncludeChildRowsSelect(
   // be an alias if the relation is self-referential.
   const nestedProjections = buildNestedIncludeProjections(
     contract,
-    childTableRef,
+    {
+      baseTableName: include.relatedTableName,
+      tableRef: childTableRef,
+      variantColumnsProjected: false,
+    },
     childState.includes,
   );
 
@@ -643,18 +687,16 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   } = options;
   const childState = include.nested;
 
-  // Force-include every grandchild's `localColumn` into the distinct
+  // Force-include every base/STI grandchild local column into the distinct
   // projection so the outer aggregates can join against the deduped rows.
-  // When the user's `.select(...)` already covers the join keys this is a
-  // no-op; when it doesn't (e.g. `.select('title').distinct('title').include('comments')`)
-  // the join keys appear inside the wrapper subquery only and are stripped
-  // from the user-visible projection in the outer SELECT.
-  //
-  // De-duplicate before projection: two sibling nested includes can share
-  // the same `localColumn` on the distinct child (e.g. a `User` whose
-  // `posts` and `invitedUsers` grandchildren both join from `users.id`).
+  // MTI columns are already forwarded by the polymorphism projection under
+  // their `variant_table__column` aliases.
   const grandchildJoinColumns = Array.from(
-    new Set(childState.includes.map((nested) => nested.localColumn)),
+    new Set(
+      childState.includes.flatMap((nested) =>
+        nested.localTableName === include.relatedTableName ? localColumnsForRowInclude(nested) : [],
+      ),
+    ),
   );
   const { selectedForQuery } = augmentSelectionForJoinColumns(
     childState.selectedFields,
@@ -766,7 +808,11 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   );
   const outerNestedProjections = buildNestedIncludeProjections(
     contract,
-    distinctAlias,
+    {
+      baseTableName: include.relatedTableName,
+      tableRef: distinctAlias,
+      variantColumnsProjected: true,
+    },
     childState.includes,
   );
 
@@ -830,19 +876,19 @@ function buildDistinctNonLeafChildRowsSelect(options: {
  */
 function buildIncludeChildScalarSelect(
   contract: Contract<SqlStorage>,
-  parentTableName: string,
+  parentSource: IncludeParentSource,
   include: IncludeExpr,
   scalar: IncludeScalar<unknown>,
 ): SelectAst {
-  const childTableAlias =
-    include.relatedTableName === parentTableName ? `${include.relationName}__child` : undefined;
-  const childTableRef = childTableAlias ?? include.relatedTableName;
+  const parentLocalRefs = resolveParentLocalRefs(parentSource, include, [include.localColumn]);
+  const parentLocalRef = parentLocalRefs[0];
+  assertDefined(parentLocalRef, `Include '${include.relationName}' has no parent-local column ref`);
+  const childSource = resolveChildTableSource(include, parentLocalRefs);
+  const childTableAlias = childSource.alias;
+  const childTableRef = childSource.tableRef;
   const state = scalar.state;
 
-  const joinExpr = BinaryExpr.eq(
-    ColumnRef.of(childTableRef, include.targetColumn),
-    ColumnRef.of(parentTableName, include.localColumn),
-  );
+  const joinExpr = BinaryExpr.eq(ColumnRef.of(childTableRef, include.targetColumn), parentLocalRef);
   const childWhere = buildStateWhere(contract, childTableRef, state, {
     filterTableName: include.relatedTableName,
     namespaceId: include.relatedNamespaceId,
@@ -1025,7 +1071,7 @@ function buildIncludeAggregateExpr(
  */
 function buildIncludeChildCombineSelect(
   contract: Contract<SqlStorage>,
-  parentTableName: string,
+  parentSource: IncludeParentSource,
   include: IncludeExpr,
   branches: Readonly<Record<string, IncludeCombineBranch>>,
 ): SelectAst {
@@ -1037,7 +1083,7 @@ function buildIncludeChildCombineSelect(
   const compiledBranches = branchEntries.map(([name, branch]) => ({
     name,
     alias: `${include.relationName}__combine__${name}`,
-    select: buildIncludeChildCombineBranchSelect(contract, parentTableName, include, branch),
+    select: buildIncludeChildCombineBranchSelect(contract, parentSource, include, branch),
   }));
 
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
@@ -1070,12 +1116,12 @@ function buildIncludeChildCombineSelect(
  */
 function buildIncludeChildCombineBranchSelect(
   contract: Contract<SqlStorage>,
-  parentTableName: string,
+  parentSource: IncludeParentSource,
   include: IncludeExpr,
   branch: IncludeCombineBranch,
 ): SelectAst {
   if (branch.kind === 'scalar') {
-    return buildIncludeChildScalarSelect(contract, parentTableName, include, branch.selector);
+    return buildIncludeChildScalarSelect(contract, parentSource, include, branch.selector);
   }
   // Row branch: synthesize an IncludeExpr whose `nested` is the
   // branch's state, then build the standard row-aggregate inner shape.
@@ -1085,7 +1131,7 @@ function buildIncludeChildCombineBranchSelect(
     scalar: undefined,
     combine: undefined,
   };
-  return buildIncludeChildRowsAggregateSelect(contract, parentTableName, syntheticInclude);
+  return buildIncludeChildRowsAggregateSelect(contract, parentSource, syntheticInclude);
 }
 
 /**
@@ -1096,12 +1142,12 @@ function buildIncludeChildCombineBranchSelect(
  */
 function buildIncludeChildRowsAggregateSelect(
   contract: Contract<SqlStorage>,
-  parentTableName: string,
+  parentSource: IncludeParentSource,
   include: IncludeExpr,
 ): SelectAst {
   const { childRows, childProjection, rowsAlias, aggregateOrderBy } = buildIncludeChildRowsSelect(
     contract,
-    parentTableName,
+    parentSource,
     include,
   );
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
@@ -1119,7 +1165,7 @@ function buildIncludeChildRowsAggregateSelect(
 
 function buildCorrelatedIncludeProjection(
   contract: Contract<SqlStorage>,
-  parentTableName: string,
+  parentSource: IncludeParentSource,
   include: IncludeExpr,
 ): {
   readonly projection: ProjectionItem;
@@ -1127,7 +1173,7 @@ function buildCorrelatedIncludeProjection(
   if (include.scalar) {
     const scalarSelect = buildIncludeChildScalarSelect(
       contract,
-      parentTableName,
+      parentSource,
       include,
       include.scalar,
     );
@@ -1139,7 +1185,7 @@ function buildCorrelatedIncludeProjection(
   if (include.combine) {
     const combineSelect = buildIncludeChildCombineSelect(
       contract,
-      parentTableName,
+      parentSource,
       include,
       include.combine,
     );
@@ -1148,7 +1194,7 @@ function buildCorrelatedIncludeProjection(
     };
   }
 
-  const aggregateQuery = buildIncludeChildRowsAggregateSelect(contract, parentTableName, include);
+  const aggregateQuery = buildIncludeChildRowsAggregateSelect(contract, parentSource, include);
   return {
     projection: ProjectionItem.of(include.relationName, SubqueryExpr.of(aggregateQuery)),
   };
@@ -1365,8 +1411,13 @@ export function compileSelectWithIncludes(
     includeProjection.push(...mtiArtifacts.projection);
   }
 
+  const parentSource: IncludeParentSource = {
+    baseTableName: tableName,
+    tableRef: tableName,
+    variantColumnsProjected: false,
+  };
   for (const include of state.includes) {
-    const artifact = buildCorrelatedIncludeProjection(contract, tableName, include);
+    const artifact = buildCorrelatedIncludeProjection(contract, parentSource, include);
     includeProjection.push(artifact.projection);
   }
 

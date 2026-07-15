@@ -1,11 +1,14 @@
 import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
 import { pathToFileURL } from 'node:url';
+import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
 import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
 import type { FormatOptions } from '@prisma-next/psl-parser/format';
+import type { PslInterpretCapable } from '@prisma-next/psl-parser/interpret';
 import { type ParseDiagnostic, parse } from '@prisma-next/psl-parser/syntax';
 import { timeouts } from '@prisma-next/test-utils';
+import { notOk, ok } from '@prisma-next/utils/result';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -2072,5 +2075,149 @@ describe('language server disposal', { timeout: timeouts.databaseOperation }, ()
     await assertNoUnhandledRejection((load) =>
       load.reject(new Error('config load failed after dispose')),
     );
+  });
+});
+
+describe('language server interpreter diagnostics', { timeout: timeouts.databaseOperation }, () => {
+  const cleanSchema = 'model User {\n  id Int @id\n}\n';
+  const fixedSchema = 'model User {\n  id Int @id\n}\n// fixed\n';
+  // Span covers "User" on the first line: 1-based columns 7..11 map to the
+  // 0-based LSP range {0,6}..{0,10}.
+  const unresolvedDiagnostic = {
+    code: 'PSL_UNRESOLVED_RELATION',
+    message: 'relation target not found',
+    span: { start: { offset: 6, line: 1, column: 7 }, end: { offset: 10, line: 1, column: 11 } },
+  };
+  const expectedUnresolved: Diagnostic = {
+    range: { start: { line: 0, character: 6 }, end: { line: 0, character: 10 } },
+    message: 'relation target not found',
+    code: 'PSL_UNRESOLVED_RELATION',
+    severity: DiagnosticSeverity.Error,
+    source: 'prisma-next',
+  };
+
+  function interpretationResolution(interpret: PslInterpretCapable['interpret']): {
+    readonly resolveInputs: ResolveInputs;
+    readonly spy: ReturnType<typeof vi.fn>;
+  } {
+    const spy = vi.fn(interpret);
+    const source = {
+      sourceFormat: 'psl',
+      inputs: [schemaPath],
+      load: async () => ok({} as never),
+      interpret: spy,
+    } as unknown as PslInterpretCapable;
+    const resolution: ConfigResolution = {
+      ...resolutionForInputs([schemaPath]),
+      interpretation: { source, context: {} as unknown as ContractSourceContext },
+    };
+    return { resolveInputs: async () => resolution, spy };
+  }
+
+  function fixAwareInterpret(): PslInterpretCapable['interpret'] {
+    return (input) =>
+      input.sourceFile.text.includes('// fixed')
+        ? ok({} as never)
+        : notOk({ summary: 'Schema has 1 error', diagnostics: [unresolvedDiagnostic] });
+  }
+
+  it('pull serves the interpreter diagnostic at its mapped range and clears it after a fix', async () => {
+    const { resolveInputs } = interpretationResolution(fixAwareInterpret());
+    harness = startHarness(resolveInputs, pullDiagnosticsCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+
+    const report = await requestPullDiagnostics(harness, schemaUri);
+    expect(fullReportItems(report)).toEqual([expectedUnresolved]);
+
+    harness.client.sendNotification(DidChangeTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri, version: 2 },
+      contentChanges: [{ text: fixedSchema }],
+    });
+
+    const fixedReport = await requestPullDiagnostics(harness, schemaUri);
+    expect(fullReportItems(fixedReport)).toEqual([]);
+  });
+
+  it('push publishes the combined parse and interpreter diagnostics', async () => {
+    const { resolveInputs } = interpretationResolution(fixAwareInterpret());
+    harness = startHarness(resolveInputs);
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+
+    const published = await harness.waitForDiagnostics(schemaUri);
+    expect(published).toEqual([expectedUnresolved]);
+  });
+
+  it('anchors a span-less interpreter diagnostic at document start', async () => {
+    const { resolveInputs } = interpretationResolution(() =>
+      notOk({
+        summary: 'Schema has 1 error',
+        diagnostics: [{ code: 'PSL_SPANLESS', message: 'no span available' }],
+      }),
+    );
+    harness = startHarness(resolveInputs, pullDiagnosticsCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+
+    const report = await requestPullDiagnostics(harness, schemaUri);
+    expect(fullReportItems(report)).toEqual([
+      {
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+        message: 'no span available',
+        code: 'PSL_SPANLESS',
+        severity: DiagnosticSeverity.Error,
+        source: 'prisma-next',
+      },
+    ]);
+  });
+
+  it('capability-less configs pull exactly the pre-slice response', async () => {
+    harness = startHarness(resolveToSchema, pullDiagnosticsCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, duplicateModelSource);
+
+    const { parseDiagnostics, symbolTableDiagnostics } =
+      parseAndSymbolTableDiagnostics(duplicateModelSource);
+    const report = await requestPullDiagnostics(harness, schemaUri);
+    expect(fullReportItems(report)).toEqual(
+      toPublishedDiagnostics([...parseDiagnostics, ...symbolTableDiagnostics]),
+    );
+  });
+
+  it('capability-less configs publish exactly the pre-slice response', async () => {
+    harness = startHarness(resolveToSchema);
+    await harness.initialize();
+    openDocument(harness, schemaUri, duplicateModelSource);
+
+    const { parseDiagnostics, symbolTableDiagnostics } =
+      parseAndSymbolTableDiagnostics(duplicateModelSource);
+    const published = await harness.waitForDiagnostics(schemaUri);
+    expect(published).toEqual(
+      toPublishedDiagnostics([...parseDiagnostics, ...symbolTableDiagnostics]),
+    );
+  });
+
+  it('interprets only for diagnostics: never for tokens, folding, or completion; memoized per version', async () => {
+    const { resolveInputs, spy } = interpretationResolution(fixAwareInterpret());
+    harness = startHarness(resolveInputs, pullDiagnosticsCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+
+    await requestSemanticTokens(harness, schemaUri);
+    await requestFoldingRanges(harness, schemaUri);
+    await requestCompletion(harness, schemaUri, { line: 1, character: 2 });
+    expect(spy).not.toHaveBeenCalled();
+
+    await requestPullDiagnostics(harness, schemaUri);
+    await requestPullDiagnostics(harness, schemaUri);
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    harness.client.sendNotification(DidChangeTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri, version: 2 },
+      contentChanges: [{ text: fixedSchema }],
+    });
+    await requestPullDiagnostics(harness, schemaUri);
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 });

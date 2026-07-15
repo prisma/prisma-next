@@ -14,10 +14,10 @@ const polyContext = getPolyTestContext();
 // `.orderBy(...)`, `.create(...)` and the decoded row shapes are driven by the
 // real `Collection` types, not a hand-written cast interface.
 //
-// The fixture's `Task` carries the relationship FK columns (`project_id`,
-// `reporter_id`) that the sibling include tests need; they are nullable and
-// surface in the default (no-`select`) projection here as `projectId` /
-// `reporterId`.
+// The fixture's hierarchy carries the relationship FK columns (`project_id`,
+// `reporter_id`, and the variant-owned assignee columns) that the sibling include
+// tests need; they are nullable and surface in the default (no-`select`)
+// projection here as `projectId`, `reporterId`, and variant-scoped `assigneeId`.
 
 function createTaskCollection(runtime: PgIntegrationRuntime) {
   return new Collection({ runtime, context: polyContext }, 'Task', { namespaceId: 'public' });
@@ -35,14 +35,16 @@ async function setupPolySchema(runtime: PgIntegrationRuntime): Promise<void> {
       type text not null,
       severity text,
       project_id integer,
-      reporter_id integer
+      reporter_id integer,
+      bug_assignee_person_id integer
     )
   `);
 
   await runtime.query(`
     create table features (
       id integer primary key references tasks(id),
-      priority integer not null
+      priority integer not null,
+      feature_assignee_person_id integer
     )
   `);
 
@@ -96,6 +98,7 @@ describe('integration/polymorphism', () => {
             projectId: null,
             reporterId: null,
             severity: 'critical',
+            assigneeId: null,
           },
           {
             id: 2,
@@ -104,6 +107,7 @@ describe('integration/polymorphism', () => {
             projectId: null,
             reporterId: null,
             severity: 'low',
+            assigneeId: null,
           },
           {
             id: 3,
@@ -112,6 +116,7 @@ describe('integration/polymorphism', () => {
             projectId: null,
             reporterId: null,
             priority: 1,
+            assigneeId: null,
           },
           {
             id: 4,
@@ -120,6 +125,7 @@ describe('integration/polymorphism', () => {
             projectId: null,
             reporterId: null,
             priority: 3,
+            assigneeId: null,
           },
         ]);
       }, polyContext.contract);
@@ -152,6 +158,7 @@ describe('integration/polymorphism', () => {
             projectId: null,
             reporterId: null,
             severity: 'critical',
+            assigneeId: null,
           },
           {
             id: 2,
@@ -160,6 +167,7 @@ describe('integration/polymorphism', () => {
             projectId: null,
             reporterId: null,
             severity: 'low',
+            assigneeId: null,
           },
         ]);
       }, polyContext.contract);
@@ -193,6 +201,7 @@ describe('integration/polymorphism', () => {
             projectId: null,
             reporterId: null,
             priority: 1,
+            assigneeId: null,
           },
           {
             id: 4,
@@ -201,6 +210,7 @@ describe('integration/polymorphism', () => {
             projectId: null,
             reporterId: null,
             priority: 3,
+            assigneeId: null,
           },
         ]);
       }, polyContext.contract);
@@ -216,7 +226,7 @@ describe('integration/polymorphism', () => {
 
         const tasks = createTaskCollection(runtime);
         const bugs = tasks.variant('Bug');
-        const created = await bugs.create({ title: 'New bug', severity: 'high' });
+        const created = await bugs.create({ title: 'New bug', severity: 'high', assigneeId: 17 });
 
         const id = created.id;
         expect(created).toEqual({
@@ -226,6 +236,7 @@ describe('integration/polymorphism', () => {
           projectId: null,
           reporterId: null,
           severity: 'high',
+          assigneeId: 17,
         });
 
         // Read the row back through the ORM (no select → default variant shape)
@@ -244,6 +255,7 @@ describe('integration/polymorphism', () => {
             projectId: null,
             reporterId: null,
             severity: 'high',
+            assigneeId: 17,
           },
         ]);
       }, polyContext.contract);
@@ -272,6 +284,7 @@ describe('integration/polymorphism', () => {
           projectId: null,
           reporterId: null,
           priority: 5,
+          assigneeId: null,
         });
 
         // Storage-level invariant the ORM intentionally hides: an MTI create is a
