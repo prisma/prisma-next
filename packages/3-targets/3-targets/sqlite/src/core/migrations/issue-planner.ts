@@ -180,12 +180,11 @@ export function tableSpecFromNode(table: SqlTableIR): SqliteTableSpec {
     ...(u.name !== undefined ? { name: u.name } : {}),
   }));
   // Every FK node on the expected tree is constraint-bearing by construction
-  // (contractToSchemaIR filters `constraint: false` FKs out before they ever
-  // become nodes — those only ever contribute an index, never an FK node).
+  // (a persisted `foreignKeys[]` entry is a constraint; a non-constraint FK
+  // contributes only a backing index, never an FK node).
   const foreignKeys: SqliteForeignKeySpec[] = table.foreignKeys.map((fk) => ({
     columns: fk.columns,
     references: { table: fk.referencedTable, columns: fk.referencedColumns },
-    constraint: true,
     ...(fk.name !== undefined ? { name: fk.name } : {}),
     ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
     ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),

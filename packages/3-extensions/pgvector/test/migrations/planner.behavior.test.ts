@@ -454,8 +454,6 @@ describe('NOT NULL column without default uses temporary default', () => {
               tableName: 'org',
               columns: ['id'],
             },
-            constraint: true,
-            index: true,
           },
         ],
       },
@@ -602,7 +600,10 @@ function createTestContract(
       },
       primaryKey: { columns: ['id'] },
       uniques: [],
-      indexes: [],
+      // FK1: the backing index for the default (`index: true`) FK below is a
+      // discrete, named entity materialized at contract emit — declared here
+      // directly rather than relying on planner-time synthesis.
+      indexes: [{ columns: ['userId'], name: 'post_userId_idx' }],
       foreignKeys: [
         {
           source: {
@@ -611,8 +612,6 @@ function createTestContract(
             columns: ['userId'],
           },
           target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-          constraint: true,
-          index: true,
         },
       ],
     },

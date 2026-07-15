@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:a6d5d037670d66b5016dfde8577ec89f693e97dc4601d8cde41bbb6082f99de6'>;
+  StorageHashBase<'sha256:4fd3b6b5481531b6fc23e6f3a97061908a8efaab460a56e3c334ef2483c9dfdb'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -2075,8 +2075,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'identities_user_id_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -2166,8 +2164,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'mfa_amr_claims_session_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -2236,8 +2232,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'mfa_challenges_auth_factor_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -2344,8 +2338,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'mfa_factors_user_id_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -2489,8 +2481,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'oauth_authorizations_client_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
                 {
                   readonly source: {
@@ -2504,8 +2494,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'oauth_authorizations_user_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -2710,8 +2698,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'oauth_consents_client_id_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
                 {
                   readonly source: {
@@ -2725,8 +2711,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'oauth_consents_user_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -2794,8 +2778,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'one_time_tokens_user_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -2901,8 +2883,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'refresh_tokens_session_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -2985,8 +2965,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'saml_providers_sso_provider_id_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -3068,8 +3046,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'saml_relay_states_flow_state_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
                 {
                   readonly source: {
@@ -3083,8 +3059,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'saml_relay_states_sso_provider_id_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -3220,8 +3194,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'sessions_oauth_client_id_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
                 {
                   readonly source: {
@@ -3235,8 +3207,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'sessions_user_id_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -3291,8 +3261,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'sso_domains_sso_provider_id_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -3642,8 +3610,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'webauthn_challenges_user_id_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -3773,8 +3739,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'webauthn_credentials_user_id_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -4075,8 +4039,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'iceberg_namespaces_catalog_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -4166,8 +4128,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'iceberg_tables_catalog_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
                 {
                   readonly source: {
@@ -4181,8 +4141,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'iceberg_tables_namespace_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -4305,8 +4263,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'objects_bucketId_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -4392,8 +4348,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 's3_multipart_uploads_bucket_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -4479,8 +4433,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 's3_multipart_uploads_parts_bucket_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
                 {
                   readonly source: {
@@ -4494,8 +4446,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 's3_multipart_uploads_parts_upload_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -4572,8 +4522,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'vector_indexes_bucket_id_fkey';
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };

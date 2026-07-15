@@ -12,7 +12,6 @@ import {
   type StorageTypeInstance,
   type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
-import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import {
   type SqlAnnotations,
   type SqlCheckConstraintIRInput,
@@ -25,7 +24,6 @@ import {
 } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { backingIndexColumnKeys } from '../foreign-key-index-backing';
 
 /**
  * Target-specific callback that expands a column's base `nativeType` and optional
@@ -308,20 +306,6 @@ function convertTable(
     );
   }
 
-  const satisfiedIndexColumns = new Set(backingIndexColumnKeys(table));
-  const fkBackingIndexes: SqlIndexIRInput[] = [];
-  for (const fk of table.foreignKeys) {
-    if (fk.index === false) continue;
-    const key = fk.source.columns.join(',');
-    if (satisfiedIndexColumns.has(key)) continue;
-    fkBackingIndexes.push({
-      columns: fk.source.columns,
-      unique: false,
-      name: defaultIndexName(name, fk.source.columns),
-    });
-    satisfiedIndexColumns.add(key);
-  }
-
   const checks: SqlCheckConstraintIRInput[] | undefined =
     table.checks && table.checks.length > 0
       ? table.checks.map((c) => convertCheck(c, storage))
@@ -331,11 +315,9 @@ function convertTable(
     name,
     columns,
     ...ifDefined('primaryKey', table.primaryKey),
-    foreignKeys: table.foreignKeys
-      .filter((fk) => fk.constraint !== false)
-      .map((fk) => convertForeignKey(fk, storage)),
+    foreignKeys: table.foreignKeys.map((fk) => convertForeignKey(fk, storage)),
     uniques: table.uniques.map(convertUnique),
-    indexes: [...table.indexes.map(convertIndex), ...fkBackingIndexes],
+    indexes: table.indexes.map(convertIndex),
     ...ifDefined('checks', checks),
   });
 }

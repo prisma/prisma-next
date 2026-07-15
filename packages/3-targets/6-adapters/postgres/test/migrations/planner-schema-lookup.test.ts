@@ -154,8 +154,6 @@ describe('hasForeignKey', () => {
   const fk = (
     overrides: Partial<ForeignKey> & Pick<ForeignKey, 'source' | 'target'>,
   ): ForeignKey => ({
-    constraint: true,
-    index: true,
     ...overrides,
   });
 

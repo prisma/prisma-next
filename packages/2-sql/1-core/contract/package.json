@@ -18,6 +18,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:0.15.0",
     "@prisma-next/framework-components": "workspace:0.15.0",
+    "@prisma-next/sql-schema-ir": "workspace:0.15.0",
     "@prisma-next/utils": "workspace:0.15.0",
     "arktype": "^2.2.2"
   },
@@ -47,6 +48,7 @@
     "./entity-handle-lowering-hook": "./dist/entity-handle-lowering-hook.mjs",
     "./entity-kinds": "./dist/entity-kinds.mjs",
     "./factories": "./dist/factories.mjs",
+    "./foreign-key-materialization": "./dist/foreign-key-materialization.mjs",
     "./index-type-validation": "./dist/index-type-validation.mjs",
     "./index-types": "./dist/index-types.mjs",
     "./pack-types": "./dist/pack-types.mjs",
