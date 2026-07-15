@@ -51,7 +51,7 @@ import type { ConfigResolution } from '../src/config-resolution';
 import type { DocumentArtifacts } from '../src/project-artifacts';
 import { resolveSchemaInputs } from '../src/schema-inputs';
 import { semanticTokensLegend } from '../src/semantic-tokens';
-import { createServer } from '../src/server';
+import { CONFIG_LOAD_FAILED_CODE, createServer } from '../src/server';
 
 type ResolveInputs = (configPath: string) => Promise<ConfigResolution>;
 type FindNearestConfigPathForFile = (filePath: string) => Promise<string | undefined>;
@@ -2225,7 +2225,7 @@ describe('language server config failure surfacing', {
   const expectedConfigFailure = (message: string): Diagnostic => ({
     range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
     message,
-    code: 'PRISMA_NEXT_CONFIG_LOAD_FAILED',
+    code: CONFIG_LOAD_FAILED_CODE,
     severity: DiagnosticSeverity.Error,
     source: 'prisma-next',
   });
@@ -2369,6 +2369,50 @@ describe('language server config failure surfacing', {
     });
 
     await harness.waitForDiagnosticsMatching(configUri, (diagnostics) => diagnostics.length === 0);
+  });
+
+  it('drops the project without resurrection or zombie marker when a reload fails after the last document closed', async () => {
+    const gate = deferredSettleable<ConfigResolution>();
+    let call = 0;
+    harness = startHarness(() => {
+      call += 1;
+      return call === 1 ? Promise.resolve(resolutionForInputs([schemaPath])) : gate.promise;
+    });
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+    await harness.waitForDiagnostics(schemaUri);
+
+    harness.notifyConfigChanged();
+    await settle();
+    harness.client.sendNotification(DidCloseTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri },
+    });
+    await settle();
+    gate.reject(new Error('config exploded'));
+    await settle();
+
+    expect(harness.publishCount(configUri)).toBe(0);
+    expect(harness.latestDiagnostics(configUri)).toBeUndefined();
+  });
+
+  it('leaves a newer load untouched when a superseded load fails', async () => {
+    const first = deferredSettleable<ConfigResolution>();
+    let calls = 0;
+    harness = startHarness(() => {
+      calls += 1;
+      return calls === 1 ? first.promise : Promise.resolve(resolutionForInputs([schemaPath]));
+    });
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+    harness.notifyConfigChanged();
+    await settle();
+    first.reject(new Error('superseded failure'));
+
+    const published = await harness.waitForDiagnostics(schemaUri);
+    expect(published).toEqual([]);
+    await settle();
+    expect(harness.publishCount(configUri)).toBe(0);
+    expect(harness.getDocumentAst(schemaUri)).toBeDefined();
   });
 
   it('stays silent for a superseded load failure', async () => {
