@@ -59,9 +59,20 @@ Breaking config-key rename; must precede the API freeze. Record upgrade instruct
 
 Idle-reconnect errors crash the host process; production-readiness fix, not cleanup.
 
-### Slice A6: supported-surface matrix as structured data — **blocked on W3 floor decision (Jul 22)**
+### Slice A6: supported-surface matrix as structured data — **start now; only the freeze waits on decisions**
 
-Feature area × database target × status (`stable` / `experimental` / `not-in-8.0`), as checked-in structured data. Every `stable` cell names the test suite that proves it. Frozen at the Jul 24 checkpoint; seeds the public road-to-final dashboard post-RC and filters the P7 test mining (S2).
+Feature area × database target × status (`stable` / `experimental` / `not-in-8.0`), as checked-in structured data. Every `stable` cell names the test suite that proves it; every `not-in-8.0` cell is a deliberate statement, not an omission.
+
+**Where the rows come from — two sources, crossed:**
+
+1. *What v8 ships*, enumerated from the codebase: facade subpath exports (`@prisma-next/{postgres,sqlite,mongo}`), the CLI command tree, the PSL feature set (attributes, types, namespaces), the ORM/query-builder operation surface, the migration operation catalog, and the extensions. If it isn't reachable through the blessed surface, it isn't a row.
+2. *What v7 users expect*: Prisma 7's capability taxonomy (docs navigation + the functional test suite's directory structure, which is a de-facto feature census). This is the completeness checklist that makes "missing capabilities are named" true — absence can only be named against an enumeration of what users look for.
+
+**Phase 1 (now, no dependencies):** enumerate rows, draft cell statuses, and list every stable-claimed cell with no proving suite — that list is S2's mining work-list.
+
+**Phase 2 (freeze at Jul 24):** stamp final statuses once the Postgres floor (Jul 22) and the polymorphism call (Jul 24) land.
+
+Feeds the S2 filter, the announcement's supported-surface section, and the post-RC public dashboard.
 
 ## Lane: Serhii — coexistence proof + correctness
 
@@ -82,9 +93,9 @@ The ~10 active correctness bugs in SQL ORM polymorphism (variant relations, incl
 ## Sequencing constraints (everything else is parallel)
 
 - W2 (npm rights) blocks nothing until release week, but its *external* nature means it starts first.
-- W3 decisions block A3 (scheme) and A6 (floor); A6 blocks the S2 filter and the matrix freeze at the checkpoint.
-- S1 must be green by Jul 24 or the coexistence claim in W5 is softened.
-- A1, A2, A4, A5, S1, X1 have no upstream dependencies — all start immediately.
+- W3 decisions block A3 (scheme) and A6 *phase 2 only* (floor + polymorphism call); A6 phase 1 blocks nothing and starts now.
+- A6 phase 1's no-proving-suite list is S2's work-list; S1 must be green by Jul 24 or the coexistence claim in W5 is softened.
+- A1, A2, A4, A5, A6 phase 1, S1, X1 have no upstream dependencies — all start immediately.
 - W4 is strictly last and consumes everything.
 
 ## Close-out (required)
