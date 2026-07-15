@@ -782,3 +782,13 @@ updated to the shipped forms. No code, API, contract shape, or emitted
 artefact changes. No extension-author action required. Incidental docs-only
 diff.
 -->
+
+<!--
+PR #915 (middleware doc-comment lifecycle fixes): comments-only. The only
+`packages/3-extensions/` touch is doc comments in
+`packages/3-extensions/middleware-cache/src/cache-middleware.ts`, correcting
+stale claims about the cache-hit lifecycle (a hit skips only the driver call
+and per-row `onRow` hooks; `beforeExecute` has already run, `afterExecute`
+still fires; `decodeRow` still runs). No SPI or behavioural change.
+No user action required. Incidental substrate diff only.
+-->
