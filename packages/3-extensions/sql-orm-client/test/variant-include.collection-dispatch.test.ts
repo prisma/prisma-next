@@ -52,7 +52,7 @@ function projectionAliases(runtime: MockRuntime): string[] {
 }
 
 describe('variant-owned include dispatch', () => {
-  it('maps the whole MTI result and keeps only the existing broad MTI projections', async () => {
+  it('maps an explicitly selected MTI result without leaking internal relation columns', async () => {
     const { tasks, runtime } = createVariantTaskCollection();
     runtime.setNextResults([
       [
@@ -60,8 +60,6 @@ describe('variant-owned include dispatch', () => {
           id: 2,
           title: 'Dark mode',
           type: 'feature',
-          features__priority: 7,
-          features__assignee_id: 42,
           assignee: '[{"id":42,"name":"Ada"}]',
         },
       ],
@@ -69,26 +67,15 @@ describe('variant-owned include dispatch', () => {
 
     const rows = await selectedTaskWithAssignee(tasks, 'Feature').toArray();
 
-    // TML-2783 remains out of scope: MTI variant fields are still broadly
-    // projected even though the parent has an explicit base-field selection.
     expect(rows).toEqual([
       {
         id: 2,
         title: 'Dark mode',
         type: 'feature',
-        priority: 7,
-        assigneeId: 42,
         assignee: { id: 42, name: 'Ada' },
       },
     ]);
-    expect(projectionAliases(runtime)).toEqual([
-      'id',
-      'title',
-      'type',
-      'features__priority',
-      'features__assignee_id',
-      'assignee',
-    ]);
+    expect(projectionAliases(runtime)).toEqual(['id', 'title', 'type', 'assignee']);
   });
 
   it('maps the whole STI result without projecting an unselected variant join key', async () => {
