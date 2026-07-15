@@ -66,11 +66,7 @@ interface ProjectState {
   readonly artifacts: ProjectArtifacts;
 }
 
-/**
- * One entry per managed config: the load in flight, the loaded project, or
- * the record of a failed first load — never a settled load without an entry
- * decision.
- */
+/** One entry per managed config — never a settled load without an entry decision. */
 type ManagedProject =
   | {
       readonly status: 'loading';
@@ -87,7 +83,7 @@ type ManagedProject =
   | { readonly status: 'loaded'; readonly project: ProjectState }
   | { readonly status: 'failed' };
 
-/** The project a new load of this config could fall back to, if any. */
+/** The project a new load of this config could fall back to. */
 function lastGoodProject(entry: ManagedProject | undefined): ProjectState | undefined {
   if (entry === undefined || entry.status === 'failed') {
     return undefined;
@@ -229,7 +225,7 @@ export function createServer(connection: Connection): LanguageServer {
   async function resolveProject(configPath: string): Promise<ProjectState> {
     const entry = managedProjects.get(configPath);
     // A `failed` entry only records the published config marker — for
-    // project resolution it behaves like absence: try a fresh load.
+    // project resolution it behaves like absence.
     if (entry === undefined || entry.status === 'failed') {
       return startProjectLoad(configPath);
     }
@@ -272,12 +268,10 @@ export function createServer(connection: Connection): LanguageServer {
           return project;
         },
         (error: unknown) => {
-          // Same guard as above: only the current load's outcome speaks;
-          // superseded failures stay silent.
+          // Same guard as above.
           if (isCurrentLoad(configPath, load)) {
             if (!hasManagedDocuments(configPath)) {
-              // Nobody is served by this config anymore: no resurrection of
-              // the last-good project and no zombie marker.
+              // No resurrection of the last-good project, no zombie marker.
               managedProjects.delete(configPath);
               clearConfigFailure(configPath);
             } else {

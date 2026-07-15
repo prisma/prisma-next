@@ -1691,10 +1691,8 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
     hook.set(resolveFails);
     harness.notifyConfigChanged();
 
-    // The broken reload surfaces on the config file; the schema keeps its
-    // last-good diagnostics instead of being cleared. (Successful loads
-    // publish harmless empty clears on the config URI, so wait for the
-    // non-empty marker specifically.)
+    // Successful loads publish harmless empty clears on the config URI, so
+    // wait for the non-empty marker specifically.
     const configDiagnostics = await harness.waitForDiagnosticsMatching(
       configUri,
       (diagnostics) => diagnostics.length > 0,
@@ -2269,7 +2267,6 @@ describe('language server config failure surfacing', {
     expect(published).toEqual([expectedConfigFailure('config exploded')]);
     expect(harness.getDocumentAst(schemaUri)).toBeUndefined();
 
-    // The marker persists after the failed load settles.
     await settle();
     expect(harness.latestDiagnostics(configUri)).toEqual([
       expectedConfigFailure('config exploded'),
@@ -2299,8 +2296,7 @@ describe('language server config failure surfacing', {
     }, pullDiagnosticsCapabilities);
     await harness.initialize();
     openDocument(harness, schemaUri, cleanSchema);
-    // Pull clients trigger project resolution through the pull request; the
-    // config failure must still arrive on the push channel.
+    // Pull clients trigger project resolution through the pull request.
     const report = await requestPullDiagnostics(harness, schemaUri);
     expect(fullReportItems(report)).toEqual([]);
 
@@ -2361,8 +2357,6 @@ describe('language server config failure surfacing', {
   });
 
   it('clears the config diagnostic when the last managed document closes', async () => {
-    // A retained last-good project dropped by its final document close must
-    // not leave a zombie config marker behind.
     let broken = false;
     harness = startHarness(async () => {
       if (broken) {
