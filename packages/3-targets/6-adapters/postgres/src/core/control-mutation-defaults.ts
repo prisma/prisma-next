@@ -158,21 +158,63 @@ const postgresDefaultFunctionRegistryEntries = [
  * The base PSL scalars as zero-arg type constructors in the unified authoring
  * channel, with explicit `nativeType` values pinned to the codec manifests
  * (`codecLookup.targetTypesFor(codecId)[0]`).
+ *
+ * Each is marked `baseScalar`: the storage is the adapter's default choice for
+ * the portable scalar name, not an explicit user storage opinion, so mutation-
+ * default generators (`@default(uuid())`) may re-pick it. Native types below
+ * deliberately carry no marker — they name their storage explicitly.
  */
 export const postgresScalarAuthoringTypes = {
-  String: { kind: 'typeConstructor', output: { codecId: 'pg/text@1', nativeType: 'text' } },
-  Boolean: { kind: 'typeConstructor', output: { codecId: 'pg/bool@1', nativeType: 'bool' } },
-  Int: { kind: 'typeConstructor', output: { codecId: 'pg/int4@1', nativeType: 'int4' } },
-  BigInt: { kind: 'typeConstructor', output: { codecId: 'pg/int8@1', nativeType: 'int8' } },
-  Float: { kind: 'typeConstructor', output: { codecId: 'pg/float8@1', nativeType: 'float8' } },
-  Decimal: { kind: 'typeConstructor', output: { codecId: 'pg/numeric@1', nativeType: 'numeric' } },
+  String: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: 'pg/text@1', nativeType: 'text' },
+  },
+  Boolean: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: 'pg/bool@1', nativeType: 'bool' },
+  },
+  Int: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: 'pg/int4@1', nativeType: 'int4' },
+  },
+  BigInt: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: 'pg/int8@1', nativeType: 'int8' },
+  },
+  Float: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: 'pg/float8@1', nativeType: 'float8' },
+  },
+  Decimal: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
+  },
   DateTime: {
     kind: 'typeConstructor',
+    baseScalar: true,
     output: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
   },
-  Json: { kind: 'typeConstructor', output: { codecId: 'pg/json@1', nativeType: 'json' } },
-  Jsonb: { kind: 'typeConstructor', output: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' } },
-  Bytes: { kind: 'typeConstructor', output: { codecId: 'pg/bytea@1', nativeType: 'bytea' } },
+  Json: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: 'pg/json@1', nativeType: 'json' },
+  },
+  Jsonb: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
+  },
+  Bytes: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: 'pg/bytea@1', nativeType: 'bytea' },
+  },
 } as const satisfies AuthoringTypeNamespace;
 
 /**

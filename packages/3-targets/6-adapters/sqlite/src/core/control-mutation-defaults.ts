@@ -180,31 +180,52 @@ const sqliteDefaultFunctionRegistryEntries = [
  * The base PSL scalars as zero-arg type constructors in the unified authoring
  * channel, with explicit `nativeType` values pinned to the codec manifests
  * (`codecLookup.targetTypesFor(codecId)[0]`).
+ *
+ * Each is marked `baseScalar`: the storage is the adapter's default choice for
+ * the portable scalar name, not an explicit user storage opinion, so mutation-
+ * default generators (`@default(uuid())`) may re-pick it.
  */
 export const sqliteScalarAuthoringTypes = {
   String: {
     kind: 'typeConstructor',
+    baseScalar: true,
     output: { codecId: SQLITE_TEXT_CODEC_ID, nativeType: 'text' },
   },
   Int: {
     kind: 'typeConstructor',
+    baseScalar: true,
     output: { codecId: SQLITE_INTEGER_CODEC_ID, nativeType: 'integer' },
   },
   BigInt: {
     kind: 'typeConstructor',
+    baseScalar: true,
     output: { codecId: SQLITE_BIGINT_CODEC_ID, nativeType: 'integer' },
   },
-  Float: { kind: 'typeConstructor', output: { codecId: SQLITE_REAL_CODEC_ID, nativeType: 'real' } },
+  Float: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: SQLITE_REAL_CODEC_ID, nativeType: 'real' },
+  },
   Decimal: {
     kind: 'typeConstructor',
+    baseScalar: true,
     output: { codecId: SQLITE_TEXT_CODEC_ID, nativeType: 'text' },
   },
   DateTime: {
     kind: 'typeConstructor',
+    baseScalar: true,
     output: { codecId: SQLITE_DATETIME_CODEC_ID, nativeType: 'text' },
   },
-  Json: { kind: 'typeConstructor', output: { codecId: SQLITE_JSON_CODEC_ID, nativeType: 'text' } },
-  Bytes: { kind: 'typeConstructor', output: { codecId: SQLITE_BLOB_CODEC_ID, nativeType: 'blob' } },
+  Json: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: SQLITE_JSON_CODEC_ID, nativeType: 'text' },
+  },
+  Bytes: {
+    kind: 'typeConstructor',
+    baseScalar: true,
+    output: { codecId: SQLITE_BLOB_CODEC_ID, nativeType: 'blob' },
+  },
 } as const satisfies AuthoringTypeNamespace;
 
 export function createSqliteDefaultFunctionRegistry(): ReadonlyMap<

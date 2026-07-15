@@ -64,6 +64,15 @@ export type ColumnDescriptor = {
    * unset.
    */
   readonly valueSet?: ValueSetRef;
+  /**
+   * Authoring-side provenance carried by scalar-view entries derived from a
+   * `baseScalar`-marked type constructor (see
+   * `AuthoringTypeConstructorDescriptor.baseScalar`): the descriptor's
+   * storage is the target's default choice for a family base scalar, not an
+   * explicit user storage opinion, so a generator default may re-pick it.
+   * Never emitted — storage columns are built by picking named fields.
+   */
+  readonly baseScalar?: true;
 };
 
 export function toNamedTypeFieldDescriptor(
@@ -543,6 +552,14 @@ export type ResolveFieldTypeResult =
       readonly ok: true;
       readonly descriptor: ColumnDescriptor;
       readonly presetContributions?: FieldPresetContributions;
+      /**
+       * Set when the field's type resolved through a `baseScalar`-marked
+       * constructor — bare (`String`) or zero-arg call (`String()`) form —
+       * meaning the descriptor's storage is the target's default choice and
+       * a generator default may override it. Named types, enums, native
+       * scalars, presets, and entity-ref constructors never report it.
+       */
+      readonly baseScalar?: true;
     }
   | { readonly ok: false; readonly alreadyReported: boolean };
 
@@ -678,7 +695,11 @@ export function resolveFieldTypeDescriptor(input: {
     if (!instantiated) {
       return { ok: false, alreadyReported: true };
     }
-    return { ok: true, descriptor: instantiated };
+    return {
+      ok: true,
+      descriptor: instantiated,
+      ...(descriptor.baseScalar ? { baseScalar: true as const } : {}),
+    };
   }
 
   const descriptor = resolveColumnDescriptor(
@@ -690,7 +711,7 @@ export function resolveFieldTypeDescriptor(input: {
   if (!descriptor) {
     return { ok: false, alreadyReported: false };
   }
-  return { ok: true, descriptor };
+  return { ok: true, descriptor, ...(descriptor.baseScalar ? { baseScalar: true as const } : {}) };
 }
 
 /**

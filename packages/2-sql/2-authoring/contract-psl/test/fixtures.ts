@@ -237,23 +237,27 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
 };
 
 export const postgresScalarTypeDescriptors = new Map([
-  ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
-  ['Boolean', { codecId: 'pg/bool@1', nativeType: 'bool' }],
-  ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
-  ['BigInt', { codecId: 'pg/int8@1', nativeType: 'int8' }],
-  ['Float', { codecId: 'pg/float8@1', nativeType: 'float8' }],
-  ['Decimal', { codecId: 'pg/numeric@1', nativeType: 'numeric' }],
-  ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
-  ['Json', { codecId: 'pg/json@1', nativeType: 'json' }],
-  ['Jsonb', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
-  ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
+  ['String', { codecId: 'pg/text@1', nativeType: 'text', baseScalar: true }],
+  ['Boolean', { codecId: 'pg/bool@1', nativeType: 'bool', baseScalar: true }],
+  ['Int', { codecId: 'pg/int4@1', nativeType: 'int4', baseScalar: true }],
+  ['BigInt', { codecId: 'pg/int8@1', nativeType: 'int8', baseScalar: true }],
+  ['Float', { codecId: 'pg/float8@1', nativeType: 'float8', baseScalar: true }],
+  ['Decimal', { codecId: 'pg/numeric@1', nativeType: 'numeric', baseScalar: true }],
+  ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz', baseScalar: true }],
+  ['Json', { codecId: 'pg/json@1', nativeType: 'json', baseScalar: true }],
+  ['Jsonb', { codecId: 'pg/jsonb@1', nativeType: 'jsonb', baseScalar: true }],
+  ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea', baseScalar: true }],
 ] as const);
 
-/** The postgres base scalars in unified-namespace form: top-level zero-arg type constructors. */
+/** The postgres base scalars in unified-namespace form: top-level zero-arg baseScalar-marked type constructors. */
 export const postgresScalarAuthoringTypes: AuthoringTypeNamespace = Object.fromEntries(
-  [...postgresScalarTypeDescriptors].map(([name, output]) => [
+  [...postgresScalarTypeDescriptors].map(([name, { codecId, nativeType }]) => [
     name,
-    { kind: 'typeConstructor' as const, output },
+    {
+      kind: 'typeConstructor' as const,
+      baseScalar: true as const,
+      output: { codecId, nativeType },
+    },
   ]),
 );
 
@@ -339,15 +343,15 @@ export function symbolTableInputFromParseArgs(args: {
 }
 
 export const sqliteScalarColumnDescriptors = new Map([
-  ['String', { codecId: 'sqlite/text@1', nativeType: 'text' }],
-  ['Boolean', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
-  ['Int', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
-  ['BigInt', { codecId: 'sqlite/bigint@1', nativeType: 'integer' }],
-  ['Float', { codecId: 'sqlite/real@1', nativeType: 'real' }],
-  ['Decimal', { codecId: 'sqlite/text@1', nativeType: 'text' }],
-  ['DateTime', { codecId: 'sqlite/datetime@1', nativeType: 'text' }],
-  ['Json', { codecId: 'sqlite/json@1', nativeType: 'text' }],
-  ['Bytes', { codecId: 'sqlite/blob@1', nativeType: 'blob' }],
+  ['String', { codecId: 'sqlite/text@1', nativeType: 'text', baseScalar: true }],
+  ['Boolean', { codecId: 'sqlite/integer@1', nativeType: 'integer', baseScalar: true }],
+  ['Int', { codecId: 'sqlite/integer@1', nativeType: 'integer', baseScalar: true }],
+  ['BigInt', { codecId: 'sqlite/bigint@1', nativeType: 'integer', baseScalar: true }],
+  ['Float', { codecId: 'sqlite/real@1', nativeType: 'real', baseScalar: true }],
+  ['Decimal', { codecId: 'sqlite/text@1', nativeType: 'text', baseScalar: true }],
+  ['DateTime', { codecId: 'sqlite/datetime@1', nativeType: 'text', baseScalar: true }],
+  ['Json', { codecId: 'sqlite/json@1', nativeType: 'text', baseScalar: true }],
+  ['Bytes', { codecId: 'sqlite/blob@1', nativeType: 'blob', baseScalar: true }],
 ] as const);
 
 const targetTypesByCodecId: Record<string, readonly string[]> = {

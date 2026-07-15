@@ -513,6 +513,22 @@ describe('collectScalarTypeConstructors', () => {
     });
   });
 
+  it('propagates the baseScalar marker from the descriptor onto the scalar view entry', () => {
+    const namespace = {
+      String: {
+        kind: 'typeConstructor',
+        baseScalar: true,
+        output: { codecId: 'pg/text@1', nativeType: 'text' },
+      },
+      Uuid: { kind: 'typeConstructor', output: { codecId: 'pg/uuid@1', nativeType: 'uuid' } },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(Object.fromEntries(collectScalarTypeConstructors(namespace))).toEqual({
+      String: { codecId: 'pg/text@1', nativeType: 'text', baseScalar: true },
+      Uuid: { codecId: 'pg/uuid@1', nativeType: 'uuid' },
+    });
+  });
+
   it('excludes namespaced constructors from the scalar view', () => {
     const namespace = {
       String: { kind: 'typeConstructor', output: { codecId: 'pg/text@1', nativeType: 'text' } },

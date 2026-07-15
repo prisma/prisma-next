@@ -354,6 +354,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     let descriptor: ColumnDescriptor | undefined;
     let scalarCodecId: string | undefined;
     let presetContributions: FieldPresetContributions | undefined;
+    let typeIsBaseScalar = false;
     const resolveInput = {
       field,
       enumTypeDescriptors,
@@ -425,6 +426,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       }
       descriptor = resolved.descriptor;
       presetContributions = resolved.presetContributions;
+      typeIsBaseScalar = resolved.baseScalar === true;
     }
 
     if (!descriptor) {
@@ -507,8 +509,13 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       });
       continue;
     }
-    const fieldUsesNamedType = namedTypeDescriptors.has(field.typeName);
-    if (loweredOnCreate && !fieldUsesNamedType) {
+    // A generator default may re-pick the column's concrete storage only
+    // when the declared type is a family base scalar (`String`, …) — a
+    // portable logical type whose storage is the target's default choice.
+    // Every spelling that names its storage explicitly (native scalars like
+    // `Uuid`, constructor calls like `Char(36)`, named types, enums) keeps
+    // the declared storage.
+    if (loweredOnCreate && typeIsBaseScalar) {
       const generatorDescriptor = generatorDescriptorById.get(loweredOnCreate.id);
       const generatedDescriptor = generatorDescriptor?.resolveGeneratedColumnDescriptor?.({
         generated: loweredOnCreate,

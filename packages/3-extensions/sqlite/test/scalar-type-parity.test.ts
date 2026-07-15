@@ -61,15 +61,17 @@ describe('sqlite scalar types derived from the unified namespace', () => {
   it('pins every base scalar to its {codecId, nativeType}', () => {
     const derived = collectScalarTypeConstructors(stack.authoringContributions.type);
 
+    // Base scalars carry the baseScalar provenance marker (their storage is
+    // the adapter's default choice, overridable by generator defaults).
     expect(Object.fromEntries(derived)).toEqual({
-      String: { codecId: 'sqlite/text@1', nativeType: 'text' },
-      Int: { codecId: 'sqlite/integer@1', nativeType: 'integer' },
-      BigInt: { codecId: 'sqlite/bigint@1', nativeType: 'integer' },
-      Float: { codecId: 'sqlite/real@1', nativeType: 'real' },
-      Decimal: { codecId: 'sqlite/text@1', nativeType: 'text' },
-      DateTime: { codecId: 'sqlite/datetime@1', nativeType: 'text' },
-      Json: { codecId: 'sqlite/json@1', nativeType: 'text' },
-      Bytes: { codecId: 'sqlite/blob@1', nativeType: 'blob' },
+      String: { codecId: 'sqlite/text@1', nativeType: 'text', baseScalar: true },
+      Int: { codecId: 'sqlite/integer@1', nativeType: 'integer', baseScalar: true },
+      BigInt: { codecId: 'sqlite/bigint@1', nativeType: 'integer', baseScalar: true },
+      Float: { codecId: 'sqlite/real@1', nativeType: 'real', baseScalar: true },
+      Decimal: { codecId: 'sqlite/text@1', nativeType: 'text', baseScalar: true },
+      DateTime: { codecId: 'sqlite/datetime@1', nativeType: 'text', baseScalar: true },
+      Json: { codecId: 'sqlite/json@1', nativeType: 'text', baseScalar: true },
+      Bytes: { codecId: 'sqlite/blob@1', nativeType: 'blob', baseScalar: true },
     });
   });
 

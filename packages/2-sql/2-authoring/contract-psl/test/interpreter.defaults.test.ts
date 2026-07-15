@@ -1,3 +1,8 @@
+import type {
+  AuthoringContributions,
+  AuthoringTypeNamespace,
+} from '@prisma-next/framework-components/authoring';
+import { collectScalarTypeConstructors } from '@prisma-next/framework-components/authoring';
 import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import {
@@ -6,6 +11,7 @@ import {
 } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
+  postgresScalarAuthoringTypes,
   postgresScalarTypeDescriptors,
   postgresTarget,
   sqliteScalarColumnDescriptors,
@@ -1010,6 +1016,145 @@ model UuidNativeBad {
           }),
         ]),
       );
+    });
+  });
+
+  describe('generator defaults never override explicitly-named storage', () => {
+    // Mirrors the adapter contribution shape: family base scalars (marked
+    // baseScalar) plus target native types (Uuid, Char) as top-level
+    // constructors, with the scalar view derived the same way the provider
+    // derives it (collectScalarTypeConstructors).
+    const authoringTypes = {
+      ...postgresScalarAuthoringTypes,
+      Uuid: { kind: 'typeConstructor', output: { codecId: 'pg/uuid@1', nativeType: 'uuid' } },
+      Char: {
+        kind: 'typeConstructor',
+        args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+        output: {
+          codecId: 'sql/char@1',
+          nativeType: 'character',
+          typeParams: { length: { kind: 'arg', index: 0 } },
+        },
+      },
+    } satisfies AuthoringTypeNamespace;
+    const authoringContributions = {
+      entityTypes: {},
+      field: {},
+      pslBlockDescriptors: {},
+      modelAttributes: {},
+      type: authoringTypes,
+    } satisfies AuthoringContributions;
+
+    const interpret = (schema: string) =>
+      interpretPslDocumentToSqlContractInternal({
+        ...symbolTableInputFromParseArgs({ schema, sourceId: 'schema.prisma' }),
+        target: postgresTarget,
+        scalarColumnDescriptors: collectScalarTypeConstructors(authoringTypes),
+        authoringContributions,
+        composedExtensionContracts: new Map(),
+        controlMutationDefaults: builtinControlMutationDefaults,
+        createNamespace: createTestSqlNamespace,
+        capabilities: { sql: { scalarList: true } },
+      });
+
+    it('keeps pg/uuid@1 for a bare native scalar field under @default(uuid())', () => {
+      const result = interpret(`model F {
+  id Uuid @id @default(uuid())
+}`);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      expect(storage.namespaces['public']?.entries.table?.['f']?.columns['id']).toEqual({
+        codecId: 'pg/uuid@1',
+        nativeType: 'uuid',
+        nullable: false,
+      });
+      expect(result.value.execution?.mutations.defaults).toEqual([
+        {
+          ref: { namespace: 'public', table: 'f', column: 'id' },
+          onCreate: { kind: 'generator', id: 'uuidv4' },
+        },
+      ]);
+    });
+
+    it('keeps pg/uuid@1 for a named type aliasing the native scalar under @default(uuid())', () => {
+      const result = interpret(`types {
+  TUuid = Uuid
+}
+
+model E {
+  id TUuid @id @default(uuid())
+}`);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      expect(storage.namespaces['public']?.entries.table?.['e']?.columns['id']).toEqual({
+        codecId: 'pg/uuid@1',
+        nativeType: 'uuid',
+        nullable: false,
+        typeRef: 'TUuid',
+      });
+    });
+
+    it('keeps explicit char storage for a constructor-form field under a non-uuid generator default', () => {
+      const result = interpret(`model M {
+  id Char(30) @id @default(cuid(2))
+}`);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      expect(storage.namespaces['public']?.entries.table?.['m']?.columns['id']).toEqual({
+        codecId: 'sql/char@1',
+        nativeType: 'character',
+        nullable: false,
+        typeParams: { length: 30 },
+      });
+      expect(result.value.execution?.mutations.defaults).toEqual([
+        {
+          ref: { namespace: 'public', table: 'm', column: 'id' },
+          onCreate: { kind: 'generator', id: 'cuid2' },
+        },
+      ]);
+    });
+
+    it('lowers a base scalar String under @default(uuid()) to the generator storage char(36)', () => {
+      const result = interpret(`model L {
+  id String @id @default(uuid())
+}`);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      expect(storage.namespaces['public']?.entries.table?.['l']?.columns['id']).toEqual({
+        codecId: 'sql/char@1',
+        nativeType: 'character',
+        nullable: false,
+        typeParams: { length: 36 },
+      });
+    });
+
+    it('lowers the zero-arg call form String() identically to bare String under @default(uuid())', () => {
+      const result = interpret(`model P {
+  id String() @id @default(uuid())
+}`);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+      expect(storage.namespaces['public']?.entries.table?.['p']?.columns['id']).toEqual({
+        codecId: 'sql/char@1',
+        nativeType: 'character',
+        nullable: false,
+        typeParams: { length: 36 },
+      });
     });
   });
 });
