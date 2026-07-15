@@ -1,5 +1,14 @@
 import type { ExpectationFailureReason } from './control-operation-results';
 
+/**
+ * A root-anchored chain of `(nodeKind, id)` steps identifying a node in a
+ * schema tree — the same vocabulary the differ pairs siblings with. Used by
+ * `DiffableNode.dependsOn` to name a node's structural prerequisites without
+ * holding a reference to the node itself (the target may live on the other
+ * diff side, or not exist at all).
+ */
+export type SchemaNodeRef = readonly { readonly nodeKind: string; readonly id: string }[];
+
 export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   /** Path from the root node down to the diffed node, as a sequence of local keys. */
   readonly path: readonly string[];
@@ -9,6 +18,14 @@ export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   readonly expected?: TNode;
   /** The actual (current-side) node, when available. Absent for `not-found` issues. */
   readonly actual?: TNode;
+  /**
+   * Paths of the other in-diff issues this issue depends on. Mirrored by
+   * `diffSchemas` from the node's own `dependsOn` refs: a ref resolves to a
+   * path only when some emitted issue sits at that exact path with a
+   * matching `nodeKind` — a ref whose target produced no issue is dropped
+   * (the dependency is satisfied by reality).
+   */
+  readonly dependsOn?: readonly (readonly string[])[];
 }
 
 /**
@@ -28,6 +45,14 @@ export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
 export interface DiffableNode {
   readonly id: string;
   readonly nodeKind: string;
+  /**
+   * The nodes this node structurally depends on — resolved references to
+   * prerequisites that must exist before it (e.g. a foreign key depends on
+   * its referenced table). Stamped by the derivation that holds the parent
+   * context; both the expected and the actual derivation stamp it by the
+   * same structural rules. Never compared by `isEqualTo`.
+   */
+  readonly dependsOn?: readonly SchemaNodeRef[];
   isEqualTo(other: DiffableNode): boolean;
   children(): readonly DiffableNode[];
 }
@@ -84,7 +109,49 @@ export function diffSchemas(
   expected: DiffableNode,
   actual: DiffableNode,
 ): readonly SchemaDiffIssue[] {
-  return diffPair(expected, actual, []);
+  return mirrorDependsOnOntoIssues(diffPair(expected, actual, []));
+}
+
+function schemaNodeRefKey(ref: SchemaNodeRef): string {
+  return ref.map((step) => step.id).join(SIBLING_KEY_DELIMITER);
+}
+
+function issuePathKey(path: readonly string[]): string {
+  return path.join(SIBLING_KEY_DELIMITER);
+}
+
+/**
+ * Copies each issue's node's `dependsOn` refs onto the issue itself, as
+ * issue-to-issue path references. A ref is kept only when some emitted issue
+ * sits at that exact path AND that issue's node `nodeKind` matches the ref's
+ * last step — otherwise the ref is dropped (its target either didn't
+ * change, or was never part of either tree; either way the dependency is
+ * satisfied by reality, not by an operation this diff will produce).
+ */
+function mirrorDependsOnOntoIssues(issues: readonly SchemaDiffIssue[]): readonly SchemaDiffIssue[] {
+  const issuesByPath = new Map<string, SchemaDiffIssue>();
+  for (const issue of issues) {
+    issuesByPath.set(issuePathKey(issue.path), issue);
+  }
+
+  return issues.map((issue) => {
+    const node = issue.expected ?? issue.actual;
+    const refs = node?.dependsOn;
+    if (refs === undefined || refs.length === 0) return issue;
+
+    const dependsOn = refs.flatMap((ref) => {
+      const lastStep = ref[ref.length - 1];
+      if (lastStep === undefined) return [];
+      const targetIssue = issuesByPath.get(schemaNodeRefKey(ref));
+      if (targetIssue === undefined) return [];
+      const targetNode = targetIssue.expected ?? targetIssue.actual;
+      if (targetNode?.nodeKind !== lastStep.nodeKind) return [];
+      return [ref.map((step) => step.id)];
+    });
+
+    if (dependsOn.length === 0) return issue;
+    return { ...issue, dependsOn };
+  });
 }
 
 function diffPair(

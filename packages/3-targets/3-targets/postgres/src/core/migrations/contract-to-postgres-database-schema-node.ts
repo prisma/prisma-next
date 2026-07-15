@@ -1,5 +1,6 @@
 import type { ContractToSchemaIROptions } from '@prisma-next/family-sql/control';
 import { contractNamespaceToSchemaIR } from '@prisma-next/family-sql/control';
+import type { SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -12,7 +13,25 @@ import { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
 import { PostgresRoleSchemaNode } from '../schema-ir/postgres-role-schema-node';
 import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
+import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
 import { resolveDdlSchemaForNamespaceStorage } from './resolve-ddl-schema';
+
+/** The database root's fixed sentinel id (`PostgresDatabaseSchemaNode#id`). */
+function databaseStep(): { readonly nodeKind: string; readonly id: string } {
+  return { nodeKind: PostgresSchemaNodeKind.database, id: 'database' };
+}
+
+function tableDependsOn(namespaceId: string, tableName: string): SchemaNodeRef {
+  return [
+    databaseStep(),
+    { nodeKind: PostgresSchemaNodeKind.namespace, id: namespaceId },
+    { nodeKind: PostgresSchemaNodeKind.table, id: tableName },
+  ];
+}
+
+function roleDependsOn(role: string): SchemaNodeRef {
+  return [databaseStep(), { nodeKind: PostgresSchemaNodeKind.role, id: role }];
+}
 
 function toPolicyNode(policy: PostgresRlsPolicy, namespaceId: string): PostgresPolicySchemaNode {
   return new PostgresPolicySchemaNode({
@@ -25,6 +44,7 @@ function toPolicyNode(policy: PostgresRlsPolicy, namespaceId: string): PostgresP
     ...ifDefined('using', policy.using),
     ...ifDefined('withCheck', policy.withCheck),
     permissive: policy.permissive,
+    dependsOn: [tableDependsOn(namespaceId, policy.tableName), ...policy.roles.map(roleDependsOn)],
   });
 }
 
@@ -115,23 +135,24 @@ export function contractToPostgresDatabaseSchemaNode(
       // clauses, and resolves the real live DDL schema — introspected FKs
       // already carry the live schema, so this is what lets an expected FK
       // pair (by diff-node id) with its introspected counterpart.
-      const foreignKeys = sqlTable.foreignKeys.map(
-        (fk) =>
-          new SqlForeignKeyIR({
-            columns: fk.columns,
-            referencedTable: fk.referencedTable,
-            referencedColumns: fk.referencedColumns,
-            referencedSchema: fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
-            ...ifDefined('name', fk.name),
-            ...ifDefined('onDelete', fk.onDelete),
-            ...ifDefined('onUpdate', fk.onUpdate),
-            ...ifDefined('annotations', fk.annotations),
-            resolvedReferencedNamespace: resolveDdlSchemaForNamespaceStorage(
-              contract.storage,
-              fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
-            ),
-          }),
-      );
+      const foreignKeys = sqlTable.foreignKeys.map((fk) => {
+        const resolvedReferencedNamespace = resolveDdlSchemaForNamespaceStorage(
+          contract.storage,
+          fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
+        );
+        return new SqlForeignKeyIR({
+          columns: fk.columns,
+          referencedTable: fk.referencedTable,
+          referencedColumns: fk.referencedColumns,
+          referencedSchema: fk.referencedSchema ?? UNBOUND_NAMESPACE_ID,
+          ...ifDefined('name', fk.name),
+          ...ifDefined('onDelete', fk.onDelete),
+          ...ifDefined('onUpdate', fk.onUpdate),
+          ...ifDefined('annotations', fk.annotations),
+          resolvedReferencedNamespace,
+          dependsOn: [tableDependsOn(resolvedReferencedNamespace, fk.referencedTable)],
+        });
+      });
       tables[tableName] = new PostgresTableSchemaNode({
         name: sqlTable.name,
         columns: sqlTable.columns,

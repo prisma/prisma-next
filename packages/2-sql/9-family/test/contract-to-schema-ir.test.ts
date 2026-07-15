@@ -1080,6 +1080,26 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
     expect(fk.referencedSchema).toBe('other_contract_ns');
     expect(fk.resolvedReferencedNamespace).toBe('other_contract_ns');
   });
+
+  it('stamps dependsOn as the chain to the referenced table in the flat tree', () => {
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: { table: { Post: postTable(UNBOUND_NAMESPACE_ID) } },
+        }),
+      },
+    });
+
+    const fk = contractToSchemaIR(wrap(storage)).tables['Post']!.foreignKeys[0]!;
+    expect(fk.dependsOn).toEqual([
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'User' },
+      ],
+    ]);
+  });
 });
 
 describe('detectDestructiveChanges', () => {

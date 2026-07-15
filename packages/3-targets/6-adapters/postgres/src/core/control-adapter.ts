@@ -7,7 +7,7 @@ import {
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, type SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
@@ -66,6 +66,7 @@ import {
   PostgresNativeEnumSchemaNode,
   PostgresPolicySchemaNode,
   PostgresRoleSchemaNode,
+  PostgresSchemaNodeKind,
   PostgresTableSchemaNode,
 } from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -1054,6 +1055,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           name: fk.name,
           ...ifDefined('onDelete', mapReferentialAction(fk.deleteRule)),
           ...ifDefined('onUpdate', mapReferentialAction(fk.updateRule)),
+          dependsOn: [postgresTableDependsOn(fk.referencedSchema, fk.referencedTable)],
         }),
       );
 
@@ -1241,6 +1243,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...(row.qual !== null ? { using: row.qual } : {}),
         ...(row.with_check !== null ? { withCheck: row.with_check } : {}),
         permissive,
+        dependsOn: [
+          postgresTableDependsOn(row.schemaname, row.tablename),
+          ...policyRoles.map(postgresRoleDependsOn),
+        ],
       });
       const list = policiesByTable.get(row.tablename) ?? [];
       list.push(policy);
@@ -1500,6 +1506,27 @@ function mapReferentialAction(rule: string): SqlReferentialAction | undefined {
   }
   if (mapped === 'noAction') return undefined;
   return mapped;
+}
+
+/**
+ * A FK/policy dependency chain, mirroring the shape the expected-side
+ * derivation stamps (`contractToPostgresDatabaseSchemaNode`): the database
+ * root's fixed sentinel id, then the namespace, then the table.
+ */
+function postgresTableDependsOn(namespaceId: string, tableName: string): SchemaNodeRef {
+  return [
+    { nodeKind: PostgresSchemaNodeKind.database, id: 'database' },
+    { nodeKind: PostgresSchemaNodeKind.namespace, id: namespaceId },
+    { nodeKind: PostgresSchemaNodeKind.table, id: tableName },
+  ];
+}
+
+/** A policy's dependency chain onto one of the roles it grants to. */
+function postgresRoleDependsOn(role: string): SchemaNodeRef {
+  return [
+    { nodeKind: PostgresSchemaNodeKind.database, id: 'database' },
+    { nodeKind: PostgresSchemaNodeKind.role, id: role },
+  ];
 }
 
 /**

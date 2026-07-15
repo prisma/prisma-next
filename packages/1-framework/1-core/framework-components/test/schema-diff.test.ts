@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DiffableNode, SchemaDiffIssue } from '../src/control/schema-diff';
+import type { DiffableNode, SchemaDiffIssue, SchemaNodeRef } from '../src/control/schema-diff';
 import { diffSchemas, SchemaDiff } from '../src/control/schema-diff';
 
 /** A synthetic root node whose `isEqualTo` is always true — used to wrap flat node lists. */
@@ -21,10 +21,12 @@ function makeNode(
   body = '',
   childNodes: readonly DiffableNode[] = [],
   nodeKind = 'widget',
+  dependsOn?: readonly SchemaNodeRef[],
 ): DiffableNode {
   return {
     id: nodeId,
     nodeKind,
+    ...(dependsOn !== undefined ? { dependsOn } : {}),
     children(): readonly DiffableNode[] {
       return childNodes;
     },
@@ -284,6 +286,91 @@ describe('diffSchemas', () => {
     expect(issues[0]).toMatchObject({
       reason: 'not-found',
       path: ['root', 'lone_leaf'],
+    });
+  });
+
+  describe('dependsOn mirroring', () => {
+    function findIssue(
+      issues: readonly SchemaDiffIssue[],
+      lastPathSegment: string,
+    ): SchemaDiffIssue {
+      const issue = issues.find((i) => i.path[i.path.length - 1] === lastPathSegment);
+      if (issue === undefined) throw new Error(`no issue found ending in "${lastPathSegment}"`);
+      return issue;
+    }
+
+    it('a node with no dependsOn produces an issue with no dependsOn field', () => {
+      const issues = diffSchemas(rootOf([makeNode('lone_leaf', 'data')]), rootOf([]));
+      expect(issues[0]).not.toHaveProperty('dependsOn');
+    });
+
+    it('a ref whose target also produced an issue is kept, resolved to that issue path', () => {
+      const table = makeNode('tableA', 'body', [], 'table');
+      const fk = makeNode('fk1', 'body', [], 'fk', [
+        [
+          { nodeKind: 'root', id: 'root' },
+          { nodeKind: 'table', id: 'tableA' },
+        ],
+      ]);
+      const issues = diffSchemas(rootOf([table, fk]), rootOf([]));
+      expect(findIssue(issues, 'fk1').dependsOn).toEqual([['root', 'tableA']]);
+    });
+
+    it('a ref whose target produced no issue is dropped (satisfied by reality)', () => {
+      const tableExpected = makeNode('tableA', 'same', [], 'table');
+      const tableActual = makeNode('tableA', 'same', [], 'table');
+      const fk = makeNode('fk1', 'body', [], 'fk', [
+        [
+          { nodeKind: 'root', id: 'root' },
+          { nodeKind: 'table', id: 'tableA' },
+        ],
+      ]);
+      const issues = diffSchemas(rootOf([tableExpected, fk]), rootOf([tableActual]));
+      expect(findIssue(issues, 'fk1')).not.toHaveProperty('dependsOn');
+    });
+
+    it('a ref whose target path matches but nodeKind differs is dropped', () => {
+      // A role happens to share the id "tableA" with what the ref names as a
+      // "table" — same path, wrong kind. The ref must not resolve to it.
+      const role = makeNode('tableA', 'body', [], 'role');
+      const fk = makeNode('fk1', 'body', [], 'fk', [
+        [
+          { nodeKind: 'root', id: 'root' },
+          { nodeKind: 'table', id: 'tableA' },
+        ],
+      ]);
+      const issues = diffSchemas(rootOf([role, fk]), rootOf([]));
+      expect(findIssue(issues, 'fk1')).not.toHaveProperty('dependsOn');
+    });
+
+    it('keeps only the refs that resolve, out of several', () => {
+      const tableExpected = makeNode('tableA', 'same', [], 'table');
+      const tableActual = makeNode('tableA', 'same', [], 'table');
+      const role = makeNode('app_user', 'body', [], 'role');
+      const policy = makeNode('policy1', 'body', [], 'policy', [
+        [
+          { nodeKind: 'root', id: 'root' },
+          { nodeKind: 'table', id: 'tableA' },
+        ],
+        [
+          { nodeKind: 'root', id: 'root' },
+          { nodeKind: 'role', id: 'app_user' },
+        ],
+      ]);
+      const issues = diffSchemas(rootOf([tableExpected, role, policy]), rootOf([tableActual]));
+      expect(findIssue(issues, 'policy1').dependsOn).toEqual([['root', 'app_user']]);
+    });
+
+    it('does not reorder issues', () => {
+      const a = makeNode('a', 'v', [], 'widget');
+      const b = makeNode('b', 'v', [], 'widget', [
+        [
+          { nodeKind: 'root', id: 'root' },
+          { nodeKind: 'widget', id: 'a' },
+        ],
+      ]);
+      const issues = diffSchemas(rootOf([a, b]), rootOf([]));
+      expect(issues.map((i) => i.path[i.path.length - 1])).toEqual(['a', 'b']);
     });
   });
 });

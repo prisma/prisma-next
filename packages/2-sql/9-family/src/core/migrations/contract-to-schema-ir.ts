@@ -1,6 +1,9 @@
 import type { ColumnDefault, Contract, JsonValue } from '@prisma-next/contract/types';
 import type { CodecRef } from '@prisma-next/framework-components/codec';
-import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
+import type {
+  MigrationPlannerConflict,
+  SchemaNodeRef,
+} from '@prisma-next/framework-components/control';
 import {
   type CheckConstraint,
   type ForeignKey,
@@ -14,6 +17,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import {
+  RelationalSchemaNodeKind,
   type SqlAnnotations,
   type SqlCheckConstraintIRInput,
   type SqlColumnIRInput,
@@ -266,6 +270,21 @@ function convertIndex(index: Index): SqlIndexIRInput {
 }
 
 /**
+ * The referenced table's chain in the flat (single-schema) tree
+ * `contractToSchemaIR`/`contractNamespaceToSchemaIR` build: the root
+ * (`SqlSchemaIR`, fixed `'database'` id) followed by the table's own id.
+ * Postgres discards this when it re-derives the FK against its own
+ * multi-schema tree shape (`contractToPostgresDatabaseSchemaNode`); SQLite's
+ * flat tree uses it as-is.
+ */
+function flatSchemaDependsOn(tableName: string): SchemaNodeRef {
+  return [
+    { nodeKind: RelationalSchemaNodeKind.schema, id: 'database' },
+    { nodeKind: RelationalSchemaNodeKind.table, id: tableName },
+  ];
+}
+
+/**
  * The FK's referenced-namespace identity comes from the target's namespace
  * node, not the raw namespace-id string. An unbound target namespace stamps
  * no `referencedSchema` at all — the FK node's id renders the absence as the
@@ -286,6 +305,7 @@ function convertForeignKey(fk: ForeignKey, storage: SqlStorage): SqlForeignKeyIR
     ...ifDefined('name', fk.name),
     ...ifDefined('onDelete', fk.onDelete),
     ...ifDefined('onUpdate', fk.onUpdate),
+    dependsOn: [flatSchemaDependsOn(fk.target.tableName)],
   };
 }
 

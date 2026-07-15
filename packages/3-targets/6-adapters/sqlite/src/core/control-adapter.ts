@@ -3,7 +3,7 @@ import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, type SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
@@ -30,7 +30,11 @@ import type {
   SqlReferentialAction,
   SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
-import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import {
+  RelationalSchemaNodeKind,
+  SqlSchemaIR,
+  SqlTableIR,
+} from '@prisma-next/sql-schema-ir/types';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -573,6 +577,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         referencedColumns: Object.freeze([...fk.referencedColumns]) as readonly string[],
         ...ifDefined('onDelete', mapSqliteReferentialAction(fk.onDelete)),
         ...ifDefined('onUpdate', mapSqliteReferentialAction(fk.onUpdate)),
+        dependsOn: [flatTableDependsOn(fk.referencedTable)],
       }));
 
       const uniques: SqlUniqueIRInput[] = [];
@@ -643,6 +648,19 @@ function mapSqliteReferentialAction(rule: string): SqlReferentialAction | undefi
   }
   if (mapped === 'noAction') return undefined;
   return mapped;
+}
+
+/**
+ * The referenced table's chain in the flat (single-schema) tree this
+ * introspection builds: the root (`SqlSchemaIR`, fixed `'database'` id)
+ * followed by the table's own id. Mirrors the expected-side derivation
+ * (`contractToSchemaIR`'s `convertForeignKey`).
+ */
+function flatTableDependsOn(tableName: string): SchemaNodeRef {
+  return [
+    { nodeKind: RelationalSchemaNodeKind.schema, id: 'database' },
+    { nodeKind: RelationalSchemaNodeKind.table, id: tableName },
+  ];
 }
 
 // ---------------------------------------------------------------------------
