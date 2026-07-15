@@ -124,20 +124,24 @@ Two changes this project surfaced but deliberately did not fold into its deliver
 
 **FK2 — `auth`/`storage` contract split for opt-in composition.** Split the pack contract so a user composes only the schema they reference. Genuine separate contracts means two contract *spaces*, which re-architects the merged Slice D `db.supabase` facade (built from one extension contract), changes the `supabase:auth.AuthUser` cross-space FK-reference syntax and the exported model-handle brand, and shifts Slice G's expected infer output — so it is its own slice, not a pre-merge tweak. Pick up when a user actually wants subset composition; `db verify` is already per-space-correct without it, and the default `contract infer` (public-scoped) never leaks pack schemas regardless.
 
-### Slice E — Docs + real-Supabase acceptance + close-out
+### Slice E — Docs + real-Supabase acceptance + close-out ✅ docs + harness shipped
 
-**Gate:** B, C, D, F, G done; explicit-namespace-dsl project close-out.
+**Shaped:** [`slices/e-docs-acceptance-closeout/spec.md`](slices/e-docs-acceptance-closeout/spec.md) + [`plan.md`](slices/e-docs-acceptance-closeout/plan.md).
+
+**Gate:** cleared — B/C/D/F/G all shipped; explicit-namespace-dsl feature landed (#778).
 
 **Goal:** the package is launch-ready.
 
 **DoD tasks:**
-- [ ] Polish the package README: describe the role-binding model (session-coupled connections, ADR 230), JWT validation modes (secret vs JWKS), and unsupported scope (PostgREST interop, edge runtimes, Supabase Realtime, storage uploads).
-- [ ] Launch-blocking acceptance test (manual, not in CI): provision a real Supabase project; run `examples/supabase` against it; verify all four handler flows (anon read, authenticated update-own, service-role admin read, JWT failure). Document evidence in the launch announcement.
-- [ ] Update the extension-authoring skill (TML-2492) to reference this package as the canonical example.
-- [ ] Update [umbrella `decisions.md`](../supabase-integration/decisions.md) marking all relevant decisions as ✅ shipped, with links to merged PRs.
-- [ ] Promote any remaining ADR drafts not yet promoted by upstream projects.
-- [ ] Close-out: delete `projects/extension-supabase/` per the project workflow rule.
-- [ ] Optional stretch: implement `auth.uid()` as a column default via `DefaultFunctionRegistry`. Defer to v0.2 if not feasible.
+- [x] Polish the package README: role-binding model (ADR 230), JWT modes (secret vs JWKS), `db.supabase` admin root (C15), unsupported scope, post-launch deferrals. Superseded codex #913.
+- [x] Author the missing `examples/supabase/README.md` (FR20/AC9).
+- [x] Build the env-guarded real-Supabase acceptance harness (`examples/supabase/test/real-supabase.acceptance.test.ts`) — skipped-green in CI; four flows + ORM update-own.
+- [ ] **Manual, post-merge (needs infra):** provision a real Supabase project; run the harness; capture evidence in the launch announcement. (Provisioning owner TBD.)
+- [~] Update the extension-authoring skill (TML-2492) — **deferred**: no authoring skill exists in the tree yet (only the *upgrade* skill); the repoint rides with TML-2492's own delivery.
+- [x] Mark umbrella `decisions.md` ✅ shipped with merged-PR links.
+- [x] ADR-draft promotion pass — this project owns no un-promoted drafts (ADR 234 already promoted; `explicit-namespace-dsl`'s draft flagged to its own close-out).
+- [~] Close-out dir deletion — **deferred to umbrella close-out**: the live umbrella densely references this dir; deletion rides with `projects/supabase-integration/` deletion per the umbrella README §Close-out.
+- [ ] Optional stretch: `auth.uid()` as a column default via `DefaultFunctionRegistry` — deferred to v0.2.
 
 ## Risks and mitigations
 
