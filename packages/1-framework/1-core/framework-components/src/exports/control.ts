@@ -103,6 +103,7 @@ export {
   extractComponentIds,
   extractQueryOperationTypeImports,
 } from '../control/control-stack';
+export { orderIssuesByDependencies } from '../control/order-issues-by-dependencies';
 export type { DiffableNode, SchemaDiffIssue, SchemaNodeRef } from '../control/schema-diff';
 export { diffSchemas, SchemaDiff } from '../control/schema-diff';
 export type {

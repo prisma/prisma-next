@@ -21,6 +21,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import { orderIssuesByDependencies } from '@prisma-next/framework-components/control';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import {
   RelationalSchemaNodeKind,
@@ -62,51 +63,6 @@ import {
 } from './planner-strategies';
 
 export type { CallMigrationStrategy, StrategyContext };
-
-// ============================================================================
-// Node-keyed issue ordering (dependency order)
-// ============================================================================
-
-/**
- * Re-keys the legacy `ISSUE_KIND_ORDER` (kind string → priority number) on
- * `(nodeKind, reason)`. Numbers are preserved from the legacy table so the
- * dependency intent stays legible; the final emission order is actually
- * fixed downstream by category bucketing (create-table → add-column →
- * create-index → recreate → drop-column → drop-index → drop-table), so this
- * only breaks ties within a single bucket.
- */
-export function nodeIssueOrder(issue: SchemaDiffIssue): number {
-  const node = issueNode(issue);
-  if (node === undefined) return 99;
-  switch (node.nodeKind) {
-    case RelationalSchemaNodeKind.foreignKey:
-      return issue.reason === 'not-expected' ? 10 : 60;
-    case RelationalSchemaNodeKind.unique:
-      return issue.reason === 'not-expected' ? 11 : 51;
-    case RelationalSchemaNodeKind.primaryKey:
-      return issue.reason === 'not-expected' ? 12 : 50;
-    case RelationalSchemaNodeKind.index:
-      return issue.reason === 'not-expected' ? 13 : 52;
-    case RelationalSchemaNodeKind.columnDefault:
-      if (issue.reason === 'not-expected') return 14;
-      return issue.reason === 'not-found' ? 42 : 43;
-    case RelationalSchemaNodeKind.column:
-      if (issue.reason === 'not-expected') return 15;
-      return issue.reason === 'not-found' ? 30 : 40;
-    case RelationalSchemaNodeKind.table:
-      return issue.reason === 'not-expected' ? 16 : 20;
-    case RelationalSchemaNodeKind.check:
-      if (issue.reason === 'not-found') return 53;
-      return issue.reason === 'not-expected' ? 54 : 55;
-    default:
-      return 99;
-  }
-}
-
-/** Deterministic tiebreak within an order bucket: the diff path itself already encodes table → child → grandchild. */
-export function nodeIssueKey(issue: SchemaDiffIssue): string {
-  return issue.path.join(' ');
-}
 
 // ============================================================================
 // Subtree coalescing — the planner's responsibility per the differ's contract
@@ -505,13 +461,12 @@ export function planIssues(
     }
   }
 
-  const sorted = [...remaining].sort((a, b) => {
-    const kindDelta = nodeIssueOrder(a) - nodeIssueOrder(b);
-    if (kindDelta !== 0) return kindDelta;
-    const keyA = nodeIssueKey(a);
-    const keyB = nodeIssueKey(b);
-    return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
-  });
+  // Dependency-graph order: a topological sort over the issues' `dependsOn`
+  // cross-links and containment edges (edge direction from the ordering law's
+  // presence rule), path-tiebroken for determinism. `classifyCall` bucketing
+  // downstream fixes the coarse create/recreate/drop sequence; this settles
+  // the order within each bucket.
+  const sorted = orderIssuesByDependencies(remaining);
 
   const defaultCalls: SqliteOpFactoryCall[] = [];
   const conflicts: SqlPlannerConflict[] = [];

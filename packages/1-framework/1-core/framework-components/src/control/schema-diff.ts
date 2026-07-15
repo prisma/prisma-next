@@ -46,11 +46,10 @@ export interface DiffableNode {
   readonly id: string;
   readonly nodeKind: string;
   /**
-   * The nodes this node structurally depends on — resolved references to
-   * prerequisites that must exist before it (e.g. a foreign key depends on
-   * its referenced table). Stamped by the derivation that holds the parent
-   * context; both the expected and the actual derivation stamp it by the
-   * same structural rules. Never compared by `isEqualTo`.
+   * The nodes this node structurally depends on — resolved references to the
+   * prerequisites that must exist before it. Stamped by the derivation that
+   * holds the parent context; both the expected and the actual derivation
+   * stamp it by the same structural rules. Never compared by `isEqualTo`.
    */
   readonly dependsOn?: readonly SchemaNodeRef[];
   isEqualTo(other: DiffableNode): boolean;

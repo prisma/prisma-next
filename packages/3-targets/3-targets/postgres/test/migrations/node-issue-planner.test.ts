@@ -1,13 +1,13 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { buildPostgresPlanDiff } from '../../src/core/migrations/diff-database-schema';
 import {
   coalesceSubtreeIssues,
   mapNodeIssueToCall,
-  nodeIssueOrder,
   planIssues as planNodeIssues,
 } from '../../src/core/migrations/issue-planner';
 import { PostgresSchema } from '../../src/core/postgres-schema';
@@ -302,7 +302,79 @@ describe('mapNodeIssueToCall — synthesized namespace issue', () => {
     if (!result.ok) throw new Error('expected ok');
     expect(result.value.map((c) => c.factoryName)).toEqual(['createSchema']);
     expect(result.value[0]).toMatchObject({ factoryName: 'createSchema', schemaName: 'auth' });
-    expect(nodeIssueOrder(issue)).toBe(1);
+  });
+});
+
+describe('planNodeIssues — dependency-graph ordering', () => {
+  const fkToUser = new SqlForeignKeyIR({
+    columns: ['userId'],
+    referencedTable: 'user',
+    referencedColumns: ['id'],
+    referencedSchema: 'public',
+    resolvedReferencedNamespace: 'public',
+    // Mirrors what the introspection adapter stamps (`postgresTableDependsOn`):
+    // the FK depends on its referenced table's node.
+    dependsOn: [
+      [
+        { nodeKind: 'postgres-database', id: 'database' },
+        { nodeKind: 'postgres-namespace', id: 'public' },
+        { nodeKind: 'postgres-table', id: 'user' },
+      ],
+    ],
+  });
+
+  function postWithFk(): PostgresTableSchemaNode {
+    return new PostgresTableSchemaNode({
+      name: 'post',
+      columns: {
+        id: { name: 'id', nativeType: 'uuid', nullable: false, resolvedNativeType: 'uuid' },
+        userId: { name: 'userId', nativeType: 'uuid', nullable: false, resolvedNativeType: 'uuid' },
+      },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [fkToUser],
+      uniques: [],
+      indexes: [],
+      policies: [],
+      rlsEnabled: false,
+    });
+  }
+
+  function userTableNode(): PostgresTableSchemaNode {
+    return new PostgresTableSchemaNode({
+      name: 'user',
+      columns: {
+        id: { name: 'id', nativeType: 'uuid', nullable: false, resolvedNativeType: 'uuid' },
+      },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      policies: [],
+      rlsEnabled: false,
+    });
+  }
+
+  // Contract keeps `post` (its FK to `user` removed) and drops `user`. On the
+  // way down the dependent op (DROP CONSTRAINT on post's FK) must precede the
+  // dependency op (DROP TABLE user) — the graph reverses the edge for drops.
+  it('drops a foreign key before the referenced table it depends on', () => {
+    const contract = makeContract({
+      post: {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      },
+    });
+    const actual = rootOf({ post: postWithFk(), user: userTableNode() });
+    const factoryNames = planFor(contract, actual).map((c) => c.factoryName);
+    expect(factoryNames).toContain('dropConstraint');
+    expect(factoryNames).toContain('dropTable');
+    expect(factoryNames.indexOf('dropConstraint')).toBeLessThan(factoryNames.indexOf('dropTable'));
   });
 });
 

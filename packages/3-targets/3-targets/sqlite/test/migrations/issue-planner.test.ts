@@ -4,7 +4,7 @@ import {
   coalesceSubtreeIssues,
   columnTypeChanged,
   mapNodeIssueToCall,
-  nodeIssueOrder,
+  planIssues,
 } from '../../src/core/migrations/issue-planner';
 import type { StrategyContext } from '../../src/core/migrations/planner-strategies';
 import {
@@ -285,25 +285,45 @@ describe('columnTypeChanged', () => {
   });
 });
 
-describe('nodeIssueOrder', () => {
-  it('orders drops before creates before alters, matching the legacy ISSUE_KIND_ORDER buckets', () => {
-    const extraTable = issue({
-      path: ['database', 'orphan'],
-      reason: 'not-expected',
-      actual: table({ name: 'orphan', columns: {} }),
-    });
-    const missingTable = issue({
-      path: ['database', 'a'],
-      reason: 'not-found',
-      expected: table({ name: 'a', columns: {} }),
-    });
-    const missingColumn = issue({
-      path: ['database', 'b', 'column:c'],
-      reason: 'not-found',
-      expected: expectedColumn({ name: 'c', nativeType: 'TEXT', nullable: true }),
-    });
-    expect(nodeIssueOrder(extraTable)).toBeLessThan(nodeIssueOrder(missingTable));
-    expect(nodeIssueOrder(missingTable)).toBeLessThan(nodeIssueOrder(missingColumn));
+describe('planIssues — dependency-graph ordering', () => {
+  function factoryNames(issues: readonly ReturnType<typeof issue>[]): readonly string[] {
+    const result = planIssues({ issues, strategies: [] });
+    if (!result.ok) throw new Error(`expected ok, got ${JSON.stringify(result.failure)}`);
+    return result.value.calls.map((c) => c.factoryName);
+  }
+
+  const created = issue({
+    path: ['database', 'created'],
+    reason: 'not-found',
+    expected: table({
+      name: 'created',
+      columns: { id: expectedColumn({ name: 'id', nativeType: 'INTEGER', nullable: false }) },
+    }),
+  });
+  const droppedA = issue({
+    path: ['database', 'a_orphan'],
+    reason: 'not-expected',
+    actual: table({ name: 'a_orphan', columns: {} }),
+  });
+  const droppedZ = issue({
+    path: ['database', 'z_orphan'],
+    reason: 'not-expected',
+    actual: table({ name: 'z_orphan', columns: {} }),
+  });
+
+  it('keeps creates before drops (the retained call-bucket order)', () => {
+    const names = factoryNames([droppedZ, created, droppedA]);
+    expect(names.indexOf('createTable')).toBeLessThan(names.indexOf('dropTable'));
+  });
+
+  it('is deterministic regardless of input order (graph path tiebreak)', () => {
+    const baseline = factoryNames([droppedZ, created, droppedA]);
+    expect(factoryNames([created, droppedA, droppedZ])).toEqual(baseline);
+    expect(factoryNames([droppedA, droppedZ, created])).toEqual(baseline);
+    // The two independent table drops come out in stable path order every run.
+    const dropOrder = factoryNames([droppedZ, droppedA]);
+    expect(dropOrder).toEqual(['dropTable', 'dropTable']);
+    expect(factoryNames([droppedA, droppedZ])).toEqual(dropOrder);
   });
 });
 

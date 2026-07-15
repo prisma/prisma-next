@@ -25,6 +25,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import { orderIssuesByDependencies } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
@@ -367,57 +368,6 @@ export function columnTypeChanged(expected: SqlColumnIR, actual: SqlColumnIR): b
   return (
     expected.nativeType !== actual.nativeType || Boolean(expected.many) !== Boolean(actual.many)
   );
-}
-
-// ----------------------------------------------------------------------------
-// Node-keyed issue ordering (re-keys ISSUE_KIND_ORDER on nodeKind + reason)
-// ----------------------------------------------------------------------------
-
-/**
- * Re-keys the legacy `ISSUE_KIND_ORDER` on `(nodeKind, reason)`, numbers
- * preserved so the dependency intent stays legible. Final emission order is
- * fixed downstream by `classifyCall` bucketing (dep → drop → table → column →
- * recipe → alter → primaryKey → unique → index → foreignKey), so this only
- * breaks ties within a bucket.
- */
-export function nodeIssueOrder(issue: SchemaDiffIssue): number {
-  const node = issueNode(issue);
-  if (node === undefined) return 99;
-  switch (node.nodeKind) {
-    case PostgresSchemaNodeKind.namespace:
-      return 1;
-    case PostgresSchemaNodeKind.nativeEnum:
-      // Creates order right after namespace creates within the 'dep' bucket
-      // (CREATE SCHEMA before CREATE TYPE); drops order after table drops
-      // within the 'drop' bucket (DROP TYPE only after its dependents left).
-      return issue.reason === 'not-expected' ? 17 : 2;
-    case RelationalSchemaNodeKind.foreignKey:
-      return issue.reason === 'not-expected' ? 10 : 60;
-    case RelationalSchemaNodeKind.unique:
-      return issue.reason === 'not-expected' ? 11 : 51;
-    case RelationalSchemaNodeKind.primaryKey:
-      return issue.reason === 'not-expected' ? 12 : 50;
-    case RelationalSchemaNodeKind.index:
-      return issue.reason === 'not-expected' ? 13 : 52;
-    case RelationalSchemaNodeKind.columnDefault:
-      if (issue.reason === 'not-expected') return 14;
-      return issue.reason === 'not-found' ? 42 : 43;
-    case RelationalSchemaNodeKind.column:
-      if (issue.reason === 'not-expected') return 15;
-      return issue.reason === 'not-found' ? 30 : 40;
-    case PostgresSchemaNodeKind.table:
-      return issue.reason === 'not-expected' ? 16 : 20;
-    case RelationalSchemaNodeKind.check:
-      if (issue.reason === 'not-found') return 53;
-      return issue.reason === 'not-expected' ? 55 : 54;
-    default:
-      return 99;
-  }
-}
-
-/** Deterministic tiebreak within an order bucket: the diff path already encodes schema → table → child. */
-export function nodeIssueKey(issue: SchemaDiffIssue): string {
-  return issue.path.join(' ');
 }
 
 // ----------------------------------------------------------------------------
@@ -1052,13 +1002,12 @@ export function planIssues(
     }
   }
 
-  const sorted = [...remaining].sort((a, b) => {
-    const kindDelta = nodeIssueOrder(a) - nodeIssueOrder(b);
-    if (kindDelta !== 0) return kindDelta;
-    const keyA = nodeIssueKey(a);
-    const keyB = nodeIssueKey(b);
-    return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
-  });
+  // Dependency-graph order: a topological sort over the issues' `dependsOn`
+  // cross-links and containment edges (the ordering law drives edge direction
+  // by presence), path-tiebroken for determinism. `classifyCall` bucketing
+  // downstream fixes the coarse cross-entity DDL sequence; this settles the
+  // order within each bucket (notably the teardown order among drops).
+  const sorted = orderIssuesByDependencies(remaining);
 
   const defaultCalls: PostgresOpFactoryCall[] = [];
   const conflicts: SqlPlannerConflict[] = [];
