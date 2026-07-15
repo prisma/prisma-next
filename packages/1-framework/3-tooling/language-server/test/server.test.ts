@@ -201,6 +201,7 @@ interface Harness {
   readonly waitForWarning: (predicate: (message: string) => boolean) => Promise<string>;
   readonly latestDiagnostics: (uri: string) => readonly Diagnostic[] | undefined;
   readonly publishCount: (uri: string) => number;
+  readonly nonEmptyPublishCount: (uri: string) => number;
   readonly diagnosticRefreshCount: () => number;
   readonly waitForDiagnosticRefresh: () => Promise<void>;
   readonly notifyConfigChanged: (uri?: string) => void;
@@ -233,6 +234,7 @@ function startHarness(
   const pending = new Map<string, (diagnostics: readonly Diagnostic[]) => void>();
   const latest = new Map<string, readonly Diagnostic[]>();
   const publishCounts = new Map<string, number>();
+  const nonEmptyPublishCounts = new Map<string, number>();
   interface PredicateWaiter {
     readonly predicate: (diagnostics: readonly Diagnostic[]) => boolean;
     readonly resolve: (diagnostics: readonly Diagnostic[]) => void;
@@ -247,6 +249,9 @@ function startHarness(
     latest.set(params.uri, params.diagnostics);
     const publishCount = (publishCounts.get(params.uri) ?? 0) + 1;
     publishCounts.set(params.uri, publishCount);
+    if (params.diagnostics.length > 0) {
+      nonEmptyPublishCounts.set(params.uri, (nonEmptyPublishCounts.get(params.uri) ?? 0) + 1);
+    }
     pending.get(params.uri)?.(params.diagnostics);
     const countQueue = countWaiters.get(params.uri);
     if (countQueue) {
@@ -361,6 +366,7 @@ function startHarness(
       }),
     latestDiagnostics: (uri) => latest.get(uri),
     publishCount: (uri) => publishCounts.get(uri) ?? 0,
+    nonEmptyPublishCount: (uri) => nonEmptyPublishCounts.get(uri) ?? 0,
     diagnosticRefreshCount: () => diagnosticRefreshes,
     waitForDiagnosticRefresh: () =>
       new Promise((resolve) => {
@@ -1686,8 +1692,13 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
     harness.notifyConfigChanged();
 
     // The broken reload surfaces on the config file; the schema keeps its
-    // last-good diagnostics instead of being cleared.
-    const configDiagnostics = await harness.waitForDiagnostics(configUri);
+    // last-good diagnostics instead of being cleared. (Successful loads
+    // publish harmless empty clears on the config URI, so wait for the
+    // non-empty marker specifically.)
+    const configDiagnostics = await harness.waitForDiagnosticsMatching(
+      configUri,
+      (diagnostics) => diagnostics.length > 0,
+    );
     expect(configDiagnostics).toHaveLength(1);
     await settle();
     expect(harness.latestDiagnostics(schemaUri)).toEqual(before);
@@ -2279,7 +2290,7 @@ describe('language server config failure surfacing', {
 
     await harness.waitForDiagnostics(configUri);
     await settle();
-    expect(harness.publishCount(configUri)).toBe(1);
+    expect(harness.nonEmptyPublishCount(configUri)).toBe(1);
   });
 
   it('publishes the config diagnostic even for pull-capable clients', async () => {
@@ -2332,7 +2343,10 @@ describe('language server config failure surfacing', {
 
     mode = 'broken';
     harness.notifyConfigChanged();
-    const failure = await harness.waitForDiagnostics(configUri);
+    const failure = await harness.waitForDiagnosticsMatching(
+      configUri,
+      (diagnostics) => diagnostics.length > 0,
+    );
     expect(failure).toEqual([expectedConfigFailure('config exploded')]);
 
     const retained = await requestPullDiagnostics(harness, schemaUri);
@@ -2391,8 +2405,8 @@ describe('language server config failure surfacing', {
     gate.reject(new Error('config exploded'));
     await settle();
 
-    expect(harness.publishCount(configUri)).toBe(0);
-    expect(harness.latestDiagnostics(configUri)).toBeUndefined();
+    expect(harness.nonEmptyPublishCount(configUri)).toBe(0);
+    expect(harness.latestDiagnostics(configUri) ?? []).toEqual([]);
   });
 
   it('leaves a newer load untouched when a superseded load fails', async () => {
@@ -2411,7 +2425,7 @@ describe('language server config failure surfacing', {
     const published = await harness.waitForDiagnostics(schemaUri);
     expect(published).toEqual([]);
     await settle();
-    expect(harness.publishCount(configUri)).toBe(0);
+    expect(harness.nonEmptyPublishCount(configUri)).toBe(0);
     expect(harness.getDocumentAst(schemaUri)).toBeDefined();
   });
 
@@ -2434,6 +2448,6 @@ describe('language server config failure surfacing', {
 
     await harness.waitForDiagnostics(schemaUri);
     await settle();
-    expect(harness.publishCount(configUri)).toBe(0);
+    expect(harness.nonEmptyPublishCount(configUri)).toBe(0);
   });
 });

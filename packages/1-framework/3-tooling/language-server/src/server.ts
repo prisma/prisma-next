@@ -69,8 +69,7 @@ interface ProjectState {
 /**
  * One entry per managed config: the load in flight, the loaded project, or
  * the record of a failed first load — never a settled load without an entry
- * decision. `configFailed` on any state means a config-failure diagnostic is
- * currently published for this config's file.
+ * decision.
  */
 type ManagedProject =
   | {
@@ -84,9 +83,8 @@ type ManagedProject =
        * diagnostic (recorded by the `failed` entry).
        */
       readonly lastGood: ProjectState | undefined;
-      readonly configFailed: boolean;
     }
-  | { readonly status: 'loaded'; readonly project: ProjectState; readonly configFailed?: true }
+  | { readonly status: 'loaded'; readonly project: ProjectState }
   | { readonly status: 'failed' };
 
 export const CONFIG_LOAD_FAILED_CODE = 'PRISMA_NEXT_CONFIG_LOAD_FAILED';
@@ -243,12 +241,6 @@ export function createServer(connection: Connection): LanguageServer {
         : existing?.status === 'loading'
           ? existing.lastGood
           : undefined;
-    const configFailed =
-      existing === undefined
-        ? false
-        : existing.status === 'failed'
-          ? true
-          : existing.configFailed === true;
     const load: Promise<ProjectState> = (previousLoad ?? Promise.resolve(undefined))
       .catch(() => undefined)
       .then(() => loadProject(configPath))
@@ -267,9 +259,9 @@ export function createServer(connection: Connection): LanguageServer {
               // project entry alive.
               managedProjects.delete(configPath);
             }
-            if (configFailed) {
-              clearConfigFailure(configPath);
-            }
+            // Unconditional: clients keep per-server diagnostic state, so an
+            // empty publish is harmless when no marker is outstanding.
+            clearConfigFailure(configPath);
           }
           return project;
         },
@@ -281,17 +273,11 @@ export function createServer(connection: Connection): LanguageServer {
               // Nobody is served by this config anymore: no resurrection of
               // the last-good project and no zombie marker.
               managedProjects.delete(configPath);
-              if (configFailed) {
-                clearConfigFailure(configPath);
-              }
+              clearConfigFailure(configPath);
             } else {
               publishConfigFailure(configPath, error);
               if (lastGood !== undefined) {
-                managedProjects.set(configPath, {
-                  status: 'loaded',
-                  project: lastGood,
-                  configFailed: true,
-                });
+                managedProjects.set(configPath, { status: 'loaded', project: lastGood });
                 return lastGood;
               }
               managedProjects.set(configPath, { status: 'failed' });
@@ -300,7 +286,7 @@ export function createServer(connection: Connection): LanguageServer {
           throw error;
         },
       );
-    managedProjects.set(configPath, { status: 'loading', load, lastGood, configFailed });
+    managedProjects.set(configPath, { status: 'loading', load, lastGood });
     return load;
   }
 
@@ -688,9 +674,7 @@ export function createServer(connection: Connection): LanguageServer {
       return;
     }
     managedProjects.delete(configPath);
-    if (entry.status === 'failed' || entry.configFailed === true) {
-      clearConfigFailure(configPath);
-    }
+    clearConfigFailure(configPath);
   }
 
   return {
