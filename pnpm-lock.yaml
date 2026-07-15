@@ -2745,7 +2745,7 @@ importers:
         specifier: workspace:0.15.0
         version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/sql-schema-ir':
-        specifier: workspace:0.14.0
+        specifier: workspace:0.15.0
         version: link:../schema-ir
       '@prisma-next/utils':
         specifier: workspace:0.15.0
