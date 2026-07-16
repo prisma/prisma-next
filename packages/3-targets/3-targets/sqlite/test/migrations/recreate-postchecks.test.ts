@@ -218,11 +218,10 @@ describe('buildRecreatePostchecks — constraints', () => {
     const spec = tableSpec({
       columns: [colSpec({ name: 'user_id' }), colSpec({ name: 'tenant_id' })],
       foreignKeys: [
-        { columns: ['user_id'], references: { table: 'users', columns: ['id'] }, constraint: true },
+        { columns: ['user_id'], references: { table: 'users', columns: ['id'] } },
         {
           columns: ['tenant_id', 'user_id'],
           references: { table: 'memberships', columns: ['tenant_id', 'user_id'] },
-          constraint: true,
         },
       ],
     });
@@ -254,9 +253,7 @@ describe('buildRecreatePostchecks — constraints', () => {
       columns: [colSpec({ name: 'a' })],
       primaryKey: { columns: ['a'] },
       uniques: [{ columns: ['a'] }],
-      foreignKeys: [
-        { columns: ['a'], references: { table: 'x', columns: ['id'] }, constraint: true },
-      ],
+      foreignKeys: [{ columns: ['a'], references: { table: 'x', columns: ['id'] } }],
     });
     const issues = [
       issue({

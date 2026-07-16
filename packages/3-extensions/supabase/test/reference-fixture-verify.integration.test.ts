@@ -18,13 +18,13 @@
  *          Supabase FK columns (e.g. `mfa_amr_claims.session_id`) have no
  *          physical index. PSL's `@relation` attribute now takes an `index`
  *          argument (`packages/2-sql/2-authoring/contract-psl/src/psl-relation-resolution.ts`'s
- *          `sqlRelation` spec), and the postgres PSL inferrer
- *          (`packages/3-targets/3-targets/postgres/src/core/psl-infer/infer-psl-contract.ts`)
- *          stamps `index: false` on a relation whose FK columns have no live
- *          backing index, using the same column-exact-match predicate
- *          `contract-to-schema-ir.ts` uses to derive the FK-backing-index
- *          expectation `db verify` checks (shared as
- *          `packages/2-sql/9-family/src/core/foreign-key-index-backing.ts`).
+ *          `sqlRelation` spec), and the postgres PSL inferrer's relation-inference step
+ *          (`packages/2-sql/9-family/src/core/psl-contract-infer/relation-inference.ts`) stamps
+ *          `index: false` on a relation whose FK columns have no live backing index, using the same
+ *          column-exact-match predicate FK1's contract construction now uses to materialize a
+ *          table's FK-backing `indexes[]` entries — the entries `db verify` checks against (shared
+ *          as `@prisma-next/sql-contract/foreign-key-materialization`,
+ *          `packages/2-sql/1-core/contract/src/foreign-key-materialization.ts`).
  *        - `storage.buckets.allowed_mime_types` / `storage.objects.path_tokens`
  *          are nullable `text[]` columns; PSL/Prisma-family list fields have
  *          no nullable-list syntax, so the contract can only declare them

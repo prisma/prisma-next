@@ -151,8 +151,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "onDelete": "cascade",
                   "source": {
                     "columns": [
@@ -191,7 +189,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:9a090604d20ee5467bc7b3e74aacfe996e66e588d584ec004539f752723f6878",
+    "storageHash": "sha256:b780ca2c413bbc8cfca1facdaee6a487a0fbd2bb4785c91ba55af78a8c4c06bc",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",
@@ -241,7 +239,7 @@
       "id": "supabase",
       "kind": "extension",
       "targetId": "postgres",
-      "version": "0.14.0"
+      "version": "0.15.0"
     }
   },
   "meta": {},

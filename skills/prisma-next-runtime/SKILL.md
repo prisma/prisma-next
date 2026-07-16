@@ -22,6 +22,7 @@ This skill covers the **runtime entry point** — `db.ts` — and how to compose
 ## When Not to Use
 
 - User wants to write queries → `prisma-next-queries`.
+- User is on Supabase — the `supabase()` role-first factory, `asUser(jwt)` / `asAnon()` / `asServiceRole()`, JWT config, RLS → `prisma-next-supabase`.
 - User wants to edit the contract → `prisma-next-contract`.
 - User wants to wire Prisma Next into a build tool (Vite plugin, Next.js, …) → `prisma-next-build`.
 - User wants to debug a connection / runtime error → `prisma-next-debug`.

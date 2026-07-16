@@ -32,6 +32,10 @@ import type { CodecLookup, ColumnTypeDescriptor } from '@prisma-next/framework-c
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { tableEntityKind, valueSetEntityKind } from '@prisma-next/sql-contract/entity-kinds';
+import {
+  type ForeignKeyAuthoringInput,
+  materializeForeignKeysAndIndexes,
+} from '@prisma-next/sql-contract/foreign-key-materialization';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -793,7 +797,9 @@ export function buildSqlContractFromDefinition(
       }
     }
 
-    const foreignKeys = (semanticModel.foreignKeys ?? []).map((fk) => {
+    const authoringForeignKeys: readonly ForeignKeyAuthoringInput[] = (
+      semanticModel.foreignKeys ?? []
+    ).map((fk) => {
       if (fk.references.spaceId !== undefined) {
         // Cross-space FK: the target lives in a different contract space.
         // Skip local model lookup and carry the spaceId coordinate through.
@@ -862,28 +868,43 @@ export function buildSqlContractFromDefinition(
     // materialised onto the base `ModelNode`, so the variant builds a domain
     // model (below) but no storage table of its own.
     if (!semanticModel.sharesBaseTable) {
+      const uniques = (semanticModel.uniques ?? []).map((u) => ({
+        columns: u.columns,
+        ...ifDefined('name', u.name),
+      }));
+      const declaredIndexes = (semanticModel.indexes ?? []).map((i) => ({
+        columns: i.columns,
+        ...ifDefined('name', i.name),
+        ...ifDefined('type', i.type),
+        ...ifDefined('options', i.options),
+      }));
+      const primaryKey = semanticModel.id
+        ? { columns: semanticModel.id.columns, ...ifDefined('name', semanticModel.id.name) }
+        : undefined;
+      // FK1: lower each FK's `constraint`/`index` authoring intent into
+      // discrete persisted entities here — the one place a table's full
+      // constraint context (its own declared indexes/uniques/primary key)
+      // is available. A `constraint: false` FK contributes no
+      // `foreignKeys[]` entry; an `index: true` FK not already backed by a
+      // declared index/unique/primary-key contributes a named `indexes[]`
+      // entry. This authoring pipeline is shared by both the TS DSL and the
+      // PSL interpreter (which calls `buildSqlContractFromDefinition`
+      // directly), so both authoring surfaces materialize identically.
+      const { foreignKeys, indexes } = materializeForeignKeysAndIndexes(
+        tableName,
+        authoringForeignKeys,
+        declaredIndexes,
+        uniques,
+        primaryKey,
+      );
+
       const tableInput: StorageTableInput = {
         columns,
         ...ifDefined('control', semanticModel.control),
-        uniques: (semanticModel.uniques ?? []).map((u) => ({
-          columns: u.columns,
-          ...ifDefined('name', u.name),
-        })),
-        indexes: (semanticModel.indexes ?? []).map((i) => ({
-          columns: i.columns,
-          ...ifDefined('name', i.name),
-          ...ifDefined('type', i.type),
-          ...ifDefined('options', i.options),
-        })),
+        uniques,
+        indexes,
         foreignKeys,
-        ...(semanticModel.id
-          ? {
-              primaryKey: {
-                columns: semanticModel.id.columns,
-                ...ifDefined('name', semanticModel.id.name),
-              },
-            }
-          : {}),
+        ...(primaryKey ? { primaryKey } : {}),
         ...(checksForTable.length > 0 ? { checks: checksForTable } : {}),
       };
 

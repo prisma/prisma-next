@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:4a7066df2fa2d2c2bbc46ee511a06e2dde7eb08cd3abf51ff773e6577752d3f7'>;
+  StorageHashBase<'sha256:169d4f45f11d35d0f5e2128121049573c0c92a93c0b4d3e641cb45d4b1a31543'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:ed14abd667c95e810498cf90d4adaa694b5130bc29593f0d88c31837a278d704'>;
 export type ProfileHash =
@@ -131,8 +131,6 @@ type ContractBase = Omit<
                     readonly tableName: 'users';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -214,7 +212,7 @@ type ContractBase = Omit<
       readonly id: 'supabase';
       readonly kind: 'extension';
       readonly targetId: 'postgres';
-      readonly version: '0.14.0';
+      readonly version: '0.15.0';
     };
   };
   readonly execution: {

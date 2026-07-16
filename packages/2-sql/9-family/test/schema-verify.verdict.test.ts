@@ -464,6 +464,12 @@ describe('differ verdict — foreign keys', () => {
               ...(actions?.onDelete !== undefined ? { onDelete: actions.onDelete } : {}),
             },
           ],
+          // FK1: the backing index for a default (`index: true`) FK is a
+          // discrete, named entity materialized at contract emit — no longer
+          // derived here by `contractToSchemaIR`, so the fixture carries it
+          // explicitly, matching what `buildSqlContractFromDefinition` would
+          // have produced.
+          indexes: [{ columns: ['user_id'], name: 'post_user_id_idx' }],
         },
       ),
     });

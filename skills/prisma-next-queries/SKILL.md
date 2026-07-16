@@ -36,6 +36,7 @@ Once the contract is emitted and the DB is up to date, this skill covers everyth
 
 - User wants to add / change a model → `prisma-next-contract`.
 - User wants to wire `db.ts` or add middleware → `prisma-next-runtime`.
+- User is querying through a Supabase role-bound db (`asUser` / `asAnon` / `asServiceRole`, RLS, `auth.*` admin reads) → `prisma-next-supabase` for the role-binding surface; everything in this skill then applies to the returned `RoleBoundDb`.
 - User wants to debug a query failure (structured error envelope) → `prisma-next-debug`.
 
 ## Pick your target
@@ -46,6 +47,7 @@ Prisma Next ships **two query lanes per target** on the same `db` value from `sr
 |---|---|
 | `@prisma-next/postgres/runtime` | [`postgres.md`](./postgres.md) — `db.orm.<Model>` + `db.sql.<table>` |
 | `@prisma-next/mongo/runtime` | [`mongo.md`](./mongo.md) — `db.orm.<root>` + `db.query.from(...)` |
+| `@prisma-next/extension-supabase/runtime` | [`postgres.md`](./postgres.md) — a Supabase `RoleBoundDb` is a Postgres surface (`db.orm.<Model>` + `db.sql.<table>`); bind a role first via `prisma-next-supabase` |
 
 Both targets share the contract and connection on one `db` value. Reach for the ORM first; drop to the lower-level lane when the ORM can't express the shape. Lane choice is local — one query function picks one lane, not the whole app.
 

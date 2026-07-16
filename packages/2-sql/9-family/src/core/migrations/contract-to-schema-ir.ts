@@ -15,7 +15,6 @@ import {
   type StorageTypeInstance,
   type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
-import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import {
   RelationalSchemaNodeKind,
   type SqlAnnotations,
@@ -29,7 +28,6 @@ import {
 } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { backingIndexColumnKeys } from '../foreign-key-index-backing';
 
 /**
  * Target-specific callback that expands a column's base `nativeType` and optional
@@ -354,21 +352,6 @@ function convertTable(
     );
   }
 
-  const satisfiedIndexColumns = new Set(backingIndexColumnKeys(table));
-  const fkBackingIndexes: SqlIndexIRInput[] = [];
-  for (const fk of table.foreignKeys) {
-    if (fk.index === false) continue;
-    const key = fk.source.columns.join(',');
-    if (satisfiedIndexColumns.has(key)) continue;
-    fkBackingIndexes.push({
-      columns: fk.source.columns,
-      unique: false,
-      name: defaultIndexName(name, fk.source.columns),
-      dependsOn: flatColumnDependsOn(name, fk.source.columns),
-    });
-    satisfiedIndexColumns.add(key);
-  }
-
   const checks: SqlCheckConstraintIRInput[] | undefined =
     table.checks && table.checks.length > 0
       ? table.checks.map((c) => convertCheck(c, storage))
@@ -387,11 +370,14 @@ function convertTable(
     name,
     columns,
     ...ifDefined('primaryKey', primaryKey),
-    foreignKeys: table.foreignKeys
-      .filter((fk) => fk.constraint !== false)
-      .map((fk) => convertForeignKey(fk, storage)),
+    // #989 persists a `constraint: false` FK's absence and its backing index as
+    // discrete entities at contract construction, so every `foreignKeys[]` entry
+    // is now constraint-bearing (no filter) and each FK-backing index is already
+    // a `table.indexes[]` entry — it flows through `convertIndex` below, carrying
+    // the object→own-column `dependsOn` edge like any other index.
+    foreignKeys: table.foreignKeys.map((fk) => convertForeignKey(fk, storage)),
     uniques: table.uniques.map((u) => convertUnique(u, name)),
-    indexes: [...table.indexes.map((i) => convertIndex(i, name)), ...fkBackingIndexes],
+    indexes: table.indexes.map((i) => convertIndex(i, name)),
     ...ifDefined('checks', checks),
   });
 }

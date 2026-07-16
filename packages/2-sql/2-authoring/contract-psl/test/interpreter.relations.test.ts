@@ -308,7 +308,8 @@ model Member {
     const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
     const memberTable = unboundTables(storage)['member'];
     const fks = memberTable?.foreignKeys ?? [];
-    expect(fks[0]).toMatchObject({ index: true });
+    expect(fks[0]).not.toHaveProperty('index');
+    expect(memberTable?.indexes).toEqual([{ columns: ['teamId'], name: 'member_teamId_idx' }]);
   });
 
   it('opts a relation foreign key out of its backing index via index: false', () => {
@@ -335,7 +336,8 @@ model Member {
     const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
     const memberTable = unboundTables(storage)['member'];
     const fks = memberTable?.foreignKeys ?? [];
-    expect(fks[0]).toMatchObject({ index: false });
+    expect(fks[0]).not.toHaveProperty('index');
+    expect(memberTable?.indexes).toEqual([]);
   });
 
   it('rejects index on a backrelation list field', () => {

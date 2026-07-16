@@ -138,8 +138,6 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
           {
             source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
             target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
-            constraint: true,
-            index: true,
           },
         ],
         uniques: [{ columns: ['slug'] }],

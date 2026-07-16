@@ -467,6 +467,15 @@ changes:
       anyMatch: true
 ---
 <!--
+Release bump to 0.15.0 (PR #988): the version bump itself. Every
+`packages/3-extensions/*/package.json` advances to 0.15.0 (version field +
+`workspace:` specifier lockstep; one stray `workspace:*` in target-postgres
+normalized to the pinned form). No SPI, contract shape, or emitted artefact
+change beyond the pack version stamp. No extension-author action beyond the
+normal dependency upgrade this recipe covers. Incidental substrate diff only.
+-->
+
+<!--
 TML-2503 (extension-supabase Slice E — launch close-out, PR #985): docs only.
 The `packages/3-extensions/` touch is `packages/3-extensions/supabase/README.md` —
 the package README corrected to as-built (runtime usage, JWT validation modes, the

@@ -5215,8 +5215,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "identities_user_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -5337,8 +5335,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "mfa_amr_claims_session_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -5417,8 +5413,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "mfa_challenges_auth_factor_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -5544,8 +5538,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "mfa_factors_user_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -5730,8 +5722,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "oauth_authorizations_client_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -5750,8 +5740,6 @@
                   }
                 },
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "oauth_authorizations_user_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -5998,8 +5986,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "oauth_consents_client_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -6018,8 +6004,6 @@
                   }
                 },
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "oauth_consents_user_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -6137,8 +6121,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "one_time_tokens_user_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -6225,8 +6207,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "refresh_tokens_session_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -6346,8 +6326,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "saml_providers_sso_provider_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -6437,8 +6415,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "saml_relay_states_flow_state_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -6457,8 +6433,6 @@
                   }
                 },
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "saml_relay_states_sso_provider_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -6619,8 +6593,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "sessions_oauth_client_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -6639,8 +6611,6 @@
                   }
                 },
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "sessions_user_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -6726,8 +6696,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "sso_domains_sso_provider_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -7103,8 +7071,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "webauthn_challenges_user_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -7255,8 +7221,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "webauthn_credentials_user_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -7720,8 +7684,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "iceberg_namespaces_catalog_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -7824,8 +7786,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "iceberg_tables_catalog_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -7844,8 +7804,6 @@
                   }
                 },
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "iceberg_tables_namespace_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -7998,8 +7956,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "objects_bucketId_fkey",
                   "source": {
                     "columns": [
@@ -8096,8 +8052,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "s3_multipart_uploads_bucket_id_fkey",
                   "source": {
                     "columns": [
@@ -8201,8 +8155,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "s3_multipart_uploads_parts_bucket_id_fkey",
                   "source": {
                     "columns": [
@@ -8220,8 +8172,6 @@
                   }
                 },
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "s3_multipart_uploads_parts_upload_id_fkey",
                   "onDelete": "cascade",
                   "source": {
@@ -8311,8 +8261,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "name": "vector_indexes_bucket_id_fkey",
                   "source": {
                     "columns": [
@@ -8355,7 +8303,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:a6d5d037670d66b5016dfde8577ec89f693e97dc4601d8cde41bbb6082f99de6",
+    "storageHash": "sha256:4fd3b6b5481531b6fc23e6f3a97061908a8efaab460a56e3c334ef2483c9dfdb",
     "types": {
       "CreatedAt": {
         "codecId": "pg/timestamp@1",

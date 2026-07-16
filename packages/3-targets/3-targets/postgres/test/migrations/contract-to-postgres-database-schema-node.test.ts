@@ -308,8 +308,6 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespac
                   tableName: 'users',
                   columns: ['id'],
                 },
-                constraint: true,
-                index: true,
               },
             ],
             uniques: [],
