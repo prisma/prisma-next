@@ -98,13 +98,16 @@ export interface ExecuteMigrateOptions<TFamilyId extends string, TTargetId exten
  * 2. Read live marker rows per space (`familyInstance.readAllMarkers`).
  * 3. Per space: `resolveRecordedPath` plots the path from the live
  *    marker to `space.headRef.hash` (or `refHash` for the app
- *    space when provided). Empty-graph spaces fail loudly — a
- *    "never planned" space is a user-error condition for replay.
+ *    space when provided). An empty-graph APP space fails loudly — a
+ *    "never planned" app space is a user-error condition for replay.
+ *    An empty-graph EXTENSION space resolves declaratively (marker to
+ *    head, zero ops), mirroring the db-init aggregate planner: an
+ *    all-external space ships no DDL and has nothing to author.
  * 4. Hand off to {@link runMigration} (the runner-driving tail
  *    shared with `db init` / `db update`). Marker advancement is
  *    inside the per-space transaction.
  *
- * Encodes the replay-only contract: every contract space must have an
+ * Encodes the replay-only contract: the app contract space must have an
  * authored migration graph on disk before this operation can advance it.
  */
 export async function executeMigrate<TFamilyId extends string, TTargetId extends string>(
@@ -230,8 +233,13 @@ export async function executeMigrate<TFamilyId extends string, TTargetId extends
   // plans). Surfaces every loaded space — including at-head empty-
   // graph extensions — in `perSpace[]` so the result reflects the
   // full aggregate, not just the spaces the runner would have touched.
-  const totalPlannedOps = sumPlannedOps(applyOrder, perSpacePlans);
-  if (totalPlannedOps === 0) {
+  // A zero-op plan still counts as pending when it advances a marker
+  // (declared-state resolution for an all-external extension space).
+  const hasPendingWork = applyOrder.some((spaceId) => {
+    const entry = perSpacePlans.get(spaceId);
+    return entry !== undefined && planRequiresExecution(entry);
+  });
+  if (!hasPendingWork) {
     const ordered = canonicalOrder
       .filter((spaceId) => perSpacePlans.has(spaceId) || atHeadResolutions.has(spaceId))
       .map((spaceId) => {
@@ -397,6 +405,36 @@ export function planSpacePath({
         }),
       };
     }
+    // Empty-graph extension space not yet at head: the space ships no
+    // migration packages at all — every real case is an all-external
+    // extension space (e.g. Supabase's auth/storage) with nothing for it
+    // to manage, and there is no command that could author an edge for it.
+    // Mirror the db-init aggregate planner's declared-state strategy:
+    // advance the marker to the head ref with zero operations. Only the
+    // app space's missing graph is a user-error condition for replay.
+    if (!isAppSpace) {
+      if (headRef.invariants.length > 0) {
+        return {
+          kind: 'unsatisfiable',
+          spaceId: space.spaceId,
+          isAppSpace,
+          missing: [...headRef.invariants].sort(),
+          targetInvariants: headRef.invariants,
+          targetSpace: space,
+          liveHash: liveHash ?? EMPTY_CONTRACT_HASH,
+          refName: undefined,
+        };
+      }
+      return {
+        kind: 'ok',
+        plan: buildAtHeadResolution({
+          aggregateTargetId: aggregate.targetId,
+          space,
+          targetHash,
+          liveMarker,
+        }),
+      };
+    }
     return { kind: 'never-planned', spaceId: space.spaceId, targetHash };
   }
 
@@ -434,11 +472,13 @@ export function planSpacePath({
 }
 
 /**
- * Build a zero-op {@link PerSpacePlan} for an empty-graph
- * space whose live marker already matches the target. Lets the apply
- * pipeline thread the space through `perSpacePlans` -> `applyOrder`
- * -> the success envelope's `perSpace[]` block so the result reflects
- * every loaded space, even when there is nothing to execute.
+ * Build a zero-op {@link PerSpacePlan} for an empty-graph space —
+ * either one whose live marker already matches the target (at-head), or
+ * an all-external extension space whose marker must advance to the head
+ * ref with no DDL (declared-state). Lets the apply pipeline thread the
+ * space through `perSpacePlans` -> `applyOrder` -> the success
+ * envelope's `perSpace[]` block so the result reflects every loaded
+ * space, even when there is nothing to execute.
  */
 function buildAtHeadResolution(args: {
   readonly aggregateTargetId: string;
@@ -469,17 +509,14 @@ function buildAtHeadResolution(args: {
   };
 }
 
-function sumPlannedOps(
-  applyOrder: readonly string[],
-  perSpacePlans: ReadonlyMap<string, PerSpacePlan>,
-): number {
-  let total = 0;
-  for (const spaceId of applyOrder) {
-    const entry = perSpacePlans.get(spaceId);
-    if (!entry) continue;
-    total += entry.plan.operations.length;
-  }
-  return total;
+/**
+ * A plan needs the runner when it executes operations or advances the
+ * space's marker (a declared-state resolution has zero operations but a
+ * destination hash the live marker doesn't carry yet).
+ */
+function planRequiresExecution(entry: PerSpacePlan): boolean {
+  if (entry.plan.operations.length > 0) return true;
+  return entry.plan.origin?.storageHash !== entry.plan.destination.storageHash;
 }
 
 interface BuildSuccessArgs {
@@ -552,9 +589,11 @@ function buildSuccess(args: BuildSuccessArgs): MigrateSuccess {
 }
 
 /**
- * Build the `neverPlanned` failure raised when a contract space has no on-disk
- * migration graph but migrate was asked to reach a target hash. The `why`
- * states only the condition; the recovery sequence is composed by
+ * Build the `neverPlanned` failure raised when the APP contract space has no
+ * on-disk migration graph but migrate was asked to reach a target hash.
+ * Extension spaces never reach this: an empty-graph extension space resolves
+ * declaratively (marker advances to its head ref with zero operations). The
+ * `why` states only the condition; the recovery sequence is composed by
  * `errorPathUnreachable`'s `fix`.
  *
  * @internal Exported for testing only.
@@ -563,7 +602,7 @@ export function buildNeverPlannedFailure(spaceId: string, targetHash: string): M
   return {
     code: 'MIGRATION_PATH_NOT_FOUND',
     summary: `No on-disk migrations for contract space "${spaceId}"`,
-    why: `migrate is replay-only: every contract space must have an authored migration graph on disk. Space "${spaceId}" has no migrations under \`migrations/${spaceId}/\` but its head ref targets "${targetHash}".`,
+    why: `migrate is replay-only: the app contract space must have an authored migration graph on disk. Space "${spaceId}" has no migrations under \`migrations/${spaceId}/\` but its head ref targets "${targetHash}".`,
     meta: { spaceId, target: targetHash, kind: 'neverPlanned' },
   };
 }
