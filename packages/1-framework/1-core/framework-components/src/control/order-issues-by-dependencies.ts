@@ -18,11 +18,11 @@ function buildsUp(issue: SchemaDiffIssue): boolean {
 }
 
 /**
- * The indices of the nearest strict-ancestor issue(s) of `path` — the
- * surviving parent entity a child is contained by. Walks the path's proper
- * prefixes from longest to shortest and returns the first prefix that is itself
- * an issue; a gap (a prefix that produced no issue) is skipped so containment
- * always attaches to the closest real parent.
+ * The nearest strict-ancestor bucket of `path` — the surviving parent entity a
+ * child is contained by. Walks the path's proper prefixes from longest to
+ * shortest and returns the first prefix that maps to a bucket; a gap (a prefix
+ * with no bucket) is skipped so containment always attaches to the closest real
+ * parent.
  *
  * Returns a list because a path prefix can be shared by two siblings of
  * different `nodeKind` (a role and a namespace named alike); linking the child
@@ -30,22 +30,15 @@ function buildsUp(issue: SchemaDiffIssue): boolean {
  * direction op and never forms a cycle, since a parent never depends on its
  * child) rather than risk picking the wrong one.
  */
-function nearestAncestorIndices(
+function nearestAncestors<T>(
   path: readonly string[],
-  indexByPath: ReadonlyMap<string, readonly number[]>,
-): readonly number[] {
+  byPath: ReadonlyMap<string, readonly T[]>,
+): readonly T[] {
   for (let end = path.length - 1; end >= 1; end -= 1) {
-    const indices = indexByPath.get(pathKey(path.slice(0, end)));
-    if (indices !== undefined) return indices;
+    const bucket = byPath.get(pathKey(path.slice(0, end)));
+    if (bucket !== undefined) return bucket;
   }
   return [];
-}
-
-interface Dependency {
-  /** The issue that requires the other to exist. */
-  readonly dependent: number;
-  /** The prerequisite the dependent needs. */
-  readonly dependency: number;
 }
 
 /**
@@ -75,74 +68,88 @@ interface Dependency {
 export function orderIssuesByDependencies<TNode extends DiffableNode = DiffableNode>(
   issues: readonly SchemaDiffIssue<TNode>[],
 ): readonly SchemaDiffIssue<TNode>[] {
-  const count = issues.length;
-  if (count <= 1) return issues;
+  if (issues.length <= 1) return issues;
 
-  const indexByPath = new Map<string, number[]>();
-  issues.forEach((issue, index) => {
-    const key = pathKey(issue.path);
-    const bucket = indexByPath.get(key);
-    if (bucket === undefined) indexByPath.set(key, [index]);
-    else bucket.push(index);
-  });
+  // Work with node records rather than parallel arrays indexed by number, so no
+  // step needs an unchecked array-index read.
+  type OrderNode = {
+    readonly issue: SchemaDiffIssue<TNode>;
+    /** Path key, used as the deterministic tiebreak among ready nodes. */
+    readonly key: string;
+    /** Whether this issue builds up (create/alter) — the ordering law's direction signal. */
+    readonly buildsUp: boolean;
+    /** Nodes that must be emitted after this one. */
+    readonly outgoing: Set<OrderNode>;
+    inDegree: number;
+  };
 
-  const dependencies: Dependency[] = [];
-  issues.forEach((issue, index) => {
-    for (const targetPath of issue.dependsOn ?? []) {
-      for (const target of indexByPath.get(pathKey(targetPath)) ?? []) {
-        if (target !== index) dependencies.push({ dependent: index, dependency: target });
+  const nodes: OrderNode[] = issues.map((issue) => ({
+    issue,
+    key: pathKey(issue.path),
+    buildsUp: buildsUp(issue),
+    outgoing: new Set<OrderNode>(),
+    inDegree: 0,
+  }));
+
+  const nodesByPath = new Map<string, OrderNode[]>();
+  for (const node of nodes) {
+    const bucket = nodesByPath.get(node.key);
+    if (bucket === undefined) nodesByPath.set(node.key, [node]);
+    else bucket.push(node);
+  }
+
+  const addEdge = (before: OrderNode, after: OrderNode): void => {
+    if (before.outgoing.has(after)) return;
+    before.outgoing.add(after);
+    after.inDegree += 1;
+  };
+  // `dependent` requires `dependency` to exist. Up (dependent builds up): the
+  // dependency's op runs first; down (a pure drop): the dependent's op runs
+  // first, so the edge reverses.
+  const addDependency = (dependent: OrderNode, dependency: OrderNode): void => {
+    if (dependent === dependency) return;
+    if (dependent.buildsUp) addEdge(dependency, dependent);
+    else addEdge(dependent, dependency);
+  };
+
+  for (const node of nodes) {
+    for (const targetPath of node.issue.dependsOn ?? []) {
+      for (const target of nodesByPath.get(pathKey(targetPath)) ?? []) {
+        addDependency(node, target);
       }
     }
-    for (const ancestor of nearestAncestorIndices(issue.path, indexByPath)) {
-      if (ancestor !== index) dependencies.push({ dependent: index, dependency: ancestor });
-    }
-  });
-
-  const outgoing: Set<number>[] = Array.from({ length: count }, () => new Set<number>());
-  const inDegree = new Array<number>(count).fill(0);
-  const addEdge = (before: number, after: number): void => {
-    if (outgoing[before]!.has(after)) return;
-    outgoing[before]!.add(after);
-    inDegree[after]! += 1;
-  };
-  for (const { dependent, dependency } of dependencies) {
-    if (buildsUp(issues[dependent]!)) {
-      addEdge(dependency, dependent);
-    } else {
-      addEdge(dependent, dependency);
+    for (const ancestor of nearestAncestors(node.issue.path, nodesByPath)) {
+      addDependency(node, ancestor);
     }
   }
 
-  const keys = issues.map((issue) => pathKey(issue.path));
-  const ready: number[] = [];
-  for (let index = 0; index < count; index += 1) {
-    if (inDegree[index] === 0) ready.push(index);
-  }
-
-  const order: number[] = [];
+  const ready: OrderNode[] = nodes.filter((node) => node.inDegree === 0);
+  const order: OrderNode[] = [];
   while (ready.length > 0) {
-    let pick = 0;
-    for (let candidate = 1; candidate < ready.length; candidate += 1) {
-      if (keys[ready[candidate]!]! < keys[ready[pick]!]!) pick = candidate;
+    // Kahn's algorithm: emit the ready node with the smallest path key, so
+    // independent issues come out in a stable, deterministic order.
+    let best: OrderNode | undefined;
+    for (const candidate of ready) {
+      if (best === undefined || candidate.key < best.key) best = candidate;
     }
-    const node = ready.splice(pick, 1)[0]!;
-    order.push(node);
-    for (const next of outgoing[node]!) {
-      inDegree[next]! -= 1;
-      if (inDegree[next] === 0) ready.push(next);
+    if (best === undefined) break;
+    ready.splice(ready.indexOf(best), 1);
+    order.push(best);
+    for (const next of best.outgoing) {
+      next.inDegree -= 1;
+      if (next.inDegree === 0) ready.push(next);
     }
   }
 
-  if (order.length !== count) {
+  if (order.length !== nodes.length) {
     const placed = new Set(order);
-    const unresolved = issues
-      .map((issue, index) => ({ issue, index }))
-      .filter(({ index }) => !placed.has(index))
-      .map(({ issue }) => issue.path.join('/'));
+    const unresolved = nodes
+      .filter((node) => !placed.has(node))
+      .map((node) => node.issue.path.join('/'));
     throw new Error(
       `orderIssuesByDependencies: dependency cycle among schema-diff issues (unresolved: ${unresolved.join(', ')})`,
     );
   }
 
-  return order.map((index) => issues[index]!);
+  return order.map((node) => node.issue);
 }
