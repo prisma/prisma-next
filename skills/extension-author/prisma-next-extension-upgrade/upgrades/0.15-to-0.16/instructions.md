@@ -19,3 +19,15 @@ read the discrete `indexes[]` entry instead. No SPI or DDL change: the schema-IR
 planner and `db verify` derive is identical. (The `packages/3-extensions/` diff is
 pgvector test fixtures updated to the new FK literal shape.)
 -->
+
+<!--
+TML-3028 (dependency-graph migration ordering; SchemaDiffIssue.reason removed):
+the migration-diff internal `SchemaDiffIssue` lost its `reason` field and the
+`ExpectationFailureReason` type was removed — discriminate a diff issue via the
+presence of `expected`/`actual`, or the exported `issueChange(issue):
+'create' | 'drop' | 'alter'` helper from
+`@prisma-next/framework-components/control`. This is a framework migration-control
+internal, not an extension-authoring SPI. The `packages/3-extensions/` diff is
+supabase-extension TEST assertions updated from `.reason` to presence — no runtime,
+contract, SPI, or DDL change. Incidental test-only diff.
+-->

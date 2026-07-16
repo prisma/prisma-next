@@ -20,3 +20,13 @@ surface) — those fields are gone; read the discrete `indexes[]` entry instead.
 migration or DDL change: the schema the planner and `db verify` derive is
 identical.
 -->
+
+<!--
+TML-3028 (dependency-graph migration ordering; SchemaDiffIssue.reason removed):
+the migration-diff internal `SchemaDiffIssue` lost its `reason` field and the
+`ExpectationFailureReason` type was removed — discriminate via the presence of
+`expected`/`actual`, or the exported `issueChange(issue)` helper. This is a
+framework migration-control internal, not an app-authoring surface. The
+`examples/` diff is supabase-example TEST assertions updated from `.reason` to
+presence — no runtime, contract, or DDL change. Incidental test-only diff.
+-->
