@@ -103,7 +103,7 @@ import {
   interpretRelationAttribute,
   type ModelBackrelationCandidate,
   normalizeReferentialAction,
-  validateNavigationListFieldAttributes,
+  validateBackrelationFieldAttributes,
 } from './psl-relation-resolution';
 import {
   baseModelSpec,
@@ -726,10 +726,16 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
 
   const resultBackrelationCandidates: ModelBackrelationCandidate[] = [];
   for (const field of Object.values(model.fields)) {
-    if (!field.list || !input.modelNames.has(field.typeName)) {
+    if (!input.modelNames.has(field.typeName)) {
       continue;
     }
-    const attributesValid = validateNavigationListFieldAttributes({
+    const relationAttribute = getAttribute(field.attributes, 'relation');
+    if (!field.list && relationAttribute) {
+      // The owning side of the relation: it declares fields/references and is
+      // lowered separately below, by the `relationAttributes` FK-building loop.
+      continue;
+    }
+    const attributesValid = validateBackrelationFieldAttributes({
       modelName: model.name,
       field,
       sourceId,
@@ -739,7 +745,6 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       familyId: input.familyId,
       targetId: input.targetId,
     });
-    const relationAttribute = getAttribute(field.attributes, 'relation');
     let relationName: string | undefined;
     if (relationAttribute) {
       const parsedRelation = interpretRelationAttribute({
@@ -786,6 +791,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       tableName,
       field,
       targetModelName: field.typeName,
+      isList: field.list,
       ...ifDefined('relationName', relationName),
     });
   }

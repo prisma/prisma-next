@@ -347,6 +347,13 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     if (field.typeContractSpaceId !== undefined && relationAttribute) {
       continue;
     }
+    // A model-typed, non-list field with no `@relation` is the back side of a
+    // 1:1 relation — the owning side always carries `@relation(fields: [...],
+    // references: [...])`. It is lowered separately, via the interpreter's
+    // backrelation-candidate matching, not as a scalar column here.
+    if (isModelField) {
+      continue;
+    }
 
     const isValueObjectField = compositeTypeNames.has(field.typeName);
     const isListField = field.list;
@@ -481,8 +488,10 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
           })
       : {};
     const loweredOnCreate = loweredDefault.executionDefaults?.onCreate;
-    const loweredFunctionDefault = loweredDefault.defaultValue?.kind === 'function';
-    if (isListField && (loweredOnCreate || loweredFunctionDefault)) {
+    // Only a genuine per-element execution-time generator has no list semantics. A
+    // `defaultValue.kind === 'function'` default (`dbgenerated(...)`, `now()`) is a storage-level
+    // SQL default and is valid on a list column regardless of `many`.
+    if (isListField && loweredOnCreate) {
       const defaultExpression =
         defaultAttribute?.args.find((arg) => arg.kind === 'positional')?.value.trim() ??
         'this function';
