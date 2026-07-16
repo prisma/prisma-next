@@ -7,7 +7,7 @@ Everything from the topic documents as dated, ordered steps. Deliberately says n
 ## Starts now — no dependencies
 
 - Dry-run the history merge in a fork; then create the `v8` branch in prisma/prisma and get CI green on it.
-- Start the npm access conversation for the `prisma` package (the only step outside our control) and check `@prisma/postgres` / `@prisma/sqlite` / `@prisma/mongo` for name collisions.
+- Check `@prisma/postgres` / `@prisma/sqlite` / `@prisma/mongo` for name collisions. (Publish permissions on the `prisma` package are already held; the remaining trusted-publisher configuration is release-week work.)
 - Build the side-by-side fixture (v7 + v8, one database, v7 owns migrations). Biggest untested claim; needed green by July 24.
 - Build the TypeScript compile-time benchmark and its public Bencher dashboard — before the type freeze, while types can still be fixed.
 - Enumerate the feature-support matrix rows (v8 surface × Prisma 7 capability census) and draft verdicts; produce the list of "works"-claimed cells with no proving test.

@@ -28,7 +28,7 @@ The CLI installs two binaries: `prisma` and `prisma-next`. This is the parallel-
 
 1. **Dry-run the history merge in a fork.** Decide how v7 history and prisma-next history combine (graft vs parallel histories), execute it in a fork, and check the result: log readability, blame, tags, repository size.
 2. **Create the `v8` branch in prisma/prisma** from the dry-run recipe and get the full CI suite green on it. It stays green from now until release week — merge mechanics must never be a last-week discovery.
-3. **Start the npm access conversation.** The `prisma` package is currently published by Prisma 7's release pipeline. We need: publish permission for our pipeline on that package, its trusted-publisher (OIDC) configuration extended to our workflow, and confirmation that v7's automation won't be disturbed by an RC appearing under another dist-tag. This is the one step controlled by people outside the project, which is why it starts on day one.
+3. **npm publish configuration.** We already hold publish permissions on the `prisma` package, so nothing here waits on anyone outside the project. What remains is config work: extend the package's trusted-publisher (OIDC) configuration to our publish workflow once it lives in prisma/prisma, do the same for the renamed database packages (trusted publishing is per-package, and renamed packages count as new), and do one dry-run publish under a throwaway dist-tag to confirm v7's release automation is undisturbed.
 4. **Check name availability.** Confirm `@prisma/postgres`, `@prisma/sqlite`, and `@prisma/mongo` don't collide with anything classic Prisma already publishes under `@prisma/*` (it owns many names there: `client`, `config`, `engines`, the `adapter-*` family, …).
 
 ### Release week (July 28–31)

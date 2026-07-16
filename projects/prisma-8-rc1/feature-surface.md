@@ -13,7 +13,7 @@ The honest answer to "what's in?" is: **that's what the feature-support matrix d
 Named at matrix freeze, but already known today:
 
 - **`migration plan --advance`** — documented but not implemented. It sits on the final-cutover step of the v7→v8 migration path, not on the parallel-running path, so it's a tracked public gap for 8.0.0 final rather than an RC blocker.
-- **Package consolidation** ("Flavor 2" of the distribution design) — bundling the ~60 internal packages into the main package so they stop being published. Designed, non-breaking, and deliberately deferred past the RC.
+- **Package consolidation** ("Flavor 2" of the distribution design) — bundling the ~60 internal packages into the main package so they stop being published. To be clear about what is and isn't deferred here: the *small public API* — users interact with exactly four packages (the CLI plus the three per-database packages), and never import an internal name — is already true (facade re-export parity shipped in May, TML-2526) and is part of the RC. What's deferred is only how the box is packed: whether internal code arrives as ~60 transitively-installed packages or bundled inside the main package, which users can't observe. Bundling is publish-pipeline surgery that doesn't belong in the release window. If the matrix enumeration finds any capability that leaked outside the facades since May, closing that gap *is* RC scope — the facades must be complete at the freeze.
 - Everything the matrix's deliberate crosses name.
 
 ## Engineering that must land before the freeze
