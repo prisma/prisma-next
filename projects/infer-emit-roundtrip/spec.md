@@ -148,17 +148,36 @@ owns.
 
 Options schemas start permissive; per-method option validation is not this slice's problem.
 
-### 5. Unbounded `numeric` crashes at connect
+### 5. The `Decimal` scalar is unusable on Postgres
+
+> **Corrected after D1 reproduced it.** This spec originally described the defect as "unbounded
+> `numeric` from infer, via `@db.Numeric` with no args." That mechanism is wrong and the blast
+> radius is much wider. Keeping the original framing here would have pointed D4's test at a
+> surface the defect doesn't live on.
 
 `NumericParams.precision` is required while every sibling temporal codec's param is optional.
 `renderOutputType`, the `expandNumeric` DDL hook, and the PSL attribute parser all already handle
 a missing precision. Only the arktype schema disagrees, and it throws
 `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH` when the app builds its `ExecutionContext`.
 
+**The real reach.** The crash arrives through the **base-scalar** path, not an attribute.
+`control-mutation-defaults.ts:162` maps `['Decimal', 'pg/numeric@1']`, so a PSL field declared
+`amount Decimal` produces a codec ref with no `typeParams` at all and crashes at connect. Infer
+never prints `@db.Numeric` with no arguments — an unbounded `numeric` column comes out as a bare
+`Decimal?`, and only a *bounded* `numeric(10,2)` gets an attribute. So this is not an infer defect
+that happens to hit `Decimal`; it is that **`Decimal` has never worked on Postgres**, and infer is
+simply the first thing that generates one.
+
+D1's evidence that it went unnoticed this long: there is not a single `Decimal` field in any
+`.prisma` file in this repository. The path has never been exercised.
+
 **Fix:** make `precision` optional on `NumericParams` and `numericParamsSchema`, matching the
 sibling `PrecisionParams` pattern. Do not loosen `assertColumnCodecIntegrity` — that check is
-working as designed. Not infer-specific: hand-authored `@db.Numeric` with no args hits the same
-crash, so the fix needs a test at the authoring surface too.
+working as designed.
+
+**D4's test must target the base scalar.** A bare `amount Decimal` field authored in PSL, taken
+through emit to a live `ExecutionContext`. A test that only covers `@db.Numeric()` would pass
+while the defect ships.
 
 ### 6. No `pg/date` codec exists
 

@@ -72,9 +72,12 @@ discards real information. For list defaults, reject only genuine `executionDefa
 permit a storage-level function default.
 
 **D4 — codecs.** `precision` optional on `NumericParams`, matching sibling `PrecisionParams`. Do
-not loosen `assertColumnCodecIntegrity` — it is working as designed. Then `pg/date@1`, with
-`@db.Date` pointing at it; `mongo/date@1` is the shape precedent. Breaking: needs an upgrade
-entry (D9 records it, this dispatch flags it).
+not loosen `assertColumnCodecIntegrity` — it is working as designed. **Test the base scalar**: a
+bare `amount Decimal` field, not `@db.Numeric()` — D1 proved the crash arrives via
+`['Decimal', 'pg/numeric@1']` on the base-scalar path, so an attribute-only test passes while the
+defect ships. See the spec's corrected defect 5. Then `pg/date@1`, with `@db.Date` pointing at it;
+`mongo/date@1` is the shape precedent. Breaking: needs an upgrade entry (D9 records it, this
+dispatch flags it).
 
 **D5 — index types + dangling FK.** The target registers `btree`, `hash`, `gin`, `gist`,
 `spgist`, `brin`. Permissive options schemas; per-method validation is out of scope. Then the
