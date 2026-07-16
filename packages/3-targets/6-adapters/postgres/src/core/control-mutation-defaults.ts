@@ -14,6 +14,20 @@ import {
 import type { FuncCallSig } from '@prisma-next/psl-parser';
 import { int, num, oneOf, optional, str } from '@prisma-next/psl-parser';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
+import { blindCast } from '@prisma-next/utils/casts';
+
+/**
+ * The shape the SQL authoring layer populates
+ * `DefaultFunctionLoweringContext.fieldContext` with (an opaque `unknown`
+ * at the framework boundary — see that field's doc comment). Declared here,
+ * not imported, because core cannot name it and the authoring layer has no
+ * reason to export a postgres-specific type; the two sides agree on the
+ * shape by convention, the same way `FuncCallSig` values below are agreed
+ * independently of the framework's `unknown`-typed `signature` field.
+ */
+interface PostgresFieldContext {
+  readonly nativeType?: string;
+}
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;
@@ -114,11 +128,18 @@ function lowerDbgenerated(input: {
   // forever even when the database matches the contract exactly. Anything
   // the normalizer doesn't recognize as a literal falls through to its own
   // `kind: 'function'` fallback, which preserves the raw expression text.
+  const fieldContext =
+    input.context.fieldContext === undefined
+      ? undefined
+      : blindCast<
+          PostgresFieldContext,
+          'psl-column-resolution.ts populates fieldContext with exactly this shape for every SQL default-function lowering call; the framework types it unknown because it cannot name a postgres-specific shape.'
+        >(input.context.fieldContext);
   return {
     ok: true,
     value: {
       kind: 'storage',
-      defaultValue: parsePostgresDefault(expression, input.context.nativeType) ?? {
+      defaultValue: parsePostgresDefault(expression, fieldContext?.nativeType) ?? {
         kind: 'function',
         expression,
       },

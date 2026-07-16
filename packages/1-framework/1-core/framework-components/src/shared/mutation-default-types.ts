@@ -29,13 +29,14 @@ export interface DefaultFunctionLoweringContext {
   readonly fieldName: string;
   readonly columnCodecId?: string;
   /**
-   * The field's resolved native type, with a trailing `[]` when the field
-   * is a list column. Matches the `resolvedNativeType` format the target's
-   * introspection normalizer receives, so a `lower` implementation can
-   * reuse that same normalizer to resolve a raw default expression instead
-   * of keeping it as opaque text.
+   * Family/target-specific field metadata a `lower` implementation may need
+   * beyond the fields above. Opaque here for the same reason
+   * {@link ControlMutationDefaultEntry.signature} is `unknown`: its concrete
+   * shape is a private agreement between whichever family constructs the
+   * context and whichever target's `lower` implementation reads it back —
+   * core cannot name either side's type.
    */
-  readonly nativeType?: string;
+  readonly fieldContext?: unknown;
 }
 
 export type LoweredDefaultValue =

@@ -153,7 +153,10 @@ describe('createPostgresDefaultFunctionRegistry', () => {
     function lower(expression: string, nativeType?: string) {
       return handler.lower({
         call: makeCall('dbgenerated', { expression }),
-        context: { ...stubContext, ...ifDefined('nativeType', nativeType) },
+        context: {
+          ...stubContext,
+          ...ifDefined('fieldContext', ifDefined('nativeType', nativeType)),
+        },
       });
     }
 
@@ -245,7 +248,10 @@ describe('createPostgresDefaultFunctionRegistry', () => {
     function lower(expression: string, nativeType?: string) {
       return handler.lower({
         call: makeCall('dbgenerated', { expression }),
-        context: { ...stubContext, ...ifDefined('nativeType', nativeType) },
+        context: {
+          ...stubContext,
+          ...ifDefined('fieldContext', ifDefined('nativeType', nativeType)),
+        },
       });
     }
 
