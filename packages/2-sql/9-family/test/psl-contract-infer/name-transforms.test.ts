@@ -142,6 +142,21 @@ describe('pluralize', () => {
     expect(pluralize('day')).toBe('days');
     expect(pluralize('key')).toBe('keys');
   });
+
+  it('leaves already-plural words unchanged', () => {
+    expect(pluralize('sessions')).toBe('sessions');
+    expect(pluralize('identities')).toBe('identities');
+    expect(pluralize('mfaAmrClaims')).toBe('mfaAmrClaims');
+  });
+
+  it('pluralizes singular words that end in s', () => {
+    expect(pluralize('status')).toBe('statuses');
+    expect(pluralize('bus')).toBe('buses');
+  });
+
+  it('pluralizes class', () => {
+    expect(pluralize('class')).toBe('classes');
+  });
 });
 
 describe('deriveRelationFieldName', () => {
@@ -177,6 +192,10 @@ describe('deriveBackRelationFieldName', () => {
 
   it('singularizes for 1:1', () => {
     expect(deriveBackRelationFieldName('Profile', true)).toBe('profile');
+  });
+
+  it('does not double-pluralize an already-plural model name for 1:N', () => {
+    expect(deriveBackRelationFieldName('Sessions', false)).toBe('sessions');
   });
 });
 
