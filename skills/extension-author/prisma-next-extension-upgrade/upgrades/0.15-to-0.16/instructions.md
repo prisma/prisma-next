@@ -19,3 +19,12 @@ read the discrete `indexes[]` entry instead. No SPI or DDL change: the schema-IR
 planner and `db verify` derive is identical. (The `packages/3-extensions/` diff is
 pgvector test fixtures updated to the new FK literal shape.)
 -->
+
+<!--
+Supabase integration close-out (TML-2503): docs-only. The
+`packages/3-extensions/` touch is `packages/3-extensions/supabase/README.md` —
+links into the deleted `projects/supabase-integration/` workspace re-pointed at
+ADR 237 (the service_role secondary-root decision) or inlined as plain text.
+No SPI, contract shape, or emitted artefact change. Incidental substrate diff
+only.
+-->

@@ -28,7 +28,7 @@ The contract is a single `Profile` model in `public` with a cross-contract FK in
 
 ## Running the tests
 
-Two lanes (integration decision [C14](../../projects/supabase-integration/decisions.md)):
+Two lanes:
 
 **Hermetic (default — every PR, no Docker):**
 
