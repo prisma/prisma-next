@@ -92,11 +92,9 @@ async function runDbInit(connectionString: string, migrationsDir: string): Promi
 
 async function applyGrantsFixture(connectionString: string): Promise<void> {
   await withClient(connectionString, async (pg) => {
-    // Explicit per-table grants for the RLS policies dbInit applies (roles created by bootstrapSupabaseShim).
-    await pg.query('GRANT SELECT ON public.profile TO anon, authenticated');
-    await pg.query('GRANT ALL ON public.profile TO service_role');
-    await pg.query('GRANT INSERT ON public.profile TO service_role');
-    await pg.query('GRANT UPDATE ON public.profile TO authenticated');
+    // No public.profile grants: the restored fixture carries real Supabase's
+    // default privileges for the postgres role, so tables dbInit creates in
+    // public already grant the platform roles — RLS scopes the rows.
 
     // PGlite uses a single connection, so the @prisma/dev WAL drain query
     // (DELETE FROM "_prisma_dev_wal"."events" RETURNING ...) can fire while one
