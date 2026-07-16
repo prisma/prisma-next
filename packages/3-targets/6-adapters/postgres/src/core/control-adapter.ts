@@ -739,7 +739,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          ORDER BY c.table_name, c.ordinal_position`,
       [schema],
     );
-    // Query all primary keys for all tables in schema
+    // Query all primary keys for all tables in schema. Reads pg_catalog, not
+    // information_schema: `information_schema.table_constraints` hides
+    // constraints on tables where the connecting role's only privilege is
+    // SELECT (its filter grants visibility for INSERT/UPDATE/DELETE/TRUNCATE/
+    // REFERENCES/TRIGGER — not SELECT), so a SELECT-only table introspects
+    // with all its columns but zero constraints and verify reports every
+    // declared constraint as missing. pg_catalog is not privilege-filtered.
     const pkResult = await driver.query<{
       table_name: string;
       constraint_name: string;
@@ -747,24 +753,29 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       ordinal_position: number;
     }>(
       `SELECT
-           tc.table_name,
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         WHERE tc.table_schema = $1
-           AND tc.constraint_type = 'PRIMARY KEY'
-         ORDER BY tc.table_name, kcu.ordinal_position`,
+           cl.relname AS table_name,
+           con.conname AS constraint_name,
+           a.attname AS column_name,
+           k.ord AS ordinal_position
+         FROM pg_catalog.pg_constraint con
+         JOIN pg_catalog.pg_class cl ON cl.oid = con.conrelid
+         JOIN pg_catalog.pg_namespace ns ON ns.oid = cl.relnamespace
+         JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+         JOIN pg_catalog.pg_attribute a
+           ON a.attrelid = con.conrelid
+           AND a.attnum = k.attnum
+         WHERE ns.nspname = $1
+           AND con.contype = 'p'
+         ORDER BY cl.relname, k.ord`,
       [schema],
     );
-    // Query all foreign keys for all tables in schema, including referential actions.
-    // Uses pg_catalog for correct positional pairing of composite FK columns
-    // (information_schema.constraint_column_usage lacks ordinal_position,
-    // which causes Cartesian products for multi-column FKs).
+    // Query all foreign keys for all tables in schema, including referential
+    // actions. Reads pg_catalog only (see the primary-key query above for why
+    // information_schema is unusable here); `unnest(conkey) WITH ORDINALITY`
+    // pairs source and referenced columns positionally, so composite FKs
+    // round-trip in declared order. The referential-action CASEs mirror
+    // pg_constraint's confdeltype/confupdtype encoding and produce the same
+    // rule strings information_schema.referential_constraints reports.
     const fkResult = await driver.query<{
       table_name: string;
       constraint_name: string;
@@ -777,41 +788,48 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       update_rule: string;
     }>(
       `SELECT
-           tc.table_name,
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position,
+           cl.relname AS table_name,
+           con.conname AS constraint_name,
+           a.attname AS column_name,
+           k.ord AS ordinal_position,
            ref_ns.nspname AS referenced_table_schema,
            ref_cl.relname AS referenced_table_name,
            ref_att.attname AS referenced_column_name,
-           rc.delete_rule,
-           rc.update_rule
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         JOIN pg_catalog.pg_constraint pgc
-           ON pgc.conname = tc.constraint_name
-           AND pgc.connamespace = (
-             SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = tc.table_schema
-           )
+           CASE con.confdeltype
+             WHEN 'a' THEN 'NO ACTION'
+             WHEN 'r' THEN 'RESTRICT'
+             WHEN 'c' THEN 'CASCADE'
+             WHEN 'n' THEN 'SET NULL'
+             WHEN 'd' THEN 'SET DEFAULT'
+           END AS delete_rule,
+           CASE con.confupdtype
+             WHEN 'a' THEN 'NO ACTION'
+             WHEN 'r' THEN 'RESTRICT'
+             WHEN 'c' THEN 'CASCADE'
+             WHEN 'n' THEN 'SET NULL'
+             WHEN 'd' THEN 'SET DEFAULT'
+           END AS update_rule
+         FROM pg_catalog.pg_constraint con
+         JOIN pg_catalog.pg_class cl ON cl.oid = con.conrelid
+         JOIN pg_catalog.pg_namespace ns ON ns.oid = cl.relnamespace
+         JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+         JOIN pg_catalog.pg_attribute a
+           ON a.attrelid = con.conrelid
+           AND a.attnum = k.attnum
          JOIN pg_catalog.pg_class ref_cl
-           ON ref_cl.oid = pgc.confrelid
+           ON ref_cl.oid = con.confrelid
          JOIN pg_catalog.pg_namespace ref_ns
            ON ref_ns.oid = ref_cl.relnamespace
          JOIN pg_catalog.pg_attribute ref_att
-           ON ref_att.attrelid = pgc.confrelid
-           AND ref_att.attnum = pgc.confkey[kcu.ordinal_position]
-         JOIN information_schema.referential_constraints rc
-           ON rc.constraint_name = tc.constraint_name
-           AND rc.constraint_schema = tc.table_schema
-         WHERE tc.table_schema = $1
-           AND tc.constraint_type = 'FOREIGN KEY'
-         ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
+           ON ref_att.attrelid = con.confrelid
+           AND ref_att.attnum = con.confkey[k.ord]
+         WHERE ns.nspname = $1
+           AND con.contype = 'f'
+         ORDER BY cl.relname, con.conname, k.ord`,
       [schema],
     );
-    // Query all unique constraints for all tables in schema (excluding PKs)
+    // Query all unique constraints for all tables in schema (excluding PKs).
+    // Reads pg_catalog (see the primary-key query above).
     const uniqueResult = await driver.query<{
       table_name: string;
       constraint_name: string;
@@ -819,18 +837,20 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       ordinal_position: number;
     }>(
       `SELECT
-           tc.table_name,
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         WHERE tc.table_schema = $1
-           AND tc.constraint_type = 'UNIQUE'
-         ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
+           cl.relname AS table_name,
+           con.conname AS constraint_name,
+           a.attname AS column_name,
+           k.ord AS ordinal_position
+         FROM pg_catalog.pg_constraint con
+         JOIN pg_catalog.pg_class cl ON cl.oid = con.conrelid
+         JOIN pg_catalog.pg_namespace ns ON ns.oid = cl.relnamespace
+         JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+         JOIN pg_catalog.pg_attribute a
+           ON a.attrelid = con.conrelid
+           AND a.attnum = k.attnum
+         WHERE ns.nspname = $1
+           AND con.contype = 'u'
+         ORDER BY cl.relname, con.conname, k.ord`,
       [schema],
     );
     // Query all indexes for all tables in schema (excluding constraints).
@@ -875,10 +895,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE i.schemaname = $1
            AND NOT EXISTS (
              SELECT 1
-             FROM information_schema.table_constraints tc
-             WHERE tc.table_schema = $1
-               AND tc.table_name = i.tablename
-               AND tc.constraint_name = i.indexname
+             FROM pg_catalog.pg_constraint con
+             WHERE con.conindid = ic.oid
            )
          ORDER BY i.tablename, i.indexname, k.ord`,
       [schema],
