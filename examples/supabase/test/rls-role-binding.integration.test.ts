@@ -35,7 +35,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import { createDb, fixtureJwt } from '../src/prisma/db';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { restoreSupabaseReference } from './supabase-reference';
 
 async function signJwt(
   payload: Record<string, unknown>,
@@ -136,7 +136,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
 
       // Seed external schema shim (auth.users etc.) + apply public.profile DDL.
       await withClient(connectionString, async (pg) => {
-        await bootstrapSupabaseShim(pg);
+        await restoreSupabaseReference(pg);
       });
       await runDbInit(connectionString, migrationsDir);
       await applyGrantsFixture(connectionString);
@@ -225,7 +225,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await bootstrapSupabaseShim(pg);
+        await restoreSupabaseReference(pg);
       });
       await runDbInit(connectionString, migrationsDir);
       await applyGrantsFixture(connectionString);
@@ -303,7 +303,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await bootstrapSupabaseShim(pg);
+        await restoreSupabaseReference(pg);
       });
       await runDbInit(connectionString, migrationsDir);
 
@@ -329,7 +329,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await bootstrapSupabaseShim(pg);
+        await restoreSupabaseReference(pg);
       });
       await runDbInit(connectionString, migrationsDir);
       await applyGrantsFixture(connectionString);

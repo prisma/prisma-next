@@ -17,9 +17,10 @@
  * verify` via the control client and asserts the per-space plan operations
  * and per-space verify results.
  *
- * Shim strategy: the external table seed SQL lives in `./supabase-bootstrap`
+ * Seed strategy: the external table seed SQL lives in the reference fixture
+ * (`./fixtures/supabase-reference/`, applied via `restoreSupabaseReference`)
  * and is shared with the walking skeleton in `examples/supabase/test/`,
- * which imports it by source path (the shim is in-repo test tooling only).
+ * which imports it by source path (in-repo test tooling only).
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -44,7 +45,7 @@ import {
 } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import supabasePack from '../src/exports/pack';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { restoreSupabaseReference } from './fixtures/supabase-reference/restore';
 
 /**
  * Minimal app contract: a single `public` schema with a `profile` table.
@@ -111,7 +112,7 @@ describe('supabase external-schema classification (db init + db verify)', () => 
       // Without this seed, `db verify` would fail with `declaredMissing`
       // for every auth.*/storage.* table.
       await withClient(connectionString, async (client) => {
-        await bootstrapSupabaseShim(client);
+        await restoreSupabaseReference(client);
       });
 
       // 2. Materialise the supabase extension contract space on disk.

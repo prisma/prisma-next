@@ -34,7 +34,7 @@ import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import { createDb } from '../src/prisma/db';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { restoreSupabaseReference } from './supabase-reference';
 
 function recordingMiddleware(): { middleware: SqlMiddleware; sqls: string[] } {
   const sqls: string[] = [];
@@ -95,7 +95,7 @@ describe('service_role queries auth/storage via the .supabase secondary root', (
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await bootstrapSupabaseShim(pg);
+        await restoreSupabaseReference(pg);
         // The documented narrow grant for admin reads of auth.users through
         // the `.supabase` secondary root — real Supabase (and the shim)
         // gives service_role no table privileges on auth.* by default.
@@ -186,7 +186,7 @@ describe('service_role queries auth/storage via the .supabase secondary root', (
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await bootstrapSupabaseShim(pg);
+        await restoreSupabaseReference(pg);
         // The documented narrow grant for admin reads of auth.users through
         // the `.supabase` secondary root — real Supabase (and the shim)
         // gives service_role no table privileges on auth.* by default.

@@ -12,7 +12,7 @@
  *   2. The supabase extension space's plan covers only the `public.profile`
  *      DDL via the app space.
  *   3. `db verify` **passes** after `db init` because:
- *      - The `bootstrapSupabaseShim` pre-seeded the external tables, so the
+ *      - The `restoreSupabaseReference` pre-seeded the external tables, so the
  *        verifier's `external` policy (`declaredMissing` → fail) is satisfied.
  *      - Extra columns / tables in the live DB are suppressed by `external`
  *        policy.
@@ -62,7 +62,7 @@ import type { Contract as RenamedPolicyContract } from './fixtures/renamed-polic
 import renamedPolicyContractJson from './fixtures/renamed-policy/contract.json' with {
   type: 'json',
 };
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { restoreSupabaseReference } from './supabase-reference';
 
 // Derive the policy wire name from the deserialized contract rather than pinning a literal.
 // The public namespace holds exactly one policy; its `.name` is the content-addressed wire name.
@@ -113,7 +113,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       // `auth.*` / `storage.*` table — the verifier's `external` policy
       // confirms declared tables actually exist.
       await withClient(connectionString, async (client) => {
-        await bootstrapSupabaseShim(client);
+        await restoreSupabaseReference(client);
       });
 
       // Step 2 — Materialise the supabase extension space on disk.
@@ -281,7 +281,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
 
       // Seed external schemas + tables.
       await withClient(connectionString, async (client) => {
-        await bootstrapSupabaseShim(client);
+        await restoreSupabaseReference(client);
       });
 
       // Materialise the supabase extension space on disk so dbInit can read it.
@@ -406,7 +406,7 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
     migrationsDir = await mkdtemp(join(tmpdir(), 'supabase-rls-e2e-'));
 
     await withClient(database.connectionString, async (pgClient) => {
-      await bootstrapSupabaseShim(pgClient);
+      await restoreSupabaseReference(pgClient);
     });
 
     const space = supabasePack.contractSpace;

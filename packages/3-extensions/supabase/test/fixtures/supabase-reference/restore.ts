@@ -4,8 +4,24 @@
  * — the schema's policies and grants reference `anon`/`authenticated`/
  * `service_role`/etc.
  *
- * Used by the pack's `contract:generate` script (introspection source) and
- * by the round-trip verify integration test.
+ * THE shared test substrate for anything Supabase-shaped: used by the pack's
+ * `contract:generate` script (introspection source), this package's
+ * integration tests, and `examples/supabase` (via a relative source import —
+ * in-repo test tooling only, not part of the published package surface; the
+ * `.sql` files it reads are not shipped).
+ *
+ * Its job is fidelity to a fresh `supabase db reset`: the fixture carries
+ * the real instance's GRANT / ALTER DEFAULT PRIVILEGES statements verbatim
+ * and this module adds no grants of its own. RLS is enforced by policies
+ * AND grants, so a test database more permissive than a real project would
+ * let tests pass that fail in production (and did — see TML-3035 findings
+ * §6/§8). Notably `service_role` has NO table privileges on `auth.*` (only
+ * schema USAGE) — a test that exercises the `.supabase` admin root must
+ * issue the narrow grant it needs in its own setup (e.g. `GRANT SELECT ON
+ * TABLE auth.users TO service_role`), the same grant a real project
+ * requires. Tables an app contract creates in `public` afterwards (e.g. via
+ * dbInit) pick up the platform roles' access through the fixture's default
+ * privileges for the `postgres` role — the role tests connect as.
  *
  * Each file is sent as one multi-statement query (`pg`'s simple query
  * protocol runs semicolon-separated statements in order) rather than one
@@ -33,6 +49,13 @@ function resolveFixtureDir(): string {
   return join(dirname(fileURLToPath(packageJsonUrl)), 'test', 'fixtures', 'supabase-reference');
 }
 
+/**
+ * Restores the Supabase reference fixture — schemas, tables, native enums,
+ * roles, and the real instance's privileges. The caller owns the client
+ * lifecycle: pass any already-connected `pg.Client` (e.g. one the test is
+ * sharing across setup steps); this function does not open or close
+ * connections.
+ */
 export async function restoreSupabaseReference(client: Client): Promise<void> {
   const fixtureDir = resolveFixtureDir();
   const rolesSql = readFileSync(join(fixtureDir, 'roles.sql'), 'utf8');
