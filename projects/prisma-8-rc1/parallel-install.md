@@ -50,7 +50,7 @@ All of the above is assembled from mechanisms that individually exist and are te
 - v7 runs its migrations, seeds data, and keeps querying through v7 code;
 - v8 adopts the database, queries the same data, and the results agree;
 - v7 runs a *further* migration, and the re-adopt routine (infer → review → sign → verify) is exercised;
-- both binaries are invoked by their coexistence names throughout.
+- the CLIs are invoked by their unambiguous names throughout — `prisma` for v7, `prisma-next` for v8 — and the fixture runs under each supported package manager to prove the alias install and binary resolution behave identically on all of them.
 
 This fixture is the receipt for the announcement's migration claim, a regression test forever after, and the skeleton the upgrade guide's code samples are lifted from. **It must be green by July 24** — if it isn't, the announcement's claim gets scaled back to what's actually proven, and that decision is made at the checkpoint rather than discovered by users.
 
