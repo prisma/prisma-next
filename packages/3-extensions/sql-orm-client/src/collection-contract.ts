@@ -41,6 +41,8 @@ export interface PolymorphismInfo {
   readonly mtiVariants: readonly PolymorphismVariantInfo[];
 }
 
+export const POLYMORPHIC_DISCRIMINATOR_ALIAS = '__prisma_polymorphic_discriminator';
+
 // Model map for a model's metadata resolution. The lookup is always scoped to
 // an explicit namespace coordinate (`orm.<ns>.<Model>`); bare-name access
 // resolves the sole namespace upstream (in the ORM factory) before reaching

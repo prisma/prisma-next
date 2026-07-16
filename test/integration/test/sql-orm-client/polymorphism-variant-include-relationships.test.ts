@@ -108,16 +108,12 @@ describe('integration/polymorphism-variant-include-relationships', () => {
             id: 3,
             title: 'Dark mode',
             type: 'feature',
-            priority: 7,
-            assigneeId: 102,
             assignee: { id: 102, name: 'Grace' },
           },
           {
             id: 4,
             title: 'Audit log',
             type: 'feature',
-            priority: 3,
-            assigneeId: null,
             assignee: null,
           },
         ]);
