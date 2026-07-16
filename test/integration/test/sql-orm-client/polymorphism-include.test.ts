@@ -1,3 +1,4 @@
+import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import { Collection } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
@@ -51,7 +52,7 @@ interface PolyIncludeParent {
     relation: string,
     refine?: (collection: PolyIncludeRefinement) => PolyIncludeRefinement,
   ): {
-    all(): { toArray(): Promise<Record<string, unknown>[]> };
+    all(): AsyncIterableResult<Record<string, unknown>>;
   };
 }
 
@@ -201,7 +202,7 @@ interface RootTaskCollection {
   variant(name: string): RootTaskCollection;
   select(...fields: string[]): RootTaskCollection;
   orderBy(selector: (row: TaskRefinementRow) => unknown): RootTaskCollection;
-  all(): { toArray(): Promise<Record<string, unknown>[]> };
+  all(): AsyncIterableResult<Record<string, unknown>>;
 }
 
 function createTaskCollection(runtime: PgIntegrationRuntime): RootTaskCollection {
@@ -318,8 +319,7 @@ describe('integration/polymorphism-include', () => {
           .include('members', (members) =>
             members.select('id', 'kind', 'role', 'plan').orderBy((member) => member.id.asc()),
           )
-          .all()
-          .toArray();
+          .all();
 
         expect(rows).toEqual([
           {
@@ -350,8 +350,7 @@ describe('integration/polymorphism-include', () => {
           .select('id', 'name')
           .orderBy((project) => project.id.asc())
           .include('tasks', (tasks) => tasks.orderBy((task) => task.id.asc()))
-          .all()
-          .toArray();
+          .all();
 
         expect(implicitRows).toEqual([
           {
@@ -377,8 +376,7 @@ describe('integration/polymorphism-include', () => {
           .select('id', 'name')
           .orderBy((project) => project.id.asc())
           .include('tasks', (tasks) => tasks.select('id', 'title').orderBy((task) => task.id.asc()))
-          .all()
-          .toArray();
+          .all();
 
         expect(selectedRows).toEqual([
           {
@@ -400,8 +398,7 @@ describe('integration/polymorphism-include', () => {
           .include('tasks', (tasks) =>
             tasks.select('id', 'title', 'type').orderBy((task) => task.id.asc()),
           )
-          .all()
-          .toArray();
+          .all();
 
         expect(selectedWithDiscriminatorRows).toEqual([
           {
@@ -423,8 +420,7 @@ describe('integration/polymorphism-include', () => {
           .include('tasks', (tasks) =>
             tasks.select('id', 'priority').orderBy((task) => task.id.asc()),
           )
-          .all()
-          .toArray();
+          .all();
 
         expect(selectedMtiRows).toEqual([
           {
@@ -460,8 +456,7 @@ describe('integration/polymorphism-include', () => {
               .select('id', 'title', 'type', 'severity')
               .orderBy((task) => task.id.asc()),
           )
-          .all()
-          .toArray();
+          .all();
 
         expect(rows).toEqual([
           {
@@ -496,8 +491,7 @@ describe('integration/polymorphism-include', () => {
               .select('id', 'title', 'type')
               .orderBy((task) => task.id.asc()),
           )
-          .all()
-          .toArray();
+          .all();
 
         expect(rows).toEqual([
           {
@@ -529,8 +523,7 @@ describe('integration/polymorphism-include', () => {
               .select('id', 'title', 'type')
               .orderBy((task) => task.id.asc()),
           )
-          .all()
-          .toArray();
+          .all();
 
         expect(rows).toEqual([
           {
@@ -556,10 +549,7 @@ describe('integration/polymorphism-include', () => {
         await seedMtiIncludeData(runtime);
 
         const tasks = createTaskCollection(runtime);
-        const implicitRows = await tasks
-          .orderBy((task) => task.id.asc())
-          .all()
-          .toArray();
+        const implicitRows = await tasks.orderBy((task) => task.id.asc()).all();
 
         expect(implicitRows).toEqual([
           {
@@ -577,8 +567,7 @@ describe('integration/polymorphism-include', () => {
         const selectedRows = await tasks
           .select('id', 'title')
           .orderBy((task) => task.id.asc())
-          .all()
-          .toArray();
+          .all();
 
         expect(selectedRows).toEqual([
           { id: 1, title: 'Crash on login' },
@@ -590,8 +579,7 @@ describe('integration/polymorphism-include', () => {
         const selectedWithDiscriminatorRows = await tasks
           .select('id', 'title', 'type')
           .orderBy((task) => task.id.asc())
-          .all()
-          .toArray();
+          .all();
 
         expect(selectedWithDiscriminatorRows).toEqual([
           { id: 1, title: 'Crash on login', type: 'bug' },
@@ -603,8 +591,7 @@ describe('integration/polymorphism-include', () => {
         const selectedMtiRows = await tasks
           .select('id', 'priority')
           .orderBy((task) => task.id.asc())
-          .all()
-          .toArray();
+          .all();
 
         expect(selectedMtiRows).toEqual([
           { id: 1 },
@@ -635,8 +622,7 @@ describe('integration/polymorphism-include', () => {
         const rows = await tasks
           .variant('Feature')
           .orderBy((task) => task.priority.desc())
-          .all()
-          .toArray();
+          .all();
 
         expect(rows).toEqual([
           { id: 4, title: 'Export PDF', type: 'feature', priority: 3, projectId: 1 },
@@ -666,8 +652,7 @@ describe('integration/polymorphism-include', () => {
           .include('tasks', (tasks) =>
             tasks.variant('Feature').orderBy((task) => task.priority.desc()),
           )
-          .all()
-          .toArray();
+          .all();
 
         expect(rows).toEqual([
           {
@@ -702,8 +687,7 @@ describe('integration/polymorphism-include', () => {
               .select('id', 'kind', 'role')
               .orderBy((member) => member.id.asc()),
           )
-          .all()
-          .toArray();
+          .all();
 
         expect(rows).toEqual([
           {
