@@ -22,13 +22,19 @@ import {
   AddColumnCall,
   CreateExtensionCall,
   CreateIndexCall,
+  CreatePostgresRlsPolicyCall,
   CreateSchemaCall,
   CreateTableCall,
+  DisableRowLevelSecurityCall,
+  DropPostgresRlsPolicyCall,
   DropTableCall,
+  EnableRowLevelSecurityCall,
   RawSqlCall,
+  RenamePostgresRlsPolicyCall,
 } from '@prisma-next/target-postgres/op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from '@prisma-next/target-postgres/planner-produced-postgres-migration';
 import { renderOps } from '@prisma-next/target-postgres/render-ops';
+import { PostgresRlsPolicy } from '@prisma-next/target-postgres/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -165,6 +171,24 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
       ),
       new AddColumnCall('public', 'user', col('nickname', 'text')),
       new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
+      new EnableRowLevelSecurityCall('public', 'user'),
+      new CreatePostgresRlsPolicyCall(
+        'public',
+        'user',
+        new PostgresRlsPolicy({
+          name: 'p_ab12cd34',
+          prefix: 'p',
+          tableName: 'user',
+          namespaceId: 'public',
+          operation: 'select',
+          roles: ['authenticated'],
+          using: '(id = auth.uid())',
+          permissive: true,
+        }),
+      ),
+      new RenamePostgresRlsPolicyCall('public', 'user', 'p_ab12cd34', 'p_e5f6a7b8'),
+      new DropPostgresRlsPolicyCall('public', 'user', 'p_e5f6a7b8'),
+      new DisableRowLevelSecurityCall('public', 'user'),
       new DropTableCall('public', 'stale'),
     ];
     const migration = new TypeScriptRenderablePostgresMigration(
