@@ -242,7 +242,7 @@ describe('createPostgresDefaultFunctionRegistry', () => {
     });
   });
 
-  describe('dbgenerated keeps genuine functions as functions (F13: guard against over-reach)', () => {
+  describe('dbgenerated keeps genuine functions as functions (guard against over-reach)', () => {
     const handler = createPostgresDefaultFunctionRegistry().get('dbgenerated')!;
 
     function lower(expression: string, nativeType?: string) {
@@ -278,13 +278,14 @@ describe('createPostgresDefaultFunctionRegistry', () => {
       });
     });
 
-    it('keeps nextval(...) a function (normalized to autoincrement(), not demoted to a literal)', () => {
-      const result = lower("nextval('seq'::regclass)", 'int4');
+    it("keeps nextval(...) a function, unchanged (does not adopt the normalizer's autoincrement() rewrite)", () => {
+      const expression = "nextval('seq'::regclass)";
+      const result = lower(expression, 'int4');
       expect(result).toMatchObject({
         ok: true,
         value: {
           kind: 'storage',
-          defaultValue: { kind: 'function', expression: 'autoincrement()' },
+          defaultValue: { kind: 'function', expression },
         },
       });
     });

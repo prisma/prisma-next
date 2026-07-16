@@ -125,9 +125,14 @@ function lowerDbgenerated(input: {
   // so a `dbgenerated(...)` default that is actually a literal (e.g.
   // `'{}'::jsonb`) is recognized as one here too. Without this, the two
   // sides disagree on `kind` and `resolvedDefaultsEqual` reports drift
-  // forever even when the database matches the contract exactly. Anything
-  // the normalizer doesn't recognize as a literal falls through to its own
-  // `kind: 'function'` fallback, which preserves the raw expression text.
+  // forever even when the database matches the contract exactly. Only a
+  // literal resolution is adopted, though: the normalizer also rewrites some
+  // function forms (e.g. `nextval(...)` to `autoincrement()`) for
+  // introspection's benefit, and adopting those rewrites here would discard
+  // the user's original expression — `dbgenerated("nextval('my_seq')")` would
+  // silently lower to `autoincrement()` and its DDL would create a fresh
+  // `SERIAL` sequence instead of using `my_seq`. A non-literal resolution, or
+  // no resolution at all, keeps the user's raw expression text unchanged.
   const fieldContext =
     input.context.fieldContext === undefined
       ? undefined
@@ -135,14 +140,12 @@ function lowerDbgenerated(input: {
           PostgresFieldContext,
           'psl-column-resolution.ts populates fieldContext with exactly this shape for every SQL default-function lowering call; the framework types it unknown because it cannot name a postgres-specific shape.'
         >(input.context.fieldContext);
+  const resolved = parsePostgresDefault(expression, fieldContext?.nativeType);
   return {
     ok: true,
     value: {
       kind: 'storage',
-      defaultValue: parsePostgresDefault(expression, fieldContext?.nativeType) ?? {
-        kind: 'function',
-        expression,
-      },
+      defaultValue: resolved?.kind === 'literal' ? resolved : { kind: 'function', expression },
     },
   };
 }
