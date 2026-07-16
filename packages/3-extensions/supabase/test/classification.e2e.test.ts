@@ -18,8 +18,8 @@
  * and per-space verify results.
  *
  * Shim strategy: the external table seed SQL lives in `./supabase-bootstrap`
- * and is shared with the walking skeleton in `examples/supabase/test/`
- * via the `@prisma-next/extension-supabase/test/utils` subpath export.
+ * and is shared with the walking skeleton in `examples/supabase/test/`,
+ * which imports it by source path (the shim is in-repo test tooling only).
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';

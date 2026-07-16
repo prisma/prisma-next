@@ -1,1 +1,1 @@
-export { bootstrapSupabaseShim } from '@prisma-next/extension-supabase/test/utils';
+export { bootstrapSupabaseShim } from '../../../packages/3-extensions/supabase/test/supabase-bootstrap';

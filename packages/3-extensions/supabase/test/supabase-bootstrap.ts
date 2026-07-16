@@ -23,10 +23,14 @@
  * transaction for isolation). Convenience wrapper for tests that don't already
  * have one:
  *
+ * In-repo test tooling only — not part of the published package surface
+ * (the fixture `.sql` files it reads are not shipped). Tests import it by
+ * source path.
+ *
  * @example
  * ```ts
  * import { withClient } from '@prisma-next/test-utils';
- * import { bootstrapSupabaseShim } from '@prisma-next/extension-supabase/test/utils';
+ * import { bootstrapSupabaseShim } from './supabase-bootstrap';
  *
  * await withClient(connectionString, async (client) => {
  *   await bootstrapSupabaseShim(client);

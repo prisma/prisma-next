@@ -77,10 +77,6 @@
       "types": "./dist/contract.d.mts",
       "import": "./dist/contract.mjs"
     },
-    "./test/utils": {
-      "types": "./dist/test/utils.d.mts",
-      "import": "./dist/test/utils.mjs"
-    },
     "./package.json": "./package.json"
   },
   "engines": {

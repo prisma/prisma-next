@@ -24,13 +24,9 @@ import type { Client } from 'pg';
 
 /**
  * Resolves this directory by the package's own `package.json` rather than
- * `import.meta.url` — this module is also bundled into `dist/test/utils.mjs`
- * (the package's `./test/utils` export, tsdown entry `test/supabase-bootstrap.ts`),
- * so `import.meta.url`-relative resolution would point at `dist/test/`, where
- * `roles.sql`/`schema.sql` don't exist (tsdown bundles code, not the fixture's
- * data files). Resolving via the package name instead survives bundling: the
- * `package.json` self-reference always resolves to the real package root,
- * and the fixture's `.sql` files never move from their source location.
+ * `import.meta.url`, so resolution is anchored at the real package root
+ * regardless of where the importing module lives. The fixture's `.sql` files
+ * never move from their source location under `test/fixtures/`.
  */
 function resolveFixtureDir(): string {
   const packageJsonUrl = import.meta.resolve('@prisma-next/extension-supabase/package.json');
