@@ -1,6 +1,6 @@
 # Supabase example
 
-The canonical runnable Prisma Next + Supabase app, and the walking skeleton the [`extension-supabase`](../../packages/3-extensions/supabase) integration was built against. It exercises every piece of the stack end-to-end against a real Postgres (PGlite in CI; a live Supabase project for the acceptance run).
+The canonical runnable Prisma Next + Supabase app, and the walking skeleton the [`extension-supabase`](../../packages/3-extensions/supabase) integration was built against. It exercises every piece of the stack end-to-end against a real Postgres (PGlite for the hermetic lane; a live `supabase start` stack for the acceptance run — both in CI).
 
 ## What it demonstrates
 
@@ -38,14 +38,19 @@ pnpm test
 
 Runs on PGlite (real Postgres in WASM) seeded by `restoreSupabaseReference` (the extension's internal test substrate), which restores the Supabase reference fixture — schemas, tables, roles, and the platform's real default privileges — so grants behave as on a fresh `supabase db reset`. This lane covers the FK, RLS enforcement, the verifier, and namespace queries.
 
-**Real-Supabase acceptance (manual — the launch ground truth):**
+**Real-Supabase acceptance (runs in CI against a live local stack):**
+
+`test/real-supabase.acceptance.test.ts` runs the RLS role-binding flows — anon read, authenticated update-own, service-role read, JWT failure, and a GoTrue-issued token verified through the project's JWKS endpoint — against a live Supabase Postgres. CI runs it on every PR via the `supabase-acceptance` job (`.github/workflows/ci.yml`): `supabase start` in this directory (the minimal `supabase/config.toml` here is what the CLI needs), then the suite with credentials exported from `supabase status`.
+
+To run it locally against your own stack:
 
 ```bash
-DATABASE_URL='postgres://…'        # a direct connection to your Supabase Postgres (service_role-capable)
-SUPABASE_JWT_SECRET='…'            # the project's JWT secret (Settings → API → JWT Secret)
+supabase start                      # in examples/supabase
+DATABASE_URL='postgres://…'         # supabase status → DB URL (direct, service_role-capable)
+SUPABASE_JWT_SECRET='…'             # supabase status → JWT secret (for self-minted HS256 test tokens)
+SUPABASE_URL='http://127.0.0.1:54321'  # supabase status → API URL (enables the GoTrue/JWKS test)
+SUPABASE_ANON_KEY='…'               # supabase status → anon key
 pnpm test
 ```
 
-`test/real-supabase.acceptance.test.ts` runs the four handler flows — anon read, authenticated update-own, service-role admin read, and JWT failure — against the live project. It is **skipped** (green) whenever `DATABASE_URL` or `SUPABASE_JWT_SECRET` is unset, so it never runs on the normal CI path; it executes only when you supply both. JWTs are signed with the real `SUPABASE_JWT_SECRET` (HS256, exactly as GoTrue issues them), and the two `auth.users` rows the flows need are seeded over the privileged connection and torn down after.
-
-> The acceptance run is the launch-blocking proof that the integration works against real Supabase, not just PGlite. Capture its output as launch evidence.
+The suite is **skipped** (green) whenever `DATABASE_URL` or `SUPABASE_JWT_SECRET` is unset; the GoTrue/JWKS test additionally needs `SUPABASE_URL` + `SUPABASE_ANON_KEY`. Three flows self-mint HS256 tokens with the stack's real `SUPABASE_JWT_SECRET`; the JWKS flow uses a token the stack's own auth server issues (ES256 on a current stack) and verifies it through `/auth/v1/.well-known/jwks.json` — the signing configuration a new Supabase project has out of the box. Seeded `auth.users` rows are torn down after each flow.
