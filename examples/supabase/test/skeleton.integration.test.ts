@@ -371,6 +371,12 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         // Delete the auth.users row via raw SQL — the cross-space FK ON DELETE CASCADE
         // fires and removes the public.profile row.
         await withClient(connectionString, async (pg) => {
+          // PGlite single-connection accommodation: the role-bound `sr`
+          // session above shares the physical session, and its
+          // `set_config('role', 'service_role', false)` persists on it.
+          // Reset so this platform-admin delete runs as postgres — on a
+          // real Supabase (separate sessions) no reset is needed.
+          await pg.query('RESET ROLE');
           await pg.query('DELETE FROM auth.users WHERE id = $1', [userId]);
         });
 

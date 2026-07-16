@@ -96,6 +96,11 @@ describe('service_role queries auth/storage via the .supabase secondary root', (
 
       await withClient(connectionString, async (pg) => {
         await bootstrapSupabaseShim(pg);
+        // The documented narrow grant for admin reads of auth.users through
+        // the `.supabase` secondary root — real Supabase (and the shim)
+        // gives service_role no table privileges on auth.* by default.
+        await pg.query('GRANT USAGE ON SCHEMA auth TO service_role');
+        await pg.query('GRANT SELECT ON TABLE auth.users TO service_role');
       });
       await runDbInit(connectionString, migrationsDir);
 
@@ -182,6 +187,11 @@ describe('service_role queries auth/storage via the .supabase secondary root', (
 
       await withClient(connectionString, async (pg) => {
         await bootstrapSupabaseShim(pg);
+        // The documented narrow grant for admin reads of auth.users through
+        // the `.supabase` secondary root — real Supabase (and the shim)
+        // gives service_role no table privileges on auth.* by default.
+        await pg.query('GRANT USAGE ON SCHEMA auth TO service_role');
+        await pg.query('GRANT SELECT ON TABLE auth.users TO service_role');
       });
       await runDbInit(connectionString, migrationsDir);
 

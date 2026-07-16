@@ -1,22 +1,21 @@
 /**
- * Shared Supabase test fixture — restores the full reference schema and
- * adds the app-facing grants a test database needs on top of it.
+ * Shared Supabase test fixture — restores the full reference schema with
+ * the real instance's privileges, and nothing else.
  *
  * Seeds a Postgres/PGlite database with the Supabase reference fixture
  * (`test/fixtures/supabase-reference/` — every schema, table, native enum,
- * and role a real Supabase instance ships, captured from a live local stack)
- * via `restoreSupabaseReference`. The composed contract declares `auth.*`
- * and `storage.*` tables as `external`, and the framework verifier confirms
- * every declared `external` table exists — restoring the full reference
- * fixture (33 tables) rather than a hand-picked few is what keeps that check
- * satisfiable regardless of which tables a given contract declares.
+ * role, GRANT, and ALTER DEFAULT PRIVILEGES a real Supabase instance ships,
+ * captured from a live local stack) via `restoreSupabaseReference`. The
+ * composed contract declares `auth.*` and `storage.*` tables as `external`,
+ * and the framework verifier confirms every declared `external` table
+ * exists — restoring the full reference fixture (33 tables) rather than a
+ * hand-picked few is what keeps that check satisfiable regardless of which
+ * tables a given contract declares.
  *
- * `auth.uid()` and the native enum types (including `auth.aal_level`) ship
- * as part of the reference fixture itself, so this shim only adds what the
- * fixture doesn't and can't know about: grants for the `public` schema an
- * app contract populates after this shim runs (e.g. `public.profile` via
- * `dbInit`), including `ALTER DEFAULT PRIVILEGES` so newly created tables
- * pick up the same access automatically.
+ * The shim's job is fidelity to a fresh `supabase db reset`: it adds no
+ * grants of its own. RLS is enforced by policies AND grants, so a shim
+ * database more permissive than a real project would let tests pass that
+ * fail in production (and did — see TML-3035 findings §6/§8).
  *
  * The caller owns the client lifecycle — pass any already-connected `pg.Client`
  * (e.g. one the test is sharing across setup steps, or one bound to a
@@ -41,30 +40,20 @@ import type { Client } from 'pg';
 import { restoreSupabaseReference } from './fixtures/supabase-reference/restore';
 
 /**
- * Restores the Supabase reference fixture, then grants the three platform
- * roles (`anon`, `authenticated`, `service_role`) access to `auth`/`storage`
- * and to whatever an app contract adds to `public` afterward. The caller
- * passes an already-connected `pg.Client` — this function does not open or
- * close connections.
+ * Restores the Supabase reference fixture — schemas, tables, roles, and the
+ * real instance's privileges. The caller passes an already-connected
+ * `pg.Client` — this function does not open or close connections.
  */
 export async function bootstrapSupabaseShim(client: Client): Promise<void> {
+  // The fixture carries the real instance's GRANT / ALTER DEFAULT PRIVILEGES
+  // statements verbatim, so the restored database has exactly the privileges
+  // a fresh `supabase db reset` produces. Notably that means `service_role`
+  // has NO table privileges on `auth.*` (only schema USAGE) — a test that
+  // exercises the `.supabase` admin root must issue the narrow grant it
+  // needs in its own setup (e.g. `GRANT SELECT ON TABLE auth.users TO
+  // service_role`), the same grant a real project requires. Tables an app
+  // contract creates in `public` afterwards (e.g. via dbInit) pick up the
+  // platform roles' access through the fixture's default privileges for the
+  // `postgres` role — the role tests connect as.
   await restoreSupabaseReference(client);
-
-  // Grants mirror a real Supabase database's platform-role access to the
-  // schemas this pack's contract declares.
-  await client.query('GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role');
-  await client.query('GRANT USAGE ON SCHEMA auth, storage TO anon, authenticated, service_role');
-  await client.query('GRANT ALL ON ALL TABLES IN SCHEMA auth TO service_role');
-  await client.query('GRANT ALL ON ALL TABLES IN SCHEMA storage TO service_role');
-  await client.query('GRANT SELECT ON ALL TABLES IN SCHEMA auth TO anon, authenticated');
-  await client.query('GRANT SELECT ON ALL TABLES IN SCHEMA storage TO anon, authenticated');
-
-  // Default privileges cover tables created after this shim runs (e.g. public.profile via dbInit).
-  await client.query(
-    'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO service_role',
-  );
-  await client.query(
-    'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, UPDATE ON TABLES TO authenticated',
-  );
-  await client.query('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO anon');
 }

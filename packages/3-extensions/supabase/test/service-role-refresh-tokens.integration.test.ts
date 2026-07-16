@@ -54,6 +54,11 @@ describe('service_role reads auth.refresh_tokens via the .supabase secondary roo
 
       await withClient(connectionString, async (pg) => {
         await bootstrapSupabaseShim(pg);
+        // The narrow grant a real project needs for admin reads through the
+        // `.supabase` secondary root: real Supabase gives service_role no
+        // table privileges on auth.* (the shim matches those defaults).
+        await pg.query('GRANT USAGE ON SCHEMA auth TO service_role');
+        await pg.query('GRANT SELECT ON TABLE auth.refresh_tokens TO service_role');
       });
 
       const token = `refresh-token-${crypto.randomUUID()}`;

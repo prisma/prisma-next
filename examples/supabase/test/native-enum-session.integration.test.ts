@@ -63,6 +63,10 @@ describe('native Postgres enum (auth.aal_level) on auth.sessions', () => {
       try {
         await withClient(connectionString, async (pg) => {
           await bootstrapSupabaseShim(pg);
+          // Narrow admin-read grant (mirrors real Supabase, where service_role
+          // has no table privileges on auth.* by default).
+          await pg.query('GRANT USAGE ON SCHEMA auth TO service_role');
+          await pg.query('GRANT SELECT ON TABLE auth.sessions TO service_role');
         });
         await seedSession(connectionString, 'aal2');
 
@@ -99,6 +103,10 @@ describe('native Postgres enum (auth.aal_level) on auth.sessions', () => {
       try {
         await withClient(connectionString, async (pg) => {
           await bootstrapSupabaseShim(pg);
+          // Narrow admin-read grant (mirrors real Supabase, where service_role
+          // has no table privileges on auth.* by default).
+          await pg.query('GRANT USAGE ON SCHEMA auth TO service_role');
+          await pg.query('GRANT SELECT ON TABLE auth.sessions TO service_role');
         });
 
         const db = await createDb(connectionString);
@@ -139,6 +147,10 @@ describe('native Postgres enum (auth.aal_level) on auth.sessions', () => {
       try {
         await withClient(connectionString, async (pg) => {
           await bootstrapSupabaseShim(pg);
+          // Narrow admin-read grant (mirrors real Supabase, where service_role
+          // has no table privileges on auth.* by default).
+          await pg.query('GRANT USAGE ON SCHEMA auth TO service_role');
+          await pg.query('GRANT SELECT ON TABLE auth.sessions TO service_role');
         });
         await seedSession(connectionString, 'aal2');
 
