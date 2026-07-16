@@ -1319,100 +1319,22 @@ namespace auth {
 });
 
 describe('interpretPslDocumentToSqlContract list-field constructs', () => {
-  it('accepts a storage-level dbgenerated(...) default on a list field', () => {
-    const document = symbolTableInputFromParseArgs({
-      schema: `model Post {
-  id Int @id
-  tags String[] @default(dbgenerated("'{}'::text[]"))
-}
-`,
-      sourceId: 'schema.prisma',
-    });
-
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      ...document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    expect(result.value.storage).toMatchObject({
-      namespaces: {
-        public: {
-          entries: {
-            table: {
-              post: {
-                columns: {
-                  tags: {
-                    many: true,
-                    default: { kind: 'function', expression: "'{}'::text[]" },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-  });
-
-  it('accepts a storage-level now() default on a list field', () => {
-    const document = symbolTableInputFromParseArgs({
-      schema: `model Post {
-  id Int @id
-  tags DateTime[] @default(now())
-}
-`,
-      sourceId: 'schema.prisma',
-    });
-
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      ...document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    expect(result.value.storage).toMatchObject({
-      namespaces: {
-        public: {
-          entries: {
-            table: {
-              post: {
-                columns: {
-                  tags: {
-                    many: true,
-                    default: { kind: 'function', expression: 'now()' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-  });
-
-  it('rejects autoincrement() on a list field', () => {
+  it('rejects an execution default now() on a list field', () => {
     expectDiagnosticForSchema(
       `model Post {
   id Int @id
-  tags Int[] @default(autoincrement())
+  tags String[] @default(now())
 }
 `,
       {
-        code: 'PSL_LIST_AUTOINCREMENT_UNSUPPORTED',
+        code: 'PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED',
         message:
-          'Field "Post.tags" is a list and cannot use @default(autoincrement()). autoincrement() draws a single value per row from a database sequence, which is not a list; remove "[]" or the default.',
+          'Field "Post.tags" is a list and cannot use an execution default ("now()"). Lists have no per-element execution-default semantics; use a literal list @default or remove the default.',
       },
     );
   });
 
-  it('rejects a genuine per-element execution default uuid() on a list field', () => {
+  it('rejects an execution default uuid() on a list field', () => {
     expectDiagnosticForSchema(
       `model Post {
   id Int @id
@@ -1423,6 +1345,21 @@ describe('interpretPslDocumentToSqlContract list-field constructs', () => {
         code: 'PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED',
         message:
           'Field "Post.tags" is a list and cannot use an execution default ("uuid()"). Lists have no per-element execution-default semantics; use a literal list @default or remove the default.',
+      },
+    );
+  });
+
+  it('rejects an execution default autoincrement() on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
+  id Int @id
+  tags Int[] @default(autoincrement())
+}
+`,
+      {
+        code: 'PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED',
+        message:
+          'Field "Post.tags" is a list and cannot use an execution default ("autoincrement()"). Lists have no per-element execution-default semantics; use a literal list @default or remove the default.',
       },
     );
   });

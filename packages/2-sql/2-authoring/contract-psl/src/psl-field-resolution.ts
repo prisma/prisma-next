@@ -488,33 +488,14 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
           })
       : {};
     const loweredOnCreate = loweredDefault.executionDefaults?.onCreate;
-    // Only a genuine per-element execution-time generator has no list semantics. A
-    // `defaultValue.kind === 'function'` default (`dbgenerated(...)`, `now()`) is a storage-level
-    // SQL default and is valid on a list column regardless of `many`.
-    if (isListField && loweredOnCreate) {
+    const loweredFunctionDefault = loweredDefault.defaultValue?.kind === 'function';
+    if (isListField && (loweredOnCreate || loweredFunctionDefault)) {
       const defaultExpression =
         defaultAttribute?.args.find((arg) => arg.kind === 'positional')?.value.trim() ??
         'this function';
       diagnostics.push({
         code: 'PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED',
         message: `Field "${model.name}.${field.name}" is a list and cannot use an execution default ("${defaultExpression}"). Lists have no per-element execution-default semantics; use a literal list @default or remove the default.`,
-        sourceId,
-        span: defaultAttribute?.span ?? field.span,
-      });
-      continue;
-    }
-    // `autoincrement()` is a storage default, so the execution-default check above does not
-    // catch it — but a sequence yields one scalar per row, which an array column cannot be.
-    // Every target lowers the call to this sentinel expression and keys its DDL rendering off
-    // it, so rejecting the sentinel here keeps the shape out of the DDL builders entirely.
-    if (
-      isListField &&
-      loweredDefault.defaultValue?.kind === 'function' &&
-      loweredDefault.defaultValue.expression === 'autoincrement()'
-    ) {
-      diagnostics.push({
-        code: 'PSL_LIST_AUTOINCREMENT_UNSUPPORTED',
-        message: `Field "${model.name}.${field.name}" is a list and cannot use @default(autoincrement()). autoincrement() draws a single value per row from a database sequence, which is not a list; remove "[]" or the default.`,
         sourceId,
         span: defaultAttribute?.span ?? field.span,
       });
