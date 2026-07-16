@@ -154,11 +154,11 @@ namespace auth {
     name                String
     clientId            String    @map("client_id")
     clientSecret        String    @map("client_secret")
-    acceptableClientIds String[]  @map("acceptable_client_ids")
-    scopes              String[]
+    acceptableClientIds String[]  @default(dbgenerated("'{}'::text[]")) @map("acceptable_client_ids")
+    scopes              String[]  @default(dbgenerated("'{}'::text[]"))
     pkceEnabled         Boolean   @default(true) @map("pkce_enabled")
-    attributeMapping    Json      @map("attribute_mapping")
-    authorizationParams Json      @map("authorization_params")
+    attributeMapping    Json      @default(dbgenerated("'{}'::jsonb")) @map("attribute_mapping")
+    authorizationParams Json      @default(dbgenerated("'{}'::jsonb")) @map("authorization_params")
     enabled             Boolean   @default(true)
     emailOptional       Boolean   @default(false) @map("email_optional")
     issuer              String?
@@ -331,6 +331,8 @@ namespace auth {
     updatedAt CreatedAt                 @default(now()) @map("updated_at")
     user      AuthUser                  @relation(fields: [userId], references: [id], onDelete: Cascade, map: "one_time_tokens_user_id_fkey", index: false)
 
+    @@index([relatesTo], map: "one_time_tokens_relates_to_hash_idx", type: "hash")
+    @@index([tokenHash], map: "one_time_tokens_token_hash_hash_idx", type: "hash")
     @@rls
     @@map("one_time_tokens")
   }
@@ -449,7 +451,7 @@ namespace auth {
     attestationType String    @default("") @map("attestation_type")
     aaguid          Id?
     signCount       BigInt    @default(0) @map("sign_count")
-    transports      Json
+    transports      Json      @default(dbgenerated("'[]'::jsonb"))
     backupEligible  Boolean   @default(false) @map("backup_eligible")
     backedUp        Boolean   @default(false) @map("backed_up")
     friendlyName    String    @default("") @map("friendly_name")
@@ -557,7 +559,7 @@ namespace storage {
     name          String
     createdAt     DateTime         @default(now()) @map("created_at")
     updatedAt     DateTime         @default(now()) @map("updated_at")
-    metadata      Json
+    metadata      Json             @default(dbgenerated("'{}'::jsonb"))
     catalogId     Id               @map("catalog_id")
     icebergTables IcebergTables[]
     catalog       BucketsAnalytics @relation(fields: [catalogId], references: [id], onDelete: Cascade, map: "iceberg_namespaces_catalog_id_fkey", index: false)

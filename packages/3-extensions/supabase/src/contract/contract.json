@@ -4832,17 +4832,29 @@
               "columns": {
                 "acceptable_client_ids": {
                   "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": []
+                  },
                   "many": true,
                   "nativeType": "text",
                   "nullable": false
                 },
                 "attribute_mapping": {
                   "codecId": "pg/jsonb@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": {}
+                  },
                   "nativeType": "jsonb",
                   "nullable": false
                 },
                 "authorization_params": {
                   "codecId": "pg/jsonb@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": {}
+                  },
                   "nativeType": "jsonb",
                   "nullable": false
                 },
@@ -4949,6 +4961,10 @@
                 },
                 "scopes": {
                   "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": []
+                  },
                   "many": true,
                   "nativeType": "text",
                   "nullable": false
@@ -6139,7 +6155,22 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "relates_to"
+                  ],
+                  "name": "one_time_tokens_relates_to_hash_idx",
+                  "type": "hash"
+                },
+                {
+                  "columns": [
+                    "token_hash"
+                  ],
+                  "name": "one_time_tokens_token_hash_hash_idx",
+                  "type": "hash"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -7200,6 +7231,10 @@
                 },
                 "transports": {
                   "codecId": "pg/jsonb@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": []
+                  },
                   "nativeType": "jsonb",
                   "nullable": false
                 },
@@ -7664,6 +7699,10 @@
                 },
                 "metadata": {
                   "codecId": "pg/jsonb@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": {}
+                  },
                   "nativeType": "jsonb",
                   "nullable": false
                 },
@@ -8303,7 +8342,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:4fd3b6b5481531b6fc23e6f3a97061908a8efaab460a56e3c334ef2483c9dfdb",
+    "storageHash": "sha256:bf835b04145e86aa7b2128d798656c05beb1f54a3046276e7bc123c59c9cf9fe",
     "types": {
       "CreatedAt": {
         "codecId": "pg/timestamp@1",
