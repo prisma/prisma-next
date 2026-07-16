@@ -1,0 +1,83 @@
+// PSL-authored fixture for the sql-orm-client data-type ledger tests.
+//
+// A single `DataRow` model (mapped to the `data_rows` table) carries one
+// nullable column per native scalar type the postgres pack supports, so a
+// test can insert a row that sets only the field under test and round-trip /
+// filter each type independently. `id` stays the required primary key.
+//
+// The enum is authored with the standard PSL `enum` keyword, backed by the
+// `pg/text@1` codec — it is stored as a plain `text` column (no Postgres
+// native enum type is created).
+//
+// Like the mn-psl fixture, the emitted contract automatically carries the
+// `sql.returning` / `postgres.returning` capability, so mutation readback
+// works without any capability patching.
+//
+// Additional models exercise parameterized and key-typed columns:
+//   - `ParamRow` uses named types (`Amount = Decimal @db.Numeric(20, 8)`,
+//     `Code = String @db.Char(12)`) so the emitted columns carry the
+//     precision/scale/length typeParams the runtime requires. Parameterized
+//     native types are only expressible via a `types { ... }` block, not via
+//     inline field attributes.
+//   - `BytesRow` has a `Bytes @id` primary key (bytea PK round-trip).
+//   - `BigParent` / `BigChild` form a 1:N relation keyed on a `BigInt @id`,
+//     for int8-precision-across-a-join coverage.
+
+enum Grade {
+  @@type("pg/text@1")
+  low = "low"
+  medium = "medium"
+  high = "high"
+}
+
+model DataRow {
+  id            Int       @id
+  bigValue      BigInt?   @map("big_value")
+  floatValue    Float?    @map("float_value")
+
+  boolValue     Boolean?  @map("bool_value")
+  bytesValue    Bytes?    @map("bytes_value")
+  dateTimeValue DateTime? @map("date_time_value")
+  stringValue   String?   @map("string_value")
+  grade         Grade?    @map("grade")
+
+  @@map("data_rows")
+}
+
+types {
+  Amount = Decimal @db.Numeric(20, 8)
+  Code = String @db.Char(12)
+}
+
+model ParamRow {
+  id     Int     @id
+  amount Amount? @map("amount")
+  code   Code?   @map("code")
+
+  @@map("param_rows")
+}
+
+model BytesRow {
+  id    Bytes   @id     @map("id")
+  label String? @map("label")
+
+  @@map("bytes_rows")
+}
+
+model BigParent {
+  id    BigInt  @id     @map("id")
+  label String? @map("label")
+
+  children BigChild[]
+
+  @@map("big_parents")
+}
+
+model BigChild {
+  id       Int    @id  @map("id")
+  parentId BigInt @map("parent_id")
+
+  parent BigParent @relation(fields: [parentId], references: [id])
+
+  @@map("big_children")
+}

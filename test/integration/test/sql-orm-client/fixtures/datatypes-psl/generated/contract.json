@@ -1,0 +1,573 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "roots": {
+    "big_children": {
+      "model": "BigChild",
+      "namespace": "public"
+    },
+    "big_parents": {
+      "model": "BigParent",
+      "namespace": "public"
+    },
+    "bytes_rows": {
+      "model": "BytesRow",
+      "namespace": "public"
+    },
+    "data_rows": {
+      "model": "DataRow",
+      "namespace": "public"
+    },
+    "param_rows": {
+      "model": "ParamRow",
+      "namespace": "public"
+    }
+  },
+  "domain": {
+    "namespaces": {
+      "public": {
+        "enum": {
+          "Grade": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "low",
+                "value": "low"
+              },
+              {
+                "name": "medium",
+                "value": "medium"
+              },
+              {
+                "name": "high",
+                "value": "high"
+              }
+            ]
+          }
+        },
+        "models": {
+          "BigChild": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "parentId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int8@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "parent": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "parentId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "BigParent",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "parentId": {
+                  "column": "parent_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "big_children"
+            }
+          },
+          "BigParent": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int8@1",
+                  "kind": "scalar"
+                }
+              },
+              "label": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "children": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "parentId"
+                  ]
+                },
+                "to": {
+                  "model": "BigChild",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "label": {
+                  "column": "label"
+                }
+              },
+              "namespaceId": "public",
+              "table": "big_parents"
+            }
+          },
+          "BytesRow": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bytea@1",
+                  "kind": "scalar"
+                }
+              },
+              "label": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "label": {
+                  "column": "label"
+                }
+              },
+              "namespaceId": "public",
+              "table": "bytes_rows"
+            }
+          },
+          "DataRow": {
+            "fields": {
+              "bigValue": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int8@1",
+                  "kind": "scalar"
+                }
+              },
+              "boolValue": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "bytesValue": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/bytea@1",
+                  "kind": "scalar"
+                }
+              },
+              "dateTimeValue": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "floatValue": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
+              "grade": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "Grade",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "stringValue": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "bigValue": {
+                  "column": "big_value"
+                },
+                "boolValue": {
+                  "column": "bool_value"
+                },
+                "bytesValue": {
+                  "column": "bytes_value"
+                },
+                "dateTimeValue": {
+                  "column": "date_time_value"
+                },
+                "floatValue": {
+                  "column": "float_value"
+                },
+                "grade": {
+                  "column": "grade"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "stringValue": {
+                  "column": "string_value"
+                }
+              },
+              "namespaceId": "public",
+              "table": "data_rows"
+            }
+          },
+          "ParamRow": {
+            "fields": {
+              "amount": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/numeric@1",
+                  "kind": "scalar"
+                }
+              },
+              "code": {
+                "nullable": true,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "amount": {
+                  "column": "amount"
+                },
+                "code": {
+                  "column": "code"
+                },
+                "id": {
+                  "column": "id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "param_rows"
+            }
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "namespaces": {
+      "public": {
+        "entries": {
+          "table": {
+            "big_children": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "parent_id": {
+                  "codecId": "pg/int8@1",
+                  "nativeType": "int8",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "parent_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "big_children"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "big_parents"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "parent_id"
+                  ],
+                  "name": "big_children_parent_id_idx"
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "big_parents": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/int8@1",
+                  "nativeType": "int8",
+                  "nullable": false
+                },
+                "label": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "bytes_rows": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/bytea@1",
+                  "nativeType": "bytea",
+                  "nullable": false
+                },
+                "label": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "data_rows": {
+              "checks": [
+                {
+                  "column": "grade",
+                  "name": "data_rows_grade_check",
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Grade",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                }
+              ],
+              "columns": {
+                "big_value": {
+                  "codecId": "pg/int8@1",
+                  "nativeType": "int8",
+                  "nullable": true
+                },
+                "bool_value": {
+                  "codecId": "pg/bool@1",
+                  "nativeType": "bool",
+                  "nullable": true
+                },
+                "bytes_value": {
+                  "codecId": "pg/bytea@1",
+                  "nativeType": "bytea",
+                  "nullable": true
+                },
+                "date_time_value": {
+                  "codecId": "pg/timestamptz@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "float_value": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": true
+                },
+                "grade": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Grade",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "string_value": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "param_rows": {
+              "columns": {
+                "amount": {
+                  "codecId": "pg/numeric@1",
+                  "nativeType": "numeric",
+                  "nullable": true,
+                  "typeRef": "Amount"
+                },
+                "code": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": true,
+                  "typeRef": "Code"
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
+          },
+          "valueSet": {
+            "Grade": {
+              "kind": "valueSet",
+              "values": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          }
+        },
+        "id": "public",
+        "kind": "postgres-schema"
+      }
+    },
+    "storageHash": "sha256:35e1d94e4fcdf8830fd4e09fdd0b5e0bb4a9ef57f0c77537d0ff328a7ae3f1f2",
+    "types": {
+      "Amount": {
+        "codecId": "pg/numeric@1",
+        "kind": "codec-instance",
+        "nativeType": "numeric",
+        "typeParams": {
+          "precision": 20,
+          "scale": 8
+        }
+      },
+      "Code": {
+        "codecId": "sql/char@1",
+        "kind": "codec-instance",
+        "nativeType": "character",
+        "typeParams": {
+          "length": 12
+        }
+      }
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "distinctOn": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "lateral": true,
+      "returning": true,
+      "scalarList": true
+    }
+  },
+  "extensionPacks": {},
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}
