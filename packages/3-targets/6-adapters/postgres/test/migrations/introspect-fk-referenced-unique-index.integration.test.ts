@@ -1,3 +1,4 @@
+import type { PostgresDatabaseSchemaNode } from '@prisma-next/target-postgres/types';
 import { createDevDatabase } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -45,7 +46,11 @@ describe('introspection of a plain unique index referenced by a foreign key', ()
   it(
     'the referenced unique index still introspects; constraint-backed indexes stay excluded',
     async () => {
-      const result = await controlAdapter.introspect(driver, undefined, 'public');
+      const result = (await controlAdapter.introspect(
+        driver,
+        undefined,
+        'public',
+      )) as PostgresDatabaseSchemaNode;
       const hub = result.namespaces['public']?.tables['hub'];
       const spoke = result.namespaces['public']?.tables['spoke'];
 
