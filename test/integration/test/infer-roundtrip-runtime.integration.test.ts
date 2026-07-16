@@ -250,9 +250,10 @@ withTempDir(({ createTempDir }) => {
             const owners = new Collection({ runtime, context }, 'Owner', {
               namespaceId: 'public',
             });
+            let includeResult: unknown;
             let includeError: unknown;
             try {
-              await owners
+              includeResult = await owners
                 .select('id')
                 // `contract` is a dynamically-introspected `Contract<SqlStorage>`
                 // with no literal domain shape (it doesn't exist until this test
@@ -268,6 +269,12 @@ withTempDir(({ createTempDir }) => {
               includeError,
               'include() should decode the same date column without throwing',
             ).toBeUndefined();
+            // The exact value, not just the absence of a throw — this is the only
+            // assertion covering the defect `pg/date@1` was built for; the
+            // top-level select path above never had the bug.
+            expect(includeResult, 'include() decodes the exact date on the included row').toEqual([
+              { id: 1, records: [{ notedOn: new Date(Date.UTC(2024, 0, 15)) }] },
+            ]);
           } finally {
             await runtime.close();
           }
