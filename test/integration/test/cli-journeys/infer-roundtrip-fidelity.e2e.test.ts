@@ -86,19 +86,6 @@ function fixIndexTypes(psl: string): string {
   return psl.replace(/,\s*type: "(?:gin|hash)"/g, '');
 }
 
-/**
- * Drops the two non-btree `@@index` attributes entirely, rather than just
- * their `type:` argument. Stripping only the argument leaves a contract that
- * declares those indexes as plain btree, which live verify then reports as a
- * type mismatch against the real gin/hash indexes — an artifact of the
- * reduction, not one of the eight defects. Dropping the attribute instead
- * makes the index an undeclared "extra", which non-strict schema-only verify
- * tolerates, isolating whatever defect a test is actually probing.
- */
-function dropNonBtreeIndexes(psl: string): string {
-  return psl.replace(/^\s*@@index\(\[\w+\], map: "[^"]+", type: "(?:gin|hash)"\)\s*$\n/gm, '');
-}
-
 withTempDir(({ createTempDir }) => {
   describe('Journey: Infer -> Emit Round-Trip Fidelity', () => {
     const db = useDevDatabase({
@@ -274,15 +261,14 @@ withTempDir(({ createTempDir }) => {
         const infer = await runContractInfer(ctx);
         expect(infer.exitCode, `IF.07: contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
-        // Fix the three unrelated emit-blockers so emit succeeds and verify
-        // can run; the jsonb default on Users.metadata is left untouched.
-        // The two non-btree indexes are dropped (not just detyped) so they
-        // become undeclared "extras" that non-strict verify tolerates,
-        // rather than a declared-btree-vs-live-gin/hash type mismatch that
-        // would otherwise mask the jsonb-default assertion this test is for.
-        const reduced = dropNonBtreeIndexes(
-          fixListDefault(fixOneToOneBackRelation(readContractPsl(ctx))),
-        );
+        // Fix the two unrelated emit-blockers (1:1 back-relation, list
+        // default) so emit succeeds and verify can run. The gin/hash indexes
+        // are left exactly as infer printed them — postgres now registers
+        // those access methods (TML-3037 D5), so they emit and round-trip
+        // clean against the live gin/hash indexes, proving that fix here
+        // too. Only the jsonb default on Users.metadata is left broken, which
+        // is what this test is for.
+        const reduced = fixListDefault(fixOneToOneBackRelation(readContractPsl(ctx)));
         writeContractPsl(ctx, reduced);
 
         const emit = await runContractEmit(ctx);

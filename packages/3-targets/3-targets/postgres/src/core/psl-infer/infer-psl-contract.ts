@@ -162,6 +162,15 @@ type ForeignKeyResolution = {
   readonly extraRelationsByTable: ReadonlyMap<string, readonly RelationField[]>;
   /** Synthetic field-name maps for cross-space-referenced pack tables, merged into `fieldNamesByTable`. */
   readonly crossSpaceFieldNamesByTable: ReadonlyMap<string, TableColumnFieldNameMap>;
+  /** Dangling foreign keys dropped per host table, kept so the model can explain the drop. */
+  readonly danglingForeignKeysByTable: ReadonlyMap<string, readonly DanglingForeignKeyInfo[]>;
+};
+
+/** A foreign key dropped because its target lives outside the introspected scope. */
+type DanglingForeignKeyInfo = {
+  readonly columns: readonly string[];
+  readonly referencedSchema: string | undefined;
+  readonly referencedTable: string;
 };
 
 /**
@@ -198,6 +207,7 @@ function resolveForeignKeys(
   const resultTables: Record<string, SqlTableIR> = {};
   const extraRelationsByTable = new Map<string, RelationField[]>();
   const crossSpaceFieldNamesByTable = new Map<string, TableColumnFieldNameMap>();
+  const danglingForeignKeysByTable = new Map<string, DanglingForeignKeyInfo[]>();
 
   for (const [tableName, table] of Object.entries(tables)) {
     const keptForeignKeys: SqlForeignKeyIR[] = [];
@@ -248,9 +258,22 @@ function resolveForeignKeys(
 
       // Not a pack-owned coordinate: keep the foreign key if the referenced
       // table survived introspection (local), otherwise drop it while keeping
-      // the scalar column (dangling).
+      // the scalar column (dangling) — recording it so the model can explain
+      // the drop instead of the relation vanishing without a trace.
       if (tables[fk.referencedTable] !== undefined) {
         keptForeignKeys.push(fk);
+      } else {
+        const dangling: DanglingForeignKeyInfo = {
+          columns: fk.columns,
+          referencedSchema: fk.referencedSchema,
+          referencedTable: fk.referencedTable,
+        };
+        const existingDangling = danglingForeignKeysByTable.get(tableName);
+        if (existingDangling) {
+          existingDangling.push(dangling);
+        } else {
+          danglingForeignKeysByTable.set(tableName, [dangling]);
+        }
       }
     }
 
@@ -260,7 +283,12 @@ function resolveForeignKeys(
         : new SqlTableIR({ ...table, foreignKeys: keptForeignKeys });
   }
 
-  return { tables: resultTables, extraRelationsByTable, crossSpaceFieldNamesByTable };
+  return {
+    tables: resultTables,
+    extraRelationsByTable,
+    crossSpaceFieldNamesByTable,
+    danglingForeignKeysByTable,
+  };
 }
 
 /**
@@ -405,6 +433,7 @@ export function inferPostgresPslContract(
     tables: resolvedTables,
     extraRelationsByTable,
     crossSpaceFieldNamesByTable,
+    danglingForeignKeysByTable,
   } = resolveForeignKeys(tables, owners);
   const schemaIR = new SqlSchemaIR({ tables: resolvedTables });
 
@@ -437,6 +466,7 @@ export function inferPostgresPslContract(
     {
       extraRelationsByTable,
       crossSpaceFieldNamesByTable,
+      danglingForeignKeysByTable,
     },
     wrapNamespaceName,
   );
@@ -447,12 +477,13 @@ export function buildPslDocumentAst(
   options: PslPrinterOptions,
   foreignKeyExtras: Pick<
     ForeignKeyResolution,
-    'extraRelationsByTable' | 'crossSpaceFieldNamesByTable'
+    'extraRelationsByTable' | 'crossSpaceFieldNamesByTable' | 'danglingForeignKeysByTable'
   >,
   namespaceName?: string,
 ): PslDocumentAst {
   const { typeMap, defaultMapping, parseRawDefault: rawDefaultParser } = options;
-  const { extraRelationsByTable, crossSpaceFieldNamesByTable } = foreignKeyExtras;
+  const { extraRelationsByTable, crossSpaceFieldNamesByTable, danglingForeignKeysByTable } =
+    foreignKeyExtras;
 
   const modelNames = buildTopLevelNameMap(
     Object.keys(schemaIR.tables),
@@ -508,6 +539,7 @@ export function buildPslDocumentAst(
           ...(relationsByTable.get(table.name) ?? []),
           ...(extraRelationsByTable.get(table.name) ?? []),
         ],
+        danglingForeignKeysByTable.get(table.name) ?? [],
       ),
     );
   }
@@ -642,6 +674,7 @@ function buildModel(
   defaultMapping: DefaultMappingOptions | undefined,
   rawDefaultParser: PslPrinterOptions['parseRawDefault'],
   relationFields: readonly RelationField[],
+  danglingForeignKeys: readonly DanglingForeignKeyInfo[],
 ): PslModel {
   const { name: modelName, map: mapName } = toModelName(table.name);
   const fieldNameMap = fieldNamesByTable.get(table.name);
@@ -719,13 +752,23 @@ function buildModel(
     modelAttributes.push(buildMapAttribute('model', mapName));
   }
 
-  // Surface introspection advisory: tables without a primary key cannot serve
-  // as the right-hand side of a `findUnique`-style query downstream, so the
-  // user should add an `@id`. This warning is part of the emitted SQL output
-  // and is asserted byte-for-byte, so keep the exact wording.
-  const comment = table.primaryKey
-    ? undefined
-    : '// WARNING: This table has no primary key in the database';
+  // Surface introspection advisories the user would otherwise have no way to
+  // discover from the emitted PSL alone. Both warnings are part of the
+  // emitted SQL output and are asserted byte-for-byte, so keep the exact
+  // wording; a table hitting both is combined onto the single comment line
+  // `PslModel.comment` supports.
+  const warnings: string[] = [];
+  if (!table.primaryKey) {
+    // Tables without a primary key cannot serve as the right-hand side of a
+    // `findUnique`-style query downstream, so the user should add an `@id`.
+    warnings.push('This table has no primary key in the database');
+  }
+  if (danglingForeignKeys.length > 0) {
+    warnings.push(
+      buildDanglingForeignKeyWarning(danglingForeignKeys, fieldNamesByTable, table.name),
+    );
+  }
+  const comment = warnings.length > 0 ? `// WARNING: ${warnings.join(' ')}` : undefined;
 
   return {
     kind: 'model',
@@ -735,6 +778,37 @@ function buildModel(
     span: SYNTHETIC_SPAN,
     ...(comment !== undefined ? { comment } : {}),
   };
+}
+
+/**
+ * Explains a foreign key `resolveForeignKeys` dropped as dangling: the
+ * database enforces it, but its target lives outside the introspected
+ * schema, so infer has no model to point a relation at. Without this, the
+ * relation just vanishes from the emitted PSL with no trace. Matches the
+ * missing-primary-key warning's voice — one line, stating the fact and the
+ * fix — since a schema outside the introspected scope is typically an
+ * extension pack (e.g. Supabase's `auth`) that isn't configured yet.
+ */
+function buildDanglingForeignKeyWarning(
+  danglingForeignKeys: readonly DanglingForeignKeyInfo[],
+  fieldNamesByTable: ReadonlyMap<string, TableColumnFieldNameMap>,
+  tableName: string,
+): string {
+  const descriptions = danglingForeignKeys.map((fk) => {
+    const fieldNames = fk.columns.map((columnName) =>
+      resolveColumnFieldName(fieldNamesByTable, tableName, columnName),
+    );
+    const target =
+      fk.referencedSchema !== undefined
+        ? `${fk.referencedSchema}.${fk.referencedTable}`
+        : fk.referencedTable;
+    return `"${fieldNames.join(', ')}" -> "${target}"`;
+  });
+  return (
+    `Foreign key ${descriptions.join(', ')} exists in the database, but its target schema is ` +
+    'outside the introspected scope, so no relation field was generated. If the target schema ' +
+    'is described by an extension pack, add it to extensionPacks and re-run infer.'
+  );
 }
 
 function buildScalarField(

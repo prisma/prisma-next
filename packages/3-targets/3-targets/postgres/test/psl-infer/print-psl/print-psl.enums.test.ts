@@ -42,6 +42,7 @@ function printWithEnums(
   const ast = buildPslDocumentAst(new SqlSchemaIR({ tables }), options, {
     extraRelationsByTable: new Map(),
     crossSpaceFieldNamesByTable: new Map(),
+    danglingForeignKeysByTable: new Map(),
   });
   return printPsl(ast, { pslBlockDescriptors: postgresAuthoringPslBlockDescriptors });
 }
