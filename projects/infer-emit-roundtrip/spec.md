@@ -197,14 +197,35 @@ Flag at PR-open; do not skip.
 
 ### 7. Array columns can't keep their default
 
+> **Remedy corrected after review.** The analysis below was right; the fix it prescribed was
+> wrong, and shipping it would have traded this defect for a worse one. Recorded rather than
+> quietly amended, because the mistake is instructive.
+
 `DEFAULT '{}'::text[]` → `PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED`. The check conflates two
 different concepts: `dbgenerated` lowers to a **storage-level** SQL default — the same shape as
-`now()` — not a per-element execution-time generator.
+`now()` — not a per-element execution-time generator. That much is true.
 
-**Fix:** the check rejects only genuine execution defaults (`executionDefaults.onCreate`) on list
-fields, and permits a storage-level function default. Nothing downstream objects:
-`buildColumnDefaultSql` ignores `column.many` entirely and emits `DEFAULT (…)` already. The
-error message stays for the case it was actually written for.
+**The prescribed fix was to relax the check** to reject only `executionDefaults.onCreate`, so a
+storage-level function default on a list would pass. That is unsound. It admits
+`tags DateTime[] @default(now())`, whose DDL Postgres refuses — the default expression's type
+doesn't match the array column — moving the error from authoring time (clear) to DDL-apply time
+(ugly). Nothing in the authoring layer can tell whether a function returns an array, so "permit
+storage function defaults on lists" cannot be made safe here.
+
+The tell was visible in the implementation: it needed a `PSL_LIST_AUTOINCREMENT_UNSUPPORTED`
+special case to plug one instance of exactly that hole.
+
+**The actual fix is defect 8's.** Once the authoring side resolves literal defaults through
+`parsePostgresDefault`, `dbgenerated("'{}'::text[]")` resolves to `kind: 'literal'` and never
+reaches the list check at all. The check stays as it was, rejecting function defaults on lists,
+and the motivating case works anyway.
+
+So this defect has no fix of its own — it is a duplicate of defect 8 wearing different clothes,
+and the round-trip journey proves the array default survives without the check being touched.
+
+**Known residual:** a genuine array-returning function default (`dbgenerated("ARRAY[gen_random_uuid()]")`)
+is still rejected. That is the pre-existing behaviour, so leaving it is not a regression. Worth a
+follow-up, not worth widening the check for.
 
 ### 8. A `dbgenerated` literal default reports drift forever
 
