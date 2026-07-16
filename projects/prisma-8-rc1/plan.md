@@ -63,7 +63,7 @@ In order:
 5. Close old v7 issues/PRs except v7 bugs; pin the explanation issue.
 6. Re-run the runtime benchmarks; confirm the published numbers still hold.
 7. Render and publish the feature matrix (the public scoreboard).
-8. Publish under the non-`latest` dist-tag; verify `npm install prisma` still yields v7 and the RC tag yields v8 with both binaries working.
+8. Publish under the non-`latest` dist-tag; verify `npm install prisma` still yields v7 and the RC tag yields v8 with the `prisma-next` binary working (and no `prisma` binary declared).
 9. Deprecation notice on the old `prisma-next` package.
 10. **Announce.**
 

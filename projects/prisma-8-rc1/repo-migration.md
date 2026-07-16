@@ -20,7 +20,7 @@ On npm:
 - **All other `@prisma-next/*` packages** (~60 of them) — unchanged. They're implementation detail, installed transitively. A later, non-breaking consolidation bundles them into the CLI package and stops publishing them; that's explicitly after the RC.
 - **The old `prisma-next` package** — gets a deprecation notice pointing users at `prisma`.
 
-The CLI installs two binaries: `prisma` and `prisma-next`. This is the parallel-install answer (see [parallel-install.md](parallel-install.md)): in a project that has both versions, v7 keeps owning the `prisma` command so existing scripts don't break, and users drive v8 as `prisma-next` — the command EA users already know — until they remove v7.
+The CLI installs exactly one binary: `prisma-next`. It does not declare a `prisma` binary — bin-name collisions between two installed packages resolve differently per package manager, so during coexistence `prisma` must unambiguously mean v7 (see [parallel-install.md](parallel-install.md)). Whether v8 ever ships a bare `prisma` command — at 8.0.0 final or later via `@prisma/cli` — is an open road-to-final decision; adding a binary is additive whenever it happens.
 
 ## Concrete steps
 
@@ -38,7 +38,7 @@ The CLI installs two binaries: `prisma` and `prisma-next`. This is the parallel-
 7. **Cut the `v7` branch** with working CI.
 8. **Merge `v8` into `main`.**
 9. **Triage the open v7 issues and pull requests.** Close everything except v7 bug reports; post a pinned issue explaining the change and use a saved reply linking to it. This deliberately happens at merge time, not earlier — doing it before there's an announcement to point at just generates weeks of confusion.
-10. **Publish** under the non-`latest` dist-tag. Verify: `npm install prisma` still yields v7; installing the RC tag yields v8; both binaries work.
+10. **Publish** under the non-`latest` dist-tag. Verify: `npm install prisma` still yields v7; installing the RC tag yields v8; the `prisma-next` binary works and no `prisma` binary is declared.
 11. **Deprecation notice** on the old `prisma-next` package.
 12. **Announce.**
 
