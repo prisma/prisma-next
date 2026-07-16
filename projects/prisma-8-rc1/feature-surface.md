@@ -1,0 +1,35 @@
+# The remaining feature set and work
+
+## What ships at the RC
+
+The honest answer to "what's in?" is: **that's what the feature-support matrix determines**, and asserting it here in prose would just create a second copy that drifts. The core that all current evidence says is solid: Postgres/SQLite/Mongo targets, the schema language and contract emission, the SQL query builder, the ORM client, transactions, the migration system, and the shipped extensions. The matrix turns that impression into a checked table with a proving suite per cell — see [scoreboard.md](scoreboard.md).
+
+## What ships experimental
+
+**Polymorphism (multi-table inheritance and variant relations)** is the candidate. It has an active stream of roughly ten open correctness bugs (variant relations, includes, update/delete predicates, variant resolution). The decision rule, applied July 24: if new bugs have stopped appearing, it ships inside the stability promise; if the stream is still producing, it ships marked experimental and stabilization continues after the RC. This is decided by the bug curve, not by a completion promise.
+
+## What's known to be out
+
+Named at matrix freeze, but already known today:
+
+- **`migration plan --advance`** — documented but not implemented. It sits on the final-cutover step of the v7→v8 migration path, not on the parallel-running path, so it's a tracked public gap for 8.0.0 final rather than an RC blocker.
+- **Package consolidation** ("Flavor 2" of the distribution design) — bundling the ~60 internal packages into the main package so they stop being published. Designed, non-breaking, and deliberately deferred past the RC.
+- Everything the matrix's deliberate crosses name.
+
+## Engineering that must land before the freeze
+
+Each item here changes a surface that freezes on July 31 (see [release-definition.md](release-definition.md)); that's what puts it on this list.
+
+1. **Error-code consistency.** Today there are four separate error systems with two incompatible code formats — roughly 46 codes shaped like `PN-CLI-4001` and roughly 89 shaped like `RUNTIME.DECODE_FAILED` — plus about sixteen error classes with no code at all (including the SQL driver errors, which are the ones users hit most). One format gets chosen (decision due July 18), everything gets folded into it, errors without codes get codes, and a table maps every old code to its new one. There is deliberately no compatibility with Prisma 7's `P1001`-style codes — the upgrade guide gets a P-code translation table instead.
+2. **Rename `extensionPacks` to `extensions`** in the configuration format. Breaking, so now or never. While doing it: sweep the config format for any other key we'd regret freezing as-is.
+3. **Fix the connection-pool crash.** A dropped idle connection currently crashes the host process because no error listener is attached. A production-readiness bug, not housekeeping.
+4. **Deduplicate migration contract snapshots.** Every migration folder currently stores full copies of the contract; a chain of N migrations stores roughly 2N copies of N+1 distinct contracts. They move to a single `migrations/snapshots/` folder, one file per distinct contract named by its content hash. Migration folders already record which contracts they go from and to, so they need no new link files. This is safe (a migration's identity hash doesn't cover the snapshots, so nothing invalidates) and must happen now (the folder layout freezes at RC). Files stay plain JSON for reviewability, but the reader also accepts gzipped files from day one so compression stays possible later without another format change.
+5. **Sweep everything that embeds the old names.** After the package rename, these all still say `prisma-next` unless someone fixes them: the templates that `init` writes into new user projects (dependency names, commands, comments), the user-facing skills that `init` installs, the documentation links embedded in error messages (which must resolve to real pages at RC), and the published upgrade-instruction skills. The old `prisma-next` npm package needs a deprecation notice pointing at `prisma`. And the names that look internal but freeze — environment variables, the per-user config file path, telemetry identifiers — each need an explicit keep-or-rename decision.
+6. **Public API documentation comments.** The exported surface of the per-database packages is what users see on hover in their editor. That set — not all 65 packages — gets an audit pass.
+
+## Quality items that should land before the announcement (but don't freeze)
+
+- The deprecation warning from the `pg` driver, printed on every connection — a terrible first impression in an otherwise polished RC.
+- The open Dependabot security alerts — the announcement puts many eyes on the repository.
+- The npm README for the `prisma` package (v8's face on npm) and the "this is an internal package" notices on the implementation packages.
+- Announcement-day readiness: confirm the Prisma 7 VS Code extension and the v8 language server don't fight over schema files in a project that has both versions installed; a docs landing page for v8; issue templates that route v7 vs v8 bug reports; verify or soften the Windows, Bun, and Deno support claims; review the telemetry consent prompt and confirm the telemetry backend can take announcement-scale load.
