@@ -1,5 +1,5 @@
 /**
- * Infer -> Emit Round-Trip Fidelity (TML-3037, dispatch D1 — the instrument)
+ * Infer -> Emit Round-Trip Fidelity (TML-3037 — the instrument)
  *
  * `contract-infer-workflow.e2e.test.ts` already proves infer -> emit -> verify
  * on a two-column table. This journey runs the same shape against a schema
@@ -93,7 +93,7 @@ withTempDir(({ createTempDir }) => {
     });
 
     it(
-      'IF.01: back-relation naming — an already-plural child table does not double-pluralize',
+      'back-relation naming — an already-plural child table does not double-pluralize',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -102,19 +102,19 @@ withTempDir(({ createTempDir }) => {
         });
 
         const infer = await runContractInfer(ctx);
-        expect(infer.exitCode, `IF.01: contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
+        expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
         const psl = readContractPsl(ctx);
         expect(
           psl,
-          'IF.01: Users back-relation to the plural "sessions" table is "sessions", not "sessionses"',
+          'Users back-relation to the plural "sessions" table is "sessions", not "sessionses"',
         ).toMatch(/\bsessions\s+Sessions\[\]/);
       },
       timeouts.spinUpPpgDev,
     );
 
     it(
-      'IF.02: the interpreter accepts the 1:1 back-relation infer prints for a unique FK',
+      'the interpreter accepts the 1:1 back-relation infer prints for a unique FK',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -123,7 +123,7 @@ withTempDir(({ createTempDir }) => {
         });
 
         const infer = await runContractInfer(ctx);
-        expect(infer.exitCode, `IF.02: contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
+        expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
         // Isolate the 1:1 back-relation defect: fix the two unrelated
         // emit-blockers (list default, non-btree index types) so any failure
@@ -134,7 +134,7 @@ withTempDir(({ createTempDir }) => {
         const emit = await runContractEmit(ctx);
         expect(
           emit.exitCode,
-          `IF.02: contract emit should accept the bare "identities Identities?" 1:1 back-relation ` +
+          `contract emit should accept the bare "identities Identities?" 1:1 back-relation ` +
             `field; instead got:\n${stripAnsi(emit.stderr)}\n${stripAnsi(emit.stdout)}`,
         ).toBe(0);
       },
@@ -142,7 +142,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'IF.03: the interpreter accepts the storage-level list default infer prints for text[]',
+      'the interpreter accepts the storage-level list default infer prints for text[]',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -151,7 +151,7 @@ withTempDir(({ createTempDir }) => {
         });
 
         const infer = await runContractInfer(ctx);
-        expect(infer.exitCode, `IF.03: contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
+        expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
         // Isolate the list-default defect: fix the two unrelated emit-blockers
         // (1:1 back-relation, non-btree index types).
@@ -161,7 +161,7 @@ withTempDir(({ createTempDir }) => {
         const emit = await runContractEmit(ctx);
         expect(
           emit.exitCode,
-          `IF.03: contract emit should accept @default(dbgenerated("'{}'::text[]")) on Users.tags; ` +
+          `contract emit should accept @default(dbgenerated("'{}'::text[]")) on Users.tags; ` +
             `instead got:\n${stripAnsi(emit.stderr)}\n${stripAnsi(emit.stdout)}`,
         ).toBe(0);
       },
@@ -169,7 +169,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'IF.04: postgres registers the gin and hash index types infer already prints',
+      'postgres registers the gin and hash index types infer already prints',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -178,7 +178,7 @@ withTempDir(({ createTempDir }) => {
         });
 
         const infer = await runContractInfer(ctx);
-        expect(infer.exitCode, `IF.04: contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
+        expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
         // Isolate the index-type defect: fix the two unrelated emit-blockers
         // (1:1 back-relation, list default).
@@ -188,7 +188,7 @@ withTempDir(({ createTempDir }) => {
         const emit = await runContractEmit(ctx);
         expect(
           emit.exitCode,
-          `IF.04: contract emit should accept @@index(..., type: "gin"/"hash"); instead got:\n` +
+          `contract emit should accept @@index(..., type: "gin"/"hash"); instead got:\n` +
             `${stripAnsi(emit.stderr)}\n${stripAnsi(emit.stdout)}`,
         ).toBe(0);
       },
@@ -196,7 +196,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'IF.05: a foreign key outside the introspected schema surfaces an explanatory comment',
+      'a foreign key outside the introspected schema surfaces an explanatory comment',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -205,24 +205,23 @@ withTempDir(({ createTempDir }) => {
         });
 
         const infer = await runContractInfer(ctx);
-        expect(infer.exitCode, `IF.05: contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
+        expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
         const psl = readContractPsl(ctx);
         // sessions.owner_ref points at secure.owners, outside the introspected
         // `public` schema — the scalar column must survive...
-        expect(psl, 'IF.05: dangling FK keeps its scalar column').toContain('ownerRef');
+        expect(psl, 'dangling FK keeps its scalar column').toContain('ownerRef');
         // ...and the model must explain why the relation is missing, the same
         // way infer already documents a table with no primary key.
-        expect(
-          psl,
-          'IF.05: Sessions documents the dropped cross-schema relation with a comment',
-        ).toMatch(/\/\/[^\n]*\nmodel Sessions \{/);
+        expect(psl, 'Sessions documents the dropped cross-schema relation with a comment').toMatch(
+          /\/\/[^\n]*\nmodel Sessions \{/,
+        );
       },
       timeouts.spinUpPpgDev,
     );
 
     it(
-      'IF.06: identity columns (both GENERATED variants) round-trip as autoincrement(); serial keeps working',
+      'identity columns (both GENERATED variants) round-trip as autoincrement(); serial keeps working',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -231,26 +230,25 @@ withTempDir(({ createTempDir }) => {
         });
 
         const infer = await runContractInfer(ctx);
-        expect(infer.exitCode, `IF.06: contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
+        expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
         const psl = readContractPsl(ctx);
-        expect(psl, 'IF.06: serial column already carries autoincrement() (control)').toMatch(
+        expect(psl, 'serial column already carries autoincrement() (control)').toMatch(
           /id\s+Int\s+@id\(map: "identities_pkey"\)\s+@default\(autoincrement\(\)\)/,
+        );
+        expect(psl, 'GENERATED ALWAYS AS IDENTITY (users.id) carries autoincrement()').toMatch(
+          /id\s+Int\s+@id\(map: "users_pkey"\)\s+@default\(autoincrement\(\)\)/,
         );
         expect(
           psl,
-          'IF.06: GENERATED ALWAYS AS IDENTITY (users.id) carries autoincrement()',
-        ).toMatch(/id\s+Int\s+@id\(map: "users_pkey"\)\s+@default\(autoincrement\(\)\)/);
-        expect(
-          psl,
-          'IF.06: GENERATED BY DEFAULT AS IDENTITY (sessions.id) carries autoincrement()',
+          'GENERATED BY DEFAULT AS IDENTITY (sessions.id) carries autoincrement()',
         ).toMatch(/id\s+Int\s+@id\(map: "sessions_pkey"\)\s+@default\(autoincrement\(\)\)/);
       },
       timeouts.spinUpPpgDev,
     );
 
     it(
-      'IF.07: a jsonb literal default round-trips clean through db verify --schema-only',
+      'a jsonb literal default round-trips clean through db verify --schema-only',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -259,12 +257,12 @@ withTempDir(({ createTempDir }) => {
         });
 
         const infer = await runContractInfer(ctx);
-        expect(infer.exitCode, `IF.07: contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
+        expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
         // Fix the two unrelated emit-blockers (1:1 back-relation, list
         // default) so emit succeeds and verify can run. The gin/hash indexes
         // are left exactly as infer printed them — postgres now registers
-        // those access methods (TML-3037 D5), so they emit and round-trip
+        // those access methods (TML-3037), so they emit and round-trip
         // clean against the live gin/hash indexes, proving that fix here
         // too. Only the jsonb default on Users.metadata is left broken, which
         // is what this test is for.
@@ -272,19 +270,19 @@ withTempDir(({ createTempDir }) => {
         writeContractPsl(ctx, reduced);
 
         const emit = await runContractEmit(ctx);
-        expect(emit.exitCode, `IF.07: contract emit\n${stripAnsi(emit.stderr)}`).toBe(0);
+        expect(emit.exitCode, `contract emit\n${stripAnsi(emit.stderr)}`).toBe(0);
 
         const verify = await runDbVerify(ctx, ['--schema-only']);
         expect(
           verify.exitCode,
-          `IF.07: db verify --schema-only should be clean for Users.metadata; instead got:\n${stripAnsi(verify.stderr)}\n${stripAnsi(verify.stdout)}`,
+          `db verify --schema-only should be clean for Users.metadata; instead got:\n${stripAnsi(verify.stderr)}\n${stripAnsi(verify.stdout)}`,
         ).toBe(0);
       },
       timeouts.spinUpPpgDev,
     );
 
     it(
-      'IF.08: full round trip — infer -> emit -> db verify --schema-only, no hand-editing',
+      'full round trip — infer -> emit -> db verify --schema-only, no hand-editing',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -293,18 +291,18 @@ withTempDir(({ createTempDir }) => {
         });
 
         const infer = await runContractInfer(ctx);
-        expect(infer.exitCode, `IF.08: contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
+        expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
         const emit = await runContractEmit(ctx);
         expect(
           emit.exitCode,
-          `IF.08: contract emit (unmodified inferred PSL)\n${stripAnsi(emit.stderr)}\n${stripAnsi(emit.stdout)}`,
+          `contract emit (unmodified inferred PSL)\n${stripAnsi(emit.stderr)}\n${stripAnsi(emit.stdout)}`,
         ).toBe(0);
 
         const verify = await runDbVerify(ctx, ['--schema-only']);
         expect(
           verify.exitCode,
-          `IF.08: db verify --schema-only\n${stripAnsi(verify.stderr)}\n${stripAnsi(verify.stdout)}`,
+          `db verify --schema-only\n${stripAnsi(verify.stderr)}\n${stripAnsi(verify.stdout)}`,
         ).toBe(0);
       },
       timeouts.spinUpPpgDev,

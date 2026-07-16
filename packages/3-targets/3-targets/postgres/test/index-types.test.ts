@@ -1,5 +1,5 @@
 /**
- * Postgres index-type registration (TML-3037, dispatch D5).
+ * Postgres index-type registration (TML-3037).
  *
  * `contract infer` prints `@@index(..., type: "gin"/"hash")` for a non-default
  * access method, but the postgres target registered zero index types, so

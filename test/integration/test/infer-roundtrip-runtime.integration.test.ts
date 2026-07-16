@@ -1,5 +1,5 @@
 /**
- * Infer -> Emit Round-Trip Fidelity — runtime defects (TML-3037, dispatches D1/D4)
+ * Infer -> Emit Round-Trip Fidelity — runtime defects (TML-3037)
  *
  * `cli-journeys/infer-roundtrip-fidelity.e2e.test.ts` drives infer -> emit ->
  * `db verify --schema-only`, but neither `contract emit` nor `db verify`
@@ -8,13 +8,14 @@
  *
  *  - An unbounded `numeric` column emits a valid contract, but building an
  *    `ExecutionContext` used to throw `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH`
- *    (fixed by making `NumericParams.precision` optional — D4). RT.03 targets
- *    the same base-scalar path directly with a hand-authored `Decimal` field.
+ *    (fixed by making `NumericParams.precision` optional). The bare-Decimal
+ *    scenario below targets the same base-scalar path directly with a
+ *    hand-authored `Decimal` field.
  *  - A `date` column decoded fine on a top-level `SELECT` (`decode()` was a
  *    passthrough over an already-parsed JS `Date`), but `.include()` went
  *    through `json_agg` -> `decodeJson()`, which rejected a bare `YYYY-MM-DD`
  *    string because `@db.Date` inherited `DateTime`'s `pg/timestamptz@1`
- *    codec (fixed by introducing `pg/date@1` — D4).
+ *    codec (fixed by introducing `pg/date@1`).
  *
  * Each scenario below infers + emits a real contract from a live database
  * (same CLI path the journey test uses), deserializes the emitted
@@ -94,7 +95,7 @@ withTempDir(({ createTempDir }) => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'RT.01: an unbounded numeric column emits cleanly and builds an ExecutionContext',
+      'an unbounded numeric column emits cleanly and builds an ExecutionContext',
       async () => {
         const ctx = await inferAndEmit(database.connectionString, createTempDir);
         const contract = readEmittedContract(ctx);
@@ -110,7 +111,7 @@ withTempDir(({ createTempDir }) => {
         }
         expect(
           constructionError,
-          'RT.01: createExecutionContext should accept an unbounded numeric column',
+          'createExecutionContext should accept an unbounded numeric column',
         ).toBeUndefined();
       },
       timeouts.spinUpPpgDev,
@@ -129,15 +130,15 @@ withTempDir(({ createTempDir }) => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'RT.03: "amount Decimal" with no @db.Numeric attribute emits cleanly and builds an ExecutionContext',
+      '"amount Decimal" with no @db.Numeric attribute emits cleanly and builds an ExecutionContext',
       async () => {
         // Hand-authored, not inferred: `control-mutation-defaults.ts` maps
         // the bare `Decimal` scalar straight to `pg/numeric@1` with no
-        // `typeParams`, independent of any `@db.Numeric` attribute. RT.01
-        // reaches this same base-scalar path indirectly (infer prints an
-        // unbounded `numeric` column as a bare `Decimal?`); this test targets
-        // it directly so the base-scalar fix can't regress behind an
-        // infer-only test.
+        // `typeParams`, independent of any `@db.Numeric` attribute. The
+        // unbounded-numeric scenario above reaches this same base-scalar path
+        // indirectly (infer prints an unbounded `numeric` column as a bare
+        // `Decimal?`); this test targets it directly so the base-scalar fix
+        // can't regress behind an infer-only test.
         const ctx: JourneyContext = setupJourney({
           connectionString: database.connectionString,
           createTempDir,
@@ -177,7 +178,7 @@ withTempDir(({ createTempDir }) => {
         }
         expect(
           constructionError,
-          'RT.03: createExecutionContext should accept a bare Decimal field',
+          'createExecutionContext should accept a bare Decimal field',
         ).toBeUndefined();
       },
       timeouts.spinUpPpgDev,
@@ -210,7 +211,7 @@ withTempDir(({ createTempDir }) => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'RT.02: top-level select decodes the date; include() decode fails on the same column',
+      'top-level select decodes the date; include() decode fails on the same column',
       async () => {
         const ctx = await inferAndEmit(database.connectionString, createTempDir);
         const contract = readEmittedContract(ctx);
@@ -242,7 +243,7 @@ withTempDir(({ createTempDir }) => {
             // `Date` (built by postgres-date's OID 1082 parser) into the
             // equivalent UTC-midnight instant, so the round-trip no longer
             // depends on the process's timezone — assert the exact value.
-            expect(row?.notedOn, 'RT.02: top-level select decodes the exact date').toEqual(
+            expect(row?.notedOn, 'top-level select decodes the exact date').toEqual(
               new Date(Date.UTC(2024, 0, 15)),
             );
 
@@ -265,7 +266,7 @@ withTempDir(({ createTempDir }) => {
             }
             expect(
               includeError,
-              'RT.02: include() should decode the same date column without throwing',
+              'include() should decode the same date column without throwing',
             ).toBeUndefined();
           } finally {
             await runtime.close();
