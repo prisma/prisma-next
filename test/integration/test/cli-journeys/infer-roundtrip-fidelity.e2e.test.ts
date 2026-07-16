@@ -6,8 +6,12 @@
  * that carries the fidelity gaps TML-3037 tracks: an already-plural
  * back-relation target, a 1:1 FK, a 1:N FK, both `GENERATED ... AS IDENTITY`
  * variants plus a `serial` control column, a GIN index, a `USING hash` index,
- * array/jsonb defaults, and a foreign key into a schema outside the
- * introspected scope.
+ * array/jsonb defaults, a foreign key into a schema outside the introspected
+ * scope, two foreign keys between the same table pair (one of them unique),
+ * and a self-referencing unique foreign key — the two shapes under which
+ * infer prints a *named* singular 1:1 back-relation (`@relation(name: ...)`
+ * with no `fields`/`references`), as opposed to the bare, unnamed one a
+ * single FK between a pair produces.
  *
  * Each `it()` isolates one defect so a single run reports every defect
  * independently instead of stopping at the first failure. Where an
@@ -61,6 +65,17 @@ const SEED_SQL = `
     provider text NOT NULL
   );
   CREATE INDEX identities_provider_hash_idx ON identities USING hash (provider);
+
+  CREATE TABLE accounts (
+    id int4 GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    primary_user_id int4 NOT NULL UNIQUE REFERENCES users(id),
+    backup_user_id int4 REFERENCES users(id)
+  );
+
+  CREATE TABLE categories (
+    id int4 GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    parent_id int4 UNIQUE REFERENCES categories(id)
+  );
 `;
 
 function readContractPsl(ctx: JourneyContext): string {
@@ -136,6 +151,78 @@ withTempDir(({ createTempDir }) => {
           emit.exitCode,
           `contract emit should accept the bare "identities Identities?" 1:1 back-relation ` +
             `field; instead got:\n${stripAnsi(emit.stderr)}\n${stripAnsi(emit.stdout)}`,
+        ).toBe(0);
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'the interpreter accepts a named 1:1 back-relation for two FKs sharing a table pair',
+      async () => {
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+          contractMode: 'psl',
+        });
+
+        const infer = await runContractInfer(ctx);
+        expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
+
+        const psl = readContractPsl(ctx);
+        // `accounts` has two FKs to `users` (`primary_user_id` is unique,
+        // `backup_user_id` isn't), so infer names both relations to
+        // disambiguate and prints the 1:1 back side on Users as a singular
+        // field carrying only a relation name — no fields/references — the
+        // shape emit rejected before this fix (it only accepted an *unnamed*
+        // singular back-relation, produced when a table pair has one FK).
+        expect(psl, 'Users carries a named singular back-relation to Accounts').toMatch(
+          /\w+\s+Accounts\?\s+@relation\(name: "[^"]+"\)\s*$/m,
+        );
+
+        // Isolate the named-back-relation defect: fix the two unrelated
+        // emit-blockers (list default, non-btree index types).
+        const reduced = fixIndexTypes(fixListDefault(psl));
+        writeContractPsl(ctx, reduced);
+
+        const emit = await runContractEmit(ctx);
+        expect(
+          emit.exitCode,
+          'contract emit should accept the named singular 1:1 back-relation field on Users; ' +
+            `instead got:\n${stripAnsi(emit.stderr)}\n${stripAnsi(emit.stdout)}`,
+        ).toBe(0);
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'the interpreter accepts a named 1:1 back-relation for a self-referencing unique FK',
+      async () => {
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+          contractMode: 'psl',
+        });
+
+        const infer = await runContractInfer(ctx);
+        expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
+
+        const psl = readContractPsl(ctx);
+        // `categories.parent_id` is a unique, self-referencing FK. A
+        // self-relation always needs a name to disambiguate its two sides, so
+        // infer prints the 1:1 back side as a singular `Categories?` field
+        // carrying only a relation name, same as the two-FK case above.
+        expect(psl, 'Categories carries a named singular self-referencing back-relation').toMatch(
+          /\w+\s+Categories\?\s+@relation\(name: "[^"]+"\)\s*$/m,
+        );
+
+        const reduced = fixIndexTypes(fixListDefault(psl));
+        writeContractPsl(ctx, reduced);
+
+        const emit = await runContractEmit(ctx);
+        expect(
+          emit.exitCode,
+          'contract emit should accept the named singular self-referencing 1:1 back-relation ' +
+            `field on Categories; instead got:\n${stripAnsi(emit.stderr)}\n${stripAnsi(emit.stdout)}`,
         ).toBe(0);
       },
       timeouts.spinUpPpgDev,
