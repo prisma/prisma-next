@@ -1,5 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import { issueChange } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { buildPostgresPlanDiff } from '@prisma-next/target-postgres/diff-database-schema';
 import {
@@ -158,7 +158,7 @@ describe('buildPostgresPlanDiff — RLS drift detection', () => {
     const issues = policyDiffIssues(buildContract([]), schemaWithPolicies([managedPolicy()]));
 
     expect(issues).toHaveLength(1);
-    expect(issueChange(issues[0]!)).toBe('drop');
+    expect(issueOutcome(issues[0]!)).toBe('not-expected');
     expect(issues[0]?.actual).toMatchObject({ name: WIRE_NAME });
   });
 
@@ -166,7 +166,7 @@ describe('buildPostgresPlanDiff — RLS drift detection', () => {
     const issues = policyDiffIssues(buildContract([]), schemaWithPolicies([externalPolicy()]));
 
     expect(issues).toHaveLength(1);
-    expect(issueChange(issues[0]!)).toBe('drop');
+    expect(issueOutcome(issues[0]!)).toBe('not-expected');
     expect(issues[0]?.actual).toMatchObject({ name: 'legacy_admin_policy' });
   });
 

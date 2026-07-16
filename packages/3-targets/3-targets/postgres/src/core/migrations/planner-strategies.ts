@@ -35,7 +35,7 @@ import type {
 import { resolveValueSetValues } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
-import { issueChange } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   type SqlStorage,
@@ -199,7 +199,7 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
   const calls: PostgresOpFactoryCall[] = [];
 
   for (const issue of issues) {
-    if (issueChange(issue) !== 'create') continue;
+    if (issueOutcome(issue) !== 'not-found') continue;
     const node = issueNode(issue);
     if (node === undefined || node.nodeKind !== RelationalSchemaNodeKind.column) continue;
     const expected = blindCast<
@@ -264,7 +264,7 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   const calls: PostgresOpFactoryCall[] = [];
 
   for (const issue of issues) {
-    if (issueChange(issue) !== 'alter') continue;
+    if (issueOutcome(issue) !== 'not-equal') continue;
     const pair = columnNodePair(issue);
     if (pair === undefined) continue;
     const { expected, actual } = pair;
@@ -358,7 +358,7 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
   const calls: PostgresOpFactoryCall[] = [];
 
   for (const issue of issues) {
-    if (issueChange(issue) !== 'alter') continue;
+    if (issueOutcome(issue) !== 'not-equal') continue;
     const pair = columnNodePair(issue);
     if (pair === undefined) continue;
     const { expected, actual } = pair;
@@ -591,7 +591,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
   const mutableStorageTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
 
   for (const issue of issues) {
-    if (issueChange(issue) !== 'create') continue;
+    if (issueOutcome(issue) !== 'not-found') continue;
     const node = issueNode(issue);
     if (node === undefined || node.nodeKind !== RelationalSchemaNodeKind.column) continue;
     const expected = blindCast<

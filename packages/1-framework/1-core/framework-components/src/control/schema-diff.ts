@@ -25,29 +25,35 @@ export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
 }
 
 /**
- * How an issue changes the actual state, derived purely from which sides are
- * present: an expected-only issue creates the node, an actual-only issue drops
- * it, and an issue carrying both alters it. Expected is the desired side,
- * actual the current side, of whatever comparison produced the issue
- * (contract-vs-database, or contract-vs-contract in an offline plan), so the
- * vocabulary is comparison-relative and never ambiguous about a base.
+ * The three ways an actual state can fail an expectation: it lacks a node that
+ * was expected (`not-found`), holds a node that was not expected
+ * (`not-expected`), or holds a node not equal to the expected one
+ * (`not-equal`). Expected is the desired side, actual the current side, of
+ * whatever comparison produced the issue (contract-vs-database, or
+ * contract-vs-contract in an offline plan), so the vocabulary is
+ * comparison-relative and never ambiguous about a base — and reads cleanly for
+ * both the planner and `db verify`.
+ *
+ * This is the RETURN TYPE of the derived {@link issueOutcome} helper, not a
+ * stored field: presence is the single source of truth, and the outcome is
+ * computed from it on demand.
  */
-export type SchemaChangeKind = 'create' | 'drop' | 'alter';
+export type ExpectationFailureReason = 'not-found' | 'not-expected' | 'not-equal';
 
 /**
- * The change an issue represents, discriminated by presence rather than any
+ * The outcome an issue represents, discriminated by presence rather than any
  * stored field — the single source of truth every consumer reads. An issue
  * always carries at least one side by construction; neither is a malformed
  * issue and throws.
  */
-export function issueChange(issue: SchemaDiffIssue): SchemaChangeKind {
+export function issueOutcome(issue: SchemaDiffIssue): ExpectationFailureReason {
   const hasExpected = issue.expected !== undefined;
   const hasActual = issue.actual !== undefined;
-  if (hasExpected && hasActual) return 'alter';
-  if (hasExpected) return 'create';
-  if (hasActual) return 'drop';
+  if (hasExpected && hasActual) return 'not-equal';
+  if (hasExpected) return 'not-found';
+  if (hasActual) return 'not-expected';
   throw new Error(
-    `issueChange: issue at "${issue.path.join('/')}" carries neither an expected nor an actual node`,
+    `issueOutcome: issue at "${issue.path.join('/')}" carries neither an expected nor an actual node`,
   );
 }
 

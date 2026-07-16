@@ -3,7 +3,7 @@ import type {
   SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import { issueChange } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { elementCoordinates } from '@prisma-next/framework-components/ir';
 
 /**
@@ -27,7 +27,7 @@ export function entityNamesDeclaredBy(contracts: ReadonlyArray<Contract>): Set<s
  * name, never a deeper index/validator/options auxiliary.
  */
 function extraCollectionName(issue: SchemaDiffIssue): string | undefined {
-  if (issueChange(issue) !== 'drop' || issue.path.length !== 1) return undefined;
+  if (issueOutcome(issue) !== 'not-expected' || issue.path.length !== 1) return undefined;
   return issue.path[0];
 }
 

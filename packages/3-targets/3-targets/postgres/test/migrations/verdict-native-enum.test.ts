@@ -1,7 +1,7 @@
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { verifySqlSchemaByDiff } from '@prisma-next/family-sql/diff';
-import { issueChange } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import type { SqlStorage as SqlStorageType } from '@prisma-next/sql-contract/types';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -220,7 +220,7 @@ describe('db verify grades enum drift by control policy', () => {
     const result = verify(external, actualTree(REORDERED), true);
     expect(result.ok).toBe(false);
     const mismatch = result.schema.issues.filter(
-      (i) => issueChange(i) === 'alter' && i.path.some((p) => p.includes('order_status')),
+      (i) => issueOutcome(i) === 'not-equal' && i.path.some((p) => p.includes('order_status')),
     );
     expect(mismatch.length).toBeGreaterThan(0);
   });

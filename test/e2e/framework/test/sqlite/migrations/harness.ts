@@ -14,7 +14,7 @@ import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import {
   APP_SPACE_ID,
   createControlStack,
-  issueChange,
+  issueOutcome,
   type MigrationOperationPolicy,
   type MigrationRunnerFailure,
 } from '@prisma-next/framework-components/control';
@@ -211,7 +211,7 @@ export async function applyMigration(
       frameworkComponents: fw,
     });
     if (!vr.ok) {
-      const lines = vr.schema.issues.map((i) => `  - ${issueChange(i)}: ${i.path.join('/')}`);
+      const lines = vr.schema.issues.map((i) => `  - ${issueOutcome(i)}: ${i.path.join('/')}`);
       throw new Error(`Schema verification failed:\n${lines.join('\n')}`);
     }
 

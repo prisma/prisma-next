@@ -19,7 +19,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
-import { issueChange } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import {
   RelationalSchemaNodeKind,
@@ -79,7 +79,7 @@ function classifyNodeIssue(issue: SchemaDiffIssue): 'widening' | 'destructive' |
   >(node).nodeKind;
   switch (nodeKind) {
     case RelationalSchemaNodeKind.column: {
-      if (issueChange(issue) !== 'alter') return null;
+      if (issueOutcome(issue) !== 'not-equal') return null;
       const expected = blindCast<SqlColumnIR, 'a not-equal column issue carries the expected node'>(
         issue.expected,
       );
@@ -92,7 +92,7 @@ function classifyNodeIssue(issue: SchemaDiffIssue): 'widening' | 'destructive' |
       return expected.nullable ? 'widening' : 'destructive';
     }
     case RelationalSchemaNodeKind.columnDefault:
-      return issueChange(issue) === 'drop' ? 'destructive' : 'widening';
+      return issueOutcome(issue) === 'not-expected' ? 'destructive' : 'widening';
     case RelationalSchemaNodeKind.primaryKey:
     case RelationalSchemaNodeKind.foreignKey:
     case RelationalSchemaNodeKind.unique:
@@ -207,7 +207,7 @@ export const nullabilityTighteningBackfillStrategy: CallMigrationStrategy = (iss
   const calls: SqliteOpFactoryCall[] = [];
   for (const issue of issues) {
     if (
-      issueChange(issue) !== 'alter' ||
+      issueOutcome(issue) !== 'not-equal' ||
       issue.expected === undefined ||
       issue.actual === undefined
     ) {

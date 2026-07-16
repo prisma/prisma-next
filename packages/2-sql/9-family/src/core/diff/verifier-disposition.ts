@@ -4,7 +4,7 @@ import type {
   VerifierIssueCategory,
   VerifierOutcome,
 } from '@prisma-next/framework-components/control';
-import { dispositionForCategory, issueChange } from '@prisma-next/framework-components/control';
+import { dispositionForCategory, issueOutcome } from '@prisma-next/framework-components/control';
 
 /**
  * Classifies a codec `verifyType` hook finding into the target-neutral
@@ -13,10 +13,10 @@ import { dispositionForCategory, issueChange } from '@prisma-next/framework-comp
  * to its value set, so a paired mismatch always classifies as `valueDrift`.
  */
 export function classifyStorageTypeDiffIssue(issue: SchemaDiffIssue): VerifierIssueCategory {
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     return 'declaredMissing';
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     return 'extraAuxiliary';
   }
   return 'valueDrift';

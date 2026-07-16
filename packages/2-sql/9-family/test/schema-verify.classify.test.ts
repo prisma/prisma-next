@@ -1,7 +1,7 @@
 import type {
   DiffableNode,
   DiffSubjectGranularity,
-  SchemaChangeKind,
+  ExpectationFailureReason,
 } from '@prisma-next/framework-components/control';
 import {
   SqlCheckConstraintIR,
@@ -26,11 +26,11 @@ const column = new SqlColumnIR({ name: 'c', nativeType: 'int4', nullable: false 
 const index = new SqlIndexIR({ columns: ['c'], unique: false });
 const check = new SqlCheckConstraintIR({ name: 'chk', column: 'c', permittedValues: ['a'] });
 
-function issueOf(change: SchemaChangeKind, node: DiffableNode) {
+function issueOf(change: ExpectationFailureReason, node: DiffableNode) {
   return {
     path: ['database', node.id],
-    ...(change !== 'drop' ? { expected: node } : {}),
-    ...(change !== 'create' ? { actual: node } : {}),
+    ...(change !== 'not-expected' ? { expected: node } : {}),
+    ...(change !== 'not-found' ? { actual: node } : {}),
   };
 }
 
@@ -43,13 +43,13 @@ function fixedGranularity(
 
 describe('classifySqlDiffIssue keys on subject granularity', () => {
   it('not-found is declaredMissing for every granularity', () => {
-    expect(classifySqlDiffIssue(issueOf('create', table), fixedGranularity('entity'))).toBe(
+    expect(classifySqlDiffIssue(issueOf('not-found', table), fixedGranularity('entity'))).toBe(
       'declaredMissing',
     );
-    expect(classifySqlDiffIssue(issueOf('create', index), fixedGranularity('auxiliary'))).toBe(
+    expect(classifySqlDiffIssue(issueOf('not-found', index), fixedGranularity('auxiliary'))).toBe(
       'declaredMissing',
     );
-    expect(classifySqlDiffIssue(issueOf('create', table), fixedGranularity('namespace'))).toBe(
+    expect(classifySqlDiffIssue(issueOf('not-found', table), fixedGranularity('namespace'))).toBe(
       'declaredMissing',
     );
   });
@@ -61,16 +61,16 @@ describe('classifySqlDiffIssue keys on subject granularity', () => {
     ['auxiliary granularity', 'auxiliary', 'extraAuxiliary'],
     ['structural granularity', 'structural', 'extraAuxiliary'],
   ] as const)('not-expected with %s classifies as %s', (_label, granularity, category) => {
-    expect(classifySqlDiffIssue(issueOf('drop', table), fixedGranularity(granularity))).toBe(
-      category,
-    );
+    expect(
+      classifySqlDiffIssue(issueOf('not-expected', table), fixedGranularity(granularity)),
+    ).toBe(category);
   });
 
   it('not-equal on a check node is valueDrift; on any other node declaredIncompatible', () => {
-    expect(classifySqlDiffIssue(issueOf('alter', check), fixedGranularity('auxiliary'))).toBe(
+    expect(classifySqlDiffIssue(issueOf('not-equal', check), fixedGranularity('auxiliary'))).toBe(
       'valueDrift',
     );
-    expect(classifySqlDiffIssue(issueOf('alter', column), fixedGranularity('field'))).toBe(
+    expect(classifySqlDiffIssue(issueOf('not-equal', column), fixedGranularity('field'))).toBe(
       'declaredIncompatible',
     );
   });
@@ -79,7 +79,7 @@ describe('classifySqlDiffIssue keys on subject granularity', () => {
 describe('strict gating keys on subject granularity', () => {
   function verdictFor(granularity: DiffSubjectGranularity, strict: boolean) {
     return computeSqlDiffVerdict({
-      issues: [issueOf('drop', table)],
+      issues: [issueOf('not-expected', table)],
       resolveControlPolicy: () => undefined,
       strict,
       defaultControlPolicy: undefined,

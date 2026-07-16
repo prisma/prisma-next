@@ -25,7 +25,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
-import { issueChange, orderIssuesByDependencies } from '@prisma-next/framework-components/control';
+import { issueOutcome, orderIssuesByDependencies } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
@@ -396,7 +396,7 @@ export function coalesceSubtreeIssues<TNode extends DiffableNode = DiffableNode>
   issues: readonly SchemaDiffIssue<TNode>[],
 ): readonly SchemaDiffIssue<TNode>[] {
   const collapsingPaths = issues
-    .filter((issue) => issueChange(issue) !== 'alter')
+    .filter((issue) => issueOutcome(issue) !== 'not-equal')
     .map((issue) => issue.path);
   if (collapsingPaths.length === 0) return issues;
   return issues.filter(
@@ -560,14 +560,14 @@ function mapNativeEnumNodeIssue(
     );
   }
   const schemaName = emissionSchemaName(ctx, ddlSchemaName);
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     const expected = blindCast<
       PostgresNativeEnumSchemaNode,
       'a not-found native-enum issue always carries the expected PostgresNativeEnumSchemaNode'
     >(issue.expected);
     return ok([new CreateNativeEnumTypeCall(schemaName, expected.typeName, expected.members)]);
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     const actual = blindCast<
       PostgresNativeEnumSchemaNode,
       'a not-expected native-enum issue always carries the actual PostgresNativeEnumSchemaNode'
@@ -613,14 +613,14 @@ function mapTableNodeIssue(
   ddlSchemaName: string,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     const table = blindCast<
       PostgresTableSchemaNode,
       'a not-found table issue always carries the expected PostgresTableSchemaNode'
     >(issue.expected);
     return ok(buildCreateTableCallsFromNode(schemaName, ddlSchemaName, table, codecHooks));
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     const table = blindCast<
       PostgresTableSchemaNode,
       'a not-expected table issue always carries the actual PostgresTableSchemaNode'
@@ -662,7 +662,7 @@ function mapColumnNodeIssue(
   tableName: string,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     const column = blindCast<
       SqlColumnIR,
       'a not-found column issue always carries the expected column node'
@@ -671,7 +671,7 @@ function mapColumnNodeIssue(
       new AddColumnCall(schemaName, tableName, renderColumnDdl(column.name, column, codecHooks)),
     ]);
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     const column = blindCast<
       SqlColumnIR,
       'a not-expected column issue always carries the actual column node'
@@ -714,7 +714,7 @@ function mapColumnDefaultNodeIssue(
   tableName: string,
   columnName: string,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     return ok([new DropDefaultCall(schemaName, tableName, columnName)]);
   }
   // not-found (SET DEFAULT, additive) or not-equal (SET DEFAULT, widening).
@@ -731,7 +731,7 @@ function mapColumnDefaultNodeIssue(
       tableName,
       columnName,
       defaultSql,
-      issueChange(issue) === 'alter' ? 'widening' : 'additive',
+      issueOutcome(issue) === 'not-equal' ? 'widening' : 'additive',
     ),
   ]);
 }
@@ -741,7 +741,7 @@ function mapPrimaryKeyNodeIssue(
   schemaName: string,
   tableName: string,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     const pk = blindCast<
       { readonly columns: readonly string[]; readonly name?: string },
       'a not-found primary-key issue always carries the expected PrimaryKey node'
@@ -749,7 +749,7 @@ function mapPrimaryKeyNodeIssue(
     const constraintName = pk.name ?? `${tableName}_pkey`;
     return ok([new AddPrimaryKeyCall(schemaName, tableName, constraintName, [...pk.columns])]);
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     const pk = blindCast<
       { readonly name?: string },
       'a not-expected primary-key issue always carries the actual PrimaryKey node'
@@ -766,14 +766,14 @@ function mapForeignKeyNodeIssue(
   schemaName: string,
   tableName: string,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     const fk = blindCast<
       SqlForeignKeyIR,
       'a not-found foreign-key issue always carries the expected foreign-key node'
     >(issue.expected);
     return ok([new AddForeignKeyCall(schemaName, tableName, fkSpecFromNode(fk, tableName))]);
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     const fk = blindCast<
       SqlForeignKeyIR,
       'a not-expected foreign-key issue always carries the actual foreign-key node'
@@ -789,7 +789,7 @@ function mapUniqueNodeIssue(
   schemaName: string,
   tableName: string,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     const unique = blindCast<
       SqlUniqueIR,
       'a not-found unique issue always carries the expected unique node'
@@ -797,7 +797,7 @@ function mapUniqueNodeIssue(
     const name = unique.name ?? `${tableName}_${unique.columns.join('_')}_key`;
     return ok([new AddUniqueCall(schemaName, tableName, name, [...unique.columns])]);
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     const unique = blindCast<
       SqlUniqueIR,
       'a not-expected unique issue always carries the actual unique node'
@@ -813,7 +813,7 @@ function mapIndexNodeIssue(
   schemaName: string,
   tableName: string,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     const index = blindCast<
       SqlIndexIR,
       'a not-found index issue always carries the expected index node'
@@ -824,7 +824,7 @@ function mapIndexNodeIssue(
     if (index.options !== undefined) extras.options = index.options;
     return ok([new CreateIndexCall(schemaName, tableName, indexName, [...index.columns], extras)]);
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     const index = blindCast<
       SqlIndexIR,
       'a not-expected index issue always carries the actual index node'
@@ -844,7 +844,7 @@ function mapCheckNodeIssue(
   // the default mapper handles directly; check_missing / check_mismatch are
   // consumed by `checkConstraintPlanCallStrategy` (drop+recreate), so reaching
   // here for them means the strategy did not run — a conflict.
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     const check = blindCast<
       { readonly name: string },
       'a not-expected check issue always carries the actual check node'
@@ -861,7 +861,7 @@ function mapCheckNodeIssue(
 
 /**
  * Maps one node-typed diff issue to its migration call(s), dispatching on the
- * node's `nodeKind` and the issue's presence-derived `issueChange`, reading
+ * node's `nodeKind` and the issue's presence-derived `issueOutcome`, reading
  * nodes and resolving column DDL from `codecRef` via `column-ddl-rendering.ts`.
  */
 export function mapNodeIssueToCall(
@@ -878,7 +878,7 @@ export function mapNodeIssueToCall(
     );
   }
   if (node.nodeKind === PostgresSchemaNodeKind.namespace) {
-    if (issueChange(issue) !== 'create') {
+    if (issueOutcome(issue) !== 'not-found') {
       return notOk(
         nodeConflict('unsupportedOperation', `Unexpected namespace drift: ${issue.path.join('/')}`),
       );

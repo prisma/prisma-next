@@ -1,5 +1,5 @@
 import { type ControlPolicy, effectiveControlPolicy } from '@prisma-next/contract/types';
-import { issueChange } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MongoCollection, type MongoContract } from '@prisma-next/mongo-contract';
 import {
@@ -88,7 +88,7 @@ describe('verifyMongoSchema control policy', () => {
     expect(result.schema.issues.length).toBeGreaterThan(0);
     expect(
       result.schema.issues.some(
-        (i) => issueChange(i) === 'drop' && i.path[1]?.startsWith('index:'),
+        (i) => issueOutcome(i) === 'not-expected' && i.path[1]?.startsWith('index:'),
       ),
     ).toBe(true);
   });
@@ -117,9 +117,9 @@ describe('verifyMongoSchema control policy', () => {
       frameworkComponents: [],
     });
     expect(result.ok).toBe(true);
-    expect(result.schema.issues.some((i) => issueChange(i) === 'drop' && i.path.length === 1)).toBe(
-      false,
-    );
+    expect(
+      result.schema.issues.some((i) => issueOutcome(i) === 'not-expected' && i.path.length === 1),
+    ).toBe(false);
   });
 
   it('softens a non-strict extra index to warn for tolerated and observed alike', () => {
@@ -174,7 +174,7 @@ describe('verifyMongoSchema control policy', () => {
     expect(result.ok).toBe(true);
     expect(
       result.schema.issues.some(
-        (i) => issueChange(i) === 'drop' && i.path[1]?.startsWith('index:'),
+        (i) => issueOutcome(i) === 'not-expected' && i.path[1]?.startsWith('index:'),
       ),
     ).toBe(false);
   });

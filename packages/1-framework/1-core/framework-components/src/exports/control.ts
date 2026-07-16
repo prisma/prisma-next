@@ -105,11 +105,11 @@ export {
 export { orderIssuesByDependencies } from '../control/order-issues-by-dependencies';
 export type {
   DiffableNode,
-  SchemaChangeKind,
+  ExpectationFailureReason,
   SchemaDiffIssue,
   SchemaNodeRef,
 } from '../control/schema-diff';
-export { diffSchemas, issueChange, SchemaDiff } from '../control/schema-diff';
+export { diffSchemas, issueOutcome, SchemaDiff } from '../control/schema-diff';
 export type {
   SchemaVerifier,
   SchemaVerifyOptions,

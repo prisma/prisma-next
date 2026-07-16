@@ -4,7 +4,7 @@ import type {
   VerifierIssueCategory,
   VerifierOutcome,
 } from '@prisma-next/framework-components/control';
-import { dispositionForCategory, issueChange } from '@prisma-next/framework-components/control';
+import { dispositionForCategory, issueOutcome } from '@prisma-next/framework-components/control';
 
 /**
  * Classifies a Mongo schema-diff issue into the target-neutral categories the
@@ -17,10 +17,10 @@ import { dispositionForCategory, issueChange } from '@prisma-next/framework-comp
  * grading.
  */
 export function classifyMongoDiffIssue(issue: SchemaDiffIssue): VerifierIssueCategory {
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     return 'declaredMissing';
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     return issue.path.length <= 1 ? 'extraTopLevelObject' : 'extraAuxiliary';
   }
   return 'declaredIncompatible';

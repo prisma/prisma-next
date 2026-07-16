@@ -5,7 +5,7 @@ import type {
   SuppressionRecord,
 } from '@prisma-next/family-sql/control';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
-import { issueChange } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { entityAt, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -253,7 +253,7 @@ const POSTGRES_NODE_CREATION_FACTORY: Readonly<Record<string, string>> = Object.
  * it is not admitted as creation-class here.
  */
 function isEnablementCreationIssue(issue: SchemaDiffIssue<SqlSchemaDiffNode>): boolean {
-  if (issueChange(issue) !== 'alter') return false;
+  if (issueOutcome(issue) !== 'not-equal') return false;
   const { expected, actual } = issue;
   return (
     expected !== undefined &&
@@ -271,7 +271,7 @@ export function resolvePostgresNodeIssueCreationFactoryName(
   if (isEnablementCreationIssue(issue)) {
     return 'enableRowLevelSecurity';
   }
-  if (issueChange(issue) !== 'create') return undefined;
+  if (issueOutcome(issue) !== 'not-found') return undefined;
   const node = issue.expected ?? issue.actual;
   if (node === undefined) return undefined;
   return POSTGRES_NODE_CREATION_FACTORY[node.nodeKind];
@@ -299,7 +299,7 @@ export function resolvePostgresNodeIssueControlPolicySubject(
     >(node);
     return {
       namespaceId: resolveNamespaceIdForDdlSchema(contract, namespaceNode.schemaName),
-      createsNewObject: issueChange(issue) === 'create',
+      createsNewObject: issueOutcome(issue) === 'not-found',
     };
   }
 

@@ -21,7 +21,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
-import { issueChange, orderIssuesByDependencies } from '@prisma-next/framework-components/control';
+import { issueOutcome, orderIssuesByDependencies } from '@prisma-next/framework-components/control';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import {
   RelationalSchemaNodeKind,
@@ -82,7 +82,9 @@ export function coalesceSubtreeIssues(
   issues: readonly SchemaDiffIssue[],
 ): readonly SchemaDiffIssue[] {
   const collapsingPaths = issues
-    .filter((issue) => issueChange(issue) === 'create' || issueChange(issue) === 'drop')
+    .filter(
+      (issue) => issueOutcome(issue) === 'not-found' || issueOutcome(issue) === 'not-expected',
+    )
     .map((issue) => issue.path);
   if (collapsingPaths.length === 0) return issues;
   return issues.filter(
@@ -229,14 +231,14 @@ function buildCreateTableCalls(table: SqlTableIR): SqliteOpFactoryCall[] {
 function mapTableIssue(
   issue: SchemaDiffIssue,
 ): Result<readonly SqliteOpFactoryCall[], SqlPlannerConflict> {
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     const table = blindCast<
       SqlTableIR,
       'a not-found table issue always carries the expected table node'
     >(issue.expected);
     return ok(buildCreateTableCalls(table));
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     const table = blindCast<
       SqlTableIR,
       'a not-expected table issue always carries the actual table node'
@@ -265,7 +267,7 @@ function mapColumnIssue(
       ),
     );
   }
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     const column = blindCast<
       SqlColumnIR,
       'a not-found column issue always carries the expected column node'
@@ -278,7 +280,7 @@ function mapColumnIssue(
     const inline = table !== undefined && isInlineAutoincrementPrimaryKeyNode(table, column);
     return ok([new AddColumnCall(tableName, columnSpecFromNode(column, inline))]);
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     const column = blindCast<
       SqlColumnIR,
       'a not-expected column issue always carries the actual column node'
@@ -312,7 +314,7 @@ function mapIndexIssue(
       ),
     );
   }
-  if (issueChange(issue) === 'create') {
+  if (issueOutcome(issue) === 'not-found') {
     const index = blindCast<
       SqlIndexIR,
       'a not-found index issue always carries the expected index node'
@@ -320,7 +322,7 @@ function mapIndexIssue(
     const indexName = index.name ?? defaultIndexName(tableName, index.columns);
     return ok([new CreateIndexCall(tableName, indexName, index.columns)]);
   }
-  if (issueChange(issue) === 'drop') {
+  if (issueOutcome(issue) === 'not-expected') {
     const index = blindCast<
       SqlIndexIR,
       'a not-expected index issue always carries the actual index node'

@@ -15,7 +15,7 @@ import {
   profileHash,
 } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import { APP_SPACE_ID, issueChange } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, issueOutcome } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { PostgresRole, PostgresSchema } from '@prisma-next/target-postgres/types';
@@ -172,7 +172,7 @@ describe.sequential('roles enter verify — existence-only, asymmetric', () => {
       });
       expect(result.ok).toBe(false);
       const roleFailure = result.schema.issues.find(
-        (i) => issueChange(i) === 'create' && i.path.includes('app_role'),
+        (i) => issueOutcome(i) === 'not-found' && i.path.includes('app_role'),
       );
       expect(roleFailure).toBeDefined();
     }
