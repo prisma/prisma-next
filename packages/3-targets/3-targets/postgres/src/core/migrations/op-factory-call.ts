@@ -45,7 +45,7 @@ import {
   tableExistsAst,
 } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
-import type { PostgresRlsPolicy } from '../postgres-rls-policy';
+import type { PostgresRlsPolicy, PostgresRlsPolicyInput } from '../postgres-rls-policy';
 import {
   escapeLiteral,
   quoteIdentifier,
@@ -1585,7 +1585,7 @@ export class CreatePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
 
   renderTypeScript(): string {
     const p = this.policy;
-    const input = {
+    const input: PostgresRlsPolicyInput = {
       name: p.name,
       prefix: p.prefix,
       tableName: p.tableName,

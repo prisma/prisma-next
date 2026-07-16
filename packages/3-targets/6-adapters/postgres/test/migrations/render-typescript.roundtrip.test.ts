@@ -183,6 +183,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
           operation: 'select',
           roles: ['authenticated'],
           using: '(id = auth.uid())',
+          withCheck: '(id = auth.uid())',
           permissive: true,
         }),
       ),
