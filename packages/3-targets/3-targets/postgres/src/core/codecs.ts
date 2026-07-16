@@ -45,6 +45,10 @@ import { type as arktype } from 'arktype';
 import {
   pgByteaDecodeJson,
   pgByteaEncodeJson,
+  pgDateDecode,
+  pgDateDecodeJson,
+  pgDateEncode,
+  pgDateEncodeJson,
   pgIntervalDecode,
   pgJsonbDecode,
   pgJsonbEncode,
@@ -64,6 +68,7 @@ import {
   PG_BOOL_CODEC_ID,
   PG_BYTEA_CODEC_ID,
   PG_CHAR_CODEC_ID,
+  PG_DATE_CODEC_ID,
   PG_ENUM_CODEC_ID,
   PG_FLOAT_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
@@ -92,14 +97,14 @@ import { PostgresNativeEnum } from './postgres-native-enum';
 
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
-type NumericParams = { readonly precision: number; readonly scale?: number };
+type NumericParams = { readonly precision?: number; readonly scale?: number };
 
 const lengthParamsSchema = arktype({
   'length?': 'number.integer > 0',
 }) satisfies StandardSchemaV1<LengthParams>;
 
 const numericParamsSchema = arktype({
-  precision: 'number.integer > 0 & number.integer <= 1000',
+  'precision?': 'number.integer > 0 & number.integer <= 1000',
   'scale?': 'number.integer >= 0',
 }) satisfies StandardSchemaV1<NumericParams>;
 
@@ -115,6 +120,7 @@ const PG_INT8_META = { db: { sql: { postgres: { nativeType: 'bigint' } } } } as 
 const PG_FLOAT4_META = { db: { sql: { postgres: { nativeType: 'real' } } } } as const;
 const PG_FLOAT8_META = { db: { sql: { postgres: { nativeType: 'double precision' } } } } as const;
 const PG_NUMERIC_META = { db: { sql: { postgres: { nativeType: 'numeric' } } } } as const;
+const PG_DATE_META = { db: { sql: { postgres: { nativeType: 'date' } } } } as const;
 const PG_TIMESTAMP_META = {
   db: { sql: { postgres: { nativeType: 'timestamp without time zone' } } },
 } as const;
@@ -648,11 +654,56 @@ export class PgNumericDescriptor extends CodecDescriptorImpl<NumericParams> {
 
 export const pgNumericDescriptor = new PgNumericDescriptor();
 
-export const pgNumericColumn = (params: NumericParams) =>
+export const pgNumericColumn = (params: NumericParams = {}) =>
   column(pgNumericDescriptor.factory(params), pgNumericDescriptor.codecId, params, 'numeric');
 
 pgNumericColumn satisfies ColumnHelperFor<PgNumericDescriptor>;
 pgNumericColumn satisfies ColumnHelperForStrict<PgNumericDescriptor>;
+
+/**
+ * A Postgres `date` has no time-of-day or timezone component. This codec
+ * canonicalizes its JS-level value as a `Date` at UTC midnight, so its
+ * round-trip is independent of the process's local timezone — see
+ * `pgDateEncode`/`pgDateDecode` in `codec-helpers.ts`.
+ */
+export class PgDateCodec extends CodecImpl<
+  typeof PG_DATE_CODEC_ID,
+  readonly ['equality', 'order'],
+  Date | string,
+  Date
+> {
+  async encode(value: Date, _ctx: CodecCallContext): Promise<string> {
+    return pgDateEncode(value);
+  }
+  async decode(wire: Date, _ctx: CodecCallContext): Promise<Date> {
+    return pgDateDecode(wire);
+  }
+  encodeJson(value: Date): JsonValue {
+    return pgDateEncodeJson(value);
+  }
+  decodeJson(json: JsonValue): Date {
+    return pgDateDecodeJson(json);
+  }
+}
+
+export class PgDateDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_DATE_CODEC_ID;
+  override readonly traits = ['equality', 'order'] as const;
+  override readonly targetTypes = ['date'] as const;
+  override readonly meta = PG_DATE_META;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => PgDateCodec {
+    return () => new PgDateCodec(this);
+  }
+}
+
+export const pgDateDescriptor = new PgDateDescriptor();
+
+export const pgDateColumn = () =>
+  column(pgDateDescriptor.factory(), pgDateDescriptor.codecId, undefined, 'date');
+
+pgDateColumn satisfies ColumnHelperFor<PgDateDescriptor>;
+pgDateColumn satisfies ColumnHelperForStrict<PgDateDescriptor>;
 
 export class PgTimestampCodec extends CodecImpl<
   typeof PG_TIMESTAMP_CODEC_ID,
@@ -1285,6 +1336,7 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgNumericDescriptor,
+  pgDateDescriptor,
   pgTimestampDescriptor,
   pgTimestamptzDescriptor,
   pgTimeDescriptor,

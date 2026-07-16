@@ -763,7 +763,7 @@ export const NATIVE_TYPE_SPECS: Readonly<Record<string, NativeTypeSpec>> = {
     codecId: 'pg/timestamptz@1',
     nativeType: 'timestamptz',
   },
-  'db.Date': { args: 'noArgs', baseType: 'DateTime', codecId: null, nativeType: 'date' },
+  'db.Date': { args: 'noArgs', baseType: 'DateTime', codecId: 'pg/date@1', nativeType: 'date' },
   'db.Time': {
     args: 'optionalPrecision',
     baseType: 'DateTime',

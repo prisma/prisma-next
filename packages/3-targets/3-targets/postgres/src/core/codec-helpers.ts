@@ -47,7 +47,7 @@ export const pgNumericDecode = (wire: string | number): string => {
 };
 
 export const pgNumericRenderOutputType = (typeParams: {
-  readonly precision: number;
+  readonly precision?: number;
   readonly scale?: number;
 }): string | undefined => {
   const precision = typeParams.precision;
@@ -102,6 +102,55 @@ export const pgTimestamptzDecodeJson = (json: JsonValue): Date => {
   const date = new Date(json);
   if (Number.isNaN(date.getTime())) {
     throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
+  }
+  return date;
+};
+
+const ISO_8601_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function formatDateOnly(year: number, month: number, day: number): string {
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * A Postgres `date` has no time-of-day or timezone component, so `pg/date@1`
+ * canonicalizes its JS-level value as a `Date` at UTC midnight
+ * (`Date.UTC(y, m, d)`), independent of the process's local timezone.
+ *
+ * `pgDateEncode` reads the calendar date via UTC getters (matching that
+ * canonical form) and formats it as `YYYY-MM-DD` directly, bypassing the pg
+ * driver's own `Date` serialization (`dateToString`), which reads *local*
+ * getters and would shift the calendar day near midnight in negative-UTC-offset
+ * environments.
+ */
+export const pgDateEncode = (value: Date): string =>
+  formatDateOnly(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+
+/**
+ * Normalizes the pg driver's already-parsed `Date` for a `date` column into
+ * the canonical UTC-midnight form. The driver (via `postgres-date`) builds
+ * that `Date` at *local* midnight from the wire text; reading it back with the
+ * same (local) getters recovers the exact calendar date the driver parsed,
+ * and reconstructing via `Date.UTC` makes the result's instant independent of
+ * the process's timezone.
+ */
+export const pgDateDecode = (wire: Date): Date =>
+  new Date(Date.UTC(wire.getFullYear(), wire.getMonth(), wire.getDate()));
+
+export const pgDateEncodeJson = (value: Date): JsonValue => pgDateEncode(value);
+
+export const pgDateDecodeJson = (json: JsonValue): Date => {
+  if (typeof json !== 'string') {
+    throw new Error(`Expected date string for pg/date@1, got ${typeof json}`);
+  }
+  const match = ISO_8601_DATE.exec(json);
+  if (!match) {
+    throw new Error(`Invalid date string for pg/date@1: ${json}`);
+  }
+  const [, yearText, monthText, dayText] = match;
+  const date = new Date(Date.UTC(Number(yearText), Number(monthText) - 1, Number(dayText)));
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid date string for pg/date@1: ${json}`);
   }
   return date;
 };

@@ -1,18 +1,20 @@
 /**
- * Infer -> Emit Round-Trip Fidelity — runtime defects (TML-3037, dispatch D1)
+ * Infer -> Emit Round-Trip Fidelity — runtime defects (TML-3037, dispatches D1/D4)
  *
  * `cli-journeys/infer-roundtrip-fidelity.e2e.test.ts` drives infer -> emit ->
  * `db verify --schema-only`, but neither `contract emit` nor `db verify`
  * builds an `ExecutionContext` — so two of the slice's eight defects never
- * surface on that path:
+ * surfaced on that path:
  *
- *  - An unbounded `numeric` column emits a valid contract, but crashes when
- *    the app builds its `ExecutionContext` (`RUNTIME.CODEC_PARAMETERIZATION_MISMATCH`).
- *  - A `date` column decodes fine on a top-level `SELECT` (`decode()` is a
- *    passthrough over an already-parsed JS `Date`), but `.include()` goes
- *    through `json_agg` -> `decodeJson()`, which rejects a bare `YYYY-MM-DD`
- *    string because `@db.Date` currently inherits `DateTime`'s
- *    `pg/timestamptz@1` codec (no `pg/date@1` exists yet).
+ *  - An unbounded `numeric` column emits a valid contract, but building an
+ *    `ExecutionContext` used to throw `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH`
+ *    (fixed by making `NumericParams.precision` optional — D4). RT.03 targets
+ *    the same base-scalar path directly with a hand-authored `Decimal` field.
+ *  - A `date` column decoded fine on a top-level `SELECT` (`decode()` was a
+ *    passthrough over an already-parsed JS `Date`), but `.include()` went
+ *    through `json_agg` -> `decodeJson()`, which rejected a bare `YYYY-MM-DD`
+ *    string because `@db.Date` inherited `DateTime`'s `pg/timestamptz@1`
+ *    codec (fixed by introducing `pg/date@1` — D4).
  *
  * Each scenario below infers + emits a real contract from a live database
  * (same CLI path the journey test uses), deserializes the emitted
@@ -20,7 +22,7 @@
  * following the shape of `rls-ts-walking-skeleton.integration.test.ts`
  * (`createDevDatabase`, a real driver, no CLI mocking) for the runtime half.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
@@ -115,6 +117,73 @@ withTempDir(({ createTempDir }) => {
     );
   });
 
+  describe('Runtime: a hand-authored bare Decimal field builds an ExecutionContext', () => {
+    let database: Awaited<ReturnType<typeof createDevDatabase>>;
+
+    beforeAll(async () => {
+      database = await createDevDatabase();
+    }, timeouts.spinUpPpgDev);
+
+    afterAll(async () => {
+      if (database) await database.close();
+    }, timeouts.spinUpPpgDev);
+
+    it(
+      'RT.03: "amount Decimal" with no @db.Numeric attribute emits cleanly and builds an ExecutionContext',
+      async () => {
+        // Hand-authored, not inferred: `control-mutation-defaults.ts` maps
+        // the bare `Decimal` scalar straight to `pg/numeric@1` with no
+        // `typeParams`, independent of any `@db.Numeric` attribute. RT.01
+        // reaches this same base-scalar path indirectly (infer prints an
+        // unbounded `numeric` column as a bare `Decimal?`); this test targets
+        // it directly so the base-scalar fix can't regress behind an
+        // infer-only test.
+        const ctx: JourneyContext = setupJourney({
+          connectionString: database.connectionString,
+          createTempDir,
+          contractMode: 'psl',
+        });
+        writeFileSync(
+          join(ctx.testDir, 'contract.prisma'),
+          [
+            '// use prisma-next',
+            '',
+            'model AmountProbe {',
+            '  id     Int     @id',
+            '  amount Decimal',
+            '',
+            '  @@map("amount_probe")',
+            '}',
+            '',
+          ].join('\n'),
+        );
+
+        const emit = await runContractEmit(ctx);
+        if (emit.exitCode !== 0) {
+          throw new Error(
+            `contract emit failed:\n${stripAnsi(emit.stderr)}\n${stripAnsi(emit.stdout)}`,
+          );
+        }
+        const contract = readEmittedContract(ctx);
+
+        let constructionError: unknown;
+        try {
+          createExecutionContext({
+            contract,
+            stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
+          });
+        } catch (error) {
+          constructionError = error;
+        }
+        expect(
+          constructionError,
+          'RT.03: createExecutionContext should accept a bare Decimal field',
+        ).toBeUndefined();
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+
   describe('Runtime: a date column decodes on select() but fails through include()', () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
 
@@ -169,13 +238,12 @@ withTempDir(({ createTempDir }) => {
               namespaceId: 'public',
             });
             const [row] = await records.select('id', 'notedOn').all();
-            // `decode()` is a passthrough over the driver's already-parsed
-            // `Date` for a `date` column — this only proves the top-level
-            // path survives; the driver's local-midnight construction makes
-            // the exact instant environment-timezone-dependent, so this
-            // checks shape, not the instant.
-            expect(row?.notedOn, 'RT.02: top-level select decodes a plain date').toBeInstanceOf(
-              Date,
+            // `pg/date@1`'s decode() normalizes the driver's local-midnight
+            // `Date` (built by postgres-date's OID 1082 parser) into the
+            // equivalent UTC-midnight instant, so the round-trip no longer
+            // depends on the process's timezone — assert the exact value.
+            expect(row?.notedOn, 'RT.02: top-level select decodes the exact date').toEqual(
+              new Date(Date.UTC(2024, 0, 15)),
             );
 
             const owners = new Collection({ runtime, context }, 'Owner', {
