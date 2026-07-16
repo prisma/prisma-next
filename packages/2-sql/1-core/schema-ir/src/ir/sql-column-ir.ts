@@ -73,6 +73,18 @@ export interface SqlColumnIRInput {
    * end)` rendering exactly.
    */
   readonly codecNamedType?: boolean;
+  /**
+   * True when the column is a Postgres `GENERATED ... AS IDENTITY` column
+   * (either `ALWAYS` or `BY DEFAULT`) — introspection-only. A contract-derived
+   * column never sets this; the contract has no identity vocabulary, and
+   * `@default(autoincrement())` alone already conveys "the database generates
+   * this value" on that side. It exists so introspection can recognize an
+   * identity column as `autoincrement()` even though the live column reports
+   * no `column_default` at all — see {@link resolvedDefault}, which the
+   * postgres control adapter stamps from this flag rather than from a raw
+   * expression when it's set.
+   */
+  readonly identity?: boolean;
 }
 
 /**
@@ -109,6 +121,8 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
   declare readonly codecBaseNativeType?: string;
   /** See {@link SqlColumnIRInput.codecNamedType}. Non-enumerable, same reason as {@link codecRef}. */
   declare readonly codecNamedType?: boolean;
+  /** See {@link SqlColumnIRInput.identity}. */
+  declare readonly identity?: boolean;
 
   constructor(input: SqlColumnIRInput) {
     super();
@@ -120,6 +134,7 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
     if (input.many !== undefined) this.many = input.many;
     if (input.resolvedNativeType !== undefined) this.resolvedNativeType = input.resolvedNativeType;
     if (input.resolvedDefault !== undefined) this.resolvedDefault = input.resolvedDefault;
+    if (input.identity !== undefined) this.identity = input.identity;
     defineNonEnumerable(this, 'codecRef', input.codecRef);
     defineNonEnumerable(this, 'codecBaseNativeType', input.codecBaseNativeType);
     defineNonEnumerable(this, 'codecNamedType', input.codecNamedType);

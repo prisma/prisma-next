@@ -167,4 +167,51 @@ describe('SqlColumnIR', () => {
       expect(column.resolvedDefault).toEqual({ kind: 'literal', value: 'x' });
     });
   });
+
+  describe('identity', () => {
+    it('is absent by default', () => {
+      const column = new SqlColumnIR({ name: 'id', nativeType: 'int4', nullable: false });
+      expect(column.identity).toBeUndefined();
+    });
+
+    it('carries true when supplied (introspected GENERATED ... AS IDENTITY column)', () => {
+      const column = new SqlColumnIR({
+        name: 'id',
+        nativeType: 'int4',
+        nullable: false,
+        identity: true,
+      });
+      expect(column.identity).toBe(true);
+    });
+
+    it('yields a default child node from resolvedDefault alone, with no raw default', () => {
+      // An identity column has no `column_default` at all — the introspected
+      // side sets `resolvedDefault` directly (see the postgres control
+      // adapter), so `children()` must still produce a default node without
+      // a `default` (raw) field.
+      const column = new SqlColumnIR({
+        name: 'id',
+        nativeType: 'int4',
+        nullable: false,
+        identity: true,
+        resolvedDefault: { kind: 'function', expression: 'autoincrement()' },
+      });
+      expect(column.children()).toEqual([
+        new SqlColumnDefaultIR({
+          resolved: { kind: 'function', expression: 'autoincrement()' },
+        }),
+      ]);
+    });
+
+    it('does not participate in isEqualTo (own-attribute comparison)', () => {
+      const identityColumn = new SqlColumnIR({
+        name: 'id',
+        nativeType: 'int4',
+        nullable: false,
+        identity: true,
+      });
+      const plainColumn = new SqlColumnIR({ name: 'id', nativeType: 'int4', nullable: false });
+      expect(identityColumn.isEqualTo(plainColumn)).toBe(true);
+    });
+  });
 });

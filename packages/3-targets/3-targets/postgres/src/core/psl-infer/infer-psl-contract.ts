@@ -873,7 +873,15 @@ function buildScalarField(
     attributes.push(buildSimpleConstraintFieldAttribute('id', singlePkConstraintName));
   }
 
-  if (column.default !== undefined) {
+  if (column.identity) {
+    // A `GENERATED ... AS IDENTITY` column (either variant) reports no
+    // `column_default` at all, so it never reaches the raw-default path
+    // below. The contract's vocabulary already means "the database
+    // generates this value" for `autoincrement()` — the same thing both
+    // identity variants and `serial` mean — so print it directly rather
+    // than modelling the ALWAYS/BY-DEFAULT distinction.
+    attributes.push(parseDefaultAttributeString('@default(autoincrement())'));
+  } else if (column.default !== undefined) {
     const parsed = parseColumnDefault(column.default, column.nativeType, rawDefaultParser);
     if (parsed) {
       const result = mapDefault(parsed, defaultMapping);
