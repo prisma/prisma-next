@@ -86,6 +86,25 @@ const contract = new SqlContractSerializer().deserializeContract({
   domain: applicationDomainOf({ models: {} }),
 }) as PostgresContract;
 
+function jsonObjectEntries(count: number) {
+  return Array.from({ length: count }, (_, i) =>
+    JsonObjectExpr.entry(`f${i + 1}`, LiteralExpr.of(i + 1)),
+  );
+}
+
+function expectedJsonbBuildObject(count: number): string {
+  const chunks: string[] = [];
+  for (let i = 0; i < count; i += 50) {
+    const end = Math.min(i + 50, count);
+    const args: string[] = [];
+    for (let j = i; j < end; j++) {
+      args.push(`'f${j + 1}'`, `${j + 1}`);
+    }
+    chunks.push(`jsonb_build_object(${args.join(', ')})`);
+  }
+  return chunks.join(' || ');
+}
+
 describe('Postgres adapter', () => {
   const adapter = createPostgresAdapter();
 
@@ -110,7 +129,7 @@ describe('Postgres adapter', () => {
 
     const lowered = adapter.lower(ast, { contract, params: [] });
 
-    expect(lowered.sql).toContain('json_build_object');
+    expect(lowered.sql).toContain('jsonb_build_object');
     expect(lowered.sql).toContain(
       '(SELECT "post"."id" AS "id" FROM "post" WHERE "post"."userId" = "user"."id") AS "firstPostId"',
     );
@@ -571,5 +590,31 @@ describe('Postgres adapter', () => {
     ]);
     const sql = adapter.lower(ast, { contract: publicContract, params: [] }).sql;
     expect(sql).toBe('SELECT "user"."id" AS "id" FROM "public"."user"');
+  });
+
+  it('renders a single jsonb_build_object call with no || for 50 or fewer entries', () => {
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('payload', JsonObjectExpr.fromEntries(jsonObjectEntries(50))),
+    ]);
+    const sql = adapter.lower(ast, { contract, params: [] }).sql;
+    expect(sql).toBe(`SELECT ${expectedJsonbBuildObject(50)} AS "payload" FROM "user"`);
+    expect((sql.match(/jsonb_build_object\(/g) ?? []).length).toBe(1);
+    expect(sql).not.toContain('||');
+  });
+
+  it('chunks jsonb_build_object into 50-pair batches merged with || past 50 entries', () => {
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('payload', JsonObjectExpr.fromEntries(jsonObjectEntries(110))),
+    ]);
+    const sql = adapter.lower(ast, { contract, params: [] }).sql;
+    expect(sql).toBe(`SELECT ${expectedJsonbBuildObject(110)} AS "payload" FROM "user"`);
+    const calls = sql.match(/jsonb_build_object\([^)]*\)/g) ?? [];
+    expect(calls.length).toBe(3);
+    expect(sql).toContain(' || ');
+    for (const call of calls) {
+      const argCount = (call.match(/,/g) ?? []).length + 1;
+      expect(argCount % 2).toBe(0);
+      expect(argCount / 2).toBeLessThanOrEqual(50);
+    }
   });
 });

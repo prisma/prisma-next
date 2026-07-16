@@ -20,7 +20,7 @@ Provide PostgreSQL-specific adapter implementation, codecs, and capabilities. En
 
 - **Adapter Implementation**: Implement `Adapter` SPI for PostgreSQL
   - Lower SQL ASTs to PostgreSQL dialect SQL
-  - Render JSON aggregation (`json_agg`, `json_build_object`) and scalar subqueries
+  - Render JSON aggregation (`json_agg`, `jsonb_build_object`) and scalar subqueries
   - Advertise PostgreSQL capabilities (`lateral`, `jsonAgg`)
   - Normalize PostgreSQL EXPLAIN output
   - Map PostgreSQL errors to `RuntimeError` envelope
@@ -90,7 +90,7 @@ flowchart TD
 - Main adapter implementation
 - Lowers SQL ASTs to PostgreSQL SQL
 - Renders joins (INNER, LEFT, RIGHT, FULL, LATERAL) with ON conditions
-- Renders JSON aggregation (`json_agg`, `json_build_object`) and scalar subqueries
+- Renders JSON aggregation (`json_agg`, `jsonb_build_object`) and scalar subqueries
 - Renders DML operations (INSERT, UPDATE, DELETE) with RETURNING clauses
 - Advertises PostgreSQL capabilities (`lateral`, `jsonAgg`, `returning`)
 - Maps PostgreSQL errors to `RuntimeError`
@@ -209,14 +209,16 @@ See `docs/reference/capabilities.md` and `docs/architecture docs/subsystems/5. A
 
 The renderer lowers JSON-aggregation AST nodes to PostgreSQL's `json_agg`:
 
-- `json_agg(json_build_object(...))` aggregates a row set into a JSON array of objects
+- `json_agg(jsonb_build_object(...))` aggregates a row set into a JSON array of objects
 - A scalar subquery (`SubqueryExpr`) in the SELECT list correlates against the outer row through its WHERE clause
 - When the subquery carries an inner `ORDER BY` and `LIMIT`, its rows are wrapped in an inner SELECT, then aggregated with `json_agg(row_to_json(sub.*))`
+
+PostgreSQL caps function arguments at 100, so `jsonb_build_object` is emitted in chunks of at most 50 key/value pairs per call (100 arguments) and the per-chunk objects are merged with the JSONB `||` concatenation operator. For 50 or fewer pairs a single `jsonb_build_object(...)` call is emitted with no `||`. JSONB (not plain `json`) is required because `||` concatenation is only defined on `jsonb`.
 
 **Example SQL Output:**
 ```sql
 SELECT "user"."id" AS "id", (
-  SELECT json_agg(json_build_object('id', "post"."id", 'title', "post"."title")) AS "posts"
+  SELECT json_agg(jsonb_build_object('id', "post"."id", 'title', "post"."title")) AS "posts"
   FROM "post"
   WHERE "user"."id" = "post"."userId"
 ) AS "posts"
