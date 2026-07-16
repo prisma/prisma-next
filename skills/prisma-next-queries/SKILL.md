@@ -76,8 +76,14 @@ const users = await db.orm.User.select('id', 'email').all();
 You do **not** need a `collect()` / `toArray()` helper — `await` is enough. Internally `await` invokes the result's `then(...)`, which buffers the rows into an array. Two equivalent alternatives exist for the cases where they read better:
 
 ```typescript
-// Explicit buffering — same outcome as `await ... .all()`, useful when you
-// want a named Promise<Row[]> to thread through downstream code.
+// `.toArray()` returns a genuine `Promise<Row[]>`. Reach for it only when
+// something needs a real `Promise` and not merely a thenable: a slot typed
+// `Promise<Row[]>` (an `AsyncIterableResult` has only `then`, not `catch` /
+// `finally`, so it does not satisfy that annotation), or a runtime
+// `instanceof Promise` check. Note that `await` and the `Promise.all` /
+// `Promise.race` combinators all accept the thenable directly — those are
+// NOT reasons to call `.toArray()`. Whenever you are just going to await it
+// here, use `await ...all()` and skip `.toArray()`.
 const rows: Promise<User[]> = db.orm.User.select('id', 'email').all().toArray();
 
 // Streaming — process rows one at a time without buffering the whole result.
