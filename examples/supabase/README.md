@@ -36,7 +36,7 @@ Two lanes:
 pnpm test
 ```
 
-Runs on PGlite (real Postgres in WASM) seeded by `bootstrapSupabaseShim`, which restores the Supabase reference fixture (schemas, tables, roles) and layers the grants + `auth.uid()`-style functions the RLS tests need. This lane covers the FK, RLS enforcement, the verifier, and namespace queries.
+Runs on PGlite (real Postgres in WASM) seeded by `restoreSupabaseReference` (the extension's internal test substrate), which restores the Supabase reference fixture — schemas, tables, roles, and the platform's real default privileges — so grants behave as on a fresh `supabase db reset`. This lane covers the FK, RLS enforcement, the verifier, and namespace queries.
 
 **Real-Supabase acceptance (manual — the launch ground truth):**
 
