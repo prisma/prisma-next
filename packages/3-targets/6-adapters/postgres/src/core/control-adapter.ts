@@ -897,6 +897,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
              SELECT 1
              FROM pg_catalog.pg_constraint con
              WHERE con.conindid = ic.oid
+               AND con.contype IN ('p', 'u', 'x')
            )
          ORDER BY i.tablename, i.indexname, k.ord`,
       [schema],
