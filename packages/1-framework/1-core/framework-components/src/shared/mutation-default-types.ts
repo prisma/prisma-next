@@ -28,6 +28,14 @@ export interface DefaultFunctionLoweringContext {
   readonly modelName: string;
   readonly fieldName: string;
   readonly columnCodecId?: string;
+  /**
+   * The field's resolved native type, with a trailing `[]` when the field
+   * is a list column. Matches the `resolvedNativeType` format the target's
+   * introspection normalizer receives, so a `lower` implementation can
+   * reuse that same normalizer to resolve a raw default expression instead
+   * of keeping it as opaque text.
+   */
+  readonly nativeType?: string;
 }
 
 export type LoweredDefaultValue =

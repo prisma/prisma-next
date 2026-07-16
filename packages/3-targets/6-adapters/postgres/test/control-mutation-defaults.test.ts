@@ -1,3 +1,4 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import {
   createPostgresDefaultFunctionRegistry,
@@ -144,6 +145,155 @@ describe('createPostgresDefaultFunctionRegistry', () => {
       context: stubContext,
     });
     expect(result).toMatchObject({ ok: false });
+  });
+
+  describe('dbgenerated resolves literal SQL text to a literal default', () => {
+    const handler = createPostgresDefaultFunctionRegistry().get('dbgenerated')!;
+
+    function lower(expression: string, nativeType?: string) {
+      return handler.lower({
+        call: makeCall('dbgenerated', { expression }),
+        context: { ...stubContext, ...ifDefined('nativeType', nativeType) },
+      });
+    }
+
+    it('resolves an empty jsonb literal to a literal object', () => {
+      const result = lower("'{}'::jsonb", 'jsonb');
+      expect(result).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'literal', value: {} } },
+      });
+    });
+
+    it('resolves a populated jsonb literal to a parsed literal object', () => {
+      const result = lower(`'{"a":1}'::jsonb`, 'jsonb');
+      expect(result).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'literal', value: { a: 1 } } },
+      });
+    });
+
+    it('resolves an empty text[] literal to a literal empty array', () => {
+      const result = lower("'{}'::text[]", 'text[]');
+      expect(result).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'literal', value: [] } },
+      });
+    });
+
+    it('resolves a populated integer[] literal to a literal array of numbers', () => {
+      const result = lower("'{1,2,3}'::integer[]", 'int4[]');
+      expect(result).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'literal', value: [1, 2, 3] } },
+      });
+    });
+
+    it('resolves NULL to a literal null', () => {
+      const result = lower('NULL');
+      expect(result).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'literal', value: null } },
+      });
+    });
+
+    it('resolves true/false to literal booleans', () => {
+      expect(lower('true')).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'literal', value: true } },
+      });
+      expect(lower('false')).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'literal', value: false } },
+      });
+    });
+
+    it('resolves a bare numeric literal to a literal number', () => {
+      expect(lower('42')).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'literal', value: 42 } },
+      });
+      expect(lower('3.14')).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'literal', value: 3.14 } },
+      });
+    });
+
+    it('resolves a plain quoted string to a literal string', () => {
+      const result = lower("'hello'", 'text');
+      expect(result).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'literal', value: 'hello' } },
+      });
+    });
+
+    it('keeps an out-of-safe-range bigint literal as its raw text, not a lossy number', () => {
+      const result = lower("'99999999999999999'::int8", 'int8');
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          kind: 'storage',
+          defaultValue: { kind: 'literal', value: '99999999999999999' },
+        },
+      });
+    });
+  });
+
+  describe('dbgenerated keeps genuine functions as functions (F13: guard against over-reach)', () => {
+    const handler = createPostgresDefaultFunctionRegistry().get('dbgenerated')!;
+
+    function lower(expression: string, nativeType?: string) {
+      return handler.lower({
+        call: makeCall('dbgenerated', { expression }),
+        context: { ...stubContext, ...ifDefined('nativeType', nativeType) },
+      });
+    }
+
+    it('keeps gen_random_uuid() a function', () => {
+      const result = lower('gen_random_uuid()');
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          kind: 'storage',
+          defaultValue: { kind: 'function', expression: 'gen_random_uuid()' },
+        },
+      });
+    });
+
+    it('keeps a now()-plus-interval expression a function, unchanged', () => {
+      const expression = "(now() + '00:03:00'::interval)";
+      const result = lower(expression, 'timestamptz');
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          kind: 'storage',
+          defaultValue: { kind: 'function', expression },
+        },
+      });
+    });
+
+    it('keeps nextval(...) a function (normalized to autoincrement(), not demoted to a literal)', () => {
+      const result = lower("nextval('seq'::regclass)", 'int4');
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          kind: 'storage',
+          defaultValue: { kind: 'function', expression: 'autoincrement()' },
+        },
+      });
+    });
+
+    it('keeps an enum-cast literal a function (unqualified cast type defeats the string-literal pattern)', () => {
+      const expression = "'confidential'::auth.oauth_client_type";
+      const result = lower(expression, 'oauth_client_type');
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          kind: 'storage',
+          defaultValue: { kind: 'function', expression },
+        },
+      });
+    });
   });
 
   it('lowers uuid(4) explicitly to uuidv4 execution generator', () => {

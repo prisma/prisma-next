@@ -924,6 +924,9 @@ export function lowerDefaultForField(input: {
         modelName: input.modelName,
         fieldName: input.fieldName,
         columnCodecId: input.columnDescriptor.codecId,
+        nativeType: input.isList
+          ? `${input.columnDescriptor.nativeType}[]`
+          : input.columnDescriptor.nativeType,
       },
     });
 

@@ -13,6 +13,7 @@ import {
 } from '@prisma-next/ids';
 import type { FuncCallSig } from '@prisma-next/psl-parser';
 import { int, num, oneOf, optional, str } from '@prisma-next/psl-parser';
+import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;
@@ -106,11 +107,21 @@ function lowerDbgenerated(input: {
       message: 'Default function "dbgenerated" argument cannot be empty.',
     });
   }
+  // Resolve the raw SQL text through the same normalizer introspection uses,
+  // so a `dbgenerated(...)` default that is actually a literal (e.g.
+  // `'{}'::jsonb`) is recognized as one here too. Without this, the two
+  // sides disagree on `kind` and `resolvedDefaultsEqual` reports drift
+  // forever even when the database matches the contract exactly. Anything
+  // the normalizer doesn't recognize as a literal falls through to its own
+  // `kind: 'function'` fallback, which preserves the raw expression text.
   return {
     ok: true,
     value: {
       kind: 'storage',
-      defaultValue: { kind: 'function', expression },
+      defaultValue: parsePostgresDefault(expression, input.context.nativeType) ?? {
+        kind: 'function',
+        expression,
+      },
     },
   };
 }
