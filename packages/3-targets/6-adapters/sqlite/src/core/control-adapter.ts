@@ -3,7 +3,7 @@ import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, type SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
@@ -30,7 +30,11 @@ import type {
   SqlReferentialAction,
   SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
-import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import {
+  RelationalSchemaNodeKind,
+  SqlSchemaIR,
+  SqlTableIR,
+} from '@prisma-next/sql-schema-ir/types';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -549,7 +553,15 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
 
       pkColumns.sort((a, b) => a.pk - b.pk);
       const primaryKey: PrimaryKeyInput | undefined =
-        pkColumns.length > 0 ? { columns: pkColumns.map((c) => c.name) } : undefined;
+        pkColumns.length > 0
+          ? {
+              columns: pkColumns.map((c) => c.name),
+              dependsOn: flatColumnDependsOn(
+                tableName,
+                pkColumns.map((c) => c.name),
+              ),
+            }
+          : undefined;
 
       const fkMap = new Map<number, FkAccumulator>();
       for (const fk of fkResult.rows) {
@@ -573,6 +585,10 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         referencedColumns: Object.freeze([...fk.referencedColumns]) as readonly string[],
         ...ifDefined('onDelete', mapSqliteReferentialAction(fk.onDelete)),
         ...ifDefined('onUpdate', mapSqliteReferentialAction(fk.onUpdate)),
+        dependsOn: [
+          flatTableDependsOn(fk.referencedTable),
+          ...flatColumnDependsOn(tableName, fk.columns),
+        ],
       }));
 
       const uniques: SqlUniqueIRInput[] = [];
@@ -590,12 +606,14 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
           uniques.push({
             columns: Object.freeze([...idxColumns]) as readonly string[],
             name: idx.name,
+            dependsOn: flatColumnDependsOn(tableName, idxColumns),
           });
         } else if (idx.origin === 'c') {
           indexes.push({
             columns: Object.freeze([...idxColumns]) as readonly string[],
             name: idx.name,
             unique: idx.unique === 1,
+            dependsOn: flatColumnDependsOn(tableName, idxColumns),
           });
         }
         // Skip 'pk' origin — already captured in primaryKey
@@ -643,6 +661,32 @@ function mapSqliteReferentialAction(rule: string): SqlReferentialAction | undefi
   }
   if (mapped === 'noAction') return undefined;
   return mapped;
+}
+
+/**
+ * The referenced table's chain in the flat (single-schema) tree this
+ * introspection builds: the root (`SqlSchemaIR`, fixed `'database'` id)
+ * followed by the table's own id. Mirrors the expected-side derivation
+ * (`contractToSchemaIR`'s `convertForeignKey`).
+ */
+function flatTableDependsOn(tableName: string): SchemaNodeRef {
+  return [
+    { nodeKind: RelationalSchemaNodeKind.schema, id: 'database' },
+    { nodeKind: RelationalSchemaNodeKind.table, id: tableName },
+  ];
+}
+
+/**
+ * The chains from a table-child object (foreign key, index, unique, primary
+ * key) to each of the own columns it is built on — the introspection-side
+ * mirror of `contractToSchemaIR`'s `flatColumnDependsOn`. An object is dropped
+ * before the columns it covers.
+ */
+function flatColumnDependsOn(tableName: string, columns: readonly string[]): SchemaNodeRef[] {
+  return columns.map((column) => [
+    ...flatTableDependsOn(tableName),
+    { nodeKind: RelationalSchemaNodeKind.column, id: `column:${column}` },
+  ]);
 }
 
 // ---------------------------------------------------------------------------

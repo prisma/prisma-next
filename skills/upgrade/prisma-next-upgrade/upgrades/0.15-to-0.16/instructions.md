@@ -27,3 +27,15 @@ Supabase integration close-out (TML-2503): docs-only. The `examples/` touch is
 `projects/supabase-integration/` workspace removed. No framework surface,
 contract shape, or emitted artefact change. Incidental substrate diff only.
 -->
+
+<!--
+TML-3028 (dependency-graph migration ordering; SchemaDiffIssue.reason removed):
+the migration-diff internal `SchemaDiffIssue` lost its `reason` field —
+discriminate via the presence of `expected`/`actual`, or the exported
+`issueOutcome(issue): ExpectationFailureReason` helper. `ExpectationFailureReason`
+keeps its `'not-found' | 'not-expected' | 'not-equal'` values and its export path;
+it is now the helper's return type rather than the removed field's type. This is a
+framework migration-control internal, not an app-authoring surface. The
+`examples/` diff is supabase-example TEST assertions updated from `.reason` to
+presence — no runtime, contract, or DDL change. Incidental test-only diff.
+-->

@@ -13,7 +13,7 @@ function makeResult(overrides: {
 }): VerifyDatabaseSchemaResult {
   const defaultIssues: readonly SchemaDiffIssue[] = overrides.ok
     ? []
-    : [{ path: [overrides.spaceId], reason: 'not-found' }];
+    : [{ path: [overrides.spaceId] }];
   const result: VerifyDatabaseSchemaResult = {
     ok: overrides.ok,
     summary: overrides.summary,
@@ -109,10 +109,7 @@ describe('combineVerifyResults', () => {
           spaceId: 'cipher',
           ok: false,
           summary: 'Schema verification found 2 issue(s)',
-          issues: [
-            { path: ['a'], reason: 'not-found' },
-            { path: ['b'], reason: 'not-found' },
-          ],
+          issues: [{ path: ['a'] }, { path: ['b'] }],
         }),
       ],
     ]);
@@ -215,11 +212,9 @@ describe('combineVerifyResults', () => {
   it('concatenates issues from all spaces into the combined result', () => {
     const appDiffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_app_abc'],
-      reason: 'not-found',
     };
     const extDiffIssue: SchemaDiffIssue = {
       path: ['public', 'audit_log', 'policy_cipher_def'],
-      reason: 'not-expected',
     };
 
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([

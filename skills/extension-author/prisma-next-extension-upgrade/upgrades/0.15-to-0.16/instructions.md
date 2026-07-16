@@ -28,3 +28,16 @@ ADR 237 (the service_role secondary-root decision) or inlined as plain text.
 No SPI, contract shape, or emitted artefact change. Incidental substrate diff
 only.
 -->
+
+<!--
+TML-3028 (dependency-graph migration ordering; SchemaDiffIssue.reason removed):
+the migration-diff internal `SchemaDiffIssue` lost its `reason` field —
+discriminate a diff issue via the presence of `expected`/`actual`, or the
+exported `issueOutcome(issue): ExpectationFailureReason` helper from
+`@prisma-next/framework-components/control`. `ExpectationFailureReason` keeps its
+`'not-found' | 'not-expected' | 'not-equal'` values and its export path; it is now
+the helper's return type rather than the removed field's type. This is a framework migration-control
+internal, not an extension-authoring SPI. The `packages/3-extensions/` diff is
+supabase-extension TEST assertions updated from `.reason` to presence — no runtime,
+contract, SPI, or DDL change. Incidental test-only diff.
+-->

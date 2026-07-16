@@ -85,7 +85,6 @@ export function diffMongoSchemas(
         collectionControlPolicy(name),
         {
           path: [name],
-          reason: 'not-found',
           expected: expectedColl,
         },
         'fail',
@@ -100,7 +99,6 @@ export function diffMongoSchemas(
         collectionControlPolicy(name),
         {
           path: [name],
-          reason: 'not-expected',
           actual: liveColl,
         },
         strict ? 'fail' : 'warn',
@@ -164,7 +162,6 @@ function diffIndexes(
         collectionControlPolicy,
         {
           path: [collName, `index:${formatIndexName(idx)}`],
-          reason: 'not-equal',
           expected: idx,
         },
         'fail',
@@ -180,7 +177,6 @@ function diffIndexes(
         collectionControlPolicy,
         {
           path: [collName, `index:${formatIndexName(idx)}`],
-          reason: 'not-expected',
           actual: idx,
         },
         strict ? 'fail' : 'warn',
@@ -207,7 +203,6 @@ function diffValidator(
       collectionControlPolicy,
       {
         path: [collName, 'validator'],
-        reason: 'not-found',
         expected: expected.validator,
       },
       'fail',
@@ -222,7 +217,6 @@ function diffValidator(
       collectionControlPolicy,
       {
         path: [collName, 'validator'],
-        reason: 'not-expected',
         actual: live.validator,
       },
       strict ? 'fail' : 'warn',
@@ -246,7 +240,6 @@ function diffValidator(
       collectionControlPolicy,
       {
         path: [collName, 'validator'],
-        reason: 'not-equal',
         expected: expectedVal,
         actual: liveVal,
       },
@@ -273,7 +266,6 @@ function diffOptions(
       collectionControlPolicy,
       {
         path: [collName, 'options'],
-        reason: 'not-equal',
         actual: live.options,
       },
       strict ? 'fail' : 'warn',
@@ -291,7 +283,6 @@ function diffOptions(
     collectionControlPolicy,
     {
       path: [collName, 'options'],
-      reason: 'not-equal',
       ...ifDefined('expected', expected.options),
       ...ifDefined('actual', live.options),
     },

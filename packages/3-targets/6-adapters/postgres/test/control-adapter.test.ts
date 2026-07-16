@@ -693,6 +693,19 @@ describe('PostgresControlAdapter', () => {
           name: 'post_user_id_fkey',
         }),
       ]);
+      expect(tablesOf(result)['post']?.foreignKeys[0]?.dependsOn).toEqual([
+        [
+          { nodeKind: 'postgres-database', id: 'database' },
+          { nodeKind: 'postgres-namespace', id: 'public' },
+          { nodeKind: 'postgres-table', id: 'user' },
+        ],
+        [
+          { nodeKind: 'postgres-database', id: 'database' },
+          { nodeKind: 'postgres-namespace', id: 'public' },
+          { nodeKind: 'postgres-table', id: 'post' },
+          { nodeKind: 'sql-column', id: 'column:user_id' },
+        ],
+      ]);
     });
 
     it('handles multi-column foreign keys', async () => {

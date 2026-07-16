@@ -1,12 +1,28 @@
-import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import type {
+  DiffableNode,
+  ExpectationFailureReason,
+  SchemaDiffIssue,
+} from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import {
   classifyStorageTypeDiffIssue,
   verifierDisposition,
 } from '../src/core/diff/verifier-disposition';
 
-function issue(reason: SchemaDiffIssue['reason']): SchemaDiffIssue {
-  return { path: ['user_status'], reason };
+const NODE: DiffableNode = {
+  id: 'user_status',
+  nodeKind: 'sql-native-enum',
+  isEqualTo: () => true,
+  children: () => [],
+};
+
+/** Builds a storage-type diff issue whose change kind derives from presence. */
+function issue(change: ExpectationFailureReason): SchemaDiffIssue {
+  return {
+    path: ['user_status'],
+    ...(change !== 'not-expected' ? { expected: NODE } : {}),
+    ...(change !== 'not-found' ? { actual: NODE } : {}),
+  };
 }
 
 describe('classifyStorageTypeDiffIssue', () => {

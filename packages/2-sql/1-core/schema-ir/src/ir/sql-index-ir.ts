@@ -1,9 +1,9 @@
-import type { DiffableNode } from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
-import { assertNode, SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface SqlIndexIRInput {
   readonly columns: readonly string[];
@@ -12,6 +12,13 @@ export interface SqlIndexIRInput {
   readonly type?: string;
   readonly options?: Record<string, unknown>;
   readonly annotations?: SqlAnnotations;
+  /**
+   * The index's own column nodes, as root-anchored chains. The derivation
+   * stamps them so an index is dropped before the columns it is built on
+   * (Postgres auto-drops the index when a covered column goes). Never
+   * compared by `isEqualTo`.
+   */
+  readonly dependsOn?: readonly SchemaNodeRef[];
 }
 
 /**
@@ -49,6 +56,8 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   declare readonly type?: string;
   declare readonly options?: Record<string, unknown>;
   declare readonly annotations?: SqlAnnotations;
+  /** See {@link SqlIndexIRInput.dependsOn}. Non-enumerable so it stays out of JSON and structural equality, matching `SqlColumnIR.codecRef`. */
+  declare readonly dependsOn?: readonly SchemaNodeRef[];
 
   constructor(input: SqlIndexIRInput) {
     super();
@@ -58,6 +67,7 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
     if (input.type !== undefined) this.type = input.type;
     if (input.options !== undefined) this.options = input.options;
     if (input.annotations !== undefined) this.annotations = input.annotations;
+    defineNonEnumerable(this, 'dependsOn', input.dependsOn);
     freezeNode(this);
   }
 

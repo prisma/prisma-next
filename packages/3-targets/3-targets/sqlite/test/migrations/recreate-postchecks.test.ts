@@ -39,8 +39,8 @@ function tableSpec(overrides: Partial<SqliteTableSpec> = {}): SqliteTableSpec {
 describe('buildRecreateSummary', () => {
   it('joins each issue path', () => {
     const summary = buildRecreateSummary('users', [
-      issue({ path: ['database', 'users', 'column:a'], reason: 'not-equal' }),
-      issue({ path: ['database', 'users', 'column:b'], reason: 'not-equal' }),
+      issue({ path: ['database', 'users', 'column:a'] }),
+      issue({ path: ['database', 'users', 'column:b'] }),
     ]);
     expect(summary).toBe(
       'Recreates table users to apply schema changes: database/users/column:a; database/users/column:b',
@@ -54,7 +54,6 @@ describe('buildRecreatePostchecks — column-level', () => {
     const issues = [
       issue({
         path: ['database', 'users', 'column:email'],
-        reason: 'not-equal',
         expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: false }),
         actual: actualColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
       }),
@@ -70,7 +69,6 @@ describe('buildRecreatePostchecks — column-level', () => {
     const issues = [
       issue({
         path: ['database', 'users', 'column:email'],
-        reason: 'not-equal',
         expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
         actual: actualColumn({ name: 'email', nativeType: 'INTEGER', nullable: true }),
       }),
@@ -86,7 +84,6 @@ describe('buildRecreatePostchecks — column-level', () => {
     const issues = [
       issue({
         path: ['database', 'users', 'column:email'],
-        reason: 'not-equal',
         expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: false }),
         actual: actualColumn({ name: 'email', nativeType: 'INTEGER', nullable: true }),
       }),
@@ -103,7 +100,6 @@ describe('buildRecreatePostchecks — column-default', () => {
     const issues = [
       issue({
         path: ['database', 'users', 'column:email', 'default'],
-        reason: 'not-found',
         expected: columnDefault({ resolved: { kind: 'literal', value: 5 } }),
       }),
     ];
@@ -118,7 +114,6 @@ describe('buildRecreatePostchecks — column-default', () => {
     const issues = [
       issue({
         path: ['database', 'users', 'column:email', 'default'],
-        reason: 'not-expected',
         actual: columnDefault({ raw: "'stale'" }),
       }),
     ];
@@ -135,7 +130,6 @@ describe('buildRecreatePostchecks — column-default', () => {
     const issues = [
       issue({
         path: ['database', 'users', 'column:email', 'default'],
-        reason: 'not-equal',
         expected: columnDefault({ resolved: { kind: 'literal', value: 7 } }),
         actual: columnDefault({ raw: '3' }),
       }),
@@ -156,7 +150,6 @@ describe('buildRecreatePostchecks — constraints', () => {
     const issues = [
       issue({
         path: ['database', 'users', 'primary-key'],
-        reason: 'not-equal',
         expected: primaryKey(['a', 'b']),
         actual: primaryKey(['a']),
       }),
@@ -177,7 +170,6 @@ describe('buildRecreatePostchecks — constraints', () => {
     const issues = [
       issue({
         path: ['database', 't', 'primary-key'],
-        reason: 'not-found',
         expected: primaryKey(['id']),
       }),
     ];
@@ -192,7 +184,6 @@ describe('buildRecreatePostchecks — constraints', () => {
     const issues = [
       issue({
         path: ['database', 't', 'primary-key'],
-        reason: 'not-expected',
         actual: primaryKey(['x']),
       }),
     ];
@@ -210,7 +201,6 @@ describe('buildRecreatePostchecks — constraints', () => {
     const issues = [
       issue({
         path: ['database', 'users', 'unique:email'],
-        reason: 'not-found',
         expected: unique(['email']),
       }),
     ];
@@ -238,7 +228,6 @@ describe('buildRecreatePostchecks — constraints', () => {
     const issues = [
       issue({
         path: ['database', 'posts', 'foreign-key:user_id->.users(id)'],
-        reason: 'not-found',
         expected: foreignKey({
           columns: ['user_id'],
           referencedTable: 'users',
@@ -269,7 +258,6 @@ describe('buildRecreatePostchecks — constraints', () => {
     const issues = [
       issue({
         path: ['database', 't', 'column:a'],
-        reason: 'not-equal',
         expected: expectedColumn({ name: 'a', nativeType: 'TEXT', nullable: true }),
         actual: actualColumn({ name: 'a', nativeType: 'INTEGER', nullable: true }),
       }),

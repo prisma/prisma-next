@@ -924,6 +924,67 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
     expect(fk.referencedSchema).toBe('other_contract_ns');
     expect(fk.resolvedReferencedNamespace).toBe('other_contract_ns');
   });
+
+  it('stamps dependsOn as the referenced table plus its own columns in the flat tree', () => {
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: { table: { Post: postTable(UNBOUND_NAMESPACE_ID) } },
+        }),
+      },
+    });
+
+    const fk = contractToSchemaIR(wrap(storage)).tables['Post']!.foreignKeys[0]!;
+    expect(fk.dependsOn).toEqual([
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'User' },
+      ],
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'Post' },
+        { nodeKind: 'sql-column', id: 'column:authorId' },
+      ],
+    ]);
+  });
+
+  it('stamps own-column dependsOn on index, unique, and primary key in the flat tree', () => {
+    const storage = new SqlStorage({
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: {
+            table: {
+              Widget: table({
+                columns: { id: col({ nativeType: 'text' }), slug: col({ nativeType: 'text' }) },
+                primaryKey: { columns: ['id'] },
+                uniques: [{ columns: ['slug'] }],
+                indexes: [{ columns: ['slug'] }],
+              }),
+            },
+          },
+        }),
+      },
+    });
+
+    const widget = contractToSchemaIR(wrap(storage)).tables['Widget']!;
+    const pkCol = [
+      { nodeKind: 'sql-schema', id: 'database' },
+      { nodeKind: 'sql-table', id: 'Widget' },
+      { nodeKind: 'sql-column', id: 'column:id' },
+    ];
+    const slugCol = [
+      { nodeKind: 'sql-schema', id: 'database' },
+      { nodeKind: 'sql-table', id: 'Widget' },
+      { nodeKind: 'sql-column', id: 'column:slug' },
+    ];
+    expect(widget.primaryKey?.dependsOn).toEqual([pkCol]);
+    expect(widget.uniques[0]?.dependsOn).toEqual([slugCol]);
+    expect(widget.indexes[0]?.dependsOn).toEqual([slugCol]);
+  });
 });
 
 describe('detectDestructiveChanges', () => {

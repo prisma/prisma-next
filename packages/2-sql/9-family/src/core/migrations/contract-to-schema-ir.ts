@@ -1,6 +1,9 @@
 import type { ColumnDefault, Contract, JsonValue } from '@prisma-next/contract/types';
 import type { CodecRef } from '@prisma-next/framework-components/codec';
-import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
+import type {
+  MigrationPlannerConflict,
+  SchemaNodeRef,
+} from '@prisma-next/framework-components/control';
 import {
   type CheckConstraint,
   type ForeignKey,
@@ -13,6 +16,7 @@ import {
   type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import {
+  RelationalSchemaNodeKind,
   type SqlAnnotations,
   type SqlCheckConstraintIRInput,
   type SqlColumnIRInput,
@@ -244,14 +248,15 @@ function convertCheck(check: CheckConstraint, storage: SqlStorage): SqlCheckCons
   };
 }
 
-function convertUnique(unique: UniqueConstraint): SqlUniqueIRInput {
+function convertUnique(unique: UniqueConstraint, tableName: string): SqlUniqueIRInput {
   return {
     columns: unique.columns,
     ...ifDefined('name', unique.name),
+    dependsOn: flatColumnDependsOn(tableName, unique.columns),
   };
 }
 
-function convertIndex(index: Index): SqlIndexIRInput {
+function convertIndex(index: Index, tableName: string): SqlIndexIRInput {
   return {
     columns: index.columns,
     unique: false,
@@ -260,7 +265,40 @@ function convertIndex(index: Index): SqlIndexIRInput {
     // introspected side (the legacy walk read them from the contract).
     ...ifDefined('type', index.type),
     ...ifDefined('options', index.options),
+    dependsOn: flatColumnDependsOn(tableName, index.columns),
   };
+}
+
+/**
+ * The referenced table's chain in the flat (single-schema) tree
+ * `contractToSchemaIR`/`contractNamespaceToSchemaIR` build: the root
+ * (`SqlSchemaIR`, fixed `'database'` id) followed by the table's own id.
+ * Postgres discards this when it re-derives the FK against its own
+ * multi-schema tree shape (`contractToPostgresDatabaseSchemaNode`); SQLite's
+ * flat tree uses it as-is.
+ */
+function flatSchemaDependsOn(tableName: string): SchemaNodeRef {
+  return [
+    { nodeKind: RelationalSchemaNodeKind.schema, id: 'database' },
+    { nodeKind: RelationalSchemaNodeKind.table, id: tableName },
+  ];
+}
+
+/**
+ * The chains from a table-child object (foreign key, index, unique, primary
+ * key) to each of the own columns it is built on, in the flat tree. Dropping
+ * a covered column auto-drops the object, so the object's drop must precede
+ * the column's; the graph derives that direction from these edges.
+ */
+function flatColumnDependsOn(
+  tableName: string,
+  columns: readonly string[],
+): readonly SchemaNodeRef[] {
+  return columns.map((column) => [
+    { nodeKind: RelationalSchemaNodeKind.schema, id: 'database' },
+    { nodeKind: RelationalSchemaNodeKind.table, id: tableName },
+    { nodeKind: RelationalSchemaNodeKind.column, id: `column:${column}` },
+  ]);
 }
 
 /**
@@ -272,6 +310,10 @@ function convertIndex(index: Index): SqlIndexIRInput {
  * cross-space target whose namespace lives in another contract's storage)
  * stamps its coordinate verbatim; namespaced targets (Postgres) resolve the
  * real DDL schema downstream.
+ *
+ * `dependsOn` carries the referenced table (created before the FK, dropped
+ * after it) plus the FK's own columns (dropped after the FK, since dropping a
+ * column auto-drops the FK built on it).
  */
 function convertForeignKey(fk: ForeignKey, storage: SqlStorage): SqlForeignKeyIRInput {
   const targetNamespace = storage.namespaces[fk.target.namespaceId];
@@ -284,6 +326,10 @@ function convertForeignKey(fk: ForeignKey, storage: SqlStorage): SqlForeignKeyIR
     ...ifDefined('name', fk.name),
     ...ifDefined('onDelete', fk.onDelete),
     ...ifDefined('onUpdate', fk.onUpdate),
+    dependsOn: [
+      flatSchemaDependsOn(fk.target.tableName),
+      ...flatColumnDependsOn(fk.source.tableName, fk.source.columns),
+    ],
   };
 }
 
@@ -311,13 +357,27 @@ function convertTable(
       ? table.checks.map((c) => convertCheck(c, storage))
       : undefined;
 
+  const primaryKey =
+    table.primaryKey !== undefined
+      ? {
+          columns: table.primaryKey.columns,
+          ...ifDefined('name', table.primaryKey.name),
+          dependsOn: flatColumnDependsOn(name, table.primaryKey.columns),
+        }
+      : undefined;
+
   return new SqlTableIR({
     name,
     columns,
-    ...ifDefined('primaryKey', table.primaryKey),
+    ...ifDefined('primaryKey', primaryKey),
+    // #989 persists a `constraint: false` FK's absence and its backing index as
+    // discrete entities at contract construction, so every `foreignKeys[]` entry
+    // is now constraint-bearing (no filter) and each FK-backing index is already
+    // a `table.indexes[]` entry — it flows through `convertIndex` below, carrying
+    // the object→own-column `dependsOn` edge like any other index.
     foreignKeys: table.foreignKeys.map((fk) => convertForeignKey(fk, storage)),
-    uniques: table.uniques.map(convertUnique),
-    indexes: table.indexes.map(convertIndex),
+    uniques: table.uniques.map((u) => convertUnique(u, name)),
+    indexes: table.indexes.map((i) => convertIndex(i, name)),
     ...ifDefined('checks', checks),
   });
 }

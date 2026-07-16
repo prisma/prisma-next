@@ -541,14 +541,15 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
 
         const policyIssue = appSchemaResult?.schema.issues.find(
           (issue) =>
-            issue.reason === 'not-found' &&
+            issue.expected !== undefined &&
+            issue.actual === undefined &&
             (issue.expected ?? issue.actual)?.id === POLICY_WIRE_NAME,
         );
         expect(
           policyIssue,
           `Expected missing issue naming '${POLICY_WIRE_NAME}'; got: ${JSON.stringify(appSchemaResult?.schema.issues)}`,
         ).toBeDefined();
-        expect(policyIssue?.reason).toBe('not-found');
+        expect(policyIssue?.expected !== undefined && policyIssue?.actual === undefined).toBe(true);
       }
     },
     timeouts.spinUpPpgDev * 4,
@@ -889,7 +890,10 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
         const appSchemaResult = verifyResult.value.schemaResults.get('app');
         expect(appSchemaResult?.ok).toBe(false);
         const roleIssue = appSchemaResult?.schema.issues.find(
-          (issue) => issue.reason === 'not-found' && issue.path.includes('missing_app_role'),
+          (issue) =>
+            issue.expected !== undefined &&
+            issue.actual === undefined &&
+            issue.path.includes('missing_app_role'),
         );
         expect(
           roleIssue,

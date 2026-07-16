@@ -27,6 +27,7 @@ import sqlFamilyDescriptor, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-s
 import {
   APP_SPACE_ID,
   createControlStack,
+  issueOutcome,
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
 import { buildFabricatedMigrationEdge } from '@prisma-next/migration-tools/aggregate';
@@ -330,7 +331,9 @@ describe.sequential('RLS walking skeleton — TS author → plan → apply → f
         frameworkComponents,
       });
       expect(verifyResult.ok).toBe(false);
-      const missing = verifyResult.schema.issues.filter((issue) => issue.reason === 'not-found');
+      const missing = verifyResult.schema.issues.filter(
+        (issue) => issueOutcome(issue) === 'not-found',
+      );
       expect(missing.some((issue) => issue.path.join('/').includes(nameRenamed))).toBe(true);
 
       // Re-apply: the plan recreates the dropped policy and verify is clean again.
@@ -388,7 +391,7 @@ describe.sequential('RLS walking skeleton — TS author → plan → apply → f
       });
       expect(verifyResult.ok).toBe(false);
       const roleIssue = verifyResult.schema.issues.find(
-        (issue) => issue.reason === 'not-found' && issue.path.includes('app_role'),
+        (issue) => issueOutcome(issue) === 'not-found' && issue.path.includes('app_role'),
       );
       expect(roleIssue).toBeDefined();
 

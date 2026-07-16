@@ -40,4 +40,5 @@ export {
   PostgresTableSchemaNode,
   type PostgresTableSchemaNodeInput,
 } from '../core/schema-ir/postgres-table-schema-node';
+export { PostgresSchemaNodeKind } from '../core/schema-ir/schema-node-kinds';
 export type { PostgresColumnDefault } from '../core/types';

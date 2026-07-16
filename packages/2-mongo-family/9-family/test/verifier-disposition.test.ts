@@ -1,18 +1,38 @@
-import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import type {
+  DiffableNode,
+  ExpectationFailureReason,
+  SchemaDiffIssue,
+} from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import {
   classifyMongoDiffIssue,
   verifierDisposition,
 } from '../src/core/schema-verify/verifier-disposition';
 
+const NODE: DiffableNode = {
+  id: 'x',
+  nodeKind: 'mongo',
+  isEqualTo: () => true,
+  children: () => [],
+};
+
+/** Stamps `expected`/`actual` so the issue's change kind derives from presence. */
+function withPresence(path: readonly string[], change: ExpectationFailureReason): SchemaDiffIssue {
+  return {
+    path,
+    ...(change !== 'not-expected' ? { expected: NODE } : {}),
+    ...(change !== 'not-found' ? { actual: NODE } : {}),
+  };
+}
+
 /** A whole-collection issue: path is exactly the collection name. */
-function collectionIssue(reason: SchemaDiffIssue['reason']): SchemaDiffIssue {
-  return { path: ['users'], reason };
+function collectionIssue(change: ExpectationFailureReason): SchemaDiffIssue {
+  return withPresence(['users'], change);
 }
 
 /** An auxiliary (index/validator/options) issue: path is one segment deeper. */
-function auxiliaryIssue(reason: SchemaDiffIssue['reason']): SchemaDiffIssue {
-  return { path: ['users', 'index:email'], reason };
+function auxiliaryIssue(change: ExpectationFailureReason): SchemaDiffIssue {
+  return withPresence(['users', 'index:email'], change);
 }
 
 describe('classifyMongoDiffIssue', () => {
