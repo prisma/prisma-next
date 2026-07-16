@@ -503,6 +503,23 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       });
       continue;
     }
+    // `autoincrement()` is a storage default, so the execution-default check above does not
+    // catch it — but a sequence yields one scalar per row, which an array column cannot be.
+    // Every target lowers the call to this sentinel expression and keys its DDL rendering off
+    // it, so rejecting the sentinel here keeps the shape out of the DDL builders entirely.
+    if (
+      isListField &&
+      loweredDefault.defaultValue?.kind === 'function' &&
+      loweredDefault.defaultValue.expression === 'autoincrement()'
+    ) {
+      diagnostics.push({
+        code: 'PSL_LIST_AUTOINCREMENT_UNSUPPORTED',
+        message: `Field "${model.name}.${field.name}" is a list and cannot use @default(autoincrement()). autoincrement() draws a single value per row from a database sequence, which is not a list; remove "[]" or the default.`,
+        sourceId,
+        span: defaultAttribute?.span ?? field.span,
+      });
+      continue;
+    }
     if (field.optional && loweredOnCreate) {
       const generatorDescription =
         loweredOnCreate.kind === 'generator' ? `"${loweredOnCreate.id}"` : 'for this field';

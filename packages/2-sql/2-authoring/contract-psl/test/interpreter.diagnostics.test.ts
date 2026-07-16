@@ -1397,43 +1397,19 @@ describe('interpretPslDocumentToSqlContract list-field constructs', () => {
     });
   });
 
-  it('accepts a storage-level autoincrement() default on a list field', () => {
-    const document = symbolTableInputFromParseArgs({
-      schema: `model Post {
+  it('rejects autoincrement() on a list field', () => {
+    expectDiagnosticForSchema(
+      `model Post {
   id Int @id
   tags Int[] @default(autoincrement())
 }
 `,
-      sourceId: 'schema.prisma',
-    });
-
-    const result = interpretPslDocumentToSqlContract({
-      ...baseInput,
-      ...document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    expect(result.value.storage).toMatchObject({
-      namespaces: {
-        public: {
-          entries: {
-            table: {
-              post: {
-                columns: {
-                  tags: {
-                    many: true,
-                    default: { kind: 'function', expression: 'autoincrement()' },
-                  },
-                },
-              },
-            },
-          },
-        },
+      {
+        code: 'PSL_LIST_AUTOINCREMENT_UNSUPPORTED',
+        message:
+          'Field "Post.tags" is a list and cannot use @default(autoincrement()). autoincrement() draws a single value per row from a database sequence, which is not a list; remove "[]" or the default.',
       },
-    });
+    );
   });
 
   it('rejects a genuine per-element execution default uuid() on a list field', () => {
