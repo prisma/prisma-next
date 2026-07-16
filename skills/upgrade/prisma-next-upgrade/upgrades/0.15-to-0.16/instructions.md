@@ -22,6 +22,13 @@ identical.
 -->
 
 <!--
+Supabase integration close-out (TML-2503): docs-only. The `examples/` touch is
+`examples/supabase/README.md` — a link into the deleted
+`projects/supabase-integration/` workspace removed. No framework surface,
+contract shape, or emitted artefact change. Incidental substrate diff only.
+-->
+
+<!--
 TML-3028 (dependency-graph migration ordering; SchemaDiffIssue.reason removed):
 the migration-diff internal `SchemaDiffIssue` lost its `reason` field —
 discriminate via the presence of `expected`/`actual`, or the exported

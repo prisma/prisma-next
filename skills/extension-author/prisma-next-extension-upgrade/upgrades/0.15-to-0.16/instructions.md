@@ -21,6 +21,15 @@ pgvector test fixtures updated to the new FK literal shape.)
 -->
 
 <!--
+Supabase integration close-out (TML-2503): docs-only. The
+`packages/3-extensions/` touch is `packages/3-extensions/supabase/README.md` —
+links into the deleted `projects/supabase-integration/` workspace re-pointed at
+ADR 237 (the service_role secondary-root decision) or inlined as plain text.
+No SPI, contract shape, or emitted artefact change. Incidental substrate diff
+only.
+-->
+
+<!--
 TML-3028 (dependency-graph migration ordering; SchemaDiffIssue.reason removed):
 the migration-diff internal `SchemaDiffIssue` lost its `reason` field —
 discriminate a diff issue via the presence of `expected`/`actual`, or the
