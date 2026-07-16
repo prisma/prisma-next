@@ -206,20 +206,31 @@ fields, and permits a storage-level function default. Nothing downstream objects
 `buildColumnDefaultSql` ignores `column.many` entirely and emits `DEFAULT (…)` already. The
 error message stays for the case it was actually written for.
 
-### 8. jsonb defaults report drift forever
+### 8. A `dbgenerated` literal default reports drift forever
+
+> **Widened after D6 exposed a second instance.** This was originally written as a jsonb defect.
+> It is not: `dbgenerated("'{}'::text[]")` drifts identically. The defect is a **class** — any
+> literal default the two sides resolve differently — and it gets fixed as a class, not
+> instance-by-instance.
 
 Emit keeps `@default(dbgenerated("'{}'::jsonb"))` as `kind: 'function'`; introspection parses the
 same literal to `kind: 'literal'`. `resolvedDefaultsEqual` compares `kind` first and returns false
 before reading content — so `db verify` flags every such column `not-equal` permanently, even when
 the database matches exactly.
 
-**Fix:** the two paths agree on one resolved shape for a JSON literal default. The authoring path
-is the one that's lossy — it keeps the user's raw text without recognizing that `'{}'::jsonb` *is*
-a literal — so the authoring side normalizes to match introspection, using the same
-`parsePostgresDefault` logic rather than a second copy of it.
+**Known instances:** `'{}'::jsonb` (D1 reproduced it) and `'{}'::text[]` (D6 reproduced it; D1
+could not, because emit failed before verify ever ran). Assume there are others —
+`parsePostgresDefault` recognizes a range of literal forms, and every form it parses is a
+candidate. Enumerate them from that function rather than from this list.
 
-Guard against the obvious over-reach: `dbgenerated("gen_random_uuid()")` is genuinely a function
-and must stay one.
+**Fix:** the two paths agree on one resolved shape for a literal default. The authoring path is
+the lossy one — it keeps the user's raw text without recognizing that `'{}'::jsonb` *is* a literal
+— so the authoring side normalizes to match introspection by **reusing `parsePostgresDefault`**,
+not by copying it. Reuse is what makes this a class fix: a form the function learns to parse later
+is then automatically consistent on both sides.
+
+Guard against the obvious over-reach: `dbgenerated("gen_random_uuid()")` and
+`dbgenerated("(now() + '00:03:00'::interval)")` are genuinely functions and must stay functions.
 
 ### Also in scope: dangling FKs drop silently
 
