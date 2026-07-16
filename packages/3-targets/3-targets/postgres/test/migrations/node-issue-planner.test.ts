@@ -284,7 +284,6 @@ describe('mapNodeIssueToCall — synthesized namespace issue', () => {
     });
     const issue: SchemaDiffIssue = {
       path: ['database', 'auth'],
-      reason: 'not-found',
       expected: namespace,
     };
     const ctx = {
@@ -484,7 +483,6 @@ describe('mapNodeIssueToCall — table rlsEnabled drift', () => {
   ): SchemaDiffIssue {
     return {
       path: ['database', 'public', 'user'],
-      reason: 'not-equal',
       expected,
       actual,
     };

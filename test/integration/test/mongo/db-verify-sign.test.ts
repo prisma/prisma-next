@@ -8,7 +8,7 @@ import {
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
 } from '@prisma-next/family-mongo/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import { createControlStack, issueChange } from '@prisma-next/framework-components/control';
 import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
 import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
@@ -213,7 +213,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       expect(result.ok).toBe(false);
       expect(
         result.schema.issues.some(
-          (i) => i.reason === 'not-equal' && i.path[1]?.startsWith('index:'),
+          (i) => issueChange(i) === 'create' && i.path[1]?.startsWith('index:'),
         ),
       ).toBe(true);
     });
@@ -239,7 +239,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       expect(result.ok).toBe(true);
       expect(
         result.schema.issues.some(
-          (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+          (i) => issueChange(i) === 'drop' && i.path[1]?.startsWith('index:'),
         ),
       ).toBe(false);
     });
@@ -265,7 +265,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       expect(result.ok).toBe(false);
       expect(
         result.schema.issues.some(
-          (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+          (i) => issueChange(i) === 'drop' && i.path[1]?.startsWith('index:'),
         ),
       ).toBe(true);
     });
@@ -286,7 +286,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
 
       expect(result.ok).toBe(false);
       expect(
-        result.schema.issues.some((i) => i.reason === 'not-found' && i.path.length === 1),
+        result.schema.issues.some((i) => issueChange(i) === 'create' && i.path.length === 1),
       ).toBe(true);
     });
   });

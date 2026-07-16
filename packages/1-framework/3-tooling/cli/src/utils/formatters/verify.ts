@@ -1,33 +1,34 @@
 import type {
   CoreSchemaView,
-  ExpectationFailureReason,
   IntrospectSchemaResult,
+  SchemaChangeKind,
   SchemaDiffIssue,
   SchemaTreeNode,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { issueChange } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
 import type { GlobalFlags } from '../global-flags';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
 
-/** Human-readable label for each failure reason, prefixed onto an issue's message for display. */
-const REASON_LABEL: Record<ExpectationFailureReason, string> = {
-  'not-found': 'missing',
-  'not-expected': 'extra',
-  'not-equal': 'mismatch',
+/** Human-readable label for each kind of change, prefixed onto an issue's message for display. */
+const CHANGE_LABEL: Record<SchemaChangeKind, string> = {
+  create: 'missing',
+  drop: 'extra',
+  alter: 'mismatch',
 };
 
 /**
  * The issue's display text: its own path, prefixed with a human label for
- * why it's flagged. Turning `reason` (and the path) into prose is this
- * formatter's job, not the differ's — the differ's issue is data (`path` +
- * `reason` + nodes), not prose.
+ * why it's flagged. Turning the presence-derived change (and the path) into
+ * prose is this formatter's job, not the differ's — the differ's issue is
+ * data (`path` + nodes), not prose.
  */
 function formatIssueMessage(issue: SchemaDiffIssue): string {
-  return `${REASON_LABEL[issue.reason]}: ${issue.path.join('/')}`;
+  return `${CHANGE_LABEL[issueChange(issue)]}: ${issue.path.join('/')}`;
 }
 
 // ============================================================================

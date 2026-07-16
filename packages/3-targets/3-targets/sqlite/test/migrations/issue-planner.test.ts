@@ -38,10 +38,7 @@ describe('mapNodeIssueToCall — table', () => {
       primaryKey: primaryKey(['id']),
       indexes: [index(['email'], { name: 'user_email_idx' })],
     });
-    const result = mapNodeIssueToCall(
-      issue({ path: ['database', 'user'], reason: 'not-found', expected: t }),
-      emptyCtx,
-    );
+    const result = mapNodeIssueToCall(issue({ path: ['database', 'user'], expected: t }), emptyCtx);
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.value).toHaveLength(2);
@@ -55,10 +52,7 @@ describe('mapNodeIssueToCall — table', () => {
 
   it('emits DropTableCall for a not-expected table', () => {
     const t = table({ name: 'orphan', columns: {} });
-    const result = mapNodeIssueToCall(
-      issue({ path: ['database', 'orphan'], reason: 'not-expected', actual: t }),
-      emptyCtx,
-    );
+    const result = mapNodeIssueToCall(issue({ path: ['database', 'orphan'], actual: t }), emptyCtx);
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.value).toEqual([
@@ -69,7 +63,7 @@ describe('mapNodeIssueToCall — table', () => {
   it('skips control tables (_prisma_marker) without emitting a drop or a conflict', () => {
     const t = table({ name: '_prisma_marker', columns: {} });
     const result = mapNodeIssueToCall(
-      issue({ path: ['database', '_prisma_marker'], reason: 'not-expected', actual: t }),
+      issue({ path: ['database', '_prisma_marker'], actual: t }),
       emptyCtx,
     );
     expect(result.ok).toBe(true);
@@ -82,7 +76,7 @@ describe('mapNodeIssueToCall — column', () => {
   it('emits AddColumnCall for a not-found column', () => {
     const col = expectedColumn({ name: 'bio', nativeType: 'TEXT', nullable: true });
     const result = mapNodeIssueToCall(
-      issue({ path: ['database', 'user', 'column:bio'], reason: 'not-found', expected: col }),
+      issue({ path: ['database', 'user', 'column:bio'], expected: col }),
       emptyCtx,
     );
     expect(result.ok).toBe(true);
@@ -95,7 +89,7 @@ describe('mapNodeIssueToCall — column', () => {
   it('emits DropColumnCall for a not-expected column', () => {
     const col = actualColumn({ name: 'old', nativeType: 'TEXT', nullable: true });
     const result = mapNodeIssueToCall(
-      issue({ path: ['database', 'user', 'column:old'], reason: 'not-expected', actual: col }),
+      issue({ path: ['database', 'user', 'column:old'], actual: col }),
       emptyCtx,
     );
     expect(result.ok).toBe(true);
@@ -109,7 +103,7 @@ describe('mapNodeIssueToCall — column', () => {
     const expected = expectedColumn({ name: 'age', nativeType: 'INTEGER', nullable: false });
     const actual = actualColumn({ name: 'age', nativeType: 'TEXT', nullable: false });
     const result = mapNodeIssueToCall(
-      issue({ path: ['database', 'user', 'column:age'], reason: 'not-equal', expected, actual }),
+      issue({ path: ['database', 'user', 'column:age'], expected, actual }),
       emptyCtx,
     );
     expect(result.ok).toBe(false);
@@ -121,7 +115,7 @@ describe('mapNodeIssueToCall — column', () => {
     const expected = expectedColumn({ name: 'age', nativeType: 'INTEGER', nullable: false });
     const actual = actualColumn({ name: 'age', nativeType: 'INTEGER', nullable: true });
     const result = mapNodeIssueToCall(
-      issue({ path: ['database', 'user', 'column:age'], reason: 'not-equal', expected, actual }),
+      issue({ path: ['database', 'user', 'column:age'], expected, actual }),
       emptyCtx,
     );
     expect(result.ok).toBe(false);
@@ -134,7 +128,7 @@ describe('mapNodeIssueToCall — index', () => {
   it('emits CreateIndexCall with the node-carried name for a not-found index', () => {
     const idx = index(['email'], { name: 'idx_explicit' });
     const result = mapNodeIssueToCall(
-      issue({ path: ['database', 'user', 'index:email'], reason: 'not-found', expected: idx }),
+      issue({ path: ['database', 'user', 'index:email'], expected: idx }),
       emptyCtx,
     );
     expect(result.ok).toBe(true);
@@ -147,7 +141,7 @@ describe('mapNodeIssueToCall — index', () => {
   it('falls back to the default index name when the node carries none', () => {
     const idx = index(['userId']);
     const result = mapNodeIssueToCall(
-      issue({ path: ['database', 'post', 'index:userId'], reason: 'not-found', expected: idx }),
+      issue({ path: ['database', 'post', 'index:userId'], expected: idx }),
       emptyCtx,
     );
     expect(result.ok).toBe(true);
@@ -160,7 +154,7 @@ describe('mapNodeIssueToCall — index', () => {
   it('emits DropIndexCall for a not-expected index', () => {
     const idx = index(['old_col'], { name: 'idx_old' });
     const result = mapNodeIssueToCall(
-      issue({ path: ['database', 'user', 'index:old_col'], reason: 'not-expected', actual: idx }),
+      issue({ path: ['database', 'user', 'index:old_col'], actual: idx }),
       emptyCtx,
     );
     expect(result.ok).toBe(true);
@@ -174,7 +168,7 @@ describe('mapNodeIssueToCall — index', () => {
     const expected = index(['email'], { name: 'idx_email' });
     const actual = index(['email'], { name: 'idx_email', unique: true });
     const result = mapNodeIssueToCall(
-      issue({ path: ['database', 'user', 'index:email'], reason: 'not-equal', expected, actual }),
+      issue({ path: ['database', 'user', 'index:email'], expected, actual }),
       emptyCtx,
     );
     expect(result.ok).toBe(false);
@@ -188,7 +182,6 @@ describe('mapNodeIssueToCall — absorbed node kinds surface as conflicts when u
     const result = mapNodeIssueToCall(
       issue({
         path: ['database', 'user', 'primary-key'],
-        reason: 'not-found',
         expected: primaryKey(['id']),
       }),
       emptyCtx,
@@ -202,7 +195,6 @@ describe('mapNodeIssueToCall — absorbed node kinds surface as conflicts when u
     const result = mapNodeIssueToCall(
       issue({
         path: ['database', 'user', 'unique:email'],
-        reason: 'not-found',
         expected: unique(['email']),
       }),
       emptyCtx,
@@ -221,7 +213,6 @@ describe('mapNodeIssueToCall — absorbed node kinds surface as conflicts when u
     const result = mapNodeIssueToCall(
       issue({
         path: ['database', 'post', 'foreign-key:userId->.user(id)'],
-        reason: 'not-found',
         expected: fk,
       }),
       emptyCtx,
@@ -235,7 +226,6 @@ describe('mapNodeIssueToCall — absorbed node kinds surface as conflicts when u
     const result = mapNodeIssueToCall(
       issue({
         path: ['database', 'user', 'column:name', 'default'],
-        reason: 'not-found',
         expected: columnDefault({ resolved: { kind: 'literal', value: 'x' } }),
       }),
       emptyCtx,
@@ -251,7 +241,6 @@ describe('mapNodeIssueToCall — check constraint', () => {
     const result = mapNodeIssueToCall(
       issue({
         path: ['database', 'user', 'check:status_check'],
-        reason: 'not-found',
         expected: checkConstraint({
           name: 'status_check',
           column: 'status',
@@ -294,7 +283,6 @@ describe('planIssues — dependency-graph ordering', () => {
 
   const created = issue({
     path: ['database', 'created'],
-    reason: 'not-found',
     expected: table({
       name: 'created',
       columns: { id: expectedColumn({ name: 'id', nativeType: 'INTEGER', nullable: false }) },
@@ -302,12 +290,10 @@ describe('planIssues — dependency-graph ordering', () => {
   });
   const droppedA = issue({
     path: ['database', 'a_orphan'],
-    reason: 'not-expected',
     actual: table({ name: 'a_orphan', columns: {} }),
   });
   const droppedZ = issue({
     path: ['database', 'z_orphan'],
-    reason: 'not-expected',
     actual: table({ name: 'z_orphan', columns: {} }),
   });
 
@@ -333,20 +319,17 @@ describe('coalesceSubtreeIssues', () => {
       name: 'user',
       columns: { id: expectedColumn({ name: 'id', nativeType: 'INTEGER', nullable: false }) },
     });
-    const tableIssue = issue({ path: ['database', 'user'], reason: 'not-found', expected: t });
+    const tableIssue = issue({ path: ['database', 'user'], expected: t });
     const nestedColumn = issue({
       path: ['database', 'user', 'column:id'],
-      reason: 'not-found',
       expected: t.columns['id'],
     });
     const nestedDefault = issue({
       path: ['database', 'user', 'column:id', 'default'],
-      reason: 'not-found',
       expected: { resolved: { kind: 'literal', value: 1 } },
     });
     const unrelated = issue({
       path: ['database', 'other'],
-      reason: 'not-found',
       expected: table({ name: 'other', columns: {} }),
     });
 
@@ -358,12 +341,10 @@ describe('coalesceSubtreeIssues', () => {
     const col = expectedColumn({ name: 'bio', nativeType: 'TEXT', nullable: true });
     const columnIssue = issue({
       path: ['database', 'user', 'column:bio'],
-      reason: 'not-found',
       expected: col,
     });
     const nestedDefault = issue({
       path: ['database', 'user', 'column:bio', 'default'],
-      reason: 'not-found',
       expected: { resolved: { kind: 'literal', value: '' } },
     });
     const result = coalesceSubtreeIssues([columnIssue, nestedDefault]);
@@ -373,13 +354,11 @@ describe('coalesceSubtreeIssues', () => {
   it('keeps sibling per-attribute issues on a matched table untouched', () => {
     const colDrift = issue({
       path: ['database', 'user', 'column:age'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'age', nativeType: 'INTEGER', nullable: false }),
       actual: actualColumn({ name: 'age', nativeType: 'TEXT', nullable: false }),
     });
     const defaultMissing = issue({
       path: ['database', 'user', 'column:age', 'default'],
-      reason: 'not-found',
       expected: { resolved: { kind: 'literal', value: 0 } },
     });
     // No table-level or column-level not-found/not-expected issue present —
@@ -390,7 +369,6 @@ describe('coalesceSubtreeIssues', () => {
   it('is a no-op when there are no not-found/not-expected issues at all', () => {
     const onlyDrift = issue({
       path: ['database', 'user', 'column:age'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'age', nativeType: 'INTEGER', nullable: false }),
       actual: actualColumn({ name: 'age', nativeType: 'TEXT', nullable: false }),
     });

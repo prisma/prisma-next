@@ -15,7 +15,7 @@
 import type { ColumnDefault, Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
-import { diffSchemas } from '@prisma-next/framework-components/control';
+import { diffSchemas, issueChange } from '@prisma-next/framework-components/control';
 import { entityAt } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import {
@@ -161,11 +161,11 @@ function runBothModes(options: {
   return { strict, lenient };
 }
 
-function failureReasonsByNodeKind(run: VerdictRun): ReadonlyArray<readonly [string, string]> {
+function failureChangesByNodeKind(run: VerdictRun): ReadonlyArray<readonly [string, string]> {
   return run.failures.map((issue) => {
     const node = issue.expected ?? issue.actual;
     const nodeKind = (node as { nodeKind?: string } | undefined)?.nodeKind ?? 'unknown';
-    return [nodeKind, issue.reason ?? 'unknown'] as const;
+    return [nodeKind, issueChange(issue)] as const;
   });
 }
 
@@ -190,7 +190,7 @@ describe('differ verdict — basic drift', () => {
     const { strict, lenient } = runBothModes({ contract, schema });
     expect(strict.ok).toBe(false);
     expect(lenient.ok).toBe(false);
-    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-table', 'not-found']);
+    expect(failureChangesByNodeKind(lenient)).toContainEqual(['sql-table', 'create']);
   });
 
   it('extra table fails strict only', () => {
@@ -204,7 +204,7 @@ describe('differ verdict — basic drift', () => {
     const { strict, lenient } = runBothModes({ contract, schema });
     expect(strict.ok).toBe(false);
     expect(lenient.ok).toBe(true);
-    expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-table', 'not-expected']);
+    expect(failureChangesByNodeKind(strict)).toContainEqual(['sql-table', 'drop']);
   });
 
   it('missing column fails both modes; extra column fails strict only', () => {
@@ -223,9 +223,9 @@ describe('differ verdict — basic drift', () => {
     const { strict, lenient } = runBothModes({ contract, schema });
     expect(strict.ok).toBe(false);
     expect(lenient.ok).toBe(false);
-    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-column', 'not-found']);
-    expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-column', 'not-expected']);
-    expect(failureReasonsByNodeKind(lenient)).not.toContainEqual(['sql-column', 'not-expected']);
+    expect(failureChangesByNodeKind(lenient)).toContainEqual(['sql-column', 'create']);
+    expect(failureChangesByNodeKind(strict)).toContainEqual(['sql-column', 'drop']);
+    expect(failureChangesByNodeKind(lenient)).not.toContainEqual(['sql-column', 'drop']);
   });
 
   it('type mismatch and nullability mismatch fail both modes as not-equal', () => {
@@ -243,7 +243,7 @@ describe('differ verdict — basic drift', () => {
     });
     const { lenient } = runBothModes({ contract, schema });
     expect(lenient.ok).toBe(false);
-    const reasons = failureReasonsByNodeKind(lenient);
+    const reasons = failureChangesByNodeKind(lenient);
     expect(reasons.filter(([kind]) => kind === 'sql-column')).toHaveLength(2);
   });
 
@@ -295,7 +295,7 @@ describe('differ verdict — defaults (default is a child node of the column)', 
     const { strict, lenient } = runBothModes({ contract, schema });
     expect(strict.ok).toBe(false);
     expect(lenient.ok).toBe(false);
-    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-column-default', 'not-found']);
+    expect(failureChangesByNodeKind(lenient)).toContainEqual(['sql-column-default', 'create']);
   });
 
   it('default mismatch fails both modes as not-equal on the default node', () => {
@@ -315,7 +315,7 @@ describe('differ verdict — defaults (default is a child node of the column)', 
     });
     const { lenient } = runBothModes({ contract, schema });
     expect(lenient.ok).toBe(false);
-    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-column-default', 'not-equal']);
+    expect(failureChangesByNodeKind(lenient)).toContainEqual(['sql-column-default', 'alter']);
   });
 
   it('EXTRA default fails strict only (the reason-lifecycle case that forced the node design)', () => {
@@ -330,7 +330,7 @@ describe('differ verdict — defaults (default is a child node of the column)', 
     const { strict, lenient } = runBothModes({ contract, schema });
     expect(strict.ok).toBe(false);
     expect(lenient.ok).toBe(true);
-    expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-column-default', 'not-expected']);
+    expect(failureChangesByNodeKind(strict)).toContainEqual(['sql-column-default', 'drop']);
   });
 
   it('function default matches case-insensitively', () => {
@@ -399,7 +399,7 @@ describe('differ verdict — primary keys', () => {
     });
     const { lenient } = runBothModes({ contract: contractWithPk(), schema: missing });
     expect(lenient.ok).toBe(false);
-    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-primary-key', 'not-found']);
+    expect(failureChangesByNodeKind(lenient)).toContainEqual(['sql-primary-key', 'create']);
 
     const contractNoPk = createTestContract({
       user: createContractTable({ id: { nativeType: 'int4', nullable: false } }),
@@ -438,7 +438,7 @@ describe('differ verdict — primary keys', () => {
     });
     const { lenient } = runBothModes({ contract, schema });
     expect(lenient.ok).toBe(false);
-    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-primary-key', 'not-equal']);
+    expect(failureChangesByNodeKind(lenient)).toContainEqual(['sql-primary-key', 'alter']);
   });
 });
 
@@ -515,7 +515,7 @@ describe('differ verdict — foreign keys', () => {
       schema: schemaWithFk({ omitFk: true }),
     });
     expect(lenient.ok).toBe(false);
-    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-foreign-key', 'not-found']);
+    expect(failureChangesByNodeKind(lenient)).toContainEqual(['sql-foreign-key', 'create']);
   });
 
   it('fk-backing index expectation: live DB missing the backing index fails both modes', () => {
@@ -524,7 +524,7 @@ describe('differ verdict — foreign keys', () => {
       schema: schemaWithFk({ omitBackingIndex: true }),
     });
     expect(lenient.ok).toBe(false);
-    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-index', 'not-found']);
+    expect(failureChangesByNodeKind(lenient)).toContainEqual(['sql-index', 'create']);
   });
 
   it('referential-action directionality: undeclared expected never flags live actions', () => {
@@ -541,7 +541,7 @@ describe('differ verdict — foreign keys', () => {
       schema: schemaWithFk({ onDelete: 'restrict' }),
     });
     expect(lenient.ok).toBe(false);
-    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-foreign-key', 'not-equal']);
+    expect(failureChangesByNodeKind(lenient)).toContainEqual(['sql-foreign-key', 'alter']);
   });
 
   it('referential-action noAction is equivalent to undeclared on both sides', () => {
@@ -598,8 +598,8 @@ describe('differ verdict — uniques and indexes (structural equality)', () => {
     // unique index is an ordinary extra (strict-only).
     expect(lenient.ok).toBe(false);
     expect(strict.ok).toBe(false);
-    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-unique', 'not-found']);
-    expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-index', 'not-expected']);
+    expect(failureChangesByNodeKind(lenient)).toContainEqual(['sql-unique', 'create']);
+    expect(failureChangesByNodeKind(strict)).toContainEqual(['sql-index', 'drop']);
   });
 
   it('contract @@index vs a live unique CONSTRAINT fails both modes (index missing + constraint extra)', () => {
@@ -619,8 +619,8 @@ describe('differ verdict — uniques and indexes (structural equality)', () => {
     const { strict, lenient } = runBothModes({ contract, schema });
     expect(lenient.ok).toBe(false);
     expect(strict.ok).toBe(false);
-    expect(failureReasonsByNodeKind(lenient)).toContainEqual(['sql-index', 'not-found']);
-    expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-unique', 'not-expected']);
+    expect(failureChangesByNodeKind(lenient)).toContainEqual(['sql-index', 'create']);
+    expect(failureChangesByNodeKind(strict)).toContainEqual(['sql-unique', 'drop']);
   });
 
   it('contract @@index (with a type) vs a live unique constraint fails both modes', () => {
@@ -655,7 +655,7 @@ describe('differ verdict — uniques and indexes (structural equality)', () => {
     const { strict, lenient } = runBothModes({ contract, schema });
     expect(strict.ok).toBe(false);
     expect(lenient.ok).toBe(true);
-    expect(failureReasonsByNodeKind(strict)).toContainEqual(['sql-index', 'not-expected']);
+    expect(failureChangesByNodeKind(strict)).toContainEqual(['sql-index', 'drop']);
   });
 
   it('a stray live non-unique index is an extra in strict only', () => {
@@ -767,7 +767,7 @@ describe('differ verdict — check constraints', () => {
       i.path.includes('check:post_status_check'),
     );
     expect(driftIssues).toHaveLength(1);
-    expect(driftIssues[0]?.reason).toBe('not-equal');
+    expect(issueChange(driftIssues[0]!)).toBe('alter');
 
     const actualRemoved = new SqlSchemaIR({
       tables: {
@@ -783,7 +783,7 @@ describe('differ verdict — check constraints', () => {
     const removedIssues = diffSchemas(expected, actualRemoved).filter((i) =>
       i.path.includes('check:post_status_check'),
     );
-    expect(removedIssues[0]?.reason).toBe('not-found');
+    expect(issueChange(removedIssues[0]!)).toBe('create');
 
     // check_removed reclassifies to not-expected per the spec: a live-only
     // check under a declared table is an undeclared extra (strict-gated),
@@ -803,7 +803,7 @@ describe('differ verdict — check constraints', () => {
     const liveOnlyCheckIssues = diffSchemas(expectedNoChecks, actualDrift).filter((i) =>
       i.path.includes('check:post_status_check'),
     );
-    expect(liveOnlyCheckIssues[0]?.reason).toBe('not-expected');
+    expect(issueChange(liveOnlyCheckIssues[0]!)).toBe('drop');
     const strictVerdict = computeSqlDiffVerdict({
       issues: liveOnlyCheckIssues,
       resolveControlPolicy: () => undefined,
@@ -954,7 +954,9 @@ describe('differ verdict — storage types (verifyType hook)', () => {
     });
 
   it('a verifyType failure fails the verdict in both modes', () => {
-    const components = [typeComponent([{ path: ['user_status'], reason: 'not-equal' }])];
+    // Both sides present → an alter (value drift), which fails under managed.
+    const node = { id: 'user_status', nodeKind: 'x', isEqualTo: () => true, children: () => [] };
+    const components = [typeComponent([{ path: ['user_status'], expected: node, actual: node }])];
     const { strict, lenient } = runBothModes({
       contract: contractWithType(),
       schema: matchingSchema(),

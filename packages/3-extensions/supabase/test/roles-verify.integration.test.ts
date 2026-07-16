@@ -17,6 +17,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import { issueChange } from '@prisma-next/framework-components/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
@@ -118,7 +119,7 @@ describe('roles enter db verify — declared in the pack contract, checked again
 
         for (const roleName of SupabaseRole.values) {
           const roleIssue = supabaseResult?.schema.issues.find(
-            (issue) => issue.reason === 'not-found' && issue.path.includes(roleName),
+            (issue) => issueChange(issue) === 'create' && issue.path.includes(roleName),
           );
           expect(roleIssue, `expected a not-found issue naming role "${roleName}"`).toBeDefined();
         }

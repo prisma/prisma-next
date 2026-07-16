@@ -1,4 +1,5 @@
 import { UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
+import { issueChange } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -79,7 +80,9 @@ describe('MongoTargetSchemaVerifier', () => {
     const result = verifier.verifySchema({ contract, schema });
 
     expect(result.ok).toBe(false);
-    expect(result.issues.some((i) => i.reason === 'not-found' && i.path[0] === 'items')).toBe(true);
+    expect(result.issues.some((i) => issueChange(i) === 'create' && i.path[0] === 'items')).toBe(
+      true,
+    );
   });
 
   it('uses the family-shared scaffolding: walks each namespace and aggregates issues', () => {

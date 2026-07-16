@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
+import { issueChange } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -71,7 +72,8 @@ const FULL_SCHEMA_VERIFY = (
     schema: {
       issues: extras.map((name) => ({
         path: [name],
-        reason: 'not-expected' as const,
+        // Actual-only: an extra live table is a drop, which `issueChange` derives from presence.
+        actual: { id: name, nodeKind: 'table', isEqualTo: () => true, children: () => [] },
         message: `Extra table "${name}"`,
       })),
     },
@@ -91,7 +93,7 @@ const CLASSIFY_ENTITY_KIND: SchemaEntityKindClassifier = () => 'table';
 function extraTables(result: VerifyDatabaseSchemaResult | undefined): string[] {
   return (result?.schema.issues ?? [])
     .flatMap((issue) =>
-      issue.reason === 'not-expected' && issue.path.length === 1 ? [issue.path[0]] : [],
+      issueChange(issue) === 'drop' && issue.path.length === 1 ? [issue.path[0]] : [],
     )
     .filter((name): name is string => name !== undefined)
     .sort();

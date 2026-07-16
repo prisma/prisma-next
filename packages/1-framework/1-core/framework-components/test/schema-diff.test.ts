@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DiffableNode, SchemaDiffIssue, SchemaNodeRef } from '../src/control/schema-diff';
-import { diffSchemas, SchemaDiff } from '../src/control/schema-diff';
+import { diffSchemas, issueChange, SchemaDiff } from '../src/control/schema-diff';
 
 /** A synthetic root node whose `isEqualTo` is always true — used to wrap flat node lists. */
 function rootOf(nodes: readonly DiffableNode[]): DiffableNode {
@@ -51,7 +51,6 @@ describe('diffSchemas', () => {
     const issues = diffSchemas(rootOf(expected), rootOf([]));
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
-      reason: 'not-found',
       path: ['root', 'public/policy/read_own_abcd1234'],
     });
   });
@@ -61,7 +60,6 @@ describe('diffSchemas', () => {
     const issues = diffSchemas(rootOf([]), rootOf(actual));
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
-      reason: 'not-expected',
       path: ['root', 'public/policy/stale_policy_deadbeef'],
     });
   });
@@ -72,7 +70,6 @@ describe('diffSchemas', () => {
     const issues = diffSchemas(rootOf(expected), rootOf(actual));
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
-      reason: 'not-equal',
       path: ['root', 'public/policy/read_own_abcd1234'],
     });
   });
@@ -98,11 +95,13 @@ describe('diffSchemas', () => {
     ];
     const issues = diffSchemas(rootOf(expected), rootOf(actual));
     expect(issues).toHaveLength(3);
-    const byKey = Object.fromEntries(issues.map((i) => [i.path[i.path.length - 1], i.reason]));
+    const byKey = Object.fromEntries(
+      issues.map((i) => [i.path[i.path.length - 1], issueChange(i)]),
+    );
     expect(byKey).toEqual({
-      'ns/widget/alpha': 'not-equal',
-      'ns/widget/gamma': 'not-found',
-      'ns/widget/delta': 'not-expected',
+      'ns/widget/alpha': 'alter',
+      'ns/widget/gamma': 'create',
+      'ns/widget/delta': 'drop',
     });
   });
 
@@ -150,8 +149,8 @@ describe('diffSchemas', () => {
     const nodeB = makeNode('policy/x');
     const issues = diffSchemas(rootOf([nodeA]), rootOf([nodeB]));
     expect(issues).toHaveLength(2);
-    const reasons = new Set(issues.map((i) => i.reason));
-    expect(reasons).toEqual(new Set(['not-found', 'not-expected']));
+    const changes = new Set(issues.map((i) => issueChange(i)));
+    expect(changes).toEqual(new Set(['create', 'drop']));
   });
 
   it('throws when two siblings share the same id in expected', () => {
@@ -193,7 +192,7 @@ describe('diffSchemas', () => {
     // Neither is reported as missing/extra — proof the two same-id, different-kind
     // siblings were never conflated into one map slot.
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ reason: 'not-equal', path: ['root', 'public'] });
+    expect(issues[0]).toMatchObject({ path: ['root', 'public'] });
     expect((issues[0]?.expected as DiffableNode | undefined)?.nodeKind).toBe('namespace');
   });
 
@@ -207,8 +206,8 @@ describe('diffSchemas', () => {
     const issues = diffSchemas(rootOf(expected), rootOf(actual));
 
     expect(issues).toHaveLength(2);
-    const reasons = new Set(issues.map((i) => i.reason));
-    expect(reasons).toEqual(new Set(['not-found', 'not-expected']));
+    const changes = new Set(issues.map((i) => issueChange(i)));
+    expect(changes).toEqual(new Set(['create', 'drop']));
   });
 
   it('descends into a matched pair and reports one issue at the child path (AC-2)', () => {
@@ -226,7 +225,6 @@ describe('diffSchemas', () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
-      reason: 'not-found',
       path: ['root', 'parent', 'only_in_expected'],
     });
   });
@@ -244,9 +242,11 @@ describe('diffSchemas', () => {
     const issues = diffSchemas(tableA, tableB);
 
     expect(issues).toHaveLength(2);
-    const byKey = Object.fromEntries(issues.map((i) => [i.path[i.path.length - 1], i.reason]));
-    expect(byKey['users']).toBe('not-equal');
-    expect(byKey['only_in_a']).toBe('not-found');
+    const byKey = Object.fromEntries(
+      issues.map((i) => [i.path[i.path.length - 1], issueChange(i)]),
+    );
+    expect(byKey['users']).toBe('alter');
+    expect(byKey['only_in_a']).toBe('create');
   });
 
   it('total descent: missing subtree emits one issue per node in the subtree', () => {
@@ -261,7 +261,7 @@ describe('diffSchemas', () => {
     expect(paths).toContain('root/child');
     expect(paths).toContain('root/child/grandchild_a');
     expect(paths).toContain('root/child/grandchild_b');
-    expect(issues.every((i) => i.reason === 'not-found')).toBe(true);
+    expect(issues.every((i) => issueChange(i) === 'create')).toBe(true);
   });
 
   it('total descent: extra subtree emits one issue per node in the subtree', () => {
@@ -276,7 +276,7 @@ describe('diffSchemas', () => {
     expect(paths).toContain('root/child');
     expect(paths).toContain('root/child/grandchild_a');
     expect(paths).toContain('root/child/grandchild_b');
-    expect(issues.every((i) => i.reason === 'not-expected')).toBe(true);
+    expect(issues.every((i) => issueChange(i) === 'drop')).toBe(true);
   });
 
   it('missing leaf still emits exactly one issue (behavior-preserving)', () => {
@@ -284,7 +284,6 @@ describe('diffSchemas', () => {
     const issues = diffSchemas(rootOf([leaf]), rootOf([]));
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
-      reason: 'not-found',
       path: ['root', 'lone_leaf'],
     });
   });
@@ -406,7 +405,7 @@ describe('diffSchemas', () => {
 });
 
 function makeSchemaDiffIssue(path: readonly string[]): SchemaDiffIssue {
-  return { path, reason: 'not-expected' };
+  return { path };
 }
 
 describe('SchemaDiff', () => {

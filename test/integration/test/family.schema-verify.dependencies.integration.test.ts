@@ -91,7 +91,6 @@ describe('family instance schemaVerify', () => {
           expect(result.ok).toBe(false);
           expect(result.schema.issues).toContainEqual(
             expect.objectContaining({
-              reason: 'not-expected',
               path: ['database', 'public', 'user', 'column:extraColumn'],
             }),
           );
@@ -279,7 +278,6 @@ describe('family instance schemaVerify', () => {
           expect(result.ok).toBe(false);
           expect(result.schema.issues).toContainEqual(
             expect.objectContaining({
-              reason: 'not-equal',
               path: ['database', 'public', 'user', 'column:id'],
             }),
           );

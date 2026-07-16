@@ -18,7 +18,6 @@ const NODE: DiffableNode = {
 function up(path: readonly string[], dependsOn?: readonly (readonly string[])[]): SchemaDiffIssue {
   return {
     path,
-    reason: 'not-found',
     expected: NODE,
     ...(dependsOn !== undefined ? { dependsOn } : {}),
   };
@@ -31,7 +30,6 @@ function down(
 ): SchemaDiffIssue {
   return {
     path,
-    reason: 'not-expected',
     actual: NODE,
     ...(dependsOn !== undefined ? { dependsOn } : {}),
   };

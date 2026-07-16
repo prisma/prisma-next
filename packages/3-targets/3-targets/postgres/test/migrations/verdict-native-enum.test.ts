@@ -1,6 +1,7 @@
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { verifySqlSchemaByDiff } from '@prisma-next/family-sql/diff';
+import { issueChange } from '@prisma-next/framework-components/control';
 import type { SqlStorage as SqlStorageType } from '@prisma-next/sql-contract/types';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -151,7 +152,6 @@ describe('differ reports enum drift (issue shapes)', () => {
     const issues = enumIssuesOf(managed, actualTree([]));
     expect(issues).toEqual([
       expect.objectContaining({
-        reason: 'not-found',
         path: ['database', 'public', 'native_enum:order_status'],
       }),
     ]);
@@ -165,7 +165,6 @@ describe('differ reports enum drift (issue shapes)', () => {
     const issues = enumIssuesOf(managed, actualTree(STRAY));
     expect(issues).toEqual([
       expect.objectContaining({
-        reason: 'not-expected',
         path: ['database', 'public', 'native_enum:stray_mood'],
       }),
     ]);
@@ -179,7 +178,6 @@ describe('differ reports enum drift (issue shapes)', () => {
     const issues = enumIssuesOf(managed, actualTree(REORDERED));
     expect(issues).toEqual([
       expect.objectContaining({
-        reason: 'not-equal',
         path: ['database', 'public', 'native_enum:order_status'],
       }),
     ]);
@@ -222,7 +220,7 @@ describe('db verify grades enum drift by control policy', () => {
     const result = verify(external, actualTree(REORDERED), true);
     expect(result.ok).toBe(false);
     const mismatch = result.schema.issues.filter(
-      (i) => i.reason === 'not-equal' && i.path.some((p) => p.includes('order_status')),
+      (i) => issueChange(i) === 'alter' && i.path.some((p) => p.includes('order_status')),
     );
     expect(mismatch.length).toBeGreaterThan(0);
   });
@@ -241,7 +239,6 @@ describe('db verify grades enum drift by control policy', () => {
     expect(result.ok).toBe(true);
     expect(result.schema.warnings?.issues).toEqual([
       expect.objectContaining({
-        reason: 'not-equal',
         path: ['database', 'public', 'native_enum:order_status'],
       }),
     ]);

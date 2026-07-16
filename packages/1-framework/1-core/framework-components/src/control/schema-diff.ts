@@ -1,5 +1,3 @@
-import type { ExpectationFailureReason } from './control-operation-results';
-
 /**
  * A root-anchored chain of `(nodeKind, id)` steps identifying a node in a
  * schema tree — the same vocabulary the differ pairs siblings with. Used by
@@ -12,11 +10,9 @@ export type SchemaNodeRef = readonly { readonly nodeKind: string; readonly id: s
 export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   /** Path from the root node down to the diffed node, as a sequence of local keys. */
   readonly path: readonly string[];
-  /** Why the actual state fails the expectation. Consumers filter on this field. */
-  readonly reason: ExpectationFailureReason;
-  /** The expected (desired-side) node, when available. Absent for `not-expected` issues. */
+  /** The expected (desired-side) node, when available. Absent for a drop. */
   readonly expected?: TNode;
-  /** The actual (current-side) node, when available. Absent for `not-found` issues. */
+  /** The actual (current-side) node, when available. Absent for a create. */
   readonly actual?: TNode;
   /**
    * Paths of the other in-diff issues this issue depends on. Mirrored by
@@ -26,6 +22,33 @@ export interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
    * (the dependency is satisfied by reality).
    */
   readonly dependsOn?: readonly (readonly string[])[];
+}
+
+/**
+ * How an issue changes the actual state, derived purely from which sides are
+ * present: an expected-only issue creates the node, an actual-only issue drops
+ * it, and an issue carrying both alters it. Expected is the desired side,
+ * actual the current side, of whatever comparison produced the issue
+ * (contract-vs-database, or contract-vs-contract in an offline plan), so the
+ * vocabulary is comparison-relative and never ambiguous about a base.
+ */
+export type SchemaChangeKind = 'create' | 'drop' | 'alter';
+
+/**
+ * The change an issue represents, discriminated by presence rather than any
+ * stored field — the single source of truth every consumer reads. An issue
+ * always carries at least one side by construction; neither is a malformed
+ * issue and throws.
+ */
+export function issueChange(issue: SchemaDiffIssue): SchemaChangeKind {
+  const hasExpected = issue.expected !== undefined;
+  const hasActual = issue.actual !== undefined;
+  if (hasExpected && hasActual) return 'alter';
+  if (hasExpected) return 'create';
+  if (hasActual) return 'drop';
+  throw new Error(
+    `issueChange: issue at "${issue.path.join('/')}" carries neither an expected nor an actual node`,
+  );
 }
 
 /**
@@ -76,7 +99,6 @@ function emitMissingSubtree(node: DiffableNode, parentPath: readonly string[]): 
   return [
     {
       path,
-      reason: 'not-found',
       expected: node,
     },
     ...node.children().flatMap((c) => emitMissingSubtree(c, path)),
@@ -88,7 +110,6 @@ function emitExtraSubtree(node: DiffableNode, parentPath: readonly string[]): Sc
   return [
     {
       path,
-      reason: 'not-expected',
       actual: node,
     },
     ...node.children().flatMap((c) => emitExtraSubtree(c, path)),
@@ -174,7 +195,6 @@ function diffPair(
   if (!expected.isEqualTo(actual)) {
     issues.push({
       path,
-      reason: 'not-equal',
       expected,
       actual,
     });

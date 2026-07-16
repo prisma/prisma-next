@@ -108,22 +108,24 @@ describe('formatErrorOutput - issues list label and body fallback', () => {
     expect(stripped).toContain('[PSL_ORPHANED_BACKRELATION_LIST] orphaned backrelation list');
   });
 
-  it('renders a schema-diff issue (no `message`) as `[reason] path/joined/with/slashes`', () => {
-    // Schema-diff issues (SchemaDiffIssue) carry no `message`; they stamp `reason` and `path`.
+  it('renders a schema-diff issue (no `message`) with a presence-derived `[missing] path/joined/with/slashes` label', () => {
+    // Schema-diff issues (SchemaDiffIssue) carry no `message`; they stamp
+    // `path` plus the `expected`/`actual` presence the label derives from.
     const error: CliErrorEnvelope = {
       ...baseError,
       code: 'PN-RUN-3000',
       domain: 'RUN',
       summary: 'Failed to resolve contract source',
       meta: {
-        issues: [{ reason: 'not-found', path: ['public', 'post'] }],
+        // expected-only → a missing object.
+        issues: [{ path: ['public', 'post'], expected: {} }],
       },
     };
 
     const flags = parseGlobalFlags({ verbose: true, 'no-color': true });
     const stripped = stripAnsi(formatErrorOutput(error, flags));
 
-    expect(stripped).toContain('[not-found] public/post');
+    expect(stripped).toContain('[missing] public/post');
   });
 });
 

@@ -60,7 +60,6 @@ export type {
 } from '../control/control-operation-preview';
 export type {
   EmitContractResult,
-  ExpectationFailureReason,
   IntrospectSchemaResult,
   OperationContext,
   SignDatabaseResult,
@@ -104,8 +103,13 @@ export {
   extractQueryOperationTypeImports,
 } from '../control/control-stack';
 export { orderIssuesByDependencies } from '../control/order-issues-by-dependencies';
-export type { DiffableNode, SchemaDiffIssue, SchemaNodeRef } from '../control/schema-diff';
-export { diffSchemas, SchemaDiff } from '../control/schema-diff';
+export type {
+  DiffableNode,
+  SchemaChangeKind,
+  SchemaDiffIssue,
+  SchemaNodeRef,
+} from '../control/schema-diff';
+export { diffSchemas, issueChange, SchemaDiff } from '../control/schema-diff';
 export type {
   SchemaVerifier,
   SchemaVerifyOptions,
