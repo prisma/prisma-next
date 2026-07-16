@@ -222,12 +222,17 @@ The concept: test RLS against the real thing — the Supabase CLI's local stack.
 begin;
 select plan(2);
 
+-- Seed as the superuser (bypasses RLS): one auth user + their profile.
+insert into auth.users (id) values ('00000000-0000-0000-0000-000000000001');
+insert into public.profile (id, username, "userId")
+  values (gen_random_uuid(), 'alice', '00000000-0000-0000-0000-000000000001');
+
 set local role anon;
-select is((select count(*)::int from public.profile), 0, 'anon sees no profiles before any is published');
+select is((select count(*)::int from public.profile), 0, 'anon sees no profiles (no anon policy matches)');
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
-select ok((select count(*) from public.profile where "userId"::text = auth.uid()::text) >= 0, 'owner-scoped read runs');
+select is((select count(*)::int from public.profile where "userId" = auth.uid()), 1, 'owner reads exactly their profile');
 
 select * from finish();
 rollback;
