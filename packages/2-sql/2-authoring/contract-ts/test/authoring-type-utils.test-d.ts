@@ -3,26 +3,38 @@ import { expectTypeOf, test } from 'vitest';
 import type {
   ArgTypeFromDescriptor,
   FieldHelperFunctionWithNamedConstraint,
+  FieldHelperFunctionWithoutNamedConstraint,
   NamedConstraintSpec,
+  ObjectArgumentType,
   TupleFromArgumentDescriptors,
 } from '../src/authoring-type-utils';
 
+const nanoidOptionsArgument = {
+  kind: 'object',
+  optional: true,
+  properties: {
+    size: { kind: 'number', optional: true, integer: true, minimum: 2, maximum: 255 },
+  },
+} as const;
+
 const nanoidDescriptor = {
   kind: 'fieldPreset',
-  args: [
-    {
-      kind: 'object',
-      optional: true,
-      properties: {
-        size: { kind: 'number', optional: true, integer: true, minimum: 2, maximum: 255 },
-      },
-    },
-  ],
+  args: [nanoidOptionsArgument],
   output: {
     codecId: 'sql/char@1',
     nativeType: 'character',
     typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
     id: true,
+  },
+} as const;
+
+const plainNanoidDescriptor = {
+  kind: 'fieldPreset',
+  args: [nanoidOptionsArgument],
+  output: {
+    codecId: 'sql/char@1',
+    nativeType: 'character',
+    typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
   },
 } as const;
 
@@ -38,6 +50,7 @@ const uuidv4Descriptor = {
 
 declare const idNanoid: FieldHelperFunctionWithNamedConstraint<typeof nanoidDescriptor>;
 declare const idUuidv4String: FieldHelperFunctionWithNamedConstraint<typeof uuidv4Descriptor>;
+declare const nanoid: FieldHelperFunctionWithoutNamedConstraint<typeof plainNanoidDescriptor>;
 
 test('option-kind descriptor types as the literal union of its values', () => {
   type OnCreateArg = { readonly kind: 'option'; readonly values: readonly ['now'] };
@@ -109,25 +122,45 @@ test('named-constraint helper resolves preset args and constraint options across
 });
 
 /**
- * Design-spec §4.3 row 3 (`field.id.nanoid({ name: 'x' })`) is NOT met, and
- * this test pins the actual behavior so the gap is visible rather than
- * silent. The spec expects signature 2 and constraint name 'x'; the call in
- * fact resolves via signature 1 with `Params = [{ name: 'x' }]` and yields no
- * constraint name.
+ * Design-spec §4.3 row 3, delivered by §4.4. This resolves via signature 2
+ * only because `ObjectArgumentType` no longer intersects with `{}` when every
+ * property is optional.
  *
- * Cause: the spec's reasoning ("`{name}` is not assignable to the size-arg
- * object, so signature 1 rejects it") does not hold. `ObjectArgumentType`
- * builds `{} & { size?: number }` — an intersection whose empty-object
- * constituent defeats weak-type/excess-property rejection — so `{ name: 'x' }`
- * IS assignable to the size-arg object and signature 1 accepts it.
+ * The mechanism is subtle enough to be worth stating: `{ size?: number }` is a
+ * "weak type" (every property optional), and TypeScript rejects an assignment
+ * to a weak type when the source shares none of its properties — so
+ * `{ name: 'x' }` is not assignable and signature 1 falls through to signature
+ * 2. The old `{} & { size?: number }` form defeated exactly that check: `{}`
+ * is not itself weak, so weak-type detection never fired for the intersection
+ * and signature 1 wrongly accepted `{ name: 'x' }` as the preset argument.
  *
- * This spelling was a compile error before the optional-tuple-slot change, so
- * it is not a regression against previously-working code, but it is a loss of
- * safety: what used to be rejected loudly now compiles to the wrong result.
- * Resolving it needs a decision from the spec owner (see dispatch 1 report).
+ * The TS surface performs no runtime argument validation (`buildFieldPreset`
+ * calls `instantiateAuthoringFieldPreset` directly), so this type-level check
+ * is the only thing standing between this call and a silently-unnamed primary
+ * key on a length-21 nanoid column.
  */
-test('named-constraint helper: options-only call is not distinguished from a preset arg', () => {
-  expectTypeOf(idNanoid({ name: 'x' }).build().id).toEqualTypeOf<NamedConstraintSpec<undefined>>();
+test('named-constraint helper routes an options-only call to the constraint overload', () => {
+  expectTypeOf(idNanoid({ name: 'x' }).build().id).toEqualTypeOf<NamedConstraintSpec<'x'>>();
+});
+
+test('an all-optional object argument rejects a foreign key', () => {
+  // @ts-expect-error `bogus` is not a declared property of the nanoid options object.
+  nanoid({ bogus: 1 });
+  // @ts-expect-error same check on the id-carrying preset, which takes the overload pair.
+  idNanoid({ bogus: 1 });
+});
+
+test('an all-optional object argument type is a plain weak type, not an intersection with {}', () => {
+  type NanoidArg = ObjectArgumentType<(typeof nanoidOptionsArgument)['properties']>;
+  expectTypeOf<NanoidArg>().toEqualTypeOf<{ readonly size?: number }>();
+});
+
+test('presets with an all-optional object argument keep their existing call behavior', () => {
+  expectTypeOf(nanoid({ size: 16 }).build().descriptor?.codecId).toEqualTypeOf<
+    'sql/char@1' | undefined
+  >();
+  expectTypeOf(nanoid().build().descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
+  expectTypeOf(nanoid().build().id).toEqualTypeOf<undefined>();
 });
 
 test('named-constraint helper without declared args keeps the no-args branch', () => {

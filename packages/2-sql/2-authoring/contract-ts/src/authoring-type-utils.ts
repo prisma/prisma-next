@@ -25,14 +25,28 @@ export type OptionalObjectArgumentKeys<
   readonly [K in keyof Properties]: Properties[K] extends { readonly optional: true } ? K : never;
 }[keyof Properties];
 
-export type ObjectArgumentType<Properties extends Record<string, AuthoringArgumentDescriptor>> = {
-  readonly [K in Exclude<
-    keyof Properties,
-    OptionalObjectArgumentKeys<Properties>
-  >]: ArgTypeFromDescriptor<Properties[K]>;
-} & {
-  readonly [K in OptionalObjectArgumentKeys<Properties>]?: ArgTypeFromDescriptor<Properties[K]>;
-};
+type RequiredObjectArgumentKeys<Properties extends Record<string, AuthoringArgumentDescriptor>> =
+  Exclude<keyof Properties, OptionalObjectArgumentKeys<Properties>>;
+
+/**
+ * When every property is optional the result must be a plain weak type rather
+ * than `{} & { … }`: TypeScript's weak-type check rejects an object sharing
+ * none of the target's properties, but only when the target is weak — and an
+ * intersection with `{}` is not. The TS authoring surface runs no runtime
+ * argument validation, so this check is the only thing rejecting a foreign key
+ * such as `field.nanoid({ bogus: 1 })`.
+ */
+export type ObjectArgumentType<Properties extends Record<string, AuthoringArgumentDescriptor>> = [
+  RequiredObjectArgumentKeys<Properties>,
+] extends [never]
+  ? {
+      readonly [K in OptionalObjectArgumentKeys<Properties>]?: ArgTypeFromDescriptor<Properties[K]>;
+    }
+  : {
+      readonly [K in RequiredObjectArgumentKeys<Properties>]: ArgTypeFromDescriptor<Properties[K]>;
+    } & {
+      readonly [K in OptionalObjectArgumentKeys<Properties>]?: ArgTypeFromDescriptor<Properties[K]>;
+    };
 
 export type ArgTypeFromDescriptor<Arg extends AuthoringArgumentDescriptor> = Arg extends {
   readonly kind: 'string';
