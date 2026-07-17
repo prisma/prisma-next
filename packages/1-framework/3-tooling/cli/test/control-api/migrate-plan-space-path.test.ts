@@ -8,8 +8,8 @@ import { planSpacePath } from '../../src/control-api/operations/migrate';
 
 const HEAD_HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-function makeContract(): Contract {
-  return createSqlContract({
+function makeContract(control: 'external' | 'managed'): Contract {
+  const base = createSqlContract({
     target: 'postgres',
     storage: {
       namespaces: {
@@ -20,10 +20,15 @@ function makeContract(): Contract {
       },
     },
   });
+  return control === 'external' ? { ...base, defaultControlPolicy: 'external' } : base;
 }
 
-function makeEmptyGraphSpace(spaceId: string, invariants: readonly string[] = []) {
-  const contract = makeContract();
+function makeEmptyGraphSpace(
+  spaceId: string,
+  invariants: readonly string[] = [],
+  control: 'external' | 'managed' = 'external',
+) {
+  const contract = makeContract(control);
   return createAggregateContractSpace({
     spaceId,
     packages: [],
@@ -102,6 +107,25 @@ describe('planSpacePath — empty-graph spaces', () => {
     expect(outcome.missing).toEqual(['ext:install-v1']);
   });
 
+  it('an extension space with a MANAGED element and no migrations is never-planned, not advanced', () => {
+    // Advancing a marker without migrations is valid only when nothing in
+    // the space is Prisma-Next-managed. A managed element with no authored
+    // graph is an authoring bug and must fail loudly.
+    const outcome = planSpacePath({
+      space: makeEmptyGraphSpace('broken-extension', [], 'managed'),
+      aggregate,
+      targetHash: HEAD_HASH,
+      refInvariants: undefined,
+      liveMarker: null,
+    });
+
+    expect(outcome).toEqual({
+      kind: 'never-planned',
+      spaceId: 'broken-extension',
+      targetHash: HEAD_HASH,
+    });
+  });
+
   it('the APP space with an empty graph and a pending target stays never-planned', () => {
     const outcome = planSpacePath({
       space: makeEmptyGraphSpace('app'),
@@ -115,7 +139,7 @@ describe('planSpacePath — empty-graph spaces', () => {
   });
 
   it('a greenfield extension space whose target is the empty sentinel stays at-head', () => {
-    const contract = makeContract();
+    const contract = makeContract('external');
     const space = createAggregateContractSpace({
       spaceId: 'supabase',
       packages: [],

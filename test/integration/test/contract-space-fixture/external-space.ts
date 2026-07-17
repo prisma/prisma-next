@@ -49,6 +49,9 @@ export const TEST_EXTERNAL_HEAD_HASH = computeStorageHash({
 const testExternalSpaceContract: Contract<SqlStorage> = {
   target: TARGET,
   targetFamily: TARGET_FAMILY,
+  // The property the declarative marker advance keys on: every element in
+  // this space resolves to the `external` control policy.
+  defaultControlPolicy: 'external',
   roots: {},
   domain: {
     namespaces: {

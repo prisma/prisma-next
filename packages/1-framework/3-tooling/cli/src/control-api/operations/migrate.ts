@@ -12,6 +12,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   type AggregateContractSpace,
+  allStorageElementsExternal,
   buildFabricatedMigrationEdge,
   type ContractMarkerRecordLike,
   type ContractSpaceAggregate,
@@ -98,11 +99,12 @@ export interface ExecuteMigrateOptions<TFamilyId extends string, TTargetId exten
  * 2. Read live marker rows per space (`familyInstance.readAllMarkers`).
  * 3. Per space: `resolveRecordedPath` plots the path from the live
  *    marker to `space.headRef.hash` (or `refHash` for the app
- *    space when provided). An empty-graph APP space fails loudly — a
- *    "never planned" app space is a user-error condition for replay.
- *    An empty-graph EXTENSION space resolves declaratively (marker to
- *    head, zero ops), mirroring the db-init aggregate planner: an
- *    all-external space ships no DDL and has nothing to author.
+ *    space when provided). An empty-graph space whose elements are ALL
+ *    externally managed resolves declaratively (marker to head, zero
+ *    ops), mirroring the db-init aggregate planner: such a space ships
+ *    no DDL and has nothing to author. Every other empty-graph space
+ *    fails loudly — "never planned" is a user-error condition for
+ *    replay.
  * 4. Hand off to {@link runMigration} (the runner-driving tail
  *    shared with `db init` / `db update`). Marker advancement is
  *    inside the per-space transaction.
@@ -406,13 +408,16 @@ export function planSpacePath({
       };
     }
     // Empty-graph extension space not yet at head: the space ships no
-    // migration packages at all — every real case is an all-external
-    // extension space (e.g. Supabase's auth/storage) with nothing for it
-    // to manage, and there is no command that could author an edge for it.
-    // Mirror the db-init aggregate planner's declared-state strategy:
-    // advance the marker to the head ref with zero operations. Only the
-    // app space's missing graph is a user-error condition for replay.
-    if (!isAppSpace) {
+    // migration packages at all. Advancing the marker without migrations
+    // (the db-init aggregate planner's declared-state strategy, mirrored
+    // here) is valid exclusively when every element the space declares is
+    // externally managed — nothing Prisma Next owns exists in such a space
+    // (e.g. Supabase's auth/storage), so its declared state needs no
+    // migration to be true, and there is no command that could author an
+    // edge for it. A space that declares a managed element but ships no
+    // migration graph is an authoring bug: it falls through to the
+    // never-planned failure, like an app space with no authored graph.
+    if (!isAppSpace && allStorageElementsExternal(space.contract())) {
       if (headRef.invariants.length > 0) {
         return {
           kind: 'unsatisfiable',
@@ -589,12 +594,12 @@ function buildSuccess(args: BuildSuccessArgs): MigrateSuccess {
 }
 
 /**
- * Build the `neverPlanned` failure raised when the APP contract space has no
- * on-disk migration graph but migrate was asked to reach a target hash.
- * Extension spaces never reach this: an empty-graph extension space resolves
- * declaratively (marker advances to its head ref with zero operations). The
- * `why` states only the condition; the recovery sequence is composed by
- * `errorPathUnreachable`'s `fix`.
+ * Build the `neverPlanned` failure raised when a contract space that
+ * declares managed storage elements has no on-disk migration graph but
+ * migrate was asked to reach a target hash. All-external spaces never reach
+ * this: they resolve declaratively (marker advances to the head ref with
+ * zero operations). The `why` states only the condition; the recovery
+ * sequence is composed by `errorPathUnreachable`'s `fix`.
  *
  * @internal Exported for testing only.
  */
@@ -602,7 +607,7 @@ export function buildNeverPlannedFailure(spaceId: string, targetHash: string): M
   return {
     code: 'MIGRATION_PATH_NOT_FOUND',
     summary: `No on-disk migrations for contract space "${spaceId}"`,
-    why: `migrate is replay-only: the app contract space must have an authored migration graph on disk. Space "${spaceId}" has no migrations under \`migrations/${spaceId}/\` but its head ref targets "${targetHash}".`,
+    why: `migrate is replay-only: a contract space that declares managed storage elements must have an authored migration graph on disk. Space "${spaceId}" has no migrations under \`migrations/${spaceId}/\` but its head ref targets "${targetHash}".`,
     meta: { spaceId, target: targetHash, kind: 'neverPlanned' },
   };
 }

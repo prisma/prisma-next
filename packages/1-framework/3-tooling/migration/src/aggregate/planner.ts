@@ -1,5 +1,6 @@
 import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
+import { allStorageElementsExternal } from './all-external';
 import { buildFabricatedMigrationEdge } from './fabricated-migration-edge';
 import type { PerSpacePlan, PlannerError, PlannerInput, PlannerOutput } from './planner-types';
 import { planFromDiff } from './strategies/plan-from-diff';
@@ -127,10 +128,8 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
       });
     }
 
-    // Empty graph: the space ships no migration packages at all — every
-    // real case is an all-external extension space (e.g. Supabase's
-    // `auth`/`storage`) with nothing for it to manage. It can only ever
-    // satisfy empty-invariant contract spaces.
+    // Empty graph: the space ships no migration packages at all. It can
+    // only ever satisfy empty-invariant contract spaces.
     if (invariantsRequired) {
       return notOk({
         kind: 'extensionPathUnsatisfiable',
@@ -139,13 +138,25 @@ export async function planMigration<TFamilyId extends string, TTargetId extends 
       });
     }
 
+    // Advancing without migrations is valid exclusively for a space whose
+    // elements are ALL externally managed (e.g. Supabase's `auth`/`storage`
+    // — nothing Prisma Next owns exists there, so the declared state needs
+    // no migration to be true). A space that declares a managed element but
+    // ships no migration graph is an authoring bug and must fail loudly.
+    // The same predicate guards the replay path in the CLI's
+    // `planSpacePath` (control-api/operations/migrate.ts).
+    if (!allStorageElementsExternal(space.contract())) {
+      return notOk({
+        kind: 'extensionPathUnreachable',
+        spaceId: space.spaceId,
+        target: headRef.hash,
+      });
+    }
+
     // Declare the no-op state directly instead of invoking the family
     // planner: a diff-fabricated plan only ever came out empty here
     // anyway (control-policy disposition drops everything the space
-    // doesn't manage), so this constructs that same fixed point without
-    // depending on the space having nothing managed — honoring
-    // check-integrity's rule that a space shipping no migrations ships
-    // no DDL.
+    // doesn't manage), so this constructs that same fixed point.
     perSpace.set(space.spaceId, {
       plan: {
         targetId: aggregate.targetId,
