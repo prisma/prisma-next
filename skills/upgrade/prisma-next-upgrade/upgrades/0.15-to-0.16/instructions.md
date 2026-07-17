@@ -39,3 +39,11 @@ framework migration-control internal, not an app-authoring surface. The
 `examples/` diff is supabase-example TEST assertions updated from `.reason` to
 presence — no runtime, contract, or DDL change. Incidental test-only diff.
 -->
+
+<!--
+Supabase example env template (TML-2503): docs-only. The `examples/` touch adds
+`examples/supabase/.env.example`, naming the two env vars the real-Supabase
+acceptance lane already reads (`DATABASE_URL`, `SUPABASE_JWT_SECRET`). Nothing
+loads the file — it documents what to export. No framework surface, contract
+shape, or emitted artefact change. Incidental substrate diff only.
+-->
