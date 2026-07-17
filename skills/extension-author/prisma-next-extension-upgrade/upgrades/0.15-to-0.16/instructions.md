@@ -1,7 +1,23 @@
 ---
 from: "0.15"
 to: "0.16"
-changes: []
+changes:
+  - id: extension-supabase-test-utils-export-removed
+    summary: |
+      `@prisma-next/extension-supabase` no longer exports the `./test/utils` subpath
+      (`bootstrapSupabaseShim`), and it is no longer a pattern to copy for extension test
+      tooling. The import typechecked (types shipped in `dist`), but the subpath never worked
+      from npm — the shim reads fixture `.sql` files that were never published, so every call
+      failed with ENOENT before touching a database. Delete any import of
+      `@prisma-next/extension-supabase/test/utils`; keep hermetic test helpers package-internal
+      (tests import them by source path) rather than publishing them as subpath exports whose
+      on-disk fixtures don't ship. For Supabase-shaped testing, use Supabase's own tooling
+      (`supabase start` / `supabase db reset`, `supabase test db` with pgTAP).
+    detection:
+      glob: "**/*.{ts,mts,cts,js,mjs}"
+      contains:
+        - "extension-supabase/test/utils"
+      anyMatch: true
 ---
 
 <!--

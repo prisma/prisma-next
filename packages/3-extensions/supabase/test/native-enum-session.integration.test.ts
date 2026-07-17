@@ -3,7 +3,7 @@
  * `native_enum AalLevel` in `auth` (member set `aal1`/`aal2`/`aal3`, mapped to
  * the Postgres type `aal_level`) and a `sessions` table with an `aal
  * pg.enum(AalLevel)?` column. Both are external — Prisma Next emits no DDL
- * for them; `bootstrapSupabaseShim` seeds `CREATE TYPE auth.aal_level` and
+ * for them; `setUpSupabaseMockSchema` seeds `CREATE TYPE auth.aal_level` and
  * `auth.sessions` directly, mirroring the existing `auth.users`/`storage.*`
  * seed pattern.
  *
@@ -24,12 +24,12 @@
  *      query executes against real Postgres and returns the expected row.
  */
 
-import type { SupabaseInternalDb } from '@prisma-next/extension-supabase/runtime';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { createDb } from '../src/prisma/db';
-import { findSessionsByAal, readSessionAal } from '../src/session-queries';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import type { SupabaseInternalDb } from '../src/exports/runtime';
+import { createDb } from './fixtures/example-app/db';
+import { findSessionsByAal, readSessionAal } from './fixtures/example-app/session-queries';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 const sessionId = '30000000-0000-0000-0000-000000000001';
 const userId = '30000000-0000-0000-0000-000000000002';
@@ -62,7 +62,11 @@ describe('native Postgres enum (auth.aal_level) on auth.sessions', () => {
 
       try {
         await withClient(connectionString, async (pg) => {
-          await bootstrapSupabaseShim(pg);
+          await setUpSupabaseMockSchema(pg);
+          // Narrow admin-read grant (mirrors real Supabase, where service_role
+          // has no table privileges on auth.* by default).
+          await pg.query('GRANT USAGE ON SCHEMA auth TO service_role');
+          await pg.query('GRANT SELECT ON TABLE auth.sessions TO service_role');
         });
         await seedSession(connectionString, 'aal2');
 
@@ -98,7 +102,11 @@ describe('native Postgres enum (auth.aal_level) on auth.sessions', () => {
 
       try {
         await withClient(connectionString, async (pg) => {
-          await bootstrapSupabaseShim(pg);
+          await setUpSupabaseMockSchema(pg);
+          // Narrow admin-read grant (mirrors real Supabase, where service_role
+          // has no table privileges on auth.* by default).
+          await pg.query('GRANT USAGE ON SCHEMA auth TO service_role');
+          await pg.query('GRANT SELECT ON TABLE auth.sessions TO service_role');
         });
 
         const db = await createDb(connectionString);
@@ -138,7 +146,11 @@ describe('native Postgres enum (auth.aal_level) on auth.sessions', () => {
 
       try {
         await withClient(connectionString, async (pg) => {
-          await bootstrapSupabaseShim(pg);
+          await setUpSupabaseMockSchema(pg);
+          // Narrow admin-read grant (mirrors real Supabase, where service_role
+          // has no table privileges on auth.* by default).
+          await pg.query('GRANT USAGE ON SCHEMA auth TO service_role');
+          await pg.query('GRANT SELECT ON TABLE auth.sessions TO service_role');
         });
         await seedSession(connectionString, 'aal2');
 

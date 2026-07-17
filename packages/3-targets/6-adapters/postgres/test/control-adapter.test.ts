@@ -149,7 +149,7 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return {
               rows: [
                 {
@@ -161,10 +161,10 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -221,13 +221,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -276,13 +276,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -331,13 +331,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -386,13 +386,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -451,13 +451,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -502,9 +502,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('PRIMARY KEY'), rows: [] },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -601,9 +601,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('PRIMARY KEY'), rows: [] },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -650,7 +650,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [
             {
               table_name: 'post',
@@ -661,7 +661,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('FOREIGN KEY'),
+          match: includes("contype = 'f'"),
           rows: [
             {
               table_name: 'post',
@@ -676,7 +676,7 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -738,7 +738,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [
             {
               table_name: 'order',
@@ -749,7 +749,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('FOREIGN KEY'),
+          match: includes("contype = 'f'"),
           rows: [
             {
               table_name: 'order',
@@ -775,7 +775,7 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -825,7 +825,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [
             {
               table_name: 'user',
@@ -835,9 +835,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
         {
-          match: (sql) => sql.includes("constraint_type = 'UNIQUE'"),
+          match: (sql) => sql.includes("contype = 'u'"),
           rows: [
             {
               table_name: 'user',
@@ -889,12 +889,12 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [],
         },
-        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
         {
-          match: (sql) => sql.includes("constraint_type = 'UNIQUE'"),
+          match: (sql) => sql.includes("contype = 'u'"),
           rows: [
             {
               table_name: 'user',
@@ -952,7 +952,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [
             {
               table_name: 'user',
@@ -962,8 +962,8 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         {
           match: includes('pg_indexes'),
           rows: [
@@ -1017,11 +1017,11 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [],
         },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         {
           match: includes('pg_indexes'),
           rows: [
@@ -1081,7 +1081,7 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return {
               rows: [
                 {
@@ -1093,10 +1093,10 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -1179,7 +1179,7 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return {
               rows: [
                 {
@@ -1191,10 +1191,10 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -1358,13 +1358,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -1413,7 +1413,7 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return {
               rows: [
                 {
@@ -1425,10 +1425,10 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -1528,9 +1528,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('PRIMARY KEY'), rows: [] },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -1576,7 +1576,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [
             {
               table_name: 'user',
@@ -1592,9 +1592,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
         {
-          match: (sql) => sql.includes("constraint_type = 'UNIQUE'"),
+          match: (sql) => sql.includes("contype = 'u'"),
           rows: [
             {
               table_name: 'user',
@@ -1661,9 +1661,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('PRIMARY KEY'), rows: [] },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -1710,9 +1710,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('PRIMARY KEY'), rows: [] },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -1747,9 +1747,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('PRIMARY KEY'), rows: [] },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },

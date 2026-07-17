@@ -273,6 +273,73 @@ jobs:
         if: needs.changes.outputs.inert != 'true'
         run: pnpm check:clean-tree
 
+  # Runs the real-Supabase acceptance harness against a live local Supabase
+  # stack (`supabase start`), so the extension's role/grant/JWT behaviour is
+  # proven against real platform defaults on every PR — the hermetic shim
+  # alone let fidelity bugs ship (TML-3035 findings §5/§6/§8). Skips its
+  # steps only on inert (docs-only) diffs; any change under packages/** or
+  # examples/** is non-inert, so extension-supabase, examples/supabase, and
+  # postgres target/adapter changes always run it.
+  supabase-acceptance:
+    name: Supabase Acceptance
+    needs: [build, changes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TEST_TIMEOUT_MULTIPLIER: 2
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      # Installed from the pinned release binary rather than
+      # supabase/setup-cli: the org allowlists actions, and only the
+      # repositories already used by this workflow are on it. Bumping the
+      # CLI is a two-line change (version + sha, both from the release's
+      # supabase_<version>_checksums.txt).
+      - name: Install Supabase CLI (pinned release binary)
+        if: needs.changes.outputs.inert != 'true'
+        env:
+          SUPABASE_CLI_VERSION: 2.95.4
+          SUPABASE_CLI_SHA256: 01a3b8f5861d108a934937cae88e8d503093c3f7d3aa32d959f69b099b4f9ef3
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/supabase.tar.gz" \
+            "https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/supabase_linux_amd64.tar.gz"
+          echo "$SUPABASE_CLI_SHA256  $RUNNER_TEMP/supabase.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/supabase.tar.gz" -C "$RUNNER_TEMP/bin" supabase
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Install dependencies
+        if: needs.changes.outputs.inert != 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Build (restored from Turbo cache)
+        if: needs.changes.outputs.inert != 'true'
+        run: pnpm build
+      - name: Start local Supabase stack
+        if: needs.changes.outputs.inert != 'true'
+        working-directory: examples/supabase
+        run: supabase start
+      - name: Export stack credentials for the acceptance harness
+        if: needs.changes.outputs.inert != 'true'
+        working-directory: examples/supabase
+        run: |
+          set -euo pipefail
+          supabase status -o env > "$RUNNER_TEMP/supabase-status.env"
+          set -a
+          # shellcheck disable=SC1091
+          . "$RUNNER_TEMP/supabase-status.env"
+          set +a
+          {
+            echo "DATABASE_URL=$DB_URL"
+            echo "SUPABASE_JWT_SECRET=$JWT_SECRET"
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_ANON_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+      - name: Run the real-Supabase acceptance harness
+        if: needs.changes.outputs.inert != 'true'
+        run: pnpm --filter @prisma-next/example-supabase test test/real-supabase.acceptance.test.ts
+
   coverage:
     name: Coverage
     needs: [build, changes]

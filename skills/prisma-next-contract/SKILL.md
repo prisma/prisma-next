@@ -334,7 +334,7 @@ export default defineConfig({
 
 `db.ts` does **not** use the stock `postgres()` factory — a Supabase app builds its client with the `supabase()` factory from `@prisma-next/extension-supabase/runtime` (role-first: `asUser(jwt)` / `asAnon()` / `asServiceRole()`, JWT validation, RLS). That runtime — and RLS policy authoring (`policy_select` / `@@rls`) — is covered by **`prisma-next-supabase`**; load it for anything past the config wiring.
 
-Export subpaths: `@prisma-next/extension-supabase/pack`, `@prisma-next/extension-supabase/runtime`, `@prisma-next/extension-supabase/contract`, `@prisma-next/extension-supabase/test/utils`. Canonical worked example: `examples/supabase`.
+Export subpaths: `@prisma-next/extension-supabase/pack`, `@prisma-next/extension-supabase/runtime`, `@prisma-next/extension-supabase/contract`. Canonical worked example: `examples/supabase`.
 
 ## Workflow — Brownfield introspection
 

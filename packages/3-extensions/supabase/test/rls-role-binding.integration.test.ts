@@ -16,13 +16,13 @@
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import supabasePack from '@prisma-next/extension-supabase/pack';
-import { InvalidJwtError } from '@prisma-next/extension-supabase/runtime';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlMiddleware } from '@prisma-next/sql-runtime';
@@ -30,9 +30,12 @@ import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import contractJson from '../src/contract.json' with { type: 'json' };
-import { createDb, fixtureJwt } from '../src/prisma/db';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import supabasePack from '../src/exports/pack';
+import { InvalidJwtError, supabase } from '../src/exports/runtime';
+import type { Contract } from './fixtures/example-app/contract';
+import contractJson from './fixtures/example-app/contract.json' with { type: 'json' };
+import { createDb, fixtureJwt } from './fixtures/example-app/db';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 async function signJwt(
   payload: Record<string, unknown>,
@@ -89,11 +92,9 @@ async function runDbInit(connectionString: string, migrationsDir: string): Promi
 
 async function applyGrantsFixture(connectionString: string): Promise<void> {
   await withClient(connectionString, async (pg) => {
-    // Explicit per-table grants for the RLS policies dbInit applies (roles created by bootstrapSupabaseShim).
-    await pg.query('GRANT SELECT ON public.profile TO anon, authenticated');
-    await pg.query('GRANT ALL ON public.profile TO service_role');
-    await pg.query('GRANT INSERT ON public.profile TO service_role');
-    await pg.query('GRANT UPDATE ON public.profile TO authenticated');
+    // No public.profile grants: the restored fixture carries real Supabase's
+    // default privileges for the postgres role, so tables dbInit creates in
+    // public already grant the platform roles — RLS scopes the rows.
 
     // PGlite uses a single connection, so the @prisma/dev WAL drain query
     // (DELETE FROM "_prisma_dev_wal"."events" RETURNING ...) can fire while one
@@ -135,7 +136,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
 
       // Seed external schema shim (auth.users etc.) + apply public.profile DDL.
       await withClient(connectionString, async (pg) => {
-        await bootstrapSupabaseShim(pg);
+        await setUpSupabaseMockSchema(pg);
       });
       await runDbInit(connectionString, migrationsDir);
       await applyGrantsFixture(connectionString);
@@ -224,7 +225,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await bootstrapSupabaseShim(pg);
+        await setUpSupabaseMockSchema(pg);
       });
       await runDbInit(connectionString, migrationsDir);
       await applyGrantsFixture(connectionString);
@@ -302,7 +303,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await bootstrapSupabaseShim(pg);
+        await setUpSupabaseMockSchema(pg);
       });
       await runDbInit(connectionString, migrationsDir);
 
@@ -317,6 +318,76 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
         await expect(db.asUser(expiredJwt)).rejects.toThrow(InvalidJwtError);
       } finally {
         await db.close();
+      }
+    },
+    timeouts.spinUpPpgDev * 4,
+  );
+
+  it(
+    'asUser verifies an ES256 token via a JWKS endpoint (current Supabase default) and RLS scopes the read',
+    async () => {
+      const { connectionString } = database;
+
+      await withClient(connectionString, async (pg) => {
+        await setUpSupabaseMockSchema(pg);
+      });
+      await runDbInit(connectionString, migrationsDir);
+      await applyGrantsFixture(connectionString);
+
+      const userAId = crypto.randomUUID();
+      const userBId = crypto.randomUUID();
+      const profileAId = crypto.randomUUID();
+      const profileBId = crypto.randomUUID();
+      const now = new Date().toISOString();
+
+      await withClient(connectionString, async (pg) => {
+        await pg.query(
+          'INSERT INTO auth.users (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3), ($4, $5, $3, $3)',
+          [userAId, 'user-a@example.com', now, userBId, 'user-b@example.com'],
+        );
+        await pg.query(
+          'INSERT INTO public.profile (id, username, "userId") VALUES ($1, $2, $3), ($4, $5, $6)',
+          [profileAId, 'alice', userAId, profileBId, 'bob', userBId],
+        );
+      });
+
+      // Current Supabase projects sign ES256 with keys published at
+      // /auth/v1/.well-known/jwks.json — mirror that with an in-test keypair
+      // and a local JWKS endpoint the client fetches at first verification.
+      const { generateKeyPair, exportJWK } = await import('jose');
+      const { publicKey, privateKey } = await generateKeyPair('ES256', { extractable: true });
+      const kid = crypto.randomUUID();
+      const jwks = { keys: [{ ...(await exportJWK(publicKey)), kid, alg: 'ES256', use: 'sig' }] };
+      const jwksServer = createServer((_req, res) => {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify(jwks));
+      });
+      await new Promise<void>((resolve) => jwksServer.listen(0, '127.0.0.1', resolve));
+      const { port } = jwksServer.address() as AddressInfo;
+      const jwksUrl = `http://127.0.0.1:${port}/auth/v1/.well-known/jwks.json`;
+
+      try {
+        const db = await supabase<Contract>({ contractJson, url: connectionString, jwksUrl });
+        try {
+          const jwtA = await new SignJWT({ sub: userAId, role: 'authenticated' })
+            .setProtectedHeader({ alg: 'ES256', kid })
+            .setExpirationTime('1h')
+            .sign(privateKey);
+
+          const userADb = await db.asUser(jwtA);
+          const rows = await userADb.orm.public.Profile.select('id', 'username', 'userId')
+            .all()
+            .toArray();
+          expect(rows).toEqual([{ id: profileAId, username: 'alice', userId: userAId }]);
+        } finally {
+          await db.close();
+        }
+      } finally {
+        // Outer finally so the listening JWKS server is closed even when
+        // client creation itself rejects — a leaked server hangs the worker.
+        await new Promise<void>((resolve, reject) =>
+          jwksServer.close((err) => (err ? reject(err) : resolve())),
+        );
       }
     },
     timeouts.spinUpPpgDev * 4,

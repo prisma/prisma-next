@@ -2,10 +2,10 @@
  * Integration test — Supabase roles enter `db verify` as first-class
  * contract entities on a live PGlite database.
  *
- *   1. Negative: a vanilla database (no `bootstrapSupabaseShim`) fails
+ *   1. Negative: a vanilla database (no `setUpSupabaseMockSchema`) fails
  *      `db verify` with a `not-found` schema issue naming each of `anon`,
  *      `authenticated`, `service_role` under the supabase contract space.
- *   2. Positive: `bootstrapSupabaseShim` creates the roles, `db init` applies
+ *   2. Positive: `setUpSupabaseMockSchema` creates the roles, `db init` applies
  *      the app schema, and `db verify` passes with zero issues across every
  *      space — the role portion verifies clean when the roles exist.
  */
@@ -26,7 +26,7 @@ import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SupabaseRole } from '../src/contract/roles';
 import supabasePack from '../src/exports/pack';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 const pgUuid = { codecId: 'pg/uuid@1', nativeType: 'uuid', nullable: false } as const;
 
@@ -139,7 +139,7 @@ describe('roles enter db verify — declared in the pack contract, checked again
       const appContractJson = serializer.serializeContract(appContract);
 
       await withClient(connectionString, async (pgClient) => {
-        await bootstrapSupabaseShim(pgClient);
+        await setUpSupabaseMockSchema(pgClient);
       });
 
       await materialiseSpaces(appContractJson, String(appContract.storage.storageHash));

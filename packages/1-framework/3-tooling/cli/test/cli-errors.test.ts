@@ -63,7 +63,7 @@ describe('errorPathUnreachable', () => {
     expect((envelope.fix ?? '').toLowerCase()).toContain('hint');
   });
 
-  it('omits the --from clause when the runner kind is neverPlanned (no fromHash in meta)', () => {
+  it('prescribes a bare plan command when the runner kind is neverPlanned (no graph to resolve --to against)', () => {
     const failure: MigrateFailure = {
       code: 'MIGRATION_PATH_NOT_FOUND',
       summary: 'No on-disk migrations for contract space "app"',
@@ -71,7 +71,10 @@ describe('errorPathUnreachable', () => {
       meta: { spaceId: 'app', kind: 'neverPlanned', target: targetHash },
     };
     const envelope = errorPathUnreachable(failure).toEnvelope();
-    expect(envelope.fix).toContain(`prisma-next migration plan --to ${targetHash} --name <slug>`);
+    // A never-planned space has an EMPTY graph, and `--to <hash>` only
+    // resolves against graph nodes — the remediation must run verbatim.
+    expect(envelope.fix).toContain('prisma-next migration plan --name <slug>');
+    expect(envelope.fix).not.toContain('--to');
     expect(envelope.fix).not.toContain('--from');
     expect(envelope.fix).not.toContain('<unknown>');
   });
@@ -135,8 +138,11 @@ describe('errorPathUnreachable', () => {
     expect(envelope.why?.toLowerCase()).toContain('no migrations');
     expect(envelope.why).not.toContain('migration plan');
 
-    expect(envelope.fix).toContain(`prisma-next migration plan --to ${targetHash} --name <slug>`);
-    expect(envelope.fix).toContain(`prisma-next migrate --to ${targetHash}`);
+    // A never-planned space has an empty graph; the fix must not
+    // prescribe a `--to <hash>` the empty graph cannot resolve.
+    expect(envelope.fix).toContain('prisma-next migration plan --name <slug>');
+    expect(envelope.fix).toContain('prisma-next migrate');
+    expect(envelope.fix).not.toContain('--to');
     expect((envelope.fix ?? '').toLowerCase()).toContain('destructive');
     expect((envelope.fix ?? '').toLowerCase()).toContain('hint');
   });

@@ -12,7 +12,7 @@
  *   2. The supabase extension space's plan covers only the `public.profile`
  *      DDL via the app space.
  *   3. `db verify` **passes** after `db init` because:
- *      - The `bootstrapSupabaseShim` pre-seeded the external tables, so the
+ *      - The `setUpSupabaseMockSchema` pre-seeded the external tables, so the
  *        verifier's `external` policy (`declaredMissing` → fail) is satisfied.
  *      - Extra columns / tables in the live DB are suppressed by `external`
  *        policy.
@@ -44,7 +44,6 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import { coreHash, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import supabasePack from '@prisma-next/extension-supabase/pack';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -53,16 +52,17 @@ import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime
 import { PostgresRole, PostgresSchema } from '@prisma-next/target-postgres/types';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Contract } from '../src/contract';
-import contractJson from '../src/contract.json' with { type: 'json' };
-import { createDb } from '../src/prisma/db';
+import supabasePack from '../src/exports/pack';
+import type { Contract } from './fixtures/example-app/contract';
+import contractJson from './fixtures/example-app/contract.json' with { type: 'json' };
+import { createDb } from './fixtures/example-app/db';
 import type { Contract as NoPolicyContract } from './fixtures/no-policy/contract';
 import noPolicyContractJson from './fixtures/no-policy/contract.json' with { type: 'json' };
 import type { Contract as RenamedPolicyContract } from './fixtures/renamed-policy/contract';
 import renamedPolicyContractJson from './fixtures/renamed-policy/contract.json' with {
   type: 'json',
 };
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 // Derive the policy wire name from the deserialized contract rather than pinning a literal.
 // The public namespace holds exactly one policy; its `.name` is the content-addressed wire name.
@@ -113,7 +113,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       // `auth.*` / `storage.*` table — the verifier's `external` policy
       // confirms declared tables actually exist.
       await withClient(connectionString, async (client) => {
-        await bootstrapSupabaseShim(client);
+        await setUpSupabaseMockSchema(client);
       });
 
       // Step 2 — Materialise the supabase extension space on disk.
@@ -281,7 +281,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
 
       // Seed external schemas + tables.
       await withClient(connectionString, async (client) => {
-        await bootstrapSupabaseShim(client);
+        await setUpSupabaseMockSchema(client);
       });
 
       // Materialise the supabase extension space on disk so dbInit can read it.
@@ -371,6 +371,12 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         // Delete the auth.users row via raw SQL — the cross-space FK ON DELETE CASCADE
         // fires and removes the public.profile row.
         await withClient(connectionString, async (pg) => {
+          // PGlite single-connection accommodation: the role-bound `sr`
+          // session above shares the physical session, and its
+          // `set_config('role', 'service_role', false)` persists on it.
+          // Reset so this platform-admin delete runs as postgres — on a
+          // real Supabase (separate sessions) no reset is needed.
+          await pg.query('RESET ROLE');
           await pg.query('DELETE FROM auth.users WHERE id = $1', [userId]);
         });
 
@@ -400,7 +406,7 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
     migrationsDir = await mkdtemp(join(tmpdir(), 'supabase-rls-e2e-'));
 
     await withClient(database.connectionString, async (pgClient) => {
-      await bootstrapSupabaseShim(pgClient);
+      await setUpSupabaseMockSchema(pgClient);
     });
 
     const space = supabasePack.contractSpace;
