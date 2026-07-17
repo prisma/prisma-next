@@ -205,24 +205,52 @@ withTempDir(({ createTempDir }) => {
           expect(errorJson.meta?.spaceId).toBe('app');
 
           // The remediation must not prescribe a hash the planner cannot
-          // resolve (an empty graph has no nodes to resolve hashes against).
+          // resolve (an empty graph has no nodes to resolve hashes against),
+          // and its two numbered steps must be exactly the plan-then-apply
+          // commands asserted here — if the printed text drifts, this
+          // parse-and-execute round fails rather than silently running
+          // hard-coded commands.
           const fix = errorJson.fix ?? '';
-          expect(fix).toContain('prisma-next migration plan --name <slug>');
           expect(fix).not.toContain('--to sha256:');
+          const numberedCommands = fix
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => /^\d+\.\s/.test(line))
+            .map((line) => line.replace(/^\d+\.\s+/, ''));
+          expect(numberedCommands).toEqual([
+            'prisma-next migration plan --name <slug>',
+            'prisma-next migrate',
+          ]);
 
-          // Run the remediation verbatim (with <slug> substituted), then
-          // the suggested migrate — it must succeed.
+          // Execute the printed remediation: derive each command's argv from
+          // the fix text itself, substituting the <slug> placeholder (plus
+          // the harness plumbing every invocation needs: --config/--json).
+          const [planCommand, migrateCommand] = numberedCommands;
+          const planArgs = (planCommand ?? '')
+            .replace(/^prisma-next migration plan\s*/, '')
+            .replaceAll('<slug>', 'initial')
+            .split(/\s+/)
+            .filter((arg) => arg.length > 0);
           const planExit = await runMigrationPlan(testDir, [
+            ...planArgs,
             '--config',
             configPath,
-            '--name',
-            'initial',
             '--no-color',
           ]);
           expect(planExit).toBe(0);
 
+          const migrateArgs = (migrateCommand ?? '')
+            .replace(/^prisma-next migrate\s*/, '')
+            .split(/\s+/)
+            .filter((arg) => arg.length > 0);
           consoleOutput.length = 0;
-          await runMigrate(testDir, ['--config', configPath, '--json', '--no-color']);
+          await runMigrate(testDir, [
+            ...migrateArgs,
+            '--config',
+            configPath,
+            '--json',
+            '--no-color',
+          ]);
           const parsed = parseJsonObjectFromCliCapture(consoleOutput) as MigrateResult;
           expect(parsed.ok).toBe(true);
         });
