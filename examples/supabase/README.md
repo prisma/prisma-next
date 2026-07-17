@@ -1,6 +1,6 @@
 # Supabase example
 
-The canonical runnable Prisma Next + Supabase app, and the walking skeleton the [`extension-supabase`](../../packages/3-extensions/supabase) integration was built against. It exercises every piece of the stack end-to-end against a real Postgres (PGlite for the hermetic lane; a live `supabase start` stack for the acceptance run — both in CI).
+The canonical runnable Prisma Next + Supabase app, and the walking skeleton the [`extension-supabase`](../../packages/3-extensions/supabase) integration was built against. Its test suite runs end-to-end against a live `supabase start` stack — locally against your own, and in CI on every PR. (Hermetic PGlite coverage of the same flows lives with the extension package.)
 
 ## What it demonstrates
 
