@@ -890,6 +890,27 @@ function buildScalarField(
     // same thing both identity variants and `serial` mean — so print it
     // directly rather than modelling the ALWAYS/BY-DEFAULT distinction.
     attributes.push(parseDefaultAttributeString('@default(autoincrement())'));
+  } else if (column.many === true && column.resolvedDefault?.kind === 'literal') {
+    // Postgres reports a list column's default as raw SQL text (e.g.
+    // `'{}'::text[]`), which the family-generic raw-default parser doesn't
+    // recognize as an array literal and falls back to printing
+    // `dbgenerated(...)` — a shape the interpreter always rejects on a list
+    // column, because `dbgenerated` only ever lowers to a storage-level
+    // function default and lists accept only literal defaults. The postgres
+    // control adapter already resolved the same raw text to a structured
+    // literal at introspection time (`resolvedDefault`), so print PSL's own
+    // literal-list syntax from that instead of re-deriving it from the raw
+    // string. PSL literal-list elements are string/number/boolean only; if
+    // the resolved value holds anything else (e.g. a nested object, or a
+    // null element), it has no literal-list spelling, so the default is
+    // omitted rather than printed as `dbgenerated` — an omitted default
+    // becomes a live-only "extra" under verify, not a false mismatch.
+    const formatted = Array.isArray(column.resolvedDefault.value)
+      ? formatPslListLiteralValue(column.resolvedDefault.value)
+      : undefined;
+    if (formatted !== undefined) {
+      attributes.push(parseDefaultAttributeString(`@default(${formatted})`));
+    }
   } else if (column.default !== undefined) {
     const parsed = parseColumnDefault(column.default, column.nativeType, rawDefaultParser);
     if (parsed) {
@@ -1078,6 +1099,27 @@ function escapePslString(value: string): string {
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n')
     .replace(/\r/g, '\\r');
+}
+
+/**
+ * Formats a resolved literal-default array as PSL literal-list syntax
+ * (`[1, 2, 3]`, `["a", "b"]`, `[]`). PSL's list-literal grammar only accepts
+ * string/number/boolean elements, so any other element (e.g. `null`, a
+ * nested array/object) makes the value unrepresentable and this returns
+ * `undefined`.
+ */
+function formatPslListLiteralValue(elements: readonly unknown[]): string | undefined {
+  const parts: string[] = [];
+  for (const element of elements) {
+    if (typeof element === 'string') {
+      parts.push(`"${escapePslString(element)}"`);
+    } else if (typeof element === 'number' || typeof element === 'boolean') {
+      parts.push(String(element));
+    } else {
+      return undefined;
+    }
+  }
+  return `[${parts.join(', ')}]`;
 }
 
 /**

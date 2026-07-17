@@ -227,6 +227,22 @@ and the round-trip journey proves the array default survives without the check b
 is still rejected. That is the pre-existing behaviour, so leaving it is not a regression. Worth a
 follow-up, not worth widening the check for.
 
+> **"No fix of its own" was also wrong.** Defect 8 ended up fixed at compare time — the
+> `resolveDefault` hook that normalizes a contract-declared default only runs when building the
+> expected-side `SchemaIR` for verify, after emit has already accepted the field. It never runs
+> during authoring, so `dbgenerated("'{}'::text[]")` on a list column still lowers to
+> `kind: 'function'` at emit time and still hits `PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED`. Defect
+> 7 stayed reproducible after defect 8 landed.
+>
+> The actual fix: PSL already has literal list syntax (`@default([...])`), and the interpreter
+> already lowers it to `kind: 'literal'` without ever reaching the list check. Infer just never
+> printed it — for any raw default it couldn't otherwise map, it fell back to `dbgenerated(<raw
+> text>)`. The postgres control adapter already resolves a list column's raw default to a
+> structured literal at introspection time (`resolvedDefault`, the same mechanism defect 3 uses
+> for identity columns), so infer now prints PSL literal-list syntax from that resolved value
+> instead of the raw-text fallback. No interpreter change, no framework change: the fix lives
+> entirely in `infer-psl-contract.ts`'s `buildScalarField`.
+
 ### 8. A `dbgenerated` literal default reports drift forever
 
 > **Widened after D6 exposed a second instance.** This was originally written as a jsonb defect.

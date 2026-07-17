@@ -154,8 +154,8 @@ namespace auth {
     name                String
     clientId            String    @map("client_id")
     clientSecret        String    @map("client_secret")
-    acceptableClientIds String[]  @map("acceptable_client_ids")
-    scopes              String[]
+    acceptableClientIds String[]  @default([]) @map("acceptable_client_ids")
+    scopes              String[]  @default([])
     pkceEnabled         Boolean   @default(true) @map("pkce_enabled")
     attributeMapping    Json      @default(dbgenerated("'{}'::jsonb")) @map("attribute_mapping")
     authorizationParams Json      @default(dbgenerated("'{}'::jsonb")) @map("authorization_params")

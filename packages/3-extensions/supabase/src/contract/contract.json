@@ -4832,6 +4832,10 @@
               "columns": {
                 "acceptable_client_ids": {
                   "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": []
+                  },
                   "many": true,
                   "nativeType": "text",
                   "nullable": false
@@ -4957,6 +4961,10 @@
                 },
                 "scopes": {
                   "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": []
+                  },
                   "many": true,
                   "nativeType": "text",
                   "nullable": false
@@ -8334,7 +8342,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:04d9f28dadbe0895ea6937df7dc605c36540144fcc50ad3ed58af72097d70230",
+    "storageHash": "sha256:1856d476008cdfac9fd383f74be8015f6cb313515966c3c6cba4067f5bc15858",
     "types": {
       "CreatedAt": {
         "codecId": "pg/timestamp@1",

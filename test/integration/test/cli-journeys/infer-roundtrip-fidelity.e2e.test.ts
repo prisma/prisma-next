@@ -91,11 +91,6 @@ function fixOneToOneBackRelation(psl: string): string {
   return psl.replace(/^\s*identities\s+Identities\?\s*$\n/m, '');
 }
 
-/** Removes the storage-level list default infer prints on `Users.tags`. */
-function fixListDefault(psl: string): string {
-  return psl.replace(/\s*@default\(dbgenerated\("'\{\}'::text\[\]"\)\)/, '');
-}
-
 /** Strips the non-btree `type:` argument infer prints on both `@@index` attributes. */
 function fixIndexTypes(psl: string): string {
   return psl.replace(/,\s*type: "(?:gin|hash)"/g, '');
@@ -140,10 +135,10 @@ withTempDir(({ createTempDir }) => {
         const infer = await runContractInfer(ctx);
         expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
-        // Isolate the 1:1 back-relation defect: fix the two unrelated
-        // emit-blockers (list default, non-btree index types) so any failure
-        // here is attributable to the 1:1 back-relation alone.
-        const reduced = fixIndexTypes(fixListDefault(readContractPsl(ctx)));
+        // Isolate the 1:1 back-relation defect: fix the one remaining
+        // unrelated emit-blocker (non-btree index types) so any failure here
+        // is attributable to the 1:1 back-relation alone.
+        const reduced = fixIndexTypes(readContractPsl(ctx));
         writeContractPsl(ctx, reduced);
 
         const emit = await runContractEmit(ctx);
@@ -179,9 +174,9 @@ withTempDir(({ createTempDir }) => {
           /\w+\s+Accounts\?\s+@relation\(name: "[^"]+"\)\s*$/m,
         );
 
-        // Isolate the named-back-relation defect: fix the two unrelated
-        // emit-blockers (list default, non-btree index types).
-        const reduced = fixIndexTypes(fixListDefault(psl));
+        // Isolate the named-back-relation defect: fix the one remaining
+        // unrelated emit-blocker (non-btree index types).
+        const reduced = fixIndexTypes(psl);
         writeContractPsl(ctx, reduced);
 
         const emit = await runContractEmit(ctx);
@@ -215,7 +210,7 @@ withTempDir(({ createTempDir }) => {
           /\w+\s+Categories\?\s+@relation\(name: "[^"]+"\)\s*$/m,
         );
 
-        const reduced = fixIndexTypes(fixListDefault(psl));
+        const reduced = fixIndexTypes(psl);
         writeContractPsl(ctx, reduced);
 
         const emit = await runContractEmit(ctx);
@@ -229,7 +224,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'the interpreter accepts the storage-level list default infer prints for text[]',
+      'infer prints the empty-array default on tags as a PSL literal list, and it round-trips clean',
       async () => {
         const ctx: JourneyContext = setupJourney({
           connectionString: db.connectionString,
@@ -240,16 +235,30 @@ withTempDir(({ createTempDir }) => {
         const infer = await runContractInfer(ctx);
         expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
-        // Isolate the list-default defect: fix the two unrelated emit-blockers
-        // (1:1 back-relation, non-btree index types).
-        const reduced = fixIndexTypes(fixOneToOneBackRelation(readContractPsl(ctx)));
+        const psl = readContractPsl(ctx);
+        expect(psl, 'Users.tags carries a PSL literal-list default, not dbgenerated').toMatch(
+          /tags\s+String\[\]\s+@default\(\[\]\)/,
+        );
+
+        // Isolate the list-default defect: fix the one remaining unrelated
+        // emit-blocker (1:1 back-relation). The gin/hash index types are left
+        // exactly as infer printed them — postgres already registers those
+        // access methods (TML-3037) — so verify below also proves that fix
+        // stays clean alongside this one.
+        const reduced = fixOneToOneBackRelation(psl);
         writeContractPsl(ctx, reduced);
 
         const emit = await runContractEmit(ctx);
         expect(
           emit.exitCode,
-          `contract emit should accept @default(dbgenerated("'{}'::text[]")) on Users.tags; ` +
+          'contract emit should accept @default([]) on Users.tags; ' +
             `instead got:\n${stripAnsi(emit.stderr)}\n${stripAnsi(emit.stdout)}`,
+        ).toBe(0);
+
+        const verify = await runDbVerify(ctx, ['--schema-only']);
+        expect(
+          verify.exitCode,
+          `db verify --schema-only should be clean for Users.tags; instead got:\n${stripAnsi(verify.stderr)}\n${stripAnsi(verify.stdout)}`,
         ).toBe(0);
       },
       timeouts.spinUpPpgDev,
@@ -267,9 +276,9 @@ withTempDir(({ createTempDir }) => {
         const infer = await runContractInfer(ctx);
         expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
-        // Isolate the index-type defect: fix the two unrelated emit-blockers
-        // (1:1 back-relation, list default).
-        const reduced = fixListDefault(fixOneToOneBackRelation(readContractPsl(ctx)));
+        // Isolate the index-type defect: fix the one remaining unrelated
+        // emit-blocker (1:1 back-relation).
+        const reduced = fixOneToOneBackRelation(readContractPsl(ctx));
         writeContractPsl(ctx, reduced);
 
         const emit = await runContractEmit(ctx);
@@ -346,14 +355,15 @@ withTempDir(({ createTempDir }) => {
         const infer = await runContractInfer(ctx);
         expect(infer.exitCode, `contract infer\n${stripAnsi(infer.stderr)}`).toBe(0);
 
-        // Fix the two unrelated emit-blockers (1:1 back-relation, list
-        // default) so emit succeeds and verify can run. The gin/hash indexes
-        // are left exactly as infer printed them — postgres now registers
-        // those access methods (TML-3037), so they emit and round-trip
-        // clean against the live gin/hash indexes, proving that fix here
-        // too. Only the jsonb default on Users.metadata is left broken, which
-        // is what this test is for.
-        const reduced = fixListDefault(fixOneToOneBackRelation(readContractPsl(ctx)));
+        // Fix the one remaining unrelated emit-blocker (1:1 back-relation) so
+        // emit succeeds and verify can run. The gin/hash indexes and the tags
+        // list default are left exactly as infer printed them — postgres now
+        // registers those access methods and infer now prints a literal-list
+        // default (TML-3037), so they emit and round-trip clean against the
+        // live gin/hash indexes and the live tags default, proving those
+        // fixes too. Only the jsonb default on Users.metadata is left broken,
+        // which is what this test is for.
+        const reduced = fixOneToOneBackRelation(readContractPsl(ctx));
         writeContractPsl(ctx, reduced);
 
         const emit = await runContractEmit(ctx);
