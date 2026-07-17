@@ -81,6 +81,8 @@ export type {
 } from '../core/migrations/types';
 export {
   temporalAuthoringPresets,
+  temporalCodecPreset,
+  temporalCodecPresetWithPrecision,
   timestampNowControlDescriptor,
 } from '../core/timestamp-now-generator';
 

@@ -73,3 +73,91 @@ export function temporalAuthoringPresets<
     },
   } as const satisfies Record<string, AuthoringFieldPresetDescriptor>;
 }
+
+const TEMPORAL_PRECISION_ARG = {
+  name: 'precision',
+  kind: 'number',
+  optional: true,
+  integer: true,
+  minimum: 0,
+} as const;
+
+const TEMPORAL_ON_CREATE_ARG = {
+  name: 'onCreate',
+  kind: 'option',
+  values: ['now'],
+  optional: true,
+} as const;
+
+const TEMPORAL_ON_UPDATE_ARG = {
+  name: 'onUpdate',
+  kind: 'option',
+  values: ['now'],
+  optional: true,
+} as const;
+
+/**
+ * Maps the preset's `now` token to the `timestampNow` generator descriptor.
+ * The token is preset vocabulary; the generator id never appears in a user's
+ * spelling (ADR 169 — `timestampNow` is preset-only).
+ */
+function temporalPhaseTemplate<const Index extends number>(index: Index) {
+  return {
+    kind: 'arg',
+    index,
+    map: { now: { kind: 'generator', id: TIMESTAMP_NOW_GENERATOR_ID } },
+  } as const;
+}
+
+/**
+ * Builds a `temporal.<codec>` field preset for a codec that takes a precision
+ * parameter (`pg/timestamp@1`, `pg/timestamptz@1`). Arguments change field
+ * properties only — never the codec, which the caller fixes here.
+ *
+ * All three arguments are optional: omitting `precision` omits `typeParams`
+ * entirely, and omitting a phase omits that phase (both omitted omits
+ * `executionDefaults`).
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export function temporalCodecPresetWithPrecision<
+  const CodecId extends string,
+  const NativeType extends string,
+>(input: { readonly codecId: CodecId; readonly nativeType: NativeType }) {
+  return {
+    kind: 'fieldPreset',
+    args: [TEMPORAL_PRECISION_ARG, TEMPORAL_ON_CREATE_ARG, TEMPORAL_ON_UPDATE_ARG],
+    output: {
+      codecId: input.codecId,
+      nativeType: input.nativeType,
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+      executionDefaults: {
+        onCreate: temporalPhaseTemplate(1),
+        onUpdate: temporalPhaseTemplate(2),
+      },
+    },
+  } as const satisfies AuthoringFieldPresetDescriptor;
+}
+
+/**
+ * Builds a `temporal.<codec>` field preset for a codec with no type
+ * parameters (`sqlite/datetime@1`). As with the precision-bearing variant,
+ * both phase arguments are optional and omitting one omits that phase.
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export function temporalCodecPreset<
+  const CodecId extends string,
+  const NativeType extends string,
+>(input: { readonly codecId: CodecId; readonly nativeType: NativeType }) {
+  return {
+    kind: 'fieldPreset',
+    args: [TEMPORAL_ON_CREATE_ARG, TEMPORAL_ON_UPDATE_ARG],
+    output: {
+      codecId: input.codecId,
+      nativeType: input.nativeType,
+      executionDefaults: {
+        onCreate: temporalPhaseTemplate(0),
+        onUpdate: temporalPhaseTemplate(1),
+      },
+    },
+  } as const satisfies AuthoringFieldPresetDescriptor;
+}
