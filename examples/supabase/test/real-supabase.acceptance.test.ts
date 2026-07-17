@@ -1,7 +1,8 @@
 /**
- * Real-Supabase acceptance test — the real-connection variant of
- * `rls-role-binding.integration.test.ts`. Runs the same RLS role-binding
- * flows against a live Supabase Postgres instead of PGlite.
+ * Real-Supabase acceptance test — the real-connection variant of the
+ * extension package's hermetic `rls-role-binding.integration.test.ts`.
+ * Runs the same RLS role-binding flows against a live Supabase Postgres
+ * instead of PGlite.
  *
  * Skipped (green) unless both `DATABASE_URL` (a direct, service_role-capable
  * connection to a real Supabase project) and `SUPABASE_JWT_SECRET` (the

@@ -1,7 +1,7 @@
 /**
  * Integration test — service_role reads `auth.refresh_tokens` through the
  * `.supabase` secondary root (see
- * examples/supabase/test/explicit-namespace-query.integration.test.ts for
+ * ./explicit-namespace-query.integration.test.ts for
  * the `auth.users` coverage this mirrors). `refresh_tokens` comes from the
  * introspection-generated complete contract, so this extends that coverage
  * beyond the handful of originally hand-declared tables.

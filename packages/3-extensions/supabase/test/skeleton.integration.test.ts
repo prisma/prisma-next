@@ -44,7 +44,6 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import { coreHash, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import supabasePack from '@prisma-next/extension-supabase/pack';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -53,16 +52,17 @@ import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime
 import { PostgresRole, PostgresSchema } from '@prisma-next/target-postgres/types';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Contract } from '../src/contract';
-import contractJson from '../src/contract.json' with { type: 'json' };
-import { createDb } from '../src/prisma/db';
+import supabasePack from '../src/exports/pack';
+import type { Contract } from './fixtures/example-app/contract';
+import contractJson from './fixtures/example-app/contract.json' with { type: 'json' };
+import { createDb } from './fixtures/example-app/db';
 import type { Contract as NoPolicyContract } from './fixtures/no-policy/contract';
 import noPolicyContractJson from './fixtures/no-policy/contract.json' with { type: 'json' };
 import type { Contract as RenamedPolicyContract } from './fixtures/renamed-policy/contract';
 import renamedPolicyContractJson from './fixtures/renamed-policy/contract.json' with {
   type: 'json',
 };
-import { restoreSupabaseReference } from './supabase-reference';
+import { restoreSupabaseReference } from './fixtures/supabase-reference/restore';
 
 // Derive the policy wire name from the deserialized contract rather than pinning a literal.
 // The public namespace holds exactly one policy; its `.name` is the content-addressed wire name.

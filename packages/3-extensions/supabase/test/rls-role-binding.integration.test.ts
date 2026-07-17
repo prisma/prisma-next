@@ -23,8 +23,6 @@ import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import supabasePack from '@prisma-next/extension-supabase/pack';
-import { InvalidJwtError, supabase } from '@prisma-next/extension-supabase/runtime';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlMiddleware } from '@prisma-next/sql-runtime';
@@ -32,10 +30,12 @@ import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Contract } from '../src/contract';
-import contractJson from '../src/contract.json' with { type: 'json' };
-import { createDb, fixtureJwt } from '../src/prisma/db';
-import { restoreSupabaseReference } from './supabase-reference';
+import supabasePack from '../src/exports/pack';
+import { InvalidJwtError, supabase } from '../src/exports/runtime';
+import type { Contract } from './fixtures/example-app/contract';
+import contractJson from './fixtures/example-app/contract.json' with { type: 'json' };
+import { createDb, fixtureJwt } from './fixtures/example-app/db';
+import { restoreSupabaseReference } from './fixtures/supabase-reference/restore';
 
 async function signJwt(
   payload: Record<string, unknown>,
@@ -366,21 +366,25 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
       const { port } = jwksServer.address() as AddressInfo;
       const jwksUrl = `http://127.0.0.1:${port}/auth/v1/.well-known/jwks.json`;
 
-      const db = await supabase<Contract>({ contractJson, url: connectionString, jwksUrl });
-
       try {
-        const jwtA = await new SignJWT({ sub: userAId, role: 'authenticated' })
-          .setProtectedHeader({ alg: 'ES256', kid })
-          .setExpirationTime('1h')
-          .sign(privateKey);
+        const db = await supabase<Contract>({ contractJson, url: connectionString, jwksUrl });
+        try {
+          const jwtA = await new SignJWT({ sub: userAId, role: 'authenticated' })
+            .setProtectedHeader({ alg: 'ES256', kid })
+            .setExpirationTime('1h')
+            .sign(privateKey);
 
-        const userADb = await db.asUser(jwtA);
-        const rows = await userADb.orm.public.Profile.select('id', 'username', 'userId')
-          .all()
-          .toArray();
-        expect(rows).toEqual([{ id: profileAId, username: 'alice', userId: userAId }]);
+          const userADb = await db.asUser(jwtA);
+          const rows = await userADb.orm.public.Profile.select('id', 'username', 'userId')
+            .all()
+            .toArray();
+          expect(rows).toEqual([{ id: profileAId, username: 'alice', userId: userAId }]);
+        } finally {
+          await db.close();
+        }
       } finally {
-        await db.close();
+        // Outer finally so the listening JWKS server is closed even when
+        // client creation itself rejects — a leaked server hangs the worker.
         await new Promise<void>((resolve, reject) =>
           jwksServer.close((err) => (err ? reject(err) : resolve())),
         );

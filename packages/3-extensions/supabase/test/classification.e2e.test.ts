@@ -19,8 +19,8 @@
  *
  * Seed strategy: the external table seed SQL lives in the reference fixture
  * (`./fixtures/supabase-reference/`, applied via `restoreSupabaseReference`)
- * and is shared with the walking skeleton in `examples/supabase/test/`,
- * which imports it by source path (in-repo test tooling only).
+ * and is shared with the sibling integration tests (including the walking
+ * skeleton in ./skeleton.integration.test.ts).
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';

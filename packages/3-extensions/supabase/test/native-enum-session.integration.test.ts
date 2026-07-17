@@ -24,12 +24,12 @@
  *      query executes against real Postgres and returns the expected row.
  */
 
-import type { SupabaseInternalDb } from '@prisma-next/extension-supabase/runtime';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { createDb } from '../src/prisma/db';
-import { findSessionsByAal, readSessionAal } from '../src/session-queries';
-import { restoreSupabaseReference } from './supabase-reference';
+import type { SupabaseInternalDb } from '../src/exports/runtime';
+import { createDb } from './fixtures/example-app/db';
+import { findSessionsByAal, readSessionAal } from './fixtures/example-app/session-queries';
+import { restoreSupabaseReference } from './fixtures/supabase-reference/restore';
 
 const sessionId = '30000000-0000-0000-0000-000000000001';
 const userId = '30000000-0000-0000-0000-000000000002';

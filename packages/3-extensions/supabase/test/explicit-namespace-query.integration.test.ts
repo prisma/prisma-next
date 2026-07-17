@@ -25,16 +25,16 @@ import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import supabasePack from '@prisma-next/extension-supabase/pack';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlMiddleware } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import contractJson from '../src/contract.json' with { type: 'json' };
-import { createDb } from '../src/prisma/db';
-import { restoreSupabaseReference } from './supabase-reference';
+import supabasePack from '../src/exports/pack';
+import contractJson from './fixtures/example-app/contract.json' with { type: 'json' };
+import { createDb } from './fixtures/example-app/db';
+import { restoreSupabaseReference } from './fixtures/supabase-reference/restore';
 
 function recordingMiddleware(): { middleware: SqlMiddleware; sqls: string[] } {
   const sqls: string[] = [];
