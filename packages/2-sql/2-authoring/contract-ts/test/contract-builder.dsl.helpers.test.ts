@@ -9,6 +9,7 @@ import { createTestSqlNamespace } from '../../../1-core/contract/test/test-suppo
 import { defineContract, rel } from '../src/contract-builder';
 import { modelsOf } from './contract-test-helpers';
 import { documentScopedTypes } from './cross-ref-helpers';
+import { nanoidIdPresetMirror, nanoidPresetMirror } from './nanoid-preset-mirror';
 import { sqlTimestampPresetMirror } from './temporal-preset-mirror';
 import { unboundTables } from './unbound-tables';
 
@@ -74,23 +75,7 @@ const sqlFamilyPack = {
           typeParams: { length: 36 },
         },
       },
-      nanoid: {
-        kind: 'fieldPreset',
-        args: [
-          {
-            kind: 'object',
-            optional: true,
-            properties: {
-              size: { kind: 'number', optional: true, integer: true, minimum: 2, maximum: 255 },
-            },
-          },
-        ],
-        output: {
-          codecId: 'sql/char@1',
-          nativeType: 'character',
-          typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
-        },
-      },
+      nanoid: nanoidPresetMirror,
       id: {
         uuidv4String: {
           kind: 'fieldPreset',
@@ -112,31 +97,7 @@ const sqlFamilyPack = {
             id: true,
           },
         },
-        nanoid: {
-          kind: 'fieldPreset',
-          args: [
-            {
-              kind: 'object',
-              optional: true,
-              properties: {
-                size: { kind: 'number', optional: true, integer: true, minimum: 2, maximum: 255 },
-              },
-            },
-          ],
-          output: {
-            codecId: 'sql/char@1',
-            nativeType: 'character',
-            typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
-            executionDefaults: {
-              onCreate: {
-                kind: 'generator',
-                id: 'nanoid',
-                params: { size: { kind: 'arg', index: 0, path: ['size'] } },
-              },
-            },
-            id: true,
-          },
-        },
+        nanoid: nanoidIdPresetMirror,
       },
     },
   },

@@ -8,18 +8,11 @@ import type {
   ObjectArgumentType,
   TupleFromArgumentDescriptors,
 } from '../src/authoring-type-utils';
-
-const nanoidOptionsArgument = {
-  kind: 'object',
-  optional: true,
-  properties: {
-    size: { kind: 'number', optional: true, integer: true, minimum: 2, maximum: 255 },
-  },
-} as const;
+import { nanoidOptionsArgumentMirror } from './nanoid-preset-mirror';
 
 const nanoidDescriptor = {
   kind: 'fieldPreset',
-  args: [nanoidOptionsArgument],
+  args: [nanoidOptionsArgumentMirror],
   output: {
     codecId: 'sql/char@1',
     nativeType: 'character',
@@ -30,7 +23,7 @@ const nanoidDescriptor = {
 
 const plainNanoidDescriptor = {
   kind: 'fieldPreset',
-  args: [nanoidOptionsArgument],
+  args: [nanoidOptionsArgumentMirror],
   output: {
     codecId: 'sql/char@1',
     nativeType: 'character',
@@ -151,7 +144,7 @@ test('an all-optional object argument rejects a foreign key', () => {
 });
 
 test('an all-optional object argument type is a plain weak type, not an intersection with {}', () => {
-  type NanoidArg = ObjectArgumentType<(typeof nanoidOptionsArgument)['properties']>;
+  type NanoidArg = ObjectArgumentType<(typeof nanoidOptionsArgumentMirror)['properties']>;
   expectTypeOf<NanoidArg>().toEqualTypeOf<{ readonly size?: number }>();
 });
 
