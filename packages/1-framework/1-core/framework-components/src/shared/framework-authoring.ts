@@ -30,6 +30,9 @@ export type AuthoringArgRef = {
    * Must not be used in the `codecId`/`nullable`/`id`/`unique` positions of a
    * preset output: the type-level `ResolveTemplateValue` does not apply
    * `map`, and those fields feed TS builder-state inference.
+   *
+   * See ADR 234 for why the mapped-from token and the value it selects are
+   * kept as separate vocabularies.
    */
   readonly map?: Readonly<Record<string, AuthoringTemplateValue>>;
 };
