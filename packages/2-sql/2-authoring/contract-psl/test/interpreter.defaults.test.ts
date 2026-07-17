@@ -12,6 +12,7 @@ import {
   sqliteTarget,
   symbolTableInputFromParseArgs,
   temporalCodecPresetMirrors,
+  temporalConvenienceMirrors,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
 import { unboundTables } from './unbound-tables';
@@ -371,34 +372,16 @@ model UuidNativeBad {
 
   // The temporal preset registry inline test fixtures use to exercise the
   // PSL-side preset surface for Postgres + SQLite. Real targets ship the
-  // same shapes via `target.authoring.field.temporal.{createdAt,updatedAt}`.
+  // same shapes via `target.authoring.field.temporal.*`.
   //
-  // The per-codec entries come from `temporalCodecPresetMirrors` in fixtures.ts,
-  // which family-sql's temporal-codec-presets.test.ts asserts deep-equal the
-  // real factory output — so a factory change fails there rather than silently
-  // leaving these tests passing against a preset that no longer ships.
+  // Every entry comes from the mirrors in fixtures.ts, which family-sql's
+  // temporal-codec-presets.test.ts asserts deep-equal the real factory output
+  // — so a factory change fails there rather than silently leaving these tests
+  // passing against a preset that no longer ships.
   const postgresTemporalContributions = {
     field: {
       temporal: {
-        createdAt: {
-          kind: 'fieldPreset',
-          output: {
-            codecId: 'pg/timestamptz@1',
-            nativeType: 'timestamptz',
-            default: { kind: 'function', expression: 'now()' },
-          },
-        },
-        updatedAt: {
-          kind: 'fieldPreset',
-          output: {
-            codecId: 'pg/timestamptz@1',
-            nativeType: 'timestamptz',
-            executionDefaults: {
-              onCreate: { kind: 'generator', id: 'timestampNow' },
-              onUpdate: { kind: 'generator', id: 'timestampNow' },
-            },
-          },
-        },
+        ...temporalConvenienceMirrors.postgres,
         timestamp: temporalCodecPresetMirrors.pgTimestamp,
         timestamptz: temporalCodecPresetMirrors.pgTimestamptz,
       },
@@ -408,25 +391,7 @@ model UuidNativeBad {
   const sqliteTemporalContributions = {
     field: {
       temporal: {
-        createdAt: {
-          kind: 'fieldPreset',
-          output: {
-            codecId: 'sqlite/datetime@1',
-            nativeType: 'text',
-            default: { kind: 'function', expression: 'now()' },
-          },
-        },
-        updatedAt: {
-          kind: 'fieldPreset',
-          output: {
-            codecId: 'sqlite/datetime@1',
-            nativeType: 'text',
-            executionDefaults: {
-              onCreate: { kind: 'generator', id: 'timestampNow' },
-              onUpdate: { kind: 'generator', id: 'timestampNow' },
-            },
-          },
-        },
+        ...temporalConvenienceMirrors.sqlite,
         datetime: temporalCodecPresetMirrors.sqliteDatetime,
       },
     },

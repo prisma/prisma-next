@@ -15,6 +15,7 @@ import {
   createBuiltinLikeControlMutationDefaults,
   symbolTableInputFromParseArgs,
   temporalCodecPresetMirrors,
+  temporalConvenienceMirrors,
   testEnumEntityContributions,
 } from './fixtures';
 
@@ -190,28 +191,7 @@ const postgresTimestampTargetPack = {
         },
       },
       temporal: {
-        createdAt: {
-          kind: 'fieldPreset',
-          output: {
-            codecId: 'pg/timestamptz@1',
-            nativeType: 'timestamptz',
-            default: {
-              kind: 'function',
-              expression: 'now()',
-            },
-          },
-        },
-        updatedAt: {
-          kind: 'fieldPreset',
-          output: {
-            codecId: 'pg/timestamptz@1',
-            nativeType: 'timestamptz',
-            executionDefaults: {
-              onCreate: { kind: 'generator', id: 'timestampNow' },
-              onUpdate: { kind: 'generator', id: 'timestampNow' },
-            },
-          },
-        },
+        ...temporalConvenienceMirrors.postgres,
         // From `temporalCodecPresetMirrors` in fixtures.ts, which family-sql's
         // temporal-codec-presets.test.ts asserts deep-equals the real factory
         // output — so a factory change cannot leave this parity test passing

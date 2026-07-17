@@ -708,8 +708,10 @@ export function buildEnumCapturingFactory(): {
 }
 
 /**
- * Hand-written mirrors of family-sql's `temporalCodecPresetWithPrecision` /
- * `temporalCodecPreset` factory output.
+ * Hand-written mirrors of family-sql's temporal authoring factories —
+ * `temporalCodecPresetWithPrecision` / `temporalCodecPreset` below, and
+ * `temporalAuthoringPresets` (the `createdAt`/`updatedAt` convenience pair)
+ * further down.
  *
  * They are hand-written because this package cannot import family-sql:
  * family-sql declares `@prisma-next/sql-contract-psl` as a devDependency, so
@@ -790,3 +792,58 @@ export const temporalCodecPresetMirrors = {
     },
   },
 } as const satisfies Record<string, AuthoringFieldPresetDescriptor>;
+
+/**
+ * Mirrors of `temporalAuthoringPresets(...)` — the `createdAt`/`updatedAt`
+ * convenience pair — per target codec. Anchored by the same family-sql test as
+ * {@link temporalCodecPresetMirrors}.
+ *
+ * The slice's headline guarantee (`temporal.updatedAt()` is byte-identical to
+ * `temporal.timestamptz(onCreate: now, onUpdate: now)`) is asserted through
+ * these, so an unanchored mirror here would let the parity tests prove a
+ * fiction of `updatedAt` identical to the real `timestamptz`.
+ */
+export const temporalConvenienceMirrors = {
+  postgres: {
+    createdAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'pg/timestamptz@1',
+        nativeType: 'timestamptz',
+        default: { kind: 'function', expression: 'now()' },
+      },
+    },
+    updatedAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'pg/timestamptz@1',
+        nativeType: 'timestamptz',
+        executionDefaults: {
+          onCreate: TEMPORAL_MIRROR_NOW_PHASE,
+          onUpdate: TEMPORAL_MIRROR_NOW_PHASE,
+        },
+      },
+    },
+  },
+  sqlite: {
+    createdAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'sqlite/datetime@1',
+        nativeType: 'text',
+        default: { kind: 'function', expression: 'now()' },
+      },
+    },
+    updatedAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'sqlite/datetime@1',
+        nativeType: 'text',
+        executionDefaults: {
+          onCreate: TEMPORAL_MIRROR_NOW_PHASE,
+          onUpdate: TEMPORAL_MIRROR_NOW_PHASE,
+        },
+      },
+    },
+  },
+} as const satisfies Record<string, Record<string, AuthoringFieldPresetDescriptor>>;

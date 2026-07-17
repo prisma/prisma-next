@@ -35,6 +35,12 @@ const sqlFamilyPack = {
         output: { codecId: 'sql/timestamp@1', nativeType: 'timestamp' },
       },
       temporal: {
+        // createdAt/updatedAt here are independent portable fixtures, NOT
+        // mirrors of family-sql's `temporalAuthoringPresets` — that factory
+        // hardcodes `now()` over a target codec, while these use the invented
+        // portable `sql/timestamp@1` with `CURRENT_TIMESTAMP`. There is nothing
+        // to anchor them to, by design. Only `timestamp` below mirrors a real
+        // factory, and it is anchored.
         createdAt: {
           kind: 'fieldPreset',
           output: {

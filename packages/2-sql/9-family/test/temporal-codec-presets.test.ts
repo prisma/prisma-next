@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { temporalCodecPresetMirrors } from '../../2-authoring/contract-psl/test/fixtures';
+import {
+  temporalCodecPresetMirrors,
+  temporalConvenienceMirrors,
+} from '../../2-authoring/contract-psl/test/fixtures';
 import { sqlTimestampPresetMirror } from '../../2-authoring/contract-ts/test/temporal-preset-mirror';
 import {
   temporalAuthoringPresets,
@@ -131,6 +134,23 @@ describe('downstream mirrors track the factories', () => {
   it('contract-ts mirrors the precision-bearing preset over its portable codec', () => {
     expect(sqlTimestampPresetMirror).toEqual(
       temporalCodecPresetWithPrecision({ codecId: 'sql/timestamp@1', nativeType: 'timestamp' }),
+    );
+  });
+
+  // The slice's headline guarantee — `temporal.updatedAt()` is byte-identical
+  // to `temporal.timestamptz(onCreate: now, onUpdate: now)` — is asserted in
+  // contract-psl against these mirrors on one side and the anchored per-codec
+  // mirror on the other. Without these two assertions the parity tests could
+  // prove a fiction of `updatedAt` identical to the real `timestamptz`.
+  it('contract-psl mirrors the postgres createdAt/updatedAt convenience pair', () => {
+    expect(temporalConvenienceMirrors.postgres).toEqual(
+      temporalAuthoringPresets({ codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }),
+    );
+  });
+
+  it('contract-psl mirrors the sqlite createdAt/updatedAt convenience pair', () => {
+    expect(temporalConvenienceMirrors.sqlite).toEqual(
+      temporalAuthoringPresets({ codecId: 'sqlite/datetime@1', nativeType: 'text' }),
     );
   });
 });
