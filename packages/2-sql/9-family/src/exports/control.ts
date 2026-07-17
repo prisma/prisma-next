@@ -21,6 +21,7 @@ export type {
 export type {
   ContractToSchemaIROptions,
   DefaultRenderer,
+  DefaultResolver,
   EnumNamespaceSchemaResolver,
   NativeTypeExpander,
 } from '../core/migrations/contract-to-schema-ir';

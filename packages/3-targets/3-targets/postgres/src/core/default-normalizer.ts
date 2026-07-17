@@ -249,3 +249,25 @@ export function parsePostgresDefault(
 
   return { kind: 'function', expression: trimmed };
 }
+
+/**
+ * Normalizes a contract-declared default through {@link parsePostgresDefault}
+ * — the same parser introspection uses — so a function-shaped default the
+ * parser recognizes as a literal (e.g. `dbgenerated("'{}'::jsonb")`)
+ * resolves to the same `resolvedDefault` shape a live introspected column
+ * would produce. Compensates once, at `SchemaIR` construction of the
+ * expected (contract-derived) side (`contractToSchemaIR`'s `resolveDefault`
+ * hook), instead of at every site that later compares the two sides. A
+ * literal default, or a function form the parser doesn't recognize, passes
+ * through unchanged; `nextval(...)` normalizes to `autoincrement()` on both
+ * sides, matching a `serial`/identity column's introspected counterpart.
+ */
+export function postgresResolveDefault(
+  def: ColumnDefault,
+  resolvedNativeType: string,
+): ColumnDefault {
+  if (def.kind !== 'function') {
+    return def;
+  }
+  return parsePostgresDefault(def.expression, resolvedNativeType) ?? def;
+}

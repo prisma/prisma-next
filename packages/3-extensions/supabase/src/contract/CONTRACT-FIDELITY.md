@@ -19,7 +19,7 @@ Machine-readable versions of these lists live in `scripts/generate-contract.ts` 
 | `storage.buckets.allowed_mime_types` | `text[]` nullable | PSL has no nullable-list syntax (`String[]?` is invalid) |
 | `storage.objects.path_tokens` | `text[]` nullable | Same; also `GENERATED ALWAYS`, so not user-writable regardless |
 
-**Column defaults (1):** `auth.users.phone` (`DEFAULT NULL` is a no-op, but round-trips through the raw-default parser as an explicit `@default(null)`, which the interpreter rejects). Column type is declared in full; only the `@default` is dropped. The jsonb/array `dbgenerated(...)` literal-default disagreement that used to widen this list (TML-3037) is fixed generically — authoring and introspection now resolve such a literal to the same shape.
+**Column defaults (3):** `auth.users.phone` (`DEFAULT NULL` is a no-op, but round-trips through the raw-default parser as an explicit `@default(null)`, which the interpreter rejects); `auth.custom_oauth_providers.acceptable_client_ids` and `.scopes` (both `text[]` with `DEFAULT '{}'::text[]`, printed as `@default(dbgenerated("'{}'::text[]"))` — the interpreter rejects any function-kind default on a list field, and a `dbgenerated(...)` default is always function-kind at authoring time). Column type is declared in full for all three; only the `@default` is dropped. The jsonb `dbgenerated(...)` defaults that used to widen this list (TML-3037) are declared again — `db verify`'s permanent-drift disagreement is fixed generically, at the postgres target's `SchemaIR` construction, so it needs no authoring-side omission.
 
 **Indexes:**
 

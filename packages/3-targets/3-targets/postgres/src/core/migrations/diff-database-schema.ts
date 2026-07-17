@@ -10,6 +10,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { postgresResolveDefault } from '../default-normalizer';
 import type { PostgresContract } from '../postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
@@ -135,6 +136,7 @@ export function diffPostgresSchema(input: {
   const fullExpected = contractToPostgresDatabaseSchemaNode(postgresContract, {
     annotationNamespace: 'pg',
     ...ifDefined('expandNativeType', expandNativeType),
+    resolveDefault: postgresResolveDefault,
   });
   const expected = pruneTableLessNamespaces(fullExpected);
   const relationalOwned = ownedSchemaNames(expected);
@@ -230,6 +232,7 @@ export function buildPostgresPlanDiff(input: {
   const projectionOptions = {
     annotationNamespace: 'pg',
     ...ifDefined('expandNativeType', expandNativeType),
+    resolveDefault: postgresResolveDefault,
   };
   const fullExpected = contractToPostgresDatabaseSchemaNode(postgresContract, projectionOptions);
   const expected = pruneTableLessNamespaces(fullExpected);

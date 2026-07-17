@@ -4832,10 +4832,6 @@
               "columns": {
                 "acceptable_client_ids": {
                   "codecId": "pg/text@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": []
-                  },
                   "many": true,
                   "nativeType": "text",
                   "nullable": false
@@ -4843,8 +4839,8 @@
                 "attribute_mapping": {
                   "codecId": "pg/jsonb@1",
                   "default": {
-                    "kind": "literal",
-                    "value": {}
+                    "expression": "'{}'::jsonb",
+                    "kind": "function"
                   },
                   "nativeType": "jsonb",
                   "nullable": false
@@ -4852,8 +4848,8 @@
                 "authorization_params": {
                   "codecId": "pg/jsonb@1",
                   "default": {
-                    "kind": "literal",
-                    "value": {}
+                    "expression": "'{}'::jsonb",
+                    "kind": "function"
                   },
                   "nativeType": "jsonb",
                   "nullable": false
@@ -4961,10 +4957,6 @@
                 },
                 "scopes": {
                   "codecId": "pg/text@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": []
-                  },
                   "many": true,
                   "nativeType": "text",
                   "nullable": false
@@ -7232,8 +7224,8 @@
                 "transports": {
                   "codecId": "pg/jsonb@1",
                   "default": {
-                    "kind": "literal",
-                    "value": []
+                    "expression": "'[]'::jsonb",
+                    "kind": "function"
                   },
                   "nativeType": "jsonb",
                   "nullable": false
@@ -7700,8 +7692,8 @@
                 "metadata": {
                   "codecId": "pg/jsonb@1",
                   "default": {
-                    "kind": "literal",
-                    "value": {}
+                    "expression": "'{}'::jsonb",
+                    "kind": "function"
                   },
                   "nativeType": "jsonb",
                   "nullable": false
@@ -8342,7 +8334,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:bf835b04145e86aa7b2128d798656c05beb1f54a3046276e7bc123c59c9cf9fe",
+    "storageHash": "sha256:04d9f28dadbe0895ea6937df7dc605c36540144fcc50ad3ed58af72097d70230",
     "types": {
       "CreatedAt": {
         "codecId": "pg/timestamp@1",

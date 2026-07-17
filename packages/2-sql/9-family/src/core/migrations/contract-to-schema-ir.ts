@@ -57,6 +57,25 @@ export type NativeTypeExpander = (input: {
 export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => string;
 
 /**
+ * Target-specific callback that normalizes a contract-declared `ColumnDefault`
+ * into the same resolved shape introspection would parse from the live
+ * database, so `resolvedDefault` compares correctly on both sides.
+ *
+ * The contract's raw default and the introspected raw default can describe
+ * the same value in different shapes (e.g. a `dbgenerated("'{}'::jsonb")`
+ * function-call default versus a literal Postgres parses from the live
+ * column). Without normalizing the contract side too, `resolvedDefaultsEqual`
+ * compares `kind` before content and reports drift forever even when the
+ * database matches exactly. This follows the same IoC pattern as
+ * `NativeTypeExpander`/`DefaultRenderer`: the target provides its own
+ * resolution (reusing whatever raw-default parser its introspection side
+ * already uses) when calling `contractToSchemaIR`, keeping the family layer
+ * target-agnostic. Omitted entirely, the contract's raw default is the
+ * resolved default unchanged (today's behavior).
+ */
+export type DefaultResolver = (def: ColumnDefault, resolvedNativeType: string) => ColumnDefault;
+
+/**
  * Target-supplied callback that resolves a contract namespace to the live
  * database schema its enums are stored under.
  *
@@ -77,6 +96,7 @@ function convertColumn(
   storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
+  resolveDefault: DefaultResolver | undefined,
 ): SqlColumnIRInput {
   // Resolve `typeRef` so columns that delegate their `nativeType`/`codecId`/
   // `typeParams` to a named `storage.types` entry expand the same way as
@@ -107,6 +127,11 @@ function convertColumn(
   // agree on as the comparable "expanded" type.
   const nativeType = baseNativeType;
   const resolvedNativeType = column.many ? `${baseNativeType}[]` : baseNativeType;
+  const rawColumnDefault = column.default ?? undefined;
+  const resolvedColumnDefault =
+    rawColumnDefault !== undefined && resolveDefault
+      ? resolveDefault(rawColumnDefault, resolvedNativeType)
+      : rawColumnDefault;
   return {
     name,
     nativeType,
@@ -117,11 +142,14 @@ function convertColumn(
       column.default != null && renderDefault ? renderDefault(column.default, column) : undefined,
     ),
     // Contract-derived columns are resolved by construction: the computed
-    // full native type doubles as the resolved value, and the contract's
-    // structured default is the resolved default (the introspected side
-    // stamps its normalizer's parse of the raw expression).
+    // full native type doubles as the resolved value. The contract's raw
+    // structured default becomes the resolved default after passing through
+    // the target's `resolveDefault` hook (when supplied), so a default the
+    // target's introspection side would normalize differently (e.g. a
+    // `dbgenerated(...)` function call that is actually a literal) compares
+    // equal instead of drifting on `kind` alone.
     resolvedNativeType,
-    ...ifDefined('resolvedDefault', column.default ?? undefined),
+    ...ifDefined('resolvedDefault', resolvedColumnDefault),
     // The column's codec identity, carried the same way the query AST
     // carries `CodecRef` (TML-2456) — the migration planner's op-builders
     // resolve DDL rendering from this at plan time (Decision 5), instead of
@@ -339,6 +367,7 @@ function convertTable(
   storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
+  resolveDefault: DefaultResolver | undefined,
   storage: SqlStorage,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIRInput> = {};
@@ -349,6 +378,7 @@ function convertTable(
       storageTypes,
       expandNativeType,
       renderDefault,
+      resolveDefault,
     );
   }
 
@@ -444,6 +474,7 @@ export interface ContractToSchemaIROptions {
   readonly annotationNamespace: string;
   readonly expandNativeType?: NativeTypeExpander;
   readonly renderDefault?: DefaultRenderer;
+  readonly resolveDefault?: DefaultResolver;
   /**
    * Target-supplied resolver mapping a namespace to the live database schema
    * its enums are stored under. When provided (Postgres), namespace-scoped
@@ -504,6 +535,7 @@ export function contractNamespaceToSchemaIR(
       storageTypes,
       options.expandNativeType,
       options.renderDefault,
+      options.resolveDefault,
       storage,
     );
   }
@@ -540,6 +572,7 @@ export function contractToSchemaIR(
         storageTypes,
         options.expandNativeType,
         options.renderDefault,
+        options.resolveDefault,
         storage,
       );
     }

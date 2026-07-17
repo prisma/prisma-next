@@ -13,21 +13,6 @@ import {
 } from '@prisma-next/ids';
 import type { FuncCallSig } from '@prisma-next/psl-parser';
 import { int, num, oneOf, optional, str } from '@prisma-next/psl-parser';
-import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
-import { blindCast } from '@prisma-next/utils/casts';
-
-/**
- * The shape the SQL authoring layer populates
- * `DefaultFunctionLoweringContext.fieldContext` with (an opaque `unknown`
- * at the framework boundary — see that field's doc comment). Declared here,
- * not imported, because core cannot name it and the authoring layer has no
- * reason to export a postgres-specific type; the two sides agree on the
- * shape by convention, the same way `FuncCallSig` values below are agreed
- * independently of the framework's `unknown`-typed `signature` field.
- */
-interface PostgresFieldContext {
-  readonly nativeType?: string;
-}
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;
@@ -121,31 +106,11 @@ function lowerDbgenerated(input: {
       message: 'Default function "dbgenerated" argument cannot be empty.',
     });
   }
-  // Resolve the raw SQL text through the same normalizer introspection uses,
-  // so a `dbgenerated(...)` default that is actually a literal (e.g.
-  // `'{}'::jsonb`) is recognized as one here too. Without this, the two
-  // sides disagree on `kind` and `resolvedDefaultsEqual` reports drift
-  // forever even when the database matches the contract exactly. Only a
-  // literal resolution is adopted, though: the normalizer also rewrites some
-  // function forms (e.g. `nextval(...)` to `autoincrement()`) for
-  // introspection's benefit, and adopting those rewrites here would discard
-  // the user's original expression — `dbgenerated("nextval('my_seq')")` would
-  // silently lower to `autoincrement()` and its DDL would create a fresh
-  // `SERIAL` sequence instead of using `my_seq`. A non-literal resolution, or
-  // no resolution at all, keeps the user's raw expression text unchanged.
-  const fieldContext =
-    input.context.fieldContext === undefined
-      ? undefined
-      : blindCast<
-          PostgresFieldContext,
-          'psl-column-resolution.ts populates fieldContext with exactly this shape for every SQL default-function lowering call; the framework types it unknown because it cannot name a postgres-specific shape.'
-        >(input.context.fieldContext);
-  const resolved = parsePostgresDefault(expression, fieldContext?.nativeType);
   return {
     ok: true,
     value: {
       kind: 'storage',
-      defaultValue: resolved?.kind === 'literal' ? resolved : { kind: 'function', expression },
+      defaultValue: { kind: 'function', expression },
     },
   };
 }

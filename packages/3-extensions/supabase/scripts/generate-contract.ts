@@ -79,21 +79,32 @@ const COLUMN_OMISSIONS: Readonly<Record<string, Readonly<Record<string, readonly
 
 // --- Default omissions (declarative, table.column keyed) ----------------
 //
-// Fidelity note:
+// Fidelity notes:
 //   - auth.users.phone: `DEFAULT NULL` on a nullable column is a no-op (same
 //     as no default at all), but the raw-default parser round-trips it as an
 //     explicit `@default(null)`, which the interpreter rejects
 //     (PSL_INVALID_DEFAULT_VALUE — "null" is not a value literal). Dropping
 //     the default changes nothing observable: the column is still nullable
-//     and still has no enforced default. This is the only entry left here:
-//     the jsonb/array `dbgenerated(...)` literal-default disagreement that
-//     used to fill out this table is fixed generically now (authoring and
-//     introspection both resolve such a literal to the same `kind: 'literal'`
-//     shape via `parsePostgresDefault`); `@default(null)` on a nullable
-//     column is a separate, still-open defect.
+//     and still has no enforced default.
+//   - auth.custom_oauth_providers.{acceptable_client_ids,scopes}: both
+//     `text[]` with `DEFAULT '{}'::text[]`, which infer prints as
+//     `@default(dbgenerated("'{}'::text[]"))`. The interpreter rejects any
+//     function-kind default on a list field
+//     (PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED) — `dbgenerated(...)` always
+//     lowers to `kind: 'function'` at authoring time (a target-owned
+//     `lower` handler classifying it as a literal there would need the
+//     column's native type, and threading that through the shared
+//     `DefaultFunctionLoweringContext` is exactly the family-vocabulary-in-
+//     framework violation TML-3037 review round 2 removed). The scalar
+//     jsonb-literal case (`Users.metadata` on the round-trip journey) is
+//     unaffected: that one is fixed generically by the target's
+//     `resolveDefault` hook at `SchemaIR` construction (compare-time, not
+//     authoring-time), which only runs after a default already emits
+//     successfully. A list-field literal default never gets that far.
 const DEFAULT_OMISSIONS: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
   auth: {
     users: ['phone'],
+    custom_oauth_providers: ['acceptable_client_ids', 'scopes'],
   },
 };
 

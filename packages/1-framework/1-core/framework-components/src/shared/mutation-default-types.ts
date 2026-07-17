@@ -28,15 +28,6 @@ export interface DefaultFunctionLoweringContext {
   readonly modelName: string;
   readonly fieldName: string;
   readonly columnCodecId?: string;
-  /**
-   * Family/target-specific field metadata a `lower` implementation may need
-   * beyond the fields above. Opaque here for the same reason
-   * {@link ControlMutationDefaultEntry.signature} is `unknown`: its concrete
-   * shape is a private agreement between whichever family constructs the
-   * context and whichever target's `lower` implementation reads it back —
-   * core cannot name either side's type.
-   */
-  readonly fieldContext?: unknown;
 }
 
 export type LoweredDefaultValue =
