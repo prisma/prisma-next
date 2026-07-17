@@ -53,6 +53,34 @@ const sqlFamilyPack = {
             },
           },
         },
+        // Mirrors `temporalCodecPresetWithPrecision` from family-sql, which
+        // this package cannot import. The factory's own shape is asserted in
+        // family-sql's temporal-codec-presets.test.ts.
+        timestamp: {
+          kind: 'fieldPreset',
+          args: [
+            { name: 'precision', kind: 'number', optional: true, integer: true, minimum: 0 },
+            { name: 'onCreate', kind: 'option', values: ['now'], optional: true },
+            { name: 'onUpdate', kind: 'option', values: ['now'], optional: true },
+          ],
+          output: {
+            codecId: 'sql/timestamp@1',
+            nativeType: 'timestamp',
+            typeParams: { precision: { kind: 'arg', index: 0 } },
+            executionDefaults: {
+              onCreate: {
+                kind: 'arg',
+                index: 1,
+                map: { now: { kind: 'generator', id: 'timestampNow' } },
+              },
+              onUpdate: {
+                kind: 'arg',
+                index: 2,
+                map: { now: { kind: 'generator', id: 'timestampNow' } },
+              },
+            },
+          },
+        },
       },
       uuidString: {
         kind: 'fieldPreset',
@@ -77,31 +105,6 @@ const sqlFamilyPack = {
           codecId: 'sql/char@1',
           nativeType: 'character',
           typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
-        },
-      },
-      stamped: {
-        kind: 'fieldPreset',
-        args: [
-          { kind: 'number', optional: true, integer: true, minimum: 0 },
-          { kind: 'option', values: ['now'], optional: true },
-          { kind: 'option', values: ['now'], optional: true },
-        ],
-        output: {
-          codecId: 'sql/timestamp@1',
-          nativeType: 'timestamp',
-          typeParams: { precision: { kind: 'arg', index: 0 } },
-          executionDefaults: {
-            onCreate: {
-              kind: 'arg',
-              index: 1,
-              map: { now: { kind: 'generator', id: 'timestampNow' } },
-            },
-            onUpdate: {
-              kind: 'arg',
-              index: 2,
-              map: { now: { kind: 'generator', id: 'timestampNow' } },
-            },
-          },
         },
       },
       id: {
@@ -830,7 +833,7 @@ describe('contract DSL helper vocabulary', () => {
     }
   });
 
-  it('resolves an option-arg preset with named-value execution defaults, zero-arg and undefined-hole calls', () => {
+  it('resolves temporal.timestamp precision and phase tokens, incl. zero-arg and undefined-hole calls', () => {
     defineContract(
       {
         family: sqlFamilyPack,
@@ -838,25 +841,29 @@ describe('contract DSL helper vocabulary', () => {
         createNamespace: createTestSqlNamespace,
       },
       ({ field }) => {
-        const fullState = field.stamped(3, 'now', 'now').build();
-        const zeroArgState = field.stamped().build();
-        const holeState = field.stamped(undefined, undefined, 'now').build();
+        const nowPhase = { kind: 'generator', id: 'timestampNow' };
+        const fullState = field.temporal.timestamp(3, 'now', 'now').build();
+        const zeroArgState = field.temporal.timestamp().build();
+        const holeState = field.temporal.timestamp(undefined, undefined, 'now').build();
 
         expectTypeOf(fullState.descriptor?.codecId).toEqualTypeOf<'sql/timestamp@1' | undefined>();
 
-        expect(fullState.descriptor?.typeParams).toEqual({ precision: 3 });
-        expect(fullState.executionDefaults).toEqual({
-          onCreate: { kind: 'generator', id: 'timestampNow' },
-          onUpdate: { kind: 'generator', id: 'timestampNow' },
+        expect(fullState.descriptor).toEqual({
+          codecId: 'sql/timestamp@1',
+          nativeType: 'timestamp',
+          typeParams: { precision: 3 },
         });
+        expect(fullState.executionDefaults).toEqual({ onCreate: nowPhase, onUpdate: nowPhase });
 
-        expect(zeroArgState.descriptor?.typeParams).toBeUndefined();
+        expect(zeroArgState.descriptor).toEqual({
+          codecId: 'sql/timestamp@1',
+          nativeType: 'timestamp',
+        });
+        expect(zeroArgState.descriptor).not.toHaveProperty('typeParams');
         expect(zeroArgState.executionDefaults).toBeUndefined();
 
-        expect(holeState.descriptor?.typeParams).toBeUndefined();
-        expect(holeState.executionDefaults).toEqual({
-          onUpdate: { kind: 'generator', id: 'timestampNow' },
-        });
+        expect(holeState.descriptor).not.toHaveProperty('typeParams');
+        expect(holeState.executionDefaults).toEqual({ onUpdate: nowPhase });
 
         return { models: {} };
       },

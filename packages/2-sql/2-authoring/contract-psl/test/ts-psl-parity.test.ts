@@ -211,6 +211,36 @@ const postgresTimestampTargetPack = {
             },
           },
         },
+        // Mirrors `temporalCodecPresetWithPrecision` from family-sql, which
+        // this package cannot import. The factory's shape is asserted in
+        // family-sql's temporal-codec-presets.test.ts, and the postgres pack's
+        // registration is asserted against the factory in the postgres target's
+        // authoring-field-presets.test.ts.
+        timestamptz: {
+          kind: 'fieldPreset',
+          args: [
+            { name: 'precision', kind: 'number', optional: true, integer: true, minimum: 0 },
+            { name: 'onCreate', kind: 'option', values: ['now'], optional: true },
+            { name: 'onUpdate', kind: 'option', values: ['now'], optional: true },
+          ],
+          output: {
+            codecId: 'pg/timestamptz@1',
+            nativeType: 'timestamptz',
+            typeParams: { precision: { kind: 'arg', index: 0 } },
+            executionDefaults: {
+              onCreate: {
+                kind: 'arg',
+                index: 1,
+                map: { now: { kind: 'generator', id: 'timestampNow' } },
+              },
+              onUpdate: {
+                kind: 'arg',
+                index: 2,
+                map: { now: { kind: 'generator', id: 'timestampNow' } },
+              },
+            },
+          },
+        },
       },
     },
   },
@@ -485,5 +515,87 @@ model Post {
       target: { namespaceId: 'auth', tableName: 'user' },
     });
     expect(tsFks).toEqual(pslFks);
+  });
+
+  // Design-spec §8 last row + slice done-condition: `temporal.updatedAt()` is a
+  // convenience spelling of the full form, so all three spellings must lower to
+  // byte-identical contracts.
+  describe('temporal.updatedAt() three-way byte-identity', () => {
+    const interpretTemporalPsl = (field: string) => {
+      const document = symbolTableInputFromParseArgs({
+        schema: `model User {
+  id Int @id
+  stamped ${field}
+}`,
+        sourceId: 'schema.prisma',
+      });
+      const result = interpretPslDocumentToSqlContract({
+        ...document,
+        target: postgresTimestampTargetPack,
+        scalarTypeDescriptors: postgresTimestampScalarTypeDescriptors,
+        composedExtensionContracts: new Map(),
+        controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
+        authoringContributions: postgresTimestampAuthoringContributions,
+        createNamespace: createTestSqlNamespace,
+        capabilities: { sql: { scalarList: true } },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('interpretation failed');
+      return result.value;
+    };
+
+    const buildTsFullForm = () =>
+      defineContract(
+        {
+          family: bareSqlFamilyPack,
+          target: postgresTimestampTargetPack,
+          createNamespace: createTestSqlNamespace,
+        },
+        ({ field, model }) => ({
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.int().id(),
+                stamped: field.temporal.timestamptz(undefined, 'now', 'now'),
+              },
+            }).sql({ table: 'user' }),
+          },
+        }),
+      );
+
+    const buildTsConvenienceForm = () =>
+      defineContract(
+        {
+          family: bareSqlFamilyPack,
+          target: postgresTimestampTargetPack,
+          createNamespace: createTestSqlNamespace,
+        },
+        ({ field, model }) => ({
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.int().id(),
+                stamped: field.temporal.updatedAt(),
+              },
+            }).sql({ table: 'user' }),
+          },
+        }),
+      );
+
+    it('PSL full form === PSL convenience form', () => {
+      expect(interpretTemporalPsl('temporal.timestamptz(onCreate: now, onUpdate: now)')).toEqual(
+        interpretTemporalPsl('temporal.updatedAt()'),
+      );
+    });
+
+    it('TS full form === TS convenience form', () => {
+      expect(buildTsFullForm()).toEqual(buildTsConvenienceForm());
+    });
+
+    it('PSL full form === TS full form', () => {
+      expect(interpretTemporalPsl('temporal.timestamptz(onCreate: now, onUpdate: now)')).toEqual(
+        buildTsFullForm(),
+      );
+    });
   });
 });
