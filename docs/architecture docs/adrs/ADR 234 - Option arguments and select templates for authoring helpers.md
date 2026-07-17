@@ -1,8 +1,8 @@
-# ADR 234 — Option arguments and value-mapped templates for authoring helpers
+# ADR 234 — Option arguments and select templates for authoring helpers
 
 ## At a glance
 
-Field presets take enumerated arguments, spelled as bare tokens in PSL and string literals in TypeScript, declared with an `option` argument kind and translated into fragments of the preset's output by a declarative `map` on argument references. Two omission rules complete the design: an argument the author does not supply leaves no trace in the contract.
+Field presets take enumerated arguments, spelled as bare tokens in PSL and string literals in TypeScript, declared with an `option` argument kind and dispatched to fragments of the preset's output by `select` template nodes. Two omission rules complete the design: an argument the author does not supply leaves no trace in the contract.
 
 The temporal presets are the motivating example. An author writes:
 
@@ -58,23 +58,23 @@ export function temporalCodecPresetWithPrecision<
 
 Four decisions make that work:
 
-1. **`option` argument kind** — an argument whose value must be one of an enumerated list, spelled as a bare token in PSL and typed as a literal union in TypeScript.
-2. **`map` on an argument reference** — a declarative token-to-template lookup, so preset vocabulary (`now`) never leaks the internal identifier it selects (`timestampNow`).
+1. **`option` argument kind** — an argument whose value must be one of an enumerated list, spelled as a bare token in PSL and typed as a literal union in TypeScript. The type is shared with the extension-block parameter vocabulary: one option concept, declared once.
+2. **The `select` template node** — a declarative token-to-template dispatch, validated against the option's `values` at pack registration, so preset vocabulary (`now`) never leaks the internal identifier it selects (`timestampNow`).
 3. **Undefined phase omits the phase** — an execution-defaults phase whose template resolves to `undefined` is left out, and a phases object with no keys is left out entirely.
 4. **Empty resolved `typeParams` is omitted** — a `typeParams` template that resolves to `{}` produces no `typeParams` key at all.
 
 ## The `option` argument kind
 
-`AuthoringArgumentDescriptor` ([framework-authoring.ts](../../../packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts)) includes:
+The option concept is one shared type, declared once in [option-descriptor.ts](../../../packages/1-framework/1-core/framework-components/src/shared/option-descriptor.ts):
 
 ```ts
-| {
-    readonly kind: 'option';
-    readonly values: readonly string[];
-  }
+export interface AuthoringOption {
+  readonly kind: 'option';
+  readonly values: readonly string[];
+}
 ```
 
-The name and shape mirror `PslBlockParamOption` in [psl-extension-block.ts](../../../packages/1-framework/1-core/framework-components/src/shared/psl-extension-block.ts), which spells an enumerated block parameter the same way — `kind: 'option'` with `values`. One word for one idea across the two declarative surfaces.
+Both declarative surfaces reference it: `AuthoringArgumentDescriptor` ([framework-authoring.ts](../../../packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts)) includes it as a member of its union, and `PslBlockParamOption` ([psl-extension-block.ts](../../../packages/1-framework/1-core/framework-components/src/shared/psl-extension-block.ts)) extends it with the block-parameter presence flag. One type for one idea — a helper argument and a block parameter that both mean "one of these tokens" cannot drift apart, because there is nothing to drift.
 
 **PSL spells an option as a bare token** (`onUpdate: now`), following `@relation(onDelete: Cascade)` — the established spelling for an enumerated attribute argument. Bare identifiers are ordinary argument expressions in the PSL grammar, so the parser's only job is to accept the identifier text ([psl-authoring-arguments.ts](../../../packages/2-sql/2-authoring/contract-psl/src/psl-authoring-arguments.ts)):
 
@@ -89,9 +89,9 @@ That case checks **syntax only**; membership in `values` is validated by the fra
 
 **TypeScript spells an option as a string literal** (`'now'`). `ArgTypeFromDescriptor` ([authoring-type-utils.ts](../../../packages/2-sql/2-authoring/contract-ts/src/authoring-type-utils.ts)) resolves an option descriptor to the literal union of its `values`, so the legal set is autocompleted and enforced by the compiler.
 
-## `map`: preset vocabulary is not generator vocabulary
+## `select`: preset vocabulary is not generator vocabulary
 
-An argument reference (`AuthoringArgRef`) carries an optional `map`:
+Templates have two non-literal nodes. An **argument reference** inserts an argument's value:
 
 ```ts
 export type AuthoringArgRef = {
@@ -99,32 +99,39 @@ export type AuthoringArgRef = {
   readonly index: number;
   readonly path?: readonly string[];
   readonly default?: AuthoringTemplateValue;
-  readonly map?: Readonly<Record<string, AuthoringTemplateValue>>;
 };
 ```
 
-The temporal presets use it to turn the token `now` into a generator descriptor:
+A **select node** inserts a template *chosen by* an argument's value:
+
+```ts
+export interface AuthoringSelectRef {
+  readonly kind: 'select';
+  readonly index: number;
+  readonly path?: readonly string[];
+  readonly cases: Readonly<Record<string, AuthoringTemplateValue>>;
+}
+```
+
+Substitution and selection are different operations, so they are different node kinds — a reader seeing `kind: 'arg'` knows the argument's value lands in the output verbatim; seeing `kind: 'select'` knows it does not. The temporal presets use a select to turn the token `now` into a generator descriptor:
 
 ```ts
 function temporalPhaseTemplate<const Index extends number>(index: Index) {
   return {
-    kind: 'arg',
+    kind: 'select',
     index,
-    map: { now: { kind: 'generator', id: TIMESTAMP_NOW_GENERATOR_ID } },
+    cases: { now: { kind: 'generator', id: TIMESTAMP_NOW_GENERATOR_ID } },
   } as const;
 }
 ```
 
-The point is the indirection. `timestampNow` is a preset-only generator id ([ADR 169](ADR%20169%20-%20Declared%20applicability%20for%20mutation%20default%20generators.md)) and must not appear in a user's spelling. `map` keeps the user-facing token and the internal id as separate vocabularies related by data, rather than passing the token through as an id and coupling the two forever.
+The point is the indirection. `timestampNow` is a preset-only generator id ([ADR 169](ADR%20169%20-%20Declared%20applicability%20for%20mutation%20default%20generators.md)) and must not appear in a user's spelling. `select` keeps the user-facing token and the internal id as separate vocabularies related by data, rather than passing the token through as an id and coupling the two forever.
 
-`resolveAuthoringTemplateValue` applies the rules in this order:
+Resolution: read `args[index]`, walk `path`; an `undefined` value resolves to `undefined` (the enclosing object template then omits the key — this is what makes an unsupplied phase argument leave no trace); a defined value must be a string that is an own key of `cases`, and the node resolves to that case's recursively resolved template. Anything else throws — an assertion for type-bypassing callers, because:
 
-1. Read `args[index]`, then walk `path`.
-2. If the value is `undefined` and `default` is present, return the resolved `default` **without applying `map`** — `default` is declared in output space, not in the input vocabulary `map` translates from.
-3. If the value is defined and `map` is present, it must be a string that is an own key of `map`; return the recursively resolved `map[value]`. Otherwise throw.
-4. Otherwise return the value, which may be `undefined`.
+**Case coverage is validated at pack registration.** Every select node must target an `option` argument, and the option's `values` must exactly cover the node's `cases` — a legal token with no case and a case no token can reach are both declaration bugs, and both are caught when the pack is composed (the check runs from `assertNoCrossRegistryCollisions`, so the PSL control stack and the TypeScript composed helpers inherit it from the same seam). The enumeration is declared in the option and *checked* against the cases; the two cannot silently disagree.
 
-**Constraint:** a `map`-bearing argument reference must not be used in the `codecId`, `nullable`, `id`, or `unique` positions of a preset output. Those feed the TypeScript builder-state inference through `ResolveTemplateValue`, which does not implement `map`. The temporal presets use `map` only inside `executionDefaults`, which builder-state inference never reads.
+**Constraint:** a select node must not be used in the `codecId`, `nullable`, `id`, or `unique` positions of a preset output. Those feed the TypeScript builder-state inference through `ResolveTemplateValue`, which does not implement select. The temporal presets use select only inside `executionDefaults`, which builder-state inference never reads.
 
 ## Which check protects which surface
 
@@ -134,9 +141,9 @@ The two surfaces are validated by different mechanisms, and deliberately do not 
 |---|---|---|
 | PSL | `validateAuthoringArgument`, at authoring time | `Authoring helper argument at <path> must be one of: now` |
 | TypeScript | the literal union, at compile time | a type error |
-| TypeScript, type bypassed | the `map` lookup's throw | `Authoring template map has no entry for value "<value>"` |
+| TypeScript, type bypassed | the select node's throw | `Authoring template select has no case for value "<value>"` |
 
-The asymmetry follows from a standing architectural property: **the TypeScript authoring surface performs no runtime argument validation.** `buildFieldPreset` ([contract-dsl.ts](../../../packages/2-sql/2-authoring/contract-ts/src/contract-dsl.ts)) calls `instantiateAuthoringFieldPreset` directly and never calls `validateAuthoringHelperArguments`; that validator exists for the PSL path, which has to coerce untyped source text. On the TypeScript surface the type system *is* the check. Where a caller bypasses the type — a `string` variable, an untyped JavaScript caller — the `map` throw is the only backstop, and it reads as an internal invariant rather than user-facing guidance, which is appropriate for a case the types already exclude.
+The asymmetry follows from a standing architectural property: **the TypeScript authoring surface performs no runtime argument validation.** `buildFieldPreset` ([contract-dsl.ts](../../../packages/2-sql/2-authoring/contract-ts/src/contract-dsl.ts)) calls `instantiateAuthoringFieldPreset` directly and never calls `validateAuthoringHelperArguments`; that validator exists for the PSL path, which has to coerce untyped source text. On the TypeScript surface the type system *is* the check. Where a caller bypasses the type — a `string` variable, an untyped JavaScript caller — the select node's throw is the only backstop, and it reads as an internal invariant rather than user-facing guidance, which is appropriate for a case the types already exclude.
 
 A future author adding an argument kind should know which check they are relying on, because the answer differs by surface.
 
@@ -243,11 +250,13 @@ Three facts about the wider system make the presets safe without any adapter or 
 
 ## Alternatives considered
 
-**A boolean argument** (`onUpdate: true`). Cheaper, but it names the *presence* of a behavior rather than the behavior itself, leaving no room for a second generator value later without a breaking change. The `option`/`map` pair is open to `values: ['now', ...]` plus a map entry; none ships today.
+**A boolean argument** (`onUpdate: true`). Cheaper, but it names the *presence* of a behavior rather than the behavior itself, leaving no room for a second generator value later without a breaking change. The `option`/`select` pair is open to `values: ['now', ...]` plus a case; none ships today.
 
 **A quoted string argument** (`onUpdate: "now"`). Rejected to keep one spelling per concept. Bare tokens already carry enumerated values in PSL (`onDelete: Cascade`), and accepting both spellings would mean two ways to write the same thing forever.
 
-**Passing the token through as the generator id.** Would delete `map` entirely — and would make `timestampNow` user-facing vocabulary, contradicting ADR 169's preset-only applicability and welding the authoring spelling to an internal identifier.
+**Passing the token through as the generator id.** Would delete `select` entirely — and would make `timestampNow` user-facing vocabulary, contradicting ADR 169's preset-only applicability and welding the authoring spelling to an internal identifier.
+
+**A `map` property on the argument reference** (`{ kind: 'arg', index, map: { now: … } }`). Rejected because it overloads the reference's meaning — a node whose `kind` says "insert the argument's value" would, with `map` present, insert something else entirely — and because it leaves the token enumeration declared in two places (the option's `values` and the map's keys) with nothing coupling them before a runtime throw. The dedicated `select` node names the operation and makes the coupling a registration-time check.
 
 **A variant-selecting argument** (`temporal.timestamp(withTimezone: true)`). Rejected: it makes an argument change the field's codec. Keeping "one preset per codec, arguments change field properties" means the codec is always readable from the spelling.
 
@@ -255,7 +264,7 @@ Three facts about the wider system make the presets safe without any adapter or 
 
 **Deriving the convenience presets structurally from the full form.** `temporal.updatedAt()` could be the full-form descriptor with its arguments pre-bound — one construction, equivalence by identity, no parity test needed. Rejected: partial argument binding is a new framework concept on descriptors, and it could only ever cover `updatedAt` — `createdAt` is a storage default, which the per-codec presets deliberately cannot express, so it stays separately authored regardless. Removing one preset's worth of drift risk did not justify the new seam; the equivalence is enforced by the named tests instead.
 
-**Type-level `map` support in `ResolveTemplateValue`.** Not needed while `map` is confined to `executionDefaults`, which builder-state inference never reads. The constraint is documented instead; the type-level resolver stays simple.
+**Type-level `select` support in `ResolveTemplateValue`.** Not needed while select is confined to `executionDefaults`, which builder-state inference never reads. The constraint is documented instead; the type-level resolver stays simple.
 
 ## References
 
