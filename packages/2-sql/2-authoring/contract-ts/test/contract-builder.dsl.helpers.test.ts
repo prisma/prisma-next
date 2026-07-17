@@ -9,6 +9,7 @@ import { createTestSqlNamespace } from '../../../1-core/contract/test/test-suppo
 import { defineContract, rel } from '../src/contract-builder';
 import { modelsOf } from './contract-test-helpers';
 import { documentScopedTypes } from './cross-ref-helpers';
+import { sqlTimestampPresetMirror } from './temporal-preset-mirror';
 import { unboundTables } from './unbound-tables';
 
 type PortableSqlCodecTypes = {
@@ -53,34 +54,11 @@ const sqlFamilyPack = {
             },
           },
         },
-        // Mirrors `temporalCodecPresetWithPrecision` from family-sql, which
-        // this package cannot import. The factory's own shape is asserted in
-        // family-sql's temporal-codec-presets.test.ts.
-        timestamp: {
-          kind: 'fieldPreset',
-          args: [
-            { name: 'precision', kind: 'number', optional: true, integer: true, minimum: 0 },
-            { name: 'onCreate', kind: 'option', values: ['now'], optional: true },
-            { name: 'onUpdate', kind: 'option', values: ['now'], optional: true },
-          ],
-          output: {
-            codecId: 'sql/timestamp@1',
-            nativeType: 'timestamp',
-            typeParams: { precision: { kind: 'arg', index: 0 } },
-            executionDefaults: {
-              onCreate: {
-                kind: 'arg',
-                index: 1,
-                map: { now: { kind: 'generator', id: 'timestampNow' } },
-              },
-              onUpdate: {
-                kind: 'arg',
-                index: 2,
-                map: { now: { kind: 'generator', id: 'timestampNow' } },
-              },
-            },
-          },
-        },
+        // From test/temporal-preset-mirror.ts, which family-sql's
+        // temporal-codec-presets.test.ts asserts deep-equals the real factory
+        // output — so a factory change cannot leave these tests passing
+        // against a preset that no longer ships.
+        timestamp: sqlTimestampPresetMirror,
       },
       uuidString: {
         kind: 'fieldPreset',
@@ -864,6 +842,30 @@ describe('contract DSL helper vocabulary', () => {
 
         expect(holeState.descriptor).not.toHaveProperty('typeParams');
         expect(holeState.executionDefaults).toEqual({ onUpdate: nowPhase });
+
+        return { models: {} };
+      },
+    );
+  });
+
+  // Design-spec §2 advertises `lastSeen: field.temporal.timestamp(3)` — a
+  // column with precision but deliberately no execution defaults.
+  it('resolves temporal.timestamp(3) to a precision column with no execution defaults', () => {
+    defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+      },
+      ({ field }) => {
+        const state = field.temporal.timestamp(3).build();
+
+        expect(state.descriptor).toEqual({
+          codecId: 'sql/timestamp@1',
+          nativeType: 'timestamp',
+          typeParams: { precision: 3 },
+        });
+        expect(state.executionDefaults).toBeUndefined();
 
         return { models: {} };
       },

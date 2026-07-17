@@ -11,6 +11,7 @@ import {
   sqliteScalarTypeDescriptors,
   sqliteTarget,
   symbolTableInputFromParseArgs,
+  temporalCodecPresetMirrors,
 } from './fixtures';
 import { sqlStorageFromSuccessfulSqlInterpretation } from './interpret-sql-contract-storage';
 import { unboundTables } from './unbound-tables';
@@ -372,34 +373,10 @@ model UuidNativeBad {
   // PSL-side preset surface for Postgres + SQLite. Real targets ship the
   // same shapes via `target.authoring.field.temporal.{createdAt,updatedAt}`.
   //
-  // The per-codec entries below mirror `temporalCodecPresetWithPrecision` /
-  // `temporalCodecPreset` from family-sql, which this package cannot import
-  // (contract-psl does not depend on family-sql). The factories' own shapes
-  // are asserted in family-sql's temporal-codec-presets.test.ts, and each
-  // target's registration is asserted against the factory output in that
-  // target's authoring-field-presets.test.ts — so these mirrors are anchored
-  // on both sides.
-  const timestampNowPhase = { kind: 'generator', id: 'timestampNow' } as const;
-  const onCreateArg = {
-    name: 'onCreate',
-    kind: 'option',
-    values: ['now'],
-    optional: true,
-  } as const;
-  const onUpdateArg = {
-    name: 'onUpdate',
-    kind: 'option',
-    values: ['now'],
-    optional: true,
-  } as const;
-  const precisionArg = {
-    name: 'precision',
-    kind: 'number',
-    optional: true,
-    integer: true,
-    minimum: 0,
-  } as const;
-
+  // The per-codec entries come from `temporalCodecPresetMirrors` in fixtures.ts,
+  // which family-sql's temporal-codec-presets.test.ts asserts deep-equal the
+  // real factory output — so a factory change fails there rather than silently
+  // leaving these tests passing against a preset that no longer ships.
   const postgresTemporalContributions = {
     field: {
       temporal: {
@@ -422,32 +399,8 @@ model UuidNativeBad {
             },
           },
         },
-        timestamp: {
-          kind: 'fieldPreset',
-          args: [precisionArg, onCreateArg, onUpdateArg],
-          output: {
-            codecId: 'pg/timestamp@1',
-            nativeType: 'timestamp',
-            typeParams: { precision: { kind: 'arg', index: 0 } },
-            executionDefaults: {
-              onCreate: { kind: 'arg', index: 1, map: { now: timestampNowPhase } },
-              onUpdate: { kind: 'arg', index: 2, map: { now: timestampNowPhase } },
-            },
-          },
-        },
-        timestamptz: {
-          kind: 'fieldPreset',
-          args: [precisionArg, onCreateArg, onUpdateArg],
-          output: {
-            codecId: 'pg/timestamptz@1',
-            nativeType: 'timestamptz',
-            typeParams: { precision: { kind: 'arg', index: 0 } },
-            executionDefaults: {
-              onCreate: { kind: 'arg', index: 1, map: { now: timestampNowPhase } },
-              onUpdate: { kind: 'arg', index: 2, map: { now: timestampNowPhase } },
-            },
-          },
-        },
+        timestamp: temporalCodecPresetMirrors.pgTimestamp,
+        timestamptz: temporalCodecPresetMirrors.pgTimestamptz,
       },
     },
   } as const;
@@ -474,18 +427,7 @@ model UuidNativeBad {
             },
           },
         },
-        datetime: {
-          kind: 'fieldPreset',
-          args: [onCreateArg, onUpdateArg],
-          output: {
-            codecId: 'sqlite/datetime@1',
-            nativeType: 'text',
-            executionDefaults: {
-              onCreate: { kind: 'arg', index: 0, map: { now: timestampNowPhase } },
-              onUpdate: { kind: 'arg', index: 1, map: { now: timestampNowPhase } },
-            },
-          },
-        },
+        datetime: temporalCodecPresetMirrors.sqliteDatetime,
       },
     },
   } as const;

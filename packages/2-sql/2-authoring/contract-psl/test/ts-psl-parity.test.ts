@@ -14,6 +14,7 @@ import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
   createBuiltinLikeControlMutationDefaults,
   symbolTableInputFromParseArgs,
+  temporalCodecPresetMirrors,
   testEnumEntityContributions,
 } from './fixtures';
 
@@ -211,36 +212,11 @@ const postgresTimestampTargetPack = {
             },
           },
         },
-        // Mirrors `temporalCodecPresetWithPrecision` from family-sql, which
-        // this package cannot import. The factory's shape is asserted in
-        // family-sql's temporal-codec-presets.test.ts, and the postgres pack's
-        // registration is asserted against the factory in the postgres target's
-        // authoring-field-presets.test.ts.
-        timestamptz: {
-          kind: 'fieldPreset',
-          args: [
-            { name: 'precision', kind: 'number', optional: true, integer: true, minimum: 0 },
-            { name: 'onCreate', kind: 'option', values: ['now'], optional: true },
-            { name: 'onUpdate', kind: 'option', values: ['now'], optional: true },
-          ],
-          output: {
-            codecId: 'pg/timestamptz@1',
-            nativeType: 'timestamptz',
-            typeParams: { precision: { kind: 'arg', index: 0 } },
-            executionDefaults: {
-              onCreate: {
-                kind: 'arg',
-                index: 1,
-                map: { now: { kind: 'generator', id: 'timestampNow' } },
-              },
-              onUpdate: {
-                kind: 'arg',
-                index: 2,
-                map: { now: { kind: 'generator', id: 'timestampNow' } },
-              },
-            },
-          },
-        },
+        // From `temporalCodecPresetMirrors` in fixtures.ts, which family-sql's
+        // temporal-codec-presets.test.ts asserts deep-equals the real factory
+        // output — so a factory change cannot leave this parity test passing
+        // against a preset that no longer ships.
+        timestamptz: temporalCodecPresetMirrors.pgTimestamptz,
       },
     },
   },

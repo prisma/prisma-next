@@ -11,6 +11,7 @@ import {
   type AuthoringContributions,
   type AuthoringEntityContext,
   type AuthoringEntityTypeNamespace,
+  type AuthoringFieldPresetDescriptor,
   type AuthoringPslBlockDescriptorNamespace,
   type PslExtensionBlock,
   resolveEnumCodecId,
@@ -705,3 +706,87 @@ export function buildEnumCapturingFactory(): {
   };
   return { createNamespace, capturedEnumTypes };
 }
+
+/**
+ * Hand-written mirrors of family-sql's `temporalCodecPresetWithPrecision` /
+ * `temporalCodecPreset` factory output.
+ *
+ * They are hand-written because this package cannot import family-sql:
+ * family-sql declares `@prisma-next/sql-contract-psl` as a devDependency, so
+ * the reverse import would be a cycle.
+ *
+ * They are kept honest by `family-sql/test/temporal-codec-presets.test.ts`,
+ * which imports each mirror below and asserts it deep-equals the factory
+ * output. That assertion — not the target-pack registration tests, whose two
+ * sides both derive from the factory — is what fails if a factory change
+ * leaves these stale.
+ */
+const TEMPORAL_MIRROR_PRECISION_ARG = {
+  name: 'precision',
+  kind: 'number',
+  optional: true,
+  integer: true,
+  minimum: 0,
+} as const;
+const TEMPORAL_MIRROR_ON_CREATE_ARG = {
+  name: 'onCreate',
+  kind: 'option',
+  values: ['now'],
+  optional: true,
+} as const;
+const TEMPORAL_MIRROR_ON_UPDATE_ARG = {
+  name: 'onUpdate',
+  kind: 'option',
+  values: ['now'],
+  optional: true,
+} as const;
+const TEMPORAL_MIRROR_NOW_PHASE = { kind: 'generator', id: 'timestampNow' } as const;
+
+export const temporalCodecPresetMirrors = {
+  pgTimestamp: {
+    kind: 'fieldPreset',
+    args: [
+      TEMPORAL_MIRROR_PRECISION_ARG,
+      TEMPORAL_MIRROR_ON_CREATE_ARG,
+      TEMPORAL_MIRROR_ON_UPDATE_ARG,
+    ],
+    output: {
+      codecId: 'pg/timestamp@1',
+      nativeType: 'timestamp',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+      executionDefaults: {
+        onCreate: { kind: 'arg', index: 1, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onUpdate: { kind: 'arg', index: 2, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+      },
+    },
+  },
+  pgTimestamptz: {
+    kind: 'fieldPreset',
+    args: [
+      TEMPORAL_MIRROR_PRECISION_ARG,
+      TEMPORAL_MIRROR_ON_CREATE_ARG,
+      TEMPORAL_MIRROR_ON_UPDATE_ARG,
+    ],
+    output: {
+      codecId: 'pg/timestamptz@1',
+      nativeType: 'timestamptz',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+      executionDefaults: {
+        onCreate: { kind: 'arg', index: 1, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onUpdate: { kind: 'arg', index: 2, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+      },
+    },
+  },
+  sqliteDatetime: {
+    kind: 'fieldPreset',
+    args: [TEMPORAL_MIRROR_ON_CREATE_ARG, TEMPORAL_MIRROR_ON_UPDATE_ARG],
+    output: {
+      codecId: 'sqlite/datetime@1',
+      nativeType: 'text',
+      executionDefaults: {
+        onCreate: { kind: 'arg', index: 0, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onUpdate: { kind: 'arg', index: 1, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+      },
+    },
+  },
+} as const satisfies Record<string, AuthoringFieldPresetDescriptor>;

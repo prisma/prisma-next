@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { temporalCodecPresetMirrors } from '../../2-authoring/contract-psl/test/fixtures';
+import { sqlTimestampPresetMirror } from '../../2-authoring/contract-ts/test/temporal-preset-mirror';
 import {
   temporalAuthoringPresets,
   temporalCodecPreset,
@@ -92,5 +94,43 @@ describe('temporalAuthoringPresets', () => {
         },
       },
     });
+  });
+});
+
+/**
+ * contract-psl and contract-ts hand-mirror these factories' output because
+ * neither can import family-sql (family-sql depends on contract-ts in
+ * production and on contract-psl in dev, so the reverse is a cycle). Their
+ * §8 output-table, diagnostic, and parity tests all run against those mirrors.
+ *
+ * These assertions are the only thing standing between a factory change and
+ * those suites silently passing against a preset that no longer ships — the
+ * target-pack registration tests cannot serve that purpose, because both
+ * sides of those assertions derive from the factory and so are invariant
+ * under factory changes.
+ */
+describe('downstream mirrors track the factories', () => {
+  it('contract-psl mirrors the postgres timestamp preset', () => {
+    expect(temporalCodecPresetMirrors.pgTimestamp).toEqual(
+      temporalCodecPresetWithPrecision({ codecId: 'pg/timestamp@1', nativeType: 'timestamp' }),
+    );
+  });
+
+  it('contract-psl mirrors the postgres timestamptz preset', () => {
+    expect(temporalCodecPresetMirrors.pgTimestamptz).toEqual(
+      temporalCodecPresetWithPrecision({ codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }),
+    );
+  });
+
+  it('contract-psl mirrors the sqlite datetime preset', () => {
+    expect(temporalCodecPresetMirrors.sqliteDatetime).toEqual(
+      temporalCodecPreset({ codecId: 'sqlite/datetime@1', nativeType: 'text' }),
+    );
+  });
+
+  it('contract-ts mirrors the precision-bearing preset over its portable codec', () => {
+    expect(sqlTimestampPresetMirror).toEqual(
+      temporalCodecPresetWithPrecision({ codecId: 'sql/timestamp@1', nativeType: 'timestamp' }),
+    );
   });
 });
