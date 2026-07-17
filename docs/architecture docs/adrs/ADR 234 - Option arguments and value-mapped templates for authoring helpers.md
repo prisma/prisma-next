@@ -1,13 +1,10 @@
 # ADR 234 — Option arguments and value-mapped templates for authoring helpers
 
-**Status:** Proposed
-**Date:** 2026-07-17
-
----
-
 ## At a glance
 
-A field preset can take an argument whose legal values are an enumerated set, and can map each of those values onto a fragment of its output. An author writes:
+Field presets take enumerated arguments, spelled as bare tokens in PSL and string literals in TypeScript, declared with an `option` argument kind and translated into fragments of the preset's output by a declarative `map` on argument references. Two omission rules complete the design: an argument the author does not supply leaves no trace in the contract.
+
+The temporal presets are the motivating example. An author writes:
 
 ```prisma
 model Page {
@@ -17,7 +14,7 @@ model Page {
 }
 ```
 
-or, on the TypeScript surface:
+`updatedAt` is a `timestamp(3)` column whose value the runtime writes on insert and on update — execution defaults ([ADR 158](ADR%20158%20-%20Execution%20mutation%20defaults.md)), applied by the data layer at mutation time, not DDL defaults or triggers. `lastSeen` is the same column type with no behavior. `touched` is written on update only. The TypeScript surface spells the same three fields positionally:
 
 ```ts
 updatedAt: field.temporal.timestamp(3, 'now', 'now'),
@@ -25,7 +22,18 @@ lastSeen:  field.temporal.timestamp(3),
 touched:   field.temporal.timestamptz(undefined, undefined, 'now'),
 ```
 
-The preset behind them is declared once, as data:
+A field preset ([ADR 170](ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md)) is declared as data, and an enumerated argument is one line of that data:
+
+```ts
+const TEMPORAL_ON_UPDATE_ARG = {
+  name: 'onUpdate',
+  kind: 'option',
+  values: ['now'],
+  optional: true,
+} as const;
+```
+
+The preset itself is a template over its arguments:
 
 ```ts
 export function temporalCodecPresetWithPrecision<
@@ -57,7 +65,7 @@ Four decisions make that work:
 
 ## The `option` argument kind
 
-`AuthoringArgumentDescriptor` ([framework-authoring.ts](../../../packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts)) gains:
+`AuthoringArgumentDescriptor` ([framework-authoring.ts](../../../packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts)) includes:
 
 ```ts
 | {
@@ -66,9 +74,9 @@ Four decisions make that work:
   }
 ```
 
-The name and shape mirror `PslBlockParamOption` in [psl-extension-block.ts](../../../packages/1-framework/1-core/framework-components/src/shared/psl-extension-block.ts), which already spells an enumerated block parameter as `kind: 'option'` with `values`. Reusing the vocabulary keeps one word for one idea across the two declarative surfaces.
+The name and shape mirror `PslBlockParamOption` in [psl-extension-block.ts](../../../packages/1-framework/1-core/framework-components/src/shared/psl-extension-block.ts), which spells an enumerated block parameter the same way — `kind: 'option'` with `values`. One word for one idea across the two declarative surfaces.
 
-**PSL spells an option as a bare token** (`onUpdate: now`), following `@relation(onDelete: Cascade)` — the established spelling for an enumerated attribute argument. No grammar change was needed: bare identifiers already parse in argument position, so `parsePslAuthoringArgumentValue` ([psl-authoring-arguments.ts](../../../packages/2-sql/2-authoring/contract-psl/src/psl-authoring-arguments.ts)) only has to accept the identifier text:
+**PSL spells an option as a bare token** (`onUpdate: now`), following `@relation(onDelete: Cascade)` — the established spelling for an enumerated attribute argument. Bare identifiers are ordinary argument expressions in the PSL grammar, so the parser's only job is to accept the identifier text ([psl-authoring-arguments.ts](../../../packages/2-sql/2-authoring/contract-psl/src/psl-authoring-arguments.ts)):
 
 ```ts
 case 'option': {
@@ -77,27 +85,13 @@ case 'option': {
 }
 ```
 
-That case checks **syntax only**. A quoted `onCreate: "now"` is rejected — one spelling, not two — and reports through the existing `PSL_INVALID_ATTRIBUTE_ARGUMENT` plumbing. The option kind introduces no diagnostic code of its own.
+That case checks **syntax only**; membership in `values` is validated by the framework layer, which owns the error message. A quoted `onCreate: "now"` is rejected — one spelling, not two — and reports through the existing `PSL_INVALID_ATTRIBUTE_ARGUMENT` plumbing. The option kind introduces no diagnostic code of its own.
 
 **TypeScript spells an option as a string literal** (`'now'`). `ArgTypeFromDescriptor` ([authoring-type-utils.ts](../../../packages/2-sql/2-authoring/contract-ts/src/authoring-type-utils.ts)) resolves an option descriptor to the literal union of its `values`, so the legal set is autocompleted and enforced by the compiler.
 
-### Which check protects which surface
-
-The two surfaces are validated by different mechanisms, and deliberately do not share an error message.
-
-| Surface | What rejects a bad option value | Message |
-|---|---|---|
-| PSL | `validateAuthoringArgument`, at authoring time | `Authoring helper argument at <path> must be one of: now` |
-| TypeScript | the literal union, at compile time | a type error |
-| TypeScript, type bypassed | the `map` lookup's throw | `Authoring template map has no entry for value "<value>"` |
-
-This asymmetry is a consequence of an existing architectural choice, not a new one: **the TypeScript authoring surface performs no runtime argument validation.** `buildFieldPreset` ([contract-dsl.ts](../../../packages/2-sql/2-authoring/contract-ts/src/contract-dsl.ts)) calls `instantiateAuthoringFieldPreset` directly and never calls `validateAuthoringHelperArguments`; that validator exists for the PSL path, which has to coerce untyped source text. On the TypeScript surface the type system *is* the check. Where a caller bypasses the type — a `string` variable, an untyped JavaScript caller — the `map` throw is the only backstop, and it reads as an internal invariant rather than user-facing guidance, which is appropriate for a case the types already exclude.
-
-A future author adding an argument kind should know which check they are relying on, because the answer differs by surface.
-
 ## `map`: preset vocabulary is not generator vocabulary
 
-`AuthoringArgRef` gains an optional `map`:
+An argument reference (`AuthoringArgRef`) carries an optional `map`:
 
 ```ts
 export type AuthoringArgRef = {
@@ -132,11 +126,25 @@ The point is the indirection. `timestampNow` is a preset-only generator id ([ADR
 
 **Constraint:** a `map`-bearing argument reference must not be used in the `codecId`, `nullable`, `id`, or `unique` positions of a preset output. Those feed the TypeScript builder-state inference through `ResolveTemplateValue`, which does not implement `map`. The temporal presets use `map` only inside `executionDefaults`, which builder-state inference never reads.
 
+## Which check protects which surface
+
+The two surfaces are validated by different mechanisms, and deliberately do not share an error message.
+
+| Surface | What rejects a bad option value | Message |
+|---|---|---|
+| PSL | `validateAuthoringArgument`, at authoring time | `Authoring helper argument at <path> must be one of: now` |
+| TypeScript | the literal union, at compile time | a type error |
+| TypeScript, type bypassed | the `map` lookup's throw | `Authoring template map has no entry for value "<value>"` |
+
+The asymmetry follows from a standing architectural property: **the TypeScript authoring surface performs no runtime argument validation.** `buildFieldPreset` ([contract-dsl.ts](../../../packages/2-sql/2-authoring/contract-ts/src/contract-dsl.ts)) calls `instantiateAuthoringFieldPreset` directly and never calls `validateAuthoringHelperArguments`; that validator exists for the PSL path, which has to coerce untyped source text. On the TypeScript surface the type system *is* the check. Where a caller bypasses the type — a `string` variable, an untyped JavaScript caller — the `map` throw is the only backstop, and it reads as an internal invariant rather than user-facing guidance, which is appropriate for a case the types already exclude.
+
+A future author adding an argument kind should know which check they are relying on, because the answer differs by surface.
+
 ## Two omission rules
 
 Both exist so that an argument the author did not supply leaves **no trace** in the contract.
 
-**A phase that resolves to `undefined` is omitted.** `resolveExecutionMutationDefaultPhase` returns `undefined` rather than throwing; `resolveAuthoringExecutionDefaultsTemplate` returns `undefined` when the resulting phases object has no keys. A contract never carries `executionDefaults: {}`. A phase that resolves to something defined but not a generator descriptor still throws — that is a malformed descriptor, not an omission.
+**A phase that resolves to `undefined` is omitted.** `resolveExecutionMutationDefaultPhase` treats an `undefined` resolution as "this phase is not declared"; `resolveAuthoringExecutionDefaultsTemplate` returns `undefined` when the resulting phases object has no keys. A contract never carries `executionDefaults: {}`. A phase that resolves to something defined but not a generator descriptor is a malformed descriptor, and throws.
 
 **An empty resolved `typeParams` is omitted.** After resolving, an object with zero keys is treated as `undefined`:
 
@@ -145,13 +153,13 @@ const normalizedTypeParams =
   typeParams !== undefined && Object.keys(typeParams).length === 0 ? undefined : typeParams;
 ```
 
-Without this, `temporal.timestamp()` would emit `typeParams: {}` — object-template resolution drops `undefined` values, so `{ precision: { kind: 'arg', index: 0 } }` collapses to `{}` when precision is absent. Absent and `{}` are equivalent to every consumer that reads them, but they are not equal to a byte comparison, and a contract that carries `{}` differs from the `@db.Timestamp` spelling that produces the same column.
+Object-template resolution drops `undefined` values, so `temporal.timestamp()`'s template `{ precision: { kind: 'arg', index: 0 } }` resolves to `{}` when no precision is supplied. Absent and `{}` are equivalent to every consumer that reads them, but they are not equal to a byte comparison — and a contract that carried `{}` would differ from the `@db.Timestamp` spelling that produces the same column.
 
 ### The two rules carry each other
 
 These are not independent conveniences. `temporal.updatedAt()` is byte-identical to `temporal.timestamptz(onCreate: now, onUpdate: now)` **only because** empty-`typeParams` normalization exists: `timestamptz` declares a `{ precision: arg0 }` template that `updatedAt` does not declare at all, and with no precision supplied that template must resolve to `{}` and then vanish for the two outputs to match. Change either rule and the shorthand guarantee breaks.
 
-## Per-codec presets: one preset per codec, named for the codec
+## One preset per codec, named for the codec
 
 The rule that makes the namespace work: **a per-codec preset's name is its codec's base name.** `pg/timestamp@1` → `temporal.timestamp`, `pg/timestamptz@1` → `temporal.timestamptz`, `sqlite/datetime@1` → `temporal.datetime`.
 
@@ -178,9 +186,9 @@ Arguments change **properties of the field** — its precision, its execution-de
 
 Two factories exist because the codecs differ in whether they take parameters: `temporalCodecPresetWithPrecision` for `pg/timestamp@1` and `pg/timestamptz@1`, whose descriptors declare a precision params schema, and `temporalCodecPreset` for `sqlite/datetime@1`, whose descriptor declares void params. Both preserve literal types end-to-end (`const` type parameters, `as const satisfies`); without that the codec id widens to `string` and the option's `'now'` widens with it, silently costing the TypeScript surface both its inference and its enforcement.
 
-### The convenience presets survive, and their equivalence is test-enforced
+### The convenience presets are held equal by tests
 
-`temporal.createdAt()` and `temporal.updatedAt()` are unchanged. `createdAt` remains a **storage** default (`now()` rendered into DDL) — a different mechanism from execution defaults, and deliberately not expressible through `onCreate: now`. `updatedAt` remains shorthand for `temporal.timestamptz(onCreate: now, onUpdate: now)`.
+`temporal.createdAt()` and `temporal.updatedAt()` are the behavioral spellings. `createdAt` is a **storage** default (`now()` rendered into DDL) — a different mechanism from execution defaults, and deliberately not expressible through `onCreate: now`. `updatedAt` is shorthand for `temporal.timestamptz(onCreate: now, onUpdate: now)`.
 
 That shorthand relationship is **a claim about two separately authored descriptors that share no code.** `temporalAuthoringPresets` and `temporalCodecPresetWithPrecision` ([timestamp-now-generator.ts](../../../packages/2-sql/9-family/src/core/timestamp-now-generator.ts)) construct their outputs independently; nothing structural forces them to agree. They are held equal by tests, and by nothing else:
 
@@ -195,13 +203,13 @@ All four spellings — PSL and TypeScript, convenience and full — funnel throu
 
 Correctness is proved by the **absolute** assertions in `describe('temporal per-codec preset lowering')` in [interpreter.defaults.test.ts](../../../packages/2-sql/2-authoring/contract-psl/test/interpreter.defaults.test.ts), which pin whole column shapes and whole execution-defaults lists against literals. The two kinds of test are not substitutes.
 
-## Consequences
+## Optional arguments on the TypeScript surface
 
-**Downstream is untouched.** `{ precision }` typeParams on the postgres timestamp codecs already flow through DDL rendering — the `@db.Timestamp(3)` spelling produces the same contract shape — and the `timestampNow` generator (control descriptor, runtime generator, adapter lowering) is reused as-is on both targets. Omitting `typeParams` entirely is safe: a parameterized codec with absent typeParams is probed with `{}` in [sql-context.ts](../../../packages/2-sql/5-runtime/src/sql-context.ts), and `undefined` is re-normalized to `{}` in resolve-codec. No emitted contract changes.
+`TupleFromArgumentDescriptors` gives an `optional: true` descriptor an optional tuple slot, which is what makes `field.temporal.timestamp()` and `field.temporal.timestamp(3)` legal calls. Two constraints follow. Required arguments must precede optional ones in a descriptor's `args` list: TypeScript rejects an optional tuple element followed by a required one, and `validateAuthoringHelperArguments`'s minimum-arity computation treats an optional-before-required argument as effectively required anyway. And a middle optional argument is skipped with an explicit `undefined` hole (`field.temporal.timestamptz(undefined, undefined, 'now')`), which the runtime accepts for any optional argument.
 
-**Optional arguments are genuinely optional on the TypeScript surface.** `TupleFromArgumentDescriptors` gives an `optional: true` descriptor an optional tuple slot, which is what makes `field.temporal.timestamp()` and `field.temporal.timestamp(3)` legal. Two constraints follow. Required arguments must precede optional ones in a descriptor's `args` list: TypeScript rejects an optional tuple element followed by a required one, and `validateAuthoringHelperArguments`'s minimum-arity computation already treats an optional-before-required argument as effectively required. And a middle optional argument is skipped with an explicit `undefined` hole (`field.temporal.timestamptz(undefined, undefined, 'now')`), which the runtime already accepts.
+### A preset that declares `id`/`unique` needs an overload pair
 
-**A preset that declares `id`/`unique` needs an overload pair.** Once the argument tuple can infer as empty, a single-signature helper with a trailing `options?: NamedConstraintSpec` binds the first real argument to `options`. `FieldHelperFunctionWithNamedConstraint` is therefore an intersection of two call signatures — no-options first, options-required second — so `field.id.nanoid({ size: 16 })` and `field.id.nanoid({ size: 16 }, { name: 'x' })` both resolve correctly.
+Because the argument tuple can infer as empty, a single-signature helper with a trailing `options?: NamedConstraintSpec` would bind the first real argument to `options`. `FieldHelperFunctionWithNamedConstraint` is therefore an intersection of two call signatures — a no-options signature first, an options-required signature second — so `field.id.nanoid({ size: 16 })` and `field.id.nanoid({ size: 16 }, { name: 'x' })` both resolve correctly.
 
 ### Which check protects which argument object
 
@@ -221,9 +229,17 @@ export type ObjectArgumentType<Properties extends Record<string, AuthoringArgume
     };
 ```
 
-`{}` is not itself weak, so an intersection with it silently disables the check.
+`{}` is not itself a weak type, so an intersection with it silently disables the check.
 
 An argument object with **required** properties is not weak, and relies on the ordinary excess-property check instead. Both are correct; they are different mechanisms, and an author adding a descriptor should know which one is protecting them — the more so because, on this surface, there is no runtime check behind either.
+
+## What the presets rely on downstream
+
+Three facts about the wider system make the presets safe without any adapter or runtime involvement:
+
+- `{ precision }` typeParams on the postgres timestamp codecs flow through DDL rendering; the `@db.Timestamp(3)` spelling produces the same contract shape and exercises the same path.
+- A parameterized codec with absent `typeParams` is probed with `{}` in [sql-context.ts](../../../packages/2-sql/5-runtime/src/sql-context.ts), and `undefined` is normalized to `{}` in resolve-codec — so omitting `typeParams` entirely is equivalent to every consumer that reads it.
+- The `timestampNow` generator — control descriptor, runtime generator, adapter lowering — is target-agnostic and serves both the postgres and sqlite presets.
 
 ## Alternatives considered
 
@@ -237,7 +253,9 @@ An argument object with **required** properties is not weak, and relies on the o
 
 **Composing `@db.*` native-type attributes with a behavioral preset.** The two mechanisms do not compose — a preset owns the whole column descriptor — and unifying them is a larger question than this decision. `@db.*` is unchanged.
 
-**Type-level `map` support in `ResolveTemplateValue`.** Not needed while `map` is confined to `executionDefaults`, which builder-state inference never reads. The constraint above is documented instead; the type-level resolver stays simple.
+**Deriving the convenience presets structurally from the full form.** `temporal.updatedAt()` could be the full-form descriptor with its arguments pre-bound — one construction, equivalence by identity, no parity test needed. Rejected: partial argument binding is a new framework concept on descriptors, and it could only ever cover `updatedAt` — `createdAt` is a storage default, which the per-codec presets deliberately cannot express, so it stays separately authored regardless. Removing one preset's worth of drift risk did not justify the new seam; the equivalence is enforced by the named tests instead.
+
+**Type-level `map` support in `ResolveTemplateValue`.** Not needed while `map` is confined to `executionDefaults`, which builder-state inference never reads. The constraint is documented instead; the type-level resolver stays simple.
 
 ## References
 
