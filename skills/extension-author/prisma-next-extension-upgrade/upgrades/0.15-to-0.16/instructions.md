@@ -11,8 +11,7 @@ changes:
       failed with ENOENT before touching a database. Delete any import of
       `@prisma-next/extension-supabase/test/utils`; keep hermetic test helpers package-internal
       (tests import them by source path) rather than publishing them as subpath exports whose
-      on-disk fixtures don't ship. For Supabase-shaped testing, use Supabase's own tooling
-      (`supabase start` / `supabase db reset`, `supabase test db` with pgTAP).
+      on-disk fixtures don't ship.
     detection:
       glob: "**/*.{ts,mts,cts,js,mjs}"
       contains:
