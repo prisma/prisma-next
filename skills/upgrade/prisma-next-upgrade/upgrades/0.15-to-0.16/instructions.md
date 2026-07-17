@@ -2,6 +2,21 @@
 from: "0.15"
 to: "0.16"
 changes:
+  - id: extension-supabase-test-utils-export-removed
+    summary: |
+      `@prisma-next/extension-supabase` no longer exports the `./test/utils` subpath
+      (`bootstrapSupabaseShim`). The import typechecked (types shipped in `dist`), but the
+      subpath never worked from npm — the shim reads fixture `.sql` files that were never
+      published, so every call failed with ENOENT before touching a database. There is no
+      working code to migrate: delete the import and whatever test setup called
+      `bootstrapSupabaseShim`. Test against Supabase's own tooling instead — `supabase start`
+      / `supabase db reset` for a local stack, and `supabase test db` (pgTAP) for asserting
+      RLS behaviour (for example that `anon` cannot see a row).
+    detection:
+      glob: "**/*.{ts,mts,cts,js,mjs}"
+      contains:
+        - "extension-supabase/test/utils"
+      anyMatch: true
   - id: pg-date-codec-for-db-date
     summary: |
       Postgres `@db.Date` columns are now backed by a dedicated `pg/date@1` codec, rather than inheriting `pg/timestamptz@1` (which `@db.Date` previously had no codec of its own and fell back to). The next `contract emit` of any existing `@db.Date` column picks up the new `codecId` automatically — no `.prisma` source change needed — which changes that column's entry in `contract.json`/`contract.d.ts` and the contract's `storageHash`. This is a fix, not a regression: a `@db.Date` column read through `.include()` previously crashed decoding a bare `YYYY-MM-DD` value through the timestamptz decoder (`json_agg` -> `decodeJson`); that now works. The field's TypeScript type and runtime value (a JS `Date` at UTC midnight) are unchanged, and no application code needs to change. If you sign, pin, or otherwise compare a contract's `storageHash` (e.g. a migration marker or a CI check), re-generate it after upgrading.
@@ -52,4 +67,12 @@ it is now the helper's return type rather than the removed field's type. This is
 framework migration-control internal, not an app-authoring surface. The
 `examples/` diff is supabase-example TEST assertions updated from `.reason` to
 presence — no runtime, contract, or DDL change. Incidental test-only diff.
+-->
+
+<!--
+Supabase example env template (TML-2503): docs-only. The `examples/` touch adds
+`examples/supabase/.env.example`, naming the two env vars the real-Supabase
+acceptance lane already reads (`DATABASE_URL`, `SUPABASE_JWT_SECRET`). Nothing
+loads the file — it documents what to export. No framework surface, contract
+shape, or emitted artefact change. Incidental substrate diff only.
 -->

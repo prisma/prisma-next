@@ -1,12 +1,16 @@
 /**
- * Real-Supabase acceptance test — the real-connection variant of
- * `rls-role-binding.integration.test.ts`. Runs the same RLS role-binding
- * flows against a live Supabase Postgres instead of PGlite.
+ * Real-Supabase acceptance test — the real-connection variant of the
+ * extension package's hermetic `rls-role-binding.integration.test.ts`.
+ * Runs the same RLS role-binding flows against a live Supabase Postgres
+ * instead of PGlite.
  *
  * Skipped (green) unless both `DATABASE_URL` (a direct, service_role-capable
  * connection to a real Supabase project) and `SUPABASE_JWT_SECRET` (the
- * project's JWT secret) are set, so it never runs on the normal CI path.
- * See `examples/supabase/README.md` for how to run it.
+ * project's JWT secret) are set. The GoTrue/JWKS test additionally needs
+ * `SUPABASE_URL` and `SUPABASE_ANON_KEY`. CI runs the whole suite against a
+ * stock `supabase start` (ci.yml `supabase-acceptance` job, which exports
+ * all four from `supabase status`); see `examples/supabase/README.md` for
+ * running it locally.
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -15,7 +19,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import supabasePack from '@prisma-next/extension-supabase/pack';
-import { InvalidJwtError } from '@prisma-next/extension-supabase/runtime';
+import { InvalidJwtError, supabase } from '@prisma-next/extension-supabase/runtime';
 import sql from '@prisma-next/family-sql/control';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlMiddleware } from '@prisma-next/sql-runtime';
@@ -24,6 +28,7 @@ import { timeouts, withClient } from '@prisma-next/test-utils';
 import { SignJWT } from 'jose';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import { createDb } from '../src/prisma/db';
 
@@ -88,18 +93,6 @@ async function runDbInit(connectionString: string, migrationsDir: string): Promi
   }
 }
 
-// A real Supabase project already has anon/authenticated/service_role and the
-// auth/storage grants bootstrapSupabaseShim fabricates for PGlite — only the
-// app-table grants dbInit's plan doesn't cover are needed here.
-async function applyProfileGrants(connectionString: string): Promise<void> {
-  await withClient(connectionString, async (pg) => {
-    await pg.query('GRANT SELECT ON public.profile TO anon, authenticated');
-    await pg.query('GRANT ALL ON public.profile TO service_role');
-    await pg.query('GRANT INSERT ON public.profile TO service_role');
-    await pg.query('GRANT UPDATE ON public.profile TO authenticated');
-  });
-}
-
 describe.skipIf(!process.env['DATABASE_URL'] || !process.env['SUPABASE_JWT_SECRET'])(
   'RLS — role-bound Supabase runtime acceptance (real Supabase)',
   () => {
@@ -121,7 +114,9 @@ describe.skipIf(!process.env['DATABASE_URL'] || !process.env['SUPABASE_JWT_SECRE
       'asUser returns only owner row; asAnon returns all (public-read policy); asServiceRole returns all; set_config invisible to middleware',
       async () => {
         await runDbInit(connectionString, migrationsDir);
-        await applyProfileGrants(connectionString);
+        // No manual grants: tables dbInit creates in public inherit the
+        // platform roles' access via Supabase's default privileges; RLS is
+        // what scopes the rows.
 
         const userAId = crypto.randomUUID();
         const userBId = crypto.randomUUID();
@@ -206,7 +201,9 @@ describe.skipIf(!process.env['DATABASE_URL'] || !process.env['SUPABASE_JWT_SECRE
       'asServiceRole ORM create succeeds; asUser ORM update scoped to own row; update against other row affects 0; withCheck rejects reassignment to another owner',
       async () => {
         await runDbInit(connectionString, migrationsDir);
-        await applyProfileGrants(connectionString);
+        // No manual grants: tables dbInit creates in public inherit the
+        // platform roles' access via Supabase's default privileges; RLS is
+        // what scopes the rows.
 
         const userAId = crypto.randomUUID();
         const userBId = crypto.randomUUID();
@@ -293,6 +290,87 @@ describe.skipIf(!process.env['DATABASE_URL'] || !process.env['SUPABASE_JWT_SECRE
           await expect(db.asUser(expiredJwt)).rejects.toThrow(InvalidJwtError);
         } finally {
           await db.close();
+        }
+      },
+      timeouts.spinUpPpgDev * 4,
+    );
+
+    // The project's REAL signing config: GoTrue issues the token (ES256 with
+    // a kid on a current stack) and the client verifies it through the
+    // project's published JWKS endpoint — no self-minted keys anywhere. This
+    // is the configuration a new Supabase project has out of the box; it is
+    // what the hermetic ES256 test in rls-role-binding.integration.test.ts
+    // simulates. Needs `SUPABASE_URL` + `SUPABASE_ANON_KEY` on top of the
+    // suite's env (the CI job exports all four from `supabase status`).
+    it.skipIf(!process.env['SUPABASE_URL'] || !process.env['SUPABASE_ANON_KEY'])(
+      'asUser accepts a GoTrue-issued token verified via the project JWKS endpoint; RLS scopes the read',
+      async () => {
+        const supabaseUrl = process.env['SUPABASE_URL'];
+        const anonKey = process.env['SUPABASE_ANON_KEY'];
+        if (!supabaseUrl || !anonKey) {
+          throw new Error(
+            'SUPABASE_URL/SUPABASE_ANON_KEY must be set — skipIf should have skipped',
+          );
+        }
+
+        await runDbInit(connectionString, migrationsDir);
+
+        // A real user, created by the real auth server. Stock local config
+        // auto-confirms email signups and returns a session directly.
+        const email = `acceptance-${crypto.randomUUID()}@example.com`;
+        const signupResponse = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+          method: 'POST',
+          headers: { apikey: anonKey, 'content-type': 'application/json' },
+          body: JSON.stringify({ email, password: `pw-${crypto.randomUUID()}` }),
+        });
+        const signupBody = (await signupResponse.json()) as {
+          access_token?: string;
+          user?: { id?: string };
+        };
+        if (!signupResponse.ok || !signupBody.access_token || !signupBody.user?.id) {
+          throw new Error(
+            `GoTrue signup failed (${signupResponse.status}): ${JSON.stringify(signupBody)}`,
+          );
+        }
+        const accessToken = signupBody.access_token;
+        const userAId = signupBody.user.id;
+
+        const userBId = crypto.randomUUID();
+        const profileAId = crypto.randomUUID();
+        const profileBId = crypto.randomUUID();
+        const now = new Date().toISOString();
+
+        await withClient(connectionString, async (pg) => {
+          await pg.query(
+            'INSERT INTO auth.users (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3)',
+            [userBId, 'user-b@example.com', now],
+          );
+          await pg.query(
+            'INSERT INTO public.profile (id, username, "userId") VALUES ($1, $2, $3), ($4, $5, $6)',
+            [profileAId, 'alice', userAId, profileBId, 'bob', userBId],
+          );
+        });
+
+        try {
+          const db = await supabase<Contract>({
+            contractJson,
+            url: connectionString,
+            jwksUrl: `${supabaseUrl}/auth/v1/.well-known/jwks.json`,
+          });
+
+          try {
+            const userADb = await db.asUser(accessToken);
+            const rows = await userADb.orm.public.Profile.select('id', 'username', 'userId')
+              .all()
+              .toArray();
+            expect(rows).toEqual([{ id: profileAId, username: 'alice', userId: userAId }]);
+          } finally {
+            await db.close();
+          }
+        } finally {
+          await withClient(connectionString, async (pg) => {
+            await pg.query('DELETE FROM auth.users WHERE id IN ($1, $2)', [userAId, userBId]);
+          });
         }
       },
       timeouts.spinUpPpgDev * 4,

@@ -2,6 +2,22 @@
 from: "0.15"
 to: "0.16"
 changes:
+  - id: extension-supabase-test-utils-export-removed
+    summary: |
+      `@prisma-next/extension-supabase` no longer exports the `./test/utils` subpath
+      (`bootstrapSupabaseShim`), and it is no longer a pattern to copy for extension test
+      tooling. The import typechecked (types shipped in `dist`), but the subpath never worked
+      from npm — the shim reads fixture `.sql` files that were never published, so every call
+      failed with ENOENT before touching a database. Delete any import of
+      `@prisma-next/extension-supabase/test/utils`; keep hermetic test helpers package-internal
+      (tests import them by source path) rather than publishing them as subpath exports whose
+      on-disk fixtures don't ship. For Supabase-shaped testing, use Supabase's own tooling
+      (`supabase start` / `supabase db reset`, `supabase test db` with pgTAP).
+    detection:
+      glob: "**/*.{ts,mts,cts,js,mjs}"
+      contains:
+        - "extension-supabase/test/utils"
+      anyMatch: true
   - id: pg-date-codec-for-db-date
     summary: |
       Postgres `@db.Date` columns are now backed by a dedicated `pg/date@1` codec, rather than inheriting `pg/timestamptz@1` (which `@db.Date` previously had no codec of its own and fell back to). The next `contract emit` of any existing `@db.Date` column in an extension pack's contract picks up the new `codecId` automatically — no `.prisma` source change needed — which changes that column's entry in `contract.json`/`contract.d.ts` and the contract's `storageHash`. This is a fix, not a regression: a `@db.Date` column read through `.include()` previously crashed decoding a bare `YYYY-MM-DD` value through the timestamptz decoder (`json_agg` -> `decodeJson`); that now works. No extension code needs to change. If your extension pins or compares a contract's `storageHash` (e.g. in a fixture snapshot or a published pack's own upgrade check), re-generate it after upgrading.
@@ -103,4 +119,8 @@ the helper's return type rather than the removed field's type. This is a framewo
 internal, not an extension-authoring SPI. The `packages/3-extensions/` diff is
 supabase-extension TEST assertions updated from `.reason` to presence — no runtime,
 contract, SPI, or DDL change. Incidental test-only diff.
+-->
+
+<!--
+TML-2783 (explicit MTI selections): `changes: []`. The `packages/3-extensions/sql-orm-client` diff is limited to internal polymorphic projection planning and regression tests; it changes no public API, contract/emitted artifact, extension-authoring surface, adapter API, or downstream source translation.
 -->

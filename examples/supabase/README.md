@@ -1,6 +1,6 @@
 # Supabase example
 
-The canonical runnable Prisma Next + Supabase app, and the walking skeleton the [`extension-supabase`](../../packages/3-extensions/supabase) integration was built against. It exercises every piece of the stack end-to-end against a real Postgres (PGlite in CI; a live Supabase project for the acceptance run).
+The canonical runnable Prisma Next + Supabase app, and the walking skeleton the [`extension-supabase`](../../packages/3-extensions/supabase) integration was built against. Its test suite runs end-to-end against a live `supabase start` stack — locally against your own, and in CI on every PR. (Hermetic PGlite coverage of the same flows lives with the extension package.)
 
 ## What it demonstrates
 
@@ -28,24 +28,21 @@ The contract is a single `Profile` model in `public` with a cross-contract FK in
 
 ## Running the tests
 
-Two lanes:
+This example's test suite is the real-Supabase acceptance run — everything here works against your own `supabase start` stack, exactly as you would run it after copying the example out of the repo. (The hermetic PGlite coverage of the same flows lives with the extension, in `packages/3-extensions/supabase/test/`.)
 
-**Hermetic (default — every PR, no Docker):**
+`test/real-supabase.acceptance.test.ts` runs the RLS role-binding flows — anon read, authenticated update-own, service-role read, JWT failure, and a GoTrue-issued token verified through the project's JWKS endpoint — against a live Supabase Postgres. CI runs it on every PR via the `supabase-acceptance` job (`.github/workflows/ci.yml`): `supabase start` in this directory (the minimal `supabase/config.toml` here is what the CLI needs), then the suite with credentials exported from `supabase status`.
+
+To run it locally against your own stack (the variables must be set in the test command's environment — `supabase status` prints each value):
 
 ```bash
+supabase start   # in examples/supabase
+DATABASE_URL='postgres://…' \
+SUPABASE_JWT_SECRET='…' \
+SUPABASE_URL='http://127.0.0.1:54321' \
+SUPABASE_ANON_KEY='…' \
 pnpm test
 ```
 
-Runs on PGlite (real Postgres in WASM) seeded by `bootstrapSupabaseShim`, which restores the Supabase reference fixture (schemas, tables, roles) and layers the grants + `auth.uid()`-style functions the RLS tests need. This lane covers the FK, RLS enforcement, the verifier, and namespace queries.
+(`DATABASE_URL` is the direct, service_role-capable DB URL; `SUPABASE_JWT_SECRET` signs the self-minted HS256 test tokens; `SUPABASE_URL` + `SUPABASE_ANON_KEY` enable the GoTrue/JWKS test.)
 
-**Real-Supabase acceptance (manual — the launch ground truth):**
-
-```bash
-DATABASE_URL='postgres://…'        # a direct connection to your Supabase Postgres (service_role-capable)
-SUPABASE_JWT_SECRET='…'            # the project's JWT secret (Settings → API → JWT Secret)
-pnpm test
-```
-
-`test/real-supabase.acceptance.test.ts` runs the four handler flows — anon read, authenticated update-own, service-role admin read, and JWT failure — against the live project. It is **skipped** (green) whenever `DATABASE_URL` or `SUPABASE_JWT_SECRET` is unset, so it never runs on the normal CI path; it executes only when you supply both. JWTs are signed with the real `SUPABASE_JWT_SECRET` (HS256, exactly as GoTrue issues them), and the two `auth.users` rows the flows need are seeded over the privileged connection and torn down after.
-
-> The acceptance run is the launch-blocking proof that the integration works against real Supabase, not just PGlite. Capture its output as launch evidence.
+The suite is **skipped** (green) whenever `DATABASE_URL` or `SUPABASE_JWT_SECRET` is unset; the GoTrue/JWKS test additionally needs `SUPABASE_URL` + `SUPABASE_ANON_KEY`. Three flows self-mint HS256 tokens with the stack's real `SUPABASE_JWT_SECRET`; the JWKS flow uses a token the stack's own auth server issues (ES256 on a current stack) and verifies it through `/auth/v1/.well-known/jwks.json` — the signing configuration a new Supabase project has out of the box. Seeded `auth.users` rows are torn down after each flow.

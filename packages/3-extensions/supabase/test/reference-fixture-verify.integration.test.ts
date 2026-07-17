@@ -52,7 +52,7 @@ import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import supabasePack from '../src/exports/pack';
-import { restoreSupabaseReference } from './fixtures/supabase-reference/restore';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 const pgUuid = { codecId: 'pg/uuid@1', nativeType: 'uuid', nullable: false } as const;
 
@@ -109,7 +109,7 @@ describe('reference fixture round-trip verify', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (client) => {
-        await restoreSupabaseReference(client);
+        await setUpSupabaseMockSchema(client);
       });
 
       const appContract = buildAppContract();
@@ -162,7 +162,7 @@ describe('reference fixture round-trip verify', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (client) => {
-        await restoreSupabaseReference(client);
+        await setUpSupabaseMockSchema(client);
         await client.query('DROP TABLE auth.refresh_tokens CASCADE');
       });
 

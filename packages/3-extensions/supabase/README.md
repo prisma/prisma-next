@@ -18,7 +18,7 @@ The contract is **introspected, not hand-authored**: `pnpm contract:generate` re
 - **`/pack` subpath**: an `ExtensionPack` value (`supabasePack` default + `supabasePackWith(options)` factory) that an app composes into its config via `extensionPacks`. Tree-shaking-clean — `/pack` imports no runtime code.
 - **`/runtime` subpath**: the `SupabaseRuntime` role-binding runtime and `supabase({...})` facade (session-coupled `set_config` role + claims binding, per [ADR 230](../../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md)), plus the `service_role`-only `.supabase` secondary root.
 - **`/contract` subpath**: branded model handles for the commonly-referenced models (`AuthUser`, `AuthIdentity`, `AuthSession`, `StorageBucket`, `StorageObject`) used for cross-space FK references from app contracts. The handle set is deliberately curated, not one-per-table.
-- **`/test/utils` subpath**: exports `bootstrapSupabaseShim(client)` — restores the full reference fixture (all Supabase schemas, tables, roles) into a test database and layers the grants/`auth.uid()`-style functions tests need. Used by this package's tests and by `examples/supabase`.
+- **Internal test substrate** (not published): `test/fixtures/supabase-reference/set-up-mock-schema.ts` exports `setUpSupabaseMockSchema(client)`, restoring the reference fixture (all Supabase schemas, tables, roles, and the platform's real default privileges) into a test database. Used only by this package's tests — including the hermetic PGlite coverage of the example app's flows (`test/fixtures/example-app/`); `examples/supabase` itself ships only the real-Supabase acceptance suite. User-facing RLS testing is Supabase's own tooling (`supabase start` + `supabase test db`).
 
 ## Dependencies
 
@@ -75,7 +75,7 @@ import contractJson from './contract.json' with { type: 'json' };
 export const db = await supabase<Contract>({
   contractJson,
   url: process.env['DATABASE_URL']!, // direct Postgres connection
-  jwtSecret: process.env['SUPABASE_JWT_SECRET']!, // xor jwksUrl — see "JWT validation"
+  jwksUrl: process.env['SUPABASE_JWKS_URL']!, // xor jwtSecret (legacy HS256) — see "JWT validation"
 });
 ```
 
@@ -102,14 +102,14 @@ const users = await admin.supabase
 
 `asUser(jwt)` verifies the token with [`jose`](https://github.com/panva/jose) *before* any connection is acquired, then derives the Postgres role from the token's `role` claim (defaulting to `authenticated`). Configure exactly one key source:
 
-- **`jwtSecret`** — the symmetric HS256 secret (the classic Supabase JWT secret).
-- **`jwksUrl`** — a JWKS endpoint, for projects on asymmetric signing keys.
+- **`jwksUrl`** — the project's JWKS endpoint (`https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json`). **Current Supabase projects sign ES256 with asymmetric keys — this is the default choice.**
+- **`jwtSecret`** — the symmetric HS256 secret, for legacy projects only. `supabase status` prints a `JWT_SECRET` even on ES256 projects; its presence does not mean the project uses it.
 
-Supplying both, or neither, throws `SupabaseConfigError`. A malformed / expired / mis-signed token throws `InvalidJwtError` with a typed `reason`.
+Supplying both, or neither, throws `SupabaseConfigError`. A malformed / expired / mis-signed token throws `InvalidJwtError` with a typed `reason` — including an algorithm/key-source mismatch (an ES256 token against a `jwtSecret` client, or an HS256 token against a `jwksUrl` client) with a message naming the fix.
 
 ### Admin reads of `auth.*` / `storage.*`
 
-Only `service_role` holds grants on the Supabase-internal schemas over a direct connection, so the `.supabase` secondary root exists **only** on `asServiceRole()` — `asUser` / `asAnon` have no `.supabase`. It is the extension's own contract surface, never merged into the app contract. Prefer the GoTrue Admin API for user *management*; direct `service_role` SQL is for ad-hoc admin reads (Supabase-internal schemas can drift across platform upgrades). See [ADR 237](../../../docs/architecture%20docs/adrs/ADR%20237%20-%20Supabase-internal%20access%20is%20a%20service_role-only%20secondary%20root.md).
+The `.supabase` secondary root exists **only** on `asServiceRole()` — `asUser` / `asAnon` have no `.supabase`. It is the extension's own contract surface, never merged into the app contract. Note that a real Supabase project grants `service_role` **no table privileges** on `auth.*` / `storage.*` (only schema `USAGE`); before using the admin root, run the narrow grant once for what you read, e.g. `GRANT USAGE ON SCHEMA auth TO service_role; GRANT SELECT ON TABLE auth.users TO service_role;`. Prefer the GoTrue Admin API for user *management*; direct `service_role` SQL is for ad-hoc admin reads (Supabase-internal schemas can drift across platform upgrades). See [ADR 237](../../../docs/architecture%20docs/adrs/ADR%20237%20-%20Supabase-internal%20access%20is%20a%20service_role-only%20secondary%20root.md).
 
 ### Authoring RLS in TypeScript
 

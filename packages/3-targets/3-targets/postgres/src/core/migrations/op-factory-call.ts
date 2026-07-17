@@ -45,7 +45,7 @@ import {
   tableExistsAst,
 } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
-import type { PostgresRlsPolicy } from '../postgres-rls-policy';
+import type { PostgresRlsPolicy, PostgresRlsPolicyInput } from '../postgres-rls-policy';
 import {
   escapeLiteral,
   quoteIdentifier,
@@ -740,10 +740,6 @@ export class AddNotNullColumnDirectCall extends PostgresOpFactoryCallNode {
   renderTypeScript(): string {
     return `rawSql(${jsonToTsSource({ id: `column.${this.tableName}.${this.columnName}`, label: this.label, operationClass: 'additive' })})`;
   }
-
-  override importRequirements(): readonly ImportRequirement[] {
-    return [];
-  }
 }
 
 /**
@@ -809,10 +805,6 @@ export class AddNotNullColumnWithTempDefaultCall extends PostgresOpFactoryCallNo
 
   renderTypeScript(): string {
     return `rawSql(${jsonToTsSource({ id: `column.${this.tableName}.${this.columnName}`, label: this.label, operationClass: 'additive' })})`;
-  }
-
-  override importRequirements(): readonly ImportRequirement[] {
-    return [];
   }
 }
 
@@ -1592,7 +1584,23 @@ export class CreatePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `createRlsPolicy(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.policy)})`;
+    const p = this.policy;
+    const input: PostgresRlsPolicyInput = {
+      name: p.name,
+      prefix: p.prefix,
+      tableName: p.tableName,
+      namespaceId: p.namespaceId,
+      operation: p.operation,
+      roles: p.roles,
+      ...ifDefined('using', p.using),
+      ...ifDefined('withCheck', p.withCheck),
+      permissive: p.permissive,
+    };
+    return `this.createRlsPolicy({ schema: ${jsonToTsSource(this.schemaName)}, table: ${jsonToTsSource(this.tableName)}, policy: ${jsonToTsSource(input)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -1623,7 +1631,11 @@ export class DropPostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `dropRlsPolicy(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.policyName)})`;
+    return `this.dropRlsPolicy({ schema: ${jsonToTsSource(this.schemaName)}, table: ${jsonToTsSource(this.tableName)}, policy: ${jsonToTsSource(this.policyName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -1652,7 +1664,11 @@ export class EnableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `enableRowLevelSecurity(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)})`;
+    return `this.enableRowLevelSecurity({ schema: ${jsonToTsSource(this.schemaName)}, table: ${jsonToTsSource(this.tableName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -1681,7 +1697,11 @@ export class DisableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `disableRowLevelSecurity(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)})`;
+    return `this.disableRowLevelSecurity({ schema: ${jsonToTsSource(this.schemaName)}, table: ${jsonToTsSource(this.tableName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -1724,7 +1744,11 @@ export class RenamePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `renameRlsPolicy(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.oldPolicyName)}, ${jsonToTsSource(this.newPolicyName)})`;
+    return `this.renameRlsPolicy({ schema: ${jsonToTsSource(this.schemaName)}, table: ${jsonToTsSource(this.tableName)}, from: ${jsonToTsSource(this.oldPolicyName)}, to: ${jsonToTsSource(this.newPolicyName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 

@@ -6,7 +6,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "emit": "prisma-next contract emit && prisma-next contract emit --config test/fixtures/no-policy.config.ts && prisma-next contract emit --config test/fixtures/renamed-policy.config.ts",
+    "emit": "prisma-next contract emit",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test": "vitest run",
     "lint": "biome check . --error-on-warnings"
