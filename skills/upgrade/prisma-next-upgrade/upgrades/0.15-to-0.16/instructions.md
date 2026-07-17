@@ -9,9 +9,7 @@ changes:
       subpath never worked from npm — the shim reads fixture `.sql` files that were never
       published, so every call failed with ENOENT before touching a database. There is no
       working code to migrate: delete the import and whatever test setup called
-      `bootstrapSupabaseShim`. Test against Supabase's own tooling instead — `supabase start`
-      / `supabase db reset` for a local stack, and `supabase test db` (pgTAP) for asserting
-      RLS behaviour (for example that `anon` cannot see a row).
+      `bootstrapSupabaseShim`.
     detection:
       glob: "**/*.{ts,mts,cts,js,mjs}"
       contains:
