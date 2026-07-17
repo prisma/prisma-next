@@ -13,6 +13,7 @@ Everything from the topic documents as dated, ordered steps. Deliberately says n
 - Enumerate the feature-support matrix rows (v8 surface × Prisma 7 capability census) and draft verdicts; produce the list of "works"-claimed cells with no proving test.
 - Deduplicate migration contract snapshots into `migrations/snapshots/` (the folder layout freezes at RC).
 - Rename `extensionPacks` → `extensions`, and sweep the config format for other keys we'd regret freezing.
+- Remove `@db.`-style attributes from PSL (decide the replacement spelling for native column types first; then parser, printer, `contract infer`, example regeneration, upgrade instructions). PSL syntax freezes at RC.
 - Fix the connection-pool crash (missing error listeners).
 - Continue the polymorphism bug-fixing stream (feeds the July 24 call).
 
