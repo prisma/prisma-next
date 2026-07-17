@@ -45,20 +45,38 @@ export type ArgTypeFromDescriptor<Arg extends AuthoringArgumentDescriptor> = Arg
       : Arg extends { readonly kind: 'stringArray' }
         ? readonly string[]
         : Arg extends {
-              readonly kind: 'object';
-              readonly properties: infer Properties extends Record<
-                string,
-                AuthoringArgumentDescriptor
-              >;
+              readonly kind: 'option';
+              readonly values: infer Values extends readonly string[];
             }
-          ? ObjectArgumentType<Properties>
-          : never;
+          ? Values[number]
+          : Arg extends {
+                readonly kind: 'object';
+                readonly properties: infer Properties extends Record<
+                  string,
+                  AuthoringArgumentDescriptor
+                >;
+              }
+            ? ObjectArgumentType<Properties>
+            : never;
 
-export type TupleFromArgumentDescriptors<Args extends readonly AuthoringArgumentDescriptor[]> = {
-  readonly [K in keyof Args]: Args[K] extends AuthoringArgumentDescriptor
-    ? ArgTypeFromDescriptor<Args[K]>
-    : never;
-};
+/**
+ * Recursive rewrite (not a mapped tuple type) so a descriptor marked
+ * `optional: true` gets an optional tuple slot (`Type?`), letting callers
+ * omit it and every optional arg after it. Required args must precede
+ * optional args in a descriptor's `args` list — TypeScript rejects an
+ * optional tuple element followed by a required one, and the runtime
+ * (`validateAuthoringHelperArguments`'s `minimumArgs`) already treats an
+ * optional-before-required arg as effectively required.
+ */
+export type TupleFromArgumentDescriptors<Args extends readonly AuthoringArgumentDescriptor[]> =
+  Args extends readonly [
+    infer Head extends AuthoringArgumentDescriptor,
+    ...infer Tail extends readonly AuthoringArgumentDescriptor[],
+  ]
+    ? Head extends { readonly optional: true }
+      ? readonly [ArgTypeFromDescriptor<Head>?, ...TupleFromArgumentDescriptors<Tail>]
+      : readonly [ArgTypeFromDescriptor<Head>, ...TupleFromArgumentDescriptors<Tail>]
+    : readonly [];
 
 export type SupportsNamedConstraintOptions<Descriptor extends AuthoringFieldPresetDescriptor> =
   Descriptor['output'] extends { readonly id: true }

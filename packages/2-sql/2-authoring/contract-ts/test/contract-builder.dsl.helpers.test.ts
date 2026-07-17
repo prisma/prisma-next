@@ -79,6 +79,31 @@ const sqlFamilyPack = {
           typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
         },
       },
+      stamped: {
+        kind: 'fieldPreset',
+        args: [
+          { kind: 'number', optional: true, integer: true, minimum: 0 },
+          { kind: 'option', values: ['now'], optional: true },
+          { kind: 'option', values: ['now'], optional: true },
+        ],
+        output: {
+          codecId: 'sql/timestamp@1',
+          nativeType: 'timestamp',
+          typeParams: { precision: { kind: 'arg', index: 0 } },
+          executionDefaults: {
+            onCreate: {
+              kind: 'arg',
+              index: 1,
+              map: { now: { kind: 'generator', id: 'timestampNow' } },
+            },
+            onUpdate: {
+              kind: 'arg',
+              index: 2,
+              map: { now: { kind: 'generator', id: 'timestampNow' } },
+            },
+          },
+        },
+      },
       id: {
         uuidv4String: {
           kind: 'fieldPreset',
@@ -803,5 +828,82 @@ describe('contract DSL helper vocabulary', () => {
     } finally {
       delete (Object.prototype as Record<string, unknown>)['polluted'];
     }
+  });
+
+  it('resolves an option-arg preset with named-value execution defaults, zero-arg and undefined-hole calls', () => {
+    defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+      },
+      ({ field }) => {
+        const fullState = field.stamped(3, 'now', 'now').build();
+        const zeroArgState = field.stamped().build();
+        const holeState = field.stamped(undefined, undefined, 'now').build();
+
+        expectTypeOf(fullState.descriptor?.codecId).toEqualTypeOf<'sql/timestamp@1' | undefined>();
+
+        expect(fullState.descriptor?.typeParams).toEqual({ precision: 3 });
+        expect(fullState.executionDefaults).toEqual({
+          onCreate: { kind: 'generator', id: 'timestampNow' },
+          onUpdate: { kind: 'generator', id: 'timestampNow' },
+        });
+
+        expect(zeroArgState.descriptor?.typeParams).toBeUndefined();
+        expect(zeroArgState.executionDefaults).toBeUndefined();
+
+        expect(holeState.descriptor?.typeParams).toBeUndefined();
+        expect(holeState.executionDefaults).toEqual({
+          onUpdate: { kind: 'generator', id: 'timestampNow' },
+        });
+
+        return { models: {} };
+      },
+    );
+  });
+
+  it('regression: field.nanoid() is legal with zero args, resolving size to its declared default', () => {
+    defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+      },
+      ({ field }) => {
+        const state = field.nanoid().build();
+        expect(state.descriptor?.typeParams).toEqual({ length: 21 });
+        return { models: {} };
+      },
+    );
+  });
+
+  it('regression: field.id.nanoid({size}, {name}) still resolves via the named-constraint overload', () => {
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+      },
+      ({ field, model }) => ({
+        models: {
+          ShortLink: model('ShortLink', {
+            fields: {
+              id: field.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }),
+            },
+          }).sql({
+            table: 'short_link',
+          }),
+        },
+      }),
+    );
+
+    expect(unboundTables(contract.storage)['short_link']!.primaryKey).toEqual({
+      columns: ['id'],
+      name: 'short_link_pkey',
+    });
+    expect(unboundTables(contract.storage)['short_link']!.columns['id']).toMatchObject({
+      typeParams: { length: 16 },
+    });
   });
 });
