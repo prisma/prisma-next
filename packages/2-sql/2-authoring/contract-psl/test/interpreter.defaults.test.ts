@@ -1001,10 +1001,12 @@ model UuidNativeBad {
     });
   });
 
-  // Design-spec §8 (normative output table). Whole column shapes and whole
-  // execution-defaults lists are asserted — not spot fields — because the
-  // table fixes exactly which keys are present and which are absent.
-  describe('temporal per-codec presets (design-spec §8)', () => {
+  // Whole column shapes and whole execution-defaults lists are asserted here,
+  // not spot fields: which keys are absent is as much a part of the lowering
+  // contract as which are present. `temporal.timestamp()` must omit
+  // `typeParams` entirely, and a preset with no phase token must omit
+  // `executionDefaults` entirely rather than emit an empty object.
+  describe('temporal per-codec preset lowering', () => {
     const interpretTemporal = (schema: string) => {
       const document = symbolTableInputFromParseArgs({ schema, sourceId: 'schema.prisma' });
       return interpretPslDocumentToSqlContract({
@@ -1134,8 +1136,9 @@ model UuidNativeBad {
       ]);
     });
 
-    // Design-spec §5 diagnostic table. All are PSL_INVALID_ATTRIBUTE_ARGUMENT
-    // via existing plumbing — no new codes.
+    // Every bad-argument spelling reports through the existing
+    // PSL_INVALID_ATTRIBUTE_ARGUMENT plumbing; the option kind introduces no
+    // diagnostic code of its own.
     it.each([
       {
         name: 'an option value outside the descriptor values',

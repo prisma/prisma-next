@@ -815,8 +815,8 @@ describe('contract DSL helper vocabulary', () => {
     );
   });
 
-  // Design-spec §2 advertises `lastSeen: field.temporal.timestamp(3)` — a
-  // column with precision but deliberately no execution defaults.
+  // A column with precision but deliberately no execution defaults — the
+  // documented spelling for "timestamp column, no auto-update behavior".
   it('resolves temporal.timestamp(3) to a precision column with no execution defaults', () => {
     defineContract(
       {

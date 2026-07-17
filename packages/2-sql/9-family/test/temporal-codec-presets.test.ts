@@ -104,7 +104,7 @@ describe('temporalAuthoringPresets', () => {
  * contract-psl and contract-ts hand-mirror these factories' output because
  * neither can import family-sql (family-sql depends on contract-ts in
  * production and on contract-psl in dev, so the reverse is a cycle). Their
- * §8 output-table, diagnostic, and parity tests all run against those mirrors.
+ * output-table, diagnostic, and parity tests all run against those mirrors.
  *
  * These assertions are the only thing standing between a factory change and
  * those suites silently passing against a preset that no longer ships — the

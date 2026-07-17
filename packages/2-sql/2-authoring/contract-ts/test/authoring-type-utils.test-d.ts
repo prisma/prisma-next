@@ -69,7 +69,7 @@ test('optional descriptors get optional tuple slots', () => {
   // rejects an explicit `undefined` assigned to an optional tuple slot, but a
   // generic rest-parameter call inferring `Params` from the arguments is
   // unaffected — precisely the `field.temporal.timestamptz(undefined, undefined, 'now')`
-  // call shape the design spec relies on.
+  // shape callers use to skip a middle optional argument.
   function acceptsParams<const P extends Params>(...args: P): P {
     return args;
   }
@@ -101,10 +101,10 @@ test('required descriptors keep required tuple slots', () => {
 });
 
 /**
- * Covers design-spec §4.3: a preset that has optional args AND declares `id`
- * takes the named-constraint overload pair. Signature 1 (no options) must win
- * for calls whose arguments satisfy the preset args, so a single preset
- * argument is never mistaken for the constraint options.
+ * A preset that has optional args AND declares `id` takes the named-constraint
+ * overload pair. Signature 1 (no options) must win for calls whose arguments
+ * satisfy the preset args, so a single preset argument is never mistaken for
+ * the constraint options.
  */
 test('named-constraint helper resolves preset args and constraint options across both overloads', () => {
   expectTypeOf(idNanoid({ size: 16 }).build().id).toEqualTypeOf<NamedConstraintSpec<undefined>>();
@@ -115,9 +115,9 @@ test('named-constraint helper resolves preset args and constraint options across
 });
 
 /**
- * Design-spec §4.3 row 3, delivered by §4.4. This resolves via signature 2
- * only because `ObjectArgumentType` no longer intersects with `{}` when every
- * property is optional.
+ * An options-only call resolves via signature 2 — but only because
+ * `ObjectArgumentType` does not intersect with `{}` when every property is
+ * optional.
  *
  * The mechanism is subtle enough to be worth stating: `{ size?: number }` is a
  * "weak type" (every property optional), and TypeScript rejects an assignment

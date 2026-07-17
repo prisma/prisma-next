@@ -473,9 +473,11 @@ model Post {
     expect(tsFks).toEqual(pslFks);
   });
 
-  // Design-spec §8 last row + slice done-condition: `temporal.updatedAt()` is a
-  // convenience spelling of the full form, so all three spellings must lower to
-  // byte-identical contracts.
+  // `temporal.updatedAt()` is a convenience spelling of
+  // `temporal.timestamptz(onCreate: now, onUpdate: now)`, so all three
+  // spellings must lower to byte-identical contracts. The two are separately
+  // authored descriptors sharing no code, so only these assertions hold them
+  // equal.
   describe('temporal.updatedAt() three-way byte-identity', () => {
     const interpretTemporalPsl = (field: string) => {
       const document = symbolTableInputFromParseArgs({
