@@ -97,15 +97,15 @@ const TEMPORAL_ON_UPDATE_ARG = {
 } as const;
 
 /**
- * Maps the preset's `now` token to the `timestampNow` generator descriptor.
- * The token is preset vocabulary; the generator id never appears in a user's
- * spelling (ADR 169 — `timestampNow` is preset-only).
+ * Selects the `timestampNow` generator descriptor for the preset's `now`
+ * token. The token is preset vocabulary; the generator id never appears in a
+ * user's spelling (ADR 169 — `timestampNow` is preset-only).
  */
 function temporalPhaseTemplate<const Index extends number>(index: Index) {
   return {
-    kind: 'arg',
+    kind: 'select',
     index,
-    map: { now: { kind: 'generator', id: TIMESTAMP_NOW_GENERATOR_ID } },
+    cases: { now: { kind: 'generator', id: TIMESTAMP_NOW_GENERATOR_ID } },
   } as const;
 }
 

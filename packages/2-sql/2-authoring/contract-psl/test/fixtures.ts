@@ -757,8 +757,8 @@ export const temporalCodecPresetMirrors = {
       nativeType: 'timestamp',
       typeParams: { precision: { kind: 'arg', index: 0 } },
       executionDefaults: {
-        onCreate: { kind: 'arg', index: 1, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
-        onUpdate: { kind: 'arg', index: 2, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onCreate: { kind: 'select', index: 1, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onUpdate: { kind: 'select', index: 2, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
       },
     },
   },
@@ -774,8 +774,8 @@ export const temporalCodecPresetMirrors = {
       nativeType: 'timestamptz',
       typeParams: { precision: { kind: 'arg', index: 0 } },
       executionDefaults: {
-        onCreate: { kind: 'arg', index: 1, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
-        onUpdate: { kind: 'arg', index: 2, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onCreate: { kind: 'select', index: 1, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onUpdate: { kind: 'select', index: 2, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
       },
     },
   },
@@ -786,8 +786,8 @@ export const temporalCodecPresetMirrors = {
       codecId: 'sqlite/datetime@1',
       nativeType: 'text',
       executionDefaults: {
-        onCreate: { kind: 'arg', index: 0, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
-        onUpdate: { kind: 'arg', index: 1, map: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onCreate: { kind: 'select', index: 0, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onUpdate: { kind: 'select', index: 1, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
       },
     },
   },

@@ -28,8 +28,8 @@ export const sqlTimestampPresetMirror = {
     nativeType: 'timestamp',
     typeParams: { precision: { kind: 'arg', index: 0 } },
     executionDefaults: {
-      onCreate: { kind: 'arg', index: 1, map: { now: NOW_PHASE } },
-      onUpdate: { kind: 'arg', index: 2, map: { now: NOW_PHASE } },
+      onCreate: { kind: 'select', index: 1, cases: { now: NOW_PHASE } },
+      onUpdate: { kind: 'select', index: 2, cases: { now: NOW_PHASE } },
     },
   },
 } as const satisfies AuthoringFieldPresetDescriptor;

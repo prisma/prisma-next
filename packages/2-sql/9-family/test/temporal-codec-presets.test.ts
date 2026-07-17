@@ -32,8 +32,8 @@ describe('temporalCodecPresetWithPrecision', () => {
       nativeType: 'timestamp',
       typeParams: { precision: { kind: 'arg', index: 0 } },
       executionDefaults: {
-        onCreate: { kind: 'arg', index: 1, map: { now: TIMESTAMP_NOW_PHASE } },
-        onUpdate: { kind: 'arg', index: 2, map: { now: TIMESTAMP_NOW_PHASE } },
+        onCreate: { kind: 'select', index: 1, cases: { now: TIMESTAMP_NOW_PHASE } },
+        onUpdate: { kind: 'select', index: 2, cases: { now: TIMESTAMP_NOW_PHASE } },
       },
     });
   });
@@ -68,8 +68,8 @@ describe('temporalCodecPreset', () => {
       codecId: 'sqlite/datetime@1',
       nativeType: 'text',
       executionDefaults: {
-        onCreate: { kind: 'arg', index: 0, map: { now: TIMESTAMP_NOW_PHASE } },
-        onUpdate: { kind: 'arg', index: 1, map: { now: TIMESTAMP_NOW_PHASE } },
+        onCreate: { kind: 'select', index: 0, cases: { now: TIMESTAMP_NOW_PHASE } },
+        onUpdate: { kind: 'select', index: 1, cases: { now: TIMESTAMP_NOW_PHASE } },
       },
     });
   });

@@ -6,6 +6,7 @@ import type {
   AuthoringTypeNamespace,
 } from '../src/shared/framework-authoring';
 import {
+  assertNoCrossRegistryCollisions,
   classifyEnumMemberType,
   hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
@@ -522,43 +523,178 @@ describe('authoring template resolution', () => {
     ).not.toThrow();
   });
 
-  describe('resolveAuthoringTemplateValue with map', () => {
-    it('resolves a mapped listed value, recursively resolving the mapped template', () => {
+  describe('resolveAuthoringTemplateValue with a select node', () => {
+    it('resolves the case the argument value selects, recursively', () => {
       expect(
         resolveAuthoringTemplateValue(
           {
-            kind: 'arg',
+            kind: 'select',
             index: 0,
-            map: { now: { kind: 'generator', id: { kind: 'arg', index: 1 } } },
+            cases: { now: { kind: 'generator', id: { kind: 'arg', index: 1 } } },
           },
           ['now', 'timestampNow'],
         ),
       ).toEqual({ kind: 'generator', id: 'timestampNow' });
     });
 
-    it('throws when the resolved value is not a key of map', () => {
+    it('throws when the resolved value has no case', () => {
       expect(() =>
-        resolveAuthoringTemplateValue({ kind: 'arg', index: 0, map: { now: 'resolved' } }, [
+        resolveAuthoringTemplateValue({ kind: 'select', index: 0, cases: { now: 'resolved' } }, [
           'later',
         ]),
-      ).toThrow(/Authoring template map has no entry for value "later"/);
+      ).toThrow(/Authoring template select has no case for value "later"/);
     });
 
-    it('returns undefined for an undefined arg with no default, even with map present', () => {
+    it('resolves undefined for an absent argument', () => {
       expect(
-        resolveAuthoringTemplateValue({ kind: 'arg', index: 0, map: { now: 'resolved' } }, [
+        resolveAuthoringTemplateValue({ kind: 'select', index: 0, cases: { now: 'resolved' } }, [
           undefined,
         ]),
       ).toBeUndefined();
     });
 
-    it('lets default bypass map entirely', () => {
+    it('walks path into an object argument before selecting', () => {
       expect(
         resolveAuthoringTemplateValue(
-          { kind: 'arg', index: 0, default: 'fallback', map: { now: 'resolved' } },
-          [undefined],
+          { kind: 'select', index: 0, path: ['mode'], cases: { now: 'resolved' } },
+          [{ mode: 'now' }],
         ),
-      ).toBe('fallback');
+      ).toBe('resolved');
+    });
+
+    it('omits an executionDefaults phase whose select argument is absent', () => {
+      const descriptor = {
+        kind: 'fieldPreset',
+        args: [{ name: 'onCreate', kind: 'option', values: ['now'], optional: true }],
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          executionDefaults: {
+            onCreate: { kind: 'select', index: 0, cases: { now: { kind: 'generator', id: 'g' } } },
+          },
+        },
+      } as const;
+
+      expect(instantiateAuthoringFieldPreset(descriptor, [undefined])).not.toHaveProperty(
+        'executionDefaults',
+      );
+      expect(instantiateAuthoringFieldPreset(descriptor, ['now']).executionDefaults).toEqual({
+        onCreate: { kind: 'generator', id: 'g' },
+      });
+    });
+  });
+
+  describe('select templates validated against option arguments at registration', () => {
+    const presetWith = (args: readonly unknown[], onCreate: unknown): Record<string, unknown> => ({
+      stamped: {
+        kind: 'fieldPreset',
+        args,
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          executionDefaults: { onCreate },
+        },
+      },
+    });
+    const check = (fieldNamespace: Record<string, unknown>) => () =>
+      assertNoCrossRegistryCollisions({}, fieldNamespace as never);
+
+    it('accepts a select whose cases exactly cover the option values', () => {
+      expect(
+        check(
+          presetWith([{ name: 'onCreate', kind: 'option', values: ['now'], optional: true }], {
+            kind: 'select',
+            index: 0,
+            cases: { now: { kind: 'generator', id: 'g' } },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it('rejects a select missing a case for a declared option value', () => {
+      expect(
+        check(
+          presetWith(
+            [{ name: 'onCreate', kind: 'option', values: ['now', 'later'], optional: true }],
+            { kind: 'select', index: 0, cases: { now: { kind: 'generator', id: 'g' } } },
+          ),
+        ),
+      ).toThrow(
+        /Authoring field helper "stamped" option argument "onCreate" allows \[now, later\] but the select template has no case for: later/,
+      );
+    });
+
+    it('rejects a select carrying a case no option value can reach', () => {
+      expect(
+        check(
+          presetWith([{ name: 'onCreate', kind: 'option', values: ['now'], optional: true }], {
+            kind: 'select',
+            index: 0,
+            cases: {
+              now: { kind: 'generator', id: 'g' },
+              later: { kind: 'generator', id: 'g' },
+            },
+          }),
+        ),
+      ).toThrow(
+        /Authoring field helper "stamped" select template has case\(s\) not allowed by option argument "onCreate": later/,
+      );
+    });
+
+    it('rejects a select whose argument is not an option', () => {
+      expect(
+        check(
+          presetWith([{ name: 'onCreate', kind: 'string', optional: true }], {
+            kind: 'select',
+            index: 0,
+            cases: { now: { kind: 'generator', id: 'g' } },
+          }),
+        ),
+      ).toThrow(
+        /Authoring field helper "stamped" select template references argument #1, which is kind "string"; select requires an option argument/,
+      );
+    });
+
+    it('rejects a select referencing an undeclared argument position', () => {
+      expect(
+        check(
+          presetWith([], {
+            kind: 'select',
+            index: 0,
+            cases: { now: { kind: 'generator', id: 'g' } },
+          }),
+        ),
+      ).toThrow(
+        /Authoring field helper "stamped" select template references argument #1, but the helper declares no argument at that position/,
+      );
+    });
+
+    it('validates a select that paths into an object-argument option property', () => {
+      const objectArg = {
+        kind: 'object',
+        optional: true,
+        properties: { mode: { kind: 'option', values: ['now'] } },
+      };
+      expect(
+        check(
+          presetWith([objectArg], {
+            kind: 'select',
+            index: 0,
+            path: ['mode'],
+            cases: { now: { kind: 'generator', id: 'g' } },
+          }),
+        ),
+      ).not.toThrow();
+      expect(
+        check(
+          presetWith([objectArg], {
+            kind: 'select',
+            index: 0,
+            path: ['mode'],
+            cases: { sometime: { kind: 'generator', id: 'g' } },
+          }),
+        ),
+      ).toThrow(/has no case for: now/);
     });
   });
 
