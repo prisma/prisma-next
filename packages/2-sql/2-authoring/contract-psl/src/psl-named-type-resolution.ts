@@ -210,6 +210,7 @@ export function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarations
         attribute: dbNativeTypeAttribute,
         baseType,
         baseDescriptor,
+        scalarTypeDescriptors: input.scalarTypeDescriptors,
         diagnostics: input.diagnostics,
         sourceId: input.sourceId,
         entityLabel: `Named type "${declaration.name}"`,

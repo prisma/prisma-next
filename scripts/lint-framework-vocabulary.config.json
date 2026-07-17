@@ -32,6 +32,11 @@
       ],
       "allow": ["SymbolTable"],
       "threshold": 836
+    },
+    {
+      "path": "packages/2-sql",
+      "forbidden": ["pg/"],
+      "threshold": 61
     }
   ]
 }

@@ -270,6 +270,10 @@ export const postgresScalarTypeDescriptors = new Map([
   ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
   ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
   ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
+  // Keyed by the full `@db.*` attribute name, not a PSL base type — see the
+  // matching entry (and its comment) in the real target's
+  // `postgresScalarTypeDescriptors`, `control-mutation-defaults.ts`.
+  ['db.Date', { codecId: 'pg/date@1', nativeType: 'date' }],
 ] as const);
 
 export function buildSymbolTableInput(
