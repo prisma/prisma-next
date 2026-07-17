@@ -1,4 +1,8 @@
-import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import {
   parseMarkerRowSafely,
   rethrowMarkerReadError,
@@ -994,13 +998,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         // IDENTITY` ('d') both report a NULL column_default — Postgres tracks
         // generation via attidentity, not a default expression — so neither
         // variant is visible in `rawDefault` at all. The contract has no
-        // syntax to distinguish the two, so both resolve to the same
+        // syntax to distinguish the two, so both resolve directly to the same
         // `autoincrement()` a `serial` column's `nextval(...)` default
-        // already maps to.
-        const identity =
-          colRow.attidentity === 'a' || colRow.attidentity === 'd' ? true : undefined;
-        const resolvedDefault = identity
-          ? parsePostgresDefault(rawDefault ?? '', resolvedNativeType, { identity: true })
+        // already maps to. This is the only place identity is recognized —
+        // there is no `SqlColumnIR.identity` field; every consumer compares
+        // `resolvedDefault` instead.
+        const isIdentityColumn = colRow.attidentity === 'a' || colRow.attidentity === 'd';
+        const resolvedDefault: ColumnDefault | undefined = isIdentityColumn
+          ? { kind: 'function', expression: 'autoincrement()' }
           : rawDefault !== undefined
             ? parsePostgresDefault(rawDefault, resolvedNativeType)
             : undefined;
@@ -1010,7 +1015,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           nullable: colRow.is_nullable === 'YES',
           ...ifDefined('default', rawDefault),
           ...ifDefined('many', many),
-          ...ifDefined('identity', identity),
           resolvedNativeType,
           ...ifDefined('resolvedDefault', resolvedDefault),
         };

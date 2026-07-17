@@ -117,27 +117,6 @@ describe('parsePostgresDefault sequences', () => {
   });
 });
 
-describe('parsePostgresDefault identity columns', () => {
-  it('resolves to autoincrement() when identity is set, regardless of rawDefault', () => {
-    // An identity column reports no `column_default` at all — the control
-    // adapter calls this with an empty raw expression and `identity: true`.
-    expect(parsePostgresDefault('', 'int4', { identity: true })).toEqual({
-      kind: 'function',
-      expression: 'autoincrement()',
-    });
-  });
-
-  it('ignores identity: false and falls back to normal parsing', () => {
-    expect(
-      parsePostgresDefault("nextval('foo_id_seq'::regclass)", 'int4', { identity: false }),
-    ).toEqual({ kind: 'function', expression: 'autoincrement()' });
-  });
-
-  it('a non-identity call is unaffected by the options parameter existing', () => {
-    expect(parsePostgresDefault("'hello'", 'text')).toEqual({ kind: 'literal', value: 'hello' });
-  });
-});
-
 describe('parsePostgresDefault timestamps', () => {
   it('normalizes now()', () => {
     expect(parsePostgresDefault('now()')).toEqual({ kind: 'function', expression: 'now()' });

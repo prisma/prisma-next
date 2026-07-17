@@ -873,13 +873,22 @@ function buildScalarField(
     attributes.push(buildSimpleConstraintFieldAttribute('id', singlePkConstraintName));
   }
 
-  if (column.identity) {
+  if (
+    column.default === undefined &&
+    column.resolvedDefault?.kind === 'function' &&
+    column.resolvedDefault.expression === 'autoincrement()'
+  ) {
     // A `GENERATED ... AS IDENTITY` column (either variant) reports no
     // `column_default` at all, so it never reaches the raw-default path
-    // below. The contract's vocabulary already means "the database
-    // generates this value" for `autoincrement()` — the same thing both
-    // identity variants and `serial` mean — so print it directly rather
-    // than modelling the ALWAYS/BY-DEFAULT distinction.
+    // below — the postgres control adapter is the only place that resolves
+    // an identity column, stamping `resolvedDefault` straight to
+    // `autoincrement()` since there is no raw expression to parse. That is
+    // the only introspected shape which carries a `resolvedDefault` with no
+    // raw `default`, so this check identifies it without a dedicated
+    // `identity` field on the column IR. The contract's vocabulary already
+    // means "the database generates this value" for `autoincrement()` — the
+    // same thing both identity variants and `serial` mean — so print it
+    // directly rather than modelling the ALWAYS/BY-DEFAULT distinction.
     attributes.push(parseDefaultAttributeString('@default(autoincrement())'));
   } else if (column.default !== undefined) {
     const parsed = parseColumnDefault(column.default, column.nativeType, rawDefaultParser);

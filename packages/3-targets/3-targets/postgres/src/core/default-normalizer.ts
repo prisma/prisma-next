@@ -160,19 +160,6 @@ function parseArrayLiteralBody(body: string): readonly JsonValue[] | undefined {
   return result;
 }
 
-export interface ParsePostgresDefaultOptions {
-  /**
-   * True when the column is a `GENERATED ... AS IDENTITY` column (either
-   * variant). An identity column reports no `column_default` at all — Postgres
-   * tracks generation via `pg_attribute.attidentity`, not a default expression
-   * — so `rawDefault` carries nothing useful here. Set this to resolve
-   * straight to `autoincrement()`, the same value a contract's
-   * `@default(autoincrement())` resolves to, so an identity column compares
-   * equal against its contract counterpart instead of drifting forever.
-   */
-  readonly identity?: boolean;
-}
-
 /**
  * Parses a raw Postgres column default expression into a normalized ColumnDefault.
  * This enables semantic comparison between contract defaults and introspected schema defaults.
@@ -187,12 +174,7 @@ export interface ParsePostgresDefaultOptions {
 export function parsePostgresDefault(
   rawDefault: string,
   nativeType?: string,
-  options?: ParsePostgresDefaultOptions,
 ): ColumnDefault | undefined {
-  if (options?.identity) {
-    return { kind: 'function', expression: 'autoincrement()' };
-  }
-
   const trimmed = rawDefault.trim();
   const normalizedType = nativeType?.toLowerCase();
   const isBigInt = normalizedType === 'bigint' || normalizedType === 'int8';
