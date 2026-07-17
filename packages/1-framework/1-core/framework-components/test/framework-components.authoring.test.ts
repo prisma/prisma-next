@@ -476,6 +476,210 @@ describe('authoring template resolution', () => {
     );
   });
 
+  it('validates option-kind arguments', () => {
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'field.test',
+        [{ kind: 'option', values: ['now'] }],
+        ['now'],
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejects an option-kind argument value not in the descriptor values', () => {
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'field.test',
+        [{ kind: 'option', values: ['now'] }],
+        ['later'],
+      ),
+    ).toThrow(/Authoring helper argument at field\.test\[0\] must be one of: now/);
+  });
+
+  it('rejects a non-string value for an option-kind argument', () => {
+    expect(() =>
+      validateAuthoringHelperArguments('field.test', [{ kind: 'option', values: ['now'] }], [42]),
+    ).toThrow(/Authoring helper argument at field\.test\[0\] must be one of: now/);
+  });
+
+  it('rejects a missing required option-kind argument', () => {
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'field.test',
+        [{ kind: 'option', values: ['now'] }],
+        [undefined],
+      ),
+    ).toThrow(/Missing required authoring helper argument at field\.test\[0\]/);
+  });
+
+  it('allows an omitted optional option-kind argument', () => {
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'field.test',
+        [{ kind: 'option', values: ['now'], optional: true }],
+        [undefined],
+      ),
+    ).not.toThrow();
+  });
+
+  describe('resolveAuthoringTemplateValue with map', () => {
+    it('resolves a mapped listed value, recursively resolving the mapped template', () => {
+      expect(
+        resolveAuthoringTemplateValue(
+          {
+            kind: 'arg',
+            index: 0,
+            map: { now: { kind: 'generator', id: { kind: 'arg', index: 1 } } },
+          },
+          ['now', 'timestampNow'],
+        ),
+      ).toEqual({ kind: 'generator', id: 'timestampNow' });
+    });
+
+    it('throws when the resolved value is not a key of map', () => {
+      expect(() =>
+        resolveAuthoringTemplateValue({ kind: 'arg', index: 0, map: { now: 'resolved' } }, [
+          'later',
+        ]),
+      ).toThrow(/Authoring template map has no entry for value "later"/);
+    });
+
+    it('returns undefined for an undefined arg with no default, even with map present', () => {
+      expect(
+        resolveAuthoringTemplateValue({ kind: 'arg', index: 0, map: { now: 'resolved' } }, [
+          undefined,
+        ]),
+      ).toBeUndefined();
+    });
+
+    it('lets default bypass map entirely', () => {
+      expect(
+        resolveAuthoringTemplateValue(
+          { kind: 'arg', index: 0, default: 'fallback', map: { now: 'resolved' } },
+          [undefined],
+        ),
+      ).toBe('fallback');
+    });
+  });
+
+  describe('execution-defaults phase omission', () => {
+    it('omits a phase whose template resolves to undefined', () => {
+      const descriptor = {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          executionDefaults: {
+            onCreate: { kind: 'arg', index: 0 },
+            onUpdate: { kind: 'generator', id: 'timestampNow' },
+          },
+        },
+      } as const;
+
+      expect(instantiateAuthoringFieldPreset(descriptor, [undefined]).executionDefaults).toEqual({
+        onUpdate: { kind: 'generator', id: 'timestampNow' },
+      });
+    });
+
+    it('omits executionDefaults entirely when every phase resolves to undefined', () => {
+      const descriptor = {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          executionDefaults: {
+            onCreate: { kind: 'arg', index: 0 },
+            onUpdate: { kind: 'arg', index: 1 },
+          },
+        },
+      } as const;
+
+      const result = instantiateAuthoringFieldPreset(descriptor, [undefined, undefined]);
+      expect(result).not.toHaveProperty('executionDefaults');
+    });
+
+    it('carries only the defined phase when one of two resolves to undefined', () => {
+      const descriptor = {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          executionDefaults: {
+            onCreate: { kind: 'arg', index: 0 },
+            onUpdate: { kind: 'arg', index: 1 },
+          },
+        },
+      } as const;
+
+      expect(
+        instantiateAuthoringFieldPreset(descriptor, [
+          { kind: 'generator', id: 'timestampNow' },
+          undefined,
+        ]).executionDefaults,
+      ).toEqual({ onCreate: { kind: 'generator', id: 'timestampNow' } });
+    });
+  });
+
+  describe('empty resolved typeParams omission', () => {
+    it('omits typeParams when the resolved value has no keys', () => {
+      const descriptor = {
+        kind: 'typeConstructor',
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          typeParams: { precision: { kind: 'arg', index: 0 } },
+        },
+      } as const;
+
+      expect(instantiateAuthoringTypeConstructor(descriptor, [undefined])).toEqual({
+        codecId: 'test/timestamp@1',
+        nativeType: 'timestamp',
+      });
+    });
+
+    it('keeps typeParams when the resolved value has at least one key', () => {
+      const descriptor = {
+        kind: 'typeConstructor',
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          typeParams: { precision: { kind: 'arg', index: 0 } },
+        },
+      } as const;
+
+      expect(instantiateAuthoringTypeConstructor(descriptor, [3])).toEqual({
+        codecId: 'test/timestamp@1',
+        nativeType: 'timestamp',
+        typeParams: { precision: 3 },
+      });
+    });
+  });
+
+  it('regression: a static executionDefaults template (e.g. temporalAuthoringPresets shape) resolves unchanged', () => {
+    const descriptor = {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'test/timestamp@1',
+        nativeType: 'timestamp',
+        executionDefaults: {
+          onCreate: { kind: 'generator', id: 'timestampNow' },
+          onUpdate: { kind: 'generator', id: 'timestampNow' },
+        },
+      },
+    } as const;
+
+    expect(instantiateAuthoringFieldPreset(descriptor, [])).toEqual({
+      descriptor: { codecId: 'test/timestamp@1', nativeType: 'timestamp' },
+      nullable: false,
+      executionDefaults: {
+        onCreate: { kind: 'generator', id: 'timestampNow' },
+        onUpdate: { kind: 'generator', id: 'timestampNow' },
+      },
+      id: false,
+      unique: false,
+    });
+  });
+
   it('stringifies primitive function default expressions', () => {
     const descriptor = {
       kind: 'fieldPreset',

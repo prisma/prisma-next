@@ -20,6 +20,18 @@ export type AuthoringArgRef = {
   readonly index: number;
   readonly path?: readonly string[];
   readonly default?: AuthoringTemplateValue;
+  /**
+   * Declarative token → template lookup: when the resolved argument value is
+   * a defined string, it must be an own key of `map`, and the ref resolves to
+   * `map[value]` (recursively resolved). `default` is checked first and, if
+   * it applies, bypasses `map` entirely — `default` is declared in output
+   * space, not in the input vocabulary `map` maps from.
+   *
+   * Must not be used in the `codecId`/`nullable`/`id`/`unique` positions of a
+   * preset output: the type-level `ResolveTemplateValue` does not apply
+   * `map`, and those fields feed TS builder-state inference.
+   */
+  readonly map?: Readonly<Record<string, AuthoringTemplateValue>>;
 };
 
 export type AuthoringTemplateValue =
@@ -50,6 +62,10 @@ export type AuthoringArgumentDescriptor = AuthoringArgumentDescriptorCommon &
     | {
         readonly kind: 'object';
         readonly properties: Record<string, AuthoringArgumentDescriptor>;
+      }
+    | {
+        readonly kind: 'option';
+        readonly values: readonly string[];
       }
   );
 
@@ -838,6 +854,13 @@ export function resolveAuthoringTemplateValue(
       return resolveAuthoringTemplateValue(template.default, args);
     }
 
+    if (value !== undefined && template.map !== undefined) {
+      if (typeof value !== 'string' || !Object.hasOwn(template.map, value)) {
+        throw new Error(`Authoring template map has no entry for value "${String(value)}"`);
+      }
+      return resolveAuthoringTemplateValue(template.map[value], args);
+    }
+
     return value;
   }
   if (Array.isArray(template)) {
@@ -915,6 +938,15 @@ function validateAuthoringArgument(
     return;
   }
 
+  if (descriptor.kind === 'option') {
+    if (typeof value !== 'string' || !descriptor.values.includes(value)) {
+      throw new Error(
+        `Authoring helper argument at ${path} must be one of: ${descriptor.values.join(', ')}`,
+      );
+    }
+    return;
+  }
+
   if (typeof value !== 'number' || Number.isNaN(value)) {
     throw new Error(`Authoring helper argument at ${path} must be a number`);
   }
@@ -978,11 +1010,13 @@ function resolveAuthoringStorageTypeTemplate(
       `Resolved authoring typeParams must be an object for codec "${template.codecId}", received ${String(typeParams)}`,
     );
   }
+  const normalizedTypeParams =
+    typeParams !== undefined && Object.keys(typeParams).length === 0 ? undefined : typeParams;
 
   return {
     codecId: template.codecId,
     nativeType,
-    ...ifDefined('typeParams', typeParams),
+    ...ifDefined('typeParams', normalizedTypeParams),
   };
 }
 
@@ -1022,8 +1056,11 @@ function resolveExecutionMutationDefaultPhase(
   phase: 'onCreate' | 'onUpdate',
   template: AuthoringTemplateValue,
   args: readonly unknown[],
-): ExecutionMutationDefaultValue {
+): ExecutionMutationDefaultValue | undefined {
   const value = resolveAuthoringTemplateValue(template, args);
+  if (value === undefined) {
+    return undefined;
+  }
   if (!isExecutionMutationDefaultValue(value)) {
     throw new Error(
       `Authoring preset executionDefaults.${phase} did not resolve to a valid generator descriptor (kind: 'generator', id: string).`,
@@ -1035,8 +1072,8 @@ function resolveExecutionMutationDefaultPhase(
 function resolveAuthoringExecutionDefaultsTemplate(
   template: AuthoringExecutionDefaultsTemplate,
   args: readonly unknown[],
-): ExecutionMutationDefaultPhases {
-  return {
+): ExecutionMutationDefaultPhases | undefined {
+  const phases: ExecutionMutationDefaultPhases = {
     ...ifDefined(
       'onCreate',
       template.onCreate !== undefined
@@ -1050,6 +1087,7 @@ function resolveAuthoringExecutionDefaultsTemplate(
         : undefined,
     ),
   };
+  return Object.keys(phases).length === 0 ? undefined : phases;
 }
 
 export function instantiateAuthoringTypeConstructor(
