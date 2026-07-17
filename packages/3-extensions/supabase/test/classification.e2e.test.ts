@@ -18,7 +18,7 @@
  * and per-space verify results.
  *
  * Seed strategy: the external table seed SQL lives in the reference fixture
- * (`./fixtures/supabase-reference/`, applied via `restoreSupabaseReference`)
+ * (`./fixtures/supabase-reference/`, applied via `setUpSupabaseMockSchema`)
  * and is shared with the sibling integration tests (including the walking
  * skeleton in ./skeleton.integration.test.ts).
  */
@@ -45,7 +45,7 @@ import {
 } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import supabasePack from '../src/exports/pack';
-import { restoreSupabaseReference } from './fixtures/supabase-reference/restore';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 /**
  * Minimal app contract: a single `public` schema with a `profile` table.
@@ -112,7 +112,7 @@ describe('supabase external-schema classification (db init + db verify)', () => 
       // Without this seed, `db verify` would fail with `declaredMissing`
       // for every auth.*/storage.* table.
       await withClient(connectionString, async (client) => {
-        await restoreSupabaseReference(client);
+        await setUpSupabaseMockSchema(client);
       });
 
       // 2. Materialise the supabase extension contract space on disk.

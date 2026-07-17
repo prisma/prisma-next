@@ -35,7 +35,7 @@ import { InvalidJwtError, supabase } from '../src/exports/runtime';
 import type { Contract } from './fixtures/example-app/contract';
 import contractJson from './fixtures/example-app/contract.json' with { type: 'json' };
 import { createDb, fixtureJwt } from './fixtures/example-app/db';
-import { restoreSupabaseReference } from './fixtures/supabase-reference/restore';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 async function signJwt(
   payload: Record<string, unknown>,
@@ -136,7 +136,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
 
       // Seed external schema shim (auth.users etc.) + apply public.profile DDL.
       await withClient(connectionString, async (pg) => {
-        await restoreSupabaseReference(pg);
+        await setUpSupabaseMockSchema(pg);
       });
       await runDbInit(connectionString, migrationsDir);
       await applyGrantsFixture(connectionString);
@@ -225,7 +225,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await restoreSupabaseReference(pg);
+        await setUpSupabaseMockSchema(pg);
       });
       await runDbInit(connectionString, migrationsDir);
       await applyGrantsFixture(connectionString);
@@ -303,7 +303,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await restoreSupabaseReference(pg);
+        await setUpSupabaseMockSchema(pg);
       });
       await runDbInit(connectionString, migrationsDir);
 
@@ -329,7 +329,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await restoreSupabaseReference(pg);
+        await setUpSupabaseMockSchema(pg);
       });
       await runDbInit(connectionString, migrationsDir);
       await applyGrantsFixture(connectionString);

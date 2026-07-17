@@ -56,7 +56,7 @@ function resolveFixtureDir(): string {
  * sharing across setup steps); this function does not open or close
  * connections.
  */
-export async function restoreSupabaseReference(client: Client): Promise<void> {
+export async function setUpSupabaseMockSchema(client: Client): Promise<void> {
   const fixtureDir = resolveFixtureDir();
   const rolesSql = readFileSync(join(fixtureDir, 'roles.sql'), 'utf8');
   const schemaSql = readFileSync(join(fixtureDir, 'schema.sql'), 'utf8');

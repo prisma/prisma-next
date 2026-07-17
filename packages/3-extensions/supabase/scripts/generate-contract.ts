@@ -42,7 +42,7 @@ import {
 import { createDevDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { SupabaseRole } from '../src/contract/roles';
-import { restoreSupabaseReference } from '../test/fixtures/supabase-reference/restore';
+import { setUpSupabaseMockSchema } from '../test/fixtures/supabase-reference/set-up-mock-schema';
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -641,7 +641,7 @@ async function main(): Promise<void> {
     const client = new Client({ connectionString });
     await client.connect();
     try {
-      await restoreSupabaseReference(client);
+      await setUpSupabaseMockSchema(client);
     } finally {
       await client.end();
     }

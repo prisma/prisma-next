@@ -34,7 +34,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import supabasePack from '../src/exports/pack';
 import contractJson from './fixtures/example-app/contract.json' with { type: 'json' };
 import { createDb } from './fixtures/example-app/db';
-import { restoreSupabaseReference } from './fixtures/supabase-reference/restore';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 function recordingMiddleware(): { middleware: SqlMiddleware; sqls: string[] } {
   const sqls: string[] = [];
@@ -95,7 +95,7 @@ describe('service_role queries auth/storage via the .supabase secondary root', (
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await restoreSupabaseReference(pg);
+        await setUpSupabaseMockSchema(pg);
         // The documented narrow grant for admin reads of auth.users through
         // the `.supabase` secondary root — real Supabase (and the shim)
         // gives service_role no table privileges on auth.* by default.
@@ -186,7 +186,7 @@ describe('service_role queries auth/storage via the .supabase secondary root', (
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await restoreSupabaseReference(pg);
+        await setUpSupabaseMockSchema(pg);
         // The documented narrow grant for admin reads of auth.users through
         // the `.supabase` secondary root — real Supabase (and the shim)
         // gives service_role no table privileges on auth.* by default.

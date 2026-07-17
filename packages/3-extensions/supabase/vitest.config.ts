@@ -1,4 +1,5 @@
 import { timeouts } from '@prisma-next/test-utils';
+import { isCI } from 'ci-info';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -9,14 +10,20 @@ export default defineConfig({
     // (WASM) teardown intermittently aborts on Linux without it. No-op on
     // macOS.
     execArgv: ['--no-memory-protection-keys'],
+    // The reference-fixture restore is the heaviest WASM operation in the
+    // repo; running several PGlite databases in parallel workers makes it
+    // crash-prone (ECONNRESET mid-restore). One worker keeps the suite
+    // deterministic — the same setting the example app used while it
+    // hosted these tests. Per-file isolation stays on: supabase-facade
+    // mocks the pg module, and a shared module registry would leak the
+    // real pg into it (or the mock into the integration files).
+    pool: 'forks',
+    maxWorkers: 1,
     testTimeout: timeouts.default,
     hookTimeout: timeouts.default,
-    // Restoring the full 33-table Supabase reference fixture into PGlite is
-    // the heaviest single WASM operation in the suite, and on the slower CI
-    // runners it intermittently trips the residual PGlite (WASM) abort that
-    // --no-memory-protection-keys only partially suppresses ("Connection
-    // terminated unexpectedly" during the reference restore). The crash does
-    // not reproduce locally; a re-run with a fresh dev database clears it.
-    retry: process.env['CI'] ? 2 : 0,
+    // Residual PGlite (WASM) abort on slower CI runners that
+    // --no-memory-protection-keys only partially suppresses; a re-run with
+    // a fresh dev database clears it. Does not reproduce locally.
+    retry: isCI ? 2 : 0,
   },
 });
