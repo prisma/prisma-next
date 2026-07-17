@@ -60,3 +60,12 @@ contract, SPI, or DDL change. Incidental test-only diff.
 <!--
 TML-2783 (explicit MTI selections): `changes: []`. The `packages/3-extensions/sql-orm-client` diff is limited to internal polymorphic projection planning and regression tests; it changes no public API, contract/emitted artifact, extension-authoring surface, adapter API, or downstream source translation.
 -->
+
+<!--
+Dependabot dev-deps group bump (PR #961): `changes: []`. The
+`packages/3-extensions/` diff is biome.jsonc schema-version alignment for the
+biome 2.5.2 dev-dependency bump plus the code sites biome 2.5 newly flags
+(useOptionalChain in `sql-orm-client/src/collection.ts`); no SPI, contract
+shape, emitted artefact, or extension-authoring surface change. Incidental
+substrate diff only.
+-->

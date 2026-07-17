@@ -60,3 +60,13 @@ acceptance lane already reads (`DATABASE_URL`, `SUPABASE_JWT_SECRET`). Nothing
 loads the file — it documents what to export. No framework surface, contract
 shape, or emitted artefact change. Incidental substrate diff only.
 -->
+
+<!--
+Dependabot dev-deps group bump (PR #961): dev-dependency version bumps only
+(biome 2.5.2, wrangler, @types/react, @cloudflare/* and friends), plus the
+biome.jsonc schema-version alignment and the handful of code sites biome 2.5
+newly flags (useOptionalChain / noProto in tests). The `examples/` diff is
+package.json devDependency version ranges and biome.jsonc schema versions only —
+no framework surface, contract shape, or emitted artefact changes. No user
+action required. Incidental substrate diff only.
+-->
