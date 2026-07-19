@@ -61,12 +61,12 @@ import {
 import {
   buildCatalogWarnings,
   exitCodeForError,
-  hasDirectDep,
   isRecognisedPnpmResolutionError,
   redactSecrets,
   runInit,
 } from '../../../src/commands/init/init';
 import type { InitFlagOptions } from '../../../src/commands/init/inputs';
+import { hasDirectDep } from '../../../src/commands/init/plan';
 import type { ProbeOverrides } from '../../../src/commands/init/probe-db';
 import type { GlobalFlags } from '../../../src/utils/global-flags';
 
