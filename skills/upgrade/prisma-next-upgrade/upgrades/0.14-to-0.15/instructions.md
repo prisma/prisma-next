@@ -110,6 +110,25 @@ changes:
 ---
 
 <!--
+Release bump to 0.15.0 (PR #988): the version bump itself. Every workspace
+`package.json` advances to 0.15.0 (version field + `workspace:` specifier
+lockstep), and the `examples/supabase` contract artifacts regenerate because the
+emitted contract embeds the composed extension pack's version
+(`packs.supabase.version: '0.14.0' → '0.15.0'` in `contract.json` /
+`contract.d.ts`) — no structural contract change. No user action beyond the
+normal dependency upgrade this recipe covers. Incidental substrate diff only.
+-->
+
+<!--
+TML-2503 (extension-supabase Slice E — launch close-out, PR #985): docs + test only.
+The `examples/` touch is `examples/supabase/README.md` (new) plus
+`examples/supabase/test/real-supabase.acceptance.test.ts` — an env-guarded (`skipIf`
+on DATABASE_URL / SUPABASE_JWT_SECRET) real-Supabase acceptance test, skipped on the
+normal CI path. No framework surface, contract shape, or emitted artefact change.
+Incidental substrate diff only.
+-->
+
+<!--
 TML-2501 (extension-supabase slice B close-out, this PR): test-only. The only
 `examples/` touch is `examples/supabase/test/rls-role-binding.integration.test.ts`:
 the acceptance test's fixture no longer hand-applies `ENABLE ROW LEVEL SECURITY` /
@@ -363,4 +382,44 @@ instance (the split 2.2.2/2.2.3 resolution broke cross-package `Type`
 assignability). The `examples/` diff is package.json dependency version
 ranges only — no framework surface, contract shape, or emitted artefact
 changes. No user action required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2503 (extension-supabase: the complete, introspected Supabase contract, this
+PR): additive + test-only. The pack's emitted `contract.json` / `contract.d.ts`
+grow from a partial hand-scoped shape to the full contract introspected from a
+Supabase reference instance (every `auth`/`storage` table, native enum, and
+platform role), so consumers re-import a now-complete set of types — additive;
+nothing previously shipped is renamed or removed except two internal named-type
+aliases (`Uuid` / `Timestamptz`) folded into the canonicalized named-type set.
+Back-relation field names are corrected from the inferrer's double-pluralized
+form (`sessionses` → `sessions`, `identitieses` → `identities`, …); those names
+were introduced by this PR's full regeneration and never shipped, so there is no
+rename for existing consumers (the general inferrer fix is TML-3024). The
+`examples/` diff is the `examples/supabase` walking-skeleton test plus a CI-only
+vitest `retry` config that absorbs a known intermittent PGlite (WASM) abort. A
+re-emit picks up any contract shape. No user action required. Incidental
+substrate diff only.
+-->
+
+<!--
+PR #915 (middleware doc-comment lifecycle fixes): comments-only. The only
+`examples/` touches are doc comments in
+`examples/prisma-next-demo/src/prisma/db.ts` and
+`examples/prisma-next-demo/src/orm-client/find-user-by-id-cached.ts`,
+correcting stale claims about what runs on a cache-middleware hit (every
+`beforeExecute` has already run before `intercept` is consulted,
+`afterExecute` still fires with `source: 'middleware'`, and `decodeRow`
+still runs on the hit path). No code, contract, or emitted-artefact change.
+No user action required. Incidental substrate diff only.
+-->
+
+<!--
+Dependabot dev-deps group bump (PR #961): dev-dependency version bumps only
+(biome 2.5.2, wrangler, @types/react, @cloudflare/* and friends), plus the
+biome.jsonc schema-version alignment and the handful of code sites biome 2.5
+newly flags (useOptionalChain / noProto in tests). The `examples/` diff is
+package.json devDependency version ranges only — no framework surface,
+contract shape, or emitted artefact changes. No user action required.
+Incidental substrate diff only.
 -->

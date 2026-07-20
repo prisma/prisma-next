@@ -8,6 +8,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { DdlColumn, DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
 import { errorPostgresMigrationStackMissing } from '../errors';
 import { PostgresContractView } from '../postgres-contract-view';
+import { PostgresRlsPolicy, type PostgresRlsPolicyInput } from '../postgres-rls-policy';
 import {
   AddCheckConstraintCall,
   AddColumnCall,
@@ -19,8 +20,10 @@ import {
   type AlterColumnTypeOptions,
   CreateIndexCall,
   CreateNativeEnumTypeCall,
+  CreatePostgresRlsPolicyCall,
   CreateSchemaCall,
   CreateTableCall,
+  DisableRowLevelSecurityCall,
   DropCheckConstraintCall,
   DropColumnCall,
   DropConstraintCall,
@@ -28,7 +31,10 @@ import {
   DropIndexCall,
   DropNativeEnumTypeCall,
   DropNotNullCall,
+  DropPostgresRlsPolicyCall,
   DropTableCall,
+  EnableRowLevelSecurityCall,
+  RenamePostgresRlsPolicyCall,
   SetDefaultCall,
   SetNotNullCall,
 } from './op-factory-call';
@@ -419,5 +425,59 @@ export abstract class PostgresMigration<
     readonly label?: string;
   }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
     return installExtension(options, this.controlAdapterFor('installExtension'));
+  }
+
+  protected enableRowLevelSecurity(options: {
+    readonly schema: string;
+    readonly table: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    return new EnableRowLevelSecurityCall(options.schema, options.table).toOp(
+      this.controlAdapterFor('enableRowLevelSecurity'),
+    );
+  }
+
+  protected disableRowLevelSecurity(options: {
+    readonly schema: string;
+    readonly table: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    return new DisableRowLevelSecurityCall(options.schema, options.table).toOp(
+      this.controlAdapterFor('disableRowLevelSecurity'),
+    );
+  }
+
+  protected createRlsPolicy(options: {
+    readonly schema: string;
+    readonly table: string;
+    readonly policy: PostgresRlsPolicyInput;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    return new CreatePostgresRlsPolicyCall(
+      options.schema,
+      options.table,
+      new PostgresRlsPolicy(options.policy),
+    ).toOp(this.controlAdapterFor('createRlsPolicy'));
+  }
+
+  protected dropRlsPolicy(options: {
+    readonly schema: string;
+    readonly table: string;
+    readonly policy: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    return new DropPostgresRlsPolicyCall(options.schema, options.table, options.policy).toOp(
+      this.controlAdapterFor('dropRlsPolicy'),
+    );
+  }
+
+  protected renameRlsPolicy(options: {
+    readonly schema: string;
+    readonly table: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
+    return new RenamePostgresRlsPolicyCall(
+      options.schema,
+      options.table,
+      options.from,
+      options.to,
+    ).toOp(this.controlAdapterFor('renameRlsPolicy'));
   }
 }

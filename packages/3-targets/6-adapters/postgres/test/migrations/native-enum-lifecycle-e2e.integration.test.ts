@@ -22,6 +22,7 @@ import { collectScalarTypeConstructors } from '@prisma-next/framework-components
 import {
   APP_SPACE_ID,
   assembleAuthoringContributions,
+  issueOutcome,
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
@@ -536,7 +537,7 @@ describe.sequential('managed native-enum verify drift (R10)', () => {
       const verify = verifyManaged(introspected);
       expect(verify.ok).toBe(false);
       const missing = verify.schema.issues.filter(
-        (i) => i.reason === 'not-found' && i.path.some((p) => p.includes('order_status')),
+        (i) => issueOutcome(i) === 'not-found' && i.path.some((p) => p.includes('order_status')),
       );
       expect(missing.length).toBeGreaterThan(0);
     },
@@ -553,7 +554,7 @@ describe.sequential('managed native-enum verify drift (R10)', () => {
       const verify = verifyManaged(introspected);
       expect(verify.ok).toBe(false);
       const extra = verify.schema.issues.filter(
-        (i) => i.reason === 'not-expected' && i.path.some((p) => p.includes('stray_mood')),
+        (i) => issueOutcome(i) === 'not-expected' && i.path.some((p) => p.includes('stray_mood')),
       );
       expect(extra.length).toBeGreaterThan(0);
     },
@@ -568,7 +569,7 @@ describe.sequential('managed native-enum verify drift (R10)', () => {
       const verify = verifyManaged(introspected);
       expect(verify.ok).toBe(false);
       const mismatch = verify.schema.issues.filter(
-        (i) => i.reason === 'not-equal' && i.path.some((p) => p.includes('order_status')),
+        (i) => issueOutcome(i) === 'not-equal' && i.path.some((p) => p.includes('order_status')),
       );
       expect(mismatch.length).toBeGreaterThan(0);
     },
@@ -646,7 +647,7 @@ describe.sequential('external native enum stays untouched (R5)', () => {
 
       expect(verify.ok).toBe(false);
       const mismatch = verify.schema.issues.filter(
-        (i) => i.reason === 'not-equal' && i.path.some((p) => p.includes('order_status')),
+        (i) => issueOutcome(i) === 'not-equal' && i.path.some((p) => p.includes('order_status')),
       );
       expect(mismatch.length).toBeGreaterThan(0);
     },

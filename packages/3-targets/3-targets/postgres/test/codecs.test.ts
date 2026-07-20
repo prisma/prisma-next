@@ -20,6 +20,7 @@ import {
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgFloatDescriptor,
+  pgInetDescriptor,
   pgInt2Descriptor,
   pgInt4Descriptor,
   pgInt8Descriptor,
@@ -71,6 +72,7 @@ const descriptorByScalar = {
   json: pgJsonDescriptor,
   jsonb: pgJsonbDescriptor,
   uuid: pgUuidDescriptor,
+  inet: pgInetDescriptor,
 } as const satisfies Record<string, AnyCodecDescriptor>;
 
 type ScalarName = keyof typeof descriptorByScalar;
@@ -95,6 +97,7 @@ describe('adapter-postgres codecs', () => {
       'float',
       'float4',
       'float8',
+      'inet',
       'int',
       'int2',
       'int4',
@@ -206,6 +209,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'sql-text', value: 'portable text' },
       { scalar: 'text', value: 'hello world' },
       { scalar: 'uuid', value: '550e8400-e29b-41d4-a716-446655440000' },
+      { scalar: 'inet', value: '192.168.1.1' },
     ] as const)('keeps $scalar values unchanged', async ({ scalar, value }) => {
       const codec = codecForScalar(scalar) as {
         encode: (input: string, ctx: SqlCodecCallContext) => Promise<string>;
@@ -446,6 +450,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'float8', nativeType: 'double precision' },
       { scalar: 'bit varying', nativeType: 'bit varying' },
       { scalar: 'uuid', nativeType: 'uuid' },
+      { scalar: 'inet', nativeType: 'inet' },
     ];
 
     it.each(postgresNativeTypeCases)('sets postgres nativeType metadata for $scalar', ({
@@ -477,6 +482,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'bool' },
       { scalar: 'int4' },
       { scalar: 'uuid' },
+      { scalar: 'inet' },
     ];
 
     it.each(paramsSchemaPresenceCases)('descriptor for $scalar carries a paramsSchema', ({
@@ -587,6 +593,13 @@ describe('adapter-postgres codecs', () => {
     it('resolves pgUuidDescriptor by codec id from the registry', () => {
       const resolved = postgresCodecRegistry.descriptorFor('pg/uuid@1');
       expect(resolved).toBe(pgUuidDescriptor);
+    });
+  });
+
+  describe('pg/inet@1 registry resolution', () => {
+    it('resolves pgInetDescriptor by codec id from the registry', () => {
+      const resolved = postgresCodecRegistry.descriptorFor('pg/inet@1');
+      expect(resolved).toBe(pgInetDescriptor);
     });
   });
 

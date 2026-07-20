@@ -146,7 +146,9 @@ describe('DisableRowLevelSecurityCall', () => {
 
   it('renderTypeScript() round-trips the call', () => {
     const call = new DisableRowLevelSecurityCall('public', 'profiles');
-    expect(call.renderTypeScript()).toBe('disableRowLevelSecurity("public", "profiles")');
+    expect(call.renderTypeScript()).toBe(
+      'this.disableRowLevelSecurity({ schema: "public", table: "profiles" })',
+    );
   });
 
   it('factoryName is disableRowLevelSecurity', () => {
@@ -180,7 +182,7 @@ describe('RenamePostgresRlsPolicyCall', () => {
   it('renderTypeScript() round-trips the call', () => {
     const call = new RenamePostgresRlsPolicyCall('public', 'profiles', OLD_NAME, NEW_NAME);
     expect(call.renderTypeScript()).toBe(
-      `renameRlsPolicy("public", "profiles", "${OLD_NAME}", "${NEW_NAME}")`,
+      `this.renameRlsPolicy({ schema: "public", table: "profiles", from: "${OLD_NAME}", to: "${NEW_NAME}" })`,
     );
   });
 

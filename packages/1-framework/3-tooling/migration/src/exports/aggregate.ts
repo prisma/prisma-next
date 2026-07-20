@@ -4,6 +4,7 @@ export {
   createContractSpaceAggregate,
   requireHeadRef,
 } from '../aggregate/aggregate';
+export { allStorageElementsExternal } from '../aggregate/all-external';
 export {
   computeIntegrityViolations,
   type IntegrityComputationInput,

@@ -10,14 +10,18 @@ export interface ForeignKeyInput {
   readonly name?: string;
   readonly onDelete?: ReferentialAction;
   readonly onUpdate?: ReferentialAction;
-  /** Whether to emit FK constraint DDL (ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY). */
-  readonly constraint: boolean;
-  /** Whether to emit a backing index for the FK columns. */
-  readonly index: boolean;
 }
 
 /**
- * SQL Contract IR node for a table-level foreign-key declaration.
+ * SQL Contract IR node for a table-level foreign-key declaration — the
+ * referential constraint only (source, target, `onDelete`/`onUpdate`).
+ *
+ * A persisted `foreignKeys[]` entry always denotes a real constraint: whether
+ * to emit the constraint at all, and whether to back it with an index, are
+ * authoring-time decisions (PSL `@relation(index:)`, TS `fk({ constraint,
+ * index })`) resolved once at `contract emit` — a `constraint: false` FK
+ * simply has no entry here, and a backing index (if any) is its own discrete,
+ * named entry in the table's `indexes[]`.
  *
  * Each FK carries explicit `source` and `target` {@link ForeignKeyReference}
  * coordinates (namespace, table, columns). For single-namespace contracts the
@@ -31,8 +35,6 @@ export interface ForeignKeyInput {
 export class ForeignKey extends SqlNode {
   readonly source: ForeignKeyReference;
   readonly target: ForeignKeyReference;
-  readonly constraint: boolean;
-  readonly index: boolean;
   declare readonly name?: string;
   declare readonly onDelete?: ReferentialAction;
   declare readonly onUpdate?: ReferentialAction;
@@ -47,8 +49,6 @@ export class ForeignKey extends SqlNode {
       input.target instanceof ForeignKeyReference
         ? input.target
         : new ForeignKeyReference(input.target);
-    this.constraint = input.constraint;
-    this.index = input.index;
     if (input.name !== undefined) this.name = input.name;
     if (input.onDelete !== undefined) this.onDelete = input.onDelete;
     if (input.onUpdate !== undefined) this.onUpdate = input.onUpdate;

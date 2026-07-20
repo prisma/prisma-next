@@ -94,7 +94,6 @@ export function verifyPostgresNamespacePresence(input: {
     });
     issues.push({
       path: ['database', ddlName],
-      reason: 'not-found',
       expected: namespace,
     });
   }

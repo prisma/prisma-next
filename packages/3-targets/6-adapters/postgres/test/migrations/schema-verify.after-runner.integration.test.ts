@@ -208,7 +208,6 @@ describe.sequential('Schema verification after runner - integration', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({
-          reason: 'not-equal',
           path: ['database', 'public', 'user', 'column:email'],
         }),
       );
@@ -234,7 +233,6 @@ describe.sequential('Schema verification after runner - integration', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({
-          reason: 'not-found',
           path: ['database', 'public', 'user', 'column:email'],
         }),
       );
@@ -261,7 +259,6 @@ describe.sequential('Schema verification after runner - integration', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({
-          reason: 'not-equal',
           path: ['database', 'public', 'user', 'column:email'],
         }),
       );

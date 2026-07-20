@@ -89,12 +89,10 @@ describe('resolvePostgresNodeIssueControlPolicySubject — generic entity coordi
   it('a table create issue and a native-enum create issue resolve the same shape, differing only in entityKind/entityName', () => {
     const tableIssue: SchemaDiffIssue<SqlSchemaDiffNode> = {
       path: ['database', 'sales', 'orders'],
-      reason: 'not-found',
       expected: tableNode('orders'),
     };
     const enumIssue: SchemaDiffIssue<SqlSchemaDiffNode> = {
       path: ['database', 'sales', 'native_enum:order_status'],
-      reason: 'not-found',
       expected: enumNode('order_status', MEMBERS),
     };
 
@@ -115,12 +113,10 @@ describe('resolvePostgresNodeIssueControlPolicySubject — generic entity coordi
   it('a dropped (not-expected) enum resolves namespaceId to UNBOUND, matching a dropped table', () => {
     const droppedEnumIssue: SchemaDiffIssue<SqlSchemaDiffNode> = {
       path: ['database', 'sales', 'native_enum:stray_mood'],
-      reason: 'not-expected',
       actual: enumNode('stray_mood', ['happy', 'sad']),
     };
     const droppedTableIssue: SchemaDiffIssue<SqlSchemaDiffNode> = {
       path: ['database', 'sales', 'orphan'],
-      reason: 'not-expected',
       actual: tableNode('orphan'),
     };
 

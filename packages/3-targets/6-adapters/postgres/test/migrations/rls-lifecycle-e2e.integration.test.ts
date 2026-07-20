@@ -4,6 +4,7 @@ import { collectScalarTypeConstructors } from '@prisma-next/framework-components
 import {
   APP_SPACE_ID,
   assembleAuthoringContributions,
+  issueOutcome,
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
@@ -380,7 +381,9 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
       });
 
       expect(verifyResult.ok).toBe(false);
-      const extraIssues = verifyResult.schema.issues.filter((i) => i.reason === 'not-expected');
+      const extraIssues = verifyResult.schema.issues.filter(
+        (i) => issueOutcome(i) === 'not-expected',
+      );
       expect(extraIssues.length).toBeGreaterThan(0);
 
       const issuePaths = extraIssues.map((i) => i.path.join('/'));

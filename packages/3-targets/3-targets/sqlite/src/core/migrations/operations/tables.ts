@@ -1,6 +1,7 @@
 import type { MigrationOperationClass } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { RelationalSchemaNodeKind, type SqlColumnIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { tableExistsAst } from '../../../contract-free/checks';
@@ -294,7 +295,7 @@ export function buildRecreatePostchecks(
 
   for (const issue of issues) {
     const nodeKind = nodeKindOf(issue);
-    if (nodeKind === RelationalSchemaNodeKind.column && issue.reason === 'not-equal') {
+    if (nodeKind === RelationalSchemaNodeKind.column && issueOutcome(issue) === 'not-equal') {
       const columnName = columnNameFromNode(issue);
       if (columnName === undefined) continue;
       const c = escapeLiteral(columnName);
@@ -325,7 +326,7 @@ export function buildRecreatePostchecks(
       const columnName = columnNameFromDefaultIssuePath(issue);
       if (columnName === undefined) continue;
       const c = escapeLiteral(columnName);
-      if (issue.reason === 'not-expected') {
+      if (issueOutcome(issue) === 'not-expected') {
         checks.push({
           description: `verify "${columnName}" has no default on "${tableName}"`,
           sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value IS NULL`,

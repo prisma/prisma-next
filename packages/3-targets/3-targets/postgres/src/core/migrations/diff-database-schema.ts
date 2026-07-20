@@ -4,7 +4,7 @@ import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
 import { classifyDiffSubjectGranularity } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
-import { diffSchemas } from '@prisma-next/framework-components/control';
+import { diffSchemas, issueOutcome } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
@@ -140,7 +140,7 @@ export function diffPostgresSchema(input: {
   const relationalOwned = ownedSchemaNames(expected);
   const structuralOwned = ownedSchemaNames(fullExpected);
   const issues = diffSchemas(expected, actual).filter((issue) => {
-    if (issue.reason !== 'not-expected') return true;
+    if (issueOutcome(issue) !== 'not-expected') return true;
     if (isClusterScopedIssue(issue)) return true;
     const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
     const namespaceSegment = issue.path[1];
@@ -240,7 +240,7 @@ export function buildPostgresPlanDiff(input: {
     readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
     'both trees are PostgresDatabaseSchemaNodes, so every diff-issue node is a SqlSchemaDiffNode'
   >(diffSchemas(expected, paddedActual)).filter((issue) => {
-    if (issue.reason !== 'not-expected') return true;
+    if (issueOutcome(issue) !== 'not-expected') return true;
     if (isClusterScopedIssue(issue)) return true;
     const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
     const namespaceSegment = issue.path[1];

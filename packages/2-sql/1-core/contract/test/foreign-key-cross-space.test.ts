@@ -44,8 +44,6 @@ function makeLocalFk(): ForeignKey {
       tableName: 'user',
       columns: ['id'],
     },
-    constraint: true,
-    index: true,
   });
 }
 
@@ -62,8 +60,6 @@ function makeSpaceFk(): ForeignKey {
       columns: ['id'],
       spaceId: 'auth-service',
     },
-    constraint: false,
-    index: true,
   });
 }
 
@@ -155,8 +151,6 @@ describe('local FK backward-compatibility', () => {
         tableName: 'user',
         columns: ['id'],
       },
-      constraint: true,
-      index: true,
     });
     // Confirm no origin/spaceId leaks
     const target = serialized['target'] as Record<string, unknown>;
@@ -356,8 +350,6 @@ describe('ForeignKeySchema', () => {
         columns: ['id'],
         spaceId: 'auth-service',
       },
-      constraint: false,
-      index: true,
     };
     const result = ForeignKeySchema(input);
     expect(result).not.toBeInstanceOf(type.errors);
@@ -376,8 +368,6 @@ describe('ForeignKeySchema', () => {
         tableName: 'user',
         columns: ['id'],
       },
-      constraint: true,
-      index: true,
     });
     expect(result).toBeInstanceOf(type.errors);
   });
@@ -394,8 +384,6 @@ describe('ForeignKeySchema', () => {
         tableName: 'user',
         columns: ['id'],
       },
-      constraint: true,
-      index: true,
     });
     expect(result).not.toBeInstanceOf(type.errors);
   });
@@ -439,8 +427,6 @@ describe('validateSqlContractFully with cross-space FKs', () => {
                         columns: ['id'],
                         spaceId: 'auth-service',
                       },
-                      constraint: false,
-                      index: true,
                     },
                   ],
                 },
@@ -482,8 +468,6 @@ describe('validateSqlContractFully with cross-space FKs', () => {
                         tableName: 'ghost_table',
                         columns: ['id'],
                       },
-                      constraint: true,
-                      index: true,
                     },
                   ],
                 },

@@ -118,8 +118,11 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
                 }
               },
               "title": {
@@ -195,8 +198,11 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
                 }
               },
               "status": {
@@ -314,8 +320,11 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 36
+                  }
                 }
               },
               "kind": {
@@ -435,9 +444,12 @@
             "bug": {
               "columns": {
                 "id": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
                 },
                 "severity": {
                   "codecId": "pg/text@1",
@@ -452,8 +464,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "onDelete": "cascade",
                   "source": {
                     "columns": [
@@ -482,9 +492,12 @@
             "feature": {
               "columns": {
                 "id": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
                 },
                 "priority": {
                   "codecId": "pg/text@1",
@@ -499,8 +512,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "onDelete": "cascade",
                   "source": {
                     "columns": [
@@ -538,9 +549,12 @@
                   "nullable": false
                 },
                 "id": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
                 },
                 "title": {
                   "codecId": "pg/text@1",
@@ -555,8 +569,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "userId"
@@ -573,7 +585,14 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "post_userId_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -598,9 +617,12 @@
                   "nullable": true
                 },
                 "id": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
                 },
                 "status": {
                   "codecId": "pg/text@1",
@@ -629,8 +651,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "userId"
@@ -647,7 +667,14 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "task_userId_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -694,9 +721,12 @@
                   "nullable": false
                 },
                 "id": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 36
+                  }
                 },
                 "kind": {
                   "codecId": "pg/text@1",
@@ -734,7 +764,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:876c31e038cff6c9d33fc3b461050e225f07c591f0567a54bfd44139be998b9c"
+    "storageHash": "sha256:b3c1ecfc1a5ec14582261dbebf5d609c4902f4022cab545b48b6b43a4ccf0008"
   },
   "execution": {
     "executionHash": "sha256:a691ed4c6ad02663bcd11c7ea8b2491e67253cd7c1968687255f2e0accfdcff7",

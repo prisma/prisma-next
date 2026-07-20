@@ -340,8 +340,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "post_userId_fkey",
                   "source": {
                     "columns": [
@@ -359,7 +357,14 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "post_userId_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -388,8 +393,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "post_tag_postId_fkey",
                   "source": {
                     "columns": [
@@ -407,8 +410,6 @@
                   }
                 },
                 {
-                  "constraint": true,
-                  "index": true,
                   "name": "post_tag_tagId_fkey",
                   "source": {
                     "columns": [
@@ -426,7 +427,20 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "postId"
+                  ],
+                  "name": "post_tag_postId_idx"
+                },
+                {
+                  "columns": [
+                    "tagId"
+                  ],
+                  "name": "post_tag_tagId_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "postId",
@@ -505,7 +519,7 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:664e11eed7f1d28dcf79412d71801ffa7c0a6369c717c38a0aa655b033e2213e"
+    "storageHash": "sha256:89be7f7a0e01dca5206d3665bf034e6c3b92b1b77d9336c1e299a131319f4f6a"
   },
   "execution": {
     "executionHash": "sha256:b5689b5ab97f808cfa98afa9bb2b762a559d895cef8c68395c9ab4611166f605",

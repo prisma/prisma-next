@@ -1,9 +1,9 @@
-import type { DiffableNode } from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
-import { assertNode, SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface SqlIndexIRInput {
   readonly columns: readonly string[];
@@ -12,6 +12,13 @@ export interface SqlIndexIRInput {
   readonly type?: string;
   readonly options?: Record<string, unknown>;
   readonly annotations?: SqlAnnotations;
+  /**
+   * The index's own column nodes, as root-anchored chains. The derivation
+   * stamps them so an index is dropped before the columns it is built on
+   * (Postgres auto-drops the index when a covered column goes). Never
+   * compared by `isEqualTo`.
+   */
+  readonly dependsOn?: readonly SchemaNodeRef[];
 }
 
 /**
@@ -28,6 +35,17 @@ export interface SqlIndexIRInput {
  * on the remaining attributes: `unique`, `type`, and `options`. A unique
  * index and a non-unique index on the same columns are different objects
  * and are not equal — there is no "stronger satisfies weaker".
+ *
+ * Deliberately column-tuple-only (not `unique`): a contract `@@index`
+ * (non-unique) must still pair against a live unique index of the same
+ * columns so the differ can report the mismatch as an incompatible index
+ * change rather than a spurious missing+extra pair — see
+ * `planner.unique-index-structural.test.ts`. The corollary is that two
+ * indexes legitimately coexisting on one table with the *same* column tuple
+ * (e.g. a unique index and a redundant plain index Postgres has no problem
+ * hosting side by side) collide on this id; the postgres control adapter's
+ * introspection keeps only one such index per table+column-tuple rather
+ * than handing the differ two same-tree siblings it cannot represent.
  */
 export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.index;
@@ -38,6 +56,8 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   declare readonly type?: string;
   declare readonly options?: Record<string, unknown>;
   declare readonly annotations?: SqlAnnotations;
+  /** See {@link SqlIndexIRInput.dependsOn}. Non-enumerable so it stays out of JSON and structural equality, matching `SqlColumnIR.codecRef`. */
+  declare readonly dependsOn?: readonly SchemaNodeRef[];
 
   constructor(input: SqlIndexIRInput) {
     super();
@@ -47,6 +67,7 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
     if (input.type !== undefined) this.type = input.type;
     if (input.options !== undefined) this.options = input.options;
     if (input.annotations !== undefined) this.annotations = input.annotations;
+    defineNonEnumerable(this, 'dependsOn', input.dependsOn);
     freezeNode(this);
   }
 

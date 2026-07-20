@@ -210,8 +210,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "onDelete": "cascade",
                   "onUpdate": "cascade",
                   "source": {
@@ -326,7 +324,7 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:95e8ea1b54d444760e630a2302b6353f8c59f32bc5f44f465c67f1cd0a2e2d3f",
+    "storageHash": "sha256:001f0568c44676d5972dd207a36062961203faf813f92ed81a3178d9d5db684d",
     "types": {
       "Email": {
         "codecId": "pg/text@1",

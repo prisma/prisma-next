@@ -759,10 +759,14 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         });
         continue;
       }
-      if (parsedRelation.onDelete || parsedRelation.onUpdate) {
+      if (
+        parsedRelation.onDelete ||
+        parsedRelation.onUpdate ||
+        parsedRelation.index !== undefined
+      ) {
         diagnostics.push({
           code: 'PSL_INVALID_RELATION_ATTRIBUTE',
-          message: `Backrelation list field "${model.name}.${field.name}" cannot declare onDelete/onUpdate; define referential actions on the FK-side relation field`,
+          message: `Backrelation list field "${model.name}.${field.name}" cannot declare onDelete/onUpdate/index; define them on the FK-side relation field`,
           sourceId,
           span: relationAttribute.span,
         });
@@ -1204,6 +1208,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         ...ifDefined('name', parsedRelation.map),
         ...ifDefined('onDelete', onDelete),
         ...ifDefined('onUpdate', onUpdate),
+        ...ifDefined('index', parsedRelation.index),
       });
 
       // Build the cross-space RelationNode directly (no local back-relation candidate).
@@ -1353,6 +1358,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       ...ifDefined('name', parsedRelation.map),
       ...ifDefined('onDelete', onDelete),
       ...ifDefined('onUpdate', onUpdate),
+      ...ifDefined('index', parsedRelation.index),
     });
 
     resultFkRelationMetadata.push({

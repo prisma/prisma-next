@@ -158,6 +158,57 @@ describe('supabase() factory — asUser', () => {
     expect(poolConnectSpy()).not.toHaveBeenCalled();
     await db.close();
   });
+
+  it('names the asymmetric-token/jwtSecret mismatch instead of leaking a jose internal', async () => {
+    const { generateKeyPair } = await import('jose');
+    const { privateKey } = await generateKeyPair('ES256');
+    const jwt = await new SignJWT({ sub: 'user-1', role: 'authenticated' })
+      .setProtectedHeader({ alg: 'ES256', kid: 'test-kid' })
+      .setExpirationTime('1h')
+      .sign(privateKey);
+
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      jwtSecret: fixtureJwt,
+    });
+
+    const failure = await db.asUser(jwt).then(
+      () => undefined,
+      (err: unknown) => err,
+    );
+    expect(failure).toBeInstanceOf(InvalidJwtError);
+    const message = failure instanceof Error ? failure.message : '';
+    expect(message).toContain('ES256');
+    expect(message).toContain('jwtSecret');
+    expect(message).toContain('jwksUrl');
+    expect(message).toContain('/auth/v1/.well-known/jwks.json');
+    expect(message).not.toContain('CryptoKey');
+    expect(message).not.toContain('Uint8Array');
+    await db.close();
+  });
+
+  it('names the symmetric-token/jwksUrl mismatch without fetching the JWKS', async () => {
+    const jwt = await makeJwt({ sub: 'user-1', role: 'authenticated' });
+
+    const db = await supabase({
+      contract,
+      url: 'postgres://localhost/db',
+      // Never fetched: the alg mismatch is detected before verification.
+      jwksUrl: 'https://project.supabase.example/auth/v1/.well-known/jwks.json',
+    });
+
+    const failure = await db.asUser(jwt).then(
+      () => undefined,
+      (err: unknown) => err,
+    );
+    expect(failure).toBeInstanceOf(InvalidJwtError);
+    const message = failure instanceof Error ? failure.message : '';
+    expect(message).toContain('HS256');
+    expect(message).toContain('jwksUrl');
+    expect(message).toContain('jwtSecret');
+    await db.close();
+  });
 });
 
 describe('supabase() factory — behavioral binding via set_config', () => {

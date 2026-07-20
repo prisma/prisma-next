@@ -8,6 +8,25 @@ import { createColorFormatter, formatDim, isVerbose } from './helpers';
 import { formatPlannerWarningsBlock } from './migrations';
 
 /**
+ * The display label for a schema-diff issue in the shared error envelope,
+ * derived from which sides are present: expected-only is a missing object,
+ * actual-only an extra one, both a mismatch. `undefined` when the entry is not
+ * a schema-diff issue (it carries neither side) so the caller can fall through
+ * to its generic label.
+ */
+function schemaDiffIssueLabel(issue: {
+  readonly expected?: unknown;
+  readonly actual?: unknown;
+}): 'missing' | 'extra' | 'mismatch' | undefined {
+  const hasExpected = issue.expected !== undefined;
+  const hasActual = issue.actual !== undefined;
+  if (hasExpected && hasActual) return 'mismatch';
+  if (hasExpected) return 'missing';
+  if (hasActual) return 'extra';
+  return undefined;
+}
+
+/**
  * Formats error output for human-readable display.
  */
 export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): string {
@@ -51,13 +70,15 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
   // Show issues list if present (always show a short list; show full list when verbose).
   // `issues` is a shared error-envelope field: PSL interpretation diagnostics stamp
   // `kind` and `message` (their diagnostic code and prose); schema-diff issues
-  // (`SchemaDiffIssue`) carry no `message` and stamp `reason` and `path` instead.
+  // (`SchemaDiffIssue`) carry no `message` and stamp `path` plus the
+  // `expected`/`actual` presence a label is derived from.
   if (error.meta?.['issues']) {
     const issues = error.meta['issues'] as readonly {
       kind?: string;
-      reason?: string;
       message?: string;
       path?: readonly string[];
+      expected?: unknown;
+      actual?: unknown;
     }[];
     if (issues.length > 0) {
       const maxToShow = isVerbose(flags, 1) ? issues.length : Math.min(3, issues.length);
@@ -66,7 +87,7 @@ export function formatErrorOutput(error: CliErrorEnvelope, flags: GlobalFlags): 
         : `  Issues (showing ${maxToShow} of ${issues.length}):`;
       lines.push(`${formatDimText(header)}`);
       for (const issue of issues.slice(0, maxToShow)) {
-        const label = issue.kind ?? issue.reason ?? 'issue';
+        const label = issue.kind ?? schemaDiffIssueLabel(issue) ?? 'issue';
         const message = issue.message ?? issue.path?.join('/') ?? '';
         lines.push(`${formatDimText(`    - [${label}] ${message}`)}`);
       }

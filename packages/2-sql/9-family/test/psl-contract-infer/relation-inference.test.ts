@@ -374,6 +374,113 @@ describe('inferRelations', () => {
     });
   });
 
+  it('stamps index: false when the FK columns have no live backing index', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      post: new SqlTableIR({
+        name: 'post',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        uniques: [],
+        indexes: [],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['post', 'Post'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const postRelations = relationsByTable.get('post');
+    expect(postRelations![0]).toMatchObject({ fieldName: 'user', index: false });
+  });
+
+  it('leaves index unset when a live non-unique index backs the FK columns', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      post: new SqlTableIR({
+        name: 'post',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        uniques: [],
+        indexes: [{ columns: ['user_id'], unique: false }],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['post', 'Post'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const postRelations = relationsByTable.get('post');
+    expect(postRelations![0]?.index).toBeUndefined();
+  });
+
+  it('stamps index: false when a live index exists but in a different column order', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: {
+          tenant_id: { name: 'tenant_id', nativeType: 'int4', nullable: false },
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['tenant_id', 'id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      post: new SqlTableIR({
+        name: 'post',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          tenant_id: { name: 'tenant_id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [
+          {
+            columns: ['tenant_id', 'user_id'],
+            referencedTable: 'user',
+            referencedColumns: ['tenant_id', 'id'],
+          },
+        ],
+        uniques: [],
+        // Same columns, reversed order: does not satisfy the FK's (tenant_id, user_id) order.
+        indexes: [{ columns: ['user_id', 'tenant_id'], unique: false }],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['post', 'Post'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const postRelations = relationsByTable.get('post');
+    expect(postRelations![0]).toMatchObject({ index: false });
+  });
+
   it('falls back to a numeric suffix when relation names still collide after appending the model name', () => {
     const tables: Record<string, SqlTableIR> = {
       user: new SqlTableIR({
