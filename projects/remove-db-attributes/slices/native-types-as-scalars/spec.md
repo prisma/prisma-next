@@ -27,6 +27,8 @@ Codec ids and no-arg emission shapes must match `NATIVE_TYPE_SPECS` (`packages/2
 
 **⛔ Operator gate (operator-mandated 2026-07-11; carried from project plan):** this slice must evaluate **retiring `scalarTypes` from `buildSymbolTable`** (`psl-parser/src/symbol-table.ts`) — its sole use is the `isScalarBinding` ScalarSymbol/TypeAliasSymbol split for `types {}` declarations, which `resolveNamedTypeDeclarations` re-classifies authoritatively. **Halt condition on the owning dispatch:** if the implementer or slice author concludes the simplification should NOT be done (split proves load-bearing, or cost disproportionate), HALT and escalate to the operator with rationale. Silently keeping the parameter is forbidden; only the operator may waive.
 
+**Generator storage override retired (operator-decided 2026-07-15, in-slice).** `@default(<generator>)` never mutates storage — the type position is the only storage decider (the project's own purpose applied to defaults). Retired wholesale: `generatedColumnDescriptor` / `resolveGeneratedColumnDescriptor` in `@prisma-next/ids` and its threading (`mutation-default-types.ts`, adapters), the override block in `psl-field-resolution.ts`, and the transitional `baseScalar` marker shipped by this slice's F-1 fix. Semantics after: `String @default(uuid())` = target's String storage (pg: text) + generated values; explicit storage spellings (`Uuid`, `Char(36)`) are the way to pin storage. Generator applicability validation (`applicableCodecIds`) survives — it validates, it does not mutate. TS field presets untouched (explicit bundles). Breaking change → upgrade-instructions entry; TS↔PSL parity fixtures re-pair preset spellings with explicit PSL storage spellings.
+
 ## Coherence rationale
 
 One outcome — "the native types exist as bare scalar types with exact storage parity" — delivered by contributions + the bare-name sugar they require + the parity tests that prove it. The JSON re-bind rides along because `Jsonb`'s existence and `Json`'s meaning are one decision.
@@ -52,6 +54,7 @@ One outcome — "the native types exist as bare scalar types with exact storage 
 - [ ] Parity tests: for each of the eleven mappings, bare-type authoring (both positions, with and without args where optional) emits the identical `{ codecId, nativeType, typeParams }` as the `@db.*` equivalent — including omitted-optional-arg forms.
 - [ ] `Json` → `pg/json@1` and `Jsonb` → `pg/jsonb@1` test-covered.
 - [ ] Operator gate resolved: symbol-table simplification either done, or an escalation with rationale is on the operator's desk — no third state.
+- [ ] Generator storage override fully retired: `rg 'generatedColumnDescriptor|resolveGeneratedColumnDescriptor|baseScalar' packages --type ts` returns zero production hits; `String @default(uuid())` emits text storage (test-pinned); upgrade entry covers the storage change.
 - [ ] `pnpm fixtures:check` clean; `pnpm lint:deps` clean.
 
 ## Open Questions
