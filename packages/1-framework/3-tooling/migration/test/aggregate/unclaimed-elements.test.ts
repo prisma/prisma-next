@@ -55,7 +55,6 @@ const classifyEntityKind: SchemaEntityKindClassifier = (issue) => {
 function extraTableIssue(name: string): SchemaDiffIssue {
   return {
     path: ['database', 'public', name],
-    reason: 'not-expected',
     actual: diffNode(name, 'table'),
   };
 }
@@ -63,7 +62,6 @@ function extraTableIssue(name: string): SchemaDiffIssue {
 function extraColumnIssueUnder(tableName: string, columnName: string): SchemaDiffIssue {
   return {
     path: ['database', 'public', tableName, `column:${columnName}`],
-    reason: 'not-expected',
     actual: diffNode(`column:${columnName}`, 'column'),
   };
 }
@@ -71,7 +69,6 @@ function extraColumnIssueUnder(tableName: string, columnName: string): SchemaDif
 function extraPolicyIssue(tableName: string, policyName: string): SchemaDiffIssue {
   return {
     path: ['database', 'public', tableName, policyName],
-    reason: 'not-expected',
     actual: diffNode(policyName, 'policy'),
   };
 }
@@ -80,7 +77,6 @@ function extraPolicyIssue(tableName: string, policyName: string): SchemaDiffIssu
 function extraCollectionIssue(name: string): SchemaDiffIssue {
   return {
     path: [name],
-    reason: 'not-expected',
     actual: diffNode(name),
   };
 }
@@ -136,7 +132,6 @@ describe('stripExtraFindings', () => {
   it('a real missing/mismatch failure survives the strip', () => {
     const missingColumn: SchemaDiffIssue = {
       path: ['database', 'public', 'user', 'column:email'],
-      reason: 'not-found',
       expected: diffNode('column:email', 'column'),
     };
     const result = makeResult({
@@ -241,7 +236,6 @@ describe('collectExtraElementCoordinates', () => {
         extraTableIssue('orphan_table'),
         {
           path: ['database', 'tenant_b', 'orphan_table'],
-          reason: 'not-expected',
           actual: diffNode('orphan_table', 'table'),
         },
       ],

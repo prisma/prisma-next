@@ -145,11 +145,12 @@ export class SqlColumnIR extends SqlSchemaIRNode implements DiffableNode {
         ...ifDefined('resolved', this.resolvedDefault),
         ...ifDefined('raw', this.default),
         ...ifDefined('nativeTypeContext', this.resolvedNativeType),
-        // `this.many` is unset on contract-derived columns (array-ness rides
-        // on the `nativeType` `[]` suffix there — `codecRef.many` carries
-        // it instead); introspected/hand-built columns set `this.many`
-        // directly. Either source works for the default node's array-
-        // literal rendering.
+        // Contract-derived and introspected columns both set `this.many`
+        // directly (with `nativeType` as the bare element type; array-ness
+        // never rides on a `[]` suffix). `codecRef.many` is a fallback for
+        // hand-built nodes that carry a codec ref without the column-level
+        // flag. Either source works for the default node's array-literal
+        // rendering.
         ...ifDefined('many', this.many ?? this.codecRef?.many),
       }),
     ];

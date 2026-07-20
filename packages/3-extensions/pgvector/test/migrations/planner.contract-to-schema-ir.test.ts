@@ -870,8 +870,6 @@ const DEMO_BASE_TABLES = {
           tableName: 'user',
           columns: ['id'],
         },
-        constraint: true,
-        index: true,
       },
     ],
   }),

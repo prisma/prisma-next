@@ -4,10 +4,11 @@ import { enumType, member } from '@prisma-next/sql-contract-ts/contract-builder'
 /**
  * Supabase's three standard Postgres roles as a Prisma Next enum — the
  * single source of truth for the role vocabulary. Runtime-only: the shipped
- * contract declares the roles via top-level PSL `role` blocks, not through
- * this handle. The runtime (`supabase-runtime.ts`, `supabase.ts`) derives
- * its role type from `SupabaseRole.values` and reads member values through
- * `SupabaseRole.members` instead of raw string literals.
+ * contract declares the roles via PSL `role` blocks inside an explicit
+ * `namespace unbound { }` block, not through this handle. The runtime
+ * (`supabase-runtime.ts`, `supabase.ts`) derives its role type from
+ * `SupabaseRole.values` and reads member values through `SupabaseRole.members`
+ * instead of raw string literals.
  */
 export const SupabaseRole = enumType(
   'SupabaseRole',

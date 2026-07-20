@@ -16,5 +16,10 @@ export default defineConfig({
         maxForks: 4,
       },
     },
+    // The PGlite (WASM) journeys still intermittently abort on the slower CI
+    // runners even with --no-memory-protection-keys ("Connection terminated
+    // unexpectedly"). The crash is environment-specific and does not reproduce
+    // locally; a re-run with a fresh dev database clears it.
+    retry: process.env['CI'] ? 2 : 0,
   },
 });

@@ -332,9 +332,12 @@ describe('formatIntrospectJson', () => {
 });
 
 describe('formatSchemaVerifyOutput', () => {
+  // A minimal node to carry presence — the formatter derives the missing/extra/
+  // mismatch label from which sides are set, not from any stored field.
+  const node = { id: 'x', nodeKind: 'x', isEqualTo: () => true, children: () => [] };
   const missingTableIssue: SchemaDiffIssue = {
     path: ['post'],
-    reason: 'not-found',
+    expected: node,
   };
 
   const createResult = (): VerifyDatabaseSchemaResult => ({
@@ -375,7 +378,7 @@ describe('formatSchemaVerifyOutput', () => {
   it('renders every issue, each on its own line', () => {
     const diffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_abc'],
-      reason: 'not-found',
+      expected: node,
     };
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
@@ -426,7 +429,7 @@ describe('formatSchemaVerifyOutput', () => {
           issues: [
             {
               path: ['database', 'public', 'legacy_jobs'],
-              reason: 'not-found',
+              expected: node,
             },
           ],
         },
@@ -560,7 +563,7 @@ describe('formatSchemaVerifyOutput', () => {
         issues: [
           {
             path: ['public', 'profiles', policyWireName],
-            reason: 'not-found',
+            expected: node,
           },
         ],
       },
@@ -692,11 +695,9 @@ describe('formatSchemaVerifyJson', () => {
         issues: [
           {
             path: ['post'],
-            reason: 'not-found',
           },
           {
             path: ['public', 'profiles', 'policy_abc'],
-            reason: 'not-found',
           },
         ],
       },

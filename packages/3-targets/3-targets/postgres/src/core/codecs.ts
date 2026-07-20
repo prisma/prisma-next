@@ -68,6 +68,7 @@ import {
   PG_FLOAT_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
+  PG_INET_CODEC_ID,
   PG_INT_CODEC_ID,
   PG_INT2_CODEC_ID,
   PG_INT4_CODEC_ID,
@@ -997,6 +998,47 @@ export const pgUuidColumn = () =>
 pgUuidColumn satisfies ColumnHelperFor<PgUuidDescriptor>;
 pgUuidColumn satisfies ColumnHelperForStrict<PgUuidDescriptor>;
 
+const PG_INET_META = { db: { sql: { postgres: { nativeType: 'inet' } } } } as const;
+
+export class PgInetCodec extends CodecImpl<
+  typeof PG_INET_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string
+> {
+  async encode(value: string, _ctx: CodecCallContext): Promise<string> {
+    return value;
+  }
+  async decode(wire: string, _ctx: CodecCallContext): Promise<string> {
+    return wire;
+  }
+  encodeJson(value: string): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): string {
+    return blindCast<string, 'inet columns serialize to JSON as their wire string form'>(json);
+  }
+}
+
+export class PgInetDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_INET_CODEC_ID;
+  override readonly traits = ['equality', 'order'] as const;
+  override readonly targetTypes = ['inet'] as const;
+  override readonly meta = PG_INET_META;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => PgInetCodec {
+    return () => new PgInetCodec(this);
+  }
+}
+
+export const pgInetDescriptor = new PgInetDescriptor();
+
+export const pgInetColumn = () =>
+  column(pgInetDescriptor.factory(), pgInetDescriptor.codecId, undefined, 'inet');
+
+pgInetColumn satisfies ColumnHelperFor<PgInetDescriptor>;
+pgInetColumn satisfies ColumnHelperForStrict<PgInetDescriptor>;
+
 export class PgIntervalCodec extends CodecImpl<
   typeof PG_INTERVAL_CODEC_ID,
   readonly ['equality', 'order'],
@@ -1252,6 +1294,7 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   pgVarbitDescriptor,
   pgByteaDescriptor,
   pgUuidDescriptor,
+  pgInetDescriptor,
   pgIntervalDescriptor,
   pgJsonDescriptor,
   pgJsonbDescriptor,

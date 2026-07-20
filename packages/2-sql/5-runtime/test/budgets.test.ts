@@ -169,6 +169,48 @@ describe('budgets middleware', () => {
     );
 
     it(
+      'throws when latency exceeds budget with error severity in permissive mode',
+      async () => {
+        const mw = budgets({ maxLatencyMs: 100, severities: { latency: 'error' } });
+        const plan = createPlan({ sql: 'SELECT 1 LIMIT 1' });
+        const ctx = createMiddlewareContext({ mode: 'permissive' });
+        const result: AfterExecuteResult = {
+          rowCount: 1,
+          latencyMs: 200,
+          completed: true,
+          source: 'driver',
+        };
+
+        await expect(mw.afterExecute?.(plan, result, ctx)).rejects.toMatchObject({
+          code: 'BUDGET.TIME_EXCEEDED',
+          category: 'BUDGET',
+        });
+      },
+      timeouts.default,
+    );
+
+    it(
+      'warns by default when latency exceeds budget in permissive mode',
+      async () => {
+        const mw = budgets({ maxLatencyMs: 100 });
+        const plan = createPlan({ sql: 'SELECT 1 LIMIT 1' });
+        const ctx = createMiddlewareContext({ mode: 'permissive' });
+        const result: AfterExecuteResult = {
+          rowCount: 1,
+          latencyMs: 200,
+          completed: true,
+          source: 'driver',
+        };
+
+        await mw.afterExecute?.(plan, result, ctx);
+        expect(ctx.log.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ code: 'BUDGET.TIME_EXCEEDED' }),
+        );
+      },
+      timeouts.default,
+    );
+
+    it(
       'does not warn when latency is within budget',
       async () => {
         const mw = budgets({ maxLatencyMs: 1000 });

@@ -27,12 +27,11 @@ The differ walks both trees together, pairing nodes level by level. Everything m
 ```ts
 {
   path: ['db', 'public', 'profile', 'profile_owner_read_a3f1c8b2'],
-  reason: 'not-found',                    // expected it, didn't find it
-  expected: PostgresPolicySchemaNode { … }, // the IR node itself
+  expected: PostgresPolicySchemaNode { … }, // the IR node itself, on the expected side only
 }
 ```
 
-`db verify` reports this issue as drift (severity graded by the table's control policy — [ADR 224](ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md)). The migration planner maps the same issue to a `CREATE POLICY` operation. Both consumers read the one issue list; neither re-diffs anything.
+The issue carries no verdict of its own: the outcome it represents is a pure function of which sides are present. Only `expected` is here, so the node is missing from the database — **not-found**. `db verify` reports this issue as drift (severity graded by the table's control policy — [ADR 224](ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md)). The migration planner maps the same issue to a `CREATE POLICY` operation. Both consumers read the one issue list; neither re-diffs anything.
 
 ## The node interface
 
@@ -42,10 +41,13 @@ Every schema element — namespace, table, column, primary key, foreign key, uni
 interface DiffableNode {
   readonly id: string;                       // a single path segment
   readonly nodeKind: string;                 // per-node discriminant; never folded into id
+  readonly dependsOn?: readonly SchemaNodeRef[]; // nodes that must exist before this one
   isEqualTo(other: DiffableNode): boolean;   // compares a matched pair's OWN attributes only
   children(): readonly DiffableNode[];       // the node's children; empty for a leaf
 }
 ```
+
+`dependsOn` names the node's structural prerequisites — a foreign key on its referenced table, a policy on its table and roles, a constraint on its own columns — as root-anchored `(nodeKind, id)` chains. Both derivations stamp it by the same rules; `isEqualTo` ignores it (a dependency change is always caused by a state change that already fires a difference).
 
 The differ is given two corresponding nodes — at the top, the two database roots — compares them, and descends into their children. Because it takes a single node on each side (not a list), it diffs any two corresponding subtrees alike: two databases, or — below them — two tables. As it descends it accumulates each node's `id` into the **path** stamped on every issue, so an issue always says exactly where in the tree it sits.
 
@@ -54,15 +56,19 @@ An issue carries the failing node itself, typed:
 ```ts
 interface SchemaDiffIssue<TNode extends DiffableNode = DiffableNode> {
   readonly path: readonly string[];
-  readonly reason: ExpectationFailureReason;  // 'not-found' | 'not-expected' | 'not-equal'
-  readonly expected?: TNode;                  // absent for not-expected issues
-  readonly actual?: TNode;                    // absent for not-found issues
+  readonly expected?: TNode;                       // absent when the node is not-expected
+  readonly actual?: TNode;                         // absent when the node is not-found
+  readonly dependsOn?: readonly (readonly string[])[]; // the paths of the in-diff issues this depends on
 }
 ```
 
-- **not-found** — in expected, not in actual (the worked example above).
-- **not-expected** — in actual, not in expected (e.g. a live policy no contract declares).
-- **not-equal** — the two sides pair up, but `isEqualTo` is false.
+The issue stores no separate kind field: the outcome it represents is discriminated by presence, read through the exported helper `issueOutcome(issue): 'not-found' | 'not-expected' | 'not-equal'`. The neutral expectation vocabulary reads cleanly from both perspectives — the planner's (create/drop/alter) and `db verify`'s (missing/extra/mismatch).
+
+- **not-found** — `expected` only: in the desired tree, not in the current one (the worked example above).
+- **not-expected** — `actual` only: in the current tree, not in the desired one (e.g. a live policy no contract declares).
+- **not-equal** — both sides present: the two nodes pair up, but `isEqualTo` is false.
+
+Caching the outcome as a stored `reason` alongside the very presence that determines it only invited the two to drift, so presence is the single source of truth. `dependsOn` is the issue-to-issue mirror of the node's own `dependsOn`: the differ resolves each node ref to the path of the in-diff issue at that coordinate, dropping any ref whose target produced no issue (that prerequisite is already satisfied by reality). The planner topologically sorts on these edges — a dependency's op before its dependent on the way up, after it on the way down.
 
 ## How pairing works
 
@@ -74,7 +80,7 @@ Three more properties complete the walk's contract:
 
 - **The differ is total.** An unmatched node emits its own issue and descends, emitting an issue for every node in the missing or extra subtree. Coalescing a parent change over its children is the planner's job, not the differ's.
 - **`isEqualTo` compares own attributes only**, never children. The differ recurses, so child differences surface as their own issues at their own paths.
-- **Ownership filtering is the caller's job.** In a database shared by several contract spaces, `not-expected` issues for entities a sibling space declares are dropped by the caller, consulting the contract-space aggregate's ownership capability. The differ itself compares everything it is handed.
+- **Ownership filtering is the caller's job.** In a database shared by several contract spaces, not-expected issues (actual-only) for entities a sibling space declares are dropped by the caller, consulting the contract-space aggregate's ownership capability. The differ itself compares everything it is handed.
 
 ## The tree has a real root
 
@@ -118,14 +124,14 @@ One guarantee falls out of this and the differ relies on it: a node is only ever
 The diff feeds the **planner** — `plan(start, end)`: two schema IRs in, the ordered list of migration operations out. The planner's needs are the reason the diff keeps its structure instead of flattening:
 
 - It sequences operations by how nodes depend on one another: a table before the policies attached to it.
-- It folds a paired drop-and-create of one logical object into a single rename — for a content-addressed node, a `not-found`/`not-expected` pair whose wire names share a hash suffix under different prefixes becomes one `ALTER POLICY … RENAME TO` ([ADR 234](ADR%20234%20-%20Content-addressed%20wire%20names%20for%20Postgres-normalized%20objects.md)).
+- It folds a paired drop-and-create of one logical object into a single rename — for a content-addressed node, a not-found/not-expected pair whose wire names share a hash suffix under different prefixes becomes one `ALTER POLICY … RENAME TO` ([ADR 234](ADR%20234%20-%20Content-addressed%20wire%20names%20for%20Postgres-normalized%20objects.md)).
 - It lets a change to a parent stand in for changes to its children.
 
 Each of those is a relationship between nodes. The walk keeps those relationships in its output — every issue carries its path, and the nodes it hands back are the IR nodes with their references intact — so the planner reads each one straight from the diff.
 
 ## Responsibilities
 
-- **The framework** owns the walk, the `(nodeKind, id)` pairing, the `not-found | not-expected | not-equal` vocabulary, and the path. It names no node type.
+- **The framework** owns the walk, the `(nodeKind, id)` pairing, the presence-derived `not-found | not-expected | not-equal` vocabulary (via `issueOutcome`), and the path. It names no node type.
 - **A node** implements `id`, `nodeKind`, `isEqualTo()`, and `children()` in the package that defines it. A target-only node — an RLS policy, a role — implements them in the target package, the one place its type is named.
 - **A derivation** builds one side's IR, populating every node that side carries in canonical form. A target's two derivations live with the target, written directly — not registered through a shared surface.
 

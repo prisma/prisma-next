@@ -742,6 +742,7 @@ export const NATIVE_TYPE_SPECS: Readonly<Record<string, NativeTypeSpec>> = {
     nativeType: 'character',
   },
   'db.Uuid': { args: 'noArgs', baseType: 'String', codecId: 'pg/uuid@1', nativeType: 'uuid' },
+  'db.Inet': { args: 'noArgs', baseType: 'String', codecId: 'pg/inet@1', nativeType: 'inet' },
   'db.SmallInt': { args: 'noArgs', baseType: 'Int', codecId: 'pg/int2@1', nativeType: 'int2' },
   'db.Real': { args: 'noArgs', baseType: 'Float', codecId: 'pg/float4@1', nativeType: 'float4' },
   'db.Numeric': {

@@ -22,6 +22,7 @@ This skill covers the **runtime entry point** — `db.ts` — and how to compose
 ## When Not to Use
 
 - User wants to write queries → `prisma-next-queries`.
+- User is on Supabase — the `supabase()` role-first factory, `asUser(jwt)` / `asAnon()` / `asServiceRole()`, JWT config, RLS → `prisma-next-supabase`.
 - User wants to edit the contract → `prisma-next-contract`.
 - User wants to wire Prisma Next into a build tool (Vite plugin, Next.js, …) → `prisma-next-build`.
 - User wants to debug a connection / runtime error → `prisma-next-debug`.
@@ -183,7 +184,6 @@ export const db = postgres<Contract>({
         deleteWithoutWhere: 'error',
         updateWithoutWhere: 'error',
         readOnlyMutation: 'error',
-        unindexedPredicate: 'warn',
       },
     }),
     budgets({
@@ -197,7 +197,7 @@ export const db = postgres<Contract>({
 });
 ```
 
-For the full option surface, read the source: `packages/2-sql/5-runtime/src/middleware/lints.ts` and `.../budgets.ts`. The `severities` keys (`selectStar`, `noLimit`, `deleteWithoutWhere`, `updateWithoutWhere`, `readOnlyMutation`, `unindexedPredicate` for lints; `rowCount`, `latency` for budgets) are the source of truth; do not extrapolate to a key that ripgrep can't find.
+For the full option surface, read the source: `packages/2-sql/5-runtime/src/middleware/lints.ts` and `.../budgets.ts`. The `severities` keys (`selectStar`, `noLimit`, `deleteWithoutWhere`, `updateWithoutWhere`, `readOnlyMutation` for lints; `rowCount`, `latency` for budgets) are the source of truth; do not extrapolate to a key that ripgrep can't find.
 
 ## Workflow — Compose multiple middleware
 
@@ -317,7 +317,7 @@ The runtime side (this skill) is the same regardless: `db.ts` reads `contract.js
 3. **Forgetting `with { type: 'json' }` on the contract import.** Required by Node's ESM JSON-import-attribute spec.
 4. **Middleware order matters.** Outermost wraps. Put telemetry first if you want it to capture inner-middleware errors.
 5. **Importing middleware from a non-existent façade subpath.** `@prisma-next/postgres/middleware` does *not* exist. Telemetry comes from `@prisma-next/middleware-telemetry`; lints / budgets come from `@prisma-next/sql-runtime` today (see *What Prisma Next doesn't do yet*).
-6. **Confabulating lint / budget option names.** Lints take `severities` (with the six keys above), not `requireWhere` / `maxRowsWithoutLimit`. Budgets use `maxLatencyMs` (not `maxDurationMs`) plus `maxRows` / `defaultTableRows` / `tableRows`. When in doubt, read the source.
+6. **Confabulating lint / budget option names.** Lints take `severities` (with the five keys above), not `requireWhere` / `maxRowsWithoutLimit`. Budgets use `maxLatencyMs` (not `maxDurationMs`) plus `maxRows` / `defaultTableRows` / `tableRows`. When in doubt, read the source.
 7. **Switching targets without re-emitting.** The contract artefacts are target-shaped; emit after the target change.
 8. **Script hangs after queries finish on Postgres.** The `pg.Pool` keeps Node's event loop alive. Solution: `await db.close()` before the script returns, or `await using db = postgres<Contract>(...)` at the top of a script module. Do not put `await using db = postgres(...)` inside a request handler — it's block-scoped and would close the pool after every request. The right server pattern is a module-level singleton in `db.ts` that lives for the process lifetime.
 

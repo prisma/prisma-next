@@ -1,14 +1,20 @@
-import type { DiffableNode } from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
-import { assertNode, SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface SqlUniqueIRInput {
   readonly columns: readonly string[];
   readonly name?: string;
   readonly annotations?: SqlAnnotations;
+  /**
+   * The constraint's own column nodes, as root-anchored chains. The
+   * derivation stamps them so a unique constraint is dropped before the
+   * columns it is built on. Never compared by `isEqualTo`.
+   */
+  readonly dependsOn?: readonly SchemaNodeRef[];
 }
 
 /**
@@ -28,12 +34,15 @@ export class SqlUniqueIR extends SqlSchemaIRNode implements DiffableNode {
   readonly columns: readonly string[];
   declare readonly name?: string;
   declare readonly annotations?: SqlAnnotations;
+  /** See {@link SqlUniqueIRInput.dependsOn}. Non-enumerable so it stays out of JSON and structural equality, matching `SqlColumnIR.codecRef`. */
+  declare readonly dependsOn?: readonly SchemaNodeRef[];
 
   constructor(input: SqlUniqueIRInput) {
     super();
     this.columns = [...input.columns];
     if (input.name !== undefined) this.name = input.name;
     if (input.annotations !== undefined) this.annotations = input.annotations;
+    defineNonEnumerable(this, 'dependsOn', input.dependsOn);
     freezeNode(this);
   }
 

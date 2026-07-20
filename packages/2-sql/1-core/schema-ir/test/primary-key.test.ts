@@ -39,4 +39,24 @@ describe('PrimaryKey', () => {
       expect(a.isEqualTo(b)).toBe(false);
     });
   });
+
+  describe('dependsOn', () => {
+    const dependsOn = [
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'users' },
+        { nodeKind: 'sql-column', id: 'column:id' },
+      ],
+    ];
+
+    it('is readable, non-enumerable, and ignored by isEqualTo', () => {
+      const withDeps = new PrimaryKey({ columns: ['id'], dependsOn });
+      const without = new PrimaryKey({ columns: ['id'] });
+      expect(withDeps.dependsOn).toEqual(dependsOn);
+      expect(without.dependsOn).toBeUndefined();
+      expect(Object.keys(withDeps)).not.toContain('dependsOn');
+      expect(JSON.parse(JSON.stringify(withDeps))).not.toHaveProperty('dependsOn');
+      expect(withDeps.isEqualTo(without)).toBe(true);
+    });
+  });
 });

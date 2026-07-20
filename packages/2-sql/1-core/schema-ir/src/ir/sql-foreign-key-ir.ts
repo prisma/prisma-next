@@ -1,9 +1,9 @@
-import type { DiffableNode } from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
-import { assertNode, SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export type SqlReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
 
@@ -26,6 +26,13 @@ export interface SqlForeignKeyIRInput {
    * unbound-namespace contract FK pairs with its introspected counterpart.
    */
   readonly resolvedReferencedNamespace?: string;
+  /**
+   * The referenced table's node, as the root-anchored chain the differ pairs
+   * siblings with. Stamped by the derivation, which holds the parent
+   * (database/namespace) context the chain's shape depends on. Never
+   * compared by `isEqualTo`.
+   */
+  readonly dependsOn?: readonly SchemaNodeRef[];
 }
 
 /**
@@ -57,6 +64,8 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode implements DiffableNode {
   declare readonly onUpdate?: SqlReferentialAction;
   declare readonly annotations?: SqlAnnotations;
   declare readonly resolvedReferencedNamespace?: string;
+  /** See {@link SqlForeignKeyIRInput.dependsOn}. Non-enumerable so it stays out of JSON and structural equality, matching `SqlColumnIR.codecRef`. */
+  declare readonly dependsOn?: readonly SchemaNodeRef[];
 
   constructor(input: SqlForeignKeyIRInput) {
     super();
@@ -72,6 +81,7 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode implements DiffableNode {
     if (resolvedReferencedNamespace !== undefined) {
       this.resolvedReferencedNamespace = resolvedReferencedNamespace;
     }
+    defineNonEnumerable(this, 'dependsOn', input.dependsOn);
     freezeNode(this);
   }
 

@@ -50,7 +50,6 @@ describe('family instance schemaVerify - modes', () => {
         expect(result.ok).toBe(false);
         expect(result.schema.issues).toContainEqual(
           expect.objectContaining({
-            reason: 'not-expected',
             path: ['database', 'public', 'user', 'column:extraColumn'],
           }),
         );

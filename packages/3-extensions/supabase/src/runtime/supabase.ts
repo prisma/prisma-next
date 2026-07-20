@@ -34,7 +34,7 @@ import {
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { createRemoteJWKSet, type JWTVerifyResult, jwtVerify } from 'jose';
+import { createRemoteJWKSet, decodeProtectedHeader, type JWTVerifyResult, jwtVerify } from 'jose';
 import type { Client } from 'pg';
 import { Pool } from 'pg';
 import extensionContractJson from '../contract/contract.json' with { type: 'json' };
@@ -205,6 +205,42 @@ function resolveKeyMaterial<TContract extends Contract<SqlStorage>>(
   throw new SupabaseConfigError('Either jwtSecret or jwksUrl is required');
 }
 
+/**
+ * Pre-verification check that the token's signing algorithm can possibly
+ * match the configured key material. Without it the mismatch surfaces as a
+ * jose internal ("Key for the ES256 algorithm must be one of type
+ * CryptoKey... Received an instance of Uint8Array") that never names the
+ * actual problem: current Supabase projects sign ES256 via JWKS by default,
+ * while `supabase status` still prints a JWT_SECRET that only fits legacy
+ * HS256 projects. Returns `undefined` when the pairing is plausible or the
+ * header is unreadable (jwtVerify then produces the canonical error).
+ */
+function algKeyMismatchReason(jwt: string, kind: KeyMaterial['kind']): string | undefined {
+  let alg: string | undefined;
+  try {
+    alg = decodeProtectedHeader(jwt).alg;
+  } catch {
+    return undefined;
+  }
+  if (alg === undefined) return undefined;
+  const asymmetric = /^(?:ES|RS|PS)\d{3}$/.test(alg) || alg === 'EdDSA' || alg === 'Ed25519';
+  if (kind === 'secret' && asymmetric) {
+    return (
+      `token is signed with ${alg} but this client is configured with jwtSecret (HS256). ` +
+      'Current Supabase projects sign with asymmetric keys by default — configure ' +
+      'jwksUrl (https://<project>/auth/v1/.well-known/jwks.json) instead of jwtSecret.'
+    );
+  }
+  if (kind === 'jwks' && alg.startsWith('HS')) {
+    return (
+      `token is signed with ${alg} (a symmetric algorithm) but this client is configured ` +
+      'with jwksUrl. A legacy HS256 Supabase project needs jwtSecret (the JWT_SECRET from ' +
+      '`supabase status`) instead of jwksUrl.'
+    );
+  }
+  return undefined;
+}
+
 function toPool<TContract extends Contract<SqlStorage>>(
   options: SupabaseOptions<TContract>,
 ): { pool: Pool; owned: boolean } | undefined {
@@ -293,6 +329,10 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
   });
 
   async function verifyJwt(jwt: string): Promise<JWTVerifyResult> {
+    const mismatch = algKeyMismatchReason(jwt, keyMaterial.kind);
+    if (mismatch !== undefined) {
+      throw new InvalidJwtError(mismatch);
+    }
     try {
       if (keyMaterial.kind === 'secret') {
         return await jwtVerify(jwt, keyMaterial.key);

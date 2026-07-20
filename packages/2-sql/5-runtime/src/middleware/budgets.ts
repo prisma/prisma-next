@@ -87,6 +87,7 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
   const tableRows = options?.tableRows ?? {};
   const maxLatencyMs = options?.maxLatencyMs ?? 1_000;
   const rowSeverity = options?.severities?.rowCount ?? 'error';
+  const latencySeverity = options?.severities?.latency ?? 'warn';
 
   const observedRowsByPlan = new WeakMap<SqlExecutionPlan, { count: number }>();
 
@@ -122,7 +123,7 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
     ) {
       const latencyMs = result.latencyMs;
       if (latencyMs > maxLatencyMs) {
-        const shouldBlock = ctx.mode === 'strict';
+        const shouldBlock = latencySeverity === 'error' || ctx.mode === 'strict';
         emitBudgetViolation(
           runtimeError('BUDGET.TIME_EXCEEDED', 'Query latency exceeds budget', {
             latencyMs,

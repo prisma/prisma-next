@@ -284,6 +284,92 @@ model Member {
     expect(fks[0]).toMatchObject({ name: 'team_member_team_ref_fkey' });
   });
 
+  it('defaults a relation foreign key to a required backing index', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Team {
+  id Int @id
+  members Member[]
+}
+
+model Member {
+  id Int @id
+  teamId Int
+  team Team @relation(fields: [teamId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    const memberTable = unboundTables(storage)['member'];
+    const fks = memberTable?.foreignKeys ?? [];
+    expect(fks[0]).not.toHaveProperty('index');
+    expect(memberTable?.indexes).toEqual([{ columns: ['teamId'], name: 'member_teamId_idx' }]);
+  });
+
+  it('opts a relation foreign key out of its backing index via index: false', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Team {
+  id Int @id
+  members Member[]
+}
+
+model Member {
+  id Int @id
+  teamId Int
+  team Team @relation(fields: [teamId], references: [id], index: false)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    const memberTable = unboundTables(storage)['member'];
+    const fks = memberTable?.foreignKeys ?? [];
+    expect(fks[0]).not.toHaveProperty('index');
+    expect(memberTable?.indexes).toEqual([]);
+  });
+
+  it('rejects index on a backrelation list field', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Team {
+  id Int @id
+  members Member[] @relation(index: false)
+}
+
+model Member {
+  id Int @id
+  teamId Int
+  team Team @relation(fields: [teamId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: expect.stringContaining('cannot declare onDelete/onUpdate/index'),
+        }),
+      ]),
+    );
+  });
+
   it('returns diagnostics for unsupported referential action tokens', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model User {

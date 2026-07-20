@@ -19,7 +19,7 @@ export function getAttribute(
 
 export function getNamedArgument(attribute: ResolvedAttribute, name: string): string | undefined {
   const entry = attribute.args.find((arg) => arg.kind === 'named' && arg.name === name);
-  if (!entry || entry.kind !== 'named') {
+  if (entry?.kind !== 'named') {
     return undefined;
   }
   return entry.value;
@@ -31,7 +31,7 @@ export function getPositionalArgumentEntry(
 ): { value: string; expression?: ExpressionAst; span: PslSpan } | undefined {
   const entries = attribute.args.filter((arg) => arg.kind === 'positional');
   const entry = entries[index];
-  if (!entry || entry.kind !== 'positional') {
+  if (entry?.kind !== 'positional') {
     return undefined;
   }
   return {
