@@ -117,6 +117,7 @@ describe('SQLite planner ownership consultation', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -139,6 +140,7 @@ describe('SQLite planner ownership consultation', () => {
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
       ownership: ownsOnly(table('app_user'), table('cipher_state')),
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -158,6 +160,7 @@ describe('SQLite planner ownership consultation', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -196,6 +199,7 @@ describe('SQLite planner ownership consultation', () => {
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
       ownership: ownsOnly(table('app_user')),
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -225,6 +229,7 @@ describe('SQLite planner ownership consultation', () => {
         entityKind: 'valueSet',
         entityName: 'orphan_table',
       }),
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');

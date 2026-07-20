@@ -42,6 +42,7 @@ export class TypeScriptRenderablePostgresMigration
   readonly #calls: readonly OpFactoryCall[];
   readonly #meta: MigrationMeta;
   readonly #spaceId: string;
+  readonly #snapshotsImportPath: string;
   readonly #lowerer: ExecuteRequestLowerer | undefined;
   #operationsCache:
     | readonly (
@@ -54,12 +55,14 @@ export class TypeScriptRenderablePostgresMigration
     calls: readonly OpFactoryCall[],
     meta: MigrationMeta,
     spaceId: string,
+    snapshotsImportPath: string,
     lowerer?: ExecuteRequestLowerer,
   ) {
     super();
     this.#calls = calls;
     this.#meta = meta;
     this.#spaceId = spaceId;
+    this.#snapshotsImportPath = snapshotsImportPath;
     this.#lowerer = lowerer;
   }
 
@@ -85,6 +88,10 @@ export class TypeScriptRenderablePostgresMigration
   }
 
   renderTypeScript(): string {
-    return renderCallsToTypeScript(this.#calls, { from: this.#meta.from, to: this.#meta.to });
+    return renderCallsToTypeScript(this.#calls, {
+      from: this.#meta.from,
+      to: this.#meta.to,
+      snapshotsImportPath: this.#snapshotsImportPath,
+    });
   }
 }

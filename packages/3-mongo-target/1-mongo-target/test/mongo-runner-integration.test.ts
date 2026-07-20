@@ -138,6 +138,7 @@ function planForContract(
     policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     fromContract,
     frameworkComponents: [],
+    snapshotsImportPath: '../../snapshots',
   });
   if (result.kind !== 'success') throw new Error('Planner failed unexpectedly');
   return result.plan;
@@ -764,6 +765,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       fromContract: bareContract('sha256:00'),
       frameworkComponents: [],
+      snapshotsImportPath: '../../snapshots',
     });
     if (ddlResult.kind !== 'success') throw new Error('Planner failed');
 

@@ -127,6 +127,7 @@ describe('SQLite planner + introspection round-trip', () => {
         fromContract: null,
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(result.kind).toBe('success');
@@ -191,6 +192,7 @@ describe('SQLite planner + introspection round-trip', () => {
         fromContract: null,
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(result.kind).toBe('success');
@@ -259,6 +261,7 @@ describe('SQLite planner + introspection round-trip', () => {
         fromContract: null,
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(result.kind).toBe('success');

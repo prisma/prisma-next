@@ -12,11 +12,11 @@
  */
 
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, storageHashHex } from '@prisma-next/framework-components/control';
 import { col, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import {
   AddColumnCall,
@@ -107,11 +107,15 @@ function rewriteImports(tsSource: string): string {
 }
 
 /**
- * Write the committed contract fixtures the rendered scaffold imports —
- * `{start,end}-contract.json` (carrying `storage.storageHash`, which the base's
- * derived `describe()` reads) and the matching `{start,end}-contract.ts` type
- * modules (`export type Contract`). The JSON hashes match `meta` so the derived
- * describe() is consistent with the migration's identity.
+ * Write the deduplicated snapshot-store fixtures the rendered scaffold
+ * imports — `snapshots/<hex>/contract.json` (carrying `storage.storageHash`,
+ * which the base's derived `describe()` reads) and the matching
+ * `snapshots/<hex>/contract.ts` type module (`export type Contract`) for
+ * each of `meta.to` and (when non-null) `meta.from`. The JSON hashes match
+ * `meta` so the derived describe() is consistent with the migration's
+ * identity. `SNAPSHOTS_IMPORT_PATH` matches the `snapshotsImportPath` passed
+ * to the migration under test, so the rendered import specifiers resolve
+ * relative to `migration.ts` at the root of `dir`.
  */
 async function writeContractFixtures(
   dir: string,
@@ -119,23 +123,25 @@ async function writeContractFixtures(
 ): Promise<void> {
   const contractType =
     'export type Contract = { readonly storage: { readonly storageHash: string } };\n';
-  await writeFile(
-    join(dir, 'end-contract.json'),
-    JSON.stringify({ storage: { storageHash: meta.to } }, null, 2),
-  );
-  await writeFile(join(dir, 'end-contract.ts'), contractType);
-  if (meta.from !== null) {
+  const writeSnapshot = async (storageHash: string) => {
+    const snapshotDir = join(dir, SNAPSHOTS_IMPORT_PATH, storageHashHex(storageHash));
+    await mkdir(snapshotDir, { recursive: true });
     await writeFile(
-      join(dir, 'start-contract.json'),
-      JSON.stringify({ storage: { storageHash: meta.from } }, null, 2),
+      join(snapshotDir, 'contract.json'),
+      JSON.stringify({ storage: { storageHash } }, null, 2),
     );
-    await writeFile(join(dir, 'start-contract.ts'), contractType);
+    await writeFile(join(snapshotDir, 'contract.ts'), contractType);
+  };
+  await writeSnapshot(meta.to);
+  if (meta.from !== null) {
+    await writeSnapshot(meta.from);
   }
 }
 
+const SNAPSHOTS_IMPORT_PATH = './snapshots';
 const META = {
-  from: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
-  to: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+  from: `sha256:${'0'.repeat(64)}`,
+  to: `sha256:${'1'.repeat(64)}`,
 } as const;
 
 describe('TypeScriptRenderablePostgresMigration round-trip', () => {
@@ -196,6 +202,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
       calls,
       META,
       APP_SPACE_ID,
+      SNAPSHOTS_IMPORT_PATH,
       testAdapter,
     );
 
@@ -218,7 +225,12 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
   it('renders an empty calls list whose executed scaffold emits []', {
     timeout: timeouts.typeScriptCompilation,
   }, async () => {
-    const migration = new TypeScriptRenderablePostgresMigration([], META, APP_SPACE_ID);
+    const migration = new TypeScriptRenderablePostgresMigration(
+      [],
+      META,
+      APP_SPACE_ID,
+      SNAPSHOTS_IMPORT_PATH,
+    );
 
     const tsSource = rewriteImports(migration.renderTypeScript());
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);
@@ -246,7 +258,12 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
       meta: { note: 'preserved' },
     };
     const calls = [new RawSqlCall(op)];
-    const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
+    const migration = new TypeScriptRenderablePostgresMigration(
+      calls,
+      META,
+      APP_SPACE_ID,
+      SNAPSHOTS_IMPORT_PATH,
+    );
 
     const tsSource = rewriteImports(migration.renderTypeScript());
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);

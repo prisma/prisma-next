@@ -347,6 +347,13 @@ export interface SqlMigrationPlannerPlanOptions {
    */
   readonly fromContract: Contract<SqlStorage> | null;
   /**
+   * POSIX-relative path from the migration package dir to
+   * `migrations/snapshots`, e.g. `'../../snapshots'`. Threaded straight
+   * into the produced plan's `renderTypeScript()` metadata so the
+   * scaffold's contract-snapshot imports point at the deduplicated store.
+   */
+  readonly snapshotsImportPath: string;
+  /**
    * Active framework components participating in this composition.
    * Each component is target-bound so SQL targets can dispatch
    * component-owned planning behaviour from the same descriptor list.

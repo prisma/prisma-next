@@ -98,6 +98,7 @@ function planForContract(
     policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     fromContract: null,
     frameworkComponents: [],
+    snapshotsImportPath: '../../snapshots',
   });
   if (result.kind !== 'success') throw new Error('Planner failed unexpectedly');
   return result.plan;

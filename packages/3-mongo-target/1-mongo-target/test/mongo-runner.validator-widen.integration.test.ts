@@ -177,6 +177,7 @@ describe('MongoMigrationRunner - validator widen', () => {
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       fromContract: null,
       frameworkComponents: [],
+      snapshotsImportPath: '../../snapshots',
     });
     expect(planResult.kind).toBe('success');
     if (planResult.kind !== 'success') throw new Error('Planner failed');
@@ -246,6 +247,7 @@ describe('MongoMigrationRunner - validator widen', () => {
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       fromContract: null,
       frameworkComponents: [],
+      snapshotsImportPath: '../../snapshots',
     });
     expect(planResult.kind).toBe('success');
     if (planResult.kind !== 'success') throw new Error('Planner failed');
@@ -291,6 +293,7 @@ describe('MongoMigrationRunner - validator widen', () => {
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       fromContract: null,
       frameworkComponents: [],
+      snapshotsImportPath: '../../snapshots',
     });
     expect(planResult.kind).toBe('success');
     if (planResult.kind !== 'success') throw new Error('Planner failed');

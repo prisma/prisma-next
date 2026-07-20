@@ -48,6 +48,12 @@ import { renderCallsToTypeScript } from '../../src/core/migrations/render-typesc
 import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import * as migrationFacade from '../../src/exports/migration';
 
+const SNAPSHOTS_IMPORT_PATH = '../../snapshots';
+const FROM_HASH = `sha256:${'a'.repeat(64)}`;
+const TO_HASH = `sha256:${'b'.repeat(64)}`;
+const FROM_HEX = 'a'.repeat(64);
+const TO_HEX = 'b'.repeat(64);
+
 const renderTypeScript = (
   calls: Parameters<typeof renderCallsToTypeScript>[0],
   meta: Parameters<typeof renderCallsToTypeScript>[1],
@@ -56,21 +62,26 @@ const renderTypeScript = (
 describe('renderCallsToTypeScript (postgres)', () => {
   it('emits contract-JSON imports + fields and Migration<Start, End> header (with-start)', () => {
     const output = renderTypeScript([new CreateSchemaCall('app')], {
-      from: 'sha256:aaa',
-      to: 'sha256:bbb',
+      from: FROM_HASH,
+      to: TO_HASH,
+      snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
     });
 
     expect(output).toContain(
       "import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';",
     );
     expect(output).toContain(
-      'import endContract from \'./end-contract.json\' with { type: "json" };',
+      `import endContract from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract.json' with { type: "json" };`,
     );
     expect(output).toContain(
-      'import startContract from \'./start-contract.json\' with { type: "json" };',
+      `import startContract from '${SNAPSHOTS_IMPORT_PATH}/${FROM_HEX}/contract.json' with { type: "json" };`,
     );
-    expect(output).toContain("import type { Contract as End } from './end-contract';");
-    expect(output).toContain("import type { Contract as Start } from './start-contract';");
+    expect(output).toContain(
+      `import type { Contract as End } from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract';`,
+    );
+    expect(output).toContain(
+      `import type { Contract as Start } from '${SNAPSHOTS_IMPORT_PATH}/${FROM_HEX}/contract';`,
+    );
     expect(output).toContain('export default class M extends Migration<Start, End> {');
     expect(output).toContain('override readonly startContractJson = startContract;');
     expect(output).toContain('override readonly endContractJson = endContract;');
@@ -80,28 +91,32 @@ describe('renderCallsToTypeScript (postgres)', () => {
 
   it('does NOT emit a describe() method (the base derives it from the contract JSON)', () => {
     const output = renderTypeScript([new DropTableCall('public', 'stale')], {
-      from: 'sha256:aaa',
-      to: 'sha256:bbb',
+      from: FROM_HASH,
+      to: TO_HASH,
+      snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
     });
 
     expect(output).not.toContain('describe()');
-    expect(output).not.toContain('sha256:aaa');
-    expect(output).not.toContain('sha256:bbb');
+    expect(output).not.toContain(FROM_HASH);
+    expect(output).not.toContain(TO_HASH);
   });
 
   it('renders the baseline shape for from: null (no start imports, Migration<never, End>)', () => {
     const output = renderTypeScript([new CreateSchemaCall('app')], {
       from: null,
-      to: 'sha256:bbb',
+      to: TO_HASH,
+      snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
     });
 
     expect(output).toContain('export default class M extends Migration<never, End> {');
     expect(output).toContain('override readonly endContractJson = endContract;');
     expect(output).toContain(
-      'import endContract from \'./end-contract.json\' with { type: "json" };',
+      `import endContract from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract.json' with { type: "json" };`,
     );
-    expect(output).toContain("import type { Contract as End } from './end-contract';");
-    expect(output).not.toContain('start-contract');
+    expect(output).toContain(
+      `import type { Contract as End } from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract';`,
+    );
+    expect(output).not.toContain('startContract');
     expect(output).not.toContain('startContractJson');
     expect(output).not.toContain('describe()');
   });
@@ -109,9 +124,29 @@ describe('renderCallsToTypeScript (postgres)', () => {
   it('inlines the operation calls unchanged', () => {
     const output = renderTypeScript([new CreateSchemaCall('app')], {
       from: null,
-      to: 'sha256:bbb',
+      to: TO_HASH,
+      snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
     });
     expect(output).toContain('this.createSchema({ schema: "app" })');
+  });
+
+  it('renders a compilable merged import block when from === to (E4)', () => {
+    const output = renderTypeScript([new CreateSchemaCall('app')], {
+      from: TO_HASH,
+      to: TO_HASH,
+      snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
+    });
+
+    expect(output).toContain(
+      `import endContract from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract.json' with { type: "json" };`,
+    );
+    expect(output).toContain(
+      `import startContract from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract.json' with { type: "json" };`,
+    );
+    expect(output).toContain(
+      `import type { Contract as End, Contract as Start } from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract';`,
+    );
+    expect(output).toContain('export default class M extends Migration<Start, End> {');
   });
 });
 
@@ -219,7 +254,11 @@ describe('renderCallsToTypeScript (postgres) — facade import surface', () => {
   });
 
   it('every symbol a rendered migration imports from the facade is actually exported by it', () => {
-    const output = renderTypeScript(oneCallPerClass, { from: 'sha256:aaa', to: 'sha256:bbb' });
+    const output = renderTypeScript(oneCallPerClass, {
+      from: FROM_HASH,
+      to: TO_HASH,
+      snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
+    });
 
     const facadeImport = output.match(
       /import\s*\{([\s\S]*?)\}\s*from\s*'@prisma-next\/postgres\/migration';/,
@@ -244,6 +283,21 @@ describe('renderCallsToTypeScript (postgres) — facade import surface', () => {
     }
   });
 
+  it('a migration containing a data transform imports endContract exactly once', () => {
+    const output = renderTypeScript(oneCallPerClass, {
+      from: FROM_HASH,
+      to: TO_HASH,
+      snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
+    });
+
+    const endContractImportLines = output
+      .split('\n')
+      .filter((line) => line.startsWith('import') && line.includes('endContract'));
+    expect(endContractImportLines).toEqual([
+      `import endContract from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract.json' with { type: "json" };`,
+    ]);
+  });
+
   it('RLS ops render as migration methods, not free-function calls', () => {
     const output = renderTypeScript(
       [
@@ -253,7 +307,7 @@ describe('renderCallsToTypeScript (postgres) — facade import surface', () => {
         new DropPostgresRlsPolicyCall('public', 'note', 'p_stale'),
         new DisableRowLevelSecurityCall('public', 'note'),
       ],
-      { from: null, to: 'sha256:bbb' },
+      { from: null, to: TO_HASH, snapshotsImportPath: SNAPSHOTS_IMPORT_PATH },
     );
 
     expect(output).toContain('this.enableRowLevelSecurity({ schema: "public", table: "note" })');

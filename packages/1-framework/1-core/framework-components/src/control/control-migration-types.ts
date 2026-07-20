@@ -466,6 +466,16 @@ export interface MigrationPlanner<
      * See {@link SchemaOwnership}.
      */
     readonly ownership?: SchemaOwnership;
+    /**
+     * POSIX-relative path from the migration package dir to
+     * `migrations/snapshots`, e.g. `'../../snapshots'`. Targets that render
+     * an authoring surface (the SQL family, Mongo) pass this straight
+     * through to the produced plan's `renderTypeScript()` metadata. Callers
+     * that never render the produced plan to TypeScript (diff-based
+     * reconciliation for `db init` / `db update`) pass a placeholder — see
+     * `planFromDiff` in `@prisma-next/migration-tools`.
+     */
+    readonly snapshotsImportPath: string;
   }): MigrationPlannerResult;
 
   /**
@@ -632,4 +642,12 @@ export interface MigrationScaffoldContext {
    * destination identity.
    */
   readonly toHash: string;
+  /**
+   * POSIX-relative path from the migration package dir to
+   * `migrations/snapshots`, e.g. `'../../snapshots'` for an app-space
+   * package. Targets that emit contract-snapshot imports (the SQL family,
+   * Mongo) pass this straight through to their renderer's
+   * `RenderMigrationMeta.snapshotsImportPath`.
+   */
+  readonly snapshotsImportPath: string;
 }

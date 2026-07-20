@@ -111,6 +111,7 @@ function planSuccess(
     policy,
     fromContract: null,
     frameworkComponents: [],
+    snapshotsImportPath: '../../snapshots',
   });
   expect(result.kind).toBe('success');
   if (result.kind !== 'success') throw new Error('Expected success');
@@ -317,6 +318,7 @@ describe('MongoMigrationPlanner', () => {
         policy: ADDITIVE_ONLY_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(result.kind).toBe('failure');
@@ -347,6 +349,7 @@ describe('MongoMigrationPlanner', () => {
         policy: ADDITIVE_ONLY_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       expect(result.kind).toBe('failure');
       if (result.kind !== 'failure') throw new Error('Expected failure');
@@ -370,6 +373,7 @@ describe('MongoMigrationPlanner', () => {
         policy: ADDITIVE_ONLY_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       expect(result.kind).toBe('failure');
       if (result.kind !== 'failure') throw new Error('Expected failure');
@@ -1145,6 +1149,7 @@ describe('MongoMigrationPlanner', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       expect(result.kind).toBe('failure');
       if (result.kind !== 'failure') throw new Error('Expected failure');
@@ -1164,6 +1169,7 @@ describe('MongoMigrationPlanner', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       expect(result.kind).toBe('failure');
       if (result.kind !== 'failure') throw new Error('Expected failure');
@@ -1186,6 +1192,7 @@ describe('MongoMigrationPlanner', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       expect(result.kind).toBe('failure');
       if (result.kind !== 'failure') throw new Error('Expected failure');
@@ -1212,6 +1219,7 @@ describe('MongoMigrationPlanner', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       expect(result.kind).toBe('failure');
       if (result.kind !== 'failure') throw new Error('Expected failure');
@@ -1240,6 +1248,7 @@ describe('MongoMigrationPlanner', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       expect(result.kind).toBe('failure');
       if (result.kind !== 'failure') throw new Error('Expected failure');
@@ -1259,6 +1268,7 @@ describe('MongoMigrationPlanner', () => {
         policy: { allowedOperationClasses: [] },
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       expect(result.kind).toBe('failure');
       if (result.kind !== 'failure') throw new Error('Expected failure');
@@ -1616,6 +1626,7 @@ describe('MongoMigrationPlanner', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') throw new Error('Expected success');
@@ -1630,6 +1641,7 @@ describe('MongoMigrationPlanner', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') throw new Error('Expected success');
@@ -1643,6 +1655,7 @@ describe('MongoMigrationPlanner', () => {
         packageDir: '/tmp/migration-pkg',
         fromHash: 'sha256:00',
         toHash: 'sha256:01',
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(empty.targetId).toBe('mongo');
@@ -1651,10 +1664,13 @@ describe('MongoMigrationPlanner', () => {
     });
 
     it('renders a migration.ts stub that imports Migration and calls MigrationCLI.run', () => {
+      const fromHash = `sha256:${'0'.repeat(64)}`;
+      const toHash = `sha256:${'1'.repeat(64)}`;
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',
-        fromHash: 'sha256:00',
-        toHash: 'sha256:01',
+        fromHash,
+        toHash,
+        snapshotsImportPath: '../../snapshots',
       });
 
       const source = empty.renderTypeScript();
@@ -1667,8 +1683,8 @@ describe('MongoMigrationPlanner', () => {
       // embedded as literals or a describe() block.
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain('sha256:00');
-      expect(source).not.toContain('sha256:01');
+      expect(source).not.toContain(`"${fromHash}"`);
+      expect(source).not.toContain(`"${toHash}"`);
     });
 
     it('produces a plan whose origin reflects the supplied fromHash', () => {
@@ -1676,6 +1692,7 @@ describe('MongoMigrationPlanner', () => {
         packageDir: '/tmp/migration-pkg',
         fromHash: 'sha256:00',
         toHash: 'sha256:01',
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(empty.origin).toEqual({ storageHash: 'sha256:00' });
@@ -1686,6 +1703,7 @@ describe('MongoMigrationPlanner', () => {
         packageDir: '/tmp/migration-pkg',
         fromHash: null,
         toHash: 'sha256:01',
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(empty.origin).toBeNull();

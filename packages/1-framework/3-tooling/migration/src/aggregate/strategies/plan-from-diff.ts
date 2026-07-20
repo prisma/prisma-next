@@ -88,6 +88,11 @@ export async function planFromDiff<TFamilyId extends string, TTargetId extends s
     frameworkComponents: input.frameworkComponents,
     spaceId: input.space.spaceId,
     ownership: input.ownership,
+    // This plan is wrapped as a plain `MigrationPlan` below (no authoring
+    // surface) and applied directly — `renderTypeScript()` is never called
+    // for a diff-fabricated reconciliation plan, so there is no migration
+    // package dir to compute a real snapshots import path from.
+    snapshotsImportPath: '',
   }) as MaybeAsyncPlannerResult);
 
   if (plannerResult.kind === 'failure') {

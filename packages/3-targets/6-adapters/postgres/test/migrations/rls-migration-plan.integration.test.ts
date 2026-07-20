@@ -143,6 +143,7 @@ describe('migration plan emits RLS (offline, no live database)', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(planResult.kind).toBe('success');
@@ -177,6 +178,7 @@ describe('migration plan emits RLS (offline, no live database)', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(planResult.kind).toBe('success');

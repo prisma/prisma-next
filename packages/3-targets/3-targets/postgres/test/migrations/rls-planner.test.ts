@@ -205,6 +205,7 @@ describe('RLS planner diff-wiring', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -236,6 +237,7 @@ describe('RLS planner diff-wiring', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -266,6 +268,7 @@ describe('RLS planner diff-wiring', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -294,6 +297,7 @@ describe('RLS planner diff-wiring', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -318,6 +322,7 @@ describe('RLS planner diff-wiring', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -345,6 +350,7 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -371,6 +377,7 @@ describe('RLS planner policy edit (missing + extra via generic pipeline)', () =>
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -399,6 +406,7 @@ describe('RLS planner roles produce zero ops (AC-6)', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('expected a successful plan');

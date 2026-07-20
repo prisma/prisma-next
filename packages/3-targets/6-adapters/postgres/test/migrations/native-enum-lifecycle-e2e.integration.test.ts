@@ -279,6 +279,7 @@ async function planContract(
     fromContract: null,
     frameworkComponents,
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
   if (planResult.kind !== 'success')
     throw new Error(`Planner failed: ${JSON.stringify(planResult)}`);
@@ -329,6 +330,7 @@ function planDirect(
     fromContract: null,
     frameworkComponents,
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
 }
 

@@ -177,6 +177,7 @@ describe('renderOps', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       const callsResult = planner.planCalls({
         contract,
@@ -209,6 +210,7 @@ describe('renderOps', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       const callsResult = planner.planCalls({
         contract,
@@ -245,6 +247,7 @@ describe('renderOps', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       const callsResult = planner.planCalls({
         contract,
@@ -277,6 +280,7 @@ describe('renderOps', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       const callsResult = planner.planCalls({
         contract,
@@ -322,6 +326,7 @@ describe('renderOps', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       const callsResult = planner.planCalls({
         contract,
@@ -377,6 +382,7 @@ describe('renderOps', () => {
         policy: ALL_CLASSES_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       const callsResult = planner.planCalls({
         contract,

@@ -1547,12 +1547,7 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
   override importRequirements(): readonly ImportRequirement[] {
     return [
       { moduleSpecifier: POSTGRES_MIGRATION_FACADE, symbol: 'placeholder' },
-      {
-        moduleSpecifier: './end-contract.json',
-        symbol: 'endContract',
-        kind: 'default',
-        attributes: { type: 'json' },
-      },
+      // endContract is imported by the migration scaffold's contractImports; an op never renders outside it.
     ];
   }
 }

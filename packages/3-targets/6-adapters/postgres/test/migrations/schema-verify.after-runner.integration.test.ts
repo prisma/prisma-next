@@ -79,6 +79,7 @@ describe.sequential('Schema verification after runner - integration', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     if (result.kind !== 'success') {

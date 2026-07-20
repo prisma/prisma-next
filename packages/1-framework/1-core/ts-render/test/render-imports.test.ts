@@ -67,13 +67,54 @@ describe('renderImports', () => {
     expect(out).toBe("import def, { a, b } from 'm';");
   });
 
-  it('throws when two requirements conflict on the default symbol', () => {
-    expect(() =>
-      renderImports([
-        { moduleSpecifier: 'm', symbol: 'x', kind: 'default' },
-        { moduleSpecifier: 'm', symbol: 'y', kind: 'default' },
-      ]),
-    ).toThrow(/Conflicting default imports/);
+  it('renders two distinct default symbols on the same module as separate lines', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'x', kind: 'default' },
+      { moduleSpecifier: 'm', symbol: 'y', kind: 'default' },
+    ]);
+    expect(out).toBe(["import x from 'm';", "import y from 'm';"].join('\n'));
+  });
+
+  it('sorts multiple distinct default symbols alphabetically', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'z', kind: 'default' },
+      { moduleSpecifier: 'm', symbol: 'a', kind: 'default' },
+    ]);
+    expect(out).toBe(["import a from 'm';", "import z from 'm';"].join('\n'));
+  });
+
+  it('attaches a shared attributes clause to every distinct default line', () => {
+    const out = renderImports([
+      {
+        moduleSpecifier: './c.json',
+        symbol: 'endContract',
+        kind: 'default',
+        attributes: { type: 'json' },
+      },
+      {
+        moduleSpecifier: './c.json',
+        symbol: 'startContract',
+        kind: 'default',
+        attributes: { type: 'json' },
+      },
+    ]);
+    expect(out).toBe(
+      [
+        'import endContract from \'./c.json\' with { type: "json" };',
+        'import startContract from \'./c.json\' with { type: "json" };',
+      ].join('\n'),
+    );
+  });
+
+  it('renders multiple distinct defaults plus a named-only line when both are present', () => {
+    const out = renderImports([
+      { moduleSpecifier: 'm', symbol: 'x', kind: 'default' },
+      { moduleSpecifier: 'm', symbol: 'y', kind: 'default' },
+      { moduleSpecifier: 'm', symbol: 'a' },
+    ]);
+    expect(out).toBe(
+      ["import x from 'm';", "import y from 'm';", "import { a } from 'm';"].join('\n'),
+    );
   });
 
   it('permits repeated default requirements with the same symbol', () => {
@@ -248,6 +289,42 @@ describe('renderImports', () => {
       { moduleSpecifier: 'm', symbol: 'v' },
     ]);
     expect(out).toBe("import D, { type T, v } from 'm';");
+  });
+
+  it('renders end/start contract imports colliding on the same specifiers (from === to)', () => {
+    const out = renderImports([
+      {
+        moduleSpecifier: './snapshots/abc/contract.json',
+        symbol: 'endContract',
+        kind: 'default',
+        attributes: { type: 'json' },
+      },
+      {
+        moduleSpecifier: './snapshots/abc/contract',
+        symbol: 'Contract',
+        alias: 'End',
+        typeOnly: true,
+      },
+      {
+        moduleSpecifier: './snapshots/abc/contract.json',
+        symbol: 'startContract',
+        kind: 'default',
+        attributes: { type: 'json' },
+      },
+      {
+        moduleSpecifier: './snapshots/abc/contract',
+        symbol: 'Contract',
+        alias: 'Start',
+        typeOnly: true,
+      },
+    ]);
+    expect(out).toBe(
+      [
+        "import type { Contract as End, Contract as Start } from './snapshots/abc/contract';",
+        'import endContract from \'./snapshots/abc/contract.json\' with { type: "json" };',
+        'import startContract from \'./snapshots/abc/contract.json\' with { type: "json" };',
+      ].join('\n'),
+    );
   });
 
   it('stringifies multi-key attribute maps in sorted order in the conflict message', () => {
