@@ -156,7 +156,6 @@ const postgresDefaultFunctionRegistryEntries = [
  * channel, with explicit `nativeType` values pinned to the codec manifests
  * (`codecLookup.targetTypesFor(codecId)[0]`).
  *
- * Each output is the adapter's storage choice for the portable scalar name.
  * The type position is the only storage decider: a mutation-default generator
  * (`@default(uuid())`) never re-picks a column's storage.
  */
@@ -286,7 +285,6 @@ export const postgresNativeAuthoringTypes = {
   Date: { kind: 'typeConstructor', output: { codecId: 'pg/timestamptz@1', nativeType: 'date' } },
 } as const satisfies AuthoringTypeNamespace;
 
-/** Every authoring type the postgres adapter contributes: base scalars plus native types. */
 export const postgresAuthoringTypes = {
   ...postgresScalarAuthoringTypes,
   ...postgresNativeAuthoringTypes,

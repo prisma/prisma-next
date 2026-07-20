@@ -1024,10 +1024,8 @@ model UuidNativeBad {
   });
 
   describe('generator defaults never mutate storage — the type position is the only storage decider', () => {
-    // Mirrors the adapter contribution shape: family base scalars plus target
-    // native types (Uuid, Char) as top-level constructors, with the scalar
-    // view derived the same way the provider derives it
-    // (collectScalarTypeConstructors).
+    // Mirrors the adapter contribution shape, with the scalar view derived
+    // the same way the provider derives it (collectScalarTypeConstructors).
     const authoringTypes = {
       ...postgresScalarAuthoringTypes,
       Uuid: { kind: 'typeConstructor', output: { codecId: 'pg/uuid@1', nativeType: 'uuid' } },

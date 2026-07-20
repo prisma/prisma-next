@@ -178,7 +178,6 @@ const sqliteDefaultFunctionRegistryEntries = [
  * channel, with explicit `nativeType` values pinned to the codec manifests
  * (`codecLookup.targetTypesFor(codecId)[0]`).
  *
- * Each output is the adapter's storage choice for the portable scalar name.
  * The type position is the only storage decider: a mutation-default generator
  * (`@default(uuid())`) never re-picks a column's storage.
  */
