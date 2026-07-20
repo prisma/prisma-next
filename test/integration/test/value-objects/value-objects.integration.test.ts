@@ -88,14 +88,13 @@ function interpretMongoPsl(schema: string) {
   });
 }
 
-/** The scalar map in unified-namespace form. `Jsonb` carries the value-object storage marker, mirroring the real postgres adapter contribution. */
+/** The scalar map in unified-namespace form. */
 const postgresScalarAuthoringTypes = Object.fromEntries(
   [...postgresScalarTypeDescriptors].map(([name, { codecId, nativeType }]) => [
     name,
     {
       kind: 'typeConstructor' as const,
       output: { codecId, nativeType },
-      ...(name === 'Jsonb' ? { valueObjectStorage: true as const } : {}),
     },
   ]),
 );
@@ -113,7 +112,11 @@ function interpretSqlPsl(schema: string) {
     sourceId: 'test.prisma',
     target: postgresTarget,
     scalarColumnDescriptors: postgresScalarTypeDescriptors,
-    authoringContributions: { type: postgresScalarAuthoringTypes },
+    // Mirrors the real postgres adapter declaration: value objects store as Jsonb.
+    authoringContributions: {
+      type: postgresScalarAuthoringTypes,
+      valueObjectStorageType: 'Jsonb',
+    },
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,
     capabilities: { sql: { scalarList: true } },

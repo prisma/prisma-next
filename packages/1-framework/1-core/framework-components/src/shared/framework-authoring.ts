@@ -95,16 +95,6 @@ export interface AuthoringTypeConstructorDescriptor {
   readonly output: AuthoringStorageTypeTemplate;
   /** Present when one of this constructor's positional arguments names another document-local entity instead of carrying a literal value. Absent for ordinary literal-argument constructors. */
   readonly entityRefArg?: AuthoringTypeConstructorEntityRef;
-  /**
-   * Marks this constructor as the storage type the family interpreter
-   * selects for embedded value-object fields (fields typed as a
-   * value-object `type` block). Declared by the target's contributions so
-   * family layers never hardcode a target's type names. At most one
-   * top-level constructor in an assembled namespace may carry the marker,
-   * and it must be bare-eligible (see {@link collectScalarTypeConstructors})
-   * for the declaration to take effect.
-   */
-  readonly valueObjectStorage?: true;
 }
 
 export interface AuthoringColumnDefaultTemplateLiteral {
@@ -476,6 +466,18 @@ export interface AuthoringContributions {
    * declarative spec and the lowering.
    */
   readonly modelAttributes?: AuthoringModelAttributeDescriptorNamespace;
+  /**
+   * Names the top-level type constructor that stores embedded value-object
+   * fields (fields typed as a value-object `type` block). A single named
+   * slot per component makes within-component ambiguity impossible by
+   * shape. Assembly rejects two components both declaring it, validates
+   * that the assembled namespace carries the named constructor as a
+   * top-level bare-eligible entry (see
+   * {@link collectScalarTypeConstructors}), and exposes the single value to
+   * family interpreters — so family layers never hardcode a target's type
+   * names. Undefined when the component declares no value-object storage.
+   */
+  readonly valueObjectStorageType?: string;
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
@@ -775,33 +777,6 @@ export function collectScalarTypeConstructors(
     result.set(name, instantiateAuthoringTypeConstructor(value, []));
   }
   return result;
-}
-
-/**
- * Returns the name of the **top-level** type constructor marked
- * {@link AuthoringTypeConstructorDescriptor.valueObjectStorage} in an
- * assembled authoring type namespace — the storage type the family
- * interpreter uses for embedded value-object fields. Undefined when the
- * namespace declares none (the family layer then has no value-object
- * storage and skips such fields). Throws when more than one constructor
- * carries the marker: the choice must be unambiguous across composed packs.
- */
-export function findValueObjectStorageTypeName(
-  namespace: AuthoringTypeNamespace | undefined,
-): string | undefined {
-  if (namespace === undefined) return undefined;
-  let found: string | undefined;
-  for (const [name, value] of Object.entries(namespace)) {
-    if (!isAuthoringTypeConstructorDescriptor(value)) continue;
-    if (value.valueObjectStorage !== true) continue;
-    if (found !== undefined) {
-      throw new Error(
-        `Ambiguous value-object storage type: both "${found}" and "${name}" are marked valueObjectStorage. Exactly one composed type constructor may carry the marker.`,
-      );
-    }
-    found = name;
-  }
-  return found;
 }
 
 /**

@@ -8,7 +8,6 @@ import type {
 import {
   classifyEnumMemberType,
   collectScalarTypeConstructors,
-  findValueObjectStorageTypeName,
   hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
@@ -668,67 +667,6 @@ describe('collectScalarTypeConstructors', () => {
     expect(Object.fromEntries(collectScalarTypeConstructors(namespace))).toEqual({
       Plain: { codecId: 'a@1', nativeType: 'text' },
     });
-  });
-});
-
-describe('findValueObjectStorageTypeName', () => {
-  it('returns undefined for an undefined namespace', () => {
-    expect(findValueObjectStorageTypeName(undefined)).toBeUndefined();
-  });
-
-  it('returns undefined when no constructor carries the marker', () => {
-    const namespace = {
-      Rich: { kind: 'typeConstructor', output: { codecId: 'a/rich@1', nativeType: 'rich' } },
-      Plain: { kind: 'typeConstructor', output: { codecId: 'a/plain@1', nativeType: 'plain' } },
-    } satisfies AuthoringTypeNamespace;
-
-    expect(findValueObjectStorageTypeName(namespace)).toBeUndefined();
-  });
-
-  it('returns the name of the marked top-level constructor', () => {
-    const namespace = {
-      Plain: { kind: 'typeConstructor', output: { codecId: 'a/plain@1', nativeType: 'plain' } },
-      Rich: {
-        kind: 'typeConstructor',
-        valueObjectStorage: true,
-        output: { codecId: 'a/rich@1', nativeType: 'rich' },
-      },
-    } satisfies AuthoringTypeNamespace;
-
-    expect(findValueObjectStorageTypeName(namespace)).toBe('Rich');
-  });
-
-  it('ignores marked constructors nested under a namespace segment', () => {
-    const namespace = {
-      vendor: {
-        Rich: {
-          kind: 'typeConstructor',
-          valueObjectStorage: true,
-          output: { codecId: 'a/rich@1', nativeType: 'rich' },
-        },
-      },
-    } satisfies AuthoringTypeNamespace;
-
-    expect(findValueObjectStorageTypeName(namespace)).toBeUndefined();
-  });
-
-  it('throws when more than one constructor carries the marker', () => {
-    const namespace = {
-      Rich: {
-        kind: 'typeConstructor',
-        valueObjectStorage: true,
-        output: { codecId: 'a/rich@1', nativeType: 'rich' },
-      },
-      Richer: {
-        kind: 'typeConstructor',
-        valueObjectStorage: true,
-        output: { codecId: 'a/richer@1', nativeType: 'richer' },
-      },
-    } satisfies AuthoringTypeNamespace;
-
-    expect(() => findValueObjectStorageTypeName(namespace)).toThrow(
-      'Ambiguous value-object storage type',
-    );
   });
 });
 

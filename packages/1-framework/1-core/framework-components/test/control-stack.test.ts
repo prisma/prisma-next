@@ -220,6 +220,122 @@ describe('assembleAuthoringContributions', () => {
     );
   });
 
+  it('assembles the single declared valueObjectStorageType', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        id: 'adapter-a',
+        authoring: {
+          type: {
+            Rich: { kind: 'typeConstructor', output: { codecId: 'a/rich@1', nativeType: 'rich' } },
+          },
+          valueObjectStorageType: 'Rich',
+        },
+      }),
+      createDescriptor({ id: 'other' }),
+    ]);
+    expect(result.valueObjectStorageType).toBe('Rich');
+  });
+
+  it('leaves valueObjectStorageType absent when no descriptor declares it', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        authoring: {
+          type: {
+            Rich: { kind: 'typeConstructor', output: { codecId: 'a/rich@1', nativeType: 'rich' } },
+          },
+        },
+      }),
+    ]);
+    expect(result.valueObjectStorageType).toBeUndefined();
+    expect('valueObjectStorageType' in result).toBe(false);
+  });
+
+  it('resolves a valueObjectStorageType contributed by another descriptor', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        id: 'target-a',
+        authoring: {
+          type: {
+            Rich: { kind: 'typeConstructor', output: { codecId: 'a/rich@1', nativeType: 'rich' } },
+          },
+        },
+      }),
+      createDescriptor({
+        id: 'adapter-a',
+        authoring: { valueObjectStorageType: 'Rich' },
+      }),
+    ]);
+    expect(result.valueObjectStorageType).toBe('Rich');
+  });
+
+  it('rejects two descriptors both declaring valueObjectStorageType naming both', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          id: 'adapter-a',
+          authoring: {
+            type: {
+              Rich: {
+                kind: 'typeConstructor',
+                output: { codecId: 'a/rich@1', nativeType: 'rich' },
+              },
+            },
+            valueObjectStorageType: 'Rich',
+          },
+        }),
+        createDescriptor({
+          id: 'adapter-b',
+          authoring: { valueObjectStorageType: 'Rich' },
+        }),
+      ]),
+    ).toThrow(
+      /Duplicate authoring valueObjectStorageType declaration\. Descriptor "adapter-b" conflicts with "adapter-a"/,
+    );
+  });
+
+  it('rejects a valueObjectStorageType that names no constructor in the assembled namespace', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          id: 'adapter-a',
+          authoring: {
+            type: {
+              Rich: {
+                kind: 'typeConstructor',
+                output: { codecId: 'a/rich@1', nativeType: 'rich' },
+              },
+            },
+            valueObjectStorageType: 'Missing',
+          },
+        }),
+      ]),
+    ).toThrow(
+      /Invalid authoring valueObjectStorageType "Missing" declared by descriptor "adapter-a"/,
+    );
+  });
+
+  it('rejects a valueObjectStorageType that names a constructor that is not bare-eligible', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          id: 'adapter-a',
+          authoring: {
+            type: {
+              Sized: {
+                kind: 'typeConstructor',
+                args: [{ kind: 'number', name: 'length', integer: true, minimum: 1 }],
+                output: { codecId: 'a/sized@1', nativeType: 'sized' },
+              },
+            },
+            valueObjectStorageType: 'Sized',
+          },
+        }),
+      ]),
+    ).toThrow(
+      /Invalid authoring valueObjectStorageType "Sized" declared by descriptor "adapter-a"/,
+    );
+  });
+
   it('merges top-level String alongside namespaced sql.String', () => {
     const result = assembleAuthoringContributions([
       createDescriptor({

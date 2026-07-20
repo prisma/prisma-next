@@ -29,7 +29,6 @@ export {
   assertNoCrossRegistryCollisions,
   classifyEnumMemberType,
   collectScalarTypeConstructors,
-  findValueObjectStorageTypeName,
   hasRegisteredFieldNamespace,
   instantiateAuthoringEntityType,
   instantiateAuthoringFieldPreset,

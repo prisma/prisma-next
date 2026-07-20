@@ -33,7 +33,10 @@ describe('interpretPslDocumentToSqlContract value objects and list fields', () =
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarColumnDescriptors: postgresScalarTypeDescriptors,
-      authoringContributions: { type: postgresScalarAuthoringTypes },
+      authoringContributions: {
+        type: postgresScalarAuthoringTypes,
+        valueObjectStorageType: 'Jsonb',
+      },
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
       capabilities: { sql: { scalarList: true } },
@@ -397,7 +400,10 @@ model User {
     const result = interpretPslDocumentToSqlContractInternal({
       target: sqliteTarget,
       scalarColumnDescriptors: sqliteScalarColumnDescriptors,
-      authoringContributions: { type: sqliteScalarAuthoringTypes },
+      authoringContributions: {
+        type: sqliteScalarAuthoringTypes,
+        valueObjectStorageType: 'Json',
+      },
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
       capabilities: { sql: {} },
@@ -452,20 +458,14 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    // Contributions without a valueObjectStorage marker: even though the
-    // scalar map still contains Jsonb/Json entries, the family layer must not
-    // fall back to hardcoded type names — the field is skipped, matching the
-    // pre-existing behavior for targets without value-object storage.
-    const unmarkedAuthoringTypes = Object.fromEntries(
-      [...postgresScalarTypeDescriptors].map(([name, { codecId, nativeType }]) => [
-        name,
-        { kind: 'typeConstructor' as const, output: { codecId, nativeType } },
-      ]),
-    );
-
+    // Contributions without a valueObjectStorageType declaration: even
+    // though the scalar map still contains Jsonb/Json entries, the family
+    // layer must not fall back to hardcoded type names — the field is
+    // skipped, matching the pre-existing behavior for stacks without
+    // value-object storage.
     const result = interpretPslDocumentToSqlContract({
       ...document,
-      authoringContributions: { type: unmarkedAuthoringTypes },
+      authoringContributions: { type: postgresScalarAuthoringTypes },
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
