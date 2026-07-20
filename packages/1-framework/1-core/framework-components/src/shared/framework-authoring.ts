@@ -536,7 +536,7 @@ function readTemplateArgumentValue(
     if (!isAuthoringTemplateRecord(value) || !Object.hasOwn(value, segment)) {
       return undefined;
     }
-    value = (value as Record<string, unknown>)[segment];
+    value = value[segment];
   }
   return value;
 }
