@@ -20,14 +20,14 @@
 | 1 | Line removed | diagnostic clears on next pull | `[]` | ✅ |
 | 1 | Unresolvable relation | interpreter diagnostic at relation span | `PSL_UNSUPPORTED_FIELD_TYPE` + `PSL_INVALID_RELATION_TARGET` at (3,2)–(3,60) | ✅ |
 | 2 | Parse error + `Unknown[]` together | both stages in one response, no double-reporting | `PSL_INVALID_MODEL_MEMBER`, `PSL_DUPLICATE_DECLARATION` + two `PSL_UNSUPPORTED_FIELD_TYPE` at **distinct spans/messages** (`Broken.model`, `Broken.tags` — both real findings on the recovered CST); zero exact duplicates | ✅ |
-| 3 | Config broken (throw) + watched change | diagnostic on config URI at (0,0)–(0,1), code `PRISMA_NEXT_CONFIG_LOAD_FAILED`, **message containing the thrown text** | URI ✅ range ✅ code ✅ severity ✅ — **message = `"Unexpected error"`, thrown text absent** | 🛑 **Blocker** (below) |
+| 3 | Config broken (throw) + watched change | diagnostic on config URI at (0,0)–(0,1), code `PRISMA_NEXT_CONFIG_LOAD_FAILED`, **message containing the thrown text** | URI ✅ range ✅ code ✅ severity ✅ — initially **message = `"Unexpected error"`** (Blocker, below); **PASS after fix** — see Addendum | ✅ (post-fix) |
 | 3 | Schema pulled while config broken | last-good project serves; interpreter finding retained | byte-identical diagnostics to pre-break pull | ✅ |
 | 3 | Config fixed + watched change | marker cleared (empty publish); fresh project serves | empty publish on config URI observed; schema findings intact | ✅ |
 | 4 | Broken config, first load via open+pull | config marker published; document unmanaged (pull `[]`) | marker `PRISMA_NEXT_CONFIG_LOAD_FAILED`; pull `[]` | ✅ |
 | 4 | Doc closed, config fixed, watched change | marker clears with **no document open** | empty publish on config URI observed | ✅ |
 | 5 | Capability-less psl provider (no `interpret`) | parse/symbol-table only; zero interpreter findings; no errors | `PSL_INVALID_MODEL_MEMBER`, `PSL_DUPLICATE_DECLARATION`; zero `PSL_UNSUPPORTED_FIELD_TYPE` | ✅ |
 
-**10/11 checks pass. One Blocker.**
+**11/11 checks pass after the Blocker fix (initially 10/11 — see Addendum).**
 
 ## 🛑 Blocker — config-failure diagnostic loses the thrown error text
 
@@ -45,3 +45,18 @@
 
 - Scenario 2's "no double-reporting" bar is met in the meaningful sense: the two `PSL_UNSUPPORTED_FIELD_TYPE` entries are distinct findings (different fields, different spans, different messages) produced by interpreting the recovered CST — not a duplicated report of one finding.
 - Scenario 4 required pull-client fidelity in the harness: project resolution triggers on the pull request, not on didOpen — matching the server's documented pull-client behavior.
+
+## Addendum — 2026-07-20, Blocker resolved
+
+Fix landed on `tml-2984-close-out`: `publishConfigFailure` now renders the
+structured error's `why` when the error is a `CliStructuredError`
+(shape-guarded via the class's own `CliStructuredError.is`; fallback
+`error.message`, then `String(error)`, unchanged). Unit pin added that rejects
+the load with a real `CliStructuredError` — the exact seam the mock gap hid.
+
+Scenario 3 re-run headless against the rebuilt binary (same harness approach):
+
+- Observed config diagnostic message: `"Failed to load config: qa-broken-config"`
+  — thrown text present, code/range/severity unchanged.
+- **Verdict: PASS.** Summary updated to 11/11.
+- Fix commit: `54bb54a47` (unit suite 228/228).
