@@ -206,8 +206,10 @@ export const sqliteScalarAuthoringTypes = {
     kind: 'typeConstructor',
     output: { codecId: SQLITE_DATETIME_CODEC_ID, nativeType: 'text' },
   },
+  // `valueObjectStorage`: value-object fields store as JSON text on sqlite.
   Json: {
     kind: 'typeConstructor',
+    valueObjectStorage: true,
     output: { codecId: SQLITE_JSON_CODEC_ID, nativeType: 'text' },
   },
   Bytes: {

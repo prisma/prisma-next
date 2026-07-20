@@ -125,6 +125,8 @@ describe('sqliteScalarAuthoringTypes', () => {
     for (const [name, codecId] of expectedScalars) {
       expect(namespace[name]).toEqual({
         kind: 'typeConstructor',
+        // Json is the storage type sqlite declares for value-object fields.
+        ...(name === 'Json' ? { valueObjectStorage: true } : {}),
         output: { codecId, nativeType: codecLookup.targetTypesFor(codecId)?.[0] },
       });
     }

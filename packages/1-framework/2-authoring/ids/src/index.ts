@@ -6,17 +6,66 @@ import type { IdGeneratorOptionsById } from './generators';
 
 export { builtinGeneratorIds };
 
+const GENERATED_CHAR_TYPE = { codecId: 'sql/char@1', nativeType: 'character' } as const;
+
+/**
+ * The explicit storage a generator's TS spec helper bundles: a `character(N)`
+ * type sized to the generator's output. Calling a helper *is* an explicit
+ * storage request (the storage is part of the helper's contract), unlike a
+ * PSL `@default(<generator>)`, which never influences the field's storage
+ * type — the PSL interpreter never consults this metadata.
+ */
+type GeneratedStorage = {
+  readonly type: ColumnTypeDescriptor<typeof GENERATED_CHAR_TYPE.codecId>;
+  readonly typeParams: { readonly length: number };
+};
+
+function charStorage(length: number): GeneratedStorage {
+  return { type: GENERATED_CHAR_TYPE, typeParams: { length } };
+}
+
+function nanoidStorage(params?: Record<string, unknown>): GeneratedStorage {
+  const rawSize = params?.['size'];
+  if (rawSize === undefined) {
+    return charStorage(21);
+  }
+  if (typeof rawSize !== 'number' || !Number.isInteger(rawSize) || rawSize < 2 || rawSize > 255) {
+    throw new Error('nanoid size must be an integer between 2 and 255');
+  }
+  return charStorage(rawSize);
+}
+
 type BuiltinGeneratorMetadata = {
   readonly applicableCodecIds: readonly string[];
+  /** The single source of the {@link GeneratedStorage} this generator's TS spec helper bundles, resolved from the helper's params (nanoid sizes its storage from `size`). */
+  readonly generatedStorage: (params?: Record<string, unknown>) => GeneratedStorage;
 };
 
 const builtinGeneratorMetadataById = {
-  ulid: { applicableCodecIds: ['pg/text@1', 'sql/char@1'] },
-  nanoid: { applicableCodecIds: ['pg/text@1', 'sql/char@1'] },
-  uuidv7: { applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'] },
-  uuidv4: { applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'] },
-  cuid2: { applicableCodecIds: ['pg/text@1', 'sql/char@1'] },
-  ksuid: { applicableCodecIds: ['pg/text@1', 'sql/char@1'] },
+  ulid: {
+    applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+    generatedStorage: () => charStorage(26),
+  },
+  nanoid: {
+    applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+    generatedStorage: nanoidStorage,
+  },
+  uuidv7: {
+    applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'],
+    generatedStorage: () => charStorage(36),
+  },
+  uuidv4: {
+    applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'],
+    generatedStorage: () => charStorage(36),
+  },
+  cuid2: {
+    applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+    generatedStorage: () => charStorage(24),
+  },
+  ksuid: {
+    applicableCodecIds: ['pg/text@1', 'sql/char@1'],
+    generatedStorage: () => charStorage(27),
+  },
 } as const satisfies Record<BuiltinGeneratorId, BuiltinGeneratorMetadata>;
 
 export const builtinGeneratorRegistryMetadata: ReadonlyArray<{
@@ -34,45 +83,16 @@ export type GeneratedColumnSpec<TCodecId extends string = string> = {
   readonly generated: ExecutionMutationDefaultValue;
 };
 
-/**
- * The explicit column storage each TS spec helper bundles: a `character(N)`
- * column sized to the generator's output. Calling a helper *is* an explicit
- * storage request (the storage is part of the helper's contract), unlike a
- * PSL `@default(<generator>)`, which never influences the column type.
- */
-const CHAR_COLUMN_TYPE = { codecId: 'sql/char@1', nativeType: 'character' } as const;
-
-const specCharLengthById: Record<Exclude<BuiltinGeneratorId, 'nanoid'>, number> = {
-  ulid: 26,
-  uuidv7: 36,
-  uuidv4: 36,
-  cuid2: 24,
-  ksuid: 27,
-};
-
-function specCharLength(id: BuiltinGeneratorId, params?: Record<string, unknown>): number {
-  if (id !== 'nanoid') {
-    return specCharLengthById[id];
-  }
-  const rawSize = params?.['size'];
-  if (rawSize === undefined) {
-    return 21;
-  }
-  if (typeof rawSize !== 'number' || !Number.isInteger(rawSize) || rawSize < 2 || rawSize > 255) {
-    throw new Error('nanoid size must be an integer between 2 and 255');
-  }
-  return rawSize;
-}
-
 function createGeneratedSpec<TId extends BuiltinGeneratorId>(
   id: TId,
   options?: IdGeneratorOptionsById[TId],
-): GeneratedColumnSpec<typeof CHAR_COLUMN_TYPE.codecId> {
+): GeneratedColumnSpec<typeof GENERATED_CHAR_TYPE.codecId> {
   const params = options as Record<string, unknown> | undefined;
+  const storage = builtinGeneratorMetadataById[id].generatedStorage(params);
   return {
-    type: CHAR_COLUMN_TYPE,
+    type: storage.type,
     nullable: false,
-    typeParams: { length: specCharLength(id, params) },
+    typeParams: storage.typeParams,
     generated: {
       kind: 'generator',
       id,

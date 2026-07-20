@@ -192,8 +192,10 @@ export const postgresScalarAuthoringTypes = {
     kind: 'typeConstructor',
     output: { codecId: 'pg/json@1', nativeType: 'json' },
   },
+  // `valueObjectStorage`: value-object fields store as jsonb on postgres.
   Jsonb: {
     kind: 'typeConstructor',
+    valueObjectStorage: true,
     output: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
   },
   Bytes: {

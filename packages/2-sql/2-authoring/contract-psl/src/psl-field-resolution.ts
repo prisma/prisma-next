@@ -5,6 +5,7 @@ import type {
   ExecutionMutationDefaultPhases,
 } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import { findValueObjectStorageTypeName } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { CapabilityMatrix } from '@prisma-next/framework-components/components';
 import type {
@@ -318,6 +319,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     codecLookup,
   } = input;
   const resolvedFields: ResolvedField[] = [];
+  const valueObjectStorageTypeName = findValueObjectStorageTypeName(authoringContributions?.type);
 
   for (const field of Object.values(model.fields)) {
     const isModelField = modelNames.has(field.typeName);
@@ -372,9 +374,14 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     };
 
     if (isValueObjectField) {
-      // Value objects store in the richest JSON storage the target contributes
-      // (postgres: Jsonb -> jsonb); targets without a Jsonb scalar fall back to Json.
-      descriptor = scalarColumnDescriptors.get('Jsonb') ?? scalarColumnDescriptors.get('Json');
+      // Value objects store in the storage type the target's contributions
+      // declare via the `valueObjectStorage` marker (postgres: Jsonb, sqlite:
+      // Json). A target that declares none has no value-object storage and
+      // the field is skipped.
+      descriptor =
+        valueObjectStorageTypeName !== undefined
+          ? scalarColumnDescriptors.get(valueObjectStorageTypeName)
+          : undefined;
     } else if (isListField) {
       if (capabilities['sql']?.['scalarList'] !== true) {
         diagnostics.push({

@@ -241,6 +241,8 @@ describe('postgresScalarAuthoringTypes', () => {
     for (const [name, codecId] of expectedScalars) {
       expect(namespace[name]).toEqual({
         kind: 'typeConstructor',
+        // Jsonb is the storage type postgres declares for value-object fields.
+        ...(name === 'Jsonb' ? { valueObjectStorage: true } : {}),
         output: { codecId, nativeType: codecLookup.targetTypesFor(codecId)?.[0] },
       });
     }

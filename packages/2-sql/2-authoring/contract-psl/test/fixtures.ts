@@ -249,13 +249,14 @@ export const postgresScalarTypeDescriptors = new Map([
   ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
 ] as const);
 
-/** The postgres base scalars in unified-namespace form: top-level zero-arg type constructors. */
+/** The postgres base scalars in unified-namespace form: top-level zero-arg type constructors. `Jsonb` carries the value-object storage marker, mirroring the real postgres adapter contribution. */
 export const postgresScalarAuthoringTypes: AuthoringTypeNamespace = Object.fromEntries(
   [...postgresScalarTypeDescriptors].map(([name, { codecId, nativeType }]) => [
     name,
     {
       kind: 'typeConstructor' as const,
       output: { codecId, nativeType },
+      ...(name === 'Jsonb' ? { valueObjectStorage: true as const } : {}),
     },
   ]),
 );
@@ -352,6 +353,18 @@ export const sqliteScalarColumnDescriptors = new Map([
   ['Json', { codecId: 'sqlite/json@1', nativeType: 'text' }],
   ['Bytes', { codecId: 'sqlite/blob@1', nativeType: 'blob' }],
 ] as const);
+
+/** The sqlite base scalars in unified-namespace form. `Json` carries the value-object storage marker, mirroring the real sqlite adapter contribution. */
+export const sqliteScalarAuthoringTypes: AuthoringTypeNamespace = Object.fromEntries(
+  [...sqliteScalarColumnDescriptors].map(([name, { codecId, nativeType }]) => [
+    name,
+    {
+      kind: 'typeConstructor' as const,
+      output: { codecId, nativeType },
+      ...(name === 'Json' ? { valueObjectStorage: true as const } : {}),
+    },
+  ]),
+);
 
 const targetTypesByCodecId: Record<string, readonly string[]> = {
   'pg/text@1': ['text'],
