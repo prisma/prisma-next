@@ -507,14 +507,12 @@ export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
 }
 
 function isAuthoringSelectRef(value: unknown): value is AuthoringSelectRef {
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    (value as { kind?: unknown }).kind !== 'select'
-  ) {
+  if (!isAuthoringTemplateRecord(value) || value['kind'] !== 'select') {
     return false;
   }
-  const { index, path, cases } = value as { index?: unknown; path?: unknown; cases?: unknown };
+  const index = value['index'];
+  const path = value['path'];
+  const cases = value['cases'];
   if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) {
     return false;
   }
