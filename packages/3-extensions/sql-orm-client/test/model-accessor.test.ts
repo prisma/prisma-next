@@ -207,6 +207,61 @@ describe('createModelAccessor', () => {
     expect(where.exprs[1]!.kind).toBe('exists');
   });
 
+  it('aliases the child table for self-referential 1:N relation predicates', () => {
+    const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+      string,
+      { some: (pred: (c: unknown) => unknown) => unknown }
+    >;
+
+    const expr = accessor['invitedUsers']!.some((c: unknown) =>
+      (c as Record<string, { eq: (v: unknown) => unknown }>)['name']!.eq('Bob'),
+    ) as ExistsExpr;
+
+    // `User.invitedUsers` is a 1:N self relation (users.invited_by_id →
+    // users.id): the EXISTS child FROM is aliased so the inner `users`
+    // reference does not shadow the outer correlation, the join correlation
+    // keeps the parent on `users` and the child on the alias, and the
+    // predicate's column refs are remapped onto the alias.
+    expect(expr.notExists).toBe(false);
+    expect(expr.subquery.from).toEqual(TableSource.named('users', 'invitedUsers__child', 'public'));
+    expect(expr.subquery.projection).toEqual([
+      ProjectionItem.of('_exists', ColumnRef.of('invitedUsers__child', 'invited_by_id')),
+    ]);
+    expect(expr.subquery.where).toEqual(
+      AndExpr.of([
+        BinaryExpr.eq(
+          ColumnRef.of('invitedUsers__child', 'invited_by_id'),
+          ColumnRef.of('users', 'id'),
+        ),
+        BinaryExpr.eq(
+          ColumnRef.of('invitedUsers__child', 'name'),
+          paramRef('users', 'name', 'Bob'),
+        ),
+      ]),
+    );
+  });
+
+  it('aliases the child table for self-referential 1:N relation predicates without a predicate', () => {
+    const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<
+      string,
+      { none: () => unknown }
+    >;
+
+    const expr = accessor['invitedUsers']!.none() as ExistsExpr;
+
+    expect(expr.notExists).toBe(true);
+    expect(expr.subquery.from).toEqual(TableSource.named('users', 'invitedUsers__child', 'public'));
+    expect(expr.subquery.projection).toEqual([
+      ProjectionItem.of('_exists', ColumnRef.of('invitedUsers__child', 'invited_by_id')),
+    ]);
+    expect(expr.subquery.where).toEqual(
+      BinaryExpr.eq(
+        ColumnRef.of('invitedUsers__child', 'invited_by_id'),
+        ColumnRef.of('users', 'id'),
+      ),
+    );
+  });
+
   it('keeps proxy symbol access undefined and relation shorthand maps null and undefined', () => {
     const user = createModelAccessor(context, 'public', 'User');
     expect((user as Record<PropertyKey, unknown>)[Symbol.iterator]).toBeUndefined();
@@ -640,9 +695,13 @@ describe('createModelAccessor', () => {
 
       const expr = feature['subtasks']!.some() as ExistsExpr;
 
-      expect(expr.subquery.from).toEqual(TableSource.named('tasks', undefined, 'public'));
+      // `subtasks` is a Task→Task self relation: the parent resolves against
+      // the base `tasks` table (not the `Feature` variant's `features`
+      // table), while the child FROM is aliased so the correlated EXISTS does
+      // not shadow the outer correlation.
+      expect(expr.subquery.from).toEqual(TableSource.named('tasks', 'subtasks__child', 'public'));
       expect(expr.subquery.where).toEqual(
-        BinaryExpr.eq(ColumnRef.of('tasks', 'parent_id'), ColumnRef.of('tasks', 'id')),
+        BinaryExpr.eq(ColumnRef.of('subtasks__child', 'parent_id'), ColumnRef.of('tasks', 'id')),
       );
     });
   });

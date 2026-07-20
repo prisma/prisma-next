@@ -69,3 +69,15 @@ biome 2.5.2 dev-dependency bump plus the code sites biome 2.5 newly flags
 shape, emitted artefact, or extension-authoring surface change. Incidental
 substrate diff only.
 -->
+
+<!--
+PR #1010 (fix(sql-orm-client): alias child table for self-referential 1:N
+relation predicates; fixes #980): `changes: []`. The
+`packages/3-extensions/sql-orm-client` diff is limited to internal
+correlated-EXISTS query generation (aliasing the child FROM to
+`${relationName}__child` for self-referential 1:N relation predicates so
+some/every/none no longer silently match nothing) plus regression tests; it
+changes no public API, contract/emitted artifact, extension-authoring surface,
+adapter API, or downstream source translation. Incidental runtime bug-fix diff
+only.
+-->

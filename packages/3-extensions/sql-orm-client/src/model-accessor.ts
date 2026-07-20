@@ -367,19 +367,29 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
     );
   }
 
+  // When the parent and child resolve to the same underlying table (a
+  // self-referential 1:N relation), the correlated EXISTS subquery must alias
+  // its child FROM — otherwise the inner table reference shadows the outer
+  // correlation and the predicate silently matches nothing. Mirrors the
+  // `${relationName}__child` alias used by the M:N path and the include path.
+  const relatedTableAlias =
+    parentNamespaceId === relation.toNamespace && parentTableName === relatedTableName
+      ? `${relationName}__child`
+      : undefined;
+  const relatedTableRef = relatedTableAlias ?? relatedTableName;
+
   const joinWhere = buildJoinWhere(
     context.contract,
     parentNamespaceId,
     parentModelName,
     parentTableName,
-    relatedTableName,
+    relatedTableRef,
     relation,
   );
-  const childWhere = toRelationWhereExpr(
-    context,
-    relation.toNamespace,
-    relation.to,
-    options.predicate,
+  const childWhere = remapColumnRefs(
+    relatedTableName,
+    relatedTableRef,
+    toRelationWhereExpr(context, relation.toNamespace, relation.to, options.predicate),
   );
 
   const filterPlan = planRelationFilterMode(joinWhere, childWhere, options.mode);
@@ -389,10 +399,15 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
 
   const selectProjectionColumn = firstTargetColumn(context.contract, relation) ?? 'id';
   const subquery = SelectAst.from(
-    tableSourceForContract(context.contract, relation.toNamespace, relatedTableName),
+    tableSourceForContract(
+      context.contract,
+      relation.toNamespace,
+      relatedTableName,
+      relatedTableAlias,
+    ),
   )
     .withProjection([
-      ProjectionItem.of('_exists', ColumnRef.of(relatedTableName, selectProjectionColumn)),
+      ProjectionItem.of('_exists', ColumnRef.of(relatedTableRef, selectProjectionColumn)),
     ])
     .withWhere(filterPlan.where);
 
@@ -616,7 +631,7 @@ function buildJoinWhere<TContract extends Contract<SqlStorage>>(
   parentNamespaceId: string,
   parentModelName: string,
   parentTableName: string,
-  relatedTableName: string,
+  relatedTableRef: string,
   relation: ResolvedModelRelation,
 ): AnyExpression {
   const localFields = relation.on?.localFields ?? [];
@@ -647,7 +662,7 @@ function buildJoinWhere<TContract extends Contract<SqlStorage>>(
 
     joinExprs.push(
       BinaryExpr.eq(
-        ColumnRef.of(relatedTableName, targetColumn),
+        ColumnRef.of(relatedTableRef, targetColumn),
         ColumnRef.of(parentTableName, localColumn),
       ),
     );
