@@ -2275,8 +2275,6 @@ describe('language server config failure surfacing', {
   });
 
   it('publishes the structured error why text instead of the generic envelope title', async () => {
-    // The config loader wraps raw config throws in a CliStructuredError whose
-    // message is a generic title; the useful text lives in `why`.
     harness = startHarness(async () => {
       throw errorUnexpected('boom', { why: 'Failed to load config: boom' });
     });

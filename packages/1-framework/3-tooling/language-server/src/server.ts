@@ -289,8 +289,6 @@ export function createServer(connection: Connection): LanguageServer {
     });
   }
 
-  // The config loader wraps raw config throws in a structured envelope whose
-  // message is a generic title; the actionable text lives in `why`.
   function configFailureMessage(error: unknown): string {
     if (CliStructuredError.is(error)) {
       return error.why ?? error.message;
