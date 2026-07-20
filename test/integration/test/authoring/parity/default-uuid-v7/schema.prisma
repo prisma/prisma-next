@@ -1,5 +1,5 @@
 // use prisma-next
 
 model User {
-  id String @id @default(uuid(7))
+  id Char(36) @id @default(uuid(7))
 }

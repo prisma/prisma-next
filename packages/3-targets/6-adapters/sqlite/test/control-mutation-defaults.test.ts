@@ -120,12 +120,11 @@ describe('sqliteScalarAuthoringTypes', () => {
     ['Bytes', 'sqlite/blob@1'],
   ] as const;
 
-  it('pins every base scalar as a baseScalar-marked zero-arg type constructor with manifest-derived nativeType', () => {
+  it('pins every base scalar as a zero-arg type constructor with manifest-derived nativeType', () => {
     expect(Object.keys(namespace).sort()).toEqual(expectedScalars.map(([name]) => name).sort());
     for (const [name, codecId] of expectedScalars) {
       expect(namespace[name]).toEqual({
         kind: 'typeConstructor',
-        baseScalar: true,
         output: { codecId, nativeType: codecLookup.targetTypesFor(codecId)?.[0] },
       });
     }

@@ -427,6 +427,37 @@ changes:
       contains:
         - "Json"
       anyMatch: true
+  - id: default-generators-no-longer-set-storage
+    summary: |
+      `@default(<generator>)` never mutates a column's storage any more — the type position is
+      the only storage decider — and the whole generator-storage-override SPI is retired with
+      it. Removed surfaces: `MutationDefaultGeneratorDescriptor.resolveGeneratedColumnDescriptor`
+      (`@prisma-next/framework-components/control`) — generator descriptors are now
+      `{ id, applicableCodecIds?, buildPhases? }` only, and `applicableCodecIds` remains the
+      validation channel (`PSL_INVALID_DEFAULT_APPLICABILITY` on mismatch); the transitional
+      `baseScalar` marker on `AuthoringTypeConstructorDescriptor` and
+      `ScalarTypeConstructorOutput` (`@prisma-next/framework-components/authoring`) — scalar
+      type-constructor contributions and the derived scalar view are plain
+      `{ codecId, nativeType, typeParams? }` again; and the `@prisma-next/ids` exports
+      `resolveBuiltinGeneratedColumnDescriptor` / `GeneratedColumnDescriptor` (the TS spec
+      helpers `uuidv4()`, `nanoid()`, … still return `GeneratedColumnSpec` bundling their
+      explicit `sql/char@1` column). Packs that registered a generator descriptor with a
+      storage-resolution hook must drop the hook; PSL schemas in extension fixtures relying on
+      `String @default(uuid()/cuid()/nanoid()/ulid())` producing `character(N)` columns must
+      either accept the target String storage (postgres: `pg/text@1` / `text`) or author the
+      char storage explicitly in the type position (`Char(36) @default(uuid())`, …), then
+      re-emit.
+    detection:
+      glob: "**/*.{ts,mts,cts,prisma}"
+      contains:
+        - "resolveGeneratedColumnDescriptor"
+        - "resolveBuiltinGeneratedColumnDescriptor"
+        - "baseScalar"
+        - "@default(uuid("
+        - "@default(cuid("
+        - "@default(nanoid("
+        - "@default(ulid("
+      anyMatch: true
 ---
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in

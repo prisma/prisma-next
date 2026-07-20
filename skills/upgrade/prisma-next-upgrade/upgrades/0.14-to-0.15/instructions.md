@@ -79,6 +79,34 @@ changes:
       contains:
         - "Json"
       anyMatch: true
+  - id: default-generators-no-longer-set-storage
+    summary: |
+      `@default(<generator>)` no longer influences a column's storage — the type position is
+      the only storage decider. Pre-0.15, a generator default on a bare `String` field re-picked
+      the column's storage to a sized char: `String @default(uuid())` / `@default(uuid(7))`
+      emitted `sql/char@1` / `character(36)`, `@default(cuid(2))` `character(24)`,
+      `@default(nanoid())` `character(21)` (or `character(<size>)` for `nanoid(<size>)`), and
+      `@default(ulid())` `character(26)`. From 0.15 such fields emit the target's `String`
+      storage (postgres: `pg/text@1` / `text`) with the same execution-time generator, so a
+      re-emit produces a new storage hash — against an existing database created with the char
+      storage this is a schema change. To keep the prior storage byte-identical, name it in the
+      type position: `Char(36) @default(uuid())`, `Char(24) @default(cuid(2))`,
+      `Char(21) @default(nanoid())` (or `Char(<size>)` for a sized nanoid), `Char(26)
+      @default(ulid())` — or adopt native `Uuid` for `uuid()` if a `uuid`-typed column is
+      preferred (that is a schema change too). Then re-run `prisma-next contract emit` and, if
+      you accepted a storage change, plan/apply the matching migration. Generator applicability
+      validation is unchanged (`uuid()` on `Int` still fails with
+      `PSL_INVALID_DEFAULT_APPLICABILITY`), and the TS builder presets
+      (`field.id.uuidv4String()`, `field.generated(uuidv4())`, …) are untouched — they bundle
+      their `char(N)` storage explicitly.
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "@default(uuid("
+        - "@default(cuid("
+        - "@default(nanoid("
+        - "@default(ulid("
+      anyMatch: true
 ---
 
 <!--

@@ -8,10 +8,7 @@ import type {
   MutationDefaultGeneratorDescriptor,
   TypedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
-import {
-  builtinGeneratorRegistryMetadata,
-  resolveBuiltinGeneratedColumnDescriptor,
-} from '@prisma-next/ids';
+import { builtinGeneratorRegistryMetadata } from '@prisma-next/ids';
 import type { FuncCallSig } from '@prisma-next/psl-parser';
 import { int, num, oneOf, optional, str } from '@prisma-next/psl-parser';
 
@@ -159,60 +156,49 @@ const postgresDefaultFunctionRegistryEntries = [
  * channel, with explicit `nativeType` values pinned to the codec manifests
  * (`codecLookup.targetTypesFor(codecId)[0]`).
  *
- * Each is marked `baseScalar`: the storage is the adapter's default choice for
- * the portable scalar name, not an explicit user storage opinion, so mutation-
- * default generators (`@default(uuid())`) may re-pick it. Native types below
- * deliberately carry no marker — they name their storage explicitly.
+ * Each output is the adapter's storage choice for the portable scalar name.
+ * The type position is the only storage decider: a mutation-default generator
+ * (`@default(uuid())`) never re-picks a column's storage.
  */
 export const postgresScalarAuthoringTypes = {
   String: {
     kind: 'typeConstructor',
-    baseScalar: true,
     output: { codecId: 'pg/text@1', nativeType: 'text' },
   },
   Boolean: {
     kind: 'typeConstructor',
-    baseScalar: true,
     output: { codecId: 'pg/bool@1', nativeType: 'bool' },
   },
   Int: {
     kind: 'typeConstructor',
-    baseScalar: true,
     output: { codecId: 'pg/int4@1', nativeType: 'int4' },
   },
   BigInt: {
     kind: 'typeConstructor',
-    baseScalar: true,
     output: { codecId: 'pg/int8@1', nativeType: 'int8' },
   },
   Float: {
     kind: 'typeConstructor',
-    baseScalar: true,
     output: { codecId: 'pg/float8@1', nativeType: 'float8' },
   },
   Decimal: {
     kind: 'typeConstructor',
-    baseScalar: true,
     output: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
   },
   DateTime: {
     kind: 'typeConstructor',
-    baseScalar: true,
     output: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
   },
   Json: {
     kind: 'typeConstructor',
-    baseScalar: true,
     output: { codecId: 'pg/json@1', nativeType: 'json' },
   },
   Jsonb: {
     kind: 'typeConstructor',
-    baseScalar: true,
     output: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
   },
   Bytes: {
     kind: 'typeConstructor',
-    baseScalar: true,
     output: { codecId: 'pg/bytea@1', nativeType: 'bytea' },
   },
 } as const satisfies AuthoringTypeNamespace;
@@ -319,21 +305,6 @@ export function createPostgresMutationDefaultGeneratorDescriptors(): readonly Mu
       ({ id, applicableCodecIds }): MutationDefaultGeneratorDescriptor => ({
         id,
         applicableCodecIds,
-        resolveGeneratedColumnDescriptor: ({ generated }) => {
-          if (generated.kind !== 'generator' || generated.id !== id) {
-            return undefined;
-          }
-          const descriptor = resolveBuiltinGeneratedColumnDescriptor({
-            id,
-            ...(generated.params ? { params: generated.params } : {}),
-          });
-          return {
-            codecId: descriptor.type.codecId,
-            nativeType: descriptor.type.nativeType,
-            ...(descriptor.type.typeRef ? { typeRef: descriptor.type.typeRef } : {}),
-            ...(descriptor.typeParams ? { typeParams: descriptor.typeParams } : {}),
-          };
-        },
       }),
     ),
     timestampNowControlDescriptor(),

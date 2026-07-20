@@ -197,28 +197,13 @@ describe('createPostgresMutationDefaultGeneratorDescriptors', () => {
     expect(descriptor.applicableCodecIds).toBeUndefined();
   });
 
-  it('resolves column descriptor for matching generator', () => {
-    const uuidv4Descriptor = descriptors.find((d) => d.id === 'uuidv4')!;
-    const resolve = uuidv4Descriptor.resolveGeneratedColumnDescriptor;
-    expect(resolve).toBeDefined();
-    const result = resolve!({
-      generated: { kind: 'generator', id: 'uuidv4' },
-    });
-    expect(result).toMatchObject({
-      codecId: 'sql/char@1',
-      nativeType: 'character',
-      typeParams: { length: 36 },
-    });
-  });
-
-  it('returns undefined for non-matching generator', () => {
-    const uuidv4Descriptor = descriptors.find((d) => d.id === 'uuidv4')!;
-    const resolve = uuidv4Descriptor.resolveGeneratedColumnDescriptor;
-    expect(resolve).toBeDefined();
-    const result = resolve!({
-      generated: { kind: 'generator', id: 'nanoid' },
-    });
-    expect(result).toBeUndefined();
+  it('keeps pg/text@1 applicable for every builtin generator so String fields never false-diagnose', () => {
+    // The type position is the only storage decider (TML-2986); a generator
+    // default on a `String` column must validate against pg/text@1.
+    for (const id of ['ulid', 'nanoid', 'uuidv7', 'uuidv4', 'cuid2', 'ksuid'] as const) {
+      const descriptor = descriptors.find((d) => d.id === id)!;
+      expect(descriptor.applicableCodecIds).toContain('pg/text@1');
+    }
   });
 });
 
@@ -251,12 +236,11 @@ describe('postgresScalarAuthoringTypes', () => {
     ['Bytes', 'pg/bytea@1'],
   ] as const;
 
-  it('pins every base scalar as a baseScalar-marked zero-arg type constructor with manifest-derived nativeType', () => {
+  it('pins every base scalar as a zero-arg type constructor with manifest-derived nativeType', () => {
     expect(Object.keys(namespace).sort()).toEqual(expectedScalars.map(([name]) => name).sort());
     for (const [name, codecId] of expectedScalars) {
       expect(namespace[name]).toEqual({
         kind: 'typeConstructor',
-        baseScalar: true,
         output: { codecId, nativeType: codecLookup.targetTypesFor(codecId)?.[0] },
       });
     }

@@ -64,20 +64,17 @@ describe('postgres scalar types derived from the unified namespace', () => {
   it('pins every bare-eligible scalar to its zero-arg instantiation', () => {
     const derived = collectScalarTypeConstructors(stack.authoringContributions.type);
 
-    // Base scalars carry the baseScalar provenance marker (their storage is
-    // the adapter's default choice, overridable by generator defaults);
-    // native types don't — they name their storage explicitly.
     expect(Object.fromEntries(derived)).toEqual({
-      String: { codecId: 'pg/text@1', nativeType: 'text', baseScalar: true },
-      Boolean: { codecId: 'pg/bool@1', nativeType: 'bool', baseScalar: true },
-      Int: { codecId: 'pg/int4@1', nativeType: 'int4', baseScalar: true },
-      BigInt: { codecId: 'pg/int8@1', nativeType: 'int8', baseScalar: true },
-      Float: { codecId: 'pg/float8@1', nativeType: 'float8', baseScalar: true },
-      Decimal: { codecId: 'pg/numeric@1', nativeType: 'numeric', baseScalar: true },
-      DateTime: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz', baseScalar: true },
-      Json: { codecId: 'pg/json@1', nativeType: 'json', baseScalar: true },
-      Jsonb: { codecId: 'pg/jsonb@1', nativeType: 'jsonb', baseScalar: true },
-      Bytes: { codecId: 'pg/bytea@1', nativeType: 'bytea', baseScalar: true },
+      String: { codecId: 'pg/text@1', nativeType: 'text' },
+      Boolean: { codecId: 'pg/bool@1', nativeType: 'bool' },
+      Int: { codecId: 'pg/int4@1', nativeType: 'int4' },
+      BigInt: { codecId: 'pg/int8@1', nativeType: 'int8' },
+      Float: { codecId: 'pg/float8@1', nativeType: 'float8' },
+      Decimal: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
+      DateTime: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
+      Json: { codecId: 'pg/json@1', nativeType: 'json' },
+      Jsonb: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
+      Bytes: { codecId: 'pg/bytea@1', nativeType: 'bytea' },
       VarChar: { codecId: 'sql/varchar@1', nativeType: 'character varying', typeParams: {} },
       Char: { codecId: 'sql/char@1', nativeType: 'character', typeParams: {} },
       Numeric: { codecId: 'pg/numeric@1', nativeType: 'numeric', typeParams: {} },

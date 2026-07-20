@@ -95,17 +95,6 @@ export interface AuthoringTypeConstructorDescriptor {
   readonly output: AuthoringStorageTypeTemplate;
   /** Present when one of this constructor's positional arguments names another document-local entity instead of carrying a literal value. Absent for ordinary literal-argument constructors. */
   readonly entityRefArg?: AuthoringTypeConstructorEntityRef;
-  /**
-   * Marks a family base scalar (`String`, `Int`, …): the name denotes the
-   * family's portable logical type, and `output` is the target's *default*
-   * storage choice for it rather than an explicit user storage opinion.
-   * Authoring layers use this provenance to decide when a mutation-default
-   * generator (`@default(uuid())`) may re-pick a field's concrete storage:
-   * only base-scalar-typed fields may be overridden. A type that explicitly
-   * names its storage — native scalars like `Uuid`, constructor calls like
-   * `Char(36)`, named types — always keeps it.
-   */
-  readonly baseScalar?: true;
 }
 
 export interface AuthoringColumnDefaultTemplateLiteral {
@@ -744,8 +733,6 @@ export interface ScalarTypeConstructorOutput {
   readonly codecId: string;
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown>;
-  /** Propagated from {@link AuthoringTypeConstructorDescriptor.baseScalar}: the bare name is a family base scalar whose storage is the target's default choice, overridable by a generator default. */
-  readonly baseScalar?: true;
 }
 
 /**
@@ -769,8 +756,7 @@ export function collectScalarTypeConstructors(
     if (value.entityRefArg !== undefined) continue;
     if (value.args?.some((arg) => arg.optional !== true)) continue;
     try {
-      const output = instantiateAuthoringTypeConstructor(value, []);
-      result.set(name, value.baseScalar ? { ...output, baseScalar: true } : output);
+      result.set(name, instantiateAuthoringTypeConstructor(value, []));
     } catch {
       // The output template does not resolve with an empty argument list,
       // so the constructor is not bare-eligible.

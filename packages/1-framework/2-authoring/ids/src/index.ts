@@ -6,84 +6,17 @@ import type { IdGeneratorOptionsById } from './generators';
 
 export { builtinGeneratorIds };
 
-export type GeneratedColumnDescriptor = {
-  readonly type: ColumnTypeDescriptor;
-  readonly typeParams?: Record<string, unknown>;
-};
-
 type BuiltinGeneratorMetadata = {
   readonly applicableCodecIds: readonly string[];
-  readonly generatedColumnDescriptor: GeneratedColumnDescriptor;
-  readonly resolveGeneratedColumnDescriptor?: (
-    params?: Record<string, unknown>,
-  ) => GeneratedColumnDescriptor;
 };
 
-function resolveNanoidColumnDescriptor(
-  params?: Record<string, unknown>,
-): GeneratedColumnDescriptor {
-  const rawSize = params?.['size'];
-  if (rawSize === undefined) {
-    return {
-      type: { codecId: 'sql/char@1', nativeType: 'character' },
-      typeParams: { length: 21 },
-    };
-  }
-
-  if (typeof rawSize !== 'number' || !Number.isInteger(rawSize) || rawSize < 2 || rawSize > 255) {
-    throw new Error('nanoid size must be an integer between 2 and 255');
-  }
-
-  return {
-    type: { codecId: 'sql/char@1', nativeType: 'character' },
-    typeParams: { length: rawSize },
-  };
-}
-
 const builtinGeneratorMetadataById = {
-  ulid: {
-    applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-    generatedColumnDescriptor: {
-      type: { codecId: 'sql/char@1', nativeType: 'character' },
-      typeParams: { length: 26 },
-    },
-  },
-  nanoid: {
-    applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-    generatedColumnDescriptor: {
-      type: { codecId: 'sql/char@1', nativeType: 'character' },
-      typeParams: { length: 21 },
-    },
-    resolveGeneratedColumnDescriptor: resolveNanoidColumnDescriptor,
-  },
-  uuidv7: {
-    applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'],
-    generatedColumnDescriptor: {
-      type: { codecId: 'sql/char@1', nativeType: 'character' },
-      typeParams: { length: 36 },
-    },
-  },
-  uuidv4: {
-    applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'],
-    generatedColumnDescriptor: {
-      type: { codecId: 'sql/char@1', nativeType: 'character' },
-      typeParams: { length: 36 },
-    },
-  },
-  cuid2: {
-    applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-    generatedColumnDescriptor: {
-      type: { codecId: 'sql/char@1', nativeType: 'character' },
-      typeParams: { length: 24 },
-    },
-  },
-  ksuid: {
-    applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-    generatedColumnDescriptor: {
-      type: { codecId: 'sql/char@1', nativeType: 'character' },
-      typeParams: { length: 27 },
-    },
-  },
+  ulid: { applicableCodecIds: ['pg/text@1', 'sql/char@1'] },
+  nanoid: { applicableCodecIds: ['pg/text@1', 'sql/char@1'] },
+  uuidv7: { applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'] },
+  uuidv4: { applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'] },
+  cuid2: { applicableCodecIds: ['pg/text@1', 'sql/char@1'] },
+  ksuid: { applicableCodecIds: ['pg/text@1', 'sql/char@1'] },
 } as const satisfies Record<BuiltinGeneratorId, BuiltinGeneratorMetadata>;
 
 export const builtinGeneratorRegistryMetadata: ReadonlyArray<{
@@ -94,17 +27,6 @@ export const builtinGeneratorRegistryMetadata: ReadonlyArray<{
   applicableCodecIds: builtinGeneratorMetadataById[id].applicableCodecIds,
 }));
 
-export function resolveBuiltinGeneratedColumnDescriptor(input: {
-  readonly id: BuiltinGeneratorId;
-  readonly params?: Record<string, unknown>;
-}): GeneratedColumnDescriptor {
-  const metadata: BuiltinGeneratorMetadata = builtinGeneratorMetadataById[input.id];
-  if (metadata.resolveGeneratedColumnDescriptor) {
-    return metadata.resolveGeneratedColumnDescriptor(input.params);
-  }
-  return metadata.generatedColumnDescriptor;
-}
-
 export type GeneratedColumnSpec<TCodecId extends string = string> = {
   readonly type: ColumnTypeDescriptor<TCodecId>;
   readonly nullable?: false;
@@ -112,28 +34,51 @@ export type GeneratedColumnSpec<TCodecId extends string = string> = {
   readonly generated: ExecutionMutationDefaultValue;
 };
 
-type GeneratorCodecId<TId extends BuiltinGeneratorId> =
-  (typeof builtinGeneratorMetadataById)[TId]['generatedColumnDescriptor']['type']['codecId'];
+/**
+ * The explicit column storage each TS spec helper bundles: a `character(N)`
+ * column sized to the generator's output. Calling a helper *is* an explicit
+ * storage request (the storage is part of the helper's contract), unlike a
+ * PSL `@default(<generator>)`, which never influences the column type.
+ */
+const CHAR_COLUMN_TYPE = { codecId: 'sql/char@1', nativeType: 'character' } as const;
+
+const specCharLengthById: Record<Exclude<BuiltinGeneratorId, 'nanoid'>, number> = {
+  ulid: 26,
+  uuidv7: 36,
+  uuidv4: 36,
+  cuid2: 24,
+  ksuid: 27,
+};
+
+function specCharLength(id: BuiltinGeneratorId, params?: Record<string, unknown>): number {
+  if (id !== 'nanoid') {
+    return specCharLengthById[id];
+  }
+  const rawSize = params?.['size'];
+  if (rawSize === undefined) {
+    return 21;
+  }
+  if (typeof rawSize !== 'number' || !Number.isInteger(rawSize) || rawSize < 2 || rawSize > 255) {
+    throw new Error('nanoid size must be an integer between 2 and 255');
+  }
+  return rawSize;
+}
 
 function createGeneratedSpec<TId extends BuiltinGeneratorId>(
   id: TId,
   options?: IdGeneratorOptionsById[TId],
-): GeneratedColumnSpec<GeneratorCodecId<TId>> {
+): GeneratedColumnSpec<typeof CHAR_COLUMN_TYPE.codecId> {
   const params = options as Record<string, unknown> | undefined;
-  const resolvedDescriptor = resolveBuiltinGeneratedColumnDescriptor({
-    id,
-    ...ifDefined('params', params),
-  });
   return {
-    type: resolvedDescriptor.type,
+    type: CHAR_COLUMN_TYPE,
     nullable: false,
-    ...ifDefined('typeParams', resolvedDescriptor.typeParams),
+    typeParams: { length: specCharLength(id, params) },
     generated: {
       kind: 'generator',
       id,
       ...ifDefined('params', params),
     },
-  } as GeneratedColumnSpec<GeneratorCodecId<TId>>;
+  };
 }
 
 export const ulid = (options?: IdGeneratorOptionsById['ulid']) =>

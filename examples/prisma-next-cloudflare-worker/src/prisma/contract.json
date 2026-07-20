@@ -118,11 +118,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "title": {
@@ -198,11 +195,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "status": {
@@ -320,11 +314,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "kind": {
@@ -444,12 +435,9 @@
             "bug": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "severity": {
                   "codecId": "pg/text@1",
@@ -494,12 +482,9 @@
             "feature": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "priority": {
                   "codecId": "pg/text@1",
@@ -553,12 +538,9 @@
                   "nullable": false
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "title": {
                   "codecId": "pg/text@1",
@@ -616,12 +598,9 @@
                   "nullable": true
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "status": {
                   "codecId": "pg/text@1",
@@ -715,12 +694,9 @@
                   "nullable": false
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "kind": {
                   "codecId": "pg/text@1",
@@ -758,7 +734,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:dcf1c78cc76b904700539151edfcdab997e8a95db8474069612a075f9e8d976b"
+    "storageHash": "sha256:876c31e038cff6c9d33fc3b461050e225f07c591f0567a54bfd44139be998b9c"
   },
   "execution": {
     "executionHash": "sha256:a691ed4c6ad02663bcd11c7ea8b2491e67253cd7c1968687255f2e0accfdcff7",
