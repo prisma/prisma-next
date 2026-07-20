@@ -514,24 +514,6 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-07-02→06, native-postgres-enums (PR #906). Round 1: `CodecRef.nativeType` flagged ("SQL-specific, cannot live in the framework domain") — fixed by moving the cast to a codec hook placed on the *framework* `CodecDescriptor`. Round 2: the hook flagged ("NATIVETYPE CANNOT BE REFERENCED IN THE FRAMEWORK DOMAIN") — relocated, but a new framework type (`AuthoringEntityRefResolution`) kept `nativeType` + a `valueSetEnforcement` strategy string-enum under a grandfathering argument. Round 3: both flagged, plus derivation logic (`deriveValueSet`) in framework core. Three rounds, one class. Operator intervention produced the class-sweep rule, the vocabulary ratchet, and this entry.
 
-### F18. CI-red on an unbriefed repo ratchet; the fix-brief then guesses at the sites
-
-**Symptom.** A slice's dispatch briefs enumerate validation gates (typecheck / test / lint / lint:deps) that all pass, but the PR's CI Lint job fails on a repo ratchet none of the briefs named (`lint:framework-vocabulary`). The follow-up fix-brief, written from the ratchet's error message rather than from a diagnosis run, names the wrong offending sites — the ratchet skips test files, so the "known offenders" it lists in test fixtures were never counted; the real hits sat in production code.
-
-**Detection signal.**
-
-- The CI Lint job's script runs more commands than the brief's gate list (compare `.github/workflows` lint steps against the brief).
-- A fix-brief asserts specific offending lines without a transcript showing the ratchet's own `--list` / diff-scoped output.
-- The ratchet's count delta doesn't match the number of sites the brief names.
-
-**Mitigation.**
-
-- **Slice-close gates must mirror the CI Lint job's full script set**, ratchets included — enumerate them from the workflow file, not from memory. (A ratchet that bit once joins every later brief's gate list: `lint:framework-vocabulary` did exactly this in the following slice.)
-- **Fix-briefs order diagnosis first.** The dispatch's first step is running the ratchet's own tooling (`--list`, scope filters) against the branch diff to establish the true sites; the brief's site list is a hypothesis, not an instruction.
-- Implementer-side: when a brief's named sites and the tool's arithmetic disagree, trust the tool and surface the divergence prominently.
-
-**Reference incident.** 2026-07, lsp-interpreter-diagnostics, slices 05/06. Slice 05's payoff dispatch passed every briefed gate; CI failed `lint:framework-vocabulary` (threshold 836, branch at 839). The fix-brief attributed the 3 hits to two `sql`-vocabulary test fixtures; the ratchet excludes `test/**`, and the real +3 were `column` tokens in the new production span-mapper — resolved by mapping through span offsets instead (a better design the ratchet forced). The ratchet then joined slice 06's brief gates and caught a `collection` token in a comment before push.
-
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.
