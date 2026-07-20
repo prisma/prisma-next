@@ -122,11 +122,13 @@ forever.
 
 So the fix is symmetric — identity is recognized as `autoincrement()` on **both** sides:
 
-- `SqlColumnIR` gains an identity field (it has none today; this is new IR surface).
-- The columns query selects `attidentity` and threads it onto the IR.
-- Infer emits `@default(autoincrement())` for an identity column.
-- The postgres default-normalizer resolves a live identity column's default to
-  `autoincrement()`, so verify compares equal.
+- The postgres control adapter's columns query selects `attidentity` and stamps
+  `resolvedDefault: { kind: 'function', expression: 'autoincrement()' }` directly onto an
+  identity column — no new field on `SqlColumnIR`.
+- Infer recognizes the same shape by its only distinguishing trait: a `resolvedDefault` of
+  `autoincrement()` with no raw default. It emits `@default(autoincrement())` for that column.
+- Because both sides agree on `resolvedDefault` before verify runs, `resolvedDefaultsEqual`
+  compares equal without any identity-specific logic of its own.
 
 **Deliberate limitation:** at the contract's altitude, `autoincrement()` means "the database
 generates this value." Identity and `serial` are both that, and PSL has no syntax to distinguish
@@ -289,8 +291,9 @@ measure of done — if a fix lands and its workaround stays, the fix didn't work
 
 ## Contract-impact
 
-- `SqlColumnIR` gains an identity field (`packages/2-sql/1-core/schema-ir`). New IR surface;
-  every constructor/factory site adapts.
+- No new field on `SqlColumnIR` (`packages/2-sql/1-core/schema-ir`). Identity is recognized once,
+  at introspection: the postgres control adapter stamps `resolvedDefault: autoincrement()`
+  directly on an identity column, and infer recognizes that same shape.
 - A new codec id `pg/date@1` joins the postgres codec registry, unbound in this slice — emitted
   contracts are unchanged until the remove-db-attributes project's `Date` type pins it.
 - Postgres registers built-in index types, so `@@index(type:)` values that previously failed

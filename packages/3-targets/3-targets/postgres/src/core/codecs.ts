@@ -1336,6 +1336,7 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgNumericDescriptor,
+  // PSL `@db.Date` binding is deferred to remove-db-attributes' `Date` type; pin it via codecId, not a second targetTypes activation here.
   pgDateDescriptor,
   pgTimestampDescriptor,
   pgTimestamptzDescriptor,
