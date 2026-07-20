@@ -7,6 +7,7 @@ import type { MigrationPlanOperation } from '@prisma-next/framework-components/c
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { writeContractSnapshot } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
@@ -268,15 +269,16 @@ async function buildMultiSpaceFixture(): Promise<{
   });
   await writeRefFor(migrationsDir, { spaceId: 'app', name: 'db', hash: HASH_804e018 });
   await writeRefFor(migrationsDir, { spaceId: 'postgis', name: 'db', hash: HASH_POSTGIS });
-  await writeFile(
-    join(migrationsDir, 'postgis', 'contract.json'),
-    JSON.stringify({
+  await writeRefFor(migrationsDir, { spaceId: 'postgis', name: 'head', hash: HASH_POSTGIS });
+  await writeContractSnapshot(migrationsDir, HASH_POSTGIS, {
+    contractJson: {
       storage: { storageHash: HASH_POSTGIS, namespaces: {} },
       schemaVersion: '1.0.0',
       target: 'postgres',
       targetFamily: 'sql',
-    }),
-  );
+    },
+    contractDts: 'export type Contract = unknown;\n',
+  });
 
   const aggregate = await loadContractSpaceAggregate({
     migrationsDir,

@@ -35,6 +35,7 @@ function makeEmptyGraphSpace(
     refs: {},
     headRef: { hash: HEAD_HASH, invariants: [...invariants] },
     refsDir: '/tmp/refs',
+    migrationsDir: '/tmp/migrations',
     resolveContract: () => contract,
     deserializeContract: (json) => json as Contract,
   });
@@ -146,6 +147,7 @@ describe('planSpacePath — empty-graph spaces', () => {
       refs: {},
       headRef: { hash: EMPTY_CONTRACT_HASH, invariants: [] },
       refsDir: '/tmp/refs',
+      migrationsDir: '/tmp/migrations',
       resolveContract: () => contract,
       deserializeContract: (json) => json as Contract,
     });

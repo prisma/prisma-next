@@ -103,11 +103,23 @@ export async function readContractSnapshotJson(
   }
 }
 
+/**
+ * Tolerant read: a missing store entry, unparseable `contract.json`, the
+ * JSON literal `null`, or a `storageHash` that isn't a well-formed
+ * `sha256:<64hex>` value all resolve to `undefined` rather than throwing —
+ * parity with the catch-all tolerance of the pre-store `readEndContractJson`
+ * (`io.ts`), which never validated the hash it was keyed by either.
+ */
 export async function readContractSnapshotJsonTolerant(
   migrationsDir: string,
   storageHash: string,
 ): Promise<unknown | undefined> {
-  const jsonPath = join(contractSnapshotDir(migrationsDir, storageHash), CONTRACT_JSON_FILE);
+  let jsonPath: string;
+  try {
+    jsonPath = join(contractSnapshotDir(migrationsDir, storageHash), CONTRACT_JSON_FILE);
+  } catch {
+    return undefined;
+  }
 
   let raw: string;
   try {

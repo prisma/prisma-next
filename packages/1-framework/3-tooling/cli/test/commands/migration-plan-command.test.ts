@@ -107,6 +107,7 @@ const SAME_HASH = `sha256:${'a'.repeat(64)}`;
 const OLD_HASH = `sha256:${'b'.repeat(64)}`;
 const NEW_HASH = `sha256:${'c'.repeat(64)}`;
 const REFS_DIR = '/tmp/test/migrations/app/refs';
+const MIGRATIONS_DIR = '/tmp/test/migrations';
 
 function makeContractJson(storageHash: string, target = 'mongo'): string {
   return JSON.stringify({ storage: { storageHash, namespaces: {} }, target });
@@ -132,6 +133,7 @@ function buildResolutionSpace(
         ? { hash: bundles[bundles.length - 1]!.metadata.to, invariants: [] }
         : null,
     refsDir: REFS_DIR,
+    migrationsDir: MIGRATIONS_DIR,
     resolveContract: () => JSON.parse(makeContractJson(NEW_HASH)) as Contract,
     deserializeContract: (c: unknown) => c as Contract,
   });
@@ -580,6 +582,7 @@ describe('migration plan command', () => {
               refs: {},
               headRef: { hash: NEW_HASH, invariants: [] },
               refsDir: REFS_DIR,
+              migrationsDir: MIGRATIONS_DIR,
               resolveContract: () => JSON.parse(makeContractJson(NEW_HASH)) as Contract,
               deserializeContract: (c: unknown) => c as Contract,
             }),
@@ -590,6 +593,7 @@ describe('migration plan command', () => {
                 refs: {},
                 headRef: { hash: OLD_HASH, invariants: [] },
                 refsDir: REFS_DIR,
+                migrationsDir: MIGRATIONS_DIR,
                 resolveContract: () => JSON.parse(makeContractJson(OLD_HASH)) as Contract,
                 deserializeContract: (c: unknown) => c as Contract,
               }),

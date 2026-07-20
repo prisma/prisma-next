@@ -22,7 +22,6 @@ export {
   type SpacePlanInput,
   type SpacePlanOutput,
 } from '../plan-all-spaces';
-export { readContractSpaceContract } from '../read-contract-space-contract';
 export {
   type ContractSpaceHeadRef,
   readContractSpaceHeadRef,

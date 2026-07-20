@@ -55,16 +55,18 @@ export type ContractAtResult =
  *   `from === to` self-edge is represented, not rejected.
  * - `contract()`: the deserialized contract for this space — lazily
  *   produced on first call and memoised. For the app it is the live
- *   contract the caller supplied; for an extension it is the on-disk
- *   `migrations/<spaceId>/contract.json` run through the family's
- *   `deserializeContract`. Throws if the on-disk contract is missing or
- *   undeserializable (surfaced as `contractUnreadable` by `checkIntegrity`
- *   under `checkContracts`); callers gate before querying it.
+ *   contract the caller supplied; for an extension it is the contract
+ *   snapshot store entry keyed by the space's head ref hash, run through
+ *   the family's `deserializeContract`. Throws if the store entry is
+ *   missing or undeserializable (surfaced as `contractUnreadable` by
+ *   `checkIntegrity` under `checkContracts`); callers gate before
+ *   querying it.
  * - `contractAt(hash, opts?)`: materializes the contract at an arbitrary
  *   graph node — when `opts.refName` is set, prefer the ref's paired
  *   snapshot; else find the package whose `metadata.to === hash` and read
- *   its `end-contract.*`. Lazy per `(hash, refName?)` memoisation; throws
- *   typed {@link MigrationToolsError} values compatible with CLI mappers.
+ *   the contract snapshot store entry keyed by that hash. Lazy per
+ *   `(hash, refName?)` memoisation; throws typed {@link MigrationToolsError}
+ *   values compatible with CLI mappers.
  */
 export interface AggregateContractSpace {
   readonly spaceId: string;

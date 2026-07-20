@@ -213,6 +213,12 @@ describe('readContractSnapshotJsonTolerant', () => {
 
     expect(json).toBeUndefined();
   });
+
+  it('returns undefined when storageHash is not a well-formed sha256:<64hex> value', async () => {
+    const json = await readContractSnapshotJsonTolerant(migrationsDir, 'sha256:short-placeholder');
+
+    expect(json).toBeUndefined();
+  });
 });
 
 describe('readContractSnapshotDts', () => {

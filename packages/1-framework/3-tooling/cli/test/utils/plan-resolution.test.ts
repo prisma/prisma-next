@@ -95,6 +95,7 @@ function makeSpace(
         ? { hash: packages[packages.length - 1]!.metadata.to, invariants: [] }
         : null,
     refsDir: '/project/migrations/refs',
+    migrationsDir: '/project/migrations',
     resolveContract: () => ({ storage: { storageHash: HASH_B } }) as Contract,
     deserializeContract: (json) => json as Contract,
   });

@@ -1,10 +1,14 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import {
+  contractSnapshotDir,
+  writeContractSnapshot,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import { join } from 'pathe';
+import { join, relative } from 'pathe';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   executeCommand,
@@ -15,10 +19,11 @@ import {
 
 /**
  * `migrate --to <node>` verifies/applies against the TARGET bundle's
- * destination contract (its sibling `end-contract.json`), not the emitted
- * `contract.json`. This is what lets a rollback / arbitrary-target migrate
- * succeed without first re-emitting the target contract. With `--to` omitted,
- * the emitted contract stays the apply contract.
+ * destination contract (resolved from the contract snapshot store, keyed by
+ * the bundle's `to` hash), not the emitted `contract.json`. This is what
+ * lets a rollback / arbitrary-target migrate succeed without first
+ * re-emitting the target contract. With `--to` omitted, the emitted
+ * contract stays the apply contract.
  *
  * The control client is mocked so the assertion is purely about *which*
  * contract `migrate` hands to `client.migrate` — path resolution and the real
@@ -58,17 +63,17 @@ function contractEnvelope(storageHash: string): Record<string, unknown> {
 }
 
 async function writeBundle(
+  migrationsDir: string,
   dir: string,
   base: Omit<MigrationMetadata, 'migrationHash'>,
   endContractHash: string,
 ): Promise<void> {
   const metadata: MigrationMetadata = { ...base, migrationHash: computeMigrationHash(base, OPS) };
   await writeMigrationPackage(dir, metadata, OPS);
-  await writeFile(
-    join(dir, 'end-contract.json'),
-    JSON.stringify(contractEnvelope(endContractHash)),
-  );
-  await writeFile(join(dir, 'end-contract.d.ts'), 'export type Contract = unknown;\n');
+  await writeContractSnapshot(migrationsDir, endContractHash, {
+    contractJson: contractEnvelope(endContractHash),
+    contractDts: 'export type Contract = unknown;\n',
+  });
 }
 
 /**
@@ -77,15 +82,18 @@ async function writeBundle(
  */
 async function setupAppliedState(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-to-'));
-  const appDir = join(cwd, 'migrations', 'app');
+  const migrationsDir = join(cwd, 'migrations');
+  const appDir = join(migrationsDir, 'app');
   await mkdir(join(appDir, 'refs'), { recursive: true });
 
   await writeBundle(
+    migrationsDir,
     join(appDir, '00001_init'),
     { from: EMPTY, to: C1, providedInvariants: [], createdAt: '2026-02-25T14:00:00.000Z' },
     C1,
   );
   await writeBundle(
+    migrationsDir,
     join(appDir, '00002_add_phone'),
     { from: C1, to: C2, providedInvariants: [], createdAt: '2026-02-25T14:01:00.000Z' },
     C2,
@@ -204,12 +212,16 @@ describe('migrate --to verifies against the target bundle contract', () => {
     expect(capturedApplyContractHash()).toBe(C2);
   });
 
-  it('reports contract validation failure naming corrupt target end-contract.json', async () => {
+  it('reports contract validation failure naming a corrupt target store entry', async () => {
     const { createMigrateCommand } = await import('../../src/commands/migrate');
     const cwd = await setupAppliedState();
     tempDirs.push(cwd);
-    const endContractRel = join('migrations', 'app', '00001_init', 'end-contract.json');
-    await writeFile(join(cwd, endContractRel), '{ not json');
+    const targetSnapshotPath = join(
+      contractSnapshotDir(join(cwd, 'migrations'), C1),
+      'contract.json',
+    );
+    const endContractRel = relative(cwd, targetSnapshotPath);
+    await writeFile(targetSnapshotPath, '{ not json');
     process.chdir(cwd);
 
     const exitCode = await runAndCaptureExit(() =>
@@ -233,7 +245,7 @@ describe('migrate --to verifies against the target bundle contract', () => {
   // Regression lock for TML-2478: the top-level `contract.json` read at the
   // migrate command entry must return a structured `notOk` envelope, never
   // throw past `handleResult`. (Distinct from the corrupt target-bundle
-  // `end-contract.json` case above, which is reached later via `contractAt`.)
+  // store-entry case above, which is reached later via `contractAt`.)
   it('reports file-not-found when the top-level contract.json is absent', async () => {
     const { createMigrateCommand } = await import('../../src/commands/migrate');
     const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-preflight-'));

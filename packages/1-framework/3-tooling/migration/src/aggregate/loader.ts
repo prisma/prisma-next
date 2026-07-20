@@ -1,8 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { readContractSnapshotJson } from '../contract-snapshot-store';
 import { MigrationToolsError } from '../errors';
 import { readMigrationsDir } from '../io';
-import { readContractSpaceContract } from '../read-contract-space-contract';
-import { readContractSpaceHeadRef } from '../read-contract-space-head-ref';
+import {
+  type ContractSpaceHeadRef,
+  readContractSpaceHeadRef,
+} from '../read-contract-space-head-ref';
 import { HEAD_REF_NAME, type RefLoadProblem, readRefsTolerant } from '../refs';
 import {
   APP_SPACE_ID,
@@ -26,7 +29,8 @@ export type { DeclaredExtensionEntry } from '../integrity-violation';
  * artefact — in Prisma Next it is always compiled from the project's
  * central contract, so the caller always has it and threads it in as
  * `appContract`. `deserializeContract` is held and called lazily only for
- * the on-disk extension contracts (`migrations/<ext>/contract.json`).
+ * the extension contracts resolved from the contract snapshot store,
+ * keyed by each extension space's head ref hash.
  */
 export interface LoadAggregateInput {
   readonly migrationsDir: string;
@@ -77,7 +81,7 @@ async function loadAppSpace(
   deserializeContract: (raw: unknown) => Contract,
 ): Promise<IntegritySpaceState> {
   const spaceDir = spaceMigrationDirectory(migrationsDir, APP_SPACE_ID);
-  const { packages, problems } = await readMigrationsDir(spaceDir);
+  const { packages, problems } = await readMigrationsDir(spaceDir, { migrationsDir });
   const { refs, problems: refProblems } = await readRefsTolerant(spaceRefsDirectory(spaceDir));
 
   const space = createAggregateContractSpace({
@@ -86,6 +90,7 @@ async function loadAppSpace(
     refs,
     headRef: { hash: appContract.storage.storageHash, invariants: [] },
     refsDir: spaceRefsDirectory(spaceDir),
+    migrationsDir,
     resolveContract: () => appContract,
     deserializeContract,
   });
@@ -125,11 +130,11 @@ async function loadExtensionSpace(
   deserializeContract: (raw: unknown) => Contract,
 ): Promise<IntegritySpaceState> {
   const spaceDir = spaceMigrationDirectory(migrationsDir, spaceId);
-  const { packages, problems } = await readMigrationsDir(spaceDir);
+  const { packages, problems } = await readMigrationsDir(spaceDir, { migrationsDir });
   const { refs, problems: refProblems } = await readRefsTolerant(spaceRefsDirectory(spaceDir));
   const { headRef, problem: headRefProblem } = await readHeadRefTolerant(migrationsDir, spaceId);
 
-  const rawContract = await readRawContractDeferred(migrationsDir, spaceId);
+  const rawContract = await readRawContractDeferred(migrationsDir, spaceId, headRef);
 
   const space = createAggregateContractSpace({
     spaceId,
@@ -137,6 +142,7 @@ async function loadExtensionSpace(
     refs,
     headRef,
     refsDir: spaceRefsDirectory(spaceDir),
+    migrationsDir,
     resolveContract: () => deserializeContract(rawContract()),
     deserializeContract,
   });
@@ -190,17 +196,28 @@ function detailOf(error: unknown): string {
 }
 
 /**
- * Read the raw on-disk contract eagerly (cheap I/O) but defer its
- * (throwing) failure to call time, so a missing or unparseable
- * `contract.json` becomes a `contract()` throw — surfaced as
- * `contractUnreadable` — rather than a construction failure.
+ * Read the raw contract snapshot-store entry eagerly (cheap I/O) but defer
+ * its (throwing) failure to call time, so a missing or unparseable store
+ * entry becomes a `contract()` throw — surfaced as `contractUnreadable` —
+ * rather than a construction failure. When `headRef` is absent there is no
+ * hash to resolve against the store, so the deferred call always throws;
+ * `checkIntegrity` already reports that case as `headRefMissing`, and a
+ * `checkContracts` pass surfaces the same space as `contractUnreadable`.
  */
 async function readRawContractDeferred(
   migrationsDir: string,
   spaceId: string,
+  headRef: ContractSpaceHeadRef | null,
 ): Promise<() => unknown> {
+  if (headRef === null) {
+    return () => {
+      throw new Error(
+        `Contract space "${spaceId}" has no head ref; its contract cannot be resolved from the snapshot store without one.`,
+      );
+    };
+  }
   try {
-    const raw = await readContractSpaceContract(migrationsDir, spaceId);
+    const raw = await readContractSnapshotJson(migrationsDir, headRef.hash);
     return () => raw;
   } catch (error) {
     return () => {
