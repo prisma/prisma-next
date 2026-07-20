@@ -42,71 +42,6 @@ changes:
       contains:
         - "policy_select"
       anyMatch: true
-  - id: scalar-type-descriptors-channel-removed
-    summary: |
-      The scalar-type descriptor channel is retired in favour of the unified authoring type
-      namespace. Projects with custom control-stack setups that import
-      `createPostgresScalarTypeDescriptors` / `createSqliteScalarTypeDescriptors`, or that read
-      `scalarTypeDescriptors` from a control stack or contract-source context, must migrate:
-      those exports are deleted, and scalar types are now zero-arg type-constructor
-      contributions in the component's `authoring.type` namespace — e.g.
-      `String: { kind: 'typeConstructor', output: { codecId: 'pg/text@1', nativeType: 'text' } }`.
-      Read the scalar type names via `stack.scalarTypes`, or the full name ->
-      `{ codecId, nativeType }` map via `collectScalarTypeConstructors(stack.authoringContributions.type)`
-      from `@prisma-next/framework-components/authoring`. Standard target setups
-      (`@prisma-next/postgres`, `@prisma-next/sqlite`) supply the contributions themselves.
-    detection:
-      glob: "**/*.{ts,mts,cts}"
-      contains:
-        - "createPostgresScalarTypeDescriptors"
-        - "createSqliteScalarTypeDescriptors"
-        - "scalarTypeDescriptors"
-      anyMatch: true
-  - id: postgres-json-rebound-to-native-json
-    summary: |
-      On the postgres target the PSL `Json` scalar re-binds from `pg/jsonb@1` / `jsonb` to
-      `pg/json@1` / `json`; a new bare `Jsonb` scalar carries `pg/jsonb@1` / `jsonb`. Postgres
-      schemas that use `Json` and mean jsonb storage (which every pre-0.15 `Json` field did)
-      must switch those fields — and `types {}` aliases — to `Jsonb`, then re-run
-      `prisma-next contract emit`; with `Jsonb` the emitted `contract.json` is byte-identical
-      to the pre-0.15 output. A field left as `Json` now emits a native `json` column and a
-      new storage hash, which against an existing jsonb database is a schema change. The
-      legacy `@db.Json` attribute path is unchanged (`Json @db.Json` still yields
-      `pg/json@1` / `json`), and sqlite/mongo `Json` bindings are untouched. The TS builder
-      surface (`field.json()`, `jsonbColumn`) is unchanged and stays jsonb.
-    detection:
-      glob: "**/*.prisma"
-      contains:
-        - "Json"
-      anyMatch: true
-  - id: default-generators-no-longer-set-storage
-    summary: |
-      `@default(<generator>)` no longer influences a column's storage — the type position is
-      the only storage decider. Pre-0.15, a generator default on a bare `String` field re-picked
-      the column's storage to a sized char: `String @default(uuid())` / `@default(uuid(7))`
-      emitted `sql/char@1` / `character(36)`, `@default(cuid(2))` `character(24)`,
-      `@default(nanoid())` `character(21)` (or `character(<size>)` for `nanoid(<size>)`), and
-      `@default(ulid())` `character(26)`. From 0.15 such fields emit the target's `String`
-      storage (postgres: `pg/text@1` / `text`) with the same execution-time generator, so a
-      re-emit produces a new storage hash — against an existing database created with the char
-      storage this is a schema change. To keep the prior storage byte-identical, name it in the
-      type position: `Char(36) @default(uuid())`, `Char(24) @default(cuid(2))`,
-      `Char(21) @default(nanoid())` (or `Char(<size>)` for a sized nanoid), `Char(26)
-      @default(ulid())` — or adopt native `Uuid` for `uuid()` if a `uuid`-typed column is
-      preferred (that is a schema change too). Then re-run `prisma-next contract emit` and, if
-      you accepted a storage change, plan/apply the matching migration. Generator applicability
-      validation is unchanged (`uuid()` on `Int` still fails with
-      `PSL_INVALID_DEFAULT_APPLICABILITY`), and the TS builder presets
-      (`field.id.uuidv4String()`, `field.generated(uuidv4())`, …) are untouched — they bundle
-      their `char(N)` storage explicitly.
-    detection:
-      glob: "**/*.prisma"
-      contains:
-        - "@default(uuid("
-        - "@default(cuid("
-        - "@default(nanoid("
-        - "@default(ulid("
-      anyMatch: true
 ---
 
 <!--
@@ -264,12 +199,11 @@ emitted contract are byte-identical. No consumer action — re-scaffold via
 
 # Upgrade 0.14 → 0.15
 
-Consumer actions for this transition are recorded in the `changes[]` entries in
-the frontmatter above.
+No consumer-facing action is required for this transition.
 
-Beyond those, the diff under `examples/` (and the example migration snapshots)
-is incidental — emitted contract artefacts (`contract.json` / `contract.d.ts`)
-were regenerated for two internal substrate changes:
+The diff under `examples/` (and the example migration snapshots) is incidental —
+emitted contract artefacts (`contract.json` / `contract.d.ts`) were regenerated
+for two internal substrate changes:
 
 - **Scalar-list storage machinery.** The emitted contracts now carry the
   adapter-reported `scalarList` capability marker and the bumped envelope
@@ -282,7 +216,7 @@ were regenerated for two internal substrate changes:
   `(namespace, table, column)`, disambiguating same-named tables across
   namespaces. The runtime applies defaults by namespace transparently.
 
-Both regenerations are picked up by re-running `prisma-next contract emit`.
+No user action — a re-emit picks up the new contract shape.
 
 <!--
 Exercise Mongo enums in retail-store (this PR): the retail-store example replaces
