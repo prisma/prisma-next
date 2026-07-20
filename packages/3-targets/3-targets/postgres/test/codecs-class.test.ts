@@ -222,6 +222,16 @@ describe('codecs-class', () => {
       );
     });
 
+    it('throws on calendar-invalid dates instead of silently normalizing them', () => {
+      expect(() => codec.decodeJson('2024-02-31')).toThrow(/Invalid date string for pg\/date@1/);
+      expect(() => codec.decodeJson('2024-13-01')).toThrow(/Invalid date string for pg\/date@1/);
+      expect(() => codec.decodeJson('0024-01-15')).toThrow(/Invalid date string for pg\/date@1/);
+    });
+
+    it('still accepts a valid calendar date', () => {
+      expect(codec.decodeJson('2024-01-15')).toEqual(new Date(Date.UTC(2024, 0, 15)));
+    });
+
     it('exposes equality-order traits and the date target/native types', () => {
       expect(pgDateDescriptor.traits).toEqual(['equality', 'order']);
       expect(pgDateDescriptor.targetTypes).toEqual(['date']);

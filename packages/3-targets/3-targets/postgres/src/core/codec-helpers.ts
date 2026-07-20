@@ -148,8 +148,11 @@ export const pgDateDecodeJson = (json: JsonValue): Date => {
     throw new Error(`Invalid date string for pg/date@1: ${json}`);
   }
   const [, yearText, monthText, dayText] = match;
-  const date = new Date(Date.UTC(Number(yearText), Number(monthText) - 1, Number(dayText)));
-  if (Number.isNaN(date.getTime())) {
+  const year = Number(yearText);
+  const month = Number(monthText) - 1;
+  const day = Number(dayText);
+  const date = new Date(Date.UTC(year, month, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) {
     throw new Error(`Invalid date string for pg/date@1: ${json}`);
   }
   return date;
