@@ -3,7 +3,7 @@
  * as a bare token in PSL and a string literal in TypeScript. Shared by the
  * extension-block parameter vocabulary (`PslBlockParamOption`) and the helper
  * argument vocabulary (`AuthoringArgumentDescriptor`) so the option concept is
- * declared once. See ADR 234.
+ * declared once. See ADR 239.
  */
 export interface AuthoringOption {
   readonly kind: 'option';

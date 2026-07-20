@@ -36,7 +36,7 @@ export type AuthoringArgRef = {
  *
  * Must not be used in the `codecId`/`nullable`/`id`/`unique` positions of a
  * preset output: the type-level `ResolveTemplateValue` does not implement
- * select, and those fields feed TS builder-state inference. See ADR 234.
+ * select, and those fields feed TS builder-state inference. See ADR 239.
  */
 export interface AuthoringSelectRef {
   readonly kind: 'select';
