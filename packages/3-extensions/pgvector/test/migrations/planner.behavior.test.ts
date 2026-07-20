@@ -72,6 +72,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result).toMatchObject({
@@ -112,6 +113,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -162,6 +164,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result).toMatchObject({
@@ -774,6 +777,7 @@ async function planUserTableOperations(
     fromContract: null,
     frameworkComponents: options?.frameworkComponents ?? [],
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
   if (result.kind !== 'success') throw new Error('expected planner success');
   return Promise.all(result.plan.operations) as Promise<

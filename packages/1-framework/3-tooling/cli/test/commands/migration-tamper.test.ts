@@ -430,6 +430,7 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
       'proceeds when cross-space layout drift is the only integrity fault',
       async () => {
         const ORPHAN_HASH = `sha256:${'c'.repeat(64)}`;
+        const DEST_HASH = `sha256:${'d'.repeat(64)}`;
         const cwd = await mkdtemp(join(tmpdir(), 'cli-migration-new-orphan-'));
         tempDirs.push(cwd);
 
@@ -462,7 +463,7 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
         await writeFile(
           join(contractDir, 'contract.json'),
           JSON.stringify({
-            storage: { storageHash: TO_HASH, namespaces: {} },
+            storage: { storageHash: DEST_HASH, namespaces: {} },
             schemaVersion: SCHEMA_VERSION,
             target: TARGET,
             targetFamily: TARGET_FAMILY,

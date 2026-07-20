@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { loadConfig } from '@prisma-next/config-loader';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
@@ -9,15 +9,14 @@ import {
   type OperationPreview,
   type SchemaOwnership,
 } from '@prisma-next/framework-components/control';
-import { canonicalizeJson } from '@prisma-next/framework-components/utils';
+import {
+  snapshotsImportPathFrom,
+  writeContractSnapshot,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
-import {
-  copyFilesWithRename,
-  formatMigrationDirName,
-  writeMigrationPackage,
-} from '@prisma-next/migration-tools/io';
+import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -62,27 +61,6 @@ interface MigrationPlanOptions extends CommonCommandOptions {
   readonly to?: string;
 }
 
-async function writeSnapshotContractArtifacts(
-  packageDir: string,
-  contractJson: unknown,
-  contractDts: string,
-  artifactBasename: 'start-contract' | 'end-contract',
-): Promise<void> {
-  await mkdir(packageDir, { recursive: true });
-  const jsonContent = `${canonicalizeJson(contractJson)}\n`;
-  const dtsContent = contractDts.endsWith('\n') ? contractDts : `${contractDts}\n`;
-  await writeFile(join(packageDir, `${artifactBasename}.json`), jsonContent);
-  await writeFile(join(packageDir, `${artifactBasename}.d.ts`), dtsContent);
-}
-
-async function writeSnapshotStartContract(
-  packageDir: string,
-  contractJson: unknown,
-  contractDts: string,
-): Promise<void> {
-  await writeSnapshotContractArtifacts(packageDir, contractJson, contractDts, 'start-contract');
-}
-
 type PlannerSuccess = {
   readonly plannedOps: readonly MigrationPlanOperation[];
   readonly migrationTsContent: string;
@@ -99,6 +77,7 @@ async function runPlannerLeg(
   fromContract: Contract | null,
   spaceId: string,
   ownership: SchemaOwnership,
+  snapshotsImportPath: string,
 ): Promise<Result<PlannerSuccess, CliStructuredError>> {
   const fromSchema = migrations.contractToSchema(fromContract, frameworkComponents);
   const plannerResult = planner.plan({
@@ -114,6 +93,7 @@ async function runPlannerLeg(
     // space in the aggregate, so it stays a genuine drop; a table another
     // space owns is never dropped.
     ownership,
+    snapshotsImportPath,
   });
   if (plannerResult.kind === 'failure') {
     return notOk(
@@ -315,8 +295,11 @@ async function executeMigrationPlanCommand(
 
   let fromContract: Contract | null = null;
   let fromHash: string | null = null;
-  let fromContractSourceDir: string | null = null;
-  let snapshotStartContract: { contractJson: unknown; contractDts: string } | null = null;
+  let snapshotStartContract: {
+    readonly fromHash: string;
+    readonly contractJson: unknown;
+    readonly contractDts: string;
+  } | null = null;
   let isAutoBaseline = false;
 
   const tolerantAggregateResult = await loadContractSpaceAggregateForCli({
@@ -346,12 +329,12 @@ async function executeMigrationPlanCommand(
     case 'graph-node':
       fromHash = resolutionResult.value.fromHash;
       fromContract = resolutionResult.value.fromContract;
-      fromContractSourceDir = resolutionResult.value.sourceDir;
       break;
     case 'snapshot':
       fromHash = resolutionResult.value.fromHash;
       fromContract = resolutionResult.value.fromContract;
       snapshotStartContract = {
+        fromHash: resolutionResult.value.fromHash,
         contractJson: resolutionResult.value.contractJson,
         contractDts: resolutionResult.value.contractDts,
       };
@@ -360,6 +343,7 @@ async function executeMigrationPlanCommand(
       fromHash = resolutionResult.value.fromHash;
       fromContract = resolutionResult.value.fromContract;
       snapshotStartContract = {
+        fromHash: resolutionResult.value.fromHash,
         contractJson: resolutionResult.value.contractJson,
         contractDts: resolutionResult.value.contractDts,
       };
@@ -463,24 +447,26 @@ async function executeMigrationPlanCommand(
     [config.target, config.adapter, ...(config.extensionPacks ?? [])],
   );
 
-  // Write the planned package's destination `end-contract.*`. With `--to`, the
-  // resolved target's raw artifacts are written; otherwise the emitted
-  // `contract.json` / `contract.d.ts` are copied verbatim (today's behaviour).
-  async function writeDestinationEndContract(packageDir: string): Promise<void> {
+  // Write the planned package's destination contract into the snapshot store.
+  // With `--to`, the resolved target's raw artifacts are written; otherwise
+  // the emitted `contract.json` / `contract.d.ts` are read from disk.
+  async function writeDestinationSnapshot(destHash: string): Promise<void> {
     if (toArtifacts !== null) {
-      await writeSnapshotContractArtifacts(
-        packageDir,
-        toArtifacts.contractJson,
-        toArtifacts.contractDts,
-        'end-contract',
-      );
+      await writeContractSnapshot(migrationsDir, destHash, {
+        contractJson: toArtifacts.contractJson,
+        contractDts: toArtifacts.contractDts,
+      });
       return;
     }
     const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
-    await copyFilesWithRename(packageDir, [
-      { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
-      { sourcePath: destinationArtifacts.dtsPath, destName: 'end-contract.d.ts' },
+    const [contractJsonRaw, contractDts] = await Promise.all([
+      readFile(destinationArtifacts.jsonPath, 'utf-8'),
+      readFile(destinationArtifacts.dtsPath, 'utf-8'),
     ]);
+    await writeContractSnapshot(migrationsDir, destHash, {
+      contractJson: JSON.parse(contractJsonRaw) as unknown,
+      contractDts,
+    });
   }
 
   try {
@@ -507,6 +493,7 @@ async function executeMigrationPlanCommand(
         null,
         aggregate.app.spaceId,
         aggregate,
+        snapshotsImportPathFrom(baselinePackageDir, migrationsDir),
       );
       if (!baselineLeg.ok) {
         return notOk(baselineLeg.failure);
@@ -519,12 +506,10 @@ async function executeMigrationPlanCommand(
         baselineTimestamp,
         baselineLeg.value,
       );
-      await writeSnapshotContractArtifacts(
-        baselinePackageDir,
-        snapshotStartContract.contractJson,
-        snapshotStartContract.contractDts,
-        'end-contract',
-      );
+      await writeContractSnapshot(migrationsDir, fromHash, {
+        contractJson: snapshotStartContract.contractJson,
+        contractDts: snapshotStartContract.contractDts,
+      });
 
       if (fromHash === toStorageHash) {
         const baselineOps = baselineLeg.value.hasPlaceholders ? [] : baselineLeg.value.plannedOps;
@@ -577,6 +562,7 @@ async function executeMigrationPlanCommand(
         fromContract,
         aggregate.app.spaceId,
         aggregate,
+        snapshotsImportPathFrom(deltaPackageDir, migrationsDir),
       );
       if (!deltaLeg.ok) {
         return notOk(deltaLeg.failure);
@@ -589,12 +575,11 @@ async function executeMigrationPlanCommand(
         deltaTimestamp,
         deltaLeg.value,
       );
-      await writeDestinationEndContract(deltaPackageDir);
-      await writeSnapshotStartContract(
-        deltaPackageDir,
-        snapshotStartContract.contractJson,
-        snapshotStartContract.contractDts,
-      );
+      await writeDestinationSnapshot(toStorageHash);
+      await writeContractSnapshot(migrationsDir, fromHash, {
+        contractJson: snapshotStartContract.contractJson,
+        contractDts: snapshotStartContract.contractDts,
+      });
 
       const deltaOps = deltaLeg.value.hasPlaceholders ? [] : deltaLeg.value.plannedOps;
       if (deltaLeg.value.hasPlaceholders) {
@@ -651,6 +636,7 @@ async function executeMigrationPlanCommand(
       fromContract,
       aggregate.app.spaceId,
       aggregate,
+      snapshotsImportPathFrom(packageDir, migrationsDir),
     );
     if (!deltaLeg.ok) {
       return notOk(deltaLeg.failure);
@@ -663,21 +649,12 @@ async function executeMigrationPlanCommand(
       timestamp,
       deltaLeg.value,
     );
-    await writeDestinationEndContract(packageDir);
-    if (fromContractSourceDir !== null) {
-      const sourceArtifacts = getEmittedArtifactPaths(
-        join(fromContractSourceDir, 'end-contract.json'),
-      );
-      await copyFilesWithRename(packageDir, [
-        { sourcePath: sourceArtifacts.jsonPath, destName: 'start-contract.json' },
-        { sourcePath: sourceArtifacts.dtsPath, destName: 'start-contract.d.ts' },
-      ]);
-    } else if (snapshotStartContract !== null) {
-      await writeSnapshotStartContract(
-        packageDir,
-        snapshotStartContract.contractJson,
-        snapshotStartContract.contractDts,
-      );
+    await writeDestinationSnapshot(toStorageHash);
+    if (snapshotStartContract !== null) {
+      await writeContractSnapshot(migrationsDir, snapshotStartContract.fromHash, {
+        contractJson: snapshotStartContract.contractJson,
+        contractDts: snapshotStartContract.contractDts,
+      });
     }
 
     if (deltaLeg.value.hasPlaceholders) {

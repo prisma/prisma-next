@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => ({
   readRefs: vi.fn(),
   readRefSnapshot: vi.fn(),
   writeMigrationPackage: vi.fn(),
-  copyFilesWithRename: vi.fn(),
+  writeContractSnapshot: vi.fn(),
   writeMigrationTs: vi.fn(),
   assertFrameworkComponentsCompatible: vi.fn(),
   extractSqlDdl: vi.fn(),
@@ -74,8 +74,14 @@ vi.mock('@prisma-next/migration-tools/io', async () => {
   return {
     ...actual,
     writeMigrationPackage: mocks.writeMigrationPackage,
-    copyFilesWithRename: mocks.copyFilesWithRename,
   };
+});
+
+vi.mock('@prisma-next/migration-tools/contract-snapshot-store', async () => {
+  const actual = await vi.importActual<
+    typeof import('@prisma-next/migration-tools/contract-snapshot-store')
+  >('@prisma-next/migration-tools/contract-snapshot-store');
+  return { ...actual, writeContractSnapshot: mocks.writeContractSnapshot };
 });
 
 vi.mock('@prisma-next/migration-tools/migration-ts', () => ({
@@ -319,7 +325,6 @@ function setupAutoBaselineEmptyGraph(fromHash = OLD_HASH, toHash = NEW_HASH): vo
   setupDbRefFromHash(fromHash, []);
   mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
   mocks.writeMigrationPackage.mockResolvedValue(undefined);
-  mocks.copyFilesWithRename.mockResolvedValue(undefined);
   mocks.extractSqlDdl.mockReturnValue([]);
 }
 
@@ -350,6 +355,10 @@ describe('migration plan command', () => {
     });
     mocks.mkdir.mockResolvedValue(undefined);
     mocks.writeFile.mockResolvedValue(undefined);
+    mocks.writeContractSnapshot.mockResolvedValue({
+      written: true,
+      dir: '/tmp/test/migrations/snapshots/mock',
+    });
   }, timeouts.typeScriptCompilation);
 
   afterEach(() => {
@@ -368,6 +377,7 @@ describe('migration plan command', () => {
     vi.doUnmock('../../src/utils/command-helpers');
     vi.doUnmock('@prisma-next/migration-tools/refs');
     vi.doUnmock('@prisma-next/migration-tools/io');
+    vi.doUnmock('@prisma-next/migration-tools/contract-snapshot-store');
     vi.doUnmock('@prisma-next/migration-tools/migration-ts');
     vi.doUnmock('../../src/utils/framework-components');
     vi.doUnmock('../../src/control-api/operations/extract-sql-ddl');
@@ -399,6 +409,16 @@ describe('migration plan command', () => {
       expect(deltaMeta.from).toBe(OLD_HASH);
       expect(deltaMeta.to).toBe(NEW_HASH);
 
+      // The baseline package's end contract and the delta package's start
+      // contract are the same fromHash-keyed store entry (write-if-absent
+      // makes the second call idempotent); the delta's destination is a
+      // separate entry keyed by toHash.
+      const snapshotHashes = mocks.writeContractSnapshot.mock.calls.map(([, hash]) => hash);
+      expect(snapshotHashes).toEqual([OLD_HASH, NEW_HASH, OLD_HASH]);
+      for (const call of mocks.writeContractSnapshot.mock.calls) {
+        expect(call[0]).toBe('/tmp/test/migrations');
+      }
+
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       const result = JSON.parse(jsonLine!) as MigrationPlanResult;
       expect(result.baselineDir).toBeDefined();
@@ -420,7 +440,6 @@ describe('migration plan command', () => {
       setupDbRefFromHash(SAME_HASH, []);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyFilesWithRename.mockResolvedValue(undefined);
 
       const command = createMigrationPlanCommand();
       const exitCode = await executeCommand(command, ['--json']);
@@ -583,7 +602,6 @@ describe('migration plan command', () => {
       setupDbRefFromHash(OLD_HASH, []);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyFilesWithRename.mockResolvedValue(undefined);
 
       const command = createMigrationPlanCommand();
       const exitCode = await executeCommand(command, ['--json']);
@@ -635,7 +653,6 @@ describe('migration plan command', () => {
       setupDbRefFromHash(OLD_HASH, bundles);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
 
       const command = createMigrationPlanCommand();
@@ -657,6 +674,20 @@ describe('migration plan command', () => {
         ],
       });
       expect(result).not.toHaveProperty('migrationHash');
+
+      // With no --from flag, resolution goes through the named 'db' ref
+      // (snapshot provenance), which carries its own contract snapshot —
+      // migration plan writes both the destination and that start snapshot.
+      expect(mocks.writeContractSnapshot).toHaveBeenCalledTimes(2);
+      expect(mocks.writeContractSnapshot).toHaveBeenCalledWith(
+        '/tmp/test/migrations',
+        NEW_HASH,
+        expect.anything(),
+      );
+      expect(mocks.writeContractSnapshot).toHaveBeenCalledWith('/tmp/test/migrations', OLD_HASH, {
+        contractJson: JSON.parse(makeContractJson(OLD_HASH)),
+        contractDts: 'export type Contract = unknown;\n',
+      });
     });
   });
 
@@ -717,7 +748,6 @@ describe('migration plan command', () => {
       setupDbRefFromHash(OLD_HASH, bundles);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyFilesWithRename.mockResolvedValue(undefined);
 
       const command = createMigrationPlanCommand();
       const exitCode = await executeCommand(command, ['--json']);
@@ -748,7 +778,6 @@ describe('migration plan command', () => {
       setupDbRefFromHash(`sha256:${'b'.repeat(64)}`, bundles);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyFilesWithRename.mockResolvedValue(undefined);
 
       const command = createMigrationPlanCommand();
       await executeCommand(command, ['--json']);
@@ -778,7 +807,6 @@ describe('migration plan command', () => {
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
 
       const command = createMigrationPlanCommand();
@@ -792,9 +820,13 @@ describe('migration plan command', () => {
       expect(result.operations).toEqual([
         { id: 'table.comment', label: 'Drop table "comment"', operationClass: 'destructive' },
       ]);
-      // Destination end-contract is written from the resolved target, not
-      // copied from the emitted contract.json.
-      expect(mocks.copyFilesWithRename).not.toHaveBeenCalled();
+      // The destination snapshot is written from the resolved target's raw
+      // artifacts (via contractAt), not read back from the emitted
+      // contract.json.
+      expect(mocks.writeContractSnapshot).toHaveBeenCalledWith('/tmp/test/migrations', OLD_HASH, {
+        contractJson: JSON.parse(makeContractJson(OLD_HASH)),
+        contractDts: 'export type Contract = unknown;\n',
+      });
     });
 
     it('renders the destructive-operations warning for a reverse delta', async () => {
@@ -814,7 +846,6 @@ describe('migration plan command', () => {
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
 
       const command = createMigrationPlanCommand();
@@ -837,7 +868,6 @@ describe('migration plan command', () => {
       setupResolutionAggregate(bundles, { staging: { hash: NEW_HASH, invariants: [] } });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
 
       const command = createMigrationPlanCommand();
@@ -854,16 +884,19 @@ describe('migration plan command', () => {
       const result = JSON.parse(jsonLine!) as MigrationPlanResult;
       expect(result.from).toBe(OLD_HASH);
       expect(result.to).toBe(NEW_HASH);
-      // Explicit graph-node --from still copies start-contract from the bundle;
-      // the destination end-contract comes from the resolved --to instead.
-      const startCopy = mocks.copyFilesWithRename.mock.calls.find(([, files]) =>
-        (files as { destName: string }[]).some((f) => f.destName === 'start-contract.json'),
+      // An explicit --from that resolves to a graph node relies on the
+      // predecessor's end contract already being in the store under its own
+      // hash — migration plan writes no start-contract snapshot for it.
+      expect(mocks.writeContractSnapshot).not.toHaveBeenCalledWith(
+        '/tmp/test/migrations',
+        OLD_HASH,
+        expect.anything(),
       );
-      expect(startCopy).toBeDefined();
-      const endCopy = mocks.copyFilesWithRename.mock.calls.find(([, files]) =>
-        (files as { destName: string }[]).some((f) => f.destName === 'end-contract.json'),
-      );
-      expect(endCopy).toBeUndefined();
+      // The destination snapshot comes from the resolved --to target.
+      expect(mocks.writeContractSnapshot).toHaveBeenCalledWith('/tmp/test/migrations', NEW_HASH, {
+        contractJson: JSON.parse(makeContractJson(NEW_HASH)),
+        contractDts: 'export type Contract = unknown;\n',
+      });
     });
 
     it('preserves the emitted contract.json as the destination when --to is omitted', async () => {
@@ -873,7 +906,6 @@ describe('migration plan command', () => {
       setupDbRefFromHash(OLD_HASH, bundles);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
 
       const command = createMigrationPlanCommand();
@@ -883,38 +915,37 @@ describe('migration plan command', () => {
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
       const result = JSON.parse(jsonLine!) as MigrationPlanResult;
       expect(result.to).toBe(NEW_HASH);
-      const [, destinationFiles] = mocks.copyFilesWithRename.mock.calls[0]!;
-      expect(destinationFiles).toEqual([
-        { sourcePath: '/tmp/test/contract.json', destName: 'end-contract.json' },
-        { sourcePath: '/tmp/test/contract.d.ts', destName: 'end-contract.d.ts' },
-      ]);
+      // With no `--to`, the destination snapshot is read from the emitted
+      // contract.json / contract.d.ts rather than a resolved ref.
+      expect(mocks.writeContractSnapshot).toHaveBeenCalledWith('/tmp/test/migrations', NEW_HASH, {
+        contractJson: JSON.parse(makeContractJson(NEW_HASH)),
+        contractDts: makeContractJson(NEW_HASH),
+      });
     });
   });
 
-  describe('contract artifact copying', () => {
-    it('copies destination contract only when there is no prior migration', async () => {
+  describe('contract snapshot store writes', () => {
+    it('writes only the destination snapshot when there is no prior migration', async () => {
       setupBaseConfig();
-      const NEW_HASH = 'sha256:new-hash';
+      const NEW_HASH = `sha256:${'d'.repeat(64)}`;
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
       setupGreenfieldRefs();
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
 
       const command = createMigrationPlanCommand();
       await executeCommand(command, ['--json']);
 
-      expect(mocks.copyFilesWithRename).toHaveBeenCalledTimes(1);
-      const [, destinationFiles] = mocks.copyFilesWithRename.mock.calls[0]!;
-      expect(destinationFiles).toEqual([
-        { sourcePath: '/tmp/test/contract.json', destName: 'end-contract.json' },
-        { sourcePath: '/tmp/test/contract.d.ts', destName: 'end-contract.d.ts' },
-      ]);
+      expect(mocks.writeContractSnapshot).toHaveBeenCalledTimes(1);
+      expect(mocks.writeContractSnapshot).toHaveBeenCalledWith('/tmp/test/migrations', NEW_HASH, {
+        contractJson: JSON.parse(makeContractJson(NEW_HASH)),
+        contractDts: makeContractJson(NEW_HASH),
+      });
     });
 
-    it('copies both destination end-contract.* and start-contract.* when --from resolves via graph node', async () => {
+    it('writes only the destination snapshot when --from resolves via graph node (the predecessor is already in the store)', async () => {
       setupBaseConfig();
       mocks.readFile.mockImplementation(async (path: string) => {
         if (typeof path === 'string' && path.endsWith('end-contract.json')) {
@@ -926,29 +957,16 @@ describe('migration plan command', () => {
       setupResolutionAggregate(bundles, {});
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
 
       const command = createMigrationPlanCommand();
       await executeCommand(command, ['--json', '--from', OLD_HASH]);
 
-      expect(mocks.copyFilesWithRename).toHaveBeenCalledTimes(2);
-      const [, destinationFiles] = mocks.copyFilesWithRename.mock.calls[0]!;
-      const [, sourceFiles] = mocks.copyFilesWithRename.mock.calls[1]!;
-      expect(destinationFiles).toEqual([
-        { sourcePath: '/tmp/test/contract.json', destName: 'end-contract.json' },
-        { sourcePath: '/tmp/test/contract.d.ts', destName: 'end-contract.d.ts' },
-      ]);
-      expect(sourceFiles).toEqual([
-        {
-          sourcePath: '/tmp/test/migrations/20260301T0900_prev/end-contract.json',
-          destName: 'start-contract.json',
-        },
-        {
-          sourcePath: '/tmp/test/migrations/20260301T0900_prev/end-contract.d.ts',
-          destName: 'start-contract.d.ts',
-        },
-      ]);
+      expect(mocks.writeContractSnapshot).toHaveBeenCalledTimes(1);
+      expect(mocks.writeContractSnapshot).toHaveBeenCalledWith('/tmp/test/migrations', NEW_HASH, {
+        contractJson: JSON.parse(makeContractJson(NEW_HASH)),
+        contractDts: makeContractJson(NEW_HASH),
+      });
     });
 
     it('surfaces a structured file-not-found error when the predecessor end-contract.json is missing', async () => {

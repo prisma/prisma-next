@@ -621,6 +621,7 @@ describe('referential actions integration', () => {
             fromContract: null,
             frameworkComponents,
             spaceId: APP_SPACE_ID,
+            snapshotsImportPath: '../../snapshots',
           });
 
           expect(planResult.kind).toBe('success');

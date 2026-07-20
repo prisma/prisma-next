@@ -33,6 +33,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadContractSpaceAggregate } from '../src/aggregate/loader';
 import { verifyMigration } from '../src/aggregate/verifier';
 import { concatenateSpaceApplyInputs } from '../src/concatenate-space-apply-inputs';
+import { contractSnapshotDir } from '../src/contract-snapshot-store';
 import {
   type ContractSpaceHeadRecord,
   emitContractSpaceArtefacts,
@@ -48,7 +49,7 @@ const TEST_HEAD_HASH = 'sha256:0000000000000000000000000000000000000000000000000
 const TEST_INVARIANT = 'test-contract-space:create-test_box-v1';
 
 const testContract = {
-  storageHash: TEST_HEAD_HASH,
+  storage: { storageHash: TEST_HEAD_HASH },
   tables: { test_box: { columns: { x: 'int', y: 'int' } } },
 };
 const testContractDts =
@@ -104,7 +105,7 @@ describe('per-space verifier + runner against a project with deleted node_module
 
   it('verifyContractSpaces returns ok when on-disk artefacts + marker rows match — no descriptor needed', async () => {
     const spaceContractRaw = await readFile(
-      join(fixture.projectMigrationsDir, TEST_SPACE_ID, 'contract.json'),
+      join(contractSnapshotDir(fixture.projectMigrationsDir, TEST_HEAD_HASH), 'contract.json'),
       'utf-8',
     );
     expect(spaceContractRaw.trimEnd()).toBe(canonicalizeJson(testContract));
@@ -199,9 +200,9 @@ describe('per-space verifier + runner against a project with deleted node_module
  * property is locked at the API surface.
  */
 describe('aggregate pipeline (loader → planner → verifier) against deleted node_modules', () => {
-  const HEAD_HASH = 'sha256:abc123';
   let projectRoot: string;
   let migrationsDir: string;
+  let headHash: string;
 
   beforeEach(async () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'no-descriptor-pipeline-'));
@@ -230,17 +231,18 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
         },
       },
     });
+    headHash = spaceContract.storage.storageHash;
     await emitContractSpaceArtefacts(migrationsDir, TEST_SPACE_ID, {
       contract: spaceContract as unknown as Record<string, unknown>,
       contractDts: '// rendered .d.ts\nexport interface Contract {}\n',
-      headRef: { hash: HEAD_HASH, invariants: [] },
+      headRef: { hash: headHash, invariants: [] },
     });
 
-    // Baseline migration package — single edge from null → HEAD_HASH —
+    // Baseline migration package — single edge from null → headHash —
     // so reconstructGraph finds a path from EMPTY_CONTRACT_HASH.
     await writeTestPackage(join(migrationsDir, TEST_SPACE_ID, '20260225_baseline'), {
       from: null,
-      to: HEAD_HASH,
+      to: headHash,
     });
 
     await rm(join(projectRoot, 'node_modules'), { recursive: true, force: true });

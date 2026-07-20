@@ -94,6 +94,7 @@ async function planAndApply(
     policy: ALL_POLICY,
     fromContract: origin,
     frameworkComponents: [],
+    snapshotsImportPath: '../../snapshots',
   });
   if (result.kind !== 'success') {
     throw new Error(`Plan failed: ${JSON.stringify(result)}`);

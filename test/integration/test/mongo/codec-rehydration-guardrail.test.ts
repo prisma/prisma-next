@@ -159,6 +159,7 @@ function planAndRehydrate(contract: MongoContract): readonly MongoMigrationPlanO
     policy: ALL_POLICY,
     fromContract: null,
     frameworkComponents: [],
+    snapshotsImportPath: '../../snapshots',
   });
   if (result.kind !== 'success') {
     throw new Error(`Plan failed: ${JSON.stringify(result.conflicts ?? [])}`);

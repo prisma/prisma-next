@@ -1,7 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'pathe';
 import { MANIFEST_FILE } from './io';
-import { APP_SPACE_ID } from './space-layout';
+import { APP_SPACE_ID, RESERVED_SPACE_SUBDIR_NAMES } from './space-layout';
 
 function hasErrnoCode(error: unknown, code: string): boolean {
   return error instanceof Error && (error as { code?: string }).code === code;
@@ -10,11 +10,14 @@ function hasErrnoCode(error: unknown, code: string): boolean {
 /**
  * List the per-space subdirectories under
  * `<projectRoot>/migrations/`. Returns space-id directory names (sorted
- * alphabetically) — i.e. any non-dot-prefixed subdirectory whose root
- * does **not** contain a `migration.json` manifest. The manifest is the
+ * alphabetically) — i.e. any non-dot-prefixed, non-reserved
+ * ({@link RESERVED_SPACE_SUBDIR_NAMES}) subdirectory whose root does
+ * **not** contain a `migration.json` manifest. The manifest is the
  * structural marker of a user-authored migration directory (see
  * `readMigrationsDir` in `./io`); directory names themselves belong to
- * the user and are not part of the contract.
+ * the user and are not part of the contract. The reserved-name filter
+ * keeps `migrations/snapshots/` (the contract snapshot store) from ever
+ * being enumerated as a phantom contract space.
  *
  * Returns `[]` if the migrations directory does not exist (greenfield
  * project).
@@ -41,6 +44,7 @@ export async function listContractSpaceDirectories(
     .filter((e) => e.isDirectory)
     .map((e) => e.name)
     .filter((name) => !name.startsWith('.'))
+    .filter((name) => !RESERVED_SPACE_SUBDIR_NAMES.has(name))
     .sort();
 
   const manifestChecks = await Promise.all(

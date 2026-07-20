@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
+import { writeContractSnapshot } from './contract-snapshot-store';
 import type { ContractSpaceHeadRef } from './read-contract-space-head-ref';
 import { assertValidSpaceId, spaceRefsDirectory } from './space-layout';
 
@@ -31,12 +32,17 @@ export interface ContractSpaceArtefactInputs {
 }
 
 /**
- * Emit the per-space artefacts (`contract.json`, `contract.d.ts`,
- * `refs/head.json`) under `<projectMigrationsDir>/<spaceId>/`.
+ * Emit the per-space artefacts — the head contract snapshot (written into
+ * the migrations-root-wide `snapshots/` store, keyed by `headRef.hash`) and
+ * `refs/head.json` — under `<projectMigrationsDir>/<spaceId>/`.
  *
- * Always-overwrite: the framework owns these files; running `migrate`
- * twice with the same inputs is a no-op observably (idempotent), but the
- * helper does not check pre-existing contents — re-emit always wins.
+ * The head contract snapshot is write-if-absent (see
+ * {@link writeContractSnapshot}): a changed extension contract has a new
+ * hash, so it lands as a new store entry; an unchanged hash means identical
+ * canonical content already sits there. `refs/head.json` stays
+ * always-overwrite: the framework owns it, so running `migrate` twice with
+ * the same inputs is a no-op observably (idempotent), but the helper does
+ * not check pre-existing contents — re-emit always wins.
  *
  * Path layout matches the convention in
  * [`spaceMigrationDirectory`](./space-layout.ts). The space id is
@@ -59,8 +65,10 @@ export async function emitContractSpaceArtefacts(
   const refsDir = spaceRefsDirectory(dir);
   await mkdir(refsDir, { recursive: true });
 
-  await writeFile(join(dir, 'contract.json'), `${canonicalizeJson(inputs.contract)}\n`);
-  await writeFile(join(dir, 'contract.d.ts'), inputs.contractDts);
+  await writeContractSnapshot(projectMigrationsDir, inputs.headRef.hash, {
+    contractJson: inputs.contract,
+    contractDts: inputs.contractDts,
+  });
 
   const sortedInvariants = [...inputs.headRef.invariants].sort();
   const headJson = canonicalizeJson({
