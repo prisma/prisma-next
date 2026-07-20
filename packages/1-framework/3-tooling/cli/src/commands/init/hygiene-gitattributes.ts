@@ -1,40 +1,53 @@
 import type { TargetId } from './templates/code-templates';
 
 /**
- * The schema-relative `.gitattributes` entries written for a freshly
- * initialised project (FR3.4). Mirrors the relevant subset of the
- * repo-root [`.gitattributes`](../../../../../../../../.gitattributes):
+ * The `.gitattributes` entries written for a freshly initialised project
+ * (FR3.4). Mirrors the relevant subset of the repo-root
+ * [`.gitattributes`](../../../../../../../../.gitattributes):
  *
  * - **Today**: `contract.json`, `contract.d.ts` are emitted on every
  *   `prisma-next contract emit`. Marking them `linguist-generated`
  *   keeps GitHub's diff stats honest and collapses the file in code
  *   review by default.
- * - **Forward-looking**: `end-contract.*`, `start-contract.*`, `ops.json`,
- *   `migration.json` are not yet emitted by `init` flows but will be
- *   produced by adjacent commands (lower / migration tooling). Adding
- *   them now matches Decision 5 (forward-looking subset) so the file
- *   does not need to be amended every time a new artefact lands.
+ * - **Forward-looking**: `ops.json`, `migration.json` are not yet emitted
+ *   by `init` flows but will be produced by adjacent commands (lower /
+ *   migration tooling). Adding them now matches Decision 5
+ *   (forward-looking subset) so the file does not need to be amended
+ *   every time a new artefact lands.
  *
- * Patterns are written relative to the schema directory so a user
- * who runs `init --schema-path db/contract.prisma` gets
- * `db/contract.json linguist-generated` — not the workspace-glob form
- * `<glob>/contract.json` (which would over-match any unrelated
+ * `ARTEFACT_FILENAMES` entries are written relative to the schema
+ * directory so a user who runs `init --schema-path db/contract.prisma`
+ * gets `db/contract.json linguist-generated` — not the workspace-glob
+ * form `<glob>/contract.json` (which would over-match any unrelated
  * `contract.json` the user has elsewhere) and not the absolute
- * `DEFAULT_CONTRACT_SOURCE_DIR/contract.json` (which would silently break for a non-default
- * schema path).
+ * `DEFAULT_CONTRACT_SOURCE_DIR/contract.json` (which would silently
+ * break for a non-default schema path).
+ *
+ * The migration contract snapshot store (`migrations/snapshots/<hex>/`)
+ * is anchored to the migrations root instead, not the schema directory:
+ * migration package depth under `migrations/` varies (`app/<pkg>`,
+ * `<space>/<pkg>`, or a bare `<pkg>` in extension source repos), so no
+ * single schema-dir-relative pattern can reach every snapshot. See
+ * `STORE_GITATTRIBUTES_LINES` below.
  */
 const ARTEFACT_FILENAMES: readonly string[] = [
   'contract.json',
   'contract.d.ts',
-  'end-contract.json',
-  'end-contract.d.ts',
-  'start-contract.json',
-  'start-contract.d.ts',
   'ops.json',
   'migration.json',
 ];
 
 const ATTRIBUTE = 'linguist-generated';
+
+/**
+ * Full `.gitattributes` lines for the migration contract snapshot store,
+ * already anchored to the migrations root — unlike `ARTEFACT_FILENAMES`,
+ * these are not combined with the schema-relative prefix.
+ */
+const STORE_GITATTRIBUTES_LINES: readonly string[] = [
+  `migrations/snapshots/**/contract.json ${ATTRIBUTE}`,
+  `migrations/snapshots/**/contract.d.ts ${ATTRIBUTE}`,
+];
 
 /**
  * Computes the `.gitattributes` lines this scaffold expects to own. Each
@@ -49,7 +62,10 @@ export function requiredGitattributesLines(
 ): readonly string[] {
   const dir = schemaDir === '.' ? '' : schemaDir.replace(/\/+$/, '');
   const prefix = dir === '' ? '' : `${dir}/`;
-  return ARTEFACT_FILENAMES.map((file) => `${prefix}${file} ${ATTRIBUTE}`);
+  return [
+    ...ARTEFACT_FILENAMES.map((file) => `${prefix}${file} ${ATTRIBUTE}`),
+    ...STORE_GITATTRIBUTES_LINES,
+  ];
 }
 
 /**

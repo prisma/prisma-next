@@ -966,7 +966,7 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
     });
     writeFileSync(join(tmpDir, 'src/prisma', 'contract.json'), '{"stale":true}');
     writeFileSync(join(tmpDir, 'src/prisma', 'contract.d.ts'), 'export type Contract = never;');
-    writeFileSync(join(tmpDir, 'src/prisma', 'end-contract.json'), '{"stale":true}');
+    writeFileSync(join(tmpDir, 'src/prisma', 'ops.json'), '{"stale":true}');
 
     await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', force: true, install: false },
@@ -975,7 +975,7 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
 
     expect(existsSync(join(tmpDir, 'src/prisma/contract.json'))).toBe(false);
     expect(existsSync(join(tmpDir, 'src/prisma/contract.d.ts'))).toBe(false);
-    expect(existsSync(join(tmpDir, 'src/prisma/end-contract.json'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'src/prisma/ops.json'))).toBe(false);
   });
 
   it('does not delete unrelated files in the schema dir (FR9.1 boundary)', async () => {

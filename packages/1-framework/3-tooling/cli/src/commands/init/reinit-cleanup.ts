@@ -4,23 +4,22 @@ import { join } from 'pathe';
 /**
  * Filenames the contract pipeline emits next to the user's schema source
  * (`<schemaDir>/contract.json`, `<schemaDir>/contract.d.ts`, …). Mirrors
- * `ARTEFACT_FILENAMES` in `hygiene-gitattributes.ts`; kept as a separate
- * constant here because the cleanup contract is target-agnostic and we
- * deliberately do not want a stale `start-contract.json` from a previous
- * target lingering after a re-init.
+ * the schema-dir-relative `ARTEFACT_FILENAMES` in `hygiene-gitattributes.ts`
+ * (not that file's migrations-root-anchored store lines, which are outside
+ * this command's scope — reinit only ever touches `schemaDir`); kept as a
+ * separate constant here because the cleanup contract is target-agnostic
+ * and we deliberately do not want a stale artefact from a previous target
+ * lingering after a re-init.
  *
- * If a future emit pipeline produces an additional artefact, add it here
- * **and** to the gitattributes list — the two stay in lockstep so the
- * file `init` advertises as `linguist-generated` is exactly the file
- * `init` is willing to delete on re-init.
+ * If a future emit pipeline produces an additional schema-dir artefact,
+ * add it here **and** to `ARTEFACT_FILENAMES` in `hygiene-gitattributes.ts`
+ * — the two stay in lockstep so the file `init` advertises as
+ * `linguist-generated` is exactly the file `init` is willing to delete on
+ * re-init.
  */
 const ARTEFACT_FILENAMES: readonly string[] = [
   'contract.json',
   'contract.d.ts',
-  'end-contract.json',
-  'end-contract.d.ts',
-  'start-contract.json',
-  'start-contract.d.ts',
   'ops.json',
   'migration.json',
 ];

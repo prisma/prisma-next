@@ -29,11 +29,11 @@ describe('findStaleArtefacts (FR9.1)', () => {
     mkdirSync(join(tmpDir, 'prisma'));
     writeFileSync(join(tmpDir, 'prisma', 'contract.json'), '{}');
     writeFileSync(join(tmpDir, 'prisma', 'contract.d.ts'), 'export {}');
-    writeFileSync(join(tmpDir, 'prisma', 'end-contract.json'), '{}');
+    writeFileSync(join(tmpDir, 'prisma', 'ops.json'), '{}');
     expect(findStaleArtefacts(tmpDir, 'prisma')).toEqual([
       'prisma/contract.json',
       'prisma/contract.d.ts',
-      'prisma/end-contract.json',
+      'prisma/ops.json',
     ]);
   });
 
