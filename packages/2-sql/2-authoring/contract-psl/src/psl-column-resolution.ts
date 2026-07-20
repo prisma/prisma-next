@@ -697,11 +697,7 @@ export function resolveFieldTypeDescriptor(input: {
  * Declarative specification for @db.* native type attributes.
  *
  * Argument kinds:
- * - `noArgs`: No arguments accepted; `codecId: null` means resolve at runtime
- *   from the target-contributed `scalarTypeDescriptors` map keyed by the
- *   attribute's own name (e.g. `"db.Date"`), falling back to `baseDescriptor`
- *   (the base PSL type's own codec) when the target contributes nothing
- *   under that key — see `resolveDbNativeTypeAttribute`.
+ * - `noArgs`: No arguments accepted; `codecId: null` means inherit from baseDescriptor.
  * - `optionalLength`: Zero or one positional integer (minimum 1), stored as `{ length }`.
  * - `optionalPrecision`: Zero or one positional integer (minimum 0), stored as `{ precision }`.
  * - `optionalNumeric`: Zero, one, or two positional integers (precision + scale).
@@ -787,18 +783,6 @@ export function resolveDbNativeTypeAttribute(input: {
   readonly attribute: ResolvedAttribute;
   readonly baseType: string;
   readonly baseDescriptor: ColumnDescriptor;
-  /**
-   * Target-contributed descriptor lookup, keyed by PSL scalar type name
-   * (e.g. `"DateTime"`) everywhere else it's used — but also consulted here
-   * by the full `@db.*` attribute name (e.g. `"db.Date"`) as a `noArgs`
-   * spec's codec-id source. A `noArgs` spec with `codecId: null` can't
-   * simply inherit the base type's own descriptor (that's `baseDescriptor`,
-   * already the wrong codec for e.g. `@db.Date` vs its `DateTime` base); the
-   * target contributes the attribute-specific codec id under its own key in
-   * the same map instead, keeping this family module free of any target's
-   * concrete codec id.
-   */
-  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly entityLabel: string;
@@ -834,10 +818,7 @@ export function resolveDbNativeTypeAttribute(input: {
         });
       }
       return {
-        codecId:
-          spec.codecId ??
-          input.scalarTypeDescriptors.get(input.attribute.name)?.codecId ??
-          input.baseDescriptor.codecId,
+        codecId: spec.codecId ?? input.baseDescriptor.codecId,
         nativeType: spec.nativeType,
       };
     }

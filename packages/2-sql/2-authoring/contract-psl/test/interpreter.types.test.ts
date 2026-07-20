@@ -70,7 +70,7 @@ model Event {
         nativeType: 'time',
         typeParams: { precision: 3 },
       },
-      PublishDay: { codecId: 'pg/date@1', nativeType: 'date' },
+      PublishDay: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
       Payload: { codecId: 'pg/json@1', nativeType: 'json' },
       Amount: {
         codecId: 'pg/numeric@1',
@@ -105,7 +105,7 @@ model Event {
                     typeRef: 'HappenedAt',
                   },
                   publishDay: {
-                    codecId: 'pg/date@1',
+                    codecId: 'pg/timestamptz@1',
                     nativeType: 'date',
                     nullable: false,
                     typeRef: 'PublishDay',

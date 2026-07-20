@@ -186,13 +186,16 @@ while the defect ships.
 already-parsed `Date`; `.include()` goes through `json_agg` → `decodeJson()`, which regex-checks
 for a full ISO timestamp and rejects `"2024-01-15"`.
 
-**Fix:** add a real `pg/date@1` codec and point `@db.Date` at it, so the alias has something
-correct to inherit. Mongo's `mongo/date@1` is the shape precedent. `decodeJson` accepts
-`YYYY-MM-DD`; infer maps a bare `date` column to it.
+**Fix (partial in this slice):** add a real `pg/date@1` codec. Mongo's `mongo/date@1` is the
+shape precedent; `decodeJson` accepts `YYYY-MM-DD`. The *binding* — making the date spelling
+resolve to the codec — is deliberately not done here: `@db.Date` is being removed by the
+remove-db-attributes project, whose bare `Date` type pins its codec explicitly. That pin must be
+`pg/date@1` (asked of that project); until it lands, `@db.Date` keeps inheriting
+`pg/timestamptz@1` and the runtime instrument pins the still-broken `.include()` behavior.
 
-**Breaking-change note:** this changes the emitted `codecId` for existing `@db.Date` columns,
-which changes the contract hash and therefore signed markers. It needs an entry under
-`skills/upgrade/prisma-next-upgrade/upgrades/` — see the `record-upgrade-instructions` skill.
+**Breaking-change note (deferred with the binding):** re-pointing existing date columns changes
+the emitted `codecId`, the contract hash, and therefore signed markers. The upgrade entry rides
+with the binding change, not this slice.
 Flag at PR-open; do not skip.
 
 ### 7. Array columns can't keep their default
@@ -288,8 +291,8 @@ measure of done — if a fix lands and its workaround stays, the fix didn't work
 
 - `SqlColumnIR` gains an identity field (`packages/2-sql/1-core/schema-ir`). New IR surface;
   every constructor/factory site adapts.
-- A new codec id `pg/date@1` joins the postgres codec registry. Emitted contracts for `@db.Date`
-  columns change `codecId`, changing the contract hash.
+- A new codec id `pg/date@1` joins the postgres codec registry, unbound in this slice — emitted
+  contracts are unchanged until the remove-db-attributes project's `Date` type pins it.
 - Postgres registers built-in index types, so `@@index(type:)` values that previously failed
   validation now persist into `contract.json`.
 - No change to `Contract` envelope shape or cardinality vocabulary — `'1:1'` already exists.
@@ -342,7 +345,8 @@ not a thing to negotiate inside the dispatch loop.
 - [ ] `generate-contract.ts`: `DOUBLE_PLURALIZED_FIELD_NAMES` deleted; `INDEX_OMISSIONS` deleted;
       `DEFAULT_OMISSIONS` reduced to only what remains genuinely unrepresentable, each with its
       reason. The pack's `contract.prisma` regenerated and the diff reviewed.
-- [ ] Upgrade instructions recorded for the `pg/date@1` codec change.
+- [ ] Upgrade instructions recorded for the `pg/date@1` codec change. *(Deferred with the
+      binding to the remove-db-attributes project; this slice ships the codec unbound.)*
 - [ ] TML-3024 closed by this PR.
 - [ ] Full gate set green: `pnpm build`, `pnpm typecheck`, the Lint job (incl. `lint:deps`,
       `lint:casts`), `pnpm fixtures:check`, `test:packages`, `test:integration`, `test:e2e`.

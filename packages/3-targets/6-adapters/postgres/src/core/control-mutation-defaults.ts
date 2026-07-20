@@ -163,14 +163,6 @@ const postgresScalarTypeDescriptors = new Map<string, string>([
   ['DateTime', 'pg/timestamptz@1'],
   ['Json', 'pg/jsonb@1'],
   ['Bytes', 'pg/bytea@1'],
-  // Keyed by the full `@db.*` attribute name, not a PSL base type — every
-  // other entry above answers "what's the codec for a bare `DateTime`
-  // field", but `@db.Date`'s own codec (`pg/date@1`) is deliberately
-  // different from its `DateTime` base's (`pg/timestamptz@1`), so it can't
-  // reuse that lookup. contract-psl's `resolveDbNativeTypeAttribute`
-  // consults this same map by attribute name for a `noArgs` spec whose
-  // `codecId` is `null`, keeping the concrete `pg/date@1` id out of 2-sql.
-  ['db.Date', 'pg/date@1'],
 ]);
 
 export function createPostgresDefaultFunctionRegistry(): ReadonlyMap<

@@ -11,11 +11,14 @@
  *    (fixed by making `NumericParams.precision` optional). The bare-Decimal
  *    scenario below targets the same base-scalar path directly with a
  *    hand-authored `Decimal` field.
- *  - A `date` column decoded fine on a top-level `SELECT` (`decode()` was a
- *    passthrough over an already-parsed JS `Date`), but `.include()` went
- *    through `json_agg` -> `decodeJson()`, which rejected a bare `YYYY-MM-DD`
- *    string because `@db.Date` inherited `DateTime`'s `pg/timestamptz@1`
- *    codec (fixed by introducing `pg/date@1`).
+ *  - A `date` column decodes fine on a top-level `SELECT` (`decode()` is a
+ *    passthrough over an already-parsed JS `Date`), but `.include()` goes
+ *    through `json_agg` -> `decodeJson()`, which rejects a bare `YYYY-MM-DD`
+ *    string because `@db.Date` inherits `DateTime`'s `pg/timestamptz@1`
+ *    codec. The `pg/date@1` codec exists but nothing binds `@db.Date` to it
+ *    yet — the binding belongs to the remove-db-attributes project's `Date`
+ *    type (TML-3037 leaves this defect open; the date scenario below pins
+ *    the broken behavior so the binding flips it).
  *
  * Each scenario below infers + emits a real contract from a live database
  * (same CLI path the journey test uses), deserializes the emitted
@@ -185,7 +188,7 @@ withTempDir(({ createTempDir }) => {
     );
   });
 
-  describe('Runtime: a date column decodes on select() but fails through include()', () => {
+  describe('Runtime: date columns — top-level select works, include() decode stays broken until @db.Date binds to pg/date@1', () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
 
     beforeAll(async () => {
@@ -211,7 +214,7 @@ withTempDir(({ createTempDir }) => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'top-level select decodes the date; include() decode fails on the same column',
+      'top-level select decodes the date; include() rejects the same column (known gap)',
       async () => {
         const ctx = await inferAndEmit(database.connectionString, createTempDir);
         const contract = readEmittedContract(ctx);
@@ -239,13 +242,17 @@ withTempDir(({ createTempDir }) => {
               namespaceId: 'public',
             });
             const [row] = await records.select('id', 'notedOn').all();
-            // `pg/date@1`'s decode() normalizes the driver's local-midnight
-            // `Date` (built by postgres-date's OID 1082 parser) into the
-            // equivalent UTC-midnight instant, so the round-trip no longer
-            // depends on the process's timezone — assert the exact value.
-            expect(row?.notedOn, 'top-level select decodes the exact date').toEqual(
-              new Date(Date.UTC(2024, 0, 15)),
-            );
+            // With `@db.Date` still inheriting `pg/timestamptz@1`, decode()
+            // passes through the driver's local-midnight `Date` (postgres-date's
+            // OID 1082 parser), so only the calendar date is stable across
+            // process timezones — local getters, not an exact instant.
+            const notedOn = row?.notedOn;
+            expect(notedOn, 'top-level select decodes a Date').toBeInstanceOf(Date);
+            const decoded = notedOn as Date;
+            expect(
+              [decoded.getFullYear(), decoded.getMonth(), decoded.getDate()],
+              'top-level select decodes the right calendar date',
+            ).toEqual([2024, 0, 15]);
 
             const owners = new Collection({ runtime, context }, 'Owner', {
               namespaceId: 'public',
@@ -265,16 +272,15 @@ withTempDir(({ createTempDir }) => {
             } catch (error) {
               includeError = error;
             }
-            expect(
-              includeError,
-              'include() should decode the same date column without throwing',
-            ).toBeUndefined();
-            // The exact value, not just the absence of a throw — this is the only
-            // assertion covering the defect `pg/date@1` was built for; the
-            // top-level select path above never had the bug.
-            expect(includeResult, 'include() decodes the exact date on the included row').toEqual([
-              { id: 1, records: [{ notedOn: new Date(Date.UTC(2024, 0, 15)) }] },
-            ]);
+            // Pinned broken behavior: `pg/timestamptz@1.decodeJson` rejects the
+            // bare `YYYY-MM-DD` that `json_agg` renders for a `date` column.
+            // When `@db.Date` (or its successor spelling) binds to `pg/date@1`,
+            // this assertion fails — flip it to assert the decoded value:
+            // [{ id: 1, records: [{ notedOn: new Date(Date.UTC(2024, 0, 15)) }] }].
+            expect(includeResult, 'include() must not silently return a value').toBeUndefined();
+            expect(includeError, 'include() rejects the date column today').toMatchObject({
+              code: 'RUNTIME.DECODE_FAILED',
+            });
           } finally {
             await runtime.close();
           }
