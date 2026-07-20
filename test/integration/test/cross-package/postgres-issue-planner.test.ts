@@ -613,8 +613,8 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
 
       const ts = renderCallsToTypeScript(result.value.calls, {
-        from: 'sha256:aaa',
-        to: 'sha256:bbb',
+        from: `sha256:${'a'.repeat(64)}`,
+        to: `sha256:${'b'.repeat(64)}`,
         snapshotsImportPath: '../../snapshots',
       });
 

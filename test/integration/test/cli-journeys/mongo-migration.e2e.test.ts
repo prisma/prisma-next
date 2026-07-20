@@ -4,17 +4,18 @@
  * Covers the gap that no Postgres-shaped journey test exercises for MongoDB:
  *
  *  1. `migration plan --target mongo` from the empty contract baseline:
- *     scaffolds a `migration.ts`, copies `end-contract.json` /
- *     `end-contract.d.ts` next to it, and emits attested `ops.json` with the
- *     expected `createIndex` operation(s). Asserts the rendered
- *     `migration.ts` is round-trip executable: running it via `tsx`
+ *     scaffolds a `migration.ts`, populates the migrations root's
+ *     content-addressed `migrations/snapshots/<hex>/contract.{json,d.ts}`
+ *     store entry for the destination contract, and emits attested
+ *     `ops.json` with the expected `createIndex` operation(s). Asserts the
+ *     rendered `migration.ts` is round-trip executable: running it via `tsx`
  *     instantiates the migration class, reads its `operations` getter, and
  *     self-emits `ops.json` + attested `migration.json`.
  *
  *  2. `migration new --target mongo` after a contract change: scaffolds an
  *     empty `Migration` subclass stub for hand-authoring (with the contract
- *     bookends populated in `describe()`) and copies the contract artifacts
- *     into the migration directory.
+ *     bookends populated in `describe()`) and populates the destination
+ *     contract's store entry.
  *
  *  3. End-to-end with a real MongoDB instance via
  *     `MongoMemoryReplSet`: plan + apply the initial DDL, seed data,
@@ -40,6 +41,7 @@ import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-em
 import { createMigrateCommand } from '@prisma-next/cli/commands/migrate';
 import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
+import { storageHashHex } from '@prisma-next/framework-components/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -206,6 +208,15 @@ function findMigrationDirBySlug(ctx: JourneyCtx, slugFragment: string): string {
   return join(migrationsDir, match);
 }
 
+/** Path to a `migrations/snapshots/<hex>/contract.{json,d.ts}` store entry. */
+function contractSnapshotPath(
+  ctx: JourneyCtx,
+  storageHash: string,
+  file: 'contract.json' | 'contract.d.ts',
+): string {
+  return join(ctx.testDir, 'migrations', 'snapshots', storageHashHex(storageHash), file);
+}
+
 // Journey tests shell out to the CLI binary, which easily exceeds the
 // integration-suite default `it` timeout of 100ms.
 describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spinUpPpgDev }, () => {
@@ -218,7 +229,7 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     created.clear();
   });
 
-  it('migration plan --target mongo scaffolds migration.ts, copies contract files, and emits attested ops.json', async () => {
+  it('migration plan --target mongo scaffolds migration.ts, populates the contract snapshot store, and emits attested ops.json', async () => {
     const ctx = setupMongoJourney(undefined);
     created.add(ctx.testDir);
 
@@ -240,12 +251,21 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     expect(migrationTs).toContain("'users'");
     expect(migrationTs).toContain('MigrationCLI.run(import.meta.url');
 
-    expect(readFileSync(join(migrationDir, 'end-contract.json'), 'utf-8')).toBe(
-      readFileSync(join(ctx.outputDir, 'contract.json'), 'utf-8'),
-    );
-    expect(readFileSync(join(migrationDir, 'end-contract.d.ts'), 'utf-8')).toBe(
-      readFileSync(join(ctx.outputDir, 'contract.d.ts'), 'utf-8'),
-    );
+    const draftManifest = JSON.parse(
+      readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
+    ) as { to: string };
+
+    // The store canonicalizes JSON (compact, sorted keys), while the
+    // emitted project artifact is pretty-printed — compare parsed content,
+    // not bytes.
+    expect(
+      JSON.parse(
+        readFileSync(contractSnapshotPath(ctx, draftManifest.to, 'contract.json'), 'utf-8'),
+      ),
+    ).toEqual(JSON.parse(readFileSync(join(ctx.outputDir, 'contract.json'), 'utf-8')));
+    expect(
+      readFileSync(contractSnapshotPath(ctx, draftManifest.to, 'contract.d.ts'), 'utf-8'),
+    ).toBe(readFileSync(join(ctx.outputDir, 'contract.d.ts'), 'utf-8'));
 
     // Plan leaves a draft migration; self-emit via `tsx migration.ts` to
     // produce `ops.json` and the attested `migration.json`.
@@ -269,7 +289,7 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     expect(manifest.migrationHash).toMatch(/^sha256:/);
   });
 
-  it('migration new --target mongo scaffolds an empty Migration stub with contract files copied', async () => {
+  it('migration new --target mongo scaffolds an empty Migration stub with the contract snapshot store populated', async () => {
     const ctx = setupMongoJourney(undefined);
     created.add(ctx.testDir);
 
@@ -303,18 +323,23 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     // Empty stub: factory imports omitted because no calls were rendered.
     expect(migrationTs).not.toContain('@prisma-next/target-mongo/migration');
 
-    expect(readFileSync(join(migrationDir, 'end-contract.json'), 'utf-8')).toBe(
-      readFileSync(join(ctx.outputDir, 'contract.json'), 'utf-8'),
-    );
-    expect(readFileSync(join(migrationDir, 'end-contract.d.ts'), 'utf-8')).toBe(
+    const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
+      to: string;
+      migrationHash: string;
+    };
+
+    // The store canonicalizes JSON (compact, sorted keys), while the
+    // emitted project artifact is pretty-printed — compare parsed content,
+    // not bytes.
+    expect(
+      JSON.parse(readFileSync(contractSnapshotPath(ctx, manifest.to, 'contract.json'), 'utf-8')),
+    ).toEqual(JSON.parse(readFileSync(join(ctx.outputDir, 'contract.json'), 'utf-8')));
+    expect(readFileSync(contractSnapshotPath(ctx, manifest.to, 'contract.d.ts'), 'utf-8')).toBe(
       readFileSync(join(ctx.outputDir, 'contract.d.ts'), 'utf-8'),
     );
 
     const ops = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'));
     expect(ops).toEqual([]);
-    const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
-      migrationHash: string;
-    };
     // `migration new` always writes a fully attested package; the
     // `migrationHash` is the content-address over `(manifest, [])` since
     // the scaffolded `migration.ts` carries no operations yet. The
