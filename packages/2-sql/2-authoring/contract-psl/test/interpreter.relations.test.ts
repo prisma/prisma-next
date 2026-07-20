@@ -143,7 +143,7 @@ model Profile {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_ORPHANED_BACKRELATION_LIST',
+          code: 'PSL_ORPHANED_BACKRELATION',
           message: expect.stringContaining('User.profile'),
         }),
       ]),
@@ -339,7 +339,7 @@ model Member {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+          code: 'PSL_AMBIGUOUS_BACKRELATION',
           message: expect.stringContaining('Employee.reports'),
         }),
       ]),

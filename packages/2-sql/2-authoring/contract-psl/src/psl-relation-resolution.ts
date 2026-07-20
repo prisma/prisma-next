@@ -472,7 +472,7 @@ export function applyBackrelationCandidates(input: {
         }
         if (junctionPairs.length > 1) {
           input.diagnostics.push({
-            code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+            code: 'PSL_AMBIGUOUS_BACKRELATION',
             message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple junction FK pairs for a many-to-many relation. Add @relation(name: "...") (or @relation("...")) to the list field and the junction FK-side relation pointing back at "${candidate.modelName}" to disambiguate.`,
             sourceId: input.sourceId,
             span: candidate.field.span,
@@ -486,7 +486,7 @@ export function applyBackrelationCandidates(input: {
         }
       }
       input.diagnostics.push({
-        code: 'PSL_ORPHANED_BACKRELATION_LIST',
+        code: 'PSL_ORPHANED_BACKRELATION',
         message: `Backrelation field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation${candidate.isList ? ' or use an explicit join model for many-to-many' : ''}.`,
         sourceId: input.sourceId,
         span: candidate.field.span,
@@ -495,7 +495,7 @@ export function applyBackrelationCandidates(input: {
     }
     if (matches.length > 1) {
       input.diagnostics.push({
-        code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+        code: 'PSL_AMBIGUOUS_BACKRELATION',
         message: `Backrelation field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation(name: "...") (or @relation("...")) to both sides to disambiguate.`,
         sourceId: input.sourceId,
         span: candidate.field.span,

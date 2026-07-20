@@ -2,7 +2,7 @@
   "failureSummary": "PSL to SQL contract interpretation failed",
   "diagnostics": [
     {
-      "code": "PSL_AMBIGUOUS_BACKRELATION_LIST",
+      "code": "PSL_AMBIGUOUS_BACKRELATION",
       "sourceId": "./schema.prisma",
       "startLine": 5
     }
