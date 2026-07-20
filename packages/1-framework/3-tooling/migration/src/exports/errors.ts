@@ -1,4 +1,6 @@
 export {
+  errorContractSnapshotHashMismatch,
+  errorContractSnapshotMissing,
   errorDescriptorHeadHashMismatch,
   errorInvalidJson,
   errorNoInvariantPath,

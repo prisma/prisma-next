@@ -456,6 +456,37 @@ export function errorHashNotInGraph(hash: string, graph: MigrationGraph): Migrat
   );
 }
 
+export function errorContractSnapshotMissing(
+  storageHash: string,
+  expectedPath: string,
+): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.CONTRACT_SNAPSHOT_MISSING',
+    'Contract snapshot is missing',
+    {
+      why: `Expected a contract snapshot for ${storageHash} at "${expectedPath}" but the file does not exist.`,
+      fix: "Re-emit the contract snapshot by re-running the command that authored the migration referencing this hash (`prisma-next migration plan` for app-space migrations; the extension's contract-space build for extension spaces), or restore migrations/snapshots/ from version control.",
+      details: { storageHash, expectedPath },
+    },
+  );
+}
+
+export function errorContractSnapshotHashMismatch(
+  storageHash: string,
+  actualHash: string,
+  dir: string,
+): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.CONTRACT_SNAPSHOT_HASH_MISMATCH',
+    'Contract snapshot hash mismatch',
+    {
+      why: `The contract JSON's inner storage.storageHash ("${actualHash}") does not match the requested storage hash ("${storageHash}") for snapshot directory "${dir}".`,
+      fix: 'Pass a contractJson whose storage.storageHash equals the storageHash argument passed to writeContractSnapshot — the two must agree by construction.',
+      details: { storageHash, actualHash, dir },
+    },
+  );
+}
+
 export function errorMigrationContractViewMissing(
   className: string,
   accessor: 'endContract' | 'startContract',
