@@ -196,7 +196,7 @@ export async function dropCheckConstraint(
  * `kind` feeds the operation's `target.details.objectType`. Descriptor-flow
  * does not carry kind information in its drop-constraint descriptor, so the
  * default is `'unique'`. The reconciliation planner passes the correct kind
- * (`'foreignKey'`, `'primaryKey'`, or `'unique'`) based on the `SchemaIssue`
+ * (`'foreignKey'`, `'primaryKey'`, or `'unique'`) based on the diff issue
  * that produced the drop.
  */
 export async function dropConstraint(

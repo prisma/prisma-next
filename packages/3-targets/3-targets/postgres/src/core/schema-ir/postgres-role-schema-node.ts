@@ -1,6 +1,6 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { assertNode, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { PostgresSchemaNodeKind } from './schema-node-kinds';
 
@@ -20,11 +20,14 @@ export interface PostgresRoleSchemaNodeInput {
  * Built by project-from-contract and project-from-database from their respective
  * `PostgresRole` contract entities / introspected rows.
  *
- * Roles are cluster-scoped, so `id` is the role name alone. `isEqualTo` compares
- * names — name-equality is role-equality for cluster-scoped objects.
+ * Roles are cluster-scoped, so `id` is the bare role name. The differ pairs
+ * siblings by `(nodeKind, id)`, so a role and a namespace may share a name
+ * (role `public`, schema `public`) without colliding. `isEqualTo` compares
+ * ids — name-equality is role-equality for cluster-scoped objects.
  */
 export class PostgresRoleSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.role;
+
   readonly name: string;
   readonly namespaceId: string;
 
@@ -57,10 +60,6 @@ export class PostgresRoleSchemaNode extends SqlSchemaIRNode implements DiffableN
   }
 
   static assert(node: SqlSchemaIRNode): asserts node is PostgresRoleSchemaNode {
-    if (!PostgresRoleSchemaNode.is(node)) {
-      throw new Error(
-        `Expected a PostgresRoleSchemaNode but got nodeKind=${node.nodeKind ?? 'undefined'}`,
-      );
-    }
+    assertNode(node, 'PostgresRoleSchemaNode', PostgresRoleSchemaNode.is);
   }
 }

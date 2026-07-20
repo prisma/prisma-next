@@ -30,6 +30,23 @@ rg 'foreignKeyNamespacesMatch' packages/
 rg 'tables:\s*\{\s*[a-z][A-Za-z_]+\s*:' packages/ -g '*.test.ts' -g '*.test-d.ts' -g 'fixtures/*.ts' | rg -v '__unbound__|public|auth|tenant'
 ```
 
+## Contract-cast hygiene
+
+```bash
+# Descriptor contractSpace.contractJson → Contract casts — forbidden anywhere:
+# ControlExtensionDescriptor declares contractSpace: ContractSpace (typed contractJson),
+# so every consumer — including ControlStack's extensionContracts assembly — property-picks;
+# no narrowing cast is sanctioned anymore. -U catches multi-line casts.
+# Form 1: reach-through (blindCast<...>(x.contractSpace.contractJson)):
+rg -U 'blindCast<[^(]*\([^)]*contractSpace!?\??\.contractJson' packages/
+# Form 2: picked-variable — a contractJson variable assigned from a contractSpace
+# (plain or destructured), cast within the next ~400 chars. The provenance tie
+# keeps API-boundary casts of unrelated contractJson values (e.g. a query-builder
+# accepting user-supplied contract JSON) from false-positiving — those are
+# separate boundaries, not this anti-pattern.
+rg -U 'contractJson[^\n=]*=[^\n]*contractSpace(?s:.){0,400}?blindCast<[^(]*\(\s*contractJson\s*\)' packages/
+```
+
 ## Cross-cutting anti-patterns
 
 ```bash

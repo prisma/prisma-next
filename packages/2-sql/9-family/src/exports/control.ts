@@ -31,7 +31,7 @@ export {
   detectDestructiveChanges,
   resolveValueSetValues,
 } from '../core/migrations/contract-to-schema-ir';
-export type { ControlPolicySubject } from '../core/migrations/control-policy';
+export type { ControlPolicySubject, SuppressionRecord } from '../core/migrations/control-policy';
 export {
   controlPolicyForCall,
   partitionCallsByControlPolicy,
@@ -39,6 +39,7 @@ export {
 } from '../core/migrations/control-policy';
 export type { PlanFieldEventOperationsOptions } from '../core/migrations/field-event-planner';
 export { planFieldEventOperations } from '../core/migrations/field-event-planner';
+export { buildNativeTypeExpander } from '../core/migrations/native-type-expander';
 export {
   createMigrationPlan,
   plannerFailure,
@@ -47,6 +48,11 @@ export {
   runnerSuccess,
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
+export type {
+  SqlSchemaDiffFn,
+  SqlSchemaDiffInput,
+  SqlSchemaDiffResult,
+} from '../core/migrations/schema-differ';
 export type {
   CodecControlHooks,
   CreateSqlMigrationPlanOptions,

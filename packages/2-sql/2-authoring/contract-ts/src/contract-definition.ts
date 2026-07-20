@@ -16,6 +16,23 @@ import type { EnumTypeHandle } from './enum-type';
 
 export type { ExecutionMutationDefaultPhases };
 
+/**
+ * Namespace-scoped pack-entity attachments, the internal build IR carrying
+ * the lowered `entities` handle list: namespace id → entity kind (the
+ * discriminator the target/extension pack registered its
+ * `AuthoringContributions.entityTypes` descriptor under, e.g. `native_enum`)
+ * → entity name → the lowered entity instance. Generic on purpose — neither
+ * the framework nor `contract-ts` names a specific entity kind here; the
+ * shape mirrors `SqlNamespaceInput.entries` (`entries.<kind>[name]`), just
+ * namespace-nested so an attachment can target any declared namespace
+ * (default or named), not only the contract's default namespace. Produced by
+ * the generic entity-handle walk in `buildContractDefinition`; never an
+ * author-facing input.
+ */
+export type AttachedEntities = Readonly<
+  Record<string, Readonly<Record<string, Readonly<Record<string, unknown>>>>>
+>;
+
 export interface FieldNode {
   readonly fieldName: string;
   readonly columnName: string;
@@ -185,4 +202,15 @@ export interface ContractDefinition {
    * default namespace.
    */
   readonly enums?: Record<string, EnumTypeHandle>;
+  /**
+   * Pack-entity attachments lowered from the `entities` handle list, keyed by
+   * namespace then entity kind then name. Each entity lands in
+   * `storage.namespaces[ns].entries.<kind>`; when the registered entity-type
+   * descriptor's factory output implements the
+   * `SqlValueSetDerivingEntityTypeOutput.deriveValueSet` hook, the derived
+   * value-set also folds into `entries.valueSet`, mirroring how `enums` flows
+   * there. Internal build IR — populated by `buildContractDefinition`, not an
+   * author input.
+   */
+  readonly attachedEntities?: AttachedEntities;
 }

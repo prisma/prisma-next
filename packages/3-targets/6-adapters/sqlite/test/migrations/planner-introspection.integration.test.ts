@@ -13,6 +13,7 @@ import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control'
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
+import { PrimaryKey } from '@prisma-next/sql-schema-ir/types';
 import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { applicationDomainOf } from '@prisma-next/test-utils';
@@ -141,7 +142,7 @@ describe('SQLite planner + introspection round-trip', () => {
       expect(schema.tables['users']!.columns['id']).toBeDefined();
       expect(schema.tables['users']!.columns['email']).toBeDefined();
       expect(schema.tables['users']!.columns['active']).toBeDefined();
-      expect(schema.tables['users']!.primaryKey).toEqual({ columns: ['id'] });
+      expect(schema.tables['users']!.primaryKey).toEqual(new PrimaryKey({ columns: ['id'] }));
 
       const idx = schema.tables['users']!.indexes.find((i) => i.name === 'idx_users_email');
       expect(idx).toBeDefined();
@@ -246,8 +247,6 @@ describe('SQLite planner + introspection round-trip', () => {
                 columns: ['id'],
               },
               onDelete: 'cascade',
-              constraint: true,
-              index: true,
             },
           ],
         }),

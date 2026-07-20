@@ -1,4 +1,5 @@
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
+import { SqlCheckConstraintIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
 import { PostgresControlAdapter, parseCheckConstraintDef } from '../src/core/control-adapter';
@@ -135,11 +136,11 @@ describe('PostgresControlAdapter.introspect — check constraints', () => {
     const result = await adapter.introspect(mockDriver);
 
     expect(Object.values(result.namespaces)[0]?.tables['post']?.checks).toEqual([
-      {
+      new SqlCheckConstraintIR({
         name: 'post_status_check',
         column: 'status',
         permittedValues: ['draft', 'published'],
-      },
+      }),
     ]);
   });
 

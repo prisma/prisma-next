@@ -94,43 +94,41 @@ describe('@@control model attribute', () => {
     }
   });
 
-  it('emits PSL_INVALID_ATTRIBUTE_ARGUMENT when @@control has no argument', () => {
+  it('emits PSL_INVALID_ATTRIBUTE_SYNTAX when @@control has no argument', () => {
     expectDiagnostic(
       `model User {
   id Int @id
   @@control()
 }`,
       {
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        message:
-          '`@@control` requires exactly one positional argument: `managed`, `tolerated`, `external`, or `observed`.',
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+        message: 'Attribute "control" is missing required argument "policy"',
       },
     );
   });
 
-  it('emits PSL_INVALID_ATTRIBUTE_ARGUMENT when @@control has multiple positional arguments', () => {
+  it('emits PSL_INVALID_ATTRIBUTE_SYNTAX when @@control has multiple positional arguments', () => {
     expectDiagnostic(
       `model User {
   id Int @id
   @@control(external, managed)
 }`,
       {
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        message: '`@@control` accepts exactly one positional argument; got 2.',
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+        message: 'Attribute "control" received too many positional arguments',
       },
     );
   });
 
-  it('emits PSL_INVALID_ATTRIBUTE_ARGUMENT when @@control argument is unknown', () => {
+  it('emits PSL_INVALID_ATTRIBUTE_SYNTAX when @@control argument is unknown', () => {
     expectDiagnostic(
       `model User {
   id Int @id
   @@control(invalid)
 }`,
       {
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        message:
-          '`@@control` argument `invalid` is not a known policy. Allowed: `managed`, `tolerated`, `external`, `observed`.',
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+        message: 'Expected one of: managed | tolerated | external | observed',
       },
     );
   });
@@ -163,16 +161,15 @@ describe('@@control model attribute', () => {
     );
   });
 
-  it('emits PSL_INVALID_ATTRIBUTE_ARGUMENT when @@control uses a named argument', () => {
+  it('emits PSL_INVALID_ATTRIBUTE_SYNTAX when @@control uses a named argument', () => {
     expectDiagnostic(
       `model User {
   id Int @id
   @@control(policy: external)
 }`,
       {
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        message:
-          '`@@control` does not accept named arguments; pass the policy positionally as `@@control(external)`.',
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+        message: 'Attribute "control" received unknown argument "policy"',
       },
     );
   });

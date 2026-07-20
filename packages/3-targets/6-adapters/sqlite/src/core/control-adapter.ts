@@ -3,7 +3,7 @@ import { parseMarkerRowSafely, withMarkerReadErrorHandling } from '@prisma-next/
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, type SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
@@ -23,14 +23,17 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
-  PrimaryKey,
-  SqlColumnIR,
-  SqlForeignKeyIR,
-  SqlIndexIR,
+  PrimaryKeyInput,
+  SqlColumnIRInput,
+  SqlForeignKeyIRInput,
+  SqlIndexIRInput,
   SqlReferentialAction,
+  SqlUniqueIRInput,
+} from '@prisma-next/sql-schema-ir/types';
+import {
+  RelationalSchemaNodeKind,
   SqlSchemaIR,
   SqlTableIR,
-  SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import {
   buildControlTableBootstrapQueries,
@@ -520,15 +523,28 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         `PRAGMA index_list("${escapePragmaArg(tableName)}")`,
       );
 
-      const columns: Record<string, SqlColumnIR> = {};
+      const columns: Record<string, SqlColumnIRInput> = {};
       const pkColumns: Array<{ name: string; pk: number }> = [];
 
       for (const col of columnsResult.rows) {
+        // Resolved values comparable against the contract-derived expected
+        // side: the normalized native type and the structured parse of the
+        // raw default. Raw fields stay untouched alongside — the relational
+        // walk still reads and normalizes them itself.
+        const resolvedNativeType = normalizeSqliteNativeType(col.type);
+        const rawDefault = col.dflt_value ?? undefined;
         columns[col.name] = {
           name: col.name,
           nativeType: col.type.toLowerCase(),
           nullable: col.notnull === 0 && col.pk === 0,
-          ...ifDefined('default', col.dflt_value ?? undefined),
+          ...ifDefined('default', rawDefault),
+          resolvedNativeType,
+          ...ifDefined(
+            'resolvedDefault',
+            rawDefault !== undefined
+              ? parseSqliteDefault(rawDefault, resolvedNativeType)
+              : undefined,
+          ),
         };
         if (col.pk > 0) {
           pkColumns.push({ name: col.name, pk: col.pk });
@@ -536,8 +552,16 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       }
 
       pkColumns.sort((a, b) => a.pk - b.pk);
-      const primaryKey: PrimaryKey | undefined =
-        pkColumns.length > 0 ? { columns: pkColumns.map((c) => c.name) } : undefined;
+      const primaryKey: PrimaryKeyInput | undefined =
+        pkColumns.length > 0
+          ? {
+              columns: pkColumns.map((c) => c.name),
+              dependsOn: flatColumnDependsOn(
+                tableName,
+                pkColumns.map((c) => c.name),
+              ),
+            }
+          : undefined;
 
       const fkMap = new Map<number, FkAccumulator>();
       for (const fk of fkResult.rows) {
@@ -555,16 +579,20 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
           });
         }
       }
-      const foreignKeys: readonly SqlForeignKeyIR[] = Array.from(fkMap.values()).map((fk) => ({
+      const foreignKeys: readonly SqlForeignKeyIRInput[] = Array.from(fkMap.values()).map((fk) => ({
         columns: Object.freeze([...fk.columns]) as readonly string[],
         referencedTable: fk.referencedTable,
         referencedColumns: Object.freeze([...fk.referencedColumns]) as readonly string[],
         ...ifDefined('onDelete', mapSqliteReferentialAction(fk.onDelete)),
         ...ifDefined('onUpdate', mapSqliteReferentialAction(fk.onUpdate)),
+        dependsOn: [
+          flatTableDependsOn(fk.referencedTable),
+          ...flatColumnDependsOn(tableName, fk.columns),
+        ],
       }));
 
-      const uniques: SqlUniqueIR[] = [];
-      const indexes: SqlIndexIR[] = [];
+      const uniques: SqlUniqueIRInput[] = [];
+      const indexes: SqlIndexIRInput[] = [];
 
       for (const idx of indexListResult.rows) {
         // origin: 'c' = CREATE INDEX, 'u' = UNIQUE constraint, 'pk' = PRIMARY KEY
@@ -578,30 +606,32 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
           uniques.push({
             columns: Object.freeze([...idxColumns]) as readonly string[],
             name: idx.name,
+            dependsOn: flatColumnDependsOn(tableName, idxColumns),
           });
         } else if (idx.origin === 'c') {
           indexes.push({
             columns: Object.freeze([...idxColumns]) as readonly string[],
             name: idx.name,
             unique: idx.unique === 1,
+            dependsOn: flatColumnDependsOn(tableName, idxColumns),
           });
         }
         // Skip 'pk' origin — already captured in primaryKey
       }
 
-      tables[tableName] = {
+      tables[tableName] = new SqlTableIR({
         name: tableName,
         columns,
         ...ifDefined('primaryKey', primaryKey),
         foreignKeys,
         uniques,
         indexes,
-      };
+      });
     }
 
-    return {
+    return new SqlSchemaIR({
       tables,
-    };
+    });
   }
 }
 
@@ -631,6 +661,32 @@ function mapSqliteReferentialAction(rule: string): SqlReferentialAction | undefi
   }
   if (mapped === 'noAction') return undefined;
   return mapped;
+}
+
+/**
+ * The referenced table's chain in the flat (single-schema) tree this
+ * introspection builds: the root (`SqlSchemaIR`, fixed `'database'` id)
+ * followed by the table's own id. Mirrors the expected-side derivation
+ * (`contractToSchemaIR`'s `convertForeignKey`).
+ */
+function flatTableDependsOn(tableName: string): SchemaNodeRef {
+  return [
+    { nodeKind: RelationalSchemaNodeKind.schema, id: 'database' },
+    { nodeKind: RelationalSchemaNodeKind.table, id: tableName },
+  ];
+}
+
+/**
+ * The chains from a table-child object (foreign key, index, unique, primary
+ * key) to each of the own columns it is built on — the introspection-side
+ * mirror of `contractToSchemaIR`'s `flatColumnDependsOn`. An object is dropped
+ * before the columns it covers.
+ */
+function flatColumnDependsOn(tableName: string, columns: readonly string[]): SchemaNodeRef[] {
+  return columns.map((column) => [
+    ...flatTableDependsOn(tableName),
+    { nodeKind: RelationalSchemaNodeKind.column, id: `column:${column}` },
+  ]);
 }
 
 // ---------------------------------------------------------------------------

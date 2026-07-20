@@ -1,1 +1,4 @@
-export { buildBuiltinIdentityValue } from '../core/migrations/planner-identity-values';
+export {
+  buildBuiltinIdentityValue,
+  resolveIdentityValue,
+} from '../core/migrations/planner-identity-values';

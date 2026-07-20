@@ -22,10 +22,6 @@ import { createTestSqlNamespace } from '../../1-core/contract/test/test-support'
 import { createSqlFamilyInstance } from '../src/core/control-instance';
 import type { SqlDescribedContractSpace } from '../src/core/control-target-descriptor';
 import type { SqlControlExtensionDescriptor } from '../src/core/migrations/types';
-import {
-  stubTargetDiffDatabaseSchema,
-  stubTargetVerifyDatabaseSchema,
-} from './schema-verify.helpers';
 
 const TARGET = 'postgres' as const;
 const TARGET_FAMILY = 'sql' as const;
@@ -40,6 +36,8 @@ const SYNTHETIC_SPAN: PslSpan = {
  * reading `appTables` off it, so a full Postgres tree is unnecessary here.
  */
 class TestSchemaTree extends SqlSchemaIRNode {
+  override readonly nodeKind = 'sql-schema';
+
   constructor(readonly appTables: readonly string[]) {
     super();
   }
@@ -167,8 +165,6 @@ function makeStack(
         deserializeContract: (json) => json as never,
         serializeContract: (contract) => contract as never,
       },
-      diffDatabaseSchema: stubTargetDiffDatabaseSchema,
-      verifyDatabaseSchema: stubTargetVerifyDatabaseSchema,
       inferPslContract: stubInferPslContract,
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     } as ControlTargetDescriptor<'sql', 'postgres'>,

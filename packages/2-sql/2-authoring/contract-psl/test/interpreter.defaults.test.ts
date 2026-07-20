@@ -271,19 +271,8 @@ model UuidNativeBad {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
           sourceId: 'schema.prisma',
-          message: expect.stringContaining('cuid(2)'),
-        }),
-        expect.objectContaining({
-          code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-          sourceId: 'schema.prisma',
-          message: expect.stringContaining('uuid'),
-        }),
-        expect.objectContaining({
-          code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-          sourceId: 'schema.prisma',
-          message: expect.stringContaining('nanoid'),
         }),
         expect.objectContaining({
           code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
@@ -917,11 +906,9 @@ model UuidNativeBad {
       );
     });
 
-    it('rejects @default(temporal.updatedAt()) with PSL_INVALID_DEFAULT_VALUE (AC5g)', () => {
-      // Namespaced calls inside @default(...) are not supported — the
-      // default-function parser only accepts bare identifiers. The honest
-      // rejection path is "this isn't a valid @default(...) value", not
-      // "this generator isn't applicable". Locks in which diagnostic fires.
+    it('rejects @default(temporal.updatedAt()) as invalid attribute syntax (AC5g)', () => {
+      // A namespaced callee fails the funcCall spec before reaching the registry, so the rejection
+      // is a syntax error rather than a generator-applicability error.
       const document = symbolTableInputFromParseArgs({
         schema: `model Bad {
   id Int @id
@@ -940,9 +927,8 @@ model UuidNativeBad {
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            code: 'PSL_INVALID_DEFAULT_VALUE',
+            code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
             sourceId: 'schema.prisma',
-            message: expect.stringContaining('temporal.updatedAt()'),
           }),
         ]),
       );

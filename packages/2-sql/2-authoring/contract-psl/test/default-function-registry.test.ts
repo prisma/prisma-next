@@ -1,10 +1,10 @@
-import type { DefaultFunctionRegistryEntry } from '@prisma-next/framework-components/control';
+import type {
+  ControlMutationDefaultEntry,
+  TypedDefaultFunctionCall,
+} from '@prisma-next/framework-components/control';
 import type { PslSpan } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
-import {
-  lowerDefaultFunctionWithRegistry,
-  parseDefaultFunctionCall,
-} from '../src/default-function-registry';
+import { lowerDefaultFunctionWithRegistry } from '../src/default-function-registry';
 import { createBuiltinLikeControlMutationDefaults } from './fixtures';
 
 function createSpan(overrides?: Partial<PslSpan['start']>): PslSpan {
@@ -22,6 +22,10 @@ function createSpan(overrides?: Partial<PslSpan['start']>): PslSpan {
   };
 }
 
+function call(fn: string, args: Record<string, unknown> = {}): TypedDefaultFunctionCall {
+  return { fn, span: createSpan(), args };
+}
+
 const loweringContext = {
   sourceId: 'schema.prisma',
   modelName: 'User',
@@ -31,77 +35,10 @@ const loweringContext = {
 describe('default function registry', () => {
   const builtinRegistry = createBuiltinLikeControlMutationDefaults().defaultFunctionRegistry;
 
-  it('returns undefined for invalid function-call shapes', () => {
-    expect(parseDefaultFunctionCall('uuid', createSpan())).toBeUndefined();
-    expect(parseDefaultFunctionCall('uuid(4', createSpan())).toBeUndefined();
-    expect(parseDefaultFunctionCall('4uuid()', createSpan())).toBeUndefined();
-  });
-
-  it('parses top-level args with nested commas and escapes', () => {
-    const call = parseDefaultFunctionCall(
-      String.raw`fn("a,b", inner(1, 2), [x, y], "escaped \"quote\"")`,
-      createSpan(),
-    );
-
-    expect(call).toBeDefined();
-    if (!call) return;
-
-    expect(call.args.map((arg) => arg.raw)).toEqual([
-      '"a,b"',
-      'inner(1, 2)',
-      '[x, y]',
-      String.raw`"escaped \"quote\""`,
-    ]);
-  });
-
-  it('rejects empty argument slots in function calls', () => {
-    expect(parseDefaultFunctionCall('uuid(4, )', createSpan())).toBeUndefined();
-    expect(parseDefaultFunctionCall('uuid(,4)', createSpan())).toBeUndefined();
-    expect(parseDefaultFunctionCall('uuid(,)', createSpan())).toBeUndefined();
-  });
-
-  it('computes multiline spans for parsed function calls', () => {
-    const call = parseDefaultFunctionCall(
-      `dbgenerated(
-  "gen_random_uuid()"
-)`,
-      createSpan({ offset: 10, line: 3, column: 4 }),
-    );
-
-    expect(call).toBeDefined();
-    if (!call) return;
-
-    expect(call.span.start).toMatchObject({ line: 3, column: 4 });
-    expect(call.span.end).toMatchObject({ line: 5, column: 2 });
-    expect(call.args).toHaveLength(1);
-    expect(call.args[0]?.span.start).toMatchObject({ line: 4, column: 3 });
-  });
-
-  it('handles carriage-return line breaks in spans', () => {
-    const call = parseDefaultFunctionCall(
-      `dbgenerated(\r\n  "gen_random_uuid()"\r\n)`,
-      createSpan({ offset: 2, line: 9, column: 8 }),
-    );
-
-    expect(call).toBeDefined();
-    if (!call) return;
-
-    expect(call.span.start).toMatchObject({ line: 9, column: 8 });
-    expect(call.span.end).toMatchObject({ line: 11, column: 2 });
-  });
-
-  it('lowers cuid(2) and rejects cuid() with actionable guidance', () => {
-    const registry = builtinRegistry;
-    const cuid2Call = parseDefaultFunctionCall('cuid(2)', createSpan());
-    const cuidCall = parseDefaultFunctionCall('cuid()', createSpan({ line: 7 }));
-
-    expect(cuid2Call).toBeDefined();
-    expect(cuidCall).toBeDefined();
-    if (!cuid2Call || !cuidCall) return;
-
+  it('lowers cuid(2) to a cuid2 execution generator', () => {
     const loweredCuid2 = lowerDefaultFunctionWithRegistry({
-      call: cuid2Call,
-      registry,
+      call: call('cuid', { version: 2 }),
+      registry: builtinRegistry,
       context: loweringContext,
     });
     expect(loweredCuid2.ok).toBe(true);
@@ -110,22 +47,10 @@ describe('default function registry', () => {
       kind: 'execution',
       generated: { kind: 'generator', id: 'cuid2' },
     });
-
-    const loweredCuid = lowerDefaultFunctionWithRegistry({
-      call: cuidCall,
-      registry,
-      context: loweringContext,
-    });
-    expect(loweredCuid.ok).toBe(false);
-    if (loweredCuid.ok) return;
-    expect(loweredCuid.diagnostic).toMatchObject({
-      code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-      message: expect.stringContaining('Use `cuid(2)`'),
-    });
   });
 
   it('derives unknown-function supported list from registry keys', () => {
-    const customRegistry = new Map<string, DefaultFunctionRegistryEntry>([
+    const customRegistry = new Map<string, ControlMutationDefaultEntry>([
       [
         'custom',
         {
@@ -142,13 +67,9 @@ describe('default function registry', () => {
         },
       ],
     ]);
-    const unknownCall = parseDefaultFunctionCall('mystery()', createSpan());
-
-    expect(unknownCall).toBeDefined();
-    if (!unknownCall) return;
 
     const loweredUnknown = lowerDefaultFunctionWithRegistry({
-      call: unknownCall,
+      call: call('mystery'),
       registry: customRegistry,
       context: loweringContext,
     });
@@ -161,7 +82,7 @@ describe('default function registry', () => {
   });
 
   it('uses contributed usage signatures when provided', () => {
-    const customRegistry = new Map<string, DefaultFunctionRegistryEntry>([
+    const customRegistry = new Map<string, ControlMutationDefaultEntry>([
       [
         'custom',
         {
@@ -179,12 +100,9 @@ describe('default function registry', () => {
         },
       ],
     ]);
-    const unknownCall = parseDefaultFunctionCall('mystery()', createSpan());
-    expect(unknownCall).toBeDefined();
-    if (!unknownCall) return;
 
     const loweredUnknown = lowerDefaultFunctionWithRegistry({
-      call: unknownCall,
+      call: call('mystery'),
       registry: customRegistry,
       context: loweringContext,
     });
@@ -196,15 +114,9 @@ describe('default function registry', () => {
   });
 
   it('lists supported signatures for unknown generator-like function names', () => {
-    const unknownCall = parseDefaultFunctionCall('uuidv7()', createSpan());
-    const registry = builtinRegistry;
-
-    expect(unknownCall).toBeDefined();
-    if (!unknownCall) return;
-
     const loweredUnknown = lowerDefaultFunctionWithRegistry({
-      call: unknownCall,
-      registry,
+      call: call('uuidv7'),
+      registry: builtinRegistry,
       context: loweringContext,
     });
     expect(loweredUnknown.ok).toBe(false);
@@ -213,74 +125,17 @@ describe('default function registry', () => {
     expect(loweredUnknown.diagnostic.message).toContain('uuid(7)');
   });
 
-  it('preserves escaped dbgenerated string content', () => {
-    const registry = builtinRegistry;
-    const call = parseDefaultFunctionCall(
-      String.raw`dbgenerated("nextval(\"public\".\"user_id_seq\")")`,
-      createSpan(),
-    );
-
-    expect(call).toBeDefined();
-    if (!call) return;
-
+  it('rejects an empty dbgenerated expression as a semantic argument error', () => {
     const lowered = lowerDefaultFunctionWithRegistry({
-      call,
-      registry,
+      call: call('dbgenerated', { expression: '' }),
+      registry: builtinRegistry,
       context: loweringContext,
     });
-    expect(lowered.ok).toBe(true);
-    if (!lowered.ok) return;
-
-    expect(lowered.value).toMatchObject({
-      kind: 'storage',
-      defaultValue: {
-        kind: 'function',
-        expression: String.raw`nextval(\"public\".\"user_id_seq\")`,
-      },
+    expect(lowered.ok).toBe(false);
+    if (lowered.ok) return;
+    expect(lowered.diagnostic).toMatchObject({
+      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
+      message: expect.stringContaining('dbgenerated'),
     });
-  });
-
-  it('returns diagnostics for nanoid and dbgenerated invalid argument shapes', () => {
-    const registry = builtinRegistry;
-    const badNanoidCall = parseDefaultFunctionCall('nanoid(16, 32)', createSpan());
-    const missingDbgeneratedArgCall = parseDefaultFunctionCall('dbgenerated()', createSpan());
-    const nonStringDbgeneratedArgCall = parseDefaultFunctionCall('dbgenerated(123)', createSpan());
-
-    expect(badNanoidCall).toBeDefined();
-    expect(missingDbgeneratedArgCall).toBeDefined();
-    expect(nonStringDbgeneratedArgCall).toBeDefined();
-    if (!badNanoidCall || !missingDbgeneratedArgCall || !nonStringDbgeneratedArgCall) return;
-
-    const badNanoid = lowerDefaultFunctionWithRegistry({
-      call: badNanoidCall,
-      registry,
-      context: loweringContext,
-    });
-    expect(badNanoid.ok).toBe(false);
-    if (!badNanoid.ok) {
-      expect(badNanoid.diagnostic.message).toContain('nanoid');
-    }
-
-    const missingDbgeneratedArg = lowerDefaultFunctionWithRegistry({
-      call: missingDbgeneratedArgCall,
-      registry,
-      context: loweringContext,
-    });
-    expect(missingDbgeneratedArg.ok).toBe(false);
-    if (!missingDbgeneratedArg.ok) {
-      expect(missingDbgeneratedArg.diagnostic.message).toContain(
-        'requires exactly one string argument',
-      );
-    }
-
-    const nonStringDbgeneratedArg = lowerDefaultFunctionWithRegistry({
-      call: nonStringDbgeneratedArgCall,
-      registry,
-      context: loweringContext,
-    });
-    expect(nonStringDbgeneratedArg.ok).toBe(false);
-    if (!nonStringDbgeneratedArg.ok) {
-      expect(nonStringDbgeneratedArg.diagnostic.message).toContain('must be a string literal');
-    }
   });
 });

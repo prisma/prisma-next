@@ -2,7 +2,14 @@ import type { PslDiagnostic } from '@prisma-next/framework-components/psl-ast';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 import type { ArgType, InterpretCtx } from '../src/exports';
-import { fieldAttribute, interpretAttribute, nodePslSpan, optional } from '../src/exports';
+import {
+  fieldAttribute,
+  int,
+  interpretArgs,
+  interpretAttribute,
+  nodePslSpan,
+  optional,
+} from '../src/exports';
 import { Cursor, parse, parseAttribute } from '../src/parse';
 import type { SourceFile } from '../src/source-file';
 import { buildSymbolTable } from '../src/symbol-table';
@@ -18,7 +25,7 @@ function makeCtx(sourceFile: SourceFile): InterpretCtx {
     scalarTypes: ['String', 'Int'],
     pslBlockDescriptors: {},
   });
-  const selfModel = table.topLevel.models.M;
+  const selfModel = table.topLevel.models['M'];
   if (!selfModel) throw new Error('expected model M in the symbol table');
   return {
     level: 'field',
@@ -316,6 +323,44 @@ describe('interpretAttribute leaf purity', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure).toEqual([FAILING_DIAGNOSTIC]);
+    }
+  });
+});
+
+describe('interpretArgs', () => {
+  it('binds arguments into a plain record from an argument iterable', () => {
+    const { node, ctx } = fieldAttr('@rel(size: 16)');
+    const span = nodePslSpan(node.syntax, ctx.sourceFile);
+
+    const result = interpretArgs(
+      node.argList()?.args() ?? [],
+      { name: 'rel', positional: [], named: { size: int() } },
+      ctx,
+      span,
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ size: 16 });
+  });
+
+  it('anchors a missing-required diagnostic to the provided span', () => {
+    const { node, ctx } = fieldAttr('@rel()');
+    const span = nodePslSpan(node.syntax, ctx.sourceFile);
+
+    const result = interpretArgs(
+      node.argList()?.args() ?? [],
+      { name: 'rel', positional: [], named: { size: int() } },
+      ctx,
+      span,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.message).toBe(
+        'Attribute "rel" is missing required argument "size"',
+      );
+      expect(result.failure[0]?.span).toEqual(span);
     }
   });
 });

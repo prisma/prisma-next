@@ -7,7 +7,7 @@ import {
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, type SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
@@ -28,14 +28,15 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type {
-  PrimaryKey,
+  PrimaryKeyInput,
   SqlCheckConstraintIRInput,
-  SqlColumnIR,
-  SqlForeignKeyIR,
-  SqlIndexIR,
+  SqlColumnIRInput,
+  SqlForeignKeyIRInput,
+  SqlIndexIRInput,
   SqlReferentialAction,
-  SqlUniqueIR,
+  SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
+import { RelationalSchemaNodeKind } from '@prisma-next/sql-schema-ir/types';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -44,22 +45,29 @@ import type {
   AddColumnAction,
   AlterTableActionVisitor,
   DropDefaultAction,
+  PostgresAlterPolicyRename,
   PostgresAlterTable,
   PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
+  PostgresCreateType,
   PostgresDdlNode,
+  PostgresDisableRowLevelSecurity,
   PostgresDropPolicy,
+  PostgresDropType,
   RlsPolicyOperation,
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
+import { parseRlsPolicyWireName } from '@prisma-next/target-postgres/rls-canonicalize';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
   PostgresDatabaseSchemaNode,
   PostgresNamespaceSchemaNode,
+  PostgresNativeEnumSchemaNode,
   PostgresPolicySchemaNode,
   PostgresRoleSchemaNode,
+  PostgresSchemaNodeKind,
   PostgresTableSchemaNode,
 } from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -69,6 +77,7 @@ import {
   execute,
   infoSchemaTables,
   ledger,
+  ledgerContract,
   ledgerReadShape,
   marker,
   mergeInvariants,
@@ -438,7 +447,11 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   /**
-   * Appends a ledger entry for `space`. See the
+   * Appends a ledger entry for `space`. When the edge carries a
+   * destination contract snapshot, the content-addressed
+   * `prisma_contract.contract` store is populated first (keyed by the
+   * destination hash, DO NOTHING on revisit) so a reader never sees a
+   * ledger row whose stored destination contract is missing. See the
    * `SqlControlAdapter.writeLedgerEntry` contract.
    */
   async writeLedgerEntry(
@@ -451,10 +464,23 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       readonly migrationName: string;
       readonly migrationHash: string;
       readonly operations: readonly unknown[];
+      readonly destinationContractJson?: unknown;
     },
   ): Promise<void> {
+    const lower = (query: AnyQueryAst) => this.lower(query, { contract: undefined });
+    if (entry.destinationContractJson !== undefined) {
+      await execute(
+        lower,
+        driver,
+        ledgerContract
+          .upsert({ core_hash: entry.to, contract_json: entry.destinationContractJson })
+          .onConflict(ledgerContract.core_hash)
+          .doNothing()
+          .build(),
+      );
+    }
     await execute(
-      (query) => this.lower(query, { contract: undefined }),
+      lower,
       driver,
       ledger
         .insert({
@@ -713,7 +739,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          ORDER BY c.table_name, c.ordinal_position`,
       [schema],
     );
-    // Query all primary keys for all tables in schema
+    // Query all primary keys for all tables in schema. Reads pg_catalog, not
+    // information_schema: `information_schema.table_constraints` hides
+    // constraints on tables where the connecting role's only privilege is
+    // SELECT (its filter grants visibility for INSERT/UPDATE/DELETE/TRUNCATE/
+    // REFERENCES/TRIGGER — not SELECT), so a SELECT-only table introspects
+    // with all its columns but zero constraints and verify reports every
+    // declared constraint as missing. pg_catalog is not privilege-filtered.
     const pkResult = await driver.query<{
       table_name: string;
       constraint_name: string;
@@ -721,24 +753,29 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       ordinal_position: number;
     }>(
       `SELECT
-           tc.table_name,
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         WHERE tc.table_schema = $1
-           AND tc.constraint_type = 'PRIMARY KEY'
-         ORDER BY tc.table_name, kcu.ordinal_position`,
+           cl.relname AS table_name,
+           con.conname AS constraint_name,
+           a.attname AS column_name,
+           k.ord AS ordinal_position
+         FROM pg_catalog.pg_constraint con
+         JOIN pg_catalog.pg_class cl ON cl.oid = con.conrelid
+         JOIN pg_catalog.pg_namespace ns ON ns.oid = cl.relnamespace
+         JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+         JOIN pg_catalog.pg_attribute a
+           ON a.attrelid = con.conrelid
+           AND a.attnum = k.attnum
+         WHERE ns.nspname = $1
+           AND con.contype = 'p'
+         ORDER BY cl.relname, k.ord`,
       [schema],
     );
-    // Query all foreign keys for all tables in schema, including referential actions.
-    // Uses pg_catalog for correct positional pairing of composite FK columns
-    // (information_schema.constraint_column_usage lacks ordinal_position,
-    // which causes Cartesian products for multi-column FKs).
+    // Query all foreign keys for all tables in schema, including referential
+    // actions. Reads pg_catalog only (see the primary-key query above for why
+    // information_schema is unusable here); `unnest(conkey) WITH ORDINALITY`
+    // pairs source and referenced columns positionally, so composite FKs
+    // round-trip in declared order. The referential-action CASEs mirror
+    // pg_constraint's confdeltype/confupdtype encoding and produce the same
+    // rule strings information_schema.referential_constraints reports.
     const fkResult = await driver.query<{
       table_name: string;
       constraint_name: string;
@@ -751,41 +788,48 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       update_rule: string;
     }>(
       `SELECT
-           tc.table_name,
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position,
+           cl.relname AS table_name,
+           con.conname AS constraint_name,
+           a.attname AS column_name,
+           k.ord AS ordinal_position,
            ref_ns.nspname AS referenced_table_schema,
            ref_cl.relname AS referenced_table_name,
            ref_att.attname AS referenced_column_name,
-           rc.delete_rule,
-           rc.update_rule
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         JOIN pg_catalog.pg_constraint pgc
-           ON pgc.conname = tc.constraint_name
-           AND pgc.connamespace = (
-             SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = tc.table_schema
-           )
+           CASE con.confdeltype
+             WHEN 'a' THEN 'NO ACTION'
+             WHEN 'r' THEN 'RESTRICT'
+             WHEN 'c' THEN 'CASCADE'
+             WHEN 'n' THEN 'SET NULL'
+             WHEN 'd' THEN 'SET DEFAULT'
+           END AS delete_rule,
+           CASE con.confupdtype
+             WHEN 'a' THEN 'NO ACTION'
+             WHEN 'r' THEN 'RESTRICT'
+             WHEN 'c' THEN 'CASCADE'
+             WHEN 'n' THEN 'SET NULL'
+             WHEN 'd' THEN 'SET DEFAULT'
+           END AS update_rule
+         FROM pg_catalog.pg_constraint con
+         JOIN pg_catalog.pg_class cl ON cl.oid = con.conrelid
+         JOIN pg_catalog.pg_namespace ns ON ns.oid = cl.relnamespace
+         JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+         JOIN pg_catalog.pg_attribute a
+           ON a.attrelid = con.conrelid
+           AND a.attnum = k.attnum
          JOIN pg_catalog.pg_class ref_cl
-           ON ref_cl.oid = pgc.confrelid
+           ON ref_cl.oid = con.confrelid
          JOIN pg_catalog.pg_namespace ref_ns
            ON ref_ns.oid = ref_cl.relnamespace
          JOIN pg_catalog.pg_attribute ref_att
-           ON ref_att.attrelid = pgc.confrelid
-           AND ref_att.attnum = pgc.confkey[kcu.ordinal_position]
-         JOIN information_schema.referential_constraints rc
-           ON rc.constraint_name = tc.constraint_name
-           AND rc.constraint_schema = tc.table_schema
-         WHERE tc.table_schema = $1
-           AND tc.constraint_type = 'FOREIGN KEY'
-         ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
+           ON ref_att.attrelid = con.confrelid
+           AND ref_att.attnum = con.confkey[k.ord]
+         WHERE ns.nspname = $1
+           AND con.contype = 'f'
+         ORDER BY cl.relname, con.conname, k.ord`,
       [schema],
     );
-    // Query all unique constraints for all tables in schema (excluding PKs)
+    // Query all unique constraints for all tables in schema (excluding PKs).
+    // Reads pg_catalog (see the primary-key query above).
     const uniqueResult = await driver.query<{
       table_name: string;
       constraint_name: string;
@@ -793,18 +837,20 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       ordinal_position: number;
     }>(
       `SELECT
-           tc.table_name,
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         WHERE tc.table_schema = $1
-           AND tc.constraint_type = 'UNIQUE'
-         ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
+           cl.relname AS table_name,
+           con.conname AS constraint_name,
+           a.attname AS column_name,
+           k.ord AS ordinal_position
+         FROM pg_catalog.pg_constraint con
+         JOIN pg_catalog.pg_class cl ON cl.oid = con.conrelid
+         JOIN pg_catalog.pg_namespace ns ON ns.oid = cl.relnamespace
+         JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+         JOIN pg_catalog.pg_attribute a
+           ON a.attrelid = con.conrelid
+           AND a.attnum = k.attnum
+         WHERE ns.nspname = $1
+           AND con.contype = 'u'
+         ORDER BY cl.relname, con.conname, k.ord`,
       [schema],
     );
     // Query all indexes for all tables in schema (excluding constraints).
@@ -849,10 +895,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE i.schemaname = $1
            AND NOT EXISTS (
              SELECT 1
-             FROM information_schema.table_constraints tc
-             WHERE tc.table_schema = $1
-               AND tc.table_name = i.tablename
-               AND tc.constraint_name = i.indexname
+             FROM pg_catalog.pg_constraint con
+             WHERE con.conindid = ic.oid
+               AND con.contype IN ('p', 'u', 'x')
            )
          ORDER BY i.tablename, i.indexname, k.ord`,
       [schema],
@@ -906,11 +951,11 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       string,
       {
         name: string;
-        columns: Record<string, SqlColumnIR>;
-        primaryKey?: PrimaryKey;
-        foreignKeys: readonly SqlForeignKeyIR[];
-        uniques: readonly SqlUniqueIR[];
-        indexes: readonly SqlIndexIR[];
+        columns: Record<string, SqlColumnIRInput>;
+        primaryKey?: PrimaryKeyInput;
+        foreignKeys: readonly SqlForeignKeyIRInput[];
+        uniques: readonly SqlUniqueIRInput[];
+        indexes: readonly SqlIndexIRInput[];
         checks?: SqlCheckConstraintIRInput[];
       }
     > = {};
@@ -919,7 +964,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       const tableName = tableRow.table_name;
 
       // Process columns for this table
-      const columns: Record<string, SqlColumnIR> = {};
+      const columns: Record<string, SqlColumnIRInput> = {};
       for (const colRow of columnsByTable.get(tableName) ?? []) {
         let nativeType = colRow.udt_name;
         const formattedType = colRow.formatted_type
@@ -955,12 +1000,26 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           nativeType = normalizeSchemaNativeType(nativeType.slice(0, -2));
         }
 
+        // Resolved values comparable against the contract-derived expected
+        // side: the normalized full native type (`[]` appended for arrays)
+        // and the structured parse of the raw default. Raw fields stay
+        // untouched alongside — the relational walk still reads and
+        // normalizes them itself.
+        const resolvedNativeType = `${normalizeSchemaNativeType(nativeType)}${many ? '[]' : ''}`;
+        const rawDefault = colRow.column_default ?? undefined;
         columns[colRow.column_name] = {
           name: colRow.column_name,
           nativeType,
           nullable: colRow.is_nullable === 'YES',
-          ...ifDefined('default', colRow.column_default ?? undefined),
+          ...ifDefined('default', rawDefault),
           ...ifDefined('many', many),
+          resolvedNativeType,
+          ...ifDefined(
+            'resolvedDefault',
+            rawDefault !== undefined
+              ? parsePostgresDefault(rawDefault, resolvedNativeType)
+              : undefined,
+          ),
         };
       }
 
@@ -969,11 +1028,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       const primaryKeyColumns = pkRows
         .sort((a, b) => a.ordinal_position - b.ordinal_position)
         .map((row) => row.column_name);
-      const primaryKey: PrimaryKey | undefined =
+      const primaryKey: PrimaryKeyInput | undefined =
         primaryKeyColumns.length > 0
           ? {
               columns: primaryKeyColumns,
               ...(pkRows[0]?.constraint_name ? { name: pkRows[0].constraint_name } : {}),
+              dependsOn: postgresColumnDependsOn(schema, tableName, primaryKeyColumns),
             }
           : undefined;
 
@@ -1007,7 +1067,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           });
         }
       }
-      const foreignKeys: readonly SqlForeignKeyIR[] = Array.from(foreignKeysMap.values()).map(
+      const foreignKeys: readonly SqlForeignKeyIRInput[] = Array.from(foreignKeysMap.values()).map(
         (fk) => ({
           columns: Object.freeze([...fk.columns]) as readonly string[],
           referencedTable: fk.referencedTable,
@@ -1016,6 +1076,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           name: fk.name,
           ...ifDefined('onDelete', mapReferentialAction(fk.deleteRule)),
           ...ifDefined('onUpdate', mapReferentialAction(fk.updateRule)),
+          dependsOn: [
+            postgresTableDependsOn(fk.referencedSchema, fk.referencedTable),
+            ...postgresColumnDependsOn(schema, tableName, fk.columns),
+          ],
         }),
       );
 
@@ -1037,9 +1101,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           });
         }
       }
-      const uniques: readonly SqlUniqueIR[] = Array.from(uniquesMap.values()).map((uq) => ({
+      const uniques: readonly SqlUniqueIRInput[] = Array.from(uniquesMap.values()).map((uq) => ({
         columns: Object.freeze([...uq.columns]) as readonly string[],
         name: uq.name,
+        dependsOn: postgresColumnDependsOn(schema, tableName, uq.columns),
       }));
 
       // Process indexes
@@ -1053,8 +1118,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           options: Record<string, string> | undefined;
         }
       >();
+      // An index with an expression key (e.g. `lower(email)`) reports that
+      // key's row with `attname = null` (Postgres attribute numbers are
+      // <= 0 for expressions, which the LEFT JOIN above can't resolve to a
+      // real column). Every row for that index name is skipped below
+      // rather than only the expression row, so the index never enters
+      // `indexesMap` with a collapsed, misleading column list — a
+      // two-column expression index silently reduced to its one real
+      // column can coincide with an unrelated real single-column index,
+      // and the schema differ's diff-tree node id is derived from the
+      // column tuple (`sql-index/index:<columns>`), so two indexes
+      // colliding on that tuple abort the diff with "duplicate id among
+      // siblings" instead of a normal drift report.
+      const indexNamesWithExpressionKey = new Set<string>();
       for (const idxRow of indexesByTable.get(tableName) ?? []) {
         if (!idxRow.attname) {
+          indexNamesWithExpressionKey.add(idxRow.indexname);
           continue;
         }
         const existing = indexesMap.get(idxRow.indexname);
@@ -1075,13 +1154,41 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           });
         }
       }
-      const indexes: readonly SqlIndexIR[] = Array.from(indexesMap.values()).map((idx) => ({
-        columns: Object.freeze([...idx.columns]) as readonly string[],
-        name: idx.name,
-        unique: idx.unique,
-        ...(idx.type !== undefined && { type: idx.type }),
-        ...(idx.options !== undefined && { options: idx.options }),
-      }));
+      // Two real indexes can legitimately share the exact same column tuple
+      // on one table (e.g. a unique index and a redundant plain index) —
+      // valid in Postgres, but the schema differ's diff-tree node id for an
+      // index is the column tuple alone (`SqlIndexIR#id`, deliberately —
+      // see its doc comment), so two same-tuple siblings from one
+      // introspection abort the diff with "duplicate id among siblings"
+      // rather than a normal drift report. Keep only one per column tuple:
+      // the unique one when there is a unique/non-unique pair (a unique
+      // index is a strict superset of what a plain index on the same
+      // columns would add), otherwise the first by name for determinism.
+      const survivingIndexes = Array.from(indexesMap.values()).filter(
+        (idx) => !indexNamesWithExpressionKey.has(idx.name),
+      );
+      const bestByColumnTuple = new Map<string, (typeof survivingIndexes)[number]>();
+      for (const idx of survivingIndexes) {
+        const tupleKey = idx.columns.join(',');
+        const existing = bestByColumnTuple.get(tupleKey);
+        if (
+          !existing ||
+          (idx.unique && !existing.unique) ||
+          (idx.unique === existing.unique && idx.name < existing.name)
+        ) {
+          bestByColumnTuple.set(tupleKey, idx);
+        }
+      }
+      const indexes: readonly SqlIndexIRInput[] = Array.from(bestByColumnTuple.values()).map(
+        (idx) => ({
+          columns: Object.freeze([...idx.columns]),
+          name: idx.name,
+          unique: idx.unique,
+          ...(idx.type !== undefined && { type: idx.type }),
+          ...(idx.options !== undefined && { options: idx.options }),
+          dependsOn: postgresColumnDependsOn(schema, tableName, idx.columns),
+        }),
+      );
 
       // Process check constraints — parse each predicate into column + value set.
       // Only the two shapes emitted by this slice are recognised; free-form
@@ -1109,16 +1216,25 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const nativeEnumResult = await driver.query<{ typname: string }>(
-      `SELECT t.typname
+    const nativeEnumResult = await driver.query<{ typname: string; enumvalues: unknown }>(
+      `SELECT t.typname, array_agg(e.enumlabel ORDER BY e.enumsortorder) AS enumvalues
          FROM pg_catalog.pg_type t
          JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+         JOIN pg_catalog.pg_enum e ON e.enumtypid = t.oid
          WHERE t.typtype = 'e'
            AND n.nspname = $1
+         GROUP BY t.typname
          ORDER BY t.typname`,
       [schema],
     );
-    const nativeEnumTypeNames = nativeEnumResult.rows.map((r) => r.typname);
+    const enums = nativeEnumResult.rows.map(
+      (r) =>
+        new PostgresNativeEnumSchemaNode({
+          typeName: r.typname,
+          namespaceId: schema,
+          members: parsePgNameArray(r.enumvalues),
+        }),
+    );
     const policiesResult = await driver.query<{
       schemaname: string;
       tablename: string;
@@ -1142,8 +1258,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase())),
       ].sort();
       const permissive = row.permissive.toUpperCase() === 'PERMISSIVE';
-      const hashSuffixMatch = /^(.+)_([0-9a-f]{8})$/.exec(row.policyname);
-      const prefix = hashSuffixMatch?.[1] ?? row.policyname;
+      const prefix = parseRlsPolicyWireName(row.policyname)?.prefix ?? row.policyname;
       const policy = new PostgresPolicySchemaNode({
         name: row.policyname,
         prefix,
@@ -1154,24 +1269,59 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...(row.qual !== null ? { using: row.qual } : {}),
         ...(row.with_check !== null ? { withCheck: row.with_check } : {}),
         permissive,
+        dependsOn: [
+          postgresTableDependsOn(row.schemaname, row.tablename),
+          ...policyRoles.map(postgresRoleDependsOn),
+        ],
       });
       const list = policiesByTable.get(row.tablename) ?? [];
       list.push(policy);
       policiesByTable.set(row.tablename, list);
     }
 
+    // RLS enablement is a table attribute (`pg_class.relrowsecurity`), not a
+    // function of the policy set — a table can have RLS on with zero
+    // policies (deny-all) or policies present with RLS off. relkind covers
+    // both plain ('r') and partitioned ('p') tables: the table listing above
+    // (`information_schema.tables`, BASE TABLE) includes partitioned parents,
+    // and Postgres supports RLS on them.
+    //
+    // Kept as a SEPARATE query from the table listing on purpose. Folding
+    // relrowsecurity into the listing would mean replacing
+    // `information_schema.tables` (which filters by the connection role's
+    // grants) with a raw `pg_class` scan (which does not), changing WHICH
+    // tables the introspection returns — a real behavior shift, not a
+    // cleanup, and one the offline golden-diff can't catch (introspection is
+    // live-only). The only cost of two queries is the concurrent-DDL window:
+    // a table listed but missed by this scan defaults (`?? false`) to
+    // RLS-off. That default is fail-safe — the worst case downstream is a
+    // spurious ENABLE (idempotent), never a spurious DISABLE.
+    const rlsEnabledResult = await driver.query<{ tablename: string; rls_enabled: boolean }>(
+      `SELECT c.relname AS tablename, c.relrowsecurity AS rls_enabled
+         FROM pg_catalog.pg_class c
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = $1
+           AND c.relkind IN ('r', 'p')
+         ORDER BY c.relname`,
+      [schema],
+    );
+    const rlsEnabledByTable = new Map<string, boolean>(
+      rlsEnabledResult.rows.map((row) => [row.tablename, row.rls_enabled]),
+    );
+
     const tables: Record<string, PostgresTableSchemaNode> = {};
     for (const [tableName, input] of Object.entries(tableInputs)) {
       tables[tableName] = new PostgresTableSchemaNode({
         ...input,
         policies: policiesByTable.get(tableName) ?? [],
+        rlsEnabled: rlsEnabledByTable.get(tableName) ?? false,
       });
     }
 
     const namespace = new PostgresNamespaceSchemaNode({
       schemaName: schema,
       tables,
-      nativeEnumTypeNames,
+      nativeEnums: enums,
     });
     return { namespace, pgVersion: await this.getPostgresVersion(driver) };
   }
@@ -1195,10 +1345,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
  * `name[]` (OID 1003). When the parser is absent the raw Postgres text-array
  * literal (`{role1,role2}`) is returned as a string instead of a JS array.
  * This function accepts either form and returns a plain string array.
+ *
+ * The string branch honors Postgres array-literal quoting: an element
+ * containing a comma, quote, backslash, brace, or significant whitespace is
+ * emitted double-quoted with `\"` / `\\` escapes, and unquoted elements are
+ * whitespace-trimmed — so a label like `in progress` or `say "hi"` parses to
+ * its true value instead of being split or kept escaped.
  */
-function parsePgNameArray(value: unknown): string[] {
+export function parsePgNameArray(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value as string[];
+    return value.map(String);
   }
   if (typeof value !== 'string') {
     return [];
@@ -1211,7 +1367,55 @@ function parsePgNameArray(value: unknown): string[] {
   if (inner === '') {
     return [];
   }
-  return inner.split(',').map((s) => s.trim());
+
+  const elements: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let wasQuoted = false;
+  const pushCurrent = () => {
+    elements.push(wasQuoted ? current : current.trim());
+    current = '';
+    wasQuoted = false;
+  };
+  let i = 0;
+  while (i < inner.length) {
+    const char = inner.charAt(i);
+    if (inQuotes) {
+      if (char === '\\') {
+        current += inner[i + 1] ?? '';
+        i += 2;
+        continue;
+      }
+      if (char === '"') {
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      current += char;
+      i++;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = true;
+      wasQuoted = true;
+      i++;
+      continue;
+    }
+    if (char === ',') {
+      pushCurrent();
+      i++;
+      continue;
+    }
+    current += char;
+    i++;
+  }
+  // A still-open quote means the literal was malformed (e.g. `{"unterminated}`);
+  // reject rather than emit the partial value.
+  if (inQuotes) {
+    return [];
+  }
+  pushCurrent();
+  return elements;
 }
 
 /**
@@ -1328,6 +1532,44 @@ function mapReferentialAction(rule: string): SqlReferentialAction | undefined {
   }
   if (mapped === 'noAction') return undefined;
   return mapped;
+}
+
+/**
+ * A FK/policy dependency chain, mirroring the shape the expected-side
+ * derivation stamps (`contractToPostgresDatabaseSchemaNode`): the database
+ * root's fixed sentinel id, then the namespace, then the table.
+ */
+function postgresTableDependsOn(namespaceId: string, tableName: string): SchemaNodeRef {
+  return [
+    { nodeKind: PostgresSchemaNodeKind.database, id: 'database' },
+    { nodeKind: PostgresSchemaNodeKind.namespace, id: namespaceId },
+    { nodeKind: PostgresSchemaNodeKind.table, id: tableName },
+  ];
+}
+
+/** A policy's dependency chain onto one of the roles it grants to. */
+function postgresRoleDependsOn(role: string): SchemaNodeRef {
+  return [
+    { nodeKind: PostgresSchemaNodeKind.database, id: 'database' },
+    { nodeKind: PostgresSchemaNodeKind.role, id: role },
+  ];
+}
+
+/**
+ * The chains from a table-child object (foreign key, index, unique, primary
+ * key) to each of the own columns it is built on — the introspection-side
+ * mirror of `contractToPostgresDatabaseSchemaNode`'s `columnDependsOn`. An
+ * object is dropped before the columns it covers.
+ */
+function postgresColumnDependsOn(
+  namespaceId: string,
+  tableName: string,
+  columns: readonly string[],
+): SchemaNodeRef[] {
+  return columns.map((column) => [
+    ...postgresTableDependsOn(namespaceId, tableName),
+    { nodeKind: RelationalSchemaNodeKind.column, id: `column:${column}` },
+  ]);
 }
 
 /**
@@ -1650,6 +1892,27 @@ function pgRenderCreateSchema(node: PostgresCreateSchema): SqlExecuteRequest {
   };
 }
 
+function pgRenderCreateType(node: PostgresCreateType): SqlExecuteRequest {
+  const typeRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.name)}`
+    : quoteIdentifier(node.name);
+  const values = node.values.map((value) => `'${escapeLiteral(value)}'`).join(', ');
+  return {
+    sql: `CREATE TYPE ${typeRef} AS ENUM (${values})`,
+    params: [],
+  };
+}
+
+function pgRenderDropType(node: PostgresDropType): SqlExecuteRequest {
+  const typeRef = node.schema
+    ? `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.name)}`
+    : quoteIdentifier(node.name);
+  return {
+    sql: `DROP TYPE ${typeRef}`,
+    params: [],
+  };
+}
+
 async function pgRenderAlterTable(
   node: PostgresAlterTable,
   codecLookup: CodecLookup,
@@ -1704,6 +1967,22 @@ function pgRenderDropPolicy(node: PostgresDropPolicy): SqlExecuteRequest {
   };
 }
 
+function pgRenderAlterPolicyRename(node: PostgresAlterPolicyRename): SqlExecuteRequest {
+  const tableRef = `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`;
+  return {
+    sql: `ALTER POLICY ${quoteIdentifier(node.name)} ON ${tableRef} RENAME TO ${quoteIdentifier(node.newName)}`,
+    params: [],
+  };
+}
+
+function pgRenderDisableRowLevelSecurity(node: PostgresDisableRowLevelSecurity): SqlExecuteRequest {
+  const tableRef = `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`;
+  return {
+    sql: `ALTER TABLE ${tableRef} DISABLE ROW LEVEL SECURITY`,
+    params: [],
+  };
+}
+
 async function pgRenderDdlExecuteRequest(
   ast: PostgresDdlNode,
   codecLookup: CodecLookup,
@@ -1711,9 +1990,15 @@ async function pgRenderDdlExecuteRequest(
   const visitor = {
     createTable: (node: PostgresCreateTable) => pgRenderCreateTable(node, codecLookup),
     createSchema: (node: PostgresCreateSchema) => Promise.resolve(pgRenderCreateSchema(node)),
+    createType: (node: PostgresCreateType) => Promise.resolve(pgRenderCreateType(node)),
+    dropType: (node: PostgresDropType) => Promise.resolve(pgRenderDropType(node)),
     alterTable: (node: PostgresAlterTable) => pgRenderAlterTable(node, codecLookup),
     createPolicy: (node: PostgresCreatePolicy) => Promise.resolve(pgRenderCreatePolicy(node)),
     dropPolicy: (node: PostgresDropPolicy) => Promise.resolve(pgRenderDropPolicy(node)),
+    alterPolicyRename: (node: PostgresAlterPolicyRename) =>
+      Promise.resolve(pgRenderAlterPolicyRename(node)),
+    disableRowLevelSecurity: (node: PostgresDisableRowLevelSecurity) =>
+      Promise.resolve(pgRenderDisableRowLevelSecurity(node)),
   };
   return ast.accept(visitor);
 }

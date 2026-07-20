@@ -10,23 +10,24 @@ import type {
   SymbolTable,
 } from '@prisma-next/psl-parser';
 import {
+  bool,
   fieldAttribute,
   fieldRef,
   identifier,
-  interpretAttribute,
   list,
   nodePslSpan,
   oneOf,
   optional,
   str,
 } from '@prisma-next/psl-parser';
-import type { FieldAttributeAst, SourceFile } from '@prisma-next/psl-parser/syntax';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 import { checkUncomposedNamespace, reportUncomposedNamespace } from './psl-column-resolution';
+import { findFieldAttributeNode, interpretFieldAttribute } from './sql-attribute-specs';
 
 export const REFERENTIAL_ACTION_MAP: Record<string, ReferentialAction | undefined> = {
   NoAction: 'noAction',
@@ -121,25 +122,23 @@ const sqlRelation = fieldAttribute('relation', {
         identifier('SetDefault'),
       ),
     ),
+    /**
+     * Opts a foreign key out of its default backing index
+     * (`index: false`). Omitted (the default) keeps the FK's derived
+     * backing-index expectation; only `false` is meaningful — there is no
+     * `index: true` spelling since that is already the default.
+     */
+    index: optional(bool()),
   },
   refine: relationInvariants,
 });
 
 export type SqlRelationOutput = InferAttr<typeof sqlRelation>;
 
-function findRelationAttributeNode(field: FieldSymbol): FieldAttributeAst | undefined {
-  for (const attribute of field.node.attributes()) {
-    if (attribute.name()?.path().join('.') === 'relation') {
-      return attribute;
-    }
-  }
-  return undefined;
-}
-
 function relationAttributeSpan(ctx: InterpretCtx): PslSpan {
   const field = ctx.field;
   if (field !== undefined) {
-    const node = findRelationAttributeNode(field);
+    const node = findFieldAttributeNode(field, 'relation');
     if (node !== undefined) {
       return nodePslSpan(node.syntax, ctx.sourceFile);
     }
@@ -162,23 +161,6 @@ function resolveReferencedModel(symbols: SymbolTable, field: FieldSymbol): Model
   return undefined;
 }
 
-function buildRelationInterpretCtx(input: {
-  readonly selfModel: ModelSymbol;
-  readonly field: FieldSymbol;
-  readonly symbols: SymbolTable;
-  readonly sourceFile: SourceFile;
-  readonly sourceId: string;
-}): InterpretCtx {
-  return {
-    level: 'field',
-    sourceId: input.sourceId,
-    sourceFile: input.sourceFile,
-    selfModel: input.selfModel,
-    field: input.field,
-    resolveReferencedModel: () => resolveReferencedModel(input.symbols, input.field),
-  };
-}
-
 export function interpretRelationAttribute(input: {
   readonly selfModel: ModelSymbol;
   readonly field: FieldSymbol;
@@ -187,19 +169,18 @@ export function interpretRelationAttribute(input: {
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): SqlRelationOutput | undefined {
-  const attributeNode = findRelationAttributeNode(input.field);
-  if (attributeNode === undefined) {
-    return undefined;
-  }
-  const ctx = buildRelationInterpretCtx(input);
-  const result = interpretAttribute(attributeNode, sqlRelation, ctx);
-  if (!result.ok) {
-    for (const failure of result.failure) {
-      input.diagnostics.push(failure);
-    }
-    return undefined;
-  }
-  return result.value;
+  const node = findFieldAttributeNode(input.field, 'relation');
+  if (node === undefined) return undefined;
+  return interpretFieldAttribute({
+    node,
+    spec: sqlRelation,
+    model: input.selfModel,
+    field: input.field,
+    sourceFile: input.sourceFile,
+    sourceId: input.sourceId,
+    diagnostics: input.diagnostics,
+    resolveReferencedModel: () => resolveReferencedModel(input.symbols, input.field),
+  });
 }
 
 export function indexFkRelations(input: {

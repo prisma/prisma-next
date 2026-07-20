@@ -242,11 +242,21 @@ export interface PslExtensionBlockAttribute {
 /**
  * Base shape for a uniform extension-contributed top-level PSL block
  * node, as produced by the generic framework parser and consumed by the
- * validator and lowering factory.
+ * validator, printer, and lowering factory.
  *
  * - `kind` is the routing discriminant, equal to the descriptor's
  *   `discriminator`. The framework parser sets this to
- *   `descriptor.discriminator` for every block it parses.
+ *   `descriptor.discriminator` for every block it parses. Several keywords
+ *   may share one discriminator (e.g. `policy_select`/`policy_insert` both
+ *   route to `kind: 'policy'`) — `kind` identifies the entity/storage kind,
+ *   not the source syntax.
+ * - `keyword` is the source PSL keyword the block was declared with
+ *   (`policy_select`, `policy_insert`, …) — the parse-dispatch identity.
+ *   Distinct from `kind` precisely when a discriminator is shared by more
+ *   than one keyword; a lowering factory that contributes several keywords
+ *   under one discriminator reads `keyword` to tell its blocks apart, and
+ *   the printer re-emits each block under its own `keyword` regardless of
+ *   how many other keywords share its `kind`.
  * - `name` is the block's declared name (the identifier after the keyword).
  * - `parameters` is the descriptor-driven parameter map. Keys are
  *   parameter names from the descriptor; values are the parsed parameter
@@ -262,6 +272,13 @@ export interface PslExtensionBlockAttribute {
  */
 export interface PslExtensionBlock {
   readonly kind: string;
+  /**
+   * The block's parse identity — the source PSL keyword it was declared
+   * with. `kind`/`discriminator` is its storage identity; several keywords
+   * can share one. E.g. the five `policy_*` keywords all lower to the
+   * `policy` entity kind.
+   */
+  readonly keyword: string;
   readonly name: string;
   readonly parameters: Record<string, PslExtensionBlockParamValue>;
   readonly blockAttributes: readonly PslExtensionBlockAttribute[];

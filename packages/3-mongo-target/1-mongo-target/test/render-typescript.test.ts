@@ -258,7 +258,12 @@ describe('renderCallsToTypeScript', () => {
 
   it('quotes __proto__ key in rendered object literals', () => {
     const opts = Object.create(null) as Record<string, unknown>;
-    opts['__proto__'] = 'poisoned';
+    Object.defineProperty(opts, '__proto__', {
+      value: 'poisoned',
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
     const calls = [
       new CollModCall('test', opts as CollModOptions, {
         id: 'test',

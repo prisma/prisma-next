@@ -12,15 +12,11 @@ import type {
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { FieldSymbol, ModelSymbol, ResolvedAttribute } from '@prisma-next/psl-parser';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import {
-  getAttribute,
-  lowerFirst,
-  parseConstraintMapArgument,
-  parseMapName,
-} from './psl-attribute-parsing';
+import { getAttribute, lowerFirst } from './psl-attribute-parsing';
 import type { ColumnDescriptor, FieldPresetContributions } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
@@ -28,6 +24,17 @@ import {
   reportUncomposedNamespace,
   resolveFieldTypeDescriptor,
 } from './psl-column-resolution';
+import {
+  buildEnumDefaultSpec,
+  findFieldAttributeNode,
+  findModelAttributeNode,
+  idFieldSpec,
+  interpretFieldAttribute,
+  interpretModelAttribute,
+  mapFieldSpec,
+  mapModelSpec,
+  uniqueFieldSpec,
+} from './sql-attribute-specs';
 
 type LoweredFieldDefault = {
   readonly defaultValue?: ColumnDefault;
@@ -37,49 +44,36 @@ type LoweredFieldDefault = {
 function lowerEnumDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
-  readonly defaultAttribute: ResolvedAttribute;
+  readonly field: FieldSymbol;
+  readonly model: ModelSymbol;
+  readonly sourceFile: SourceFile;
   readonly enumHandle: EnumTypeHandle;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): LoweredFieldDefault {
-  const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'positional');
-  const hasNamedEntries = input.defaultAttribute.args.some((arg) => arg.kind === 'named');
-  const expressionEntry = positionalEntries[0];
-  if (hasNamedEntries || positionalEntries.length !== 1 || expressionEntry === undefined) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-      message: `Field "${input.modelName}.${input.fieldName}" @default on an enum field expects exactly one positional enum member argument.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
-
-  const raw = expressionEntry.value.trim();
-  const isQuotedString = /^(['"]).*\1$/.test(raw);
-  const isFunctionCall = raw.includes('(') && raw.endsWith(')');
-
-  if (isQuotedString || isFunctionCall) {
-    input.diagnostics.push({
-      code: 'PSL_ENUM_DEFAULT_MUST_BE_MEMBER_NAME',
-      message: `Field "${input.modelName}.${input.fieldName}" @default on an enum field must name a member (e.g. @default(Low)), not a raw value or function.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
-
-  const match = input.enumHandle.enumMembers.find((m) => m.name === raw);
-  if (!match) {
-    const validNames = input.enumHandle.enumMembers.map((m) => m.name).join(', ');
-    input.diagnostics.push({
-      code: 'PSL_ENUM_UNKNOWN_DEFAULT_MEMBER',
-      message: `Field "${input.modelName}.${input.fieldName}" @default(${raw}) does not name a member of ${input.enumHandle.enumName}. Valid members: ${validNames}.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
+  const { field, model, sourceFile, enumHandle, sourceId, diagnostics } = input;
+  const node = findFieldAttributeNode(field, 'default');
+  if (node === undefined) return {};
+  const [firstMember, ...restMembers] = enumHandle.enumMembers.map((m) => m.name);
+  // A memberless enum is already a contract error at its declaration; there is no member a
+  // `@default` could name, so skip lowering rather than invent a grammar for it.
+  if (firstMember === undefined) return {};
+  const spec = buildEnumDefaultSpec([firstMember, ...restMembers]);
+  const interpreted = interpretFieldAttribute({
+    node,
+    spec,
+    model,
+    field,
+    sourceFile,
+    sourceId,
+    diagnostics,
+  });
+  if (interpreted === undefined) return {};
+  const member = interpreted.member;
+  // The grammar (one `identifier(member)` arm per enum member) guarantees a match; the guard
+  // keeps the narrowing total without a diagnostic — an unknown member already failed as syntax.
+  const match = enumHandle.enumMembers.find((m) => m.name === member);
+  if (!match) return {};
 
   return {
     defaultValue: {
@@ -147,6 +141,7 @@ export interface CollectResolvedFieldsInput {
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
+  readonly sourceFile: SourceFile;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly enumHandles?: ReadonlyMap<string, EnumTypeHandle>;
   readonly capabilities: CapabilityMatrix;
@@ -259,6 +254,7 @@ function validateFieldAttributes(input: {
 function extractFieldConstraintNames(input: {
   readonly model: ModelSymbol;
   readonly field: FieldSymbol;
+  readonly sourceFile: SourceFile;
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): {
@@ -269,22 +265,32 @@ function extractFieldConstraintNames(input: {
 } {
   const idAttribute = getAttribute(input.field.attributes, 'id');
   const uniqueAttribute = getAttribute(input.field.attributes, 'unique');
-  const idName = parseConstraintMapArgument({
-    attribute: idAttribute,
-    sourceId: input.sourceId,
-    diagnostics: input.diagnostics,
-    entityLabel: `Field "${input.model.name}.${input.field.name}" @id`,
-    span: input.field.span,
-    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-  });
-  const uniqueName = parseConstraintMapArgument({
-    attribute: uniqueAttribute,
-    sourceId: input.sourceId,
-    diagnostics: input.diagnostics,
-    entityLabel: `Field "${input.model.name}.${input.field.name}" @unique`,
-    span: input.field.span,
-    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-  });
+  const idNode = findFieldAttributeNode(input.field, 'id');
+  const idName =
+    idNode === undefined
+      ? undefined
+      : interpretFieldAttribute({
+          node: idNode,
+          spec: idFieldSpec,
+          model: input.model,
+          field: input.field,
+          sourceFile: input.sourceFile,
+          sourceId: input.sourceId,
+          diagnostics: input.diagnostics,
+        })?.map;
+  const uniqueNode = findFieldAttributeNode(input.field, 'unique');
+  const uniqueName =
+    uniqueNode === undefined
+      ? undefined
+      : interpretFieldAttribute({
+          node: uniqueNode,
+          spec: uniqueFieldSpec,
+          model: input.model,
+          field: input.field,
+          sourceFile: input.sourceFile,
+          sourceId: input.sourceId,
+          diagnostics: input.diagnostics,
+        })?.map;
   return { idAttribute, uniqueAttribute, idName, uniqueName };
 }
 
@@ -453,7 +459,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         ? lowerEnumDefaultForField({
             modelName: model.name,
             fieldName: field.name,
-            defaultAttribute,
+            field,
+            model,
+            sourceFile: input.sourceFile,
             enumHandle,
             sourceId,
             diagnostics,
@@ -461,7 +469,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         : lowerDefaultForField({
             modelName: model.name,
             fieldName: field.name,
-            defaultAttribute,
+            field,
+            model,
+            sourceFile: input.sourceFile,
             columnDescriptor: descriptor,
             generatorDescriptorById,
             sourceId,
@@ -509,6 +519,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     const { idAttribute, uniqueAttribute, idName, uniqueName } = extractFieldConstraintNames({
       model,
       field,
+      sourceFile: input.sourceFile,
       sourceId,
       diagnostics,
     });
@@ -578,29 +589,37 @@ export function buildModelMappings(
   defaultNamespaceId: string,
   diagnostics: ContractSourceDiagnostic[],
   sourceId: string,
+  sourceFile: SourceFile,
 ): Map<string, ModelNameMapping> {
   const result = new Map<string, ModelNameMapping>();
   for (const { model, namespaceId } of modelEntries) {
-    const mapAttribute = getAttribute(model.attributes, 'map');
-    const tableName = parseMapName({
-      attribute: mapAttribute,
-      defaultValue: lowerFirst(model.name),
-      sourceId,
-      diagnostics,
-      entityLabel: `Model "${model.name}"`,
-      span: model.span,
-    });
+    const mapNode = findModelAttributeNode(model, 'map');
+    const tableName =
+      mapNode === undefined
+        ? lowerFirst(model.name)
+        : (interpretModelAttribute({
+            node: mapNode,
+            spec: mapModelSpec,
+            model,
+            sourceFile,
+            sourceId,
+            diagnostics,
+          })?.name ?? lowerFirst(model.name));
     const fieldColumns = new Map<string, string>();
     for (const field of Object.values(model.fields)) {
-      const fieldMapAttribute = getAttribute(field.attributes, 'map');
-      const columnName = parseMapName({
-        attribute: fieldMapAttribute,
-        defaultValue: field.name,
-        sourceId,
-        diagnostics,
-        entityLabel: `Field "${model.name}.${field.name}"`,
-        span: field.span,
-      });
+      const fieldMapNode = findFieldAttributeNode(field, 'map');
+      const columnName =
+        fieldMapNode === undefined
+          ? field.name
+          : (interpretFieldAttribute({
+              node: fieldMapNode,
+              spec: mapFieldSpec,
+              model,
+              field,
+              sourceFile,
+              sourceId,
+              diagnostics,
+            })?.name ?? field.name);
       fieldColumns.set(field.name, columnName);
     }
     result.set(modelCoordinateKey(namespaceId ?? defaultNamespaceId, model.name), {

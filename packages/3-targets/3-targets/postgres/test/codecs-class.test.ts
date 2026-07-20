@@ -4,6 +4,7 @@ import {
   PG_BOOL_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
+  PG_INET_CODEC_ID,
   PG_INT2_CODEC_ID,
   PG_INT4_CODEC_ID,
   PG_INT8_CODEC_ID,
@@ -24,6 +25,7 @@ import {
   pgBoolDescriptor,
   pgFloat4Descriptor,
   pgFloat8Descriptor,
+  pgInetDescriptor,
   pgInt2Descriptor,
   pgInt4Descriptor,
   pgInt8Descriptor,
@@ -168,10 +170,10 @@ describe('codecs-class', () => {
       expect(await codec.decode(instant, callCtx)).toBe(instant);
     });
 
-    it('serializes Date to ISO 8601 string for JSON', () => {
+    it('uses the Postgres JSON timestamp representation', () => {
       const instant = new Date('2024-01-15T10:30:00Z');
-      expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000Z');
-      expect(codec.decodeJson('2024-01-15T10:30:00.000Z')).toEqual(instant);
+      expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000');
+      expect(codec.decodeJson('2024-01-15T10:30:00.000')).toEqual(instant);
     });
 
     it('throws on invalid JSON input', () => {
@@ -201,10 +203,10 @@ describe('codecs-class', () => {
       expect(await codec.decode(instant, callCtx)).toBe(instant);
     });
 
-    it('round-trips through JSON via ISO 8601', () => {
+    it('uses the Postgres JSON timestamptz representation', () => {
       const instant = new Date('2024-01-15T10:30:00Z');
-      expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000Z');
-      expect(codec.decodeJson('2024-01-15T10:30:00.000Z')).toEqual(instant);
+      expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000+00:00');
+      expect(codec.decodeJson('2024-01-15T10:30:00.000+00:00')).toEqual(instant);
     });
 
     it('throws on invalid JSON input with pg/timestamptz@1 label', () => {
@@ -347,6 +349,25 @@ describe('codecs-class', () => {
     });
   });
 
+  describe('pg/inet@1', () => {
+    const codec = pgInetDescriptor.factory()(instanceCtx);
+    const SAMPLE_INET = '192.168.1.1';
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_INET_CODEC_ID);
+    });
+
+    it('encodes and decodes string values verbatim', async () => {
+      expect(await codec.encode(SAMPLE_INET, callCtx)).toBe(SAMPLE_INET);
+      expect(await codec.decode(SAMPLE_INET, callCtx)).toBe(SAMPLE_INET);
+    });
+
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson(SAMPLE_INET)).toBe(SAMPLE_INET);
+      expect(codec.decodeJson(SAMPLE_INET)).toBe(SAMPLE_INET);
+    });
+  });
+
   describe('descriptor metadata', () => {
     it('codec ids match the PG_*_CODEC_ID constants', () => {
       expect(pgTextDescriptor.codecId).toBe(PG_TEXT_CODEC_ID);
@@ -367,6 +388,7 @@ describe('codecs-class', () => {
       expect(pgJsonDescriptor.codecId).toBe(PG_JSON_CODEC_ID);
       expect(pgJsonbDescriptor.codecId).toBe(PG_JSONB_CODEC_ID);
       expect(pgUuidDescriptor.codecId).toBe(PG_UUID_CODEC_ID);
+      expect(pgInetDescriptor.codecId).toBe(PG_INET_CODEC_ID);
     });
 
     it('exposes nativeType meta keyed under db.sql.postgres', () => {
@@ -392,6 +414,7 @@ describe('codecs-class', () => {
       expect(pgJsonDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('json');
       expect(pgJsonbDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('jsonb');
       expect(pgUuidDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('uuid');
+      expect(pgInetDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('inet');
     });
 
     it('exposes traits and targetTypes for each codec', () => {
@@ -407,6 +430,8 @@ describe('codecs-class', () => {
       expect(pgVarbitDescriptor.targetTypes).toEqual(['bit varying']);
       expect(pgUuidDescriptor.traits).toEqual(['equality', 'order']);
       expect(pgUuidDescriptor.targetTypes).toEqual(['uuid']);
+      expect(pgInetDescriptor.traits).toEqual(['equality', 'order']);
+      expect(pgInetDescriptor.targetTypes).toEqual(['inet']);
     });
   });
 });

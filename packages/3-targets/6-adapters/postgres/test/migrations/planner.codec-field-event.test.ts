@@ -22,7 +22,6 @@ const emptySchema = new PostgresDatabaseSchemaNode({
     public: new PostgresNamespaceSchemaNode({
       schemaName: 'public',
       tables: {},
-      nativeEnumTypeNames: [],
     }),
   },
   pgVersion: '',

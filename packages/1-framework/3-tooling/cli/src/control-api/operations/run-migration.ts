@@ -45,10 +45,11 @@ export interface RunMigrationInputs<TFamilyId extends string, TTargetId extends 
   readonly aggregate: ContractSpaceAggregate;
   /**
    * Per-space plans, keyed by `spaceId`. Produced by either the full
-   * {@link planMigration} pipeline (`db init` / `db update` — synth
-   * for the app, graph-walk for extensions) or by direct
-   * {@link graphWalkStrategy} calls (`migrate` — graph-walk
-   * for every contract space). Either way, the runner consumes the same shape.
+   * {@link planMigration} pipeline (`db init` / `db update` —
+   * `planFromDiff` for the app, `resolveRecordedPath` for extensions) or
+   * by direct {@link resolveRecordedPath} calls (`migrate` — resolves
+   * the recorded path for every contract space). Either way, the runner
+   * consumes the same shape.
    */
   readonly perSpacePlans: ReadonlyMap<string, PerSpacePlan>;
   /**

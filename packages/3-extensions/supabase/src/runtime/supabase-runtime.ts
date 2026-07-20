@@ -11,12 +11,12 @@ import type {
   RuntimeTransaction,
 } from '@prisma-next/sql-runtime';
 import { blindCast } from '@prisma-next/utils/casts';
+import type { SupabaseRole } from '../contract/roles';
 
 export interface SupabaseRuntime extends PostgresRuntime {}
 
 export interface SupabaseRoleBinding {
-  // TODO(TML-2501): role names move to the Supabase extension contract (roles as first-class IR) when postgres-rls lands.
-  readonly role: 'anon' | 'authenticated' | 'service_role';
+  readonly role: SupabaseRole;
   readonly claims?: Record<string, unknown>;
 }
 

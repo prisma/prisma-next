@@ -229,11 +229,10 @@ model Feature {
         expect.objectContaining({
           source: expect.objectContaining({ tableName: 'features', columns: ['id'] }),
           target: expect.objectContaining({ tableName: 'tasks', columns: ['id'] }),
-          constraint: true,
-          index: false,
           onDelete: 'cascade',
         }),
       ]);
+      expect(featureTable?.indexes).toEqual([]);
 
       // The link column is storage-only: the domain variant stays thin so
       // variant create/read surfaces are not forced to carry an `id` field.
@@ -291,11 +290,10 @@ model Feature {
             tableName: 'tasks',
             columns: ['id'],
           }),
-          constraint: true,
-          index: false,
           onDelete: 'cascade',
         }),
       ]);
+      expect(featureTable?.indexes).toEqual([]);
     });
 
     it('variant models contain only their own fields (thin)', () => {
@@ -759,7 +757,8 @@ model Bug {
       expect(result.failure.diagnostics).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            code: 'PSL_DISCRIMINATOR_FIELD_NOT_FOUND',
+            code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+            message: expect.stringContaining('does not exist'),
           }),
         ]),
       );

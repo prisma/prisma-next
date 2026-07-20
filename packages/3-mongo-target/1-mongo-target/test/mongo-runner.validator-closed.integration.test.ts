@@ -9,7 +9,7 @@ import type {
   ControlFamilyInstance,
   MigrationPlan,
 } from '@prisma-next/framework-components/control';
-import { buildSynthMigrationEdge } from '@prisma-next/migration-tools/aggregate';
+import { buildFabricatedMigrationEdge } from '@prisma-next/migration-tools/aggregate';
 import { MongoCollection, type MongoContract } from '@prisma-next/mongo-contract';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import {
@@ -241,7 +241,7 @@ describe('MongoMigrationRunner - closed validators', () => {
     const result = await runner.execute({
       plan: serializePlan(planResult.plan),
       migrationEdges: [
-        buildSynthMigrationEdge({
+        buildFabricatedMigrationEdge({
           currentMarkerStorageHash: planResult.plan.origin?.storageHash,
           destinationStorageHash: planResult.plan.destination.storageHash,
           operationCount: planResult.plan.operations.length,

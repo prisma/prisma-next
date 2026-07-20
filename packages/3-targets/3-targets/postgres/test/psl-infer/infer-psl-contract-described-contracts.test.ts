@@ -32,11 +32,12 @@ function idColumnTable(name: string, foreignKeys: PostgresTableSchemaNode['forei
     uniques: [],
     indexes: [],
     policies: [],
+    rlsEnabled: false,
   });
 }
 
 function namespaceNode(schemaName: string, tables: Record<string, PostgresTableSchemaNode>) {
-  return new PostgresNamespaceSchemaNode({ schemaName, tables, nativeEnumTypeNames: [] });
+  return new PostgresNamespaceSchemaNode({ schemaName, tables });
 }
 
 function tree(namespaces: Record<string, PostgresNamespaceSchemaNode>) {
@@ -222,6 +223,36 @@ describe('inferPostgresPslContract — described-contract omission', () => {
     expect(flatPslModels(ast).map((m) => m.name)).toContain('Widgets');
   });
 
+  it('an rls marker entity in a described contract does not omit the same-named table', () => {
+    // The marker is keyed by table name (`entries.rls[tableName]`), so a
+    // described contract marking a table RLS-controlled must not suppress the
+    // introspected table itself — only a `table`-kind entry omits tables.
+    const database = tree({
+      public: namespaceNode('public', { profile: idColumnTable('profile') }),
+    });
+    const contractWithRlsMarker: SqlDescribedContractSpace = {
+      spaceId: 'pack',
+      contract: {
+        ...describedContract({}).contract,
+        storage: new SqlStorage({
+          storageHash: coreHash('sha256:contract'),
+          namespaces: {
+            public: new PostgresSchema({
+              id: 'public',
+              entries: {
+                rls: { profile: { kind: 'rls', tableName: 'profile', namespaceId: 'public' } },
+              },
+            }),
+          },
+        }),
+      },
+    };
+
+    const ast = inferPostgresPslContract(database, [contractWithRlsMarker]);
+
+    expect(flatPslModels(ast).map((m) => m.name)).toContain('Profile');
+  });
+
   it('resolves a cross-space FK into a described contract as the qualified relation, omitting the target table', () => {
     const database = tree({
       public: namespaceNode('public', {
@@ -244,6 +275,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -271,7 +303,9 @@ describe('inferPostgresPslContract — described-contract omission', () => {
 
     const printed = printPsl(ast);
     expect(printed).toContain('supabase:auth.AuthUser');
-    expect(printed).toContain('@relation(fields: [userId], references: [id], onDelete: Cascade)');
+    expect(printed).toContain(
+      '@relation(fields: [userId], references: [id], onDelete: Cascade, index: false)',
+    );
   });
 
   it('resolves the cross-space FK even when a same-bare-named local table survives (pack-owned coordinate wins over the local shadow)', () => {
@@ -297,6 +331,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -350,6 +385,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -375,6 +411,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -409,6 +446,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });

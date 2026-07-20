@@ -55,9 +55,9 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
               uniques: [],
               foreignKeys: [],
               indexes: [],
+              rlsEnabled: false,
             }),
           },
-          nativeEnumTypeNames: [],
         }),
       },
       roles: [],
@@ -95,9 +95,9 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
               uniques: [],
               foreignKeys: [],
               indexes: [],
+              rlsEnabled: false,
             }),
           },
-          nativeEnumTypeNames: [],
         }),
       },
       roles: [],
@@ -145,9 +145,9 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
               uniques: [],
               foreignKeys: [],
               indexes: [],
+              rlsEnabled: false,
             }),
           },
-          nativeEnumTypeNames: [],
         }),
       },
       roles: [],
@@ -170,7 +170,8 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
         expect.objectContaining({
           kind: 'typeMismatch',
           location: {
-            table: 'user',
+            entityKind: 'table',
+            entityName: 'user',
             column: 'email',
           },
         }),
@@ -390,6 +391,7 @@ describe('NOT NULL column without default uses temporary default', () => {
         uniques: [],
         foreignKeys: [],
         indexes: [],
+        rlsEnabled: false,
       }),
     );
 
@@ -452,8 +454,6 @@ describe('NOT NULL column without default uses temporary default', () => {
               tableName: 'org',
               columns: ['id'],
             },
-            constraint: true,
-            index: true,
           },
         ],
       },
@@ -480,6 +480,7 @@ describe('NOT NULL column without default uses temporary default', () => {
             uniques: [],
             foreignKeys: [],
             indexes: [],
+            rlsEnabled: false,
           }),
         },
       },
@@ -599,7 +600,10 @@ function createTestContract(
       },
       primaryKey: { columns: ['id'] },
       uniques: [],
-      indexes: [],
+      // FK1: the backing index for the default (`index: true`) FK below is a
+      // discrete, named entity materialized at contract emit — declared here
+      // directly rather than relying on planner-time synthesis.
+      indexes: [{ columns: ['userId'], name: 'post_userId_idx' }],
       foreignKeys: [
         {
           source: {
@@ -608,8 +612,6 @@ function createTestContract(
             columns: ['userId'],
           },
           target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-          constraint: true,
-          index: true,
         },
       ],
     },
@@ -658,6 +660,7 @@ function buildUserTableSchema(): PostgresTableSchemaNode {
     uniques: [{ columns: ['email'], name: 'user_email_key' }],
     foreignKeys: [],
     indexes: [{ columns: ['email'], name: 'user_email_idx', unique: false }],
+    rlsEnabled: false,
   });
 }
 
@@ -758,7 +761,6 @@ async function planUserTableOperations(
           ...(options?.extraSchemaTables ?? {}),
           user: schemaUserTable,
         },
-        nativeEnumTypeNames: [],
       }),
     },
     roles: [],
@@ -799,6 +801,7 @@ function buildUserTableSchemaWithoutEmail(): PostgresTableSchemaNode {
     uniques: [],
     foreignKeys: [],
     indexes: [],
+    rlsEnabled: false,
   });
 }
 
@@ -818,8 +821,16 @@ function buildPostTableSchema(): PostgresTableSchemaNode {
         referencedTable: 'user',
         referencedColumns: ['id'],
         name: 'post_userId_fkey',
+        // The differ pairs FK nodes by id, which folds in
+        // `resolvedReferencedNamespace` — match what
+        // `contractToPostgresDatabaseSchemaNode` stamps on the expected side
+        // for an unbound-namespace FK target (resolves to the live `public`
+        // DDL schema), or this hand-built actual node never pairs and shows
+        // up as a spurious drop+recreate.
+        resolvedReferencedNamespace: 'public',
       },
     ],
     indexes: [{ columns: ['userId'], name: 'post_userId_idx', unique: false }],
+    rlsEnabled: false,
   });
 }

@@ -1,5 +1,6 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createContract } from '@prisma-next/test-utils';
+import { blindCast } from '@prisma-next/utils/casts';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { col, fk, table } from '../src/factories';
@@ -19,11 +20,12 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function unboundTables(tables: Record<string, unknown>) {
+function unboundTables<T extends Record<string, unknown>>(tables: T) {
   return {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
+        kind: 'test-sql-namespace',
         entries: { table: tables },
       },
     },
@@ -42,8 +44,6 @@ function makeLocalFk(): ForeignKey {
       tableName: 'user',
       columns: ['id'],
     },
-    constraint: true,
-    index: true,
   });
 }
 
@@ -60,8 +60,6 @@ function makeSpaceFk(): ForeignKey {
       columns: ['id'],
       spaceId: 'auth-service',
     },
-    constraint: false,
-    index: true,
   });
 }
 
@@ -153,8 +151,6 @@ describe('local FK backward-compatibility', () => {
         tableName: 'user',
         columns: ['id'],
       },
-      constraint: true,
-      index: true,
     });
     // Confirm no origin/spaceId leaks
     const target = serialized['target'] as Record<string, unknown>;
@@ -203,10 +199,16 @@ describe('round-trips mixed local and cross-space FK carriers', () => {
 
     // Deserialize back into ForeignKeyReference instances
     const localRoundTripped = new ForeignKeyReference(
-      localJson as Parameters<typeof ForeignKeyReference>[0],
+      blindCast<
+        ConstructorParameters<typeof ForeignKeyReference>[0],
+        'JSON.parse(JSON.stringify(...)) round-trip of a ForeignKeyReference; shape is preserved'
+      >(localJson),
     );
     const spaceRoundTripped = new ForeignKeyReference(
-      spaceJson as Parameters<typeof ForeignKeyReference>[0],
+      blindCast<
+        ConstructorParameters<typeof ForeignKeyReference>[0],
+        'JSON.parse(JSON.stringify(...)) round-trip of a ForeignKeyReference; shape is preserved'
+      >(spaceJson),
     );
 
     expect(localRoundTripped.spaceId).toBeUndefined();
@@ -219,8 +221,18 @@ describe('round-trips mixed local and cross-space FK carriers', () => {
     const localFkJson = JSON.parse(JSON.stringify(localFkInstance)) as Record<string, unknown>;
     const spaceFkJson = JSON.parse(JSON.stringify(spaceFkInstance)) as Record<string, unknown>;
 
-    const localFkRoundTripped = new ForeignKey(localFkJson as Parameters<typeof ForeignKey>[0]);
-    const spaceFkRoundTripped = new ForeignKey(spaceFkJson as Parameters<typeof ForeignKey>[0]);
+    const localFkRoundTripped = new ForeignKey(
+      blindCast<
+        ConstructorParameters<typeof ForeignKey>[0],
+        'JSON.parse(JSON.stringify(...)) round-trip of a ForeignKey; shape is preserved'
+      >(localFkJson),
+    );
+    const spaceFkRoundTripped = new ForeignKey(
+      blindCast<
+        ConstructorParameters<typeof ForeignKey>[0],
+        'JSON.parse(JSON.stringify(...)) round-trip of a ForeignKey; shape is preserved'
+      >(spaceFkJson),
+    );
 
     expect(localFkRoundTripped.target.spaceId).toBeUndefined();
     expect(spaceFkRoundTripped.target.spaceId).toBe('auth-service');
@@ -239,7 +251,12 @@ describe('round-trips mixed local and cross-space FK carriers', () => {
     });
 
     const json = JSON.parse(JSON.stringify(mixedTable)) as Record<string, unknown>;
-    const reconstructed = new StorageTable(json as Parameters<typeof StorageTable>[0]);
+    const reconstructed = new StorageTable(
+      blindCast<
+        ConstructorParameters<typeof StorageTable>[0],
+        'JSON.parse(JSON.stringify(...)) round-trip of a StorageTable; shape is preserved'
+      >(json),
+    );
 
     expect(reconstructed.foreignKeys).toHaveLength(2);
     const [localFk, spaceFk] = reconstructed.foreignKeys;
@@ -333,8 +350,6 @@ describe('ForeignKeySchema', () => {
         columns: ['id'],
         spaceId: 'auth-service',
       },
-      constraint: false,
-      index: true,
     };
     const result = ForeignKeySchema(input);
     expect(result).not.toBeInstanceOf(type.errors);
@@ -353,8 +368,6 @@ describe('ForeignKeySchema', () => {
         tableName: 'user',
         columns: ['id'],
       },
-      constraint: true,
-      index: true,
     });
     expect(result).toBeInstanceOf(type.errors);
   });
@@ -371,8 +384,6 @@ describe('ForeignKeySchema', () => {
         tableName: 'user',
         columns: ['id'],
       },
-      constraint: true,
-      index: true,
     });
     expect(result).not.toBeInstanceOf(type.errors);
   });
@@ -390,7 +401,6 @@ describe('validateSqlContractFully with cross-space FKs', () => {
     // reject this as a missing table reference.
     const rawContract = createContract({
       storage: {
-        storageHash: 'sha256:cross-space',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
@@ -417,8 +427,6 @@ describe('validateSqlContractFully with cross-space FKs', () => {
                         columns: ['id'],
                         spaceId: 'auth-service',
                       },
-                      constraint: false,
-                      index: true,
                     },
                   ],
                 },
@@ -435,7 +443,6 @@ describe('validateSqlContractFully with cross-space FKs', () => {
     // A local FK (no spaceId) pointing at a non-existent table must still fail.
     const rawContract = createContract({
       storage: {
-        storageHash: 'sha256:missing-local',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
@@ -461,8 +468,6 @@ describe('validateSqlContractFully with cross-space FKs', () => {
                         tableName: 'ghost_table',
                         columns: ['id'],
                       },
-                      constraint: true,
-                      index: true,
                     },
                   ],
                 },

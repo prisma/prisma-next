@@ -3,7 +3,7 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import {
   type AggregateMigrationEdgeRef,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
@@ -33,8 +33,8 @@ interface LedgerRow {
   readonly migration_hash: string;
   readonly origin_core_hash: string | null;
   readonly destination_core_hash: string;
-  readonly contract_json_before: unknown;
-  readonly contract_json_after: unknown;
+  readonly contract_json: unknown;
+  readonly origin_contract_json: unknown;
   readonly operations: unknown;
 }
 
@@ -55,11 +55,22 @@ function expectReadLedger(
 
 async function readLedgerRows(driver: PostgresControlDriver): Promise<LedgerRow[]> {
   const result = await driver.query<LedgerRow>(
-    `select space, migration_name, migration_hash, origin_core_hash, destination_core_hash,
-      contract_json_before, contract_json_after, operations
-     from prisma_contract.ledger order by id`,
+    `select l.space, l.migration_name, l.migration_hash, l.origin_core_hash,
+      l.destination_core_hash, l.operations,
+      ca.contract_json, cb.contract_json as origin_contract_json
+     from prisma_contract.ledger l
+     left join prisma_contract.contract ca on ca.core_hash = l.destination_core_hash
+     left join prisma_contract.contract cb on cb.core_hash = l.origin_core_hash
+     order by l.id`,
   );
   return result.rows;
+}
+
+async function countContractRows(driver: PostgresControlDriver): Promise<number> {
+  const result = await driver.query<{ n: string | number }>(
+    'select count(*)::int as n from prisma_contract.contract',
+  );
+  return Number(result.rows[0]?.n ?? 0);
 }
 
 describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
@@ -159,8 +170,8 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     const ops = rows[0]!.operations as Array<{ id: string }>;
     expect(ops).toHaveLength(1);
     expect(ops[0]?.id).toBe('edge.single.op');
-    expect(rows[0]!.contract_json_before).toBeNull();
-    expect(rows[0]!.contract_json_after).toBeNull();
+    expect(rows[0]!.contract_json).toBeNull();
+    expect(await countContractRows(driver!)).toBe(0);
 
     const ledger = await ledgerAdapter.readLedger(driver!, LEDGER_TEST_SPACE_ID);
     expectReadLedger(ledger, [
@@ -173,6 +184,96 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
         operationCount: 1,
       },
     ]);
+  });
+
+  it('persists each edge destination snapshot in the hash-keyed contract store', {
+    timeout: testTimeout,
+  }, async () => {
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+    const midHash = 'sha256:snapshot-mid';
+    const destHash = contract.storage.storageHash;
+    const midContract = { models: ['user'] };
+    const endContract = { models: ['user', 'post'] };
+    const edges: readonly AggregateMigrationEdgeRef[] = [
+      {
+        migrationHash: 'sha256:mig-snap-a',
+        dirName: '001_snap_a',
+        from: EMPTY_CONTRACT_HASH,
+        to: midHash,
+        operationCount: 1,
+        destinationContractJson: midContract,
+      },
+      {
+        migrationHash: 'sha256:mig-snap-b',
+        dirName: '002_snap_b',
+        from: midHash,
+        to: destHash,
+        operationCount: 1,
+        destinationContractJson: endContract,
+      },
+    ];
+    const plan = createLedgerTestPlan<PostgresPlanTargetDetails>({
+      destinationHash: destHash,
+      operations: [
+        {
+          id: 'edge.snap.a',
+          label: 'snapshot edge a',
+          operationClass: 'additive',
+          target: {
+            id: 'postgres',
+            details: { schema: 'public', objectType: 'table', name: 'user' },
+          },
+          precheck: [],
+          execute: [],
+          postcheck: [{ description: 'ok', sql: 'SELECT TRUE' }],
+        },
+        {
+          id: 'edge.snap.b',
+          label: 'snapshot edge b',
+          operationClass: 'additive',
+          target: {
+            id: 'postgres',
+            details: { schema: 'public', objectType: 'table', name: 'post' },
+          },
+          precheck: [],
+          execute: [],
+          postcheck: [{ description: 'ok', sql: 'SELECT TRUE' }],
+        },
+      ],
+      migrationEdges: edges,
+    });
+
+    const result = await runner.execute({
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: LEDGER_TEST_SPACE_ID,
+          plan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+          migrationEdges: edges,
+        },
+      ],
+    });
+    if (!result.ok) throw new Error(formatRunnerFailure(result.failure));
+
+    const rows = await readLedgerRows(driver!);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.contract_json).toEqual(midContract);
+    expect(rows[1]!.contract_json).toEqual(endContract);
+    // The second edge's *before* state resolves directly through its
+    // origin hash — no chain reconstruction; the baseline edge has none.
+    expect(rows[0]!.origin_contract_json).toBeNull();
+    expect(rows[1]!.origin_contract_json).toEqual(midContract);
+    // Content-addressed store: one row per distinct contract, keyed by hash.
+    expect(await countContractRows(driver!)).toBe(2);
+    const stored = await driver!.query<{ core_hash: string }>(
+      'select core_hash from prisma_contract.contract order by core_hash',
+    );
+    expect(stored.rows.map((row) => row.core_hash).sort()).toEqual([midHash, destHash].sort());
   });
 
   it('throws when migrationEdges operationCount sum does not match plan.operations length', {
@@ -230,7 +331,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     expect(ledger).toEqual([]);
   });
 
-  it('writes N ledger rows in walk order for multi-edge apply with ops and contract_json on endpoints only', {
+  it('writes N ledger rows in walk order for multi-edge apply with ops and no contract rows when edges carry no snapshots', {
     timeout: testTimeout,
   }, async () => {
     const runner = postgresTargetDescriptor.createRunner(familyInstance);
@@ -358,12 +459,8 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     const opIds = rows.flatMap((r) => (r.operations as Array<{ id: string }>).map((o) => o.id));
     expect(opIds).toEqual(['edge.a', 'edge.b1', 'edge.b2', 'edge.c']);
 
-    expect(rows[0]!.contract_json_before).toBeNull();
-    expect(rows[0]!.contract_json_after).toBeNull();
-    expect(rows[1]!.contract_json_before).toBeNull();
-    expect(rows[1]!.contract_json_after).toBeNull();
-    expect(rows[2]!.contract_json_before).toBeNull();
-    expect(rows[2]!.contract_json_after).toBeNull();
+    expect(rows.map((r) => r.contract_json)).toEqual([null, null, null]);
+    expect(await countContractRows(driver!)).toBe(0);
 
     const ledger = await ledgerAdapter.readLedger(driver!, LEDGER_TEST_SPACE_ID);
     expectReadLedger(ledger, [
@@ -411,7 +508,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     if (planResult.kind !== 'success') throw new Error('expected planner success');
 
     const synthEdges = [
-      buildSynthMigrationEdge({
+      buildFabricatedMigrationEdge({
         currentMarkerStorageHash: null,
         destinationStorageHash: contract.storage.storageHash,
         operationCount: planResult.plan.operations.length,

@@ -2,6 +2,7 @@ export type {
   PrimaryKeyInput,
   SqlAnnotations,
   SqlCheckConstraintIRInput,
+  SqlColumnDefaultIRInput,
   SqlColumnIRInput,
   SqlForeignKeyIRInput,
   SqlIndexIRInput,
@@ -14,8 +15,14 @@ export type {
 } from '../types';
 
 export {
+  assertNode,
+  defineNonEnumerable,
   PrimaryKey,
+  RelationalSchemaNodeKind,
+  relationalNodeEntityKind,
+  relationalNodeGranularity,
   SqlCheckConstraintIR,
+  SqlColumnDefaultIR,
   SqlColumnIR,
   SqlForeignKeyIR,
   SqlIndexIR,

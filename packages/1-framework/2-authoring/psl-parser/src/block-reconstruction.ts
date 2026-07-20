@@ -71,6 +71,7 @@ export function reconstructExtensionBlock(
 
   return {
     kind: descriptor?.discriminator ?? keyword,
+    keyword,
     name: blockName,
     parameters,
     blockAttributes,

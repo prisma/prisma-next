@@ -56,7 +56,12 @@ describe('canonicalizeJson', () => {
       string,
       unknown
     >;
-    input['__proto__'] = sentinel;
+    Object.defineProperty(input, '__proto__', {
+      value: sentinel,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
     const result = canonicalizeJson(input);
     expect(result).toBe('{"__proto__":{"polluted":"yes"},"a":1}');
     expect(Object.getPrototypeOf({})).toBe(protoBefore);

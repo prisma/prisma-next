@@ -1,9 +1,10 @@
-import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
-import { describe, expect, expectTypeOf, it, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { PostgresNamespaceSchemaNode } from '../src/core/schema-ir/postgres-namespace-schema-node';
+import { PostgresNativeEnumSchemaNode } from '../src/core/schema-ir/postgres-native-enum-schema-node';
 import { PostgresPolicySchemaNode } from '../src/core/schema-ir/postgres-policy-schema-node';
 import { PostgresRoleSchemaNode } from '../src/core/schema-ir/postgres-role-schema-node';
 import { PostgresTableSchemaNode } from '../src/core/schema-ir/postgres-table-schema-node';
+import type { SqlSchemaDiffNode } from '../src/core/schema-ir/schema-node-kinds';
 
 const policy = new PostgresPolicySchemaNode({
   name: 'read_own_a1b2c3d4',
@@ -23,6 +24,7 @@ const tableA = new PostgresTableSchemaNode({
   uniques: [],
   indexes: [],
   policies: [policy],
+  rlsEnabled: false,
 });
 
 const tableB = new PostgresTableSchemaNode({
@@ -32,12 +34,12 @@ const tableB = new PostgresTableSchemaNode({
   uniques: [],
   indexes: [],
   policies: [],
+  rlsEnabled: false,
 });
 
 const baseInput = {
   schemaName: 'public',
   tables: { profiles: tableA, orders: tableB },
-  nativeEnumTypeNames: ['status_enum'],
 };
 
 describe('PostgresNamespaceSchemaNode', () => {
@@ -48,7 +50,7 @@ describe('PostgresNamespaceSchemaNode', () => {
 
   it('isEqualTo matches by id (schema name)', () => {
     const a = new PostgresNamespaceSchemaNode(baseInput);
-    const same = new PostgresNamespaceSchemaNode({ ...baseInput, nativeEnumTypeNames: [] });
+    const same = new PostgresNamespaceSchemaNode(baseInput);
     const other = new PostgresNamespaceSchemaNode({ ...baseInput, schemaName: 'other' });
     expect(a.isEqualTo(same)).toBe(true);
     expect(a.isEqualTo(other)).toBe(false);
@@ -60,19 +62,14 @@ describe('PostgresNamespaceSchemaNode', () => {
   });
 
   it('children() returns empty array when no tables', () => {
-    const node = new PostgresNamespaceSchemaNode({
-      schemaName: 'empty',
-      tables: {},
-      nativeEnumTypeNames: [],
-    });
+    const node = new PostgresNamespaceSchemaNode({ schemaName: 'empty', tables: {} });
     expect(node.children()).toEqual([]);
   });
 
   it('children() does not include roles (roles are database-level)', () => {
     const node = new PostgresNamespaceSchemaNode(baseInput);
-    const children = node.children();
-    for (const child of children) {
-      expect(PostgresRoleSchemaNode.is(child as SqlSchemaIRNode)).toBe(false);
+    for (const child of node.children()) {
+      expect(PostgresRoleSchemaNode.is(child as SqlSchemaDiffNode)).toBe(false);
     }
   });
 
@@ -81,30 +78,94 @@ describe('PostgresNamespaceSchemaNode', () => {
     expect(node.schemaName).toBe('public');
   });
 
-  it('carries nativeEnumTypeNames', () => {
-    const node = new PostgresNamespaceSchemaNode(baseInput);
-    expect(node.nativeEnumTypeNames).toEqual(['status_enum']);
-  });
-
   it('carries tables keyed by name', () => {
     const node = new PostgresNamespaceSchemaNode(baseInput);
     expect(Object.keys(node.tables)).toEqual(['profiles', 'orders']);
     expect(node.tables['profiles']).toBe(tableA);
   });
 
-  it('carries nativeEnumTypeNames as a typed field', () => {
-    const node = new PostgresNamespaceSchemaNode(baseInput);
-    expect(node.nativeEnumTypeNames).toEqual(['status_enum']);
-  });
-
-  it('nativeEnumTypeNames is empty when none are supplied', () => {
-    const node = new PostgresNamespaceSchemaNode({ ...baseInput, nativeEnumTypeNames: [] });
-    expect(node.nativeEnumTypeNames).toEqual([]);
-  });
-
   it('instance is frozen', () => {
     const node = new PostgresNamespaceSchemaNode(baseInput);
     expect(Object.isFrozen(node)).toBe(true);
+  });
+
+  describe('native enums', () => {
+    it('carries enum nodes passed directly into children()', () => {
+      const enumNode = new PostgresNativeEnumSchemaNode({
+        typeName: 'aal_level',
+        namespaceId: 'auth',
+        members: ['aal1', 'aal2'],
+        control: 'external',
+      });
+      const node = new PostgresNamespaceSchemaNode({
+        schemaName: 'auth',
+        tables: {},
+        nativeEnums: [enumNode],
+      });
+      expect(node.nativeEnums).toEqual([enumNode]);
+      expect(node.children()).toEqual([enumNode]);
+    });
+
+    it('defaults to empty when nativeEnums is omitted', () => {
+      const node = new PostgresNamespaceSchemaNode(baseInput);
+      expect(node.nativeEnums).toEqual([]);
+    });
+
+    it('freezes the nativeEnums list', () => {
+      const enumNode = new PostgresNativeEnumSchemaNode({
+        typeName: 'status_enum',
+        namespaceId: 'public',
+        members: ['draft', 'review'],
+      });
+      const node = new PostgresNamespaceSchemaNode({
+        ...baseInput,
+        nativeEnums: [enumNode],
+      });
+      expect(Object.isFrozen(node.nativeEnums)).toBe(true);
+    });
+
+    it('exposes one enum diff node per entry through children()', () => {
+      const enumNode = new PostgresNativeEnumSchemaNode({
+        typeName: 'aal_level',
+        namespaceId: 'auth',
+        members: ['aal1', 'aal2'],
+      });
+      const node = new PostgresNamespaceSchemaNode({
+        schemaName: 'auth',
+        tables: { profiles: tableA },
+        nativeEnums: [enumNode],
+      });
+      const enumChildren = node.children().filter((child) => child.id.startsWith('native_enum:'));
+      expect(enumChildren).toEqual([
+        expect.objectContaining({
+          nodeKind: 'postgres-native-enum',
+          typeName: 'aal_level',
+          namespaceId: 'auth',
+          members: ['aal1', 'aal2'],
+        }),
+      ]);
+      expect(node.children()).toHaveLength(2);
+    });
+
+    it('threads an entry-level control grade onto the enum node', () => {
+      const enumNode = new PostgresNativeEnumSchemaNode({
+        typeName: 'aal_level',
+        namespaceId: 'auth',
+        members: ['aal1'],
+        control: 'external',
+      });
+      const node = new PostgresNamespaceSchemaNode({
+        schemaName: 'auth',
+        tables: {},
+        nativeEnums: [enumNode],
+      });
+      expect(node.children()[0]).toMatchObject({ control: 'external' });
+    });
+
+    it('children() stays tables-only when no enums are supplied (regression pin)', () => {
+      const node = new PostgresNamespaceSchemaNode(baseInput);
+      expect(node.children()).toEqual([tableA, tableB]);
+    });
   });
 
   describe('PostgresNamespaceSchemaNode.is', () => {
@@ -121,9 +182,9 @@ describe('PostgresNamespaceSchemaNode', () => {
       expect(PostgresNamespaceSchemaNode.is(policy)).toBe(false);
     });
   });
-});
 
-test('PostgresNamespaceSchemaNode is assignable to SqlSchemaIR', () => {
-  const node = new PostgresNamespaceSchemaNode(baseInput);
-  expectTypeOf(node).toExtend<SqlSchemaIR>();
+  it('carries a `tables` field readable by legacy per-schema consumers reading SqlSchemaIRNode structurally', () => {
+    const node = new PostgresNamespaceSchemaNode(baseInput);
+    expect(Object.keys(node.tables)).toEqual(['profiles', 'orders']);
+  });
 });

@@ -7,12 +7,6 @@ import { createEmitterTestContract as createContract } from './create-emitter-te
 describe('sql-target-family-hook', () => {
   it('validates types from referenced extensions', () => {
     const ir = createContract({
-      extensions: {
-        postgres: {
-          version: '0.0.1',
-        },
-        pg: {},
-      },
       storage: {
         tables: {
           user: {

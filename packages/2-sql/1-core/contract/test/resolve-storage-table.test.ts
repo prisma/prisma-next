@@ -1,3 +1,4 @@
+import { coreHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { SqlStorage } from '../src/ir/sql-storage';
@@ -38,7 +39,7 @@ function twoNamespaceSameTableName(): {
   const publicUsers = tableWithColumn('email_addr');
   const authUsers = tableWithColumn('token_col');
   const storage = new SqlStorage({
-    storageHash: 'sha256:test',
+    storageHash: coreHash('sha256:test'),
     namespaces: {
       public: createTestSqlNamespace({ id: 'public', entries: { table: { users: publicUsers } } }),
       auth: createTestSqlNamespace({ id: 'auth', entries: { table: { users: authUsers } } }),
@@ -51,7 +52,7 @@ describe('resolveStorageTable', () => {
   it('finds a table in whichever namespace declares it', () => {
     const authOnly = tableNamed('auth-only');
     const storage = new SqlStorage({
-      storageHash: 'sha256:test',
+      storageHash: coreHash('sha256:test'),
       namespaces: {
         public: createTestSqlNamespace({ id: 'public', entries: { table: {} } }),
         auth: createTestSqlNamespace({ id: 'auth', entries: { table: { user: authOnly } } }),
@@ -66,7 +67,7 @@ describe('resolveStorageTable', () => {
   it('resolves within a single namespace contract', () => {
     const users = tableNamed('users');
     const storage = new SqlStorage({
-      storageHash: 'sha256:test',
+      storageHash: coreHash('sha256:test'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -82,7 +83,7 @@ describe('resolveStorageTable', () => {
 
   it('returns undefined when no namespace declares the table name', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test',
+      storageHash: coreHash('sha256:test'),
       namespaces: {
         public: createTestSqlNamespace({ id: 'public', entries: { table: {} } }),
       },

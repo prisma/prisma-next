@@ -8,7 +8,7 @@
  *   2. The supabase extension space artefacts are materialised on disk so the
  *      aggregate loader can compose them.
  *   3. PGlite is seeded with the external `auth.*` / `storage.*` tables via
- *      `bootstrapSupabaseShim`.
+ *      `setUpSupabaseMockSchema`.
  *   4. The CLI's `dbInit` (apply mode) runs through the aggregate planner and
  *      emits `ALTER TABLE … ADD CONSTRAINT … REFERENCES "auth"."users"("id")`.
  *   5. `pg_constraint` is queried cross-joining `pg_namespace` + `pg_class` to
@@ -33,7 +33,7 @@ import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AuthUser } from '../src/exports/contract';
 import supabasePack from '../src/exports/pack';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 // ---------------------------------------------------------------------------
 // Synthetic app contract — Profile model with cross-space FK to auth.users.id
@@ -105,7 +105,7 @@ describe('AC7 — cross-contract FK: public.profile.user_id → auth.users.id', 
       // Without this, `db verify` would fail with `declaredMissing` for every
       // `auth.*` / `storage.*` table.
       await withClient(connectionString, async (client) => {
-        await bootstrapSupabaseShim(client);
+        await setUpSupabaseMockSchema(client);
       });
 
       // Step 2 — Materialise the supabase extension space artefacts on disk.

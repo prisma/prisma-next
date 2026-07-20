@@ -3,11 +3,15 @@ import {
   AddColumnAction,
   type AnyAlterTableAction,
   DropDefaultAction,
+  PostgresAlterPolicyRename,
   PostgresAlterTable,
   PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
+  PostgresCreateType,
+  PostgresDisableRowLevelSecurity,
   PostgresDropPolicy,
+  PostgresDropType,
   type RlsPolicyOperation,
 } from '../core/ddl/nodes';
 
@@ -44,6 +48,31 @@ export function createSchema(options: {
   readonly ifNotExists?: boolean;
 }): PostgresCreateSchema {
   return new PostgresCreateSchema(options);
+}
+
+/**
+ * Build a Postgres `CREATE TYPE … AS ENUM (…)` DDL node. The type name (and
+ * optional schema) are quoted by the renderer; the enum member `values` are
+ * emitted as single-quote-escaped string literals. An absent `schema` renders
+ * the type name unqualified so the connection's `search_path` resolves it.
+ */
+export function createType(options: {
+  readonly schema?: string;
+  readonly name: string;
+  readonly values: readonly string[];
+}): PostgresCreateType {
+  return new PostgresCreateType(options);
+}
+
+/**
+ * Build a Postgres `DROP TYPE` DDL node. See {@link createType} for the
+ * identifier-quoting and unqualified-when-schemaless behaviour.
+ */
+export function dropType(options: {
+  readonly schema?: string;
+  readonly name: string;
+}): PostgresDropType {
+  return new PostgresDropType(options);
 }
 
 /**
@@ -105,4 +134,28 @@ export function dropPolicy(options: {
   readonly name: string;
 }): PostgresDropPolicy {
   return new PostgresDropPolicy(options);
+}
+
+/**
+ * Build a Postgres `ALTER POLICY … RENAME TO` DDL node.
+ * Identifiers (`schema`, `table`, `name`, `newName`) are quoted by the renderer.
+ */
+export function alterPolicyRename(options: {
+  readonly schema: string;
+  readonly table: string;
+  readonly name: string;
+  readonly newName: string;
+}): PostgresAlterPolicyRename {
+  return new PostgresAlterPolicyRename(options);
+}
+
+/**
+ * Build a Postgres `ALTER TABLE … DISABLE ROW LEVEL SECURITY` DDL node.
+ * Identifiers (`schema`, `table`) are quoted by the renderer.
+ */
+export function disableRowLevelSecurity(options: {
+  readonly schema: string;
+  readonly table: string;
+}): PostgresDisableRowLevelSecurity {
+  return new PostgresDisableRowLevelSecurity(options);
 }

@@ -1,4 +1,4 @@
-import type { JsonValue } from '@prisma-next/contract/types';
+import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { CapabilityMatrix } from '../shared/capabilities';
 import { mergeCapabilityMatrices } from '../shared/capabilities';
@@ -9,6 +9,7 @@ import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
+  AuthoringModelAttributeDescriptorNamespace,
   AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
@@ -41,6 +42,7 @@ export interface AssembledAuthoringContributions {
   readonly type: AuthoringTypeNamespace;
   readonly entityTypes: AuthoringEntityTypeNamespace;
   readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
+  readonly modelAttributes: AuthoringModelAttributeDescriptorNamespace;
 }
 
 export interface ControlStack<
@@ -52,6 +54,8 @@ export interface ControlStack<
   readonly adapter?: ControlAdapterDescriptor<TFamilyId, TTargetId> | undefined;
   readonly driver?: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
   readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+
+  readonly extensionContracts: ReadonlyMap<string, Contract>;
 
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly queryOperationTypeImports: ReadonlyArray<TypesImportSpec>;
@@ -162,6 +166,7 @@ export function assembleAuthoringContributions(
   const type = {} as Record<string, unknown>;
   const entityTypes = {} as Record<string, unknown>;
   const pslBlockDescriptors: Record<string, unknown> = {};
+  const modelAttributes: Record<string, unknown> = {};
 
   for (const descriptor of descriptors) {
     if (descriptor.authoring?.field) {
@@ -188,6 +193,15 @@ export function assembleAuthoringContributions(
         'pslBlock',
       );
     }
+    if (descriptor.authoring?.modelAttributes) {
+      mergeAuthoringNamespaces(
+        modelAttributes,
+        descriptor.authoring.modelAttributes,
+        [],
+        'modelAttribute',
+        'modelAttribute',
+      );
+    }
   }
 
   const fieldNamespace = field as AuthoringFieldNamespace;
@@ -197,11 +211,16 @@ export function assembleAuthoringContributions(
     AuthoringPslBlockDescriptorNamespace,
     'merge target accumulator narrows to typed namespace post-merge'
   >(pslBlockDescriptors);
+  const modelAttributeNamespace = blindCast<
+    AuthoringModelAttributeDescriptorNamespace,
+    'merge target accumulator narrows to typed namespace post-merge'
+  >(modelAttributes);
   assertNoCrossRegistryCollisions(
     typeNamespace,
     fieldNamespace,
     entityTypeNamespace,
     pslBlockDescriptorNamespace,
+    modelAttributeNamespace,
   );
 
   return {
@@ -209,6 +228,7 @@ export function assembleAuthoringContributions(
     type: typeNamespace,
     entityTypes: entityTypeNamespace,
     pslBlockDescriptors: pslBlockDescriptorNamespace,
+    modelAttributes: modelAttributeNamespace,
   };
 }
 
@@ -413,6 +433,19 @@ interface DependencyDeclaringDescriptor {
   };
 }
 
+function assembleExtensionContracts(
+  extensions: ReadonlyArray<
+    Pick<ControlExtensionDescriptor<string, string>, 'id' | 'contractSpace'>
+  >,
+): ReadonlyMap<string, Contract> {
+  const result = new Map<string, Contract>();
+  for (const ext of extensions) {
+    if (ext.contractSpace === undefined) continue;
+    result.set(ext.id, ext.contractSpace.contractJson);
+  }
+  return result;
+}
+
 function readDeclaredDependencyIds(descriptor: DependencyDeclaringDescriptor): readonly string[] {
   const packs = descriptor.contractSpace?.contractJson?.extensionPacks;
   if (packs === null || typeof packs !== 'object') return [];
@@ -515,6 +548,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     adapter,
     driver,
     extensionPacks: orderedExtensionPacks,
+    extensionContracts: assembleExtensionContracts(orderedExtensionPacks),
 
     codecTypeImports: extractCodecTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),

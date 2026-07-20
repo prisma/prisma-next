@@ -100,12 +100,13 @@ async function resolveCacheKey(
  * The middleware uses three hooks:
  *
  * - `intercept` — on each execution, checks the cache. On a hit, returns
- *   the cached raw rows; the runtime skips `beforeExecute`, `runDriver`,
- *   and `onRow`, and yields the cached rows to the consumer (which, in
- *   the SQL runtime, sees them after the standard `decodeRow` pass —
- *   i.e. the cache stores wire-format values). On a miss, records a
- *   pending buffer keyed on the `exec` object identity and returns
- *   `undefined` (passthrough).
+ *   the cached raw rows; the runtime skips `runDriver` and `onRow`
+ *   (`beforeExecute` is not affected — it has already run for every
+ *   middleware before any `intercept` is consulted) and yields the
+ *   cached rows to the consumer (which, in the SQL runtime, sees them
+ *   after the standard `decodeRow` pass — i.e. the cache stores
+ *   wire-format values). On a miss, records a pending buffer keyed on
+ *   the `exec` object identity and returns `undefined` (passthrough).
  * - `onRow` — on the miss path, appends each row yielded by the driver
  *   to the pending buffer.
  * - `afterExecute` — on the miss path, commits the buffer to the store

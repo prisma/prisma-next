@@ -6,9 +6,10 @@ import {
   getColumnToFieldMap,
   getCompleteColumnToFieldMap,
   getFieldToColumnMap,
+  POLYMORPHIC_DISCRIMINATOR_ALIAS,
   type PolymorphismInfo,
 } from './collection-contract';
-import type { CollectionContext, RuntimeConnection } from './types';
+import type { CollectionContext } from './types';
 
 export interface RowEnvelope {
   readonly raw: Record<string, unknown>;
@@ -105,9 +106,13 @@ export function mapPolymorphicRow(
   row: Record<string, unknown>,
   variantName?: string,
 ): Record<string, unknown> {
+  const discriminatorValue =
+    row[polyInfo.discriminatorColumn] ?? row[POLYMORPHIC_DISCRIMINATOR_ALIAS];
   const variant = variantName
     ? polyInfo.variants.get(variantName)
-    : polyInfo.variantsByValue.get(row[polyInfo.discriminatorColumn] as string);
+    : typeof discriminatorValue === 'string'
+      ? polyInfo.variantsByValue.get(discriminatorValue)
+      : undefined;
 
   if (!variant) {
     const baseMap = getCompleteColumnToFieldMap(contract, namespaceId, baseModelName);
@@ -180,10 +185,11 @@ export async function acquireRuntimeScope(
   }
 
   const connection = await runtime.connection();
-  if (typeof connection.release === 'function') {
+  const release = connection.release;
+  if (typeof release === 'function') {
     return {
       scope: connection,
-      release: () => (connection as RuntimeConnection).release?.() ?? Promise.resolve(),
+      release: () => release.call(connection) ?? Promise.resolve(),
     };
   }
 

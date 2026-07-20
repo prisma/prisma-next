@@ -19,12 +19,21 @@ import {
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
+  ControlMutationDefaultEntry,
   ControlMutationDefaults,
   DefaultFunctionLoweringContext,
-  ParsedDefaultFunctionCall,
+  TypedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
-import type { SymbolTable } from '@prisma-next/psl-parser';
-import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
+import type { FuncCallSig, SymbolTable } from '@prisma-next/psl-parser';
+import {
+  buildSymbolTable,
+  int,
+  num,
+  oneOf,
+  optional,
+  rangeToPslSpan,
+  str,
+} from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceBase, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
@@ -161,7 +170,7 @@ export const testEnumEntityContributions = {
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;
-  readonly span: ParsedDefaultFunctionCall['span'];
+  readonly span: TypedDefaultFunctionCall['span'];
   readonly message: string;
 }) {
   return {
@@ -187,38 +196,6 @@ function executionGenerator(id: string, params?: Record<string, unknown>) {
       },
     },
   };
-}
-
-function expectNoArgs(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-  readonly usage: string;
-}) {
-  if (input.call.args.length === 0) {
-    return undefined;
-  }
-  return invalidArgumentDiagnostic({
-    context: input.context,
-    span: input.call.span,
-    message: `Default function "${input.call.name}" does not accept arguments. Use ${input.usage}.`,
-  });
-}
-
-function parseIntegerArgument(raw: string): number | undefined {
-  const trimmed = raw.trim();
-  if (!/^-?\d+$/.test(trimmed)) {
-    return undefined;
-  }
-  const value = Number(trimmed);
-  if (!Number.isInteger(value)) {
-    return undefined;
-  }
-  return value;
-}
-
-function parseStringLiteral(raw: string): string | undefined {
-  const match = raw.trim().match(/^(['"])(.*)\1$/s);
-  return match?.[2];
 }
 
 export const postgresEnumInferenceCodecs = {
@@ -266,6 +243,7 @@ export const pgvectorAuthoringContributions = {
   entityTypes: {},
   field: {},
   pslBlockDescriptors: {},
+  modelAttributes: {},
   type: {
     pgvector: {
       Vector: {
@@ -421,6 +399,7 @@ export function createPostgresTestContext(
       type: {},
       entityTypes: {},
       pslBlockDescriptors: {},
+      modelAttributes: {},
     },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
@@ -430,137 +409,85 @@ export function createPostgresTestContext(
   };
 }
 
+const nowSig: FuncCallSig = {};
+const autoincrementSig: FuncCallSig = {};
+const ulidSig: FuncCallSig = {};
+const uuidSig: FuncCallSig = {
+  positional: [{ key: 'version', type: optional(oneOf(num(4), num(7))) }],
+};
+const cuidSig: FuncCallSig = { positional: [{ key: 'version', type: num(2) }] };
+const nanoidSig: FuncCallSig = {
+  positional: [{ key: 'size', type: optional(int({ min: 2, max: 255 })) }],
+};
+const dbgeneratedSig: FuncCallSig = { positional: [{ key: 'expression', type: str() }] };
+
 export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefaults {
   return {
-    defaultFunctionRegistry: new Map([
+    defaultFunctionRegistry: new Map<string, ControlMutationDefaultEntry>([
       [
         'autoincrement',
         {
-          lower: ({ call, context }) => {
-            const noArgs = expectNoArgs({ call, context, usage: '`autoincrement()`' });
-            if (noArgs) return noArgs;
-            return {
-              ok: true as const,
-              value: {
-                kind: 'storage' as const,
-                defaultValue: { kind: 'function' as const, expression: 'autoincrement()' },
-              },
-            };
-          },
+          signature: autoincrementSig,
+          lower: () => ({
+            ok: true as const,
+            value: {
+              kind: 'storage' as const,
+              defaultValue: { kind: 'function' as const, expression: 'autoincrement()' },
+            },
+          }),
           usageSignatures: ['autoincrement()'],
         },
       ],
       [
         'now',
         {
-          lower: ({ call, context }) => {
-            const noArgs = expectNoArgs({ call, context, usage: '`now()`' });
-            if (noArgs) return noArgs;
-            return {
-              ok: true as const,
-              value: {
-                kind: 'storage' as const,
-                defaultValue: { kind: 'function' as const, expression: 'now()' },
-              },
-            };
-          },
+          signature: nowSig,
+          lower: () => ({
+            ok: true as const,
+            value: {
+              kind: 'storage' as const,
+              defaultValue: { kind: 'function' as const, expression: 'now()' },
+            },
+          }),
           usageSignatures: ['now()'],
         },
       ],
       [
         'uuid',
         {
-          lower: ({ call, context }) => {
-            if (call.args.length === 0) return executionGenerator('uuidv4');
-            if (call.args.length !== 1) {
-              return invalidArgumentDiagnostic({
-                context,
-                span: call.span,
-                message:
-                  'Default function "uuid" accepts at most one version argument: `uuid()`, `uuid(4)`, or `uuid(7)`.',
-              });
-            }
-            const version = parseIntegerArgument(call.args[0]?.raw ?? '');
-            if (version === 4) return executionGenerator('uuidv4');
-            if (version === 7) return executionGenerator('uuidv7');
-            return invalidArgumentDiagnostic({
-              context,
-              span: call.args[0]?.span ?? call.span,
-              message:
-                'Default function "uuid" supports only `uuid()`, `uuid(4)`, or `uuid(7)` in SQL PSL provider v1.',
-            });
-          },
+          signature: uuidSig,
+          lower: ({ call }) =>
+            call.args['version'] === 7
+              ? executionGenerator('uuidv7')
+              : executionGenerator('uuidv4'),
           usageSignatures: ['uuid()', 'uuid(4)', 'uuid(7)'],
         },
       ],
       [
         'cuid',
         {
-          lower: ({ call, context }) => {
-            if (call.args.length === 0) {
-              return {
-                ok: false as const,
-                diagnostic: {
-                  code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-                  message:
-                    'Default function "cuid()" is not supported in SQL PSL provider v1. Use `cuid(2)` instead.',
-                  sourceId: context.sourceId,
-                  span: call.span,
-                },
-              };
-            }
-            if (call.args.length !== 1) {
-              return invalidArgumentDiagnostic({
-                context,
-                span: call.span,
-                message: 'Default function "cuid" accepts exactly one version argument: `cuid(2)`.',
-              });
-            }
-            const version = parseIntegerArgument(call.args[0]?.raw ?? '');
-            if (version === 2) return executionGenerator('cuid2');
-            return invalidArgumentDiagnostic({
-              context,
-              span: call.args[0]?.span ?? call.span,
-              message: 'Default function "cuid" supports only `cuid(2)` in SQL PSL provider v1.',
-            });
-          },
+          signature: cuidSig,
+          lower: () => executionGenerator('cuid2'),
           usageSignatures: ['cuid(2)'],
         },
       ],
       [
         'ulid',
         {
-          lower: ({ call, context }) => {
-            const noArgs = expectNoArgs({ call, context, usage: '`ulid()`' });
-            if (noArgs) return noArgs;
-            return executionGenerator('ulid');
-          },
+          signature: ulidSig,
+          lower: () => executionGenerator('ulid'),
           usageSignatures: ['ulid()'],
         },
       ],
       [
         'nanoid',
         {
-          lower: ({ call, context }) => {
-            if (call.args.length === 0) return executionGenerator('nanoid');
-            if (call.args.length !== 1) {
-              return invalidArgumentDiagnostic({
-                context,
-                span: call.span,
-                message:
-                  'Default function "nanoid" accepts at most one size argument: `nanoid()` or `nanoid(<2-255>)`.',
-              });
-            }
-            const size = parseIntegerArgument(call.args[0]?.raw ?? '');
-            if (size !== undefined && size >= 2 && size <= 255) {
-              return executionGenerator('nanoid', { size });
-            }
-            return invalidArgumentDiagnostic({
-              context,
-              span: call.args[0]?.span ?? call.span,
-              message:
-                'Default function "nanoid" size argument must be an integer between 2 and 255.',
-            });
+          signature: nanoidSig,
+          lower: ({ call }) => {
+            const size = call.args['size'];
+            return typeof size === 'number'
+              ? executionGenerator('nanoid', { size })
+              : executionGenerator('nanoid');
           },
           usageSignatures: ['nanoid()', 'nanoid(<2-255>)'],
         },
@@ -568,27 +495,13 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
       [
         'dbgenerated',
         {
+          signature: dbgeneratedSig,
           lower: ({ call, context }) => {
-            if (call.args.length !== 1) {
+            const expression = call.args['expression'];
+            if (typeof expression !== 'string' || expression.trim().length === 0) {
               return invalidArgumentDiagnostic({
                 context,
                 span: call.span,
-                message:
-                  'Default function "dbgenerated" requires exactly one string argument: `dbgenerated("...")`.',
-              });
-            }
-            const rawExpression = parseStringLiteral(call.args[0]?.raw ?? '');
-            if (rawExpression === undefined) {
-              return invalidArgumentDiagnostic({
-                context,
-                span: call.args[0]?.span ?? call.span,
-                message: 'Default function "dbgenerated" argument must be a string literal.',
-              });
-            }
-            if (rawExpression.trim().length === 0) {
-              return invalidArgumentDiagnostic({
-                context,
-                span: call.args[0]?.span ?? call.span,
                 message: 'Default function "dbgenerated" argument cannot be empty.',
               });
             }
@@ -596,10 +509,7 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
               ok: true as const,
               value: {
                 kind: 'storage' as const,
-                defaultValue: {
-                  kind: 'function' as const,
-                  expression: rawExpression,
-                },
+                defaultValue: { kind: 'function' as const, expression },
               },
             };
           },

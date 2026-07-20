@@ -7,7 +7,7 @@ import type {
   ControlFamilyInstance,
   MigrationPlan,
 } from '@prisma-next/framework-components/control';
-import { buildSynthMigrationEdge } from '@prisma-next/migration-tools/aggregate';
+import { buildFabricatedMigrationEdge } from '@prisma-next/migration-tools/aggregate';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
@@ -192,7 +192,7 @@ async function applyPolymorphicMigration() {
   const result = await runner.execute({
     plan,
     migrationEdges: [
-      buildSynthMigrationEdge({
+      buildFabricatedMigrationEdge({
         currentMarkerStorageHash: plan.origin?.storageHash,
         destinationStorageHash: plan.destination.storageHash,
         operationCount: plan.operations.length,

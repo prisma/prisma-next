@@ -1272,4 +1272,24 @@ describe('QualifiedNameAst', () => {
     const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
     expect(qn.isOverQualified()).toBe(true);
   });
+
+  it('matches a bare name with isSimpleName', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'Foo');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.isSimpleName('Foo')).toBe(true);
+    expect(qn.isSimpleName('Bar')).toBe(false);
+  });
+
+  it('never matches a qualified name with isSimpleName', () => {
+    const b = new GreenNodeBuilder();
+    b.startNode('QualifiedName');
+    ident(b, 'db');
+    b.token('Dot', '.');
+    ident(b, 'VarChar');
+    const qn = QualifiedNameAst.cast(createSyntaxTree(b.finishNode()))!;
+    expect(qn.isSimpleName('VarChar')).toBe(false);
+    expect(qn.isSimpleName('db.VarChar')).toBe(false);
+  });
 });

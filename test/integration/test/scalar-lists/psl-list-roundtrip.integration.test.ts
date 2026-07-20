@@ -9,7 +9,7 @@ import postgresControlDriver from '@prisma-next/driver-postgres/control';
 import sql, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import { flatPslModels } from '@prisma-next/framework-components/psl-ast';
-import { buildSynthMigrationEdge } from '@prisma-next/migration-tools/aggregate';
+import { buildFabricatedMigrationEdge } from '@prisma-next/migration-tools/aggregate';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   BinaryExpr,
@@ -70,7 +70,7 @@ async function migrateContract(
           space: APP_SPACE_ID,
           plan: planResult.plan,
           migrationEdges: [
-            buildSynthMigrationEdge({
+            buildFabricatedMigrationEdge({
               currentMarkerStorageHash: planResult.plan.origin?.storageHash,
               destinationStorageHash: planResult.plan.destination.storageHash,
               operationCount: planResult.plan.operations.length,

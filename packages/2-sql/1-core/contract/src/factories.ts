@@ -1,7 +1,6 @@
 import { asNamespaceId, type ScalarFieldType } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  applyFkDefaults,
   ForeignKey,
   type ForeignKeyOptions,
   Index,
@@ -45,9 +44,8 @@ export function fk(
   srcColumns: readonly string[],
   targetTableName: string,
   targetColumns: readonly string[],
-  opts?: ForeignKeyOptions & { constraint?: boolean; index?: boolean; namespaceId?: string },
+  opts?: ForeignKeyOptions & { namespaceId?: string },
 ): ForeignKey {
-  const defaults = applyFkDefaults({ constraint: opts?.constraint, index: opts?.index });
   const namespaceId = asNamespaceId(opts?.namespaceId ?? UNBOUND_NAMESPACE_ID);
   return new ForeignKey({
     source: { namespaceId, tableName: srcTableName, columns: srcColumns },
@@ -55,8 +53,6 @@ export function fk(
     ...(opts?.name !== undefined && { name: opts.name }),
     ...(opts?.onDelete !== undefined && { onDelete: opts.onDelete }),
     ...(opts?.onUpdate !== undefined && { onUpdate: opts.onUpdate }),
-    constraint: defaults.constraint,
-    index: defaults.index,
   });
 }
 

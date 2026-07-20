@@ -1,10 +1,19 @@
-import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
+import type {
+  SchemaEntityCoordinate,
+  VerifyDatabaseSchemaResult,
+} from '@prisma-next/framework-components/control';
+import { coordinateKey } from '@prisma-next/framework-components/ir';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { requireHeadRef } from './aggregate';
 import type { ContractMarkerRecordLike } from './marker-types';
 import type { AggregateContractSpace, ContractSpaceAggregate } from './types';
-import { collectExtraElementNames, stripExtraFindings } from './unclaimed-elements';
+import {
+  collectExtraElementCoordinates,
+  type SchemaEntityKindClassifier,
+  type SchemaSubjectClassifier,
+  stripExtraFindings,
+} from './unclaimed-elements';
 
 /**
  * Caller policy for the verifier. Today's only knob is
@@ -29,6 +38,22 @@ export interface VerifierInput {
     space: AggregateContractSpace,
     mode: 'strict' | 'lenient',
   ) => VerifyDatabaseSchemaResult;
+  /**
+   * Classifies a diff issue's subject granularity on demand — the injected
+   * capability the caller reads off the family instance (via
+   * `hasSchemaSubjectClassifier`) when it has one. Absent for families that
+   * classify nothing; the unclaimed-elements sweep falls back to path shape
+   * in that case. Never stamped onto the issue or the node.
+   */
+  readonly classifySubjectGranularity?: SchemaSubjectClassifier;
+  /**
+   * Classifies a diff issue's subject storage `entityKind` on demand — the
+   * sibling injected capability read off the family instance alongside
+   * `classifySubjectGranularity`. Absent for families that classify
+   * nothing; the unclaimed-elements sweep falls back to a placeholder in
+   * that case. Never stamped onto the issue or the node.
+   */
+  readonly classifyEntityKind?: SchemaEntityKindClassifier;
 }
 
 /**
@@ -121,7 +146,15 @@ export function verifyMigration(input: VerifierInput): VerifierOutput {
 }
 
 function runVerifyMigration(input: VerifierInput): VerifierOutput {
-  const { aggregate, markersBySpaceId, schemaIntrospection, mode, verifySchemaForSpace } = input;
+  const {
+    aggregate,
+    markersBySpaceId,
+    schemaIntrospection,
+    mode,
+    verifySchemaForSpace,
+    classifySubjectGranularity,
+    classifyEntityKind,
+  } = input;
   const allSpaces: ReadonlyArray<AggregateContractSpace> = [aggregate.app, ...aggregate.extensions];
   const aggregateSpaceIds = new Set(allSpaces.map((m) => m.spaceId));
 
@@ -166,18 +199,28 @@ function runVerifyMigration(input: VerifierInput): VerifierOutput {
 
   // Schema check: verify each space against the full schema, then split the
   // results in two: each space's contract-satisfaction view (extras
-  // stripped), and every extra name across all spaces, deduplicated and kept
-  // only when no contract space declares it.
+  // stripped), and every extra coordinate across all spaces, deduplicated
+  // and kept only when no contract space declares it at that coordinate.
   const schemaPerSpace = new Map<string, VerifyDatabaseSchemaResult>();
-  const extraNames = new Set<string>();
+  const extraCoordinates = new Map<string, SchemaEntityCoordinate>();
   for (const space of allSpaces) {
     const result = verifySchemaForSpace(schemaIntrospection, space, mode);
-    schemaPerSpace.set(space.spaceId, stripExtraFindings(result));
-    for (const name of collectExtraElementNames(result)) extraNames.add(name);
+    schemaPerSpace.set(space.spaceId, stripExtraFindings(result, classifySubjectGranularity));
+    for (const coordinate of collectExtraElementCoordinates(
+      result,
+      classifySubjectGranularity,
+      classifyEntityKind,
+    )) {
+      extraCoordinates.set(coordinateKey(coordinate), coordinate);
+    }
   }
-  const unclaimed = [...extraNames]
-    .filter((name) => !aggregate.declaresEntity(name))
-    .sort((a, b) => a.localeCompare(b));
+  const unclaimed = [
+    ...new Set(
+      [...extraCoordinates.values()]
+        .filter((coordinate) => !aggregate.declaresEntity(coordinate))
+        .map((coordinate) => coordinate.entityName),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
 
   return ok({
     markerCheck: {

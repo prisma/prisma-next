@@ -1,6 +1,6 @@
 ---
 name: prisma-next
-description: Route a vague Prisma Next prompt to the right specific skill. Use for "help me with Prisma Next", "what is Prisma Next", "explain Prisma Next", "I'm new to PN", "where do I start", "what can I do with Prisma Next", "what can I do next with Prisma", "just ran createprisma", "tour of Prisma Next", "Prisma Next overview", and comparison questions like "Prisma Next vs Prisma 7", "PN vs Drizzle", "PN vs Kysely", "PN vs TypeORM". Do NOT use when the prompt clearly matches a workflow skill — adoption / quickstart / first-touch orientation / brownfield introspection, schema / contract editing, migration authoring (db update / migration plan / migrate), migration review on deploy / concurrent migrations, queries / db.orm / db.sql / TypedSQL, runtime / db.ts / middleware wiring, build / Vite plugin / Next.js plugin, debug / structured error envelopes / PN-* error codes, or feedback / bug report / feature request — load that sibling skill directly.
+description: Route a vague Prisma Next prompt to the right specific skill. Use for "help me with Prisma Next", "what is Prisma Next", "explain Prisma Next", "I'm new to PN", "where do I start", "what can I do with Prisma Next", "what can I do next with Prisma", "just ran createprisma", "tour of Prisma Next", "Prisma Next overview", and comparison questions like "Prisma Next vs Prisma 7", "PN vs Drizzle", "PN vs Kysely", "PN vs TypeORM". Do NOT use when the prompt clearly matches a workflow skill — adoption / quickstart / first-touch orientation / brownfield introspection, schema / contract editing, migration authoring (db update / migration plan / migrate), migration review on deploy / concurrent migrations, queries / db.orm / db.sql / TypedSQL, Supabase / RLS / role binding, runtime / db.ts / middleware wiring, build / Vite plugin / Next.js plugin, debug / structured error envelopes / PN-* error codes, or feedback / bug report / feature request — load that sibling skill directly.
 ---
 
 # Prisma Next — Router
@@ -23,6 +23,7 @@ This skill exists to disambiguate vague Prisma Next prompts. When the user hasn'
   - Authoring a migration, fixing a planner error → `prisma-next-migrations`.
   - Reviewing what's about to run on merge, handling concurrent migrations → `prisma-next-migration-review`.
   - Writing a query → `prisma-next-queries`.
+  - Supabase — RLS policies, role binding (`asUser` / `asAnon` / `asServiceRole`), `auth.users` FKs, `@prisma-next/extension-supabase` → `prisma-next-supabase`.
   - Wiring `db.ts`, middleware, environment config → `prisma-next-runtime`.
   - Build-system / dev-server plugin (Vite, Next.js, …) → `prisma-next-build`.
   - A specific error code or symptom → `prisma-next-debug`.

@@ -1,6 +1,6 @@
 ---
 name: prisma-next-contract
-description: Edit the Prisma Next data contract — add models, fields, relations, indexes, enums, value objects (composite types), type aliases, namespaces (Postgres schemas), cross-contract foreign keys (cross-space FK), polymorphic types (`@@discriminator` / `@@base`), use extension namespaces (`pgvector.Vector(...)`, `cipherstash.EncryptedString(...)`), wire `prisma-next.config.ts` with `defineConfig` from the `@prisma-next/<target>/config` façade, and run `prisma-next contract emit`. Use for schema, models, fields, attributes, soft delete, paranoid, scopes, validations, callbacks, prisma schema, PSL, contract.prisma, contract.ts, contract.json, contract.d.ts, façade imports, `@prisma-next/postgres/config`, `@prisma-next/postgres/contract-builder`, `@prisma-next/postgres/control`, `@prisma-next/mongo/config`, `@prisma-next/mongo/contract-builder`, `extensions:`, `extensionPacks`, pgvector, cipherstash, postgis, paradedb, supabase, `@prisma-next/extension-supabase`, `@@control`, control policy, managed, tolerated, external, observed, PN-CLI-4002, PN-CLI-4003, PN-CLI-4011.
+description: Edit the Prisma Next data contract — add models, fields, relations, indexes, enums, value objects (composite types), type aliases, namespaces (Postgres schemas), cross-contract foreign keys (cross-space FK), polymorphic types (`@@discriminator` / `@@base`), use extension namespaces (`pgvector.Vector(...)`, `cipherstash.EncryptedString(...)`), wire `prisma-next.config.ts` with `defineConfig` from the `@prisma-next/<target>/config` façade, and run `prisma-next contract emit`. Use for schema, models, fields, attributes, soft delete, paranoid, scopes, validations, callbacks, prisma schema, PSL, contract.prisma, contract.ts, contract.json, contract.d.ts, `@prisma-next/postgres/config`, `@prisma-next/postgres/contract-builder`, `@prisma-next/postgres/control`, `@prisma-next/mongo/config`, `@prisma-next/mongo/contract-builder`, `extensions:`, `extensionPacks`, pgvector, cipherstash, postgis, paradedb, supabase, `@prisma-next/extension-supabase`, `@@control`, control policy, managed, tolerated, external, observed.
 ---
 
 # Prisma Next — Contract Authoring
@@ -317,7 +317,7 @@ A contract-level default can be set via `defaultControlPolicy` on `prismaContrac
 
 ## Workflow — `@prisma-next/extension-supabase`
 
-The concept: the Supabase extension provides the `supabase` contract space (containing `auth.AuthUser` and related auth models) and a runtime extension. It does not expose a `/control` subpath so it cannot be registered via the user-facing `defineConfig({ extensions: [...] })` façade. Instead it is wired via `extensionPacks` in the low-level config and `extensions` in the runtime factory. See `examples/supabase` for the full working pattern.
+The concept: the Supabase extension provides the `supabase` contract space (the `auth` / `storage` schemas as `external` tables, plus the platform roles) and its own role-first runtime factory. It does not expose a `/control` subpath so it cannot be registered via the user-facing `defineConfig({ extensions: [...] })` façade — it is wired via `extensionPacks` in the low-level config. See `examples/supabase` for the full working pattern.
 
 `prisma-next.config.ts` (mirrors the example):
 
@@ -332,17 +332,7 @@ export default defineConfig({
 });
 ```
 
-`src/prisma/db.ts`:
-
-```typescript
-import supabaseExtension from '@prisma-next/extension-supabase/runtime';
-import postgres from '@prisma-next/postgres/runtime';
-
-export const db = postgres<Contract>({
-  contractJson,
-  extensions: [supabaseExtension],
-});
-```
+`db.ts` does **not** use the stock `postgres()` factory — a Supabase app builds its client with the `supabase()` factory from `@prisma-next/extension-supabase/runtime` (role-first: `asUser(jwt)` / `asAnon()` / `asServiceRole()`, JWT validation, RLS). That runtime — and RLS policy authoring (`policy_select` / `@@rls`) — is covered by **`prisma-next-supabase`**; load it for anything past the config wiring.
 
 Export subpaths: `@prisma-next/extension-supabase/pack`, `@prisma-next/extension-supabase/runtime`, `@prisma-next/extension-supabase/contract`. Canonical worked example: `examples/supabase`.
 

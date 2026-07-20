@@ -629,7 +629,7 @@ function generateTableLiteralType(table: StorageTable): string {
       const name = fk.name ? `; readonly name: ${serializeValue(fk.name)}` : '';
       const srcRef = `{ readonly namespaceId: ${serializeNamespaceId(String(fk.source.namespaceId))}; readonly tableName: ${serializeValue(fk.source.tableName)}; readonly columns: readonly [${srcCols}] }`;
       const tgtRef = `{ readonly namespaceId: ${serializeNamespaceId(String(fk.target.namespaceId))}; readonly tableName: ${serializeValue(fk.target.tableName)}; readonly columns: readonly [${tgtCols}] }`;
-      return `{ readonly source: ${srcRef}; readonly target: ${tgtRef}${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
+      return `{ readonly source: ${srcRef}; readonly target: ${tgtRef}${name} }`;
     })
     .join(', ');
   tableParts.push(`foreignKeys: readonly [${fks}]`);

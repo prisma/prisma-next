@@ -1,48 +1,90 @@
 import type {
-  SchemaVerificationNode,
+  DiffableNode,
+  DiffSubjectGranularity,
+  SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
+import type {
+  SchemaEntityKindClassifier,
+  SchemaSubjectClassifier,
+} from '../../src/aggregate/unclaimed-elements';
 import {
-  collectExtraElementNames,
+  collectExtraElementCoordinates,
   stripExtraFindings,
+  UNCLASSIFIED_ENTITY_KIND,
 } from '../../src/aggregate/unclaimed-elements';
 
-function tableNode(
-  name: string,
-  status: SchemaVerificationNode['status'],
-  code = '',
-  children: SchemaVerificationNode[] = [],
-): SchemaVerificationNode {
+/**
+ * A minimal diff node carrying a fake `kind` discriminator — the strip never
+ * reads it directly, only via the injected `classify` capability below,
+ * mirroring how a real family/target classifier resolves granularity from a
+ * node's `nodeKind`.
+ */
+function diffNode(id: string, kind?: string): DiffableNode & { readonly kind?: string } {
   return {
-    status,
-    kind: 'table',
-    name,
-    contractPath: `storage.namespaces.public.entries.table.${name}`,
-    code,
-    message: '',
-    expected: undefined,
-    actual: undefined,
-    children,
+    id,
+    nodeKind: kind ?? 'unclassified',
+    isEqualTo: () => true,
+    children: () => [],
+    ...ifDefined('kind', kind),
   };
 }
 
-function extraTableNode(name: string, status: 'fail' | 'warn'): SchemaVerificationNode {
-  return { ...tableNode(`table ${name}`, status, 'extra_table'), reason: 'not-expected' };
+/** A fake classifier keyed on the fixture nodes' `kind`, standing in for a real family/target one. */
+const classify: SchemaSubjectClassifier = (issue) => {
+  const node = issue.actual ?? issue.expected;
+  const kind = (node as { readonly kind?: string } | undefined)?.kind;
+  const granularity: Readonly<Record<string, DiffSubjectGranularity>> = {
+    table: 'entity',
+    column: 'field',
+    policy: 'structural',
+  };
+  return kind !== undefined ? granularity[kind] : undefined;
+};
+
+/** A fake entity-kind classifier keyed on the fixture nodes' `kind`, sibling of `classify` above. */
+const classifyEntityKind: SchemaEntityKindClassifier = (issue) => {
+  const node = issue.actual ?? issue.expected;
+  const kind = (node as { readonly kind?: string } | undefined)?.kind;
+  return kind === 'table' ? 'table' : undefined;
+};
+
+function extraTableIssue(name: string): SchemaDiffIssue {
+  return {
+    path: ['database', 'public', name],
+    actual: diffNode(name, 'table'),
+  };
+}
+
+function extraColumnIssueUnder(tableName: string, columnName: string): SchemaDiffIssue {
+  return {
+    path: ['database', 'public', tableName, `column:${columnName}`],
+    actual: diffNode(`column:${columnName}`, 'column'),
+  };
+}
+
+function extraPolicyIssue(tableName: string, policyName: string): SchemaDiffIssue {
+  return {
+    path: ['database', 'public', tableName, policyName],
+    actual: diffNode(policyName, 'policy'),
+  };
+}
+
+/** A document-family extra-collection issue: no classifiable kind, path is the bare name. */
+function extraCollectionIssue(name: string): SchemaDiffIssue {
+  return {
+    path: [name],
+    actual: diffNode(name),
+  };
 }
 
 function makeResult(args: {
   ok: boolean;
-  children: SchemaVerificationNode[];
-  counts: VerifyDatabaseSchemaResult['schema']['counts'];
   issues?: VerifyDatabaseSchemaResult['schema']['issues'];
-  schemaDiffIssues?: VerifyDatabaseSchemaResult['schema']['schemaDiffIssues'];
 }): VerifyDatabaseSchemaResult {
-  const rootStatus = args.children.some((c) => c.status === 'fail')
-    ? 'fail'
-    : args.children.some((c) => c.status === 'warn')
-      ? 'warn'
-      : 'pass';
   return {
     ok: args.ok,
     ...(args.ok ? {} : { code: 'PN-RUN-3010' }),
@@ -51,19 +93,6 @@ function makeResult(args: {
     target: { expected: 'postgres' },
     schema: {
       issues: args.issues ?? [],
-      schemaDiffIssues: args.schemaDiffIssues ?? [],
-      root: {
-        status: rootStatus,
-        kind: 'contract',
-        name: 'contract',
-        contractPath: '',
-        code: '',
-        message: '',
-        expected: undefined,
-        actual: undefined,
-        children: args.children,
-      },
-      counts: args.counts,
     },
     timings: { total: 0 },
   };
@@ -71,218 +100,165 @@ function makeResult(args: {
 
 describe('stripExtraFindings', () => {
   it('returns the result unchanged when there are no extras', () => {
-    const result = makeResult({
-      ok: true,
-      children: [tableNode('user', 'pass')],
-      // Faithful SQL basis: the root is counted at its own status (pass).
-      counts: { pass: 2, warn: 0, fail: 0, totalNodes: 2 },
-    });
-    expect(stripExtraFindings(result)).toBe(result);
+    const result = makeResult({ ok: true });
+    expect(stripExtraFindings(result, classify)).toBe(result);
   });
 
-  it('SQL basis (root counted): strict extras-only failure passes after the strip', () => {
-    // Faithful SQL counts: computeCounts walks EVERY node including the root at
-    // its own status. Root fail + user pass + extra fail => pass=1, fail=2.
+  it('strict extras-only failure passes after the strip (table + its descendants dropped)', () => {
     const result = makeResult({
       ok: false,
-      children: [tableNode('user', 'pass'), extraTableNode('legacy', 'fail')],
-      counts: { pass: 1, warn: 0, fail: 2, totalNodes: 3 },
-      issues: [{ kind: 'extra_table', table: 'legacy', reason: 'not-expected', message: 'x' }],
+      issues: [extraTableIssue('legacy'), extraColumnIssueUnder('legacy', 'id')],
     });
 
-    const stripped = stripExtraFindings(result);
+    const stripped = stripExtraFindings(result, classify);
 
-    expect(stripped.schema.root.children.map((c) => c.name)).toEqual(['user']);
     expect(stripped.schema.issues).toEqual([]);
-    // The only failures were the extra node and the root's echo of it. The
-    // pruned tree is all-pass, so the space satisfies its contract.
     expect(stripped.ok).toBe(true);
-    expect(stripped.schema.counts).toEqual({ pass: 2, warn: 0, fail: 0, totalNodes: 2 });
+    expect(stripped.summary).toBe('Database schema satisfies contract');
   });
 
-  it('SQL basis: a real missing/mismatch failure survives the strip', () => {
-    // Root fail + user fail + extra fail => fail=3 under the SQL basis.
+  it('a Mongo-shape extra collection issue is stripped the same way (no classifier injected)', () => {
     const result = makeResult({
       ok: false,
-      children: [tableNode('user', 'fail', 'missing_column'), extraTableNode('legacy', 'fail')],
-      counts: { pass: 0, warn: 0, fail: 3, totalNodes: 3 },
-      issues: [
-        {
-          kind: 'missing_column',
-          table: 'user',
-          column: 'email',
-          reason: 'not-found',
-          message: 'm',
-        },
-        { kind: 'extra_table', table: 'legacy', reason: 'not-expected', message: 'x' },
-      ],
+      issues: [extraCollectionIssue('a'), extraCollectionIssue('b')],
     });
 
     const stripped = stripExtraFindings(result);
+
+    expect(stripped.schema.issues).toEqual([]);
+    expect(stripped.ok).toBe(true);
+  });
+
+  it('a real missing/mismatch failure survives the strip', () => {
+    const missingColumn: SchemaDiffIssue = {
+      path: ['database', 'public', 'user', 'column:email'],
+      expected: diffNode('column:email', 'column'),
+    };
+    const result = makeResult({
+      ok: false,
+      issues: [missingColumn, extraTableIssue('legacy')],
+    });
+
+    const stripped = stripExtraFindings(result, classify);
 
     expect(stripped.ok).toBe(false);
-    expect(stripped.schema.issues.map((i) => i.kind)).toEqual(['missing_column']);
-    // Recomputed from the pruned tree: root fail + user fail.
-    expect(stripped.schema.counts.fail).toBe(2);
-  });
-
-  it('Mongo basis (root not counted): strict extras-only failure passes after the strip', () => {
-    // Faithful Mongo counts: fail++ per collection, the root is never counted.
-    // Two extra collections => fail=2, totalNodes=2.
-    const result = makeResult({
-      ok: false,
-      children: [extraTableNode('a', 'fail'), extraTableNode('b', 'fail')],
-      counts: { pass: 0, warn: 0, fail: 2, totalNodes: 2 },
-      issues: [
-        { kind: 'extra_table', table: 'a', reason: 'not-expected', message: 'x' },
-        { kind: 'extra_table', table: 'b', reason: 'not-expected', message: 'x' },
-      ],
-    });
-
-    const stripped = stripExtraFindings(result);
-
-    // Recomputed with a plain self-consistent walk of the pruned tree: only the
-    // (now passing) root remains.
-    expect(stripped.schema.counts).toEqual({ pass: 1, warn: 0, fail: 0, totalNodes: 1 });
-    expect(stripped.ok).toBe(true);
-  });
-
-  it('strips an extra node whatever disposition the control policy reconciled it to', () => {
-    // Mongo lenient basis: user pass + extra warn => pass=1, warn=1, root not counted.
-    const result = makeResult({
-      ok: true,
-      children: [tableNode('user', 'pass'), extraTableNode('legacy', 'warn')],
-      counts: { pass: 1, warn: 1, fail: 0, totalNodes: 2 },
-      issues: [{ kind: 'extra_table', table: 'legacy', reason: 'not-expected', message: 'x' }],
-    });
-
-    const stripped = stripExtraFindings(result);
-
-    expect(stripped.schema.root.children.map((c) => c.name)).toEqual(['user']);
-    expect(stripped.schema.counts.warn).toBe(0);
-    expect(stripped.ok).toBe(true);
+    expect(stripped.schema.issues).toEqual([missingColumn]);
   });
 
   it('keeps an extra column on a declared table as the space’s own drift', () => {
-    // An extra column lives INSIDE a declared table's subtree; its fail is baked
-    // into the tree and counts. Stripping the issue while the failure stays
-    // would make the space fail with an empty issue list.
-    const columnNode: SchemaVerificationNode = {
-      status: 'fail',
-      kind: 'column',
-      name: 'stale',
-      contractPath: 'storage.namespaces.public.entries.table.user.columns.stale',
-      code: 'extra_column',
-      message: 'Extra column "stale"',
-      expected: undefined,
-      actual: 'stale',
-      children: [],
-    };
+    // The extra column's path is not under any dropped table, so it stays and
+    // the verdict stays consistent with the surviving evidence.
     const result = makeResult({
       ok: false,
-      children: [tableNode('user', 'fail', 'extra_column', [columnNode])],
-      counts: { pass: 0, warn: 0, fail: 3, totalNodes: 3 },
-      issues: [
-        {
-          kind: 'extra_column',
-          table: 'user',
-          column: 'stale',
-          reason: 'not-expected',
-          message: 'x',
-        },
-      ],
+      issues: [extraColumnIssueUnder('user', 'stale')],
     });
 
-    const stripped = stripExtraFindings(result);
+    const stripped = stripExtraFindings(result, classify);
 
-    // Nothing top-level was stripped, so the result is untouched: the issue
-    // stays as evidence and the verdict stays consistent with it.
     expect(stripped).toBe(result);
-    expect(stripped.schema.issues.map((i) => i.kind)).toEqual(['extra_column']);
     expect(stripped.ok).toBe(false);
   });
 
-  it('keeps failing on an extra RLS policy when a sibling extra node is dropped', () => {
-    // Composed case: the space is relationally clean but has one extra RLS
-    // policy on its own table — a schemaDiffIssue with NO tree node; the family
-    // folds schemaDiffIssues.length into counts.fail. A sibling space's table
-    // shows up as a dropped top-level extra, so the dropped branch recomputes
-    // counts from the pruned tree — which must re-fold the policy contribution,
-    // or the space false-passes with live policy drift.
-    const policyIssue = {
-      path: ['public', 'user', 'policy_rogue'],
-      outcome: 'extra' as const,
-      reason: 'not-expected' as const,
-      message: "RLS policy 'policy_rogue' is present in the database but not in the contract",
-    };
+  it('keeps failing on an extra RLS policy when a sibling extra table is dropped', () => {
+    // The policy is structural: it survives the strip even though its subject
+    // sits under the space's own table, so live policy drift never false-passes.
+    const policyIssue = extraPolicyIssue('user', 'policy_rogue');
     const result = makeResult({
       ok: false,
-      children: [tableNode('user', 'pass'), extraTableNode('cipher_state', 'fail')],
-      // Faithful SQL counts: computeCounts (root fail + user pass + extra fail)
-      // then the family fold adds the policy: fail = 2 + 1 = 3.
-      counts: { pass: 1, warn: 0, fail: 3, totalNodes: 3 },
-      issues: [
-        { kind: 'extra_table', table: 'cipher_state', reason: 'not-expected', message: 'x' },
-      ],
-      schemaDiffIssues: [policyIssue],
+      issues: [extraTableIssue('cipher_state'), policyIssue],
     });
 
-    const stripped = stripExtraFindings(result);
+    const stripped = stripExtraFindings(result, classify);
 
-    expect(stripped.schema.schemaDiffIssues).toEqual([policyIssue]);
-    // Pruned tree is all-pass, but the policy drift remains the space's own
-    // failure: countTree (fail 0) + refolded schemaDiffIssues (1).
-    expect(stripped.schema.counts.fail).toBe(1);
+    expect(stripped.schema.issues).toEqual([policyIssue]);
     expect(stripped.ok).toBe(false);
   });
 
-  it('keeps an extra-policy schemaDiffIssue as the space’s own drift', () => {
+  it('a structural policy extra under a DROPPED stray table still survives the strip', () => {
+    const policyIssue = extraPolicyIssue('cipher_state', 'policy_rogue');
     const result = makeResult({
       ok: false,
-      children: [tableNode('user', 'pass')],
-      counts: { pass: 2, warn: 0, fail: 1, totalNodes: 2 },
-      schemaDiffIssues: [
-        {
-          path: ['public', 'user', 'policy_rogue'],
-          outcome: 'extra',
-          reason: 'not-expected',
-          message: "RLS policy 'policy_rogue' is present in the database but not in the contract",
-        },
+      issues: [
+        extraTableIssue('cipher_state'),
+        extraColumnIssueUnder('cipher_state', 'id'),
+        policyIssue,
       ],
     });
 
-    const stripped = stripExtraFindings(result);
+    const stripped = stripExtraFindings(result, classify);
 
-    // Policy extras are the space's own drift evidence; the family already
-    // folded them into the verdict, so they must stay visible in the space view.
+    expect(stripped.schema.issues).toEqual([policyIssue]);
+    expect(stripped.ok).toBe(false);
+  });
+
+  it('keeps an extra-policy issue as the space’s own drift (nothing else stripped)', () => {
+    const result = makeResult({
+      ok: false,
+      issues: [extraPolicyIssue('user', 'policy_rogue')],
+    });
+
+    const stripped = stripExtraFindings(result, classify);
+
     expect(stripped).toBe(result);
-    expect(stripped.schema.schemaDiffIssues).toHaveLength(1);
+    expect(stripped.schema.issues).toHaveLength(1);
     expect(stripped.ok).toBe(false);
   });
 });
 
-describe('collectExtraElementNames', () => {
-  it('gathers extra names from issues and extra schemaDiffIssues', () => {
+describe('collectExtraElementCoordinates', () => {
+  it('gathers extra coordinates from whole-table-role nodes and Mongo-shape whole-collection issues', () => {
     const result = makeResult({
       ok: false,
-      children: [],
-      counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
       issues: [
-        { kind: 'extra_table', table: 'legacy', reason: 'not-expected', message: 'x' },
-        { kind: 'missing_table', table: 'wanted', reason: 'not-found', message: 'm' },
-      ],
-      schemaDiffIssues: [
-        {
-          path: ['public', 'audit', 'p'],
-          outcome: 'extra',
-          reason: 'not-expected',
-          message: 'e',
-          actual: { tableName: 'audit' } as never,
-        },
-        { path: ['public', 'x', 'p'], outcome: 'missing', reason: 'not-found', message: 'm' },
+        extraTableIssue('stray'),
+        extraCollectionIssue('legacy'),
+        extraPolicyIssue('audit', 'p'),
       ],
     });
 
-    expect([...collectExtraElementNames(result)].sort()).toEqual(['audit', 'legacy']);
+    const coordinates = [
+      ...collectExtraElementCoordinates(result, classify, classifyEntityKind),
+    ].sort((a, b) => a.entityName.localeCompare(b.entityName));
+    expect(coordinates).toEqual([
+      {
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        entityKind: UNCLASSIFIED_ENTITY_KIND,
+        entityName: 'legacy',
+      },
+      { namespaceId: 'public', entityKind: 'table', entityName: 'stray' },
+    ]);
+  });
+
+  it('does not conflate the same bare name declared in two different namespaces', () => {
+    const result = makeResult({
+      ok: false,
+      issues: [
+        extraTableIssue('orphan_table'),
+        {
+          path: ['database', 'tenant_b', 'orphan_table'],
+          actual: diffNode('orphan_table', 'table'),
+        },
+      ],
+    });
+
+    const coordinates = [
+      ...collectExtraElementCoordinates(result, classify, classifyEntityKind),
+    ].sort((a, b) => a.namespaceId.localeCompare(b.namespaceId));
+    expect(coordinates).toEqual([
+      { namespaceId: 'public', entityKind: 'table', entityName: 'orphan_table' },
+      { namespaceId: 'tenant_b', entityKind: 'table', entityName: 'orphan_table' },
+    ]);
+  });
+
+  it('falls back to the unclassified placeholder when no entity-kind classifier is injected', () => {
+    const result = makeResult({
+      ok: false,
+      issues: [extraTableIssue('stray')],
+    });
+
+    const coordinates = [...collectExtraElementCoordinates(result, classify)];
+    expect(coordinates).toEqual([
+      { namespaceId: 'public', entityKind: UNCLASSIFIED_ENTITY_KIND, entityName: 'stray' },
+    ]);
   });
 });

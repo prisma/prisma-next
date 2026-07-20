@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:dcf1c78cc76b904700539151edfcdab997e8a95db8474069612a075f9e8d976b'>;
+  StorageHashBase<'sha256:b3c1ecfc1a5ec14582261dbebf5d609c4902f4022cab545b48b6b43a4ccf0008'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:a691ed4c6ad02663bcd11c7ea8b2491e67253cd7c1968687255f2e0accfdcff7'>;
 export type ProfileHash =
@@ -249,8 +249,6 @@ type ContractBase = Omit<
                     readonly tableName: 'task';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -288,8 +286,6 @@ type ContractBase = Omit<
                     readonly tableName: 'task';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -320,7 +316,9 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                { readonly columns: readonly ['userId']; readonly name: 'post_userId_idx' },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -333,8 +331,6 @@ type ContractBase = Omit<
                     readonly tableName: 'user';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -384,7 +380,9 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                { readonly columns: readonly ['userId']; readonly name: 'task_userId_idx' },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -397,8 +395,6 @@ type ContractBase = Omit<
                     readonly tableName: 'user';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
