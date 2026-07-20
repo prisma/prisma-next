@@ -54,13 +54,19 @@ import {
 const EXT_SPACE_ID = 'test_contract_space_sqlite';
 const EXT_BASELINE_DIR = '20260101T0000_create_helper';
 
+// Stable 64-hex-char storage hashes: the contract-snapshot store keys its
+// on-disk directory by `storageHashHex(storage.storageHash)`, which requires
+// a well-formed `sha256:<64hex>` value.
+const EXT_STORAGE_HASH_V1 = `sha256:${'1'.repeat(64)}`;
+const EXT_STORAGE_HASH_V2 = `sha256:${'2'.repeat(64)}`;
+
 function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
   return {
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash(`sha256:ext-test-v${version}`),
     storage: new SqlStorage({
-      storageHash: coreHash(`sha256:ext-contract-v${version}`),
+      storageHash: coreHash(version === 1 ? EXT_STORAGE_HASH_V1 : EXT_STORAGE_HASH_V2),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,

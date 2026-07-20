@@ -46,13 +46,19 @@ import {
 const EXT_SPACE_ID = 'pg_ext_test_contract_space';
 const EXT_BASELINE_DIR = '20260101T0000_create_helper';
 
+// Stable 64-hex-char storage hashes: the contract-snapshot store keys its
+// on-disk directory by `storageHashHex(storage.storageHash)`, which requires
+// a well-formed `sha256:<64hex>` value.
+const EXT_STORAGE_HASH_V1 = `sha256:${'3'.repeat(64)}`;
+const EXT_STORAGE_HASH_V2 = `sha256:${'4'.repeat(64)}`;
+
 function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash(`sha256:pg-ext-test-v${version}`),
     storage: new SqlStorage({
-      storageHash: coreHash(`sha256:pg-ext-contract-v${version}`),
+      storageHash: coreHash(version === 1 ? EXT_STORAGE_HASH_V1 : EXT_STORAGE_HASH_V2),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
