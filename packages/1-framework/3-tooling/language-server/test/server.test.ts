@@ -2,6 +2,7 @@ import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
+import { errorUnexpected } from '@prisma-next/errors/control';
 import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
 import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
 import type { FormatOptions } from '@prisma-next/psl-parser/format';
@@ -2271,6 +2272,19 @@ describe('language server config failure surfacing', {
     expect(harness.latestDiagnostics(configUri)).toEqual([
       expectedConfigFailure('config exploded'),
     ]);
+  });
+
+  it('publishes the structured error why text instead of the generic envelope title', async () => {
+    // The config loader wraps raw config throws in a CliStructuredError whose
+    // message is a generic title; the useful text lives in `why`.
+    harness = startHarness(async () => {
+      throw errorUnexpected('boom', { why: 'Failed to load config: boom' });
+    });
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+
+    const published = await harness.waitForDiagnostics(configUri);
+    expect(published).toEqual([expectedConfigFailure('Failed to load config: boom')]);
   });
 
   it('publishes the config diagnostic exactly once when two documents await the same load', async () => {
