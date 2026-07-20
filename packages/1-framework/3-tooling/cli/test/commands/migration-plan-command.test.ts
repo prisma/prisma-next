@@ -179,7 +179,6 @@ function buildResolutionSpace(
           contractJson,
           contractDts,
           provenance: 'graph-node',
-          sourceDir: matchingBundle.dirPath,
         };
       } catch (error) {
         if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {

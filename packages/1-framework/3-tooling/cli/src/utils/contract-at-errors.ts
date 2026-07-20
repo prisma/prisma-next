@@ -66,6 +66,22 @@ export function mapContractAtError(
             fix: error.fix,
           }),
         );
+      case 'MIGRATION.CONTRACT_SNAPSHOT_MISSING': {
+        const expectedPath =
+          typeof error.details?.['expectedPath'] === 'string'
+            ? error.details['expectedPath']
+            : 'migrations/snapshots/';
+        const role = options?.artifactRole ?? 'from';
+        return notOk(
+          errorFileNotFound(expectedPath, {
+            why:
+              role === 'to'
+                ? `Target migration is missing its contract snapshot at ${expectedPath}`
+                : `Predecessor migration is missing its contract snapshot at ${expectedPath}`,
+            fix: 'Restore migrations/snapshots/ from version control, or re-run the command that produced this migration to regenerate its snapshot.',
+          }),
+        );
+      }
       case 'MIGRATION.FILE_MISSING': {
         const file =
           typeof error.details?.['file'] === 'string' ? error.details['file'] : 'end-contract.json';

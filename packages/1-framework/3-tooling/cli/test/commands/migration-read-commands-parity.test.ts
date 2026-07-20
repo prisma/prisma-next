@@ -829,7 +829,7 @@ describe('migration check multi-space parity (D6 lock)', () => {
     expect(spaceIds).toContain('app');
     expect(spaceIds).toContain('postgis');
 
-    const result = runMigrationCheck({ spaces });
+    const result = await runMigrationCheck({ spaces });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.ok).toBe(true);
@@ -840,7 +840,7 @@ describe('migration check multi-space parity (D6 lock)', () => {
     const { aggregate, migrationsDir } = await buildMultiSpaceFixture();
     const spaces = await enumerateCheckSpaces(aggregate, migrationsDir);
 
-    const result = runMigrationCheck({ spaces, spaceFilter: 'app' });
+    const result = await runMigrationCheck({ spaces, spaceFilter: 'app' });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.ok).toBe(true);
@@ -852,7 +852,7 @@ describe('migration check multi-space parity (D6 lock)', () => {
     const { aggregate, migrationsDir } = await buildMultiSpaceFixture();
     const spaces = await enumerateCheckSpaces(aggregate, migrationsDir);
 
-    const result = runMigrationCheck({ spaces, spaceFilter: 'nonexistent' });
+    const result = await runMigrationCheck({ spaces, spaceFilter: 'nonexistent' });
     expect(result.ok).toBe(false);
     if (result.ok) return;
     const envelope = result.failure.toEnvelope();

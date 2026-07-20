@@ -130,7 +130,6 @@ async function resolveGraphNodeContractAt(args: {
     contractDts,
     contract,
     provenance: 'graph-node',
-    sourceDir: matchingBundle.dirPath,
   };
 }
 

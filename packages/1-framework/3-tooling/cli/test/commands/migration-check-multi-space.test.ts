@@ -107,7 +107,7 @@ async function checkFromDisk(inputs: {
     deserializeContract: identityDeserialize,
   });
   const spaces = await enumerateCheckSpaces(aggregate, inputs.migrationsDir);
-  const outcome = runMigrationCheck({
+  const outcome = await runMigrationCheck({
     spaces,
     ...(inputs.spaceFilter !== undefined ? { spaceFilter: inputs.spaceFilter } : {}),
   });
@@ -262,7 +262,7 @@ describe('migration check — --space narrowing', () => {
       deserializeContract: identityDeserialize,
     });
     const spaces = await enumerateCheckSpaces(aggregate, migrationsRoot);
-    const outcome = runMigrationCheck({ spaces, spaceFilter: '../escape' });
+    const outcome = await runMigrationCheck({ spaces, spaceFilter: '../escape' });
     expect(outcome.ok).toBe(false);
     if (outcome.ok) throw new Error('unreachable');
     const envelope = outcome.failure.toEnvelope();
@@ -284,7 +284,7 @@ describe('migration check — --space narrowing', () => {
       deserializeContract: identityDeserialize,
     });
     const spaces = await enumerateCheckSpaces(aggregate, migrationsRoot);
-    const outcome = runMigrationCheck({ spaces, spaceFilter: 'nope' });
+    const outcome = await runMigrationCheck({ spaces, spaceFilter: 'nope' });
     expect(outcome.ok).toBe(false);
     if (outcome.ok) throw new Error('unreachable');
     const envelope = outcome.failure.toEnvelope();
@@ -310,7 +310,7 @@ describe('migration check — migrationCheckResultSchema validation', () => {
       deserializeContract: identityDeserialize,
     });
     const spaces = await enumerateCheckSpaces(aggregate, migrationsRoot);
-    const outcome = runMigrationCheck({ spaces });
+    const outcome = await runMigrationCheck({ spaces });
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) throw new Error('unreachable');
 
@@ -341,7 +341,7 @@ describe('migration check — migrationCheckResultSchema validation', () => {
       deserializeContract: identityDeserialize,
     });
     const spaces = await enumerateCheckSpaces(aggregate, migrationsRoot);
-    const outcome = runMigrationCheck({ spaces });
+    const outcome = await runMigrationCheck({ spaces });
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) throw new Error('unreachable');
 

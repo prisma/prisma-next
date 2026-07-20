@@ -1,6 +1,9 @@
-import { readFile } from 'node:fs/promises';
 import { loadConfig } from '@prisma-next/config-loader';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import {
+  contractSnapshotDir,
+  readContractSnapshotJson,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { findLatestMigration, isGraphNode } from '@prisma-next/migration-tools/migration-graph';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
@@ -114,17 +117,25 @@ export async function executeRefSetCommand(
       return notOk(errorRefSetBundleNotFound(resolvedHash));
     }
 
-    const contractJsonPath = join(matchingBundle.dirPath, 'end-contract.json');
+    const contractJsonPath = join(
+      contractSnapshotDir(migrationsDir, resolvedHash),
+      'contract.json',
+    );
     let contractJson: Record<string, unknown>;
     try {
-      const raw = await readFile(contractJsonPath, 'utf-8');
-      contractJson = JSON.parse(raw) as Record<string, unknown>;
+      contractJson = (await readContractSnapshotJson(migrationsDir, resolvedHash)) as Record<
+        string,
+        unknown
+      >;
     } catch (readError) {
-      if (readError instanceof Error && (readError as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (
+        MigrationToolsError.is(readError) &&
+        readError.code === 'MIGRATION.CONTRACT_SNAPSHOT_MISSING'
+      ) {
         return notOk(
           errorFileNotFound(contractJsonPath, {
-            why: `Migration bundle for hash ${resolvedHash} is missing its end-contract snapshot at ${contractJsonPath}`,
-            fix: 'Run `pnpm fixtures:check`, or re-emit the migration so its end-contract.json is restored.',
+            why: `Migration bundle for hash ${resolvedHash} is missing its contract snapshot at ${contractJsonPath}`,
+            fix: 'Restore migrations/snapshots/ from version control, or re-run the command that produced this migration to regenerate its snapshot.',
           }),
         );
       }

@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import { writeContractSnapshot } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
@@ -80,7 +81,10 @@ async function setupFixture(): Promise<{
     };
     await writeMigrationPackage(join(appDir, dirName), metadata, [ADDITIVE_OP]);
   }
-  await writeFile(join(appDir, dirNext, 'end-contract.json'), JSON.stringify(endContract));
+  await writeContractSnapshot(join(cwd, 'migrations'), HASH_B, {
+    contractJson: endContract,
+    contractDts: 'export type Contract = unknown;\n',
+  });
 
   return { contractPath, dirNext, endContract };
 }

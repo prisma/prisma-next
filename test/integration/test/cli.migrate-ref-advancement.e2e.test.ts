@@ -6,6 +6,7 @@ import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-em
 import type { MigrateResult } from '@prisma-next/cli/commands/migrate';
 import { createMigrateCommand } from '@prisma-next/cli/commands/migrate';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
+import { contractSnapshotDir } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -130,7 +131,13 @@ function noRefFilesUnder(refsDir: string): boolean {
 async function seedPlannedMigration(
   createTempDir: () => string,
   connectionString: string,
-): Promise<{ testDir: string; configPath: string; migrationDir: string; contractPath?: string }> {
+): Promise<{
+  testDir: string;
+  configPath: string;
+  migrationDir: string;
+  toHash: string;
+  contractPath?: string;
+}> {
   const { testDir, configPath, contractPath } = setupTestDirectoryFromFixtures(
     createTempDir,
     fixtureSubdir,
@@ -140,7 +147,10 @@ async function seedPlannedMigration(
   await emitContract(testDir, configPath);
   await runMigrationPlan(testDir, ['--config', configPath, '--name', 'initial', '--no-color']);
   const migrationDir = getLatestMigrationDir(testDir)!;
-  return { testDir, configPath, migrationDir, contractPath };
+  const manifest = JSON.parse(
+    readFileSync(join(testDir, 'migrations', 'app', migrationDir, 'migration.json'), 'utf-8'),
+  ) as { to: string };
+  return { testDir, configPath, migrationDir, toHash: manifest.to, contractPath };
 }
 
 withTempDir(({ createTempDir }) => {
@@ -225,20 +235,17 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'advances an explicit ref with --to using the bundle end-contract snapshot',
+      'advances an explicit ref with --to using the bundle contract snapshot',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
-          const { testDir, configPath, migrationDir } = await seedPlannedMigration(
+          const { testDir, configPath, migrationDir, toHash } = await seedPlannedMigration(
             createTempDir,
             connectionString,
           );
           const refsDir = appRefsDir(testDir);
           const bundleEndContract = join(
-            testDir,
-            'migrations',
-            'app',
-            migrationDir,
-            'end-contract.json',
+            contractSnapshotDir(join(testDir, 'migrations'), toHash),
+            'contract.json',
           );
 
           await runMigrate(testDir, ['--config', configPath, '--no-color']);

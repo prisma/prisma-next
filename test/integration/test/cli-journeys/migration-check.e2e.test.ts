@@ -13,6 +13,7 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { contractSnapshotDir } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
@@ -34,6 +35,10 @@ function findLatestMigrationDir(ctx: JourneyContext): string {
     .sort();
   if (entries.length === 0) throw new Error('No migration directories');
   return join(appDir, entries[entries.length - 1]!);
+}
+
+function snapshotContractJsonPath(ctx: JourneyContext, storageHash: string): string {
+  return join(contractSnapshotDir(join(ctx.testDir, 'migrations'), storageHash), 'contract.json');
 }
 
 withTempDir(({ createTempDir }) => {
@@ -173,7 +178,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'edge mismatch (end-contract.json disagrees with metadata) → PN-MIG-CHECK-005',
+      'edge mismatch (contract snapshot disagrees with metadata) → PN-MIG-CHECK-005',
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
@@ -183,18 +188,11 @@ withTempDir(({ createTempDir }) => {
         expect(plan.exitCode, 'plan').toBe(0);
 
         const migDir = findLatestMigrationDir(ctx);
-        const endContractPath = join(migDir, 'end-contract.json');
-
-        if (existsSync(endContractPath)) {
-          const contract = JSON.parse(readFileSync(endContractPath, 'utf-8'));
-          contract.storage.storageHash = `sha256:${'d'.repeat(64)}`;
-          writeFileSync(endContractPath, JSON.stringify(contract, null, 2));
-        } else {
-          writeFileSync(
-            endContractPath,
-            JSON.stringify({ storage: { storageHash: `sha256:${'d'.repeat(64)}` } }, null, 2),
-          );
-        }
+        const manifest = JSON.parse(readFileSync(join(migDir, 'migration.json'), 'utf-8'));
+        const snapshotPath = snapshotContractJsonPath(ctx, manifest.to);
+        const contract = JSON.parse(readFileSync(snapshotPath, 'utf-8'));
+        contract.storage.storageHash = `sha256:${'d'.repeat(64)}`;
+        writeFileSync(snapshotPath, JSON.stringify(contract, null, 2));
 
         const check = await runMigrationCheck(ctx, ['--json']);
         const json = parseJsonOutput(check);
@@ -224,18 +222,11 @@ withTempDir(({ createTempDir }) => {
 
         const migDir = findLatestMigrationDir(ctx);
         const dirName = migDir.split('/').pop() ?? '';
-        const endContractPath = join(migDir, 'end-contract.json');
-
-        if (existsSync(endContractPath)) {
-          const contract = JSON.parse(readFileSync(endContractPath, 'utf-8'));
-          contract.storage.storageHash = `sha256:${'d'.repeat(64)}`;
-          writeFileSync(endContractPath, JSON.stringify(contract, null, 2));
-        } else {
-          writeFileSync(
-            endContractPath,
-            JSON.stringify({ storage: { storageHash: `sha256:${'d'.repeat(64)}` } }, null, 2),
-          );
-        }
+        const manifest = JSON.parse(readFileSync(join(migDir, 'migration.json'), 'utf-8'));
+        const snapshotPath = snapshotContractJsonPath(ctx, manifest.to);
+        const contract = JSON.parse(readFileSync(snapshotPath, 'utf-8'));
+        contract.storage.storageHash = `sha256:${'d'.repeat(64)}`;
+        writeFileSync(snapshotPath, JSON.stringify(contract, null, 2));
 
         const check = await runMigrationCheck(ctx, [dirName, '--json']);
         const json = parseJsonOutput(check);

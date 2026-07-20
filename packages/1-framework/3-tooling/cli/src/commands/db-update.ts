@@ -1,4 +1,7 @@
-import { readFile } from 'node:fs/promises';
+import {
+  contractSnapshotDir,
+  readContractSnapshotJson,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -141,10 +144,14 @@ async function executeDbUpdateCommand(
           ),
         );
       }
-      const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
-      const raw = await readFile(endContractPath, 'utf-8');
-      contractJson = JSON.parse(raw) as Record<string, unknown>;
-      contractJsonPathForSnapshot = endContractPath;
+      contractJson = (await readContractSnapshotJson(migrationsDir, targetHash)) as Record<
+        string,
+        unknown
+      >;
+      contractJsonPathForSnapshot = join(
+        contractSnapshotDir(migrationsDir, targetHash),
+        'contract.json',
+      );
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));

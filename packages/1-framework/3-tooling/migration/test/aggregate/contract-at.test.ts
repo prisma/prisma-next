@@ -121,7 +121,6 @@ describe('AggregateContractSpace.contractAt', () => {
     expect(result.hash).toBe(HASH_B);
     expect(result.provenance).toBe('graph-node');
     if (result.provenance !== 'graph-node') throw new Error('expected graph-node provenance');
-    expect(result.sourceDir).toBe(packageDir);
     expect(result.contractDts).toBe(sampleContractDts('bundle'));
     expect((result.contractJson as { storage: { storageHash: string } }).storage.storageHash).toBe(
       HASH_B,
@@ -137,7 +136,6 @@ describe('AggregateContractSpace.contractAt', () => {
 
     expect(result.provenance).toBe('graph-node');
     if (result.provenance !== 'graph-node') throw new Error('expected graph-node provenance');
-    expect(result.sourceDir).toBe(packageDir);
     expect(result.contractDts).toBe(sampleContractDts('bundle'));
   });
 

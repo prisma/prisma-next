@@ -23,7 +23,6 @@ export type ContractAtResult =
     }
   | {
       readonly provenance: 'graph-node';
-      readonly sourceDir: string;
       readonly hash: string;
       readonly contractJson: unknown;
       readonly contractDts: string;
