@@ -3,6 +3,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { blindCast } from '@prisma-next/utils/casts';
 import { Collection } from './collection';
+import { ormError } from './orm-errors';
 import { domainModelNamesInNamespace, domainModelTableInNamespace } from './storage-resolution';
 import type {
   CollectionContext,
@@ -187,13 +188,17 @@ function createCollectionRegistry<
       continue;
     }
     if (!isCollectionClass(collectionClass)) {
-      throw new Error(
+      throw ormError(
+        'ORM.ARGUMENT_INVALID',
         `Custom collection '${key}' must be a Collection class (constructor), not an instance`,
+        { meta: { method: 'orm', argument: 'collections', key } },
       );
     }
     if (!Object.hasOwn(models, key)) {
-      throw new Error(
+      throw ormError(
+        'ORM.ARGUMENT_INVALID',
         `No model found for custom collection '${key}'. Available models: ${Object.keys(models).join(', ')}`,
+        { meta: { method: 'orm', argument: 'collections', key } },
       );
     }
     registry.set(key, collectionClass);

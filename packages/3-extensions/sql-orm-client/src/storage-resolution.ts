@@ -5,6 +5,7 @@ import {
 } from '@prisma-next/sql-contract/resolve-storage-table';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { TableSource } from '@prisma-next/sql-relational-core/ast';
+import { ormError } from './orm-errors';
 
 export type { ResolvedStorageTable };
 
@@ -23,7 +24,9 @@ export function requireStorageTableForContract(
 ): ResolvedStorageTable {
   const resolved = resolveTableForContract(contract, namespaceId, tableName);
   if (resolved === undefined) {
-    throw new Error(`Unknown table "${tableName}"`);
+    throw ormError('ORM.TABLE_UNKNOWN', `Unknown table "${tableName}"`, {
+      meta: { namespaceId, tableName },
+    });
   }
   return resolved;
 }

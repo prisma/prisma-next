@@ -4,6 +4,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { type AnyQueryAst, collectOrderedParamRefs } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { ormError } from './orm-errors';
 import { storageTableForContract } from './storage-resolution';
 
 export function deriveParamsFromAst(ast: AnyQueryAst): {
@@ -27,7 +28,9 @@ export function resolveTableColumns(
     if (error instanceof Error && error.message.includes('ambiguous')) {
       throw error;
     }
-    throw new Error(`Unknown table "${tableName}" in SQL ORM query planner`);
+    throw ormError('ORM.TABLE_UNKNOWN', `Unknown table "${tableName}" in SQL ORM query planner`, {
+      meta: { namespaceId, tableName },
+    });
   }
 }
 
