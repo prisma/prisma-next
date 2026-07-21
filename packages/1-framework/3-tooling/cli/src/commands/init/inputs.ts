@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import * as clack from '@clack/prompts';
 import { extname, join, normalize } from 'pathe';
-import type { GlobalFlags } from '../../utils/global-flags';
 import {
   errorInitAuthoringSchemaPathMismatch,
   errorInitInvalidFlagValue,
@@ -102,14 +101,15 @@ const AUTHORING_VALUES: ReadonlyMap<string, AuthoringId> = new Map([
  * (`./index.ts`) owns the merge of stdout-TTY (decoration) and stdin-TTY
  * (prompts). `flags.interactive` continues to gate `TerminalUI` decoration
  * — see [Style Guide § Interactivity](../../../../../../../docs/CLI%20Style%20Guide.md#interactivity).
+ * `autoAcceptPrompts` carries the `--yes` decision.
  */
 export async function resolveInitInputs(ctx: {
   readonly baseDir: string;
   readonly options: InitFlagOptions;
-  readonly flags: GlobalFlags;
   readonly canPrompt: boolean;
+  readonly autoAcceptPrompts: boolean;
 }): Promise<ResolvedInitInputs> {
-  const { baseDir, options, flags, canPrompt } = ctx;
+  const { baseDir, options, canPrompt, autoAcceptPrompts } = ctx;
   // `--force` and `--yes` are deliberately separate: `--force` is the
   // contract for "overwrite an existing scaffold" (works in both modes);
   // `--yes` only auto-accepts interactive prompts and never substitutes
@@ -117,7 +117,6 @@ export async function resolveInitInputs(ctx: {
   // alone does nothing useful; the user must supply `--target`,
   // `--authoring`, and (for re-init) `--force`.
   const force = Boolean(options.force);
-  const autoAcceptPrompts = Boolean(flags.yes);
 
   // --strict-probe is a no-op without --probe-db; surface the mistake
   // rather than silently swallowing it (FR8.3 / NFR9).

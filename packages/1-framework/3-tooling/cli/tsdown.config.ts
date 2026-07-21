@@ -5,6 +5,7 @@ export default defineConfig({
     'src/cli.ts',
     'src/exports/index.ts',
     'src/exports/config-types.ts',
+    'src/exports/init.ts',
     'src/exports/init-output.ts',
     'src/commands/contract-infer.ts',
     'src/commands/db-init.ts',
