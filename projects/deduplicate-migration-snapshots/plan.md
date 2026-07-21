@@ -178,3 +178,43 @@ change that moves them.
 - **Risk:** Cipherstash (external) breaks on the new layout. **Mitigation:**
   direct notification (Checkpoint C), upgrade note + migrator script are the
   paved path.
+
+## Follow-up slice — deduplicate ref-paired snapshots into the store
+
+Decision (operator, 2026-07-21): **its own ticket + PR + review**, sequenced
+immediately after this slice, both landing **before the RC layout freeze** (a
+post-RC change to `refs/*.contract.*` would be breaking). Kept separate because
+it touches the ADR-218 subsystem with its own invariants (ref lifecycle,
+`db sign` / `db verify`, drift) that merit focused review; it depends on this
+slice's store existing. Recorded here so it isn't lost. (Foldable into this PR
+if a single atomic frozen-layout change is preferred, but the reviews stay
+cleaner apart.)
+
+**Outcome.** `refs/<name>.json` holds only `{ hash, invariants }`; the ref's
+contract resolves through `migrations/snapshots/<hex>/`. `refs/<name>.contract.{json,d.ts}`
+are deleted — the last full-contract copies in the frozen layout — and the
+"snapshot" concept stops being overloaded (ref = pointer; one snapshot store).
+
+**Mechanics (contained — 1 reader + 4 writers).**
+
+- Read side, one reader: `aggregate/aggregate.ts:77` (the `provenance: 'snapshot'`
+  branch of `contractAt`) → `readContractSnapshotJson(migrationsDir, refEntry.hash)`.
+  Rename/retag the now-misleading `provenance: 'snapshot'` (the read no longer
+  comes from a ref-paired file) — resolves the aggregate provenance inversion.
+- Write side, four commands, all already routing `readContractIR → writeRefSnapshot`:
+  `db-init.ts`, `migrate.ts`, `db-update.ts`, `ref.ts` → `writeContractSnapshot(migrationsDir, hash, { contractJson, contractDts })`
+  (write-if-absent) and keep writing the `refs/<name>.json` hash pointer.
+- Delete `refs/snapshot.ts` (`writeRefSnapshot` / `readRefSnapshot`) and the
+  `MIGRATION.SNAPSHOT_MISSING` path if it dissolves; fold committed
+  `refs/*.contract.json` into the store in the migrator; amend ADR 218.
+
+**Invariant (holds by construction).** Every ref-advance path already resolves
+the contract bytes (it writes the ref snapshot today), so advancing a ref
+writes the store — the ref's hash is always resolvable there. No path sets a
+ref hash without the bytes.
+
+**Free wins.** `refs/snapshot.ts` already ships the atomic temp-dir + `rename`
+writer the new store lacks — folds in the F05 store-atomicity fix. And ADR 239
+(this slice) can then describe the single-store end state instead of a
+two-`snapshot`-concept boundary — so its "draw the boundary" burden shrinks to
+"refs hold pointers; all contract bytes live in the one store."

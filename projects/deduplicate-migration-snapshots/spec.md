@@ -558,13 +558,7 @@ are moved between files, never reshaped. `migrationHash` inputs are untouched
 
 ## Out of scope
 
-- **Ref-paired snapshots (`refs/db.json`, `refs/db.contract.json`,
-  `refs/db.contract.d.ts`, ADR 218).** They are mutable working state paired
-  to a live database, re-emitted on advance ("re-emit always wins"), not
-  chain-history duplicates; deduplicating them buys one copy per ref and
-  couples ref lifecycle to the store's write-if-absent semantics. They stay
-  exactly as they are. (Flagged to the operator at spec review as the one
-  remaining full-contract copy in the frozen layout.)
+- **Ref-paired snapshots (`refs/<name>.json` + `refs/<name>.contract.{json,d.ts}`, ADR 218) — out of scope for THIS slice, but now a committed immediate follow-up (not "left as-is").** They are mutable working state paired to a live database, re-emitted on advance, not chain-history duplicates. This slice leaves them untouched to keep its single concept clean. **Decision (operator, 2026-07-21): consolidate them into this store as the very next slice, before the RC layout freeze** — see [plan.md](./plan.md) § "Follow-up slice". The finding that overturns the original "leave them as-is" calculus: the ref entry already stores its hash (`RefEntry = { hash, invariants }`), so `refs/<name>.contract.*` are pure redundant copies of store content; the "couples ref lifecycle to write-if-absent" worry dissolves because every ref-advance path already resolves the contract bytes and can write the store on advance; and collapsing them removes the last full-contract copies in the frozen layout **and** dissolves the "snapshot" concept overload (the ref becomes a pure pointer, leaving one snapshot concept — the content-addressed store).
 - Gzip support in any form (decision 8).
 - A contract-source slot in the store (decision 3).
 - Any change to `migration.json` schema, `migrationHash` inputs, ops format,
