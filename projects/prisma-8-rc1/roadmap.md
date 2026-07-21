@@ -2,18 +2,18 @@
 
 Prisma Next — the contract-first rewrite of Prisma — ships as **Prisma 8**. On **July 31** we publish **`prisma@8.0.0-rc.1`** from the `prisma/prisma` repository: the same repository and the same npm package Prisma users already know. The release candidate is published under a pre-release tag, so `npm install prisma` keeps installing Prisma 7 until 8.0.0 final ships. A release candidate freezes the public API; it does not promise Prisma 7 feature parity. Its promise is different: **everything it ships works and is proven by a test**, everything experimental is labeled, and everything absent is named rather than silently missing.
 
-**Updated July 21 · Health: on track · Ships July 31**
+**Updated July 21 · Health: on track · Ships July 31 · Tasks: 1 done / 12 in flight / 21 not started · [Scoreboard](https://github.com/prisma/prisma-next/pull/1000): ~450 proven / ~500 unproven / ~250 not in 8.0**
 
 ## What needs to happen to release v8-RC1
 
 Six things must be true on release day. Everything on this page belongs to one of them.
 
-1. **[Queries must return correct values](#1-queries-must-return-correct-values)** — *in progress.* The main remaining defect: values read through relation-loading corrupt or fail.
-2. **[The schema language must reach its final form](#2-the-schema-language-must-reach-its-final-form)** — *in flight.* Whatever syntax the RC ships is permanent for the life of v8; three language projects are running.
-3. **[Every name and format users depend on must be final](#3-every-name-and-format-users-depend-on-must-be-final)** — *in progress.* The error-code consolidation is in review; config keys, hashes, and generated-file layouts still to do.
-4. **[The release's claims must be proven](#4-the-releases-claims-must-be-proven)** — *scoreboard drafted, proofs open.* "It works" and "you can migrate incrementally" each need a runnable receipt.
-5. **[The code must move into prisma/prisma](#5-the-code-must-move-into-prismaprisma)** — *starting.* Repository merge, publishing pipeline, and years of open v7 issues.
-6. **[The rough edges users hit on day one must be gone](#6-the-rough-edges-users-hit-on-day-one-must-be-gone)** — *not started.* Small fixes that would be embarrassing under announcement-day attention.
+1. **[Queries must return correct values](#1-queries-must-return-correct-values)** — *in progress · Alexey.* The main remaining defect: values read through relation-loading corrupt or fail.
+2. **[The schema language must reach its final form](#2-the-schema-language-must-reach-its-final-form)** — *in flight · Serhii.* Whatever syntax the RC ships is permanent for the life of v8; three language projects are running.
+3. **[Every name and format users depend on must be final](#3-every-name-and-format-users-depend-on-must-be-final)** — *in progress · Will.* The error-code consolidation is in review; config keys, hashes, and generated-file layouts still to do.
+4. **[The release's claims must be proven](#4-the-releases-claims-must-be-proven)** — *scoreboard drafted, proofs open · everyone.* "It works" and "you can migrate incrementally" each need a runnable receipt.
+5. **[The code must move into prisma/prisma](#5-the-code-must-move-into-prismaprisma)** — *starting · Alexey.* Repository merge, publishing pipeline, and years of open v7 issues.
+6. **[The rough edges users hit on day one must be gone](#6-the-rough-edges-users-hit-on-day-one-must-be-gone)** — *not started · everyone.* Small fixes that would be embarrassing under announcement-day attention.
 
 Two decisions gate work and have dates: the minimum supported Postgres version (July 22 — it blocks final scoreboard verdicts), and the polymorphism stable-or-experimental call (July 24, decided by whether its bug stream has flattened). A third is already made: error codes standardize on dotted namespace codes (like `ORM.DECODE_FAILED`), and the consolidation is in review. July 24 is also the day the scoreboard verdicts freeze and scope stops moving. There is no other internal schedule: we work these sections as fast as they'll go and ship when they're done.
 
@@ -119,7 +119,7 @@ Prisma 8 grew four separate error systems with two incompatible code formats —
 
 <details><summary>⬜ <b>Rename the `extensionPacks` config key to `extensions`</b></summary>
 
-A simple rename with a deep reach: the key appears in user config files, in the schema of the generated contract document, and in the code that canonicalizes and hashes contracts — about 350 files. Breaking, so it happens now or never. While in there, the config format gets a sweep for any other key we'd regret freezing as-is.
+A simple rename with a deep reach: the key appears in user config files, in the schema of the generated contract document, and in the code that canonicalizes and hashes contracts — about 350 files. Breaking, so it happens now or never. While in there, the config format gets a sweep for any other key we'd regret freezing as-is. ([TML-2462](https://linear.app/prisma-company/issue/TML-2462))
 </details>
 
 <details><summary>⬜ <b>Hashes lose their `sha256:` prefix</b></summary>
@@ -222,27 +222,27 @@ None of these block anything technically. All of them are what a skeptical engin
 
 <details><summary>⬜ <b>A dropped database connection can crash the host process</b></summary>
 
-When an idle pooled connection drops (a database restart, a network blip), the error has no listener attached and crashes the whole Node.js process. A production-readiness bug, not housekeeping — fixed before anyone's production meets it.
+When an idle pooled connection drops (a database restart, a network blip), the error has no listener attached and crashes the whole Node.js process. A production-readiness bug, not housekeeping — fixed before anyone's production meets it. ([TML-2655](https://linear.app/prisma-company/issue/TML-2655))
 </details>
 
 <details><summary>⬜ <b>A deprecation warning prints on every single database connection</b></summary>
 
-The underlying Postgres driver prints a deprecation notice each time a connection opens. Harmless, but it's the first thing every new user sees, and it reads as "this isn't finished."
+The underlying Postgres driver prints a deprecation notice each time a connection opens. Harmless, but it's the first thing every new user sees, and it reads as "this isn't finished." ([TML-2628](https://linear.app/prisma-company/issue/TML-2628))
 </details>
 
 <details><summary>⬜ <b>Open security alerts on dependencies</b></summary>
 
-The announcement puts many eyes on the repository; a visible backlog of automated vulnerability alerts on day one is a bad look and a support-ticket magnet. Cleared before the merge.
+The announcement puts many eyes on the repository; a visible backlog of automated vulnerability alerts on day one is a bad look and a support-ticket magnet. Cleared before the merge. ([TML-2789](https://linear.app/prisma-company/issue/TML-2789))
 </details>
 
 <details><summary>⬜ <b>The npm page and editor experience for the packages people actually open</b></summary>
 
-The `prisma` package's README becomes Prisma 8's face on npm. The four public packages' exported functions and types are what users see when they hover in their editor — those documentation comments get an audit. The ~60 internal packages get a short standard notice identifying them as implementation detail.
+The `prisma` package's README becomes Prisma 8's face on npm. The four public packages' exported functions and types are what users see when they hover in their editor — those documentation comments get an audit. The ~60 internal packages get a short standard notice identifying them as implementation detail. ([TML-1799](https://linear.app/prisma-company/issue/TML-1799))
 </details>
 
 <details><summary>⏳ <b>First-class editor support for the schema language</b></summary>
 
-A language users write by hand deserves an editor that helps: formatting, autocomplete, syntax coloring, and diagnostics for Prisma 8's schema language, served by its language server. This work is running now — hooking the formatter to the language server, keyword and model-type completions, semantic-token coloring, and replacing the legacy schema parser with the new syntax-tree parser underneath it all (the "Language Tools Support Prisma Next PSL" project, several slices in flight). It also has to track the schema-language changes in section 2 as they land, or the editor will underline the new syntax as errors.
+A language users write by hand deserves an editor that helps: formatting, autocomplete, syntax coloring, and diagnostics for Prisma 8's schema language, served by its language server. This work is running now — hooking the formatter to the language server, keyword and model-type completions, semantic-token coloring, and replacing the legacy schema parser with the new syntax-tree parser underneath it all (the "Language Tools Support Prisma Next PSL" project — e.g. [TML-2929](https://linear.app/prisma-company/issue/TML-2929), [TML-2947](https://linear.app/prisma-company/issue/TML-2947), [TML-2948](https://linear.app/prisma-company/issue/TML-2948)). It also has to track the schema-language changes in section 2 as they land, or the editor will underline the new syntax as errors.
 </details>
 
 <details><summary>⬜ <b>The editor doesn't fight itself in a two-version project</b></summary>
