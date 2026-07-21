@@ -13,7 +13,7 @@ Everything from the topic documents as dated, ordered steps. Deliberately says n
 - Enumerate the feature-support matrix rows (v8 surface × Prisma 7 capability census) and draft verdicts; produce the list of "works"-claimed cells with no proving test.
 - Deduplicate migration contract snapshots into `migrations/snapshots/` (the folder layout freezes at RC).
 - Rename `extensionPacks` → `extensions`, and sweep the config format for other keys we'd regret freezing.
-- PSL mixins ([TML-3055](https://linear.app/prisma-company/issue/TML-3055/psl-mixins-named-field-set-reuse-retire-field-presets-type-aliases-and)): spec and slice plan immediately, then execution — mixins replace field presets and type aliases, and type constructors replace `@db.*` attributes. The largest pre-freeze item; PSL syntax freezes at RC.
+- PSL mixins ([TML-3055](https://linear.app/prisma-company/issue/TML-3055/psl-mixins-named-field-set-reuse-retire-field-presets-type-aliases-and)): spec and slice plan immediately, then execution — mixins replace field presets and type aliases, type constructors replace `@db.*` attributes, and `@dbgenerated()` retires in favor of ADR 129 tagged literals for raw SQL defaults. The largest pre-freeze item; PSL syntax freezes at RC.
 - Drop the `sha256:` prefix from all hashes and hash references (emitted contracts, migration manifests, marker/ledger, ~368 source files; regenerate examples). The textual hash form freezes at RC.
 - Implement template-tagged literals in PSL per ADR 129 (`` pg.sql`…` `` backtick fences for extension-owned text; currently unimplemented — plain quoted strings would freeze as the API otherwise). Coordinate the grammar work with the mixins project.
 - Fix the connection-pool crash (missing error listeners).
