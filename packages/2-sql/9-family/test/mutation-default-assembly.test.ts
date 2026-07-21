@@ -33,7 +33,7 @@ describe('assembleAuthoringContributions', () => {
             args: [{ kind: 'string' }, { kind: 'stringArray' }],
             output: {
               codecId: 'app/test-type@1',
-              nativeType: { kind: 'arg', index: 0 },
+              nativeType: 'enum',
               typeParams: {
                 values: { kind: 'arg', index: 1 },
               },
@@ -90,7 +90,7 @@ describe('assembleAuthoringContributions', () => {
             args: [{ kind: 'string' }, { kind: 'stringArray' }],
             output: {
               codecId: 'app/test-type@1',
-              nativeType: { kind: 'arg', index: 0 },
+              nativeType: 'enum',
             },
           },
         },
@@ -104,7 +104,7 @@ describe('assembleAuthoringContributions', () => {
             args: [{ kind: 'string' }, { kind: 'stringArray' }],
             output: {
               codecId: 'conflict/enum@1',
-              nativeType: { kind: 'arg', index: 0 },
+              nativeType: 'enum',
             },
           },
         },

@@ -37,7 +37,6 @@ function emit(scalarColumnDescriptors: ReadonlyMap<string, ScalarTypeConstructor
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarColumnDescriptors.keys()],
     pslBlockDescriptors: stack.authoringContributions.pslBlockDescriptors,
   });
   return interpretPslDocumentToSqlContract({

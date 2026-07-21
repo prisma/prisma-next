@@ -319,6 +319,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     codecLookup,
   } = input;
   const resolvedFields: ResolvedField[] = [];
+  const valueObjectStorageTypeName = authoringContributions?.valueObjectStorageType;
 
   for (const field of Object.values(model.fields)) {
     const isModelField = modelNames.has(field.typeName);
@@ -380,7 +381,12 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     };
 
     if (isValueObjectField) {
-      descriptor = scalarColumnDescriptors.get('Json');
+      // A stack that declares no valueObjectStorageType has no value-object
+      // storage — the field is skipped.
+      descriptor =
+        valueObjectStorageTypeName !== undefined
+          ? scalarColumnDescriptors.get(valueObjectStorageTypeName)
+          : undefined;
     } else if (isListField) {
       if (capabilities['sql']?.['scalarList'] !== true) {
         diagnostics.push({
@@ -512,16 +518,6 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         span: defaultAttribute?.span ?? field.span,
       });
       continue;
-    }
-    const fieldUsesNamedType = namedTypeDescriptors.has(field.typeName);
-    if (loweredOnCreate && !fieldUsesNamedType) {
-      const generatorDescriptor = generatorDescriptorById.get(loweredOnCreate.id);
-      const generatedDescriptor = generatorDescriptor?.resolveGeneratedColumnDescriptor?.({
-        generated: loweredOnCreate,
-      });
-      if (generatedDescriptor) {
-        descriptor = generatedDescriptor;
-      }
     }
     const mappedColumnName = mapping.fieldColumns.get(field.name) ?? field.name;
     const { idAttribute, uniqueAttribute, idName, uniqueName } = extractFieldConstraintNames({

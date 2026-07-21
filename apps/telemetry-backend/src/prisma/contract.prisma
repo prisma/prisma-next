@@ -6,7 +6,7 @@ model TelemetryEvent {
   installationId String
   version        String
   command        String
-  flags          Json
+  flags          Jsonb
   runtimeName    String
   runtimeVersion String
   os             String
@@ -15,7 +15,7 @@ model TelemetryEvent {
   databaseTarget String?
   tsVersion      String?
   agent          String?
-  extensions     Json
+  extensions     Jsonb
 
   @@index([ingestedAt])
   @@map("telemetry_event")

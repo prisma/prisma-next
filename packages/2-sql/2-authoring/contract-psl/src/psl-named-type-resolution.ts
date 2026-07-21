@@ -1,6 +1,6 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import type { ResolvedAttribute, ScalarSymbol, TypeAliasSymbol } from '@prisma-next/psl-parser';
+import type { NamedTypeSymbol, ResolvedAttribute } from '@prisma-next/psl-parser';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
   type ColumnDescriptor,
@@ -11,8 +11,6 @@ import {
   resolvePslTypeConstructorDescriptor,
   toNamedTypeFieldDescriptor,
 } from './psl-column-resolution';
-
-type NamedTypeSymbol = ScalarSymbol | TypeAliasSymbol;
 
 export interface ResolveNamedTypeDeclarationsInput {
   readonly declarations: readonly NamedTypeSymbol[];
@@ -241,7 +239,7 @@ export function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarations
         kind: 'codec-instance',
         codecId: baseDescriptor.codecId,
         nativeType: baseDescriptor.nativeType,
-        typeParams: {},
+        typeParams: baseDescriptor.typeParams ?? {},
       },
     ]);
   }

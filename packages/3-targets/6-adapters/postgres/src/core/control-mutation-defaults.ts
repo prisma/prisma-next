@@ -8,10 +8,7 @@ import type {
   MutationDefaultGeneratorDescriptor,
   TypedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
-import {
-  builtinGeneratorRegistryMetadata,
-  resolveBuiltinGeneratedColumnDescriptor,
-} from '@prisma-next/ids';
+import { builtinGeneratorRegistryMetadata } from '@prisma-next/ids';
 import type { FuncCallSig } from '@prisma-next/psl-parser';
 import { int, num, oneOf, optional, str } from '@prisma-next/psl-parser';
 
@@ -158,20 +155,139 @@ const postgresDefaultFunctionRegistryEntries = [
  * The base PSL scalars as zero-arg type constructors in the unified authoring
  * channel, with explicit `nativeType` values pinned to the codec manifests
  * (`codecLookup.targetTypesFor(codecId)[0]`).
+ *
+ * The type position is the only storage decider: a mutation-default generator
+ * (`@default(uuid())`) never re-picks a column's storage.
  */
 export const postgresScalarAuthoringTypes = {
-  String: { kind: 'typeConstructor', output: { codecId: 'pg/text@1', nativeType: 'text' } },
-  Boolean: { kind: 'typeConstructor', output: { codecId: 'pg/bool@1', nativeType: 'bool' } },
-  Int: { kind: 'typeConstructor', output: { codecId: 'pg/int4@1', nativeType: 'int4' } },
-  BigInt: { kind: 'typeConstructor', output: { codecId: 'pg/int8@1', nativeType: 'int8' } },
-  Float: { kind: 'typeConstructor', output: { codecId: 'pg/float8@1', nativeType: 'float8' } },
-  Decimal: { kind: 'typeConstructor', output: { codecId: 'pg/numeric@1', nativeType: 'numeric' } },
+  String: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/text@1', nativeType: 'text' },
+  },
+  Boolean: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/bool@1', nativeType: 'bool' },
+  },
+  Int: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/int4@1', nativeType: 'int4' },
+  },
+  BigInt: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/int8@1', nativeType: 'int8' },
+  },
+  Float: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/float8@1', nativeType: 'float8' },
+  },
+  Decimal: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
+  },
   DateTime: {
     kind: 'typeConstructor',
     output: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
   },
-  Json: { kind: 'typeConstructor', output: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' } },
-  Bytes: { kind: 'typeConstructor', output: { codecId: 'pg/bytea@1', nativeType: 'bytea' } },
+  Json: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/json@1', nativeType: 'json' },
+  },
+  Jsonb: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' },
+  },
+  Bytes: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/bytea@1', nativeType: 'bytea' },
+  },
+} as const satisfies AuthoringTypeNamespace;
+
+/**
+ * The former `@db.*` native types as first-class top-level type constructors
+ * (TML-2986). Codec ids, native types, and typeParams key shapes mirror the
+ * legacy `@db.*` attribute path (`NATIVE_TYPE_SPECS` in sql-contract-psl)
+ * exactly; every argument is optional, so each name is also authorable bare
+ * (`VarChar` ≡ `VarChar()`), and omitted arguments omit their typeParams keys.
+ */
+export const postgresNativeAuthoringTypes = {
+  VarChar: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+    output: {
+      codecId: 'sql/varchar@1',
+      nativeType: 'character varying',
+      typeParams: { length: { kind: 'arg', index: 0 } },
+    },
+  },
+  Char: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+    output: {
+      codecId: 'sql/char@1',
+      nativeType: 'character',
+      typeParams: { length: { kind: 'arg', index: 0 } },
+    },
+  },
+  Numeric: {
+    kind: 'typeConstructor',
+    args: [
+      { kind: 'number', name: 'precision', integer: true, minimum: 1, optional: true },
+      { kind: 'number', name: 'scale', integer: true, minimum: 0, optional: true },
+    ],
+    output: {
+      codecId: 'pg/numeric@1',
+      nativeType: 'numeric',
+      typeParams: {
+        precision: { kind: 'arg', index: 0 },
+        scale: { kind: 'arg', index: 1 },
+      },
+    },
+  },
+  Timestamp: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/timestamp@1',
+      nativeType: 'timestamp',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+  Timestamptz: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/timestamptz@1',
+      nativeType: 'timestamptz',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+  Time: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/time@1',
+      nativeType: 'time',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+  Timetz: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/timetz@1',
+      nativeType: 'timetz',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+  Uuid: { kind: 'typeConstructor', output: { codecId: 'pg/uuid@1', nativeType: 'uuid' } },
+  SmallInt: { kind: 'typeConstructor', output: { codecId: 'pg/int2@1', nativeType: 'int2' } },
+  Real: { kind: 'typeConstructor', output: { codecId: 'pg/float4@1', nativeType: 'float4' } },
+  Date: { kind: 'typeConstructor', output: { codecId: 'pg/timestamptz@1', nativeType: 'date' } },
+} as const satisfies AuthoringTypeNamespace;
+
+export const postgresAuthoringTypes = {
+  ...postgresScalarAuthoringTypes,
+  ...postgresNativeAuthoringTypes,
 } as const satisfies AuthoringTypeNamespace;
 
 export function createPostgresDefaultFunctionRegistry(): ReadonlyMap<
@@ -187,21 +303,6 @@ export function createPostgresMutationDefaultGeneratorDescriptors(): readonly Mu
       ({ id, applicableCodecIds }): MutationDefaultGeneratorDescriptor => ({
         id,
         applicableCodecIds,
-        resolveGeneratedColumnDescriptor: ({ generated }) => {
-          if (generated.kind !== 'generator' || generated.id !== id) {
-            return undefined;
-          }
-          const descriptor = resolveBuiltinGeneratedColumnDescriptor({
-            id,
-            ...(generated.params ? { params: generated.params } : {}),
-          });
-          return {
-            codecId: descriptor.type.codecId,
-            nativeType: descriptor.type.nativeType,
-            ...(descriptor.type.typeRef ? { typeRef: descriptor.type.typeRef } : {}),
-            ...(descriptor.typeParams ? { typeParams: descriptor.typeParams } : {}),
-          };
-        },
       }),
     ),
     timestampNowControlDescriptor(),

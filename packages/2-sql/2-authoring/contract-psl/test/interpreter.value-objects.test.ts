@@ -7,8 +7,12 @@ import {
 import {
   createBuiltinLikeControlMutationDefaults,
   modelsOf,
+  postgresScalarAuthoringTypes,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  sqliteScalarAuthoringTypes,
+  sqliteScalarColumnDescriptors,
+  sqliteTarget,
   symbolTableInputFromParseArgs,
   valueObjectsOf,
 } from './fixtures';
@@ -29,6 +33,10 @@ describe('interpretPslDocumentToSqlContract value objects and list fields', () =
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarColumnDescriptors: postgresScalarTypeDescriptors,
+      authoringContributions: {
+        type: postgresScalarAuthoringTypes,
+        valueObjectStorageType: 'Jsonb',
+      },
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
       capabilities: { sql: { scalarList: true } },
@@ -373,5 +381,107 @@ model Order {
     if (!result.ok) return;
 
     expect(valueObjectsOf(result.value)).toBeUndefined();
+  });
+
+  it('stores value object fields in the storage type the sqlite target declares', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `type Address {
+  street String
+  city String
+}
+
+model User {
+  id Int @id
+  homeAddress Address?
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractInternal({
+      target: sqliteTarget,
+      scalarColumnDescriptors: sqliteScalarColumnDescriptors,
+      authoringContributions: {
+        type: sqliteScalarAuthoringTypes,
+        valueObjectStorageType: 'Json',
+      },
+      composedExtensionContracts: new Map(),
+      createNamespace: createTestSqlNamespace,
+      capabilities: { sql: {} },
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(modelsOf(result.value)).toMatchObject({
+      User: {
+        fields: {
+          homeAddress: {
+            nullable: true,
+            type: { kind: 'valueObject', name: 'Address' },
+          },
+        },
+      },
+    });
+
+    const namespaces = result.value.storage.namespaces;
+    const [namespace] = Object.values(namespaces);
+    expect(namespace).toMatchObject({
+      entries: {
+        table: {
+          user: {
+            columns: {
+              homeAddress: {
+                codecId: 'sqlite/json@1',
+                nativeType: 'text',
+                nullable: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('skips value object fields when the target declares no value-object storage type', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `type Address {
+  street String
+  city String
+}
+
+model User {
+  id Int @id
+  homeAddress Address?
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    // The scalar map still contains Jsonb/Json entries; the family layer
+    // must not fall back to hardcoded type names.
+    const result = interpretPslDocumentToSqlContract({
+      ...document,
+      authoringContributions: { type: postgresScalarAuthoringTypes },
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(modelsOf(result.value)['User']?.fields).not.toHaveProperty('homeAddress');
+    expect(result.value.storage).toMatchObject({
+      namespaces: {
+        public: {
+          entries: {
+            table: {
+              user: {
+                columns: expect.not.objectContaining({ homeAddress: expect.anything() }),
+              },
+            },
+          },
+        },
+      },
+    });
   });
 });

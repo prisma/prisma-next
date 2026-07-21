@@ -79,13 +79,10 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
         });
       }
 
-      const scalarTypeCodecIds = collectScalarTypeCodecIds(context.authoringContributions.type);
-
       const { document, sourceFile, diagnostics: parseDiagnostics } = parse(schema);
       const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
         document,
         sourceFile,
-        scalarTypes: [...scalarTypeCodecIds.keys()],
         pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
       });
 

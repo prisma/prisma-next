@@ -28,6 +28,7 @@ export type {
 } from '../shared/framework-authoring';
 export {
   assertNoCrossRegistryCollisions,
+  assertResolvableTypeConstructorTemplates,
   classifyEnumMemberType,
   collectScalarTypeConstructors,
   hasRegisteredFieldNamespace,

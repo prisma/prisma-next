@@ -36,10 +36,12 @@ function stubStackWithContext(): ControlStack {
   return {
     extensionPacks: [{ id: 'ext-a' }, { id: 'ext-b' }],
     extensionContracts: new Map([['ext-a', { targetFamily: 'demo' }]]),
-    scalarTypeDescriptors: new Map([['Int', 'int']]),
+    scalarTypes: ['Int'],
     authoringContributions: {
       field: {},
-      type: {},
+      type: {
+        Int: { kind: 'typeConstructor', output: { codecId: 'demo/int@1', nativeType: 'int' } },
+      },
       entityTypes: {},
       pslBlockDescriptors: {},
       modelAttributes: {},
@@ -188,7 +190,6 @@ describe('interpretation resolution', () => {
     const context = result.interpretation?.context;
     expect(context?.composedExtensionPacks).toEqual(['ext-a', 'ext-b']);
     expect(context?.composedExtensionContracts).toBe(stack.extensionContracts);
-    expect(context?.scalarTypeDescriptors).toBe(stack.scalarTypeDescriptors);
     expect(context?.authoringContributions).toBe(stack.authoringContributions);
     expect(context?.codecLookup).toBe(stack.codecLookup);
     expect(context?.controlMutationDefaults).toBe(stack.controlMutationDefaults);
@@ -222,9 +223,7 @@ describe('interpretation resolution', () => {
     vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(
       loadedConfig('psl', ['/abs/schema.prisma']),
     );
-    vi.spyOn(control, 'createControlStack').mockReturnValue(
-      stubStack(new Map([['Int', 'int']]), {}),
-    );
+    vi.spyOn(control, 'createControlStack').mockReturnValue(stubStack(['Int'], {}));
 
     const result = await resolveConfigInputs('/abs/prisma-next.config.ts');
 

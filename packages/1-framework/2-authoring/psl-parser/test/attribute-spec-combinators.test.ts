@@ -31,7 +31,6 @@ function makeCtx(sourceFile: SourceFile): InterpretCtx {
   const { table } = buildSymbolTable({
     document,
     sourceFile: modelSource,
-    scalarTypes: ['String', 'Int'],
     pslBlockDescriptors: {},
   });
   const selfModel = table.topLevel.models['M'];

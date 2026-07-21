@@ -29,7 +29,6 @@ function symbolTableInput(schema: string) {
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...postgresScalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   return { symbolTable: table, sourceFile, sourceId: 'schema.prisma' };

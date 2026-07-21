@@ -53,7 +53,7 @@ types {
 }
 
 model Cafe {
-  id       String      @id @default(uuid())
+  id       Char(36)    @id @default(uuid())
   name     String
   location WgsGeometry
   @@map("cafe")
@@ -114,7 +114,7 @@ types {
 }
 
 model Route {
-  id   String      @id @default(uuid())
+  id   Char(36)    @id @default(uuid())
   name String
   path WgsGeometry        // LineStrings, polygons, points — all valid runtime values
   @@map("route")

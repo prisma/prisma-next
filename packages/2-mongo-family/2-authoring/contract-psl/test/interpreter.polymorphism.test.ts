@@ -64,7 +64,6 @@ function buildSymbolTableInput(schema: string): {
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   return { symbolTable: table, sourceFile, sourceId: 'test.prisma' };

@@ -119,7 +119,6 @@ function makeContractFromPsl(): MongoContract {
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   const result = interpretPslDocumentToMongoContract({

@@ -56,7 +56,6 @@ function parsePsl(source: string) {
   return buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarColumnDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
 }
@@ -66,7 +65,6 @@ function interpret(source: string) {
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarColumnDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
   return interpretPslDocumentToSqlContract({
@@ -425,7 +423,6 @@ describe('native_enum coexists with a PSL enum block in the same namespace', () 
     const { table: symbolTable } = buildSymbolTable({
       document,
       sourceFile,
-      scalarTypes: [...scalarColumnDescriptors.keys()],
       pslBlockDescriptors: combinedAssembled.pslBlockDescriptors,
     });
     return interpretPslDocumentToSqlContract({

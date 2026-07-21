@@ -36,8 +36,7 @@ export interface SymbolTable {
 
 export interface TopLevelScope {
   readonly namespaces: Record<string, NamespaceSymbol>;
-  readonly scalars: Record<string, ScalarSymbol>;
-  readonly typeAliases: Record<string, TypeAliasSymbol>;
+  readonly namedTypes: Record<string, NamedTypeSymbol>;
   readonly blocks: Record<string, BlockSymbol>;
   readonly models: Record<string, ModelSymbol>;
   readonly compositeTypes: Record<string, CompositeTypeSymbol>;
@@ -88,15 +87,13 @@ export interface ResolvedNamedTypeBinding {
   readonly attributes: readonly ResolvedAttribute[];
 }
 
-export interface ScalarSymbol extends ResolvedNamedTypeBinding {
-  readonly kind: 'scalar';
-  readonly name: string;
-  readonly node: NamedTypeDeclarationAst;
-  readonly span: PslSpan;
-}
-
-export interface TypeAliasSymbol extends ResolvedNamedTypeBinding {
-  readonly kind: 'typeAlias';
+/**
+ * A `types {}` binding, collected without classification: whether the binding
+ * refines a target scalar is pronounced by the interpreter
+ * (`resolveNamedTypeDeclarations`), not by the family-blind symbol table.
+ */
+export interface NamedTypeSymbol extends ResolvedNamedTypeBinding {
+  readonly kind: 'namedType';
   readonly name: string;
   readonly node: NamedTypeDeclarationAst;
   readonly span: PslSpan;
@@ -121,7 +118,6 @@ export interface FieldSymbol {
 export interface BuildSymbolTableOptions {
   readonly document: DocumentAst;
   readonly sourceFile: SourceFile;
-  readonly scalarTypes: readonly string[];
   readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
 }
 
@@ -135,13 +131,11 @@ export interface SymbolTableResult {
  * should consume first-wins symbols rather than re-emitting duplicate diagnostics.
  */
 export function buildSymbolTable(options: BuildSymbolTableOptions): SymbolTableResult {
-  const { document, sourceFile, scalarTypes, pslBlockDescriptors } = options;
+  const { document, sourceFile, pslBlockDescriptors } = options;
   const diagnostics: ParseDiagnostic[] = [];
-  const scalarSet = new Set(scalarTypes);
 
   const namespaces: Record<string, NamespaceSymbol> = {};
-  const scalars: Record<string, ScalarSymbol> = {};
-  const typeAliases: Record<string, TypeAliasSymbol> = {};
+  const namedTypes: Record<string, NamedTypeSymbol> = {};
   const blocks: Record<string, BlockSymbol> = {};
   const models: Record<string, ModelSymbol> = {};
   const compositeTypes: Record<string, CompositeTypeSymbol> = {};
@@ -196,17 +190,13 @@ export function buildSymbolTable(options: BuildSymbolTableOptions): SymbolTableR
         if (name === undefined) continue;
         const resolved = resolveNamedTypeBinding(binding, sourceFile);
         const span = nodePslSpan(binding.syntax, sourceFile);
-        if (isScalarBinding(binding, scalarSet)) {
-          scalars[name] = { kind: 'scalar', name, node: binding, span, ...resolved };
-        } else {
-          typeAliases[name] = { kind: 'typeAlias', name, node: binding, span, ...resolved };
-        }
+        namedTypes[name] = { kind: 'namedType', name, node: binding, span, ...resolved };
       }
     }
   }
 
   const table: SymbolTable = {
-    topLevel: { namespaces, scalars, typeAliases, blocks, models, compositeTypes },
+    topLevel: { namespaces, namedTypes, blocks, models, compositeTypes },
   };
   return { table, diagnostics };
 }
@@ -414,13 +404,6 @@ function resolveNamedTypeBinding(
     ...(typeConstructor !== undefined ? { typeConstructor } : {}),
     attributes: readResolvedAttributes(node.attributes(), sourceFile),
   };
-}
-
-function isScalarBinding(node: NamedTypeDeclarationAst, scalarTypes: Set<string>): boolean {
-  const annotation = node.typeAnnotation();
-  if (annotation === undefined || annotation.isConstructor()) return false;
-  const base = annotation.name()?.identifier()?.name();
-  return base !== undefined && scalarTypes.has(base);
 }
 
 function nameRange(name: IdentifierAst | undefined, sourceFile: SourceFile): Range | undefined {
