@@ -2381,16 +2381,26 @@ export function interpretPslDocumentToSqlContract(
     fkRelationMetadata,
   });
   const modelIdColumns = new Map<string, readonly string[]>();
+  const modelUniqueColumnSets = new Map<string, readonly (readonly string[])[]>();
   for (const modelNode of modelNodes) {
     if (modelNode.id) {
       modelIdColumns.set(modelNode.modelName, modelNode.id.columns);
     }
+    const uniqueColumnSets: (readonly string[])[] = [];
+    if (modelNode.id) {
+      uniqueColumnSets.push(modelNode.id.columns);
+    }
+    for (const unique of modelNode.uniques ?? []) {
+      uniqueColumnSets.push(unique.columns);
+    }
+    modelUniqueColumnSets.set(modelNode.modelName, uniqueColumnSets);
   }
   applyBackrelationCandidates({
     backrelationCandidates,
     fkRelationsByPair,
     fkRelationsByDeclaringModel,
     modelIdColumns,
+    modelUniqueColumnSets,
     modelRelations,
     diagnostics,
     sourceId,
