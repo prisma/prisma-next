@@ -47,6 +47,34 @@ changes:
         - "./start-contract'"
         - "./end-contract'"
       anyMatch: true
+  - id: ref-paired-snapshots-moved-to-content-addressed-store
+    summary: |
+      Ref-paired contract snapshot files (`refs/<name>.contract.json` /
+      `refs/<name>.contract.d.ts`) are no longer written or read. A ref is now
+      only its pointer file, `refs/<name>.json` (`{ hash, invariants }`); the
+      contract it names resolves through the same content-addressed store as
+      every migration graph node, `migrations/snapshots/<hex>/contract.json` +
+      `contract.d.ts`, by that hash. Your extension repo's `migrations/refs/`
+      normally carries only the system `head.json` pointer, which was never
+      ref-paired — this only matters if your repo also carries named refs
+      (e.g. from testing `ref set` against the extension's own migrations
+      root). A pointer whose store entry is missing now fails with
+      `MIGRATION.CONTRACT_SNAPSHOT_MISSING` naming the expected hash and path,
+      rather than silently falling back to the migration graph. The same
+      one-shot migrator that folds per-package sibling snapshots (see the
+      entry above) also folds any existing `refs/<name>.contract.json` /
+      `refs/<name>.contract.d.ts` pairs: it write-if-absents the pair into the
+      store under the sibling pointer's `hash`, then deletes the pair — the
+      pointer file itself is read but never written, so it stays
+      byte-identical. A `.contract.json` with no sibling pointer, or whose
+      inner `storage.storageHash` disagrees with the pointer's `hash`, aborts
+      the whole run before anything is written or deleted. Run `node
+      scripts/migrate-migrations-layout.mjs <path-to-your-migrations-dir>`
+      (same invocation as above; one run folds both migration-package and
+      ref-paired snapshots), then review the diff.
+    detection:
+      glob: "**/refs/*.contract.json"
+      anyMatch: true
 ---
 
 Also in this release, the ORM client's internal `throw new Error(...)` sites

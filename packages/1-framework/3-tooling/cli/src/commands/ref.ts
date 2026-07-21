@@ -9,11 +9,11 @@ import { findLatestMigration, isGraphNode } from '@prisma-next/migration-tools/m
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import {
-  deleteRefPaired,
+  deleteRef,
   readRefs,
   validateRefName,
   validateRefValue,
-  writeRefPaired,
+  writeRef,
 } from '@prisma-next/migration-tools/refs';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -37,7 +37,6 @@ import {
 import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import { formatCommandHelp } from '../utils/formatters/help';
 import { parseGlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
-import { readContractIR } from '../utils/ref-advancement';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI } from '../utils/terminal-ui';
 
@@ -121,12 +120,8 @@ export async function executeRefSetCommand(
       contractSnapshotDir(migrationsDir, resolvedHash),
       'contract.json',
     );
-    let contractJson: Record<string, unknown>;
     try {
-      contractJson = (await readContractSnapshotJson(migrationsDir, resolvedHash)) as Record<
-        string,
-        unknown
-      >;
+      await readContractSnapshotJson(migrationsDir, resolvedHash);
     } catch (readError) {
       if (
         MigrationToolsError.is(readError) &&
@@ -142,9 +137,8 @@ export async function executeRefSetCommand(
       throw readError;
     }
 
-    const contractIR = await readContractIR(contractJson, contractJsonPath);
     const entry: RefEntry = { hash: resolvedHash, invariants: [] };
-    await writeRefPaired(refsDir, name, entry, contractIR);
+    await writeRef(refsDir, name, entry);
     return ok({ ok: true as const, ref: name, hash: resolvedHash, invariants: [] });
   } catch (error) {
     if (error instanceof CliStructuredError) return notOk(error);
@@ -159,7 +153,7 @@ export async function executeRefDeleteCommand(
   try {
     const config = await loadConfig(options.config);
     const { refsDir } = resolveMigrationPaths(options.config, config);
-    await deleteRefPaired(refsDir, name);
+    await deleteRef(refsDir, name);
     return ok({ ok: true as const, ref: name, deleted: true as const });
   } catch (error) {
     if (error instanceof CliStructuredError) return notOk(error);

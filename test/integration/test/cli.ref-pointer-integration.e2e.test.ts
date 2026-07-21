@@ -86,28 +86,29 @@ function refPointerPath(refsDir: string, name: string): string {
   return join(refsDir, `${name}.json`);
 }
 
-function snapshotJsonPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.json`);
+function refPointerHash(refsDir: string, name: string): string | undefined {
+  const pointerPath = refPointerPath(refsDir, name);
+  if (!existsSync(pointerPath)) return undefined;
+  return (JSON.parse(readFileSync(pointerPath, 'utf-8')) as { hash: string }).hash;
 }
 
-function snapshotDtsPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.d.ts`);
+function storeContractJsonPath(testDir: string, refsDir: string, name: string): string {
+  const hash = refPointerHash(refsDir, name);
+  if (hash === undefined) throw new Error(`ref "${name}" has no pointer`);
+  return join(contractSnapshotDir(join(testDir, 'migrations'), hash), 'contract.json');
 }
 
-function refFilesExist(refsDir: string, name: string): boolean {
-  return (
-    existsSync(refPointerPath(refsDir, name)) &&
-    existsSync(snapshotJsonPath(refsDir, name)) &&
-    existsSync(snapshotDtsPath(refsDir, name))
-  );
+// A ref now consists of just its pointer file; the contract bytes resolve
+// through the content-addressed store keyed by the pointer's hash.
+function refFilesExist(testDir: string, refsDir: string, name: string): boolean {
+  const hash = refPointerHash(refsDir, name);
+  if (hash === undefined) return false;
+  const storeDir = contractSnapshotDir(join(testDir, 'migrations'), hash);
+  return existsSync(join(storeDir, 'contract.json')) && existsSync(join(storeDir, 'contract.d.ts'));
 }
 
 function refFilesAbsent(refsDir: string, name: string): boolean {
-  return (
-    !existsSync(refPointerPath(refsDir, name)) &&
-    !existsSync(snapshotJsonPath(refsDir, name)) &&
-    !existsSync(snapshotDtsPath(refsDir, name))
-  );
+  return !existsSync(refPointerPath(refsDir, name));
 }
 
 async function seedPlannedMigration(
@@ -130,7 +131,7 @@ async function seedPlannedMigration(
 }
 
 withTempDir(({ createTempDir }) => {
-  describe('ref snapshot integration (e2e)', () => {
+  describe('ref pointer integration (e2e)', () => {
     let consoleOutput: string[];
     let consoleErrors: string[];
     let cleanupMocks: () => void;
@@ -176,7 +177,7 @@ withTempDir(({ createTempDir }) => {
     }
 
     it(
-      'ref set writes paired snapshots, ref list ignores them, ref delete removes all files',
+      'ref set writes only the pointer, ref list lists it, ref delete removes the pointer but leaves the store entry',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           const { testDir, configPath, toHash } = await seedPlannedMigration(
@@ -197,24 +198,22 @@ withTempDir(({ createTempDir }) => {
             configPath,
           ]);
           expect(setResult.exitCode, 'ref set exit code').toBe(0);
-          expect(refFilesExist(refsDir, 'staging')).toBe(true);
-          expect(JSON.parse(readFileSync(snapshotJsonPath(refsDir, 'staging'), 'utf-8'))).toEqual(
-            JSON.parse(readFileSync(bundleEndContract, 'utf-8')),
-          );
+          expect(refFilesExist(testDir, refsDir, 'staging')).toBe(true);
+          expect(
+            JSON.parse(readFileSync(storeContractJsonPath(testDir, refsDir, 'staging'), 'utf-8')),
+          ).toEqual(JSON.parse(readFileSync(bundleEndContract, 'utf-8')));
 
           const listResult = await runRef(testDir, ['list', '--config', configPath]);
           expect(listResult.exitCode, 'ref list exit code').toBe(0);
           expect(listResult.output).toContain('staging');
-          expect(listResult.output).not.toContain('staging.contract.json');
-          expect(
-            readdirSync(refsDir).filter(
-              (name) => name.endsWith('.json') && !name.includes('.contract.'),
-            ),
-          ).toEqual(['staging.json']);
+          expect(readdirSync(refsDir).filter((name) => name.endsWith('.json'))).toEqual([
+            'staging.json',
+          ]);
 
           const deleteResult = await runRef(testDir, ['delete', 'staging', '--config', configPath]);
           expect(deleteResult.exitCode, 'ref delete exit code').toBe(0);
           expect(refFilesAbsent(refsDir, 'staging')).toBe(true);
+          expect(existsSync(bundleEndContract)).toBe(true);
         });
       },
       timeouts.spinUpPpgDev,

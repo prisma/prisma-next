@@ -28,7 +28,6 @@ const mocks = vi.hoisted(() => ({
   mkdir: vi.fn(),
   writeFile: vi.fn(),
   readRefs: vi.fn(),
-  readRefSnapshot: vi.fn(),
   writeMigrationPackage: vi.fn(),
   writeContractSnapshot: vi.fn(),
   writeMigrationTs: vi.fn(),
@@ -67,7 +66,7 @@ vi.mock('@prisma-next/migration-tools/refs', async () => {
   const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/refs')>(
     '@prisma-next/migration-tools/refs',
   );
-  return { ...actual, readRefs: mocks.readRefs, readRefSnapshot: mocks.readRefSnapshot };
+  return { ...actual, readRefs: mocks.readRefs };
 });
 
 vi.mock('@prisma-next/migration-tools/io', async () => {
@@ -150,7 +149,7 @@ function buildResolutionSpace(
           contract: snap.contract as Contract,
           contractJson: snap.contract,
           contractDts: snap.contractDts,
-          provenance: 'snapshot',
+          provenance: 'ref',
         };
       }
 
@@ -678,7 +677,7 @@ describe('migration plan command', () => {
       expect(result).not.toHaveProperty('migrationHash');
 
       // With no --from flag, resolution goes through the named 'db' ref
-      // (snapshot provenance), which carries its own contract snapshot —
+      // (ref provenance), which carries its own contract snapshot —
       // migration plan writes both the destination and that start snapshot.
       expect(mocks.writeContractSnapshot).toHaveBeenCalledTimes(2);
       expect(mocks.writeContractSnapshot).toHaveBeenCalledWith(

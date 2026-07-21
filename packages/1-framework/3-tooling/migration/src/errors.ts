@@ -401,14 +401,20 @@ export function errorMigrationHashMismatch(
   });
 }
 
-export function errorSnapshotMissing(refName: string): MigrationToolsError {
+/**
+ * A ref name that resolves to nothing: no pointer file named `refName`
+ * exists, and the hash being resolved (the `contractAt` argument, used as a
+ * fallback when the pointer is absent) is not a node in the migration graph
+ * either. There is no contract to materialize.
+ */
+export function errorRefNotResolvable(refName: string): MigrationToolsError {
   return new MigrationToolsError(
-    'MIGRATION.SNAPSHOT_MISSING',
-    `Ref "${refName}" has no paired contract snapshot`,
+    'MIGRATION.REF_NOT_RESOLVABLE',
+    `Ref "${refName}" is not resolvable`,
     {
-      why: `Ref "${refName}" exists but its paired snapshot files are missing.`,
-      fix: `Run "prisma-next db update --advance-ref ${refName}" to repopulate the snapshot, or "prisma-next ref delete ${refName}" to clear the orphan pointer.`,
-      details: { refName, identifier: refName, viaRef: true },
+      why: `Ref "${refName}" has no pointer file, and the hash being resolved is not a node in the migration graph either — there is nothing to materialize a contract from.`,
+      fix: `Create the ref with "prisma-next ref set ${refName} <hash>" (or advance it via "prisma-next db update --advance-ref ${refName}"), or pass a hash that is a node in the migration graph.`,
+      details: { refName, identifier: refName },
     },
   );
 }

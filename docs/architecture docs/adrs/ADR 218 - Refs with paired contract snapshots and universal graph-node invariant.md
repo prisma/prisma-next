@@ -4,6 +4,8 @@
 
 **Accepted** — closes the dev → ship transition trap tracked in [TML-2629](https://linear.app/prisma-company/issue/TML-2629/dev-ship-transition-broken-first-migration-plan-after-db-update).
 
+The **paired contract snapshot** part of this decision (a ref carrying its own `<name>.contract.json` / `<name>.contract.d.ts` copy) was folded into the shared content-addressed store introduced by [ADR 240](ADR%20240%20-%20Contract%20snapshots%20live%20in%20a%20content-addressed%20store.md) (TML-3072). A ref is now only its pointer file (`{hash, invariants}`); the contract bytes it names resolve through `migrations/snapshots/<hex>/contract.{json,d.ts}` by that hash, the same store every graph node resolves through. The **universal graph-node invariant** and **asymmetric ref-advancement** decisions below are unaffected and remain current.
+
 ## Context
 
 Prisma Next's migration workflow is deliberately Git-shaped: named **refs** point at contract hashes, the on-disk **migration graph** records committed edges between hashes, and the live database **marker** records which hash the database was last brought up to. In healthy operation those three views agree. In the dev-shaped loop — iterate locally with `db init` / `db update`, then publish with `migration plan` and `migrate` — they can drift apart with no precise diagnostic.

@@ -1,12 +1,6 @@
-import {
-  copyFileSync,
-  existsSync,
-  readFileSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { contractSnapshotDir } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from './utils/cli-test-helpers';
@@ -73,7 +67,9 @@ interface PlanJsonResult {
   readonly dir?: string;
   readonly baselineDir?: string;
   readonly noOp?: boolean;
+  readonly code?: string;
   readonly meta?: { readonly code?: string };
+  readonly why?: string;
   readonly fix?: string;
 }
 
@@ -96,11 +92,11 @@ function readDbRefHash(ctx: JourneyContext): string {
 }
 
 function dbRefSnapshotExists(ctx: JourneyContext): boolean {
-  const dir = refsDir(ctx);
+  const storeDir = contractSnapshotDir(join(ctx.testDir, 'migrations'), readDbRefHash(ctx));
   return (
-    existsSync(join(dir, 'db.contract.json')) &&
-    existsSync(join(dir, 'db.contract.d.ts')) &&
-    statSync(join(dir, 'db.contract.json')).size > 0
+    existsSync(join(storeDir, 'contract.json')) &&
+    existsSync(join(storeDir, 'contract.d.ts')) &&
+    statSync(join(storeDir, 'contract.json')).size > 0
   );
 }
 
@@ -183,14 +179,12 @@ export default defineConfig({
   return ctx;
 }
 
+// Simulates a store entry that has gone missing (e.g. `migrations/snapshots/`
+// was not restored from version control) while the db ref's pointer still
+// exists and still names that hash.
 function stripDbSnapshot(ctx: JourneyContext): void {
-  const dir = refsDir(ctx);
-  for (const name of ['db.contract.json', 'db.contract.d.ts']) {
-    const path = join(dir, name);
-    if (existsSync(path)) {
-      unlinkSync(path);
-    }
-  }
+  const storeDir = contractSnapshotDir(join(ctx.testDir, 'migrations'), readDbRefHash(ctx));
+  rmSync(storeDir, { recursive: true, force: true });
 }
 
 async function withJourney(
@@ -281,7 +275,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'explicit --from staging ref resolves via paired snapshot',
+      'explicit --from staging ref resolves through the snapshot store',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           await withJourney(createTempDir, connectionString, async (ctx) => {
@@ -386,7 +380,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'refuses snapshot-missing when db pointer exists without paired snapshot',
+      'refuses contract-snapshot-missing when db pointer exists but its store entry is gone',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           await withJourney(createTempDir, connectionString, async (ctx) => {
@@ -396,38 +390,9 @@ withTempDir(({ createTempDir }) => {
             const plan = await runMigrationPlan(ctx, ['--json']);
             expect(plan.exitCode).toBe(2);
             const err = parseJsonOutput<PlanJsonResult>(plan);
-            expect(err.meta?.code).toBe('MIGRATION.SNAPSHOT_MISSING');
-            expect(err.fix).toMatch(/db update --advance-ref db/);
-          });
-        });
-      },
-      timeouts.spinUpPpgDev,
-    );
-
-    it(
-      'legacy db pointer without snapshot falls back to bundle source when hash is in graph',
-      async () => {
-        await withDevDatabase(async ({ connectionString }) => {
-          await withJourney(createTempDir, connectionString, async (ctx) => {
-            expect((await runContractEmit(ctx)).exitCode).toBe(0);
-            expect((await runDbInit(ctx)).exitCode).toBe(0);
-
-            swapContract(ctx, 'contract-additive');
-            expect((await runContractEmit(ctx)).exitCode).toBe(0);
-            const plan0 = await runAutoBaselinePlanAndEmit(ctx, ['--name', 'init', '--json']);
-            expect(plan0.exitCode).toBe(0);
-            expect((await runMigrate(ctx)).exitCode).toBe(0);
-
-            stripDbSnapshot(ctx);
-
-            swapContract(ctx, 'contract-phone');
-            expect((await runContractEmit(ctx)).exitCode).toBe(0);
-
-            const plan = await runMigrationPlan(ctx, ['--name', 'legacy-fallback', '--json']);
-            expect(plan.exitCode).toBe(0);
-            const planJson = parseJsonOutput<PlanJsonResult>(plan);
-            expect(planJson.baselineDir).toBeUndefined();
-            expect(listAppMigrationBundleDirs(ctx)).toHaveLength(3);
+            expect(err.code).toBe('CLI.FILE_NOT_FOUND');
+            expect(err.why).toMatch(/missing its contract snapshot/);
+            expect(err.fix).toMatch(/migrations\/snapshots/);
           });
         });
       },

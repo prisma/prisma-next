@@ -18,6 +18,12 @@
  * still carries a per-space `contract.json`/`contract.d.ts`: the pair is
  * written into the store under `refs/head.json`'s hash, then deleted.
  *
+ * For every `refs/<name>.contract.json` + `refs/<name>.contract.d.ts` pair
+ * (written by `ref set` / `--advance-ref` pre-TML-3072): the pair is written
+ * into the store under the sibling pointer `refs/<name>.json`'s hash, then
+ * deleted. The pointer itself is never written — a ref is now only its
+ * pointer file, resolving its contract through the store by hash.
+ *
  * Every contract's inner `storage.storageHash` is asserted against the
  * hash it is being filed under before anything is written or deleted —
  * the whole run aborts on the first mismatch, before any root's plan is
@@ -216,6 +222,43 @@ async function findSpaceHeadContractDirs(root) {
   return spaceDirs.sort();
 }
 
+/**
+ * Every `refs/` directory under a migrations root: the root itself and its
+ * immediate children (excluding the store), filtered to those with a `refs/`
+ * subdirectory. Same candidate set as {@link findSpaceHeadContractDirs}, but
+ * without requiring a sibling `contract.json` — a `refs/` directory can
+ * carry ref-paired snapshots independently of a per-space head contract.
+ */
+async function findRefsDirs(root) {
+  const candidates = [root, ...(await listSubdirs(root))].filter(
+    (dir) => basename(dir) !== CONTRACT_SNAPSHOTS_DIRNAME,
+  );
+
+  const refsDirs = [];
+  for (const dir of candidates) {
+    const refsDir = join(dir, 'refs');
+    if (await isDirectory(refsDir)) refsDirs.push(refsDir);
+  }
+  return refsDirs.sort();
+}
+
+const CONTRACT_JSON_SUFFIX = '.contract.json';
+
+/**
+ * Every `<name>.contract.json` file under a `refs/` directory, found
+ * recursively (ref names may contain `/`, e.g. `staging/v1`). Returns paths
+ * relative to `refsDir`, sorted.
+ */
+async function findRefContractJsonPaths(refsDir) {
+  let entries;
+  try {
+    entries = await readdir(refsDir, { recursive: true, encoding: 'utf-8' });
+  } catch {
+    return [];
+  }
+  return entries.filter((entry) => entry.endsWith(CONTRACT_JSON_SUFFIX)).sort();
+}
+
 // ---------------------------------------------------------------------------
 // Planning (read-only; throws before anything is written or deleted)
 // ---------------------------------------------------------------------------
@@ -369,15 +412,68 @@ async function planSpaceDir(dir) {
 }
 
 /**
- * Build the full plan for one migrations root: read every package and
- * space, asserting every inner hash against the value it is recorded
- * under. Throws {@link MigrationLayoutAbortError} (or lets a production
- * `readMigrationPackage` error propagate) on the first inconsistency —
- * nothing is written or deleted while planning.
+ * Plan one ref-paired snapshot: `refsDir/<name>.contract.json` (found at
+ * `contractJsonRelPath`, relative to `refsDir`) plus its sibling
+ * `refsDir/<name>.contract.d.ts`. A `.contract.json` with no sibling pointer
+ * (`refsDir/<name>.json`) is an abort-worthy inconsistency — it can't be
+ * filed under any hash. The pointer's `hash` is asserted against the
+ * contract's inner `storage.storageHash`, same style as
+ * {@link planContractSide} / {@link planSpaceDir}. The pointer is read but
+ * never written by this migrator — folding leaves it byte-identical.
+ */
+async function planRefPair(refsDir, contractJsonRelPath) {
+  const name = contractJsonRelPath.slice(0, -CONTRACT_JSON_SUFFIX.length);
+  const contractJsonPath = join(refsDir, contractJsonRelPath);
+  const pointerPath = join(refsDir, `${name}.json`);
+
+  if (!(await pathExists(pointerPath))) {
+    throw new MigrationLayoutAbortError(
+      `${contractJsonPath} exists but its pointer ${pointerPath} does not. ` +
+        'Aborting before writing or deleting anything.',
+    );
+  }
+  const pointerBefore = await readFile(pointerPath, 'utf8');
+  const hash = JSON.parse(pointerBefore).hash;
+
+  const contractJson = await readJsonFile(contractJsonPath);
+  const actualHash = contractJson?.storage?.storageHash;
+  if (actualHash !== hash) {
+    throw new MigrationLayoutAbortError(
+      `${contractJsonPath}: inner storage.storageHash "${actualHash}" does not match ` +
+        `${pointerPath}'s hash "${hash}". Aborting before writing or deleting anything.`,
+    );
+  }
+
+  const dtsPath = join(refsDir, `${name}.contract.d.ts`);
+  if (!(await pathExists(dtsPath))) {
+    throw new MigrationLayoutAbortError(
+      `${contractJsonPath} exists but ${dtsPath} does not. ` +
+        'Aborting before writing or deleting anything.',
+    );
+  }
+  const contractDts = await readFile(dtsPath, 'utf8');
+
+  return {
+    pointerPath,
+    pointerBefore,
+    hash,
+    contractJson,
+    contractDts,
+    filesToDelete: [contractJsonPath, dtsPath],
+  };
+}
+
+/**
+ * Build the full plan for one migrations root: read every package, space,
+ * and ref-paired snapshot, asserting every inner hash against the value it
+ * is recorded under. Throws {@link MigrationLayoutAbortError} (or lets a
+ * production `readMigrationPackage` error propagate) on the first
+ * inconsistency — nothing is written or deleted while planning.
  */
 export async function planMigrationsRoot(root) {
   const packageDirs = await findMigrationPackageDirs(root);
   const spaceDirs = await findSpaceHeadContractDirs(root);
+  const refsDirs = await findRefsDirs(root);
 
   const packages = [];
   for (const dir of packageDirs) {
@@ -387,8 +483,14 @@ export async function planMigrationsRoot(root) {
   for (const dir of spaceDirs) {
     spaces.push(await planSpaceDir(dir));
   }
+  const refs = [];
+  for (const refsDir of refsDirs) {
+    for (const contractJsonRelPath of await findRefContractJsonPaths(refsDir)) {
+      refs.push(await planRefPair(refsDir, contractJsonRelPath));
+    }
+  }
 
-  return { root, packages, spaces };
+  return { root, packages, spaces, refs };
 }
 
 // ---------------------------------------------------------------------------
@@ -401,6 +503,7 @@ function emptySummary(root) {
     root,
     packagesProcessed: 0,
     spacesProcessed: 0,
+    refsProcessed: 0,
     storeEntriesWritten: 0,
     storeEntriesAlreadyPresent: 0,
     filesDeleted: 0,
@@ -478,6 +581,28 @@ export async function applyMigrationsRootPlan(plan) {
     summary.spacesProcessed++;
   }
 
+  for (const ref of plan.refs) {
+    const { written } = await writeContractSnapshot(root, ref.hash, {
+      contractJson: ref.contractJson,
+      contractDts: ref.contractDts,
+    });
+    written ? summary.storeEntriesWritten++ : summary.storeEntriesAlreadyPresent++;
+
+    for (const file of ref.filesToDelete) {
+      await rm(file);
+      summary.filesDeleted++;
+    }
+
+    const pointerAfter = await readFile(ref.pointerPath, 'utf8');
+    if (pointerAfter !== ref.pointerBefore) {
+      throw new MigrationLayoutAbortError(
+        `${ref.pointerPath} changed during migration; the migrator never writes this file.`,
+      );
+    }
+
+    summary.refsProcessed++;
+  }
+
   return summary;
 }
 
@@ -516,6 +641,7 @@ export function formatSummary(summaries) {
     lines.push(`  ${relativeToRepoRoot(s.root)}`);
     lines.push(
       `    packages: ${s.packagesProcessed}  spaces: ${s.spacesProcessed}  ` +
+        `refs: ${s.refsProcessed}  ` +
         `store writes: ${s.storeEntriesWritten} (${s.storeEntriesAlreadyPresent} already present)  ` +
         `files deleted: ${s.filesDeleted}  migrationHash verified: ${s.migrationHashesVerified}`,
     );
