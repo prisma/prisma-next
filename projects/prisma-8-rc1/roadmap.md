@@ -9,13 +9,13 @@ Prisma Next — the contract-first rewrite of Prisma — ships as **Prisma 8**. 
 Six things must be true on release day. Everything on this page belongs to one of them.
 
 1. **[Queries must return correct values](#1-queries-must-return-correct-values)** — *in progress.* The main remaining defect: values read through relation-loading corrupt or fail.
-2. **[The schema language must reach its final form](#2-the-schema-language-must-reach-its-final-form)** — *design in progress.* Whatever syntax the RC ships is permanent for the life of v8.
-3. **[Every name and format users depend on must be final](#3-every-name-and-format-users-depend-on-must-be-final)** — *not started.* Error codes, config keys, hashes, and generated-file layouts all freeze at the RC.
+2. **[The schema language must reach its final form](#2-the-schema-language-must-reach-its-final-form)** — *in flight.* Whatever syntax the RC ships is permanent for the life of v8; three language projects are running.
+3. **[Every name and format users depend on must be final](#3-every-name-and-format-users-depend-on-must-be-final)** — *in progress.* The error-code consolidation is in review; config keys, hashes, and generated-file layouts still to do.
 4. **[The release's claims must be proven](#4-the-releases-claims-must-be-proven)** — *scoreboard drafted, proofs open.* "It works" and "you can migrate incrementally" each need a runnable receipt.
 5. **[The code must move into prisma/prisma](#5-the-code-must-move-into-prismaprisma)** — *starting.* Repository merge, publishing pipeline, and years of open v7 issues.
 6. **[The rough edges users hit on day one must be gone](#6-the-rough-edges-users-hit-on-day-one-must-be-gone)** — *not started.* Small fixes that would be embarrassing under announcement-day attention.
 
-Three decisions gate work and have dates: the error-code format (due now — it blocks the error consolidation), the minimum supported Postgres version (July 22 — it blocks final scoreboard verdicts), and the polymorphism stable-or-experimental call (July 24, decided by whether its bug stream has flattened). July 24 is also the day the scoreboard verdicts freeze and scope stops moving. There is no other internal schedule: we work these sections as fast as they'll go and ship when they're done.
+Two decisions gate work and have dates: the minimum supported Postgres version (July 22 — it blocks final scoreboard verdicts), and the polymorphism stable-or-experimental call (July 24, decided by whether its bug stream has flattened). A third is already made: error codes standardize on dotted namespace codes (like `ORM.DECODE_FAILED`), and the consolidation is in review. July 24 is also the day the scoreboard verdicts freeze and scope stops moving. There is no other internal schedule: we work these sections as fast as they'll go and ship when they're done.
 
 ---
 
@@ -37,11 +37,33 @@ Tracked as [TML-3060](https://linear.app/prisma-company/issue/TML-3060/plan-code
 The codec that correctly handles Postgres `date` values exists and is strict (it rejects impossible dates like February 31st rather than silently normalizing them). But nothing connects the `date` column type to that codec yet, so reading a `date` column through `.include()` fails. The connection is a one-line change that deliberately waits for the schema-language work below (which reshapes how column types bind to codecs), and a failing test already pins the exact behavior — when the fix lands, that test flips from red to green.
 </details>
 
+<details><summary>⏳ <b>Binary columns read through relation-loading return hex text instead of bytes</b></summary>
+
+Same disease as the big one above, concrete instance: a `Bytes` column selected inside `.include()` comes back as the raw hexadecimal text Postgres uses in JSON (`\x48656c6c6f`) while the TypeScript types promise a `Uint8Array`. Fixed by the same lossless-JSON work; a separate ticket ([TML-2990](https://linear.app/prisma-company/issue/TML-2990)) tracks it so it can't be forgotten in the sweep. In progress.
+</details>
+
+<details><summary>⏳ <b>Places where the TypeScript types and the runtime disagree</b></summary>
+
+Two known mismatches, both "the type signature promises one thing, the running code returns another":
+
+- `Timestamp`/`Timestamptz` columns: the declared output type is a branded string, but the codec actually returns a JavaScript `Date` ([TML-2391](https://linear.app/prisma-company/issue/TML-2391), in progress).
+- Projects that use the schema types directly without running contract emission (`typeof contract`) get types that ignore per-instance codec parameters and enum value sets — so a column can typecheck against values the database will reject ([TML-2960](https://linear.app/prisma-company/issue/TML-2960), in progress).
+
+A type that lies is a correctness bug with a delay on it; both must be resolved (or the type corrected to tell the truth) before the types freeze.
+</details>
+
 <details><summary>⏳ <b>Finish the polymorphism bug tail — then decide: stable or experimental</b></summary>
 
-Polymorphism means models that inherit from a base model, stored across joined tables (multi-table inheritance). It has been the source of most of Prisma 8's recent correctness bugs. The encouraging signal: the last three fixes were narrow edge cases — scoping predicates correctly in bulk count-updates, restricting results to explicitly selected fields, rejecting an ambiguous relation shape — rather than missing capabilities, and no known-broken or skipped tests remain in the area.
+Polymorphism means models that inherit from a base model, stored across joined tables (multi-table inheritance). It has been the source of most of Prisma 8's recent correctness bugs. The encouraging signal: recent fixes are narrow edge cases rather than missing capabilities, and no known-broken or skipped tests remain in the area. The open list, so the tail is visible rather than vibes:
 
-On July 24 we decide from the bug curve, not from hope: if new bugs have stopped appearing, polymorphism ships inside the stability promise; if they're still coming, it ships clearly labeled experimental and stabilization continues after the RC without blocking it.
+- Explicit `.select(...)` on a polymorphic include doesn't restrict variant-table columns ([TML-2783](https://linear.app/prisma-company/issue/TML-2783), in progress — the core fix landed, follow-up open).
+- Variant lookup is namespace-flat, so two variants with the same name in different namespaces can't be addressed ([TML-2841](https://linear.app/prisma-company/issue/TML-2841), in progress).
+- The model accessor's return type isn't variant-aware ([TML-2847](https://linear.app/prisma-company/issue/TML-2847), in progress).
+- The shorthand `.where({priority: 1})` form rejects variant fields that the callback form accepts ([TML-2982](https://linear.app/prisma-company/issue/TML-2982), open).
+- Bulk `createAll()` on a variant silently drops write annotations ([TML-2600](https://linear.app/prisma-company/issue/TML-2600), open).
+- A variant model declaring a column that collides with a base-table column silently merges instead of failing validation ([TML-2827](https://linear.app/prisma-company/issue/TML-2827), open).
+
+On July 24 we decide from this list and the discovery rate, not from hope: if it's shrinking and nothing new is appearing, polymorphism ships inside the stability promise; otherwise it ships clearly labeled experimental and stabilization continues after the RC without blocking it.
 </details>
 
 ---
@@ -57,9 +79,16 @@ The long-standing ask — share `createdAt`/`updatedAt`/tenant-id fields across 
 Decided by the team on July 20; design in progress. Tracked as [TML-3055](https://linear.app/prisma-company/issue/TML-3055/psl-mixins-named-field-set-reuse-retire-field-presets-type-aliases-and). This is the largest single pre-release work item.
 </details>
 
-<details><summary>⬜ <b>Native column types move onto type constructors; `@db.*` attributes are deleted</b></summary>
+<details><summary>⏳ <b>Native column types move onto type constructors; `@db.*` attributes are deleted</b></summary>
 
-Prisma 7 spelled database-native column types with attributes: `email String @db.VarChar(255)`. Prisma 8 replaces that spelling with type constructors written directly in the type position: `email sql.varchar(255)`, `createdAt pg.timestamptz`. The type says what the column is; no attribute needed. All `@db.*` attribute support is deleted from the language before the freeze — shipping both spellings would freeze both forever.
+Prisma 7 spelled database-native column types with attributes: `email String @db.VarChar(255)`. Prisma 8 replaces that spelling with the type written directly in the type position: `email VarChar(255)`, `id Uuid`, `payload Jsonb`. The type says what the column is; no attribute needed. All `@db.*` attribute support is deleted from the language before the freeze — shipping both spellings would freeze both forever.
+
+This has its own running project ("Remove `@db.*` attributes from PSL"): Postgres native types as bare PSL scalar types is in review ([TML-2986](https://linear.app/prisma-company/issue/TML-2986)), and the unification that makes every scalar type a zero-argument type constructor under one contribution mechanism is in progress ([TML-2985](https://linear.app/prisma-company/issue/TML-2985)). The `date`-column fix from section 1 lands here.
+</details>
+
+<details><summary>⏳ <b>Relations get a directional spelling; `@relation(name:)` retires</b></summary>
+
+Prisma 7 expressed relations with paired fields on both models and disambiguated with `@relation(name: "...")` strings — a spelling users routinely get wrong. Prisma 8 replaces it with directional syntax: a foreign key declares where it points (`from`/`to`), many-to-many goes through an explicit junction (`through: Junction`) or an implicit one synthesized for you, and multi-hop paths spell the route out (`a -> J.b -> J.c -> T.d`). Five slices, all in flight ([TML-2940](https://linear.app/prisma-company/issue/TML-2940) through [TML-2944](https://linear.app/prisma-company/issue/TML-2944)). This is frozen-surface work on exactly the same clock as mixins: whatever relation spelling the RC accepts is the spelling for the life of v8.
 </details>
 
 <details><summary>⬜ <b>SQL embedded in schemas gets proper fences instead of escaped strings</b></summary>
@@ -78,9 +107,9 @@ All of the above changes what generated schema and migration files look like. Th
 
 Users write `catch` blocks against error codes, commit generated contract and migration files to their repositories, and write config files against our keys. All of that becomes permanent API at the RC. Five changes must land first — sequenced together, because several of them alter the same generated files and users should see one change, not five.
 
-<details><summary>⬜ <b>One error-code scheme instead of four</b> · blocked on a decision, due now</summary>
+<details><summary>⏳ <b>One error-code scheme instead of four</b> · format decided, consolidation in review</summary>
 
-Prisma 8 currently has four separately-grown error systems with two incompatible code formats — about 46 codes shaped like `PN-CLI-4001` and about 89 shaped like `RUNTIME.DECODE_FAILED` — plus roughly sixteen error classes that carry no code at all, including the database driver errors users hit most often. Before codes freeze: pick one format (the decision on the table), fold every error into it, give codes to the codeless, and publish a table mapping every old code to its new one. Prisma 7's `P1001`-style codes are deliberately not carried over — the upgrade guide will include a translation table for migrating monitoring rules and runbooks.
+Prisma 8 grew four separate error systems with two incompatible code formats — about 46 codes shaped like `PN-CLI-4001` and about 89 shaped like `RUNTIME.DECODE_FAILED` — plus roughly sixteen error classes carrying no code at all, including the database driver errors users hit most often. The format decision is made: **dotted namespace codes win** (`RUNTIME.DECODE_FAILED`-style). The structural consolidation is in review ([TML-3067](https://linear.app/prisma-company/issue/TML-3067)), and the sweep converting the ORM's codeless throws into structured `ORM.*` errors is in progress ([TML-3070](https://linear.app/prisma-company/issue/TML-3070)). Still to come with it: the published table mapping every old code to its new one. Prisma 7's `P1001`-style codes are deliberately not carried over — the upgrade guide will include a translation table for migrating monitoring rules and runbooks.
 </details>
 
 <details><summary>⬜ <b>Rename the `extensionPacks` config key to `extensions`</b></summary>
@@ -114,6 +143,17 @@ The announcement will make two big claims: *everything Prisma 8 ships works*, an
 A matrix of every feature against every supported database (Postgres, SQLite, MongoDB). Each cell holds a verdict: **works** (and names the test suite that proves it), **unproven** (reachable, but no test demonstrates it yet), **experimental** (shipped, outside the stability promise), or **not in 8.0** (a deliberate, written-down absence — nothing is allowed to be silently missing). The rows come from two directions: everything Prisma 8's public surface exposes, crossed with every notable Prisma 7 capability, so absences are named rather than discovered.
 
 The draft is up for review as [PR #1000](https://github.com/prisma/prisma-next/pull/1000). Current draft counts: **~450 cells proven, ~500 unproven, ~30 experimental, ~250 named absences.** The unproven column is literally the remaining test-writing queue, and the rendered matrix ships publicly with the RC — progress from here on is cells flipping from unproven to proven.
+</details>
+
+<details><summary>⏳ <b>Capabilities still landing before the verdicts freeze on July 24</b></summary>
+
+Several features are mid-flight; their scoreboard cells can't get final verdicts until they land or get cut:
+
+- **Native scalar arrays** — `String[]`, `Int[]` and friends as real Postgres array columns, end-to-end from schema authoring through querying, filtering, and mutation. Slices 2 and 3 in flight ([TML-2912](https://linear.app/prisma-company/issue/TML-2912), [TML-2913](https://linear.app/prisma-company/issue/TML-2913)).
+- **Enums on every database** — the plan to treat enums as an application-level concept so they work uniformly on Postgres, SQLite, and MongoDB rather than only where the database has native enums ([TML-2815](https://linear.app/prisma-company/issue/TML-2815), planning in progress).
+- **Polymorphism in the TypeScript authoring path** — schemas written in TypeScript (instead of PSL) can't declare inheritance yet; the PSL path can ([TML-2228](https://linear.app/prisma-company/issue/TML-2228), open). Until it lands, the scoreboard carries the asymmetry explicitly.
+
+Anything on this list that misses July 24 gets its cells stamped as they actually are — unproven, experimental, or not in 8.0 — rather than holding the freeze.
 </details>
 
 <details><summary>⬜ <b>The side-by-side proof: both versions, one database, migrating incrementally</b></summary>
@@ -193,6 +233,11 @@ The announcement puts many eyes on the repository; a visible backlog of automate
 <details><summary>⬜ <b>The npm page and editor experience for the packages people actually open</b></summary>
 
 The `prisma` package's README becomes Prisma 8's face on npm. The four public packages' exported functions and types are what users see when they hover in their editor — those documentation comments get an audit. The ~60 internal packages get a short standard notice identifying them as implementation detail.
+</details>
+
+<details><summary>⏳ <b>First-class editor support for the schema language</b></summary>
+
+A language users write by hand deserves an editor that helps: formatting, autocomplete, syntax coloring, and diagnostics for Prisma 8's schema language, served by its language server. This work is running now — hooking the formatter to the language server, keyword and model-type completions, semantic-token coloring, and replacing the legacy schema parser with the new syntax-tree parser underneath it all (the "Language Tools Support Prisma Next PSL" project, several slices in flight). It also has to track the schema-language changes in section 2 as they land, or the editor will underline the new syntax as errors.
 </details>
 
 <details><summary>⬜ <b>The editor doesn't fight itself in a two-version project</b></summary>
