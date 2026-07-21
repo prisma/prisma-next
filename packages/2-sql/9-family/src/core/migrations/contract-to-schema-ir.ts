@@ -57,21 +57,13 @@ export type NativeTypeExpander = (input: {
 export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => string;
 
 /**
- * Target-specific callback that normalizes a contract-declared `ColumnDefault`
- * into the same resolved shape introspection would parse from the live
- * database, so `resolvedDefault` compares correctly on both sides.
- *
- * The contract's raw default and the introspected raw default can describe
- * the same value in different shapes (e.g. a `dbgenerated("'{}'::jsonb")`
- * function-call default versus a literal Postgres parses from the live
- * column). Without normalizing the contract side too, `resolvedDefaultsEqual`
- * compares `kind` before content and reports drift forever even when the
- * database matches exactly. This follows the same IoC pattern as
- * `NativeTypeExpander`/`DefaultRenderer`: the target provides its own
- * resolution (reusing whatever raw-default parser its introspection side
- * already uses) when calling `contractToSchemaIR`, keeping the family layer
- * target-agnostic. Omitted entirely, the contract's raw default is the
- * resolved default unchanged (today's behavior).
+ * Target-supplied hook (same IoC seam as `NativeTypeExpander`/`DefaultRenderer`)
+ * that normalizes a contract-declared `ColumnDefault` into the resolved shape
+ * the target's introspection parses from the live database — e.g. a
+ * `dbgenerated("'{}'::jsonb")` function call and the literal Postgres reports
+ * are the same value in different shapes, and `resolvedDefaultsEqual`
+ * compares `kind` before content. When omitted, the contract's raw default
+ * is the resolved default unchanged.
  */
 export type DefaultResolver = (def: ColumnDefault, resolvedNativeType: string) => ColumnDefault;
 

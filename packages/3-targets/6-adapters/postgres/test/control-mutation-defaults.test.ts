@@ -147,13 +147,12 @@ describe('createPostgresDefaultFunctionRegistry', () => {
   });
 
   describe('dbgenerated keeps the raw expression verbatim, never resolving it', () => {
-    // `lowerDbgenerated` no longer resolves the raw SQL text at all — a
-    // literal-shaped expression (e.g. `'{}'::jsonb`) is recognized and
-    // normalized once, at SchemaIR construction on the expected side (see
-    // `contractToSchemaIR`'s target-supplied `resolveDefault` hook), not
-    // here. Adopting the normalizer's rewrites here would also discard the
-    // user's original expression for cases like `nextval('my_seq')`, whose
-    // DDL must keep referencing the named sequence.
+    // `lowerDbgenerated` must not resolve the raw SQL text — a literal-shaped
+    // expression (e.g. `'{}'::jsonb`) is normalized once, at SchemaIR
+    // construction on the expected side (`contractToSchemaIR`'s
+    // target-supplied `resolveDefault` hook), not here. Rewriting here would
+    // also discard the user's original expression for cases like
+    // `nextval('my_seq')`, whose DDL must keep referencing the named sequence.
     const handler = createPostgresDefaultFunctionRegistry().get('dbgenerated')!;
 
     function lower(expression: string) {

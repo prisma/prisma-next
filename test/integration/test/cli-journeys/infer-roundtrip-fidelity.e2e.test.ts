@@ -167,9 +167,9 @@ withTempDir(({ createTempDir }) => {
         // `accounts` has two FKs to `users` (`primary_user_id` is unique,
         // `backup_user_id` isn't), so infer names both relations to
         // disambiguate and prints the 1:1 back side on Users as a singular
-        // field carrying only a relation name — no fields/references — the
-        // shape emit rejected before this fix (it only accepted an *unnamed*
-        // singular back-relation, produced when a table pair has one FK).
+        // field carrying only a relation name — no fields/references — a
+        // distinct shape from the unnamed singular back-relation a
+        // single-FK table pair produces.
         expect(psl, 'Users carries a named singular back-relation to Accounts').toMatch(
           /\w+\s+Accounts\?\s+@relation\(name: "[^"]+"\)\s*$/m,
         );

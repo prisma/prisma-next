@@ -2,12 +2,11 @@
  * Postgres index-type registration (TML-3037).
  *
  * `contract infer` prints `@@index(..., type: "gin"/"hash")` for a non-default
- * access method, but the postgres target registered zero index types, so
- * `validateIndexTypes` rejected every non-btree index at emit. These tests
- * prove: (1) the registry itself carries the six Postgres built-in access
- * methods with permissive options, and (2) a real PSL interpret → build pass
- * accepts a `gin`/`hash` index end-to-end while still rejecting a bogus type
- * — registering real methods must not disable the check.
+ * access method; `validateIndexTypes` rejects any type the target has not
+ * registered. These tests prove: (1) the registry carries the six Postgres
+ * built-in access methods with permissive options, and (2) a real PSL
+ * interpret → build pass accepts a `gin`/`hash` index end-to-end while still
+ * rejecting a bogus type — registering real methods must not disable the check.
  */
 import { assembleAuthoringContributions } from '@prisma-next/framework-components/control';
 import { buildSymbolTable } from '@prisma-next/psl-parser';

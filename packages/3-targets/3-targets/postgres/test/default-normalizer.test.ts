@@ -350,11 +350,10 @@ describe('parsePostgresDefault unparseable expressions', () => {
 describe('postgresResolveDefault', () => {
   // The contract-derived (expected) side's `resolveDefault` hook, called at
   // `SchemaIR` construction so the expected side normalizes a `dbgenerated`
-  // literal-shaped function default the same way introspection already
-  // does. Reintroducing a bare "keep the contract default unchanged" here
-  // would reproduce the class of bug this fixes: `db verify` reporting
-  // permanent drift for a jsonb/text[] literal default that matches the
-  // live database exactly.
+  // literal-shaped function default the same way introspection does. If this
+  // ever passes the contract default through unnormalized, `db verify`
+  // reports permanent drift for a jsonb/text[] literal default that matches
+  // the live database exactly.
 
   it('a literal default passes through unchanged', () => {
     const literal = { kind: 'literal' as const, value: 'draft' };

@@ -783,11 +783,9 @@ function buildModel(
 /**
  * Explains a foreign key `resolveForeignKeys` dropped as dangling: the
  * database enforces it, but its target lives outside the introspected
- * schema, so infer has no model to point a relation at. Without this, the
- * relation just vanishes from the emitted PSL with no trace. Matches the
- * missing-primary-key warning's voice — one line, stating the fact and the
- * fix — since a schema outside the introspected scope is typically an
- * extension pack (e.g. Supabase's `auth`) that isn't configured yet.
+ * schema, so infer has no model to point a relation at. The suggested fix
+ * targets the common cause — an unconfigured extension pack's schema
+ * (e.g. Supabase's `auth`).
  */
 function buildDanglingForeignKeyWarning(
   danglingForeignKeys: readonly DanglingForeignKeyInfo[],
@@ -878,17 +876,11 @@ function buildScalarField(
     column.resolvedDefault?.kind === 'function' &&
     column.resolvedDefault.expression === 'autoincrement()'
   ) {
-    // A `GENERATED ... AS IDENTITY` column (either variant) reports no
-    // `column_default` at all, so it never reaches the raw-default path
-    // below — the postgres control adapter is the only place that resolves
-    // an identity column, stamping `resolvedDefault` straight to
-    // `autoincrement()` since there is no raw expression to parse. That is
-    // the only introspected shape which carries a `resolvedDefault` with no
-    // raw `default`, so this check identifies it without a dedicated
-    // `identity` field on the column IR. The contract's vocabulary already
-    // means "the database generates this value" for `autoincrement()` — the
-    // same thing both identity variants and `serial` mean — so print it
-    // directly rather than modelling the ALWAYS/BY-DEFAULT distinction.
+    // An identity column: a `resolvedDefault` with no raw `default` is the
+    // only introspected shape the control adapter produces for
+    // `GENERATED ... AS IDENTITY` (Postgres reports no `column_default`;
+    // the adapter stamps `autoincrement()` directly). There is no
+    // `identity` field on the column IR — this pairing is the marker.
     attributes.push(parseDefaultAttributeString('@default(autoincrement())'));
   } else if (column.many === true && column.resolvedDefault?.kind === 'literal') {
     // Postgres reports a list column's default as raw SQL text (e.g.

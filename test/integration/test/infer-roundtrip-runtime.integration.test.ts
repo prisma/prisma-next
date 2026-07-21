@@ -1,30 +1,12 @@
 /**
- * Infer -> Emit Round-Trip Fidelity — runtime defects (TML-3037)
+ * Infer -> Emit Round-Trip Fidelity — runtime half (TML-3037).
  *
  * `cli-journeys/infer-roundtrip-fidelity.e2e.test.ts` drives infer -> emit ->
  * `db verify --schema-only`, but neither `contract emit` nor `db verify`
- * builds an `ExecutionContext` — so two of the slice's eight defects never
- * surfaced on that path:
- *
- *  - An unbounded `numeric` column emits a valid contract, but building an
- *    `ExecutionContext` used to throw `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH`
- *    (fixed by making `NumericParams.precision` optional). The bare-Decimal
- *    scenario below targets the same base-scalar path directly with a
- *    hand-authored `Decimal` field.
- *  - A `date` column decodes fine on a top-level `SELECT` (`decode()` is a
- *    passthrough over an already-parsed JS `Date`), but `.include()` goes
- *    through `json_agg` -> `decodeJson()`, which rejects a bare `YYYY-MM-DD`
- *    string because `@db.Date` inherits `DateTime`'s `pg/timestamptz@1`
- *    codec. The `pg/date@1` codec exists but nothing binds `@db.Date` to it
- *    yet — the binding belongs to the remove-db-attributes project's `Date`
- *    type (TML-3037 leaves this defect open; the date scenario below pins
- *    the broken behavior so the binding flips it).
- *
- * Each scenario below infers + emits a real contract from a live database
- * (same CLI path the journey test uses), deserializes the emitted
- * `contract.json`, and builds a real `ExecutionContext`/runtime against it —
- * following the shape of `rls-ts-walking-skeleton.integration.test.ts`
- * (`createDevDatabase`, a real driver, no CLI mocking) for the runtime half.
+ * builds an `ExecutionContext` — codec parameterization and decode behavior
+ * are only observable here. Each scenario infers + emits a real contract from
+ * a live database, then builds a real `ExecutionContext`/runtime against it
+ * (`createDevDatabase`, a real driver, no CLI mocking).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -137,11 +119,9 @@ withTempDir(({ createTempDir }) => {
       async () => {
         // Hand-authored, not inferred: `control-mutation-defaults.ts` maps
         // the bare `Decimal` scalar straight to `pg/numeric@1` with no
-        // `typeParams`, independent of any `@db.Numeric` attribute. The
-        // unbounded-numeric scenario above reaches this same base-scalar path
-        // indirectly (infer prints an unbounded `numeric` column as a bare
-        // `Decimal?`); this test targets it directly so the base-scalar fix
-        // can't regress behind an infer-only test.
+        // `typeParams`, independent of any `@db.Numeric` attribute — the same
+        // base-scalar path the unbounded-numeric scenario above reaches
+        // indirectly, exercised here without infer in the loop.
         const ctx: JourneyContext = setupJourney({
           connectionString: database.connectionString,
           createTempDir,
@@ -242,10 +222,10 @@ withTempDir(({ createTempDir }) => {
               namespaceId: 'public',
             });
             const [row] = await records.select('id', 'notedOn').all();
-            // With `@db.Date` still inheriting `pg/timestamptz@1`, decode()
-            // passes through the driver's local-midnight `Date` (postgres-date's
-            // OID 1082 parser), so only the calendar date is stable across
-            // process timezones — local getters, not an exact instant.
+            // `@db.Date` inherits `pg/timestamptz@1`, whose decode() passes
+            // through the driver's local-midnight `Date` — only the calendar
+            // date is stable across process timezones, so assert via local
+            // getters, not an exact instant.
             const notedOn = row?.notedOn;
             expect(notedOn, 'top-level select decodes a Date').toBeInstanceOf(Date);
             const decoded = notedOn as Date;
@@ -272,10 +252,9 @@ withTempDir(({ createTempDir }) => {
             } catch (error) {
               includeError = error;
             }
-            // Pinned broken behavior: `pg/timestamptz@1.decodeJson` rejects the
-            // bare `YYYY-MM-DD` that `json_agg` renders for a `date` column.
-            // When `@db.Date` (or its successor spelling) binds to `pg/date@1`,
-            // this assertion fails — flip it to assert the decoded value:
+            // Pins the gap: `pg/timestamptz@1.decodeJson` rejects the bare
+            // `YYYY-MM-DD` that `json_agg` renders. Binding the date spelling to
+            // `pg/date@1` flips this — then assert
             // [{ id: 1, records: [{ notedOn: new Date(Date.UTC(2024, 0, 15)) }] }].
             expect(includeResult, 'include() must not silently return a value').toBeUndefined();
             expect(includeError, 'include() rejects the date column today').toMatchObject({
