@@ -160,7 +160,7 @@ describe('verifyMongoSchema', () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('CONTRACT.MARKER_REQUIRED');
+      expect(result.code).toBe('CONTRACT.SCHEMA_VERIFICATION_FAILED');
       expect(result.schema.issues.length).toBeGreaterThan(0);
       expect(result.schema.issues).toContainEqual(expect.objectContaining({ path: ['users'] }));
     });
@@ -179,7 +179,7 @@ describe('verifyMongoSchema', () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('CONTRACT.MARKER_REQUIRED');
+      expect(result.code).toBe('CONTRACT.SCHEMA_VERIFICATION_FAILED');
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({ path: ['users', 'index:email:1'] }),
       );
