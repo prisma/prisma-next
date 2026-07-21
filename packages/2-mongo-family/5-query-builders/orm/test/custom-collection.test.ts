@@ -7,7 +7,12 @@ import type {
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract';
 import ormContractJson from '../../../1-foundation/mongo-contract/test/fixtures/orm-contract.json';
-import { Collection, createMongoCollection } from '../src/collection';
+import {
+  Collection,
+  createMongoCollection,
+  isMongoCollectionClass,
+  MONGO_ORM_COLLECTION_BRAND,
+} from '../src/collection';
 import type { MongoQueryExecutor } from '../src/executor';
 import { mongoOrm } from '../src/mongo-orm';
 
@@ -78,7 +83,7 @@ describe('custom collection subclasses', () => {
     });
     const base = createMongoCollection(contract, 'User', baseExecutor);
 
-    for await (const _row of (client.users as UserRepository).byName('Alice').all()) {
+    for await (const _row of client.users.byName('Alice').all()) {
       // drain
     }
     for await (const _row of base.where({ name: 'Alice' }).all()) {
@@ -93,7 +98,7 @@ describe('custom collection subclasses', () => {
   it('chaining preserves the subclass', () => {
     const executor = createMockExecutor();
     const client = mongoOrm({ contract, executor, collections: { User: UserRepository } });
-    const users = client.users as UserRepository;
+    const users = client.users;
     expect(users.byName('Alice')).toBeInstanceOf(UserRepository);
     expect(users.newestFirst()).toBeInstanceOf(UserRepository);
     expect(users.byName('Alice').take(5).skip(1).select('name')).toBeInstanceOf(UserRepository);
@@ -102,7 +107,7 @@ describe('custom collection subclasses', () => {
   it('variant() preserves the subclass', () => {
     const executor = createMockExecutor();
     const client = mongoOrm({ contract, executor, collections: { Task: TaskRepository } });
-    const tasks = client.tasks as TaskRepository;
+    const tasks = client.tasks;
     expect(tasks.bugs()).toBeInstanceOf(TaskRepository);
   });
 
@@ -111,7 +116,61 @@ describe('custom collection subclasses', () => {
     const executor = createMockExecutor();
     expect(() =>
       mongoOrm({ contract, executor, collections: { User: NotACollection as never } }),
-    ).toThrow('must extend the Collection class');
+    ).toThrow("Custom collection 'User' must be a Collection class");
+  });
+
+  it('rejects an instance where a class was expected', () => {
+    const executor = createMockExecutor();
+    expect(() =>
+      mongoOrm({
+        contract,
+        executor,
+        collections: { User: new UserRepository(contract, 'User', executor) as never },
+      }),
+    ).toThrow("Custom collection 'User' must be a Collection class");
+  });
+
+  it('rejects a key that names no model, rather than silently ignoring it', () => {
+    const executor = createMockExecutor();
+    expect(() => mongoOrm({ contract, executor, collections: { Uesr: UserRepository } })).toThrow(
+      "No model found for custom collection 'Uesr'",
+    );
+  });
+
+  it('rejects the registry before constructing any of its classes', () => {
+    let constructed = false;
+    class EagerRepository extends Collection<Contract, 'User'> {
+      constructor(c: Contract, m: 'User', e: MongoQueryExecutor) {
+        super(c, m, e);
+        constructed = true;
+      }
+    }
+    const executor = createMockExecutor();
+    expect(() =>
+      mongoOrm({
+        contract,
+        executor,
+        collections: { User: EagerRepository, Uesr: UserRepository },
+      }),
+    ).toThrow("No model found for custom collection 'Uesr'");
+    expect(constructed).toBe(false);
+  });
+
+  it('recognises a subclass from a duplicated package copy, where instanceof fails', () => {
+    class ForeignCopyCollection {
+      static readonly [MONGO_ORM_COLLECTION_BRAND] = true;
+      readonly modelName: string;
+      constructor(_contract: Contract, modelName: string, _executor: MongoQueryExecutor) {
+        this.modelName = modelName;
+      }
+    }
+    expect(ForeignCopyCollection.prototype instanceof Collection).toBe(false);
+    expect(isMongoCollectionClass(ForeignCopyCollection)).toBe(true);
+    expect(isMongoCollectionClass(UserRepository)).toBe(true);
+    expect(isMongoCollectionClass(class Unrelated {})).toBe(false);
+    expect(isMongoCollectionClass(new UserRepository(contract, 'User', createMockExecutor()))).toBe(
+      false,
+    );
   });
 
   it('a directly constructed subclass executes queries', async () => {
@@ -124,7 +183,7 @@ describe('custom collection subclasses', () => {
   it('domain methods compose with base chaining before execution', async () => {
     const executor = createMockExecutor([]);
     const client = mongoOrm({ contract, executor, collections: { User: UserRepository } });
-    const users = client.users as UserRepository;
+    const users = client.users;
     for await (const _row of users.byName('Alice').orderBy({ name: 1 }).take(2).all()) {
       // drain
     }

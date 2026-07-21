@@ -1,3 +1,4 @@
+import { domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
 import type {
   AnyMongoTypeMaps,
   MongoContract,
@@ -6,7 +7,11 @@ import type {
 } from '@prisma-next/mongo-contract';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { MongoCollection } from './collection';
-import { Collection, createMongoCollection, MONGO_ORM_COLLECTION_BRAND } from './collection';
+import {
+  createMongoCollection,
+  isMongoCollectionClass,
+  MONGO_ORM_COLLECTION_BRAND,
+} from './collection';
 import type { MongoQueryExecutor } from './executor';
 
 /**
@@ -58,6 +63,32 @@ export type MongoOrmClient<
   readonly [K in keyof TContract['roots'] & string]: RootCollection<TContract, Collections, K>;
 };
 
+/**
+ * Rejects registry entries before any of them is constructed, mirroring the SQL ORM's
+ * `createCollectionRegistry`: a key that names no model is a typo, not a silent no-op.
+ */
+function validateCollectionRegistry(
+  contract: MongoContract,
+  collections: Partial<Record<string, AnyMongoCollectionClass>> | undefined,
+): void {
+  if (!collections) return;
+
+  const models = domainModelsAtDefaultNamespace(contract.domain);
+  for (const [key, collectionClass] of Object.entries(collections)) {
+    if (!collectionClass) continue;
+    if (!isMongoCollectionClass(collectionClass)) {
+      throw new Error(
+        `Custom collection '${key}' must be a Collection class (constructor) exported by @prisma-next/mongo-orm, not an instance or an unrelated class`,
+      );
+    }
+    if (!Object.hasOwn(models, key)) {
+      throw new Error(
+        `No model found for custom collection '${key}'. Available models: ${Object.keys(models).join(', ')}`,
+      );
+    }
+  }
+}
+
 function instantiateCustomCollection(
   CustomCtor: AnyMongoCollectionClass,
   contract: MongoContract,
@@ -70,15 +101,9 @@ function instantiateCustomCollection(
       modelName: string,
       executor: MongoQueryExecutor,
     ) => object,
-    'registered classes extend Collection (brand-checked statically, instanceof-checked below), so they take the base constructor arguments'
+    'validateCollectionRegistry has confirmed the class carries the Collection brand, so it takes the base constructor arguments'
   >(CustomCtor);
-  const instance = new Ctor(contract, modelName, executor);
-  if (!(instance instanceof Collection)) {
-    throw new Error(
-      `collections["${modelName}"] must extend the Collection class exported by @prisma-next/mongo-orm`,
-    );
-  }
-  return instance;
+  return new Ctor(contract, modelName, executor);
 }
 
 export function mongoOrm<
@@ -86,6 +111,7 @@ export function mongoOrm<
   Collections extends Partial<Record<string, AnyMongoCollectionClass>> = Record<never, never>,
 >(options: MongoOrmOptions<TContract, Collections>): MongoOrmClient<TContract, Collections> {
   const { contract, executor, collections } = options;
+  validateCollectionRegistry(contract, collections);
   const client: Record<string, unknown> = {};
 
   for (const [rootName, rootRef] of Object.entries(contract.roots)) {

@@ -805,8 +805,9 @@ No user action required. Incidental substrate diff only.
 <!--
 ADR 175 Mongo custom collections (PR #936): `@prisma-next/mongo-orm` exports the
 extendable `Collection` class (previously the package-private implementation behind
-the `MongoCollection` interface), a `MONGO_ORM_COLLECTION_BRAND` type-level brand,
-and an `AnyMongoCollectionClass` constructor type. `mongoOrm(...)` and the
+the `MongoCollection` interface), a `MONGO_ORM_COLLECTION_BRAND` brand (type-level plus a
+static runtime marker on the class), an `isMongoCollectionClass` structural guard, and an
+`AnyMongoCollectionClass` constructor type. `mongoOrm(...)` and the
 `@prisma-next/mongo` `mongo(...)` facade gain an optional `collections` registry
 (subclasses keyed by model name); `@prisma-next/mongo/runtime` re-exports
 `Collection`. All additive — the `MongoCollection` interface, `createMongoCollection`,

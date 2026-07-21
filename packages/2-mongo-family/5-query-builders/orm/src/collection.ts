@@ -156,8 +156,23 @@ function resolveCollectionName(model: MongoModelDefinition, modelName: string): 
 // String-key brand rather than a unique symbol, mirroring ENUM_TYPE_HANDLE_BRAND
 // (contract-authoring/enum-type.ts): string equality survives .d.mts chunk
 // de-duplication across package boundaries, unique symbols do not. The brand lets
-// `collections` registries accept only Collection subclasses at the type level.
+// `collections` registries accept only Collection subclasses at the type level, and
+// its static counterpart lets them do so at runtime without `instanceof` — see
+// `isMongoCollectionClass`.
 export const MONGO_ORM_COLLECTION_BRAND = '__prismaNextMongoOrmCollection__';
+
+/**
+ * Whether `value` is a `Collection` subclass constructor.
+ *
+ * Structural rather than `instanceof`, so a subclass built against a duplicated copy of
+ * `@prisma-next/mongo-orm` (two versions in one bundle) is still recognised — the same
+ * cross-copy failure `isPgPool`/`isPgClient` fixed for `pg` bindings.
+ */
+export function isMongoCollectionClass(value: unknown): boolean {
+  if (typeof value !== 'function') return false;
+  const brand: unknown = Reflect.get(value, MONGO_ORM_COLLECTION_BRAND);
+  return brand === true;
+}
 
 /**
  * The extendable Mongo ORM collection ([ADR 175](../../../../../docs/architecture%20docs/adrs/ADR%20175%20-%20Shared%20ORM%20Collection%20interface.md)).
@@ -185,7 +200,14 @@ export class Collection<
   TVariant extends string = never,
 > implements MongoCollection<TContract, ModelName, TIncludes, TVariant>
 {
-  /** Type-level brand consumed by `AnyMongoCollectionClass`; never exists at runtime. */
+  /**
+   * Runtime brand, inherited by every subclass constructor. `isMongoCollectionClass`
+   * reads it instead of using `instanceof`, so registration survives duplicated copies
+   * of this package in one bundle.
+   */
+  static readonly [MONGO_ORM_COLLECTION_BRAND] = true;
+
+  /** Type-level brand consumed by `AnyMongoCollectionClass`; never exists on instances. */
   declare readonly [MONGO_ORM_COLLECTION_BRAND]: true;
 
   readonly #contract: TContract;
