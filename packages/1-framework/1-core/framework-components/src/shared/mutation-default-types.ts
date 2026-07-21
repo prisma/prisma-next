@@ -50,16 +50,6 @@ export interface MutationDefaultGeneratorDescriptor {
    * structural and the list would be tautological.
    */
   readonly applicableCodecIds?: readonly string[];
-  readonly resolveGeneratedColumnDescriptor?: (input: {
-    readonly generated: ExecutionMutationDefaultValue;
-  }) =>
-    | {
-        readonly codecId: string;
-        readonly nativeType: string;
-        readonly typeRef?: string;
-        readonly typeParams?: Record<string, unknown>;
-      }
-    | undefined;
   /**
    * Construct the `onCreate`/`onUpdate` phases value owned by this
    * generator. Authoring layers (PSL `temporal.updatedAt()`, TS field presets) call

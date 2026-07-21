@@ -458,7 +458,6 @@ model AuthSession {
     const { table } = buildSymbolTable({
       document,
       sourceFile,
-      scalarTypes: [...postgresScalarTypeDescriptors.keys()],
       pslBlockDescriptors,
     });
     const field = table.topLevel.models['AuthSession']?.fields['aal'];

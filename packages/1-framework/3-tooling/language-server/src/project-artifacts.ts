@@ -126,7 +126,6 @@ export function createProjectArtifacts(options: ProjectArtifactsOptions): Projec
         symbolTable ??= buildSymbolTable({
           document: artifacts.document,
           sourceFile: artifacts.sourceFile,
-          scalarTypes: controlStack.scalarTypes,
           pslBlockDescriptors: controlStack.pslBlockDescriptors,
         }).table;
         return symbolTable;

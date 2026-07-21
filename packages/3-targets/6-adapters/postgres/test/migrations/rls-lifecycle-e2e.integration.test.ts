@@ -144,7 +144,6 @@ function buildContractFromPsl(psl: string): Contract<SqlStorage> {
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarColumnDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
 

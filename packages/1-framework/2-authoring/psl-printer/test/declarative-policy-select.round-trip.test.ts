@@ -144,7 +144,6 @@ function parsePolicySelect(schema: string, sourceId = 'r1'): ParsedPolicySelect 
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
   const blockSymbols = Object.values(table.topLevel.blocks).filter(

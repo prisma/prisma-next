@@ -133,4 +133,8 @@ describe('sqliteScalarAuthoringTypes', () => {
   it('is wired as the adapter descriptor authoring type contribution', () => {
     expect(sqliteAdapterDescriptor.authoring?.type).toBe(sqliteScalarAuthoringTypes);
   });
+
+  it('declares Json as the value-object storage type', () => {
+    expect(sqliteAdapterDescriptor.authoring?.valueObjectStorageType).toBe('Json');
+  });
 });

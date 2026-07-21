@@ -220,7 +220,8 @@ const postgresTimestampScalarTypeDescriptors = new Map([
   ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
   ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
   ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
-  ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
+  ['Json', { codecId: 'pg/json@1', nativeType: 'json' }],
+  ['Jsonb', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
 ] as const);
 
 const postgresTimestampAuthoringContributions = {

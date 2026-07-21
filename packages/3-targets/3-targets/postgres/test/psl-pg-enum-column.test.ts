@@ -88,7 +88,6 @@ function interpret(source: string, capabilities: Record<string, Record<string, b
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarColumnDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
   return interpretPslDocumentToSqlContract({

@@ -15,6 +15,7 @@ import type {
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
+  assertResolvableTypeConstructorTemplates,
   collectContributedDescriptorPaths,
   collectScalarTypeConstructors,
   mergeAuthoringNamespaces,
@@ -45,6 +46,8 @@ export interface AssembledAuthoringContributions {
   readonly entityTypes: AuthoringEntityTypeNamespace;
   readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
   readonly modelAttributes: AuthoringModelAttributeDescriptorNamespace;
+  /** The single {@link AuthoringContributions.valueObjectStorageType} declared across the composed components, validated at assembly against the merged `type` namespace. */
+  readonly valueObjectStorageType?: string;
 }
 
 export interface ControlStack<
@@ -191,14 +194,33 @@ export function assembleAuthoringContributions(
     }
   };
 
+  let valueObjectStorageDeclaration:
+    | { readonly name: string; readonly ownerId: string }
+    | undefined;
+
   for (const descriptor of descriptors) {
     const descriptorId = descriptor.id ?? '<unknown>';
+    const declaredValueObjectStorageType = descriptor.authoring?.valueObjectStorageType;
+    if (declaredValueObjectStorageType !== undefined) {
+      if (valueObjectStorageDeclaration !== undefined) {
+        throw new Error(
+          'Duplicate authoring valueObjectStorageType declaration. ' +
+            `Descriptor "${descriptorId}" conflicts with "${valueObjectStorageDeclaration.ownerId}". ` +
+            'Exactly one composed component may declare the value-object storage type.',
+        );
+      }
+      valueObjectStorageDeclaration = {
+        name: declaredValueObjectStorageType,
+        ownerId: descriptorId,
+      };
+    }
     if (descriptor.authoring?.field) {
       claimContributedPaths(descriptor.authoring.field, 'fieldPreset', 'field', descriptorId);
       mergeAuthoringNamespaces(field, descriptor.authoring.field, [], 'fieldPreset', 'field');
     }
     if (descriptor.authoring?.type) {
       claimContributedPaths(descriptor.authoring.type, 'typeConstructor', 'type', descriptorId);
+      assertResolvableTypeConstructorTemplates(descriptor.authoring.type, descriptorId);
       mergeAuthoringNamespaces(type, descriptor.authoring.type, [], 'typeConstructor', 'type');
     }
     if (descriptor.authoring?.entityTypes) {
@@ -256,12 +278,25 @@ export function assembleAuthoringContributions(
     modelAttributeNamespace,
   );
 
+  if (
+    valueObjectStorageDeclaration !== undefined &&
+    !collectScalarTypeConstructors(typeNamespace).has(valueObjectStorageDeclaration.name)
+  ) {
+    throw new Error(
+      `Invalid authoring valueObjectStorageType "${valueObjectStorageDeclaration.name}" declared by descriptor "${valueObjectStorageDeclaration.ownerId}". ` +
+        'The name must be a top-level bare-eligible type constructor in the assembled authoring namespace.',
+    );
+  }
+
   return {
     field: fieldNamespace,
     type: typeNamespace,
     entityTypes: entityTypeNamespace,
     pslBlockDescriptors: pslBlockDescriptorNamespace,
     modelAttributes: modelAttributeNamespace,
+    ...(valueObjectStorageDeclaration !== undefined
+      ? { valueObjectStorageType: valueObjectStorageDeclaration.name }
+      : {}),
   };
 }
 

@@ -237,37 +237,35 @@ describe('authoring template resolution', () => {
       kind: 'typeConstructor',
       output: {
         codecId: 'test/text@1',
-        nativeType: {
-          kind: 'arg',
-          index: 0,
-          path: ['nativeType'],
-          default: 'text',
+        nativeType: 'text',
+        typeParams: {
+          label: {
+            kind: 'arg',
+            index: 0,
+            path: ['label'],
+            default: 'fallback',
+          },
         },
       },
     } as const;
 
-    const args = [Object.create({ nativeType: 'prototype-text' })];
+    const args = [Object.create({ label: 'prototype-label' })];
 
     expect(instantiateAuthoringTypeConstructor(descriptor, args)).toEqual({
       codecId: 'test/text@1',
       nativeType: 'text',
+      typeParams: { label: 'fallback' },
     });
   });
 
-  it('rejects resolved nativeType values that are not strings', () => {
+  it('rejects instantiation of an output template without a nativeType', () => {
     const descriptor = {
       kind: 'typeConstructor',
-      output: {
-        codecId: 'test/text@1',
-        nativeType: {
-          kind: 'arg',
-          index: 0,
-        },
-      },
+      output: { codecId: 'test/text@1' },
     } as const;
 
-    expect(() => instantiateAuthoringTypeConstructor(descriptor, [123])).toThrow(
-      /Resolved authoring nativeType must be a string/,
+    expect(() => instantiateAuthoringTypeConstructor(descriptor, [])).toThrow(
+      /declares no nativeType; only entity-ref constructors may omit it/,
     );
   });
 
@@ -528,12 +526,82 @@ describe('collectScalarTypeConstructors', () => {
     expect([...collectScalarTypeConstructors(namespace).keys()]).toEqual(['String']);
   });
 
-  it('excludes top-level constructors that declare args', () => {
+  it('excludes top-level constructors that declare required args', () => {
     const namespace = {
       Vector: {
         kind: 'typeConstructor',
         args: [{ kind: 'number', name: 'length', integer: true, minimum: 1 }],
         output: { codecId: 'pg/vector@1', nativeType: 'vector' },
+      },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(collectScalarTypeConstructors(namespace).size).toBe(0);
+  });
+
+  it('includes an all-optional-args constructor with exactly its zero-arg instantiation output', () => {
+    const VarCharish = {
+      kind: 'typeConstructor',
+      args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+      output: {
+        codecId: 'sql/varchar@1',
+        nativeType: 'character varying',
+        typeParams: { length: { kind: 'arg', index: 0 } },
+      },
+    } satisfies AuthoringTypeConstructorDescriptor;
+    const namespace = { VarCharish } satisfies AuthoringTypeNamespace;
+
+    const bare = collectScalarTypeConstructors(namespace).get('VarCharish');
+    expect(bare).toEqual(instantiateAuthoringTypeConstructor(VarCharish, []));
+    expect(bare).toEqual({
+      codecId: 'sql/varchar@1',
+      nativeType: 'character varying',
+      typeParams: {},
+    });
+  });
+
+  it('applies a template default in bare form, same as the zero-arg call', () => {
+    const Defaulted = {
+      kind: 'typeConstructor',
+      args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+      output: {
+        codecId: 'sql/varchar@1',
+        nativeType: 'character varying',
+        typeParams: { length: { kind: 'arg', index: 0, default: 191 } },
+      },
+    } satisfies AuthoringTypeConstructorDescriptor;
+    const namespace = { Defaulted } satisfies AuthoringTypeNamespace;
+
+    const bare = collectScalarTypeConstructors(namespace).get('Defaulted');
+    expect(bare).toEqual(instantiateAuthoringTypeConstructor(Defaulted, []));
+    expect(bare).toEqual({
+      codecId: 'sql/varchar@1',
+      nativeType: 'character varying',
+      typeParams: { length: 191 },
+    });
+  });
+
+  it('excludes constructors mixing an optional arg with a required one', () => {
+    const namespace = {
+      Mixed: {
+        kind: 'typeConstructor',
+        args: [
+          { kind: 'number', name: 'precision', integer: true },
+          { kind: 'number', name: 'scale', integer: true, optional: true },
+        ],
+        output: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
+      },
+    } satisfies AuthoringTypeNamespace;
+
+    expect(collectScalarTypeConstructors(namespace).size).toBe(0);
+  });
+
+  it('excludes all-optional constructors that declare an entityRefArg', () => {
+    const namespace = {
+      Ref: {
+        kind: 'typeConstructor',
+        args: [{ kind: 'string', name: 'entity', optional: true }],
+        entityRefArg: { index: 0, entityKind: 'native_enum' },
+        output: { codecId: 'pg/enum@1', nativeType: 'enum' },
       },
     } satisfies AuthoringTypeNamespace;
 
@@ -547,14 +615,6 @@ describe('collectScalarTypeConstructors', () => {
         entityRefArg: { index: 0, entityKind: 'native_enum' },
         output: { codecId: 'pg/enum@1' },
       },
-    } satisfies AuthoringTypeNamespace;
-
-    expect(collectScalarTypeConstructors(namespace).size).toBe(0);
-  });
-
-  it('excludes zero-arg constructors without a literal nativeType', () => {
-    const namespace = {
-      Odd: { kind: 'typeConstructor', output: { codecId: 'pg/odd@1' } },
     } satisfies AuthoringTypeNamespace;
 
     expect(collectScalarTypeConstructors(namespace).size).toBe(0);

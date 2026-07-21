@@ -57,13 +57,14 @@ export type AuthoringArgumentDescriptor = AuthoringArgumentDescriptorCommon &
 export interface AuthoringStorageTypeTemplate {
   readonly codecId: string;
   /**
+   * The storage type's base name — a plain string, never a template:
+   * parameters live in `typeParams` and the DDL renderer composes them.
    * Optional so a type constructor whose {@link AuthoringTypeConstructorDescriptor.entityRefArg}
-   * names another entity can omit this template entirely — its output for
-   * that case is derived by the codec at `codecId`, not by resolving a
-   * literal here. Every other consumer of this shape (field presets, plain
-   * type constructors) always supplies it.
+   * names another entity can omit it entirely — its output for that case is
+   * derived by the codec at `codecId`. Every other consumer of this shape
+   * (field presets, plain type constructors) always supplies it.
    */
-  readonly nativeType?: AuthoringTemplateValue;
+  readonly nativeType?: string;
   readonly typeParams?: Record<string, AuthoringTemplateValue>;
 }
 
@@ -466,6 +467,18 @@ export interface AuthoringContributions {
    * declarative spec and the lowering.
    */
   readonly modelAttributes?: AuthoringModelAttributeDescriptorNamespace;
+  /**
+   * Names the top-level type constructor that stores embedded value-object
+   * fields (fields typed as a value-object `type` block). A single named
+   * slot per component makes within-component ambiguity impossible by
+   * shape. Assembly rejects two components both declaring it, validates
+   * that the assembled namespace carries the named constructor as a
+   * top-level bare-eligible entry (see
+   * {@link collectScalarTypeConstructors}), and exposes the single value to
+   * family interpreters — so family layers never hardcode a target's type
+   * names.
+   */
+  readonly valueObjectStorageType?: string;
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
@@ -732,16 +745,23 @@ export function collectContributedDescriptorPaths(
 export interface ScalarTypeConstructorOutput {
   readonly codecId: string;
   readonly nativeType: string;
+  readonly typeParams?: Record<string, unknown>;
 }
 
 /**
  * Derives the scalar view of an assembled authoring type namespace: every
- * **top-level** zero-arg type constructor whose output declares an explicit
- * literal storage type name. A bare type name `T` in a schema is
- * semantically the zero-arg instantiation `T()`, so these entries are
- * exactly the base scalars a target registers. Constructors registered
- * under a namespace segment, constructors declaring args, and entity-ref
- * constructors are not scalars and are excluded.
+ * **top-level** type constructor that is instantiable with an empty argument
+ * list — all declared args optional and no entity-ref argument. A bare type
+ * name `T` in a schema is semantically the zero-arg instantiation `T()`, so
+ * each entry is exactly what that call produces (defaulted template values
+ * applied, absent optional-arg typeParams keys omitted). Constructors
+ * registered under a namespace segment, constructors with required args, and
+ * entity-ref constructors are not scalars and are excluded.
+ *
+ * Eligibility needs no template inspection: templates that cannot resolve
+ * for their legal call shapes are rejected at the composition boundary by
+ * {@link assertResolvableTypeConstructorTemplates}, so the zero-arg
+ * instantiation below cannot fail for an eligible constructor.
  */
 export function collectScalarTypeConstructors(
   namespace: AuthoringTypeNamespace,
@@ -749,13 +769,81 @@ export function collectScalarTypeConstructors(
   const result = new Map<string, ScalarTypeConstructorOutput>();
   for (const [name, value] of Object.entries(namespace)) {
     if (!isAuthoringTypeConstructorDescriptor(value)) continue;
-    if (value.args !== undefined && value.args.length > 0) continue;
     if (value.entityRefArg !== undefined) continue;
-    const nativeType = value.output.nativeType;
-    if (typeof nativeType !== 'string') continue;
-    result.set(name, { codecId: value.output.codecId, nativeType });
+    if (value.args?.some((arg) => arg.optional !== true)) continue;
+    result.set(name, instantiateAuthoringTypeConstructor(value, []));
   }
   return result;
+}
+
+function visitTemplateArgRefs(
+  template: AuthoringTemplateValue | undefined,
+  visit: (ref: AuthoringArgRef) => void,
+): void {
+  if (template === undefined) return;
+  if (isAuthoringArgRef(template)) {
+    visit(template);
+    // A reference's fallback is a template of its own; its references are
+    // checked too.
+    visitTemplateArgRefs(template.default, visit);
+    return;
+  }
+  if (Array.isArray(template)) {
+    for (const value of template) {
+      visitTemplateArgRefs(value, visit);
+    }
+    return;
+  }
+  if (typeof template === 'object' && template !== null) {
+    for (const value of Object.values(template)) {
+      visitTemplateArgRefs(value, visit);
+    }
+  }
+}
+
+/**
+ * Boundary validation for a contributed authoring type namespace, called
+ * per contributing component at assembly (which supplies `contributedBy`
+ * for attribution). Rejects what the types cannot express — entity-ref
+ * constructors are skipped (their output derives from the referenced
+ * entity): a plain constructor must declare its output storage type name,
+ * and every `typeParams` arg-ref (including refs inside arg-ref defaults)
+ * must point at a declared argument index.
+ */
+export function assertResolvableTypeConstructorTemplates(
+  namespace: AuthoringTypeNamespace,
+  contributedBy: string,
+  path: readonly string[] = [],
+): void {
+  for (const [name, value] of Object.entries(namespace)) {
+    const currentPath = [...path, name];
+    if (!isAuthoringTypeConstructorDescriptor(value)) {
+      assertResolvableTypeConstructorTemplates(value, contributedBy, currentPath);
+      continue;
+    }
+    if (value.entityRefArg !== undefined) continue;
+
+    const args = value.args ?? [];
+    const invalid = (detail: string) =>
+      new Error(
+        `Invalid authoring type constructor "${currentPath.join('.')}" contributed by descriptor "${contributedBy}". ${detail}`,
+      );
+
+    if (value.output.nativeType === undefined) {
+      throw invalid(
+        'The output declares no storage type template and no entityRefArg; a plain constructor must declare one.',
+      );
+    }
+    for (const [key, template] of Object.entries(value.output.typeParams ?? {})) {
+      visitTemplateArgRefs(template, (ref) => {
+        if (args[ref.index] === undefined) {
+          throw invalid(
+            `output.typeParams.${key} references argument ${ref.index}, but the constructor declares ${args.length} argument(s). Declare the argument or correct the reference index.`,
+          );
+        }
+      });
+    }
+  }
 }
 
 /**
@@ -1213,10 +1301,10 @@ function resolveAuthoringStorageTypeTemplate(
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown>;
 } {
-  const nativeType = resolveAuthoringTemplateValue(template.nativeType, args);
-  if (typeof nativeType !== 'string') {
+  const nativeType = template.nativeType;
+  if (nativeType === undefined) {
     throw new Error(
-      `Resolved authoring nativeType must be a string for codec "${template.codecId}", received ${String(nativeType)}`,
+      `Authoring output template for codec "${template.codecId}" declares no nativeType; only entity-ref constructors may omit it`,
     );
   }
   const typeParams =

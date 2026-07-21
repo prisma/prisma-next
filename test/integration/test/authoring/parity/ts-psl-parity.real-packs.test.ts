@@ -41,7 +41,6 @@ function interpretWithRealPacks(schema: string) {
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarColumnDescriptors.keys()],
     pslBlockDescriptors: stack.authoringContributions.pslBlockDescriptors,
   });
   return interpretPslDocumentToSqlContract({

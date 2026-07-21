@@ -1,7 +1,7 @@
 // use prisma-next
 
 model User {
-  id        String   @id @default(uuid())
+  id        Char(36) @id @default(uuid())
   email     String
   createdAt DateTime @default(now())
   posts     Post[]
@@ -10,7 +10,7 @@ model User {
 }
 
 model Post {
-  id        String   @id @default(uuid())
+  id        Char(36) @id @default(uuid())
   title     String
   userId    String
   createdAt DateTime @default(now())

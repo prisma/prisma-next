@@ -166,8 +166,9 @@ model Post {
               args: [{ kind: 'string' }, { kind: 'stringArray' }],
               output: {
                 codecId: 'custom/enum@1',
-                nativeType: { kind: 'arg', index: 0 },
+                nativeType: 'enum',
                 typeParams: {
+                  name: { kind: 'arg', index: 0 },
                   values: { kind: 'arg', index: 1 },
                 },
               },
@@ -182,8 +183,8 @@ model Post {
     expect(documentScopedTypes(result.value)).toMatchObject({
       Tag: {
         codecId: 'custom/enum@1',
-        nativeType: 'Tag',
-        typeParams: { values: ['hello, world', 'a,b,c', 'plain'] },
+        nativeType: 'enum',
+        typeParams: { name: 'Tag', values: ['hello, world', 'a,b,c', 'plain'] },
       },
     });
   });

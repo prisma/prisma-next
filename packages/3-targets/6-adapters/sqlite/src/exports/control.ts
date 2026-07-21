@@ -10,7 +10,7 @@ import { sqliteAdapterDescriptorMeta } from '../core/descriptor-meta';
 
 const sqliteAdapterDescriptor: SqlControlAdapterDescriptor<'sqlite'> = {
   ...sqliteAdapterDescriptorMeta,
-  authoring: { type: sqliteScalarAuthoringTypes },
+  authoring: { type: sqliteScalarAuthoringTypes, valueObjectStorageType: 'Json' },
   controlMutationDefaults: {
     defaultFunctionRegistry: createSqliteDefaultFunctionRegistry(),
     generatorDescriptors: createSqliteMutationDefaultGeneratorDescriptors(),

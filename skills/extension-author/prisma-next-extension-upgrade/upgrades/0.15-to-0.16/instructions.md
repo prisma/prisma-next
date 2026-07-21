@@ -17,6 +17,77 @@ changes:
       contains:
         - "extension-supabase/test/utils"
       anyMatch: true
+  - id: scalar-type-descriptors-channel-removed
+    summary: |
+      `ComponentMetadata.scalarTypeDescriptors` is retired — the unified authoring type namespace
+      is now the single channel for scalar types. If your extension/adapter descriptor declared
+      `scalarTypeDescriptors: new Map([['String', 'pg/text@1'], ...])`, move each entry to a
+      zero-arg type-constructor contribution in the descriptor's `authoring.type` namespace:
+      `String: { kind: 'typeConstructor', output: { codecId: 'pg/text@1', nativeType: 'text' } }`.
+      The `nativeType` is now explicit — it was previously derived from the codec's first target
+      type, so check the codec manifest for the value to inline. Code that read
+      `ControlStack.scalarTypeDescriptors` / `ContractSourceContext.scalarTypeDescriptors` should
+      read `stack.scalarTypes` (the scalar type names) or derive the name ->
+      `{ codecId, nativeType }` map via `collectScalarTypeConstructors(stack.authoringContributions.type)`
+      from `@prisma-next/framework-components/authoring`. `assembleScalarTypeDescriptors` is
+      deleted, and `validateScalarTypeCodecIds` now takes the authoring type namespace instead of
+      a descriptor map.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "scalarTypeDescriptors"
+        - "assembleScalarTypeDescriptors"
+      anyMatch: true
+  - id: postgres-json-rebound-to-native-json
+    summary: |
+      On the postgres target the PSL `Json` scalar re-binds from `pg/jsonb@1` / `jsonb` to
+      `pg/json@1` / `json`; a new bare `Jsonb` scalar carries `pg/jsonb@1` / `jsonb`
+      (`postgresScalarAuthoringTypes` in `@prisma-next/adapter-postgres`). Extension test
+      schemas and fixtures that author postgres `Json` fields and mean jsonb storage must
+      switch those fields to `Jsonb`; assertions that pin the `Json` name's derived binding
+      (e.g. over `collectScalarTypeConstructors(stack.authoringContributions.type)` or
+      `stack.scalarTypes`) now expect `Json -> { codecId: 'pg/json@1', nativeType: 'json' }`
+      plus the new `Jsonb -> { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }` entry. PSL
+      value-object storage columns still emit jsonb (the interpreter now prefers the target's
+      `Jsonb` scalar and falls back to `Json`). The legacy `@db.Json` attribute path
+      (`NATIVE_TYPE_SPECS`) is unchanged, as are sqlite/mongo `Json` bindings and the TS
+      builder surface (`field.json()`, `jsonbColumn`).
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "Json"
+      anyMatch: true
+  - id: default-generators-no-longer-set-storage
+    summary: |
+      `@default(<generator>)` never mutates a column's storage any more — the type position is
+      the only storage decider — and the whole generator-storage-override SPI is retired with
+      it. Removed surfaces: `MutationDefaultGeneratorDescriptor.resolveGeneratedColumnDescriptor`
+      (`@prisma-next/framework-components/control`) — generator descriptors are now
+      `{ id, applicableCodecIds?, buildPhases? }` only, and `applicableCodecIds` remains the
+      validation channel (`PSL_INVALID_DEFAULT_APPLICABILITY` on mismatch); the transitional
+      `baseScalar` marker on `AuthoringTypeConstructorDescriptor` and
+      `ScalarTypeConstructorOutput` (`@prisma-next/framework-components/authoring`) — scalar
+      type-constructor contributions and the derived scalar view are plain
+      `{ codecId, nativeType, typeParams? }` again; and the `@prisma-next/ids` exports
+      `resolveBuiltinGeneratedColumnDescriptor` / `GeneratedColumnDescriptor` (the TS spec
+      helpers `uuidv4()`, `nanoid()`, … still return `GeneratedColumnSpec` bundling their
+      explicit `sql/char@1` column). Packs that registered a generator descriptor with a
+      storage-resolution hook must drop the hook; PSL schemas in extension fixtures relying on
+      `String @default(uuid()/cuid()/nanoid()/ulid())` producing `character(N)` columns must
+      either accept the target String storage (postgres: `pg/text@1` / `text`) or author the
+      char storage explicitly in the type position (`Char(36) @default(uuid())`, …), then
+      re-emit.
+    detection:
+      glob: "**/*.{ts,mts,cts,prisma}"
+      contains:
+        - "resolveGeneratedColumnDescriptor"
+        - "resolveBuiltinGeneratedColumnDescriptor"
+        - "baseScalar"
+        - "@default(uuid("
+        - "@default(cuid("
+        - "@default(nanoid("
+        - "@default(ulid("
+      anyMatch: true
 ---
 
 <!--

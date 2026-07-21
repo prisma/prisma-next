@@ -1,9 +1,16 @@
 import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
+import {
+  collectScalarTypeConstructors,
+  instantiateAuthoringTypeConstructor,
+  validateAuthoringHelperArguments,
+} from '@prisma-next/framework-components/authoring';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
 import {
   createPostgresDefaultFunctionRegistry,
   createPostgresMutationDefaultGeneratorDescriptors,
+  postgresAuthoringTypes,
+  postgresNativeAuthoringTypes,
   postgresScalarAuthoringTypes,
 } from '../src/core/control-mutation-defaults';
 import postgresAdapterDescriptor from '../src/exports/control';
@@ -190,28 +197,13 @@ describe('createPostgresMutationDefaultGeneratorDescriptors', () => {
     expect(descriptor.applicableCodecIds).toBeUndefined();
   });
 
-  it('resolves column descriptor for matching generator', () => {
-    const uuidv4Descriptor = descriptors.find((d) => d.id === 'uuidv4')!;
-    const resolve = uuidv4Descriptor.resolveGeneratedColumnDescriptor;
-    expect(resolve).toBeDefined();
-    const result = resolve!({
-      generated: { kind: 'generator', id: 'uuidv4' },
-    });
-    expect(result).toMatchObject({
-      codecId: 'sql/char@1',
-      nativeType: 'character',
-      typeParams: { length: 36 },
-    });
-  });
-
-  it('returns undefined for non-matching generator', () => {
-    const uuidv4Descriptor = descriptors.find((d) => d.id === 'uuidv4')!;
-    const resolve = uuidv4Descriptor.resolveGeneratedColumnDescriptor;
-    expect(resolve).toBeDefined();
-    const result = resolve!({
-      generated: { kind: 'generator', id: 'nanoid' },
-    });
-    expect(result).toBeUndefined();
+  it('keeps pg/text@1 applicable for every builtin generator so String fields never false-diagnose', () => {
+    // The type position is the only storage decider (TML-2986); a generator
+    // default on a `String` column must validate against pg/text@1.
+    for (const id of ['ulid', 'nanoid', 'uuidv7', 'uuidv4', 'cuid2', 'ksuid'] as const) {
+      const descriptor = descriptors.find((d) => d.id === id)!;
+      expect(descriptor.applicableCodecIds).toContain('pg/text@1');
+    }
   });
 });
 
@@ -239,7 +231,8 @@ describe('postgresScalarAuthoringTypes', () => {
     ['Float', 'pg/float8@1'],
     ['Decimal', 'pg/numeric@1'],
     ['DateTime', 'pg/timestamptz@1'],
-    ['Json', 'pg/jsonb@1'],
+    ['Json', 'pg/json@1'],
+    ['Jsonb', 'pg/jsonb@1'],
     ['Bytes', 'pg/bytea@1'],
   ] as const;
 
@@ -253,7 +246,80 @@ describe('postgresScalarAuthoringTypes', () => {
     }
   });
 
-  it('is wired as the adapter descriptor authoring type contribution', () => {
-    expect(postgresAdapterDescriptor.authoring?.type).toBe(postgresScalarAuthoringTypes);
+  it('is wired into the adapter descriptor authoring type contribution', () => {
+    expect(postgresAdapterDescriptor.authoring?.type).toBe(postgresAuthoringTypes);
+    expect(postgresAuthoringTypes).toEqual({
+      ...postgresScalarAuthoringTypes,
+      ...postgresNativeAuthoringTypes,
+    });
+  });
+
+  it('declares Jsonb as the value-object storage type', () => {
+    expect(postgresAdapterDescriptor.authoring?.valueObjectStorageType).toBe('Jsonb');
+  });
+});
+
+describe('postgresNativeAuthoringTypes', () => {
+  it('contributes all eleven native types as bare-eligible top-level constructors', () => {
+    const derived = collectScalarTypeConstructors(postgresNativeAuthoringTypes);
+
+    expect(Object.fromEntries(derived)).toEqual({
+      VarChar: { codecId: 'sql/varchar@1', nativeType: 'character varying', typeParams: {} },
+      Char: { codecId: 'sql/char@1', nativeType: 'character', typeParams: {} },
+      Numeric: { codecId: 'pg/numeric@1', nativeType: 'numeric', typeParams: {} },
+      Timestamp: { codecId: 'pg/timestamp@1', nativeType: 'timestamp', typeParams: {} },
+      Timestamptz: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz', typeParams: {} },
+      Time: { codecId: 'pg/time@1', nativeType: 'time', typeParams: {} },
+      Timetz: { codecId: 'pg/timetz@1', nativeType: 'timetz', typeParams: {} },
+      Uuid: { codecId: 'pg/uuid@1', nativeType: 'uuid' },
+      SmallInt: { codecId: 'pg/int2@1', nativeType: 'int2' },
+      Real: { codecId: 'pg/float4@1', nativeType: 'float4' },
+      Date: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
+    });
+  });
+
+  it('materializes typeParams keys only for arguments that are given', () => {
+    expect(
+      instantiateAuthoringTypeConstructor(postgresNativeAuthoringTypes.VarChar, [191]),
+    ).toEqual({
+      codecId: 'sql/varchar@1',
+      nativeType: 'character varying',
+      typeParams: { length: 191 },
+    });
+    expect(instantiateAuthoringTypeConstructor(postgresNativeAuthoringTypes.Numeric, [10])).toEqual(
+      {
+        codecId: 'pg/numeric@1',
+        nativeType: 'numeric',
+        typeParams: { precision: 10 },
+      },
+    );
+    expect(
+      instantiateAuthoringTypeConstructor(postgresNativeAuthoringTypes.Numeric, [10, 2]),
+    ).toEqual({
+      codecId: 'pg/numeric@1',
+      nativeType: 'numeric',
+      typeParams: { precision: 10, scale: 2 },
+    });
+    expect(instantiateAuthoringTypeConstructor(postgresNativeAuthoringTypes.Timetz, [2])).toEqual({
+      codecId: 'pg/timetz@1',
+      nativeType: 'timetz',
+      typeParams: { precision: 2 },
+    });
+  });
+
+  it('rejects out-of-range arguments via the declarative minimums', () => {
+    expect(() =>
+      validateAuthoringHelperArguments('VarChar', postgresNativeAuthoringTypes.VarChar.args, [0]),
+    ).toThrow('must be >= 1');
+    expect(() =>
+      validateAuthoringHelperArguments('Numeric', postgresNativeAuthoringTypes.Numeric.args, [0]),
+    ).toThrow('must be >= 1');
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'Timestamp',
+        postgresNativeAuthoringTypes.Timestamp.args,
+        [-1],
+      ),
+    ).toThrow('must be >= 0');
   });
 });

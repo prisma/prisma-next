@@ -16,7 +16,7 @@ model User {
   role Role
   createdAt DateTime @default(now())
   isActive Boolean @default(true)
-  profile Json?
+  profile Jsonb?
 }
 
 model Post {
