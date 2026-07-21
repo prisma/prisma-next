@@ -159,7 +159,7 @@ function createParamRef(
     throw ormError(
       'ORM.COLUMN_UNKNOWN',
       `Unknown column "${columnRef.column}" in table "${columnRef.table}"`,
-      { meta: { table: columnRef.table, column: columnRef.column } },
+      { meta: { tableName: columnRef.table, column: columnRef.column } },
     );
   }
   const codec = codecRefForStorageColumn(

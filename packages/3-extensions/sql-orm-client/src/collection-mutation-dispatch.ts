@@ -235,6 +235,6 @@ export async function executeMutationReturningSingleRow<Row>(
     return row;
   }
   throw ormError('ORM.MUTATION_ROW_MISSING', onMissingRowMessage, {
-    meta: { operation, model: modelName, table: tableName },
+    meta: { operation, model: modelName, tableName },
   });
 }

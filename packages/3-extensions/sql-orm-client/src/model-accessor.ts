@@ -604,7 +604,7 @@ function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
       throw ormError(
         'ORM.FILTER_UNSUPPORTED',
         `Shorthand filter on "${relatedModelName}.${fieldName}": field does not support equality comparisons`,
-        { meta: { model: relatedModelName, field: fieldName, trait: 'eq' } },
+        { meta: { model: relatedModelName, field: fieldName, trait: 'equality' } },
       );
     }
     exprs.push(fieldAccessor.eq(value));
