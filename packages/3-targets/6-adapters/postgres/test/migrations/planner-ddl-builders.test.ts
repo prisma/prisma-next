@@ -195,4 +195,37 @@ describe('renderDefaultLiteral', () => {
     const result = renderDefaultLiteral({ key: 'val' });
     expect(result).toBe(`'{"key":"val"}'`);
   });
+
+  it('renders an empty array literal for a list column', () => {
+    const result = renderDefaultLiteral([], col({ nativeType: 'text', many: true }));
+    expect(result).toBe("'{}'");
+  });
+
+  it('renders a populated array literal for a list column', () => {
+    const result = renderDefaultLiteral(['a', 'b'], col({ nativeType: 'text', many: true }));
+    expect(result).toBe(`ARRAY['a', 'b']`);
+  });
+
+  it('renders a mixed-type array literal element-by-element', () => {
+    const result = renderDefaultLiteral([1, true, null], col({ nativeType: 'int4', many: true }));
+    expect(result).toBe('ARRAY[1, true, NULL]');
+  });
+});
+
+describe('buildColumnDefaultSql with a list column', () => {
+  it('renders DEFAULT with an empty array literal', () => {
+    const result = buildColumnDefaultSql(
+      { kind: 'literal', value: [] },
+      col({ nativeType: 'text', many: true }),
+    );
+    expect(result).toBe("DEFAULT '{}'");
+  });
+
+  it('renders DEFAULT with a populated array literal', () => {
+    const result = buildColumnDefaultSql(
+      { kind: 'literal', value: ['a', 'b'] },
+      col({ nativeType: 'text', many: true }),
+    );
+    expect(result).toBe(`DEFAULT ARRAY['a', 'b']`);
+  });
 });

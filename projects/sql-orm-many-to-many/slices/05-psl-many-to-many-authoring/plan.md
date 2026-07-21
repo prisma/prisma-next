@@ -10,7 +10,7 @@
 - **Outcome:** the PSL relation resolver/lowering recognises a junction (explicit `@@id([a,b])` join model — form 1) and emits a relation with `cardinality:'N:M'` + a populated `through` descriptor (composite-key-correct), parity with the TS builder. Unit-tested at the lowering level.
 - **Builds on:** slice 0's contract `through` shape (the target); the TS builder's `rel.manyToMany` lowering as the parity reference.
 - **Hands to:** PSL emits navigable M:N relations.
-- **Focus:** `psl-relation-resolution.ts` + the PSL→RelationNode lowering; the `PSL_ORPHANED_BACKRELATION_LIST` diagnostic (relax when a junction is recognised, without regressing legitimate explicit-junction 1:N use).
+- **Focus:** `psl-relation-resolution.ts` + the PSL→RelationNode lowering; the `PSL_ORPHANED_BACKRELATION` diagnostic (relax when a junction is recognised, without regressing legitimate explicit-junction 1:N use).
 
 ### Dispatch 2: PSL M:N fixture + ORM-API parity tests
 

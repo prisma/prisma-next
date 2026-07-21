@@ -1,3 +1,5 @@
+import pluralizeLib from 'pluralize';
+
 const PSL_RESERVED_WORDS = new Set(['model', 'enum', 'types', 'type', 'generator', 'datasource']);
 
 const IDENTIFIER_PART_PATTERN = /[A-Za-z0-9]+/g;
@@ -143,19 +145,7 @@ export function toEnumMemberName(value: string): string {
 }
 
 export function pluralize(word: string): string {
-  if (
-    word.endsWith('s') ||
-    word.endsWith('x') ||
-    word.endsWith('z') ||
-    word.endsWith('ch') ||
-    word.endsWith('sh')
-  ) {
-    return `${word}es`;
-  }
-  if (word.endsWith('y') && !/[aeiou]y$/i.test(word)) {
-    return `${word.slice(0, -1)}ies`;
-  }
-  return `${word}s`;
+  return pluralizeLib.plural(word);
 }
 
 export function deriveRelationFieldName(

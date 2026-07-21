@@ -6,7 +6,7 @@ _Parent project: `projects/sql-orm-many-to-many/`. Linear: [TML-2794](https://li
 
 ## At a glance
 
-PSL can't author a navigable M:N relation. The PSL relation resolver emits only `cardinality:'N:1'`/`'1:N'`; `'N:M'` + `through` comes only from the TS builder (`rel.manyToMany`). PSL routes M:N to explicit junction models (`PSL_ORPHANED_BACKRELATION_LIST`). This slice teaches PSL to lower a junction to a navigable `N:M` + `through`, so PSL-authored schemas get the same M:N ORM API (and the PG demo, slice 6, becomes possible).
+PSL can't author a navigable M:N relation. The PSL relation resolver emits only `cardinality:'N:1'`/`'1:N'`; `'N:M'` + `through` comes only from the TS builder (`rel.manyToMany`). PSL routes M:N to explicit junction models (`PSL_ORPHANED_BACKRELATION`). This slice teaches PSL to lower a junction to a navigable `N:M` + `through`, so PSL-authored schemas get the same M:N ORM API (and the PG demo, slice 6, becomes possible).
 
 ## Chosen design (intent — to be firmed at pickup)
 
@@ -15,7 +15,7 @@ Teach the PSL interpreter / lowering to recognise a many-to-many shape and emit 
 1. **Explicit junction model** — an `@@id([a, b])` join model with two FK relations (the shape PSL currently emits as three `1:N`/`N:1` relations) is recognised and *additionally* surfaced as a navigable `N:M` on each side. Lowest-magic; matches what the diagnostic already steers authors toward.
 2. **Prisma-style implicit list** — `tags Tag[]` / `posts Post[]` with no explicit junction, lowered to an implicit junction table. More ergonomic, more interpreter work.
 
-Primary surface: `packages/2-sql/2-authoring/contract-psl/src/psl-relation-resolution.ts` (today emits `N:1` at ~line 255, `1:N` at ~line 322 — no `N:M`/`through`) + the PSL→RelationNode lowering + the `PSL_ORPHANED_BACKRELATION_LIST` diagnostic (relax/replace when the junction is recognised).
+Primary surface: `packages/2-sql/2-authoring/contract-psl/src/psl-relation-resolution.ts` (today emits `N:1` at ~line 255, `1:N` at ~line 322 — no `N:M`/`through`) + the PSL→RelationNode lowering + the `PSL_ORPHANED_BACKRELATION` diagnostic (relax/replace when the junction is recognised).
 
 ## Scope
 
@@ -29,7 +29,7 @@ Primary surface: `packages/2-sql/2-authoring/contract-psl/src/psl-relation-resol
 |---|---|
 | Composite-key junctions | `through.{parentColumns,childColumns,targetColumns}` are arrays — lowering must handle multi-column FKs (parity with the TS builder) |
 | Self-referential M:N (e.g. User↔User followers) | confirm the lowering handles same-model both-sides |
-| Existing `PSL_ORPHANED_BACKRELATION_LIST` consumers | relaxing the diagnostic must not regress schemas that legitimately want explicit-junction 1:N modelling |
+| Existing `PSL_ORPHANED_BACKRELATION` consumers | relaxing the diagnostic must not regress schemas that legitimately want explicit-junction 1:N modelling |
 
 ## Slice-specific done conditions
 

@@ -17,6 +17,7 @@ import {
   pgBoolDescriptor,
   pgByteaDescriptor,
   pgCharDescriptor,
+  pgDateDescriptor,
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgFloatDescriptor,
@@ -60,6 +61,7 @@ const descriptorByScalar = {
   float4: pgFloat4Descriptor,
   float8: pgFloat8Descriptor,
   numeric: pgNumericDescriptor,
+  date: pgDateDescriptor,
   timestamp: pgTimestampDescriptor,
   timestamptz: pgTimestamptzDescriptor,
   time: pgTimeDescriptor,
@@ -93,6 +95,7 @@ describe('adapter-postgres codecs', () => {
       'char',
       'character',
       'character varying',
+      'date',
       'double precision',
       'float',
       'float4',
@@ -286,6 +289,22 @@ describe('adapter-postgres codecs', () => {
 
     it('decodes number to string', async () => {
       expect(await numericCodec.decode(42, {})).toBe('42');
+    });
+  });
+
+  describe('date codec', () => {
+    const dateCodec = codecForScalar('date') as {
+      encode: (value: Date, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: Date, ctx: SqlCodecCallContext) => Promise<Date>;
+    };
+
+    it('encodes a Date as its UTC calendar date, not the pg driver Date auto-conversion', async () => {
+      expect(await dateCodec.encode(new Date(Date.UTC(2024, 0, 15)), {})).toBe('2024-01-15');
+    });
+
+    it('decodes the driver local-midnight Date to the equivalent UTC-midnight instant', async () => {
+      const decoded = await dateCodec.decode(new Date(2024, 0, 15), {});
+      expect(decoded.getTime()).toBe(Date.UTC(2024, 0, 15));
     });
   });
 
@@ -600,6 +619,13 @@ describe('adapter-postgres codecs', () => {
     it('resolves pgInetDescriptor by codec id from the registry', () => {
       const resolved = postgresCodecRegistry.descriptorFor('pg/inet@1');
       expect(resolved).toBe(pgInetDescriptor);
+    });
+  });
+
+  describe('pg/date@1 registry resolution', () => {
+    it('resolves pgDateDescriptor by codec id from the registry', () => {
+      const resolved = postgresCodecRegistry.descriptorFor('pg/date@1');
+      expect(resolved).toBe(pgDateDescriptor);
     });
   });
 

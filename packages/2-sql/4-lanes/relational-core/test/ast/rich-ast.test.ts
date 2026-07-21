@@ -172,7 +172,7 @@ describe('rich SQL AST', () => {
     expect(rewritten.limit).toBe(99);
     expect(rewritten.projection[0]?.expr).toEqual(ColumnRef.of('member', 'id'));
     expect(rewritten.projection[1]?.expr?.kind).toBe('operation');
-    expect((rewritten.projection[1]?.expr as OperationExpr).args[0]).toEqual(
+    expect((rewritten.projection[1]!.expr as OperationExpr).args[0]).toEqual(
       ParamRef.of(10, { name: 'email', codec: { codecId: 'pg/text@1' } }),
     );
     expect(rewritten.joins?.[0]?.on).toEqual(
@@ -182,7 +182,7 @@ describe('rich SQL AST', () => {
       ),
     );
     expect(
-      ((rewritten.joins?.[0]?.source as DerivedTableSource).query.where as BinaryExpr).right,
+      ((rewritten.joins![0]!.source as DerivedTableSource).query.where as BinaryExpr).right,
     ).toEqual(LiteralExpr.of('TRUE'));
   });
 

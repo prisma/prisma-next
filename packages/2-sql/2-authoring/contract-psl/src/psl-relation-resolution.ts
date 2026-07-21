@@ -62,6 +62,8 @@ export type ModelBackrelationCandidate = {
   readonly tableName: string;
   readonly field: FieldSymbol;
   readonly targetModelName: string;
+  /** Whether the PSL field itself is list-typed (`Target[]`) rather than singular (`Target?`). A singular candidate is the back side of a 1:1 relation and can never be many-to-many. */
+  readonly isList: boolean;
   readonly relationName?: string;
 };
 
@@ -453,35 +455,39 @@ export function applyBackrelationCandidates(input: {
       : [...pairMatches];
 
     if (matches.length === 0) {
-      const { pairs: junctionPairs, nearMisses } = findJunctionFkPairs({
-        candidate,
-        fkRelationsByDeclaringModel: input.fkRelationsByDeclaringModel,
-        modelIdColumns: input.modelIdColumns,
-      });
-      const junctionPair = junctionPairs[0];
-      if (junctionPairs.length === 1 && junctionPair) {
-        relationsForModel(input.modelRelations, candidate.modelName).push(
-          manyToManyRelationNode(candidate, junctionPair),
-        );
-        continue;
-      }
-      if (junctionPairs.length > 1) {
-        input.diagnostics.push({
-          code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
-          message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple junction FK pairs for a many-to-many relation. Add @relation(name: "...") (or @relation("...")) to the list field and the junction FK-side relation pointing back at "${candidate.modelName}" to disambiguate.`,
-          sourceId: input.sourceId,
-          span: candidate.field.span,
+      // A singular candidate is the back side of a 1:1 — many-to-many junction
+      // matching only makes sense for a list-typed backrelation.
+      if (candidate.isList) {
+        const { pairs: junctionPairs, nearMisses } = findJunctionFkPairs({
+          candidate,
+          fkRelationsByDeclaringModel: input.fkRelationsByDeclaringModel,
+          modelIdColumns: input.modelIdColumns,
         });
-        continue;
-      }
-      const nearMiss = nearMisses[0];
-      if (nearMiss) {
-        input.diagnostics.push(junctionNearMissDiagnostic(candidate, nearMiss, input.sourceId));
-        continue;
+        const junctionPair = junctionPairs[0];
+        if (junctionPairs.length === 1 && junctionPair) {
+          relationsForModel(input.modelRelations, candidate.modelName).push(
+            manyToManyRelationNode(candidate, junctionPair),
+          );
+          continue;
+        }
+        if (junctionPairs.length > 1) {
+          input.diagnostics.push({
+            code: 'PSL_AMBIGUOUS_BACKRELATION',
+            message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple junction FK pairs for a many-to-many relation. Add @relation(name: "...") (or @relation("...")) to the list field and the junction FK-side relation pointing back at "${candidate.modelName}" to disambiguate.`,
+            sourceId: input.sourceId,
+            span: candidate.field.span,
+          });
+          continue;
+        }
+        const nearMiss = nearMisses[0];
+        if (nearMiss) {
+          input.diagnostics.push(junctionNearMissDiagnostic(candidate, nearMiss, input.sourceId));
+          continue;
+        }
       }
       input.diagnostics.push({
-        code: 'PSL_ORPHANED_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
+        code: 'PSL_ORPHANED_BACKRELATION',
+        message: `Backrelation field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation${candidate.isList ? ' or use an explicit join model for many-to-many' : ''}.`,
         sourceId: input.sourceId,
         span: candidate.field.span,
       });
@@ -489,8 +495,8 @@ export function applyBackrelationCandidates(input: {
     }
     if (matches.length > 1) {
       input.diagnostics.push({
-        code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation(name: "...") (or @relation("...")) to both sides to disambiguate.`,
+        code: 'PSL_AMBIGUOUS_BACKRELATION',
+        message: `Backrelation field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation(name: "...") (or @relation("...")) to both sides to disambiguate.`,
         sourceId: input.sourceId,
         span: candidate.field.span,
       });
@@ -506,7 +512,7 @@ export function applyBackrelationCandidates(input: {
       toModel: matched.declaringModelName,
       toTable: matched.declaringTableName,
       ...ifDefined('toNamespaceId', matched.declaringNamespaceId),
-      cardinality: '1:N',
+      cardinality: candidate.isList ? '1:N' : '1:1',
       on: {
         parentTable: candidate.tableName,
         parentColumns: matched.referencedColumns,
@@ -517,7 +523,7 @@ export function applyBackrelationCandidates(input: {
   }
 }
 
-export function validateNavigationListFieldAttributes(input: {
+export function validateBackrelationFieldAttributes(input: {
   readonly modelName: string;
   readonly field: FieldSymbol;
   readonly sourceId: string;

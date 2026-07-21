@@ -27,7 +27,8 @@
     "@prisma-next/sql-runtime": "workspace:0.15.0",
     "@prisma-next/sql-schema-ir": "workspace:0.15.0",
     "@prisma-next/utils": "workspace:0.15.0",
-    "arktype": "^2.2.2"
+    "arktype": "^2.2.2",
+    "pluralize": "^8.0.0"
   },
   "devDependencies": {
     "@prisma-next/driver-postgres": "workspace:0.15.0",
@@ -37,6 +38,7 @@
     "@prisma-next/test-utils": "workspace:0.15.0",
     "@prisma-next/tsconfig": "workspace:0.15.0",
     "@prisma-next/tsdown": "workspace:0.15.0",
+    "@types/pluralize": "^0.0.33",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

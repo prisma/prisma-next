@@ -158,7 +158,7 @@ describe('CfExprSelectQuery.join — inner join surface', () => {
     const join = ast.joins?.[0];
     expect(join?.joinType).toBe('inner');
     expect(join?.lateral).toBe(false);
-    expect((join?.source as TableSource).alias).toBe('n');
+    expect((join!.source as TableSource).alias).toBe('n');
     expect(join?.on).toBe(on.ast);
   });
 
@@ -176,8 +176,8 @@ describe('CfExprSelectQuery.join — inner join surface', () => {
       .project('one', cfExpr.lit(1))
       .build();
     expect(ast.joins).toHaveLength(2);
-    expect((ast.joins?.[0]?.source as TableSource).name).toBe('pg_class');
-    expect((ast.joins?.[1]?.source as TableSource).name).toBe('pg_namespace');
+    expect((ast.joins![0]!.source as TableSource).name).toBe('pg_class');
+    expect((ast.joins![1]!.source as TableSource).name).toBe('pg_namespace');
   });
 
   it('leftJoin adds a LEFT JOIN with an expression ON clause', () => {
@@ -192,7 +192,7 @@ describe('CfExprSelectQuery.join — inner join surface', () => {
     const join = ast.joins?.[0];
     expect(join?.joinType).toBe('left');
     expect(join?.lateral).toBe(false);
-    expect((join?.source as TableSource).alias).toBe('c2');
+    expect((join!.source as TableSource).alias).toBe('c2');
     expect(join?.on).toBe(on.ast);
   });
 

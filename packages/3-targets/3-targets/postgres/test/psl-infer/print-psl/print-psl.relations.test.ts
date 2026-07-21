@@ -487,8 +487,8 @@ describe('printPsl', () => {
       // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Parent {
-        id     Int     @id
-        childs Child[]
+        id       Int     @id
+        children Child[]
 
         @@map("parent")
       }
