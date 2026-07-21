@@ -21,7 +21,9 @@ import {
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import { resolvePolymorphismInfo, resolvePrimaryKeyColumn } from './collection-contract';
+import { ormError } from './orm-errors';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { storageTableForContract, tableSourceForContract } from './storage-resolution';
 import { combineWhereExprs } from './where-utils';
@@ -60,7 +62,9 @@ function toParamAssignments(
 
   for (const [column, value] of Object.entries(values)) {
     if (!table.columns[column]) {
-      throw new Error(`Unknown column "${column}" in table "${tableName}"`);
+      throw ormError('ORM.COLUMN_UNKNOWN', `Unknown column "${column}" in table "${tableName}"`, {
+        meta: { namespaceId, tableName, column },
+      });
     }
     const codec = codecRefForStorageColumn(contract.storage, namespaceId, tableName, column);
     assignments[column] = ParamRef.of(value, {
@@ -81,7 +85,7 @@ function normalizeInsertRows(
   readonly rows: ReadonlyArray<Record<string, ParamRef | DefaultValueExpr>>;
 } {
   if (rows.length === 0) {
-    throw new Error('normalizeInsertRows requires at least one row');
+    throw new InternalError('normalizeInsertRows requires at least one row');
   }
 
   const orderedColumns: string[] = [];
@@ -108,7 +112,11 @@ function normalizeInsertRows(
     for (const column of orderedColumns) {
       if (Object.hasOwn(row, column)) {
         if (!table.columns[column]) {
-          throw new Error(`Unknown column "${column}" in table "${tableName}"`);
+          throw ormError(
+            'ORM.COLUMN_UNKNOWN',
+            `Unknown column "${column}" in table "${tableName}"`,
+            { meta: { namespaceId, tableName, column } },
+          );
         }
         const codec = codecRefForStorageColumn(contract.storage, namespaceId, tableName, column);
         normalizedRow[column] = ParamRef.of(row[column], {
@@ -264,7 +272,9 @@ export function compileInsertReturningSplit(
   returningColumns: readonly string[] | undefined,
 ): ReadonlyArray<SqlQueryPlan<Record<string, unknown>>> {
   if (rows.length === 0) {
-    throw new Error('create() requires at least one row');
+    throw ormError('ORM.MUTATION_DATA_MISSING', 'create() requires at least one row', {
+      meta: { method: 'create', namespaceId, tableName },
+    });
   }
   return groupRowsByColumnSignature(rows).map((group) =>
     compileInsertReturning(contract, namespaceId, tableName, group, returningColumns),
@@ -278,7 +288,9 @@ export function compileInsertCountSplit(
   rows: readonly Record<string, unknown>[],
 ): ReadonlyArray<SqlQueryPlan<Record<string, unknown>>> {
   if (rows.length === 0) {
-    throw new Error('createCount() requires at least one row');
+    throw ormError('ORM.MUTATION_DATA_MISSING', 'createCount() requires at least one row', {
+      meta: { method: 'createCount', namespaceId, tableName },
+    });
   }
   return groupRowsByColumnSignature(rows).map((group) =>
     compileInsertCount(contract, namespaceId, tableName, group),

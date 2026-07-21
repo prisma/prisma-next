@@ -27,6 +27,7 @@ import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { assertNever, InternalError } from '@prisma-next/utils/internal-error';
 import {
   getCompleteColumnToFieldMap,
   getFieldToColumnMap,
@@ -35,6 +36,7 @@ import {
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
 } from './collection-contract';
+import { ormError } from './orm-errors';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { augmentSelectionForJoinColumns } from './selection-shaping';
 import { tableSourceForContract } from './storage-resolution';
@@ -236,7 +238,13 @@ function buildCursorWhere(
     const column = order.expr.column;
     const value = cursor[column];
     if (value === undefined) {
-      throw new Error(`Missing cursor value for orderBy column "${column}"`);
+      throw ormError(
+        'ORM.CURSOR_VALUE_MISSING',
+        `Missing cursor value for orderBy column "${column}"`,
+        {
+          meta: { column },
+        },
+      );
     }
     entries.push({
       column,
@@ -325,7 +333,7 @@ function buildIncludeOrderArtifacts(
   const aggregateOrderBy = hiddenOrderProjection.map((projection, index) => {
     const orderItem = childOrderBy[index];
     if (!orderItem) {
-      throw new Error(`Missing include order metadata at index ${index}`);
+      throw new InternalError(`Missing include order metadata at index ${index}`);
     }
     return new OrderByItem(ColumnRef.of(rowAlias, projection.alias), orderItem.dir);
   });
@@ -964,7 +972,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   // the partition expression list below is well-typed without a cast.
   const distinctColumns = childState.distinct;
   if (distinctColumns === undefined || distinctColumns.length === 0) {
-    throw new Error(
+    throw new InternalError(
       'buildDistinctNonLeafChildRowsSelect requires a non-empty `distinct` selection',
     );
   }
@@ -1240,7 +1248,13 @@ function buildIncludeAggregateExpr(
     return AggregateExpr.count();
   }
   if (scalar.column === undefined) {
-    throw new Error(`Aggregate selector "${scalar.fn}" requires a column`);
+    throw ormError(
+      'ORM.AGGREGATE_SELECTOR_INVALID',
+      `Aggregate selector "${scalar.fn}" requires a column`,
+      {
+        meta: { fn: scalar.fn },
+      },
+    );
   }
   const columnRef = ColumnRef.of(childTableRef, scalar.column);
   switch (scalar.fn) {
@@ -1253,7 +1267,7 @@ function buildIncludeAggregateExpr(
     case 'max':
       return AggregateExpr.max(columnRef);
     default:
-      throw new Error(`Unsupported aggregate selector: ${scalar.fn satisfies never}`);
+      return assertNever(scalar.fn);
   }
 }
 
@@ -1284,7 +1298,13 @@ function buildIncludeChildCombineSelect(
 ): SelectAst {
   const branchEntries = Object.entries(branches);
   if (branchEntries.length === 0) {
-    throw new Error(`combine() include "${include.relationName}" has no branches`);
+    throw ormError(
+      'ORM.INCLUDE_INVALID',
+      `combine() include "${include.relationName}" has no branches`,
+      {
+        meta: { relation: include.relationName },
+      },
+    );
   }
 
   const compiledBranches = branchEntries.map(([name, branch]) => ({
@@ -1303,7 +1323,7 @@ function buildIncludeChildCombineSelect(
   if (!firstBranch) {
     // Unreachable given the empty-branches guard above; keeps the
     // type-narrowing honest for the destructuring read below.
-    throw new Error(`combine() include "${include.relationName}" has no branches`);
+    throw new InternalError(`combine() include "${include.relationName}" has no branches`);
   }
 
   const joins = restBranches.map((branch) =>
@@ -1490,7 +1510,7 @@ function buildTopLevelDistinctRankedInner(
 ): SelectAst {
   const distinctColumns = state.distinct;
   if (distinctColumns === undefined || distinctColumns.length === 0) {
-    throw new Error('buildTopLevelDistinctRankedInner called without `state.distinct`');
+    throw new InternalError('buildTopLevelDistinctRankedInner called without `state.distinct`');
   }
   // Project every column of the underlying table so outer references
   // (projection, joins, includes' correlations, orderBy) resolve

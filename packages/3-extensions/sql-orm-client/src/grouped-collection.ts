@@ -19,6 +19,7 @@ import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder
 import { getFieldToColumnMap } from './collection-contract';
 import { mapStorageRowToModelFields } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
+import { ormError } from './orm-errors';
 import { compileGroupedAggregate, mergeAnnotations } from './query-plan';
 import type {
   AggregateBuilder,
@@ -114,12 +115,20 @@ export class GroupedCollection<
     );
     const aggregateEntries = Object.entries(aggregateSpec);
     if (aggregateEntries.length === 0) {
-      throw new Error('groupBy().aggregate() requires at least one aggregation selector');
+      throw ormError(
+        'ORM.AGGREGATE_SELECTOR_MISSING',
+        'groupBy().aggregate() requires at least one aggregation selector',
+        { meta: { method: 'groupBy.aggregate', model: this.modelName } },
+      );
     }
 
     for (const [alias, selector] of aggregateEntries) {
       if (!isAggregateSelector(selector)) {
-        throw new Error(`groupBy().aggregate() selector "${alias}" is invalid`);
+        throw ormError(
+          'ORM.AGGREGATE_SELECTOR_INVALID',
+          `groupBy().aggregate() selector "${alias}" is invalid`,
+          { meta: { method: 'groupBy.aggregate', model: this.modelName, alias } },
+        );
       }
     }
 
