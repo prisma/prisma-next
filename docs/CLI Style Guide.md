@@ -90,7 +90,7 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
   - Why: one line cause
   - Fix: one line next step
   - Where: `file:line` when applicable
-  - More: hint to rerun with `-v`/`--trace`; docs link by code (`docs.prisma.io/docs/orm/next/error-codes#<CODE>`)
+  - More: hint to rerun with `-v`/`--trace`; docs link by code (`docs.prisma.io/docs/orm/next/reference/error-reference#<CODE>`)
 - JSON schema (single object): `{ code, severity, summary, why, fix, where: { path, line }, meta, docsUrl }`.
 - Exit code: a structured failure exits `2` (precondition; see [Exit Codes](#exit-codes)), except a user-declined prompt which exits `3`. Only an internal bug or uncaught error exits `1`.
 - **Missing-input failures**: when a command fails because required flags are missing in non-interactive mode, the envelope MUST set `meta.missingFlags: string[]` listing each missing flag's long form (e.g. `["--target", "--authoring"]`) so callers can react programmatically. The `fix:` text SHOULD list the same flags in canonical CLI form, copy-pasteable.
