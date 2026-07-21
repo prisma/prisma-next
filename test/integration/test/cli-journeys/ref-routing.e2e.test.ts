@@ -99,7 +99,7 @@ withTempDir(({ createTempDir }) => {
 
         // N.01: apply --ref production fails (DB at C2, ref at C1, no backward edge)
         const applyProdFail = await runMigrate(ctx, ['--to', 'production', '--json']);
-        expect(applyProdFail.exitCode, 'N.01: apply --ref production fails').toBe(1);
+        expect(applyProdFail.exitCode, 'N.01: apply --ref production fails').toBe(2);
 
         // N.02: status --ref production reports ahead-of-ref condition
         const statusProdAfter = await runMigrationStatus(ctx, ['--to', 'production', '--json']);

@@ -150,7 +150,7 @@ describe('emit command', () => {
 
       const parsed = JSON.parse(errorOutput);
       expect(parsed).toMatchObject({
-        code: expect.stringMatching(/^PN-CLI-/),
+        code: 'CONFIG.CONTRACT_MISSING',
         summary: expect.any(String),
         why: expect.any(String),
         fix: expect.any(String),
