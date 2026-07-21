@@ -20,7 +20,7 @@ import { runContractSpaceSeedPhase } from '../../src/utils/contract-space-seed-p
  * property that they accept a Mongo-shaped contract cleanly.
  *
  * The seed phase canonicalises any `unknown` contract value to JSON
- * via `emitContractSpaceArtefacts`, and the `.d.ts` it emits is a
+ * via `emitContractSpaceArtifacts`, and the `.d.ts` it emits is a
  * framework-wide placeholder stub (a typed `.d.ts` renderer for
  * extension contracts is a separately-tracked concern). The
  * Mongo-shape input here is structural; no Mongo-family runtime
@@ -40,7 +40,7 @@ import { runContractSpaceSeedPhase } from '../../src/utils/contract-space-seed-p
  *   `readContractSpaceHeadRef`, `listContractSpaceDirectories` round-trip
  *   the written values.
  * - Re-running the seed phase with no contract change produces
- *   byte-identical artefacts.
+ *   byte-identical artifacts.
  */
 
 const EXT_SPACE = 'cipherstash';
@@ -187,7 +187,7 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
     });
   });
 
-  it('re-emits byte-identical artefacts on a no-op re-seed', async () => {
+  it('re-emits byte-identical artifacts on a no-op re-seed', async () => {
     const contract = buildMongoExtensionContract();
     const headHash = contract.storage.storageHash;
     const invariants = ['inv:a', 'inv:b'] as const;

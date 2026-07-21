@@ -12,8 +12,8 @@
  *
  * Layers of coverage:
  *
- *   1. **Pinned per-space artefacts on disk.** After
- *      `emitContractSpaceArtefacts` runs for both extension spaces, the
+ *   1. **Pinned per-space artifacts on disk.** After
+ *      `emitContractSpaceArtifacts` runs for both extension spaces, the
  *      consuming app's repo carries `migrations/audit/{contract.json,
  *      contract.d.ts, refs/head.json}` and the same triple under
  *      `migrations/feature-flags/`.
@@ -51,7 +51,7 @@
  * (now-deleted) per-package `contract.ts` / `migrations.ts` modules —
  * each internal package now authors via the on-disk
  * `prisma-next contract emit` / `prisma-next migration plan` pipeline,
- * and the descriptor is the canonical reader of those artefacts.
+ * and the descriptor is the canonical reader of those artifacts.
  */
 
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -67,7 +67,7 @@ import {
   type MigrationPackage,
 } from '@prisma-next/framework-components/control';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
@@ -166,7 +166,7 @@ async function setupTestProject(): Promise<TestProject> {
   const migrationsDir = join(projectRoot, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  await emitContractSpaceArtefacts(migrationsDir, AUDIT_SPACE_ID, {
+  await emitContractSpaceArtifacts(migrationsDir, AUDIT_SPACE_ID, {
     contract: auditContract,
     contractDts: '// rendered .d.ts for audit contract space\nexport interface Contract {}\n',
     headRef: { hash: auditHeadRef.hash, invariants: [...auditHeadRef.invariants] },
@@ -174,7 +174,7 @@ async function setupTestProject(): Promise<TestProject> {
   const auditSpaceDir = join(migrationsDir, AUDIT_SPACE_ID);
   await materialiseMigrationPackage(auditSpaceDir, auditBaselineMigration);
 
-  await emitContractSpaceArtefacts(migrationsDir, FEATURE_FLAGS_SPACE_ID, {
+  await emitContractSpaceArtifacts(migrationsDir, FEATURE_FLAGS_SPACE_ID, {
     contract: featureFlagsContract,
     contractDts:
       '// rendered .d.ts for feature-flags contract space\nexport interface Contract {}\n',
@@ -222,7 +222,7 @@ describe.sequential('multi-extension-monorepo end-to-end (PGlite)', {
     }
   }, timeouts.spinUpPpgDev);
 
-  it('pinned per-space artefacts land for both extension spaces', async () => {
+  it('pinned per-space artifacts land for both extension spaces', async () => {
     project = await setupTestProject();
 
     const auditHeadJson = JSON.parse(

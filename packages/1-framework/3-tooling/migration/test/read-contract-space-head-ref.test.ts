@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { emitContractSpaceArtefacts } from '../src/emit-contract-space-artefacts';
+import { emitContractSpaceArtifacts } from '../src/emit-contract-space-artifacts';
 import { MigrationToolsError } from '../src/errors';
 import { readContractSpaceHeadRef } from '../src/read-contract-space-head-ref';
 import { APP_SPACE_ID } from '../src/space-layout';
@@ -28,10 +28,10 @@ describe('readContractSpaceHeadRef', () => {
     expect(await readContractSpaceHeadRef(missing, 'cipherstash')).toBeNull();
   });
 
-  it('round-trips with emitContractSpaceArtefacts', async () => {
+  it('round-trips with emitContractSpaceArtifacts', async () => {
     const hash = `sha256:${'0'.repeat(63)}1`;
     const invariants = ['inv-2', 'inv-1', 'inv-3'];
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
       contract: { storage: { storageHash: hash }, foo: 1 },
       contractDts: '\n',
       headRef: { hash, invariants },
@@ -44,7 +44,7 @@ describe('readContractSpaceHeadRef', () => {
 
   it('round-trips for the app space (uniform with extensions)', async () => {
     const hash = `sha256:${'a'.repeat(64)}`;
-    await emitContractSpaceArtefacts(migrationsDir, APP_SPACE_ID, {
+    await emitContractSpaceArtifacts(migrationsDir, APP_SPACE_ID, {
       contract: { storage: { storageHash: hash } },
       contractDts: '\n',
       headRef: { hash, invariants: [] },

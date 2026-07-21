@@ -126,7 +126,7 @@ describe('loadContractSpaceAggregate', () => {
     it('reads head ref from disk when space has no packages', async () => {
       const extContract = sqlContractWithTables({ tables: ['ext_table'] });
       const headHash = extContract.storage.storageHash;
-      // Write the space artefacts including head.json (as emitContractSpaceArtefacts does).
+      // Write the space artifacts including head.json (as emitContractSpaceArtifacts does).
       await writeContractSnapshotEntry(headHash, extContract);
       await writeHeadRef('supabase', { hash: headHash, invariants: [] });
 

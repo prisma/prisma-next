@@ -6,7 +6,7 @@ import type { ContractSpaceHeadRef } from './read-contract-space-head-ref';
 import { assertValidSpaceId, spaceRefsDirectory } from './space-layout';
 
 /**
- * Inputs for {@link emitContractSpaceArtefacts}.
+ * Inputs for {@link emitContractSpaceArtifacts}.
  *
  * - `contract` is the canonical contract value the framework just emitted
  *   for the space; it is serialised through {@link canonicalizeJson}, so
@@ -25,14 +25,14 @@ import { assertValidSpaceId, spaceRefsDirectory } from './space-layout';
  *   callers passing the same set in different orders produce
  *   byte-identical `refs/head.json`.
  */
-export interface ContractSpaceArtefactInputs {
+export interface ContractSpaceArtifactInputs {
   readonly contract: unknown;
   readonly contractDts: string;
   readonly headRef: ContractSpaceHeadRef;
 }
 
 /**
- * Emit the per-space artefacts — the head contract snapshot (written into
+ * Emit the per-space artifacts — the head contract snapshot (written into
  * the migrations-root-wide `snapshots/` store, keyed by `headRef.hash`) and
  * `refs/head.json` — under `<projectMigrationsDir>/<spaceId>/`.
  *
@@ -54,10 +54,10 @@ export interface ContractSpaceArtefactInputs {
  * The migrations directory and space subdirectory are created if they
  * do not yet exist (`mkdir { recursive: true }`).
  */
-export async function emitContractSpaceArtefacts(
+export async function emitContractSpaceArtifacts(
   projectMigrationsDir: string,
   spaceId: string,
-  inputs: ContractSpaceArtefactInputs,
+  inputs: ContractSpaceArtifactInputs,
 ): Promise<void> {
   assertValidSpaceId(spaceId);
 

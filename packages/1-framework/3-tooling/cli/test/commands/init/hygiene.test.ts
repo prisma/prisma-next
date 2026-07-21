@@ -81,7 +81,7 @@ describe('requiredGitattributesLines (FR3.4)', () => {
     expect(lines).toContain('src/prisma/contract.d.ts linguist-generated');
   });
 
-  it('includes forward-looking artefacts (Decision 5)', () => {
+  it('includes forward-looking artifacts (Decision 5)', () => {
     const lines = requiredGitattributesLines('prisma', 'postgres');
     expect(lines).toContain('prisma/ops.json linguist-generated');
     expect(lines).toContain('prisma/migration.json linguist-generated');

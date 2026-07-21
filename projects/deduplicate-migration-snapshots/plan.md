@@ -17,7 +17,7 @@ dispatch and returns to the orchestrator — it is never silently reinterpreted.
 | TC4 | All three renderers emit store specifiers (end always; start when `from !== null`); baseline emits no start imports; `from === to` renders a compilable merged import with both `End`/`Start` aliases (E4). | Update `render-typescript.test.ts` ×3; new `from === to` case ×3. |
 | TC5 | `DataTransformCall.importRequirements()` no longer declares a contract import; rendered migration with a data transform compiles with exactly one `endContract` import (E2). | Update `op-factory-call.rendering.test.ts`, `op-factory-call.lowering.test.ts`; postgres render-typescript roundtrip. |
 | TC6 | `migration plan` / `migration new`: package dir gets only `migration.ts` + `migration.json` + `ops.json`; store entries created; second run `{written:false}` idempotent (AC5); predecessor `fromContract` read from store; missing predecessor entry → structured error (AC7/TC-E8). | Update `migration-plan-command.test.ts`, migration-new tests. |
-| TC7 | Seed phase writes store entry keyed by `headRef.hash`; writes no per-space `contract.json`/`contract.d.ts`; `refs/head.json` unchanged (AC2/AC8). | Update seed-phase + `emit-contract-space-artefacts` tests, `loader.test.ts`, `contract-space-seed-phase.mongo.test.ts`. |
+| TC7 | Seed phase writes store entry keyed by `headRef.hash`; writes no per-space `contract.json`/`contract.d.ts`; `refs/head.json` unchanged (AC2/AC8). | Update seed-phase + `emit-contract-space-artifacts` tests, `loader.test.ts`, `contract-space-seed-phase.mongo.test.ts`. |
 | TC8 | Aggregate loader resolves extension-space head through the store; unreadable/missing store entry surfaces as the existing `contractUnreadable` integrity problem. | Update `loader.test.ts`, `contract-space-aggregate-loader.ac15.test.ts`. |
 | TC9 | `readMigrationPackage(dir, {migrationsDir})` populates `endContractJson` from the store (tolerant); `resolve-recorded-path` still maps it to `destinationContractJson` (ledger upsert unchanged). | Update `io.test.ts`, `resolve-recorded-path.test.ts`, `contract-at.test.ts`. |
 | TC10 | `db sign` / `db update` / ref advancement / `migration check` read through the store; CHECK-005 fires on store-vs-manifest drift; absent entry tolerated by `check`. | Update `ref.test.ts`, db-update goldens, migration-check e2e journey. |
@@ -79,7 +79,7 @@ change that moves them.
 - Rewire per spec D5: store writes for destination/baseline/ref-snapshot legs,
   predecessor copy blocks deleted, `fromContract` from
   `readContractSnapshotJson`, `emptyMigration` options updated,
-  `snapshotsImportPathFrom` threaded, `emit-contract-space-artefacts` writes
+  `snapshotsImportPathFrom` threaded, `emit-contract-space-artifacts` writes
   the store + `refs/head.json` only.
 - Update `migration-plan-command.test.ts`, migration-new tests, seed-phase
   tests (TC6, TC7).

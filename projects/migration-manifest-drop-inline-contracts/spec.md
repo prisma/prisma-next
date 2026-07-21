@@ -117,7 +117,7 @@ Regenerate the committed manifests by running each migration's `migration.ts` (s
 - Redesigning predecessor-contract storage (e.g. a content-addressed `contracts/` directory). The current sibling-file convention stays.
 - Defining a general backwards-compatibility policy. Tracked under [TML-2515](https://linear.app/prisma-company/issue/TML-2515).
 - Changes to `start-contract.json` / `end-contract.json` / `*.d.ts` emission. Those continue to be written exactly as today; they remain a convenience for typed access inside `migration.ts` and the predecessor-contract source for `migration plan`.
-- Changes to the per-space root `migrations/<space-id>/contract.json` (the head contract written by `emitContractSpaceArtefacts`). Unaffected.
+- Changes to the per-space root `migrations/<space-id>/contract.json` (the head contract written by `emitContractSpaceArtifacts`). Unaffected.
 - Any change to the hash function or its inputs. Already storage-only; nothing to alter.
 
 ## Open questions

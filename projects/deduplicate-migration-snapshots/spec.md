@@ -324,8 +324,8 @@ start-contract copy block including its bespoke ENOENT → `errorFileNotFound`
 wrapper (216-238) is deleted (the planner in `migration new` needs the
 predecessor value the same way: `readContractSnapshotJson`).
 
-`contract-space-seed-phase.ts` / `emit-contract-space-artefacts.ts`
-(`packages/1-framework/3-tooling/migration/src/emit-contract-space-artefacts.ts`):
+`contract-space-seed-phase.ts` / `emit-contract-space-artifacts.ts`
+(`packages/1-framework/3-tooling/migration/src/emit-contract-space-artifacts.ts`):
 
 - Remove the `contract.json` and `contract.d.ts` writes.
 - Add `writeContractSnapshot(projectMigrationsDir, inputs.headRef.hash, { contractJson: inputs.contract, contractDts: inputs.contractDts })`.
@@ -397,7 +397,7 @@ single place that covers all, documenting which in the PR).
 
 - `cli/src/commands/init/hygiene-gitattributes.ts`: remove `end-contract.json`,
   `end-contract.d.ts`, `start-contract.json`, `start-contract.d.ts` from
-  `ARTEFACT_FILENAMES`; add migrations-rooted glob lines
+  `ARTIFACT_FILENAMES`; add migrations-rooted glob lines
   `migrations/snapshots/**/contract.json linguist-generated` and
   `migrations/snapshots/**/contract.d.ts linguist-generated` (the existing
   bare-filename entries are schema-dir-relative and do not match the store).
@@ -408,7 +408,7 @@ single place that covers all, documenting which in the PR).
   `start-contract.*`/`end-contract.*` from the cleanup list; add the
   `snapshots/` store directory to whatever cleanup scope the command already
   applies to `migrations/` content (match existing semantics — reinit removes
-  generated artefacts).
+  generated artifacts).
 - `package.json` `fixtures:check` diff globs: remove
   `':(glob)**/start-contract.*'` and `':(glob)**/end-contract.*'`; the existing
   `':(glob)**/contract.*'` already matches `snapshots/<hex>/contract.*`.
@@ -458,7 +458,7 @@ single place that covers all, documenting which in the PR).
   not changed. Append the index row to `docs/architecture docs/ADR-INDEX.md`
   under `## Migration System` following the existing row format.
 - `docs/architecture docs/subsystems/7. Migration System.md`: File Layout
-  (288-312), line 100 (sibling-files claim + the "Pinned per-space artefacts
+  (288-312), line 100 (sibling-files claim + the "Pinned per-space artifacts
   on disk" anchor), "Contract snapshot" (224-228), and "Runner-side
   independence" (316-322 — the per-space `contract.json` mention). The
   runner-independence property is restated: apply needs `migration.json` +

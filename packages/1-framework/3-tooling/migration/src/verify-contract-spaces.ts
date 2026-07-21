@@ -67,7 +67,7 @@ export async function listContractSpaceDirectories(
 /**
  * On-disk head value (`(hash, invariants)`) for one contract space.
  * The verifier compares this against the marker row for the same space
- * to detect drift between the user-emitted artefacts and the live DB
+ * to detect drift between the user-emitted artifacts and the live DB
  * marker.
  */
 export interface ContractSpaceHeadRecord {

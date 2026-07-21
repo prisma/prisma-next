@@ -4,20 +4,20 @@ import { join } from 'pathe';
 /**
  * Filenames the contract pipeline emits next to the user's schema source
  * (`<schemaDir>/contract.json`, `<schemaDir>/contract.d.ts`, …). Mirrors
- * the schema-dir-relative `ARTEFACT_FILENAMES` in `hygiene-gitattributes.ts`
+ * the schema-dir-relative `ARTIFACT_FILENAMES` in `hygiene-gitattributes.ts`
  * (not that file's migrations-root-anchored store lines, which are outside
  * this command's scope — reinit only ever touches `schemaDir`); kept as a
  * separate constant here because the cleanup contract is target-agnostic
- * and we deliberately do not want a stale artefact from a previous target
+ * and we deliberately do not want a stale artifact from a previous target
  * lingering after a re-init.
  *
- * If a future emit pipeline produces an additional schema-dir artefact,
- * add it here **and** to `ARTEFACT_FILENAMES` in `hygiene-gitattributes.ts`
+ * If a future emit pipeline produces an additional schema-dir artifact,
+ * add it here **and** to `ARTIFACT_FILENAMES` in `hygiene-gitattributes.ts`
  * — the two stay in lockstep so the file `init` advertises as
  * `linguist-generated` is exactly the file `init` is willing to delete on
  * re-init.
  */
-const ARTEFACT_FILENAMES: readonly string[] = [
+const ARTIFACT_FILENAMES: readonly string[] = [
   'contract.json',
   'contract.d.ts',
   'ops.json',
@@ -25,19 +25,19 @@ const ARTEFACT_FILENAMES: readonly string[] = [
 ];
 
 /**
- * Returns the schema-relative paths of stale contract artefacts the
+ * Returns the schema-relative paths of stale contract artifacts the
  * previous `init` run (or a `contract emit`) left behind in `schemaDir`.
  * Paths are returned relative to `baseDir` so the caller can plumb them
  * into `filesWritten`-style logging without re-deriving the path.
  *
  * Pure function: no filesystem mutation. Used by `runInit`'s precondition
  * phase (FR6.2 / NFR3 atomicity) so a downstream parse failure leaves
- * the artefacts on disk and the project byte-identical to its pre-init
+ * the artifacts on disk and the project byte-identical to its pre-init
  * state.
  */
-export function findStaleArtefacts(baseDir: string, schemaDir: string): readonly string[] {
+export function findStaleArtifacts(baseDir: string, schemaDir: string): readonly string[] {
   const result: string[] = [];
-  for (const filename of ARTEFACT_FILENAMES) {
+  for (const filename of ARTIFACT_FILENAMES) {
     const rel = join(schemaDir, filename);
     if (existsSync(join(baseDir, rel))) {
       result.push(rel);

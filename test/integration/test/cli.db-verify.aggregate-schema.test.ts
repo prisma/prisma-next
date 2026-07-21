@@ -6,7 +6,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { seedTestMarker } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
@@ -58,7 +58,7 @@ async function writePinnedExtensionDir(testDir: string): Promise<string> {
   // PN-MIG-5002). The test extension's baseline op carries an
   // `invariantId`, so the derivation produces `[TEST_BASELINE_INVARIANT_ID]`
   // — match that on disk for both the head ref and migration metadata.
-  await emitContractSpaceArtefacts(migrationsDir, EXT_SPACE_ID, {
+  await emitContractSpaceArtifacts(migrationsDir, EXT_SPACE_ID, {
     contract: extContractJson,
     contractDts: '// placeholder for test\nexport {};\n',
     headRef: { hash: extHeadRef.hash, invariants: [...extHeadRef.invariants] },

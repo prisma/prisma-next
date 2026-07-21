@@ -13,7 +13,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import postgres from '@prisma-next/target-postgres/control';
 
 export interface TestControlClientOptions {
@@ -52,12 +52,12 @@ export function createPrismaNextControlClient(options: TestControlClientOptions)
  * ```
  */
 /**
- * Materialise pgvector's pinned contract-space artefacts under
+ * Materialise pgvector's pinned contract-space artifacts under
  * `<migrationsDir>/pgvector/...`. The demo's contract uses pgvector,
  * so the per-space `db init` flow requires its head ref + baseline
  * migration to be present on disk.
  */
-async function materialisePgvectorPinnedArtefacts(migrationsDir: string): Promise<void> {
+async function materialisePgvectorPinnedArtifacts(migrationsDir: string): Promise<void> {
   const space = pgvector.contractSpace;
   if (!space) {
     throw new Error('pgvector descriptor must declare a contractSpace');
@@ -66,7 +66,7 @@ async function materialisePgvectorPinnedArtefacts(migrationsDir: string): Promis
   if (!baseline) {
     throw new Error('pgvector contract-space must ship at least one baseline migration');
   }
-  await emitContractSpaceArtefacts(migrationsDir, 'pgvector', {
+  await emitContractSpaceArtifacts(migrationsDir, 'pgvector', {
     contract: space.contractJson,
     contractDts: '// rendered .d.ts for pgvector contract space\nexport interface Contract {}\n',
     headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
@@ -80,7 +80,7 @@ export async function initTestDatabase(options: {
   /**
    * On-disk migrations directory. When omitted, a temporary directory is
    * created (and cleaned up) and pgvector's pinned contract-space
-   * artefacts are materialised inside it.
+   * artifacts are materialised inside it.
    */
   readonly migrationsDir?: string;
 }): Promise<void> {
@@ -92,7 +92,7 @@ export async function initTestDatabase(options: {
   try {
     if (ownsMigrationsDir) {
       mkdirSync(migrationsDir, { recursive: true });
-      await materialisePgvectorPinnedArtefacts(migrationsDir);
+      await materialisePgvectorPinnedArtifacts(migrationsDir);
     }
     const initResult = await client.dbInit({
       contract: options.contract,

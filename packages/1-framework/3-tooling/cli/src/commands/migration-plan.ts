@@ -370,11 +370,11 @@ async function executeMigrationPlanCommand(
     };
   }
 
-  // Phase 1 — seed: unconditionally re-emit per-space pinned artefacts
+  // Phase 1 — seed: unconditionally re-emit per-space pinned artifacts
   // (contract.json / contract.d.ts / refs/head.json) and materialise any
   // descriptor-shipped migration packages not yet on disk. Runs before
   // the no-op check so that an extension bump alone (with no structural
-  // app-space change) still re-pins extension artefacts on disk.
+  // app-space change) still re-pins extension artifacts on disk.
   const canonicalExtensionInputs = toExtensionInputs(config.extensionPacks ?? []);
   const seedResult = await runContractSpaceSeedPhase({
     migrationsDir,

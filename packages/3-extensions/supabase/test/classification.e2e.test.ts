@@ -32,7 +32,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
@@ -119,14 +119,14 @@ describe('supabase external-schema classification (db init + db verify)', () => 
       //
       // The supabase pack is migration-less: it declares only external schema
       // (auth.* / storage.* are Supabase-managed tables). We emit the space
-      // artefacts (contract.json, refs/head.json) so `db init` discovers the
+      // artifacts (contract.json, refs/head.json) so `db init` discovers the
       // extension space. No migration packages are written — the loader treats a
       // zero-package space as all-external and the planner falls through to synth
       // strategy (zero ops).
       const space = supabasePack.contractSpace;
       if (!space) throw new Error('supabasePack must carry a contractSpace');
 
-      await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+      await emitContractSpaceArtifacts(migrationsDir, 'supabase', {
         contract: space.contractJson,
         contractDts: '// supabase extension contract space\n',
         headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },

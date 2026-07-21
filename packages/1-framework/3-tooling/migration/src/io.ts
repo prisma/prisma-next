@@ -92,7 +92,7 @@ export async function writeMigrationPackage(
  *
  * The per-space head contract resolves through
  * `<projectMigrationsDir>/snapshots/<hex>/` (written by
- * {@link import('./emit-contract-space-artefacts').emitContractSpaceArtefacts}),
+ * {@link import('./emit-contract-space-artifacts').emitContractSpaceArtifacts}),
  * not inside the per-package directory. The runner reads only
  * `migration.json` + `ops.json` from each package.
  */

@@ -144,7 +144,7 @@ withTempDir(({ createTempDir }) => {
           );
 
           await emitContract(testDir, configPath);
-          // Seeds the external space's pinned artefacts (head ref, no
+          // Seeds the external space's pinned artifacts (head ref, no
           // bundles) and authors the app baseline bundle.
           await runMigrationPlan(testDir, [
             '--config',

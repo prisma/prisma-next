@@ -14,7 +14,7 @@ import type {
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqliteCreateNamespace } from '@prisma-next/target-sqlite/control';
 import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
@@ -33,7 +33,7 @@ import {
 /**
  * End-to-end coverage for the CLI aggregate `db init` / `db update`
  * pipeline against a real SQLite database with on-disk
- * artefacts.
+ * artifacts.
  *
  * Locks the CLI-level half of:
  *
@@ -168,11 +168,11 @@ function buildFailingOps(): readonly MigrationPlanOperation[] {
   ];
 }
 
-interface ContractSpaceArtefactSetup {
+interface ContractSpaceArtifactSetup {
   readonly migrationsDir: string;
 }
 
-async function writeExtensionContractSpaceArtefacts(args: {
+async function writeExtensionContractSpaceArtifacts(args: {
   readonly tmpDir: string;
   readonly contract: Contract<SqlStorage>;
   readonly headHash: string;
@@ -182,11 +182,11 @@ async function writeExtensionContractSpaceArtefacts(args: {
   readonly toHash: string;
   readonly ops: readonly MigrationPlanOperation[];
   readonly providedInvariants: readonly string[];
-}): Promise<ContractSpaceArtefactSetup> {
+}): Promise<ContractSpaceArtifactSetup> {
   const migrationsDir = join(args.tmpDir, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  await emitContractSpaceArtefacts(migrationsDir, EXT_SPACE_ID, {
+  await emitContractSpaceArtifacts(migrationsDir, EXT_SPACE_ID, {
     contract: args.contract,
     contractDts: '// placeholder\nexport {};\n',
     headRef: { hash: args.headHash, invariants: [...args.invariants] },
@@ -263,8 +263,8 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
     return db.path.replace(/\/test\.db$/, '');
   }
 
-  async function setupBaseline(tmpDir: string): Promise<ContractSpaceArtefactSetup> {
-    return writeExtensionContractSpaceArtefacts({
+  async function setupBaseline(tmpDir: string): Promise<ContractSpaceArtifactSetup> {
+    return writeExtensionContractSpaceArtifacts({
       tmpDir,
       contract: extContractV1,
       headHash: extContractV1.storage.storageHash,
@@ -353,7 +353,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
     // migration package. The on-disk graph now has two edges
     // (null→v1, v1→v2); the marker is at v1 so only the second edge
     // walks.
-    await emitContractSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
+    await emitContractSpaceArtifacts(baseline.migrationsDir, EXT_SPACE_ID, {
       contract: extContractV2,
       contractDts: '// placeholder\nexport {};\n',
       headRef: { hash: extContractV2.storage.storageHash, invariants: [] },
@@ -632,7 +632,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
     const extHashBefore = markersBefore.rows.find((r) => r.space === EXT_SPACE_ID)!.core_hash;
 
     // Bump extension to v2 with a *failing* op.
-    await emitContractSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
+    await emitContractSpaceArtifacts(baseline.migrationsDir, EXT_SPACE_ID, {
       contract: extContractV2,
       contractDts: '// placeholder\nexport {};\n',
       headRef: { hash: extContractV2.storage.storageHash, invariants: [] },

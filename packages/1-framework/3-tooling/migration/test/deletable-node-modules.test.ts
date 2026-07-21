@@ -9,17 +9,17 @@
  * descriptor) does not affect verify / apply outcomes.
  *
  * Scoped to the framework helpers
- * (`emitContractSpaceArtefacts` + `listContractSpaceDirectories` +
+ * (`emitContractSpaceArtifacts` + `listContractSpaceDirectories` +
  * `verifyContractSpaces` + `concatenateSpaceApplyInputs`). The test
  * intentionally **does not import** the synthetic
  * `test-contract-space` fixture (today hosted under
  * `test/integration/test/contract-space-fixture/`) — that is the
  * point. The test invents a `'test-contract-space'` space id inline
- * and runs the helpers against on-disk artefacts on disk plus a fake set of
+ * and runs the helpers against on-disk artifacts on disk plus a fake set of
  * marker rows.
  *
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
- *   — "Pinned per-space artefacts" / verifier reads only the user repo.
+ *   — "Pinned per-space artifacts" / verifier reads only the user repo.
  */
 
 import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
@@ -36,7 +36,7 @@ import { concatenateSpaceApplyInputs } from '../src/concatenate-space-apply-inpu
 import { contractSnapshotDir } from '../src/contract-snapshot-store';
 import {
   type ContractSpaceHeadRecord,
-  emitContractSpaceArtefacts,
+  emitContractSpaceArtifacts,
   listContractSpaceDirectories,
   type SpaceApplyInput,
   type SpaceMarkerRecord,
@@ -75,7 +75,7 @@ async function setupProjectWithTestSpace(): Promise<ProjectFixture> {
     recursive: true,
   });
 
-  await emitContractSpaceArtefacts(projectMigrationsDir, TEST_SPACE_ID, {
+  await emitContractSpaceArtifacts(projectMigrationsDir, TEST_SPACE_ID, {
     contract: testContract,
     contractDts: testContractDts,
     headRef: { hash: TEST_HEAD_HASH, invariants: [TEST_INVARIANT] },
@@ -103,7 +103,7 @@ describe('per-space verifier + runner against a project with deleted node_module
     expect(dirs).toEqual([TEST_SPACE_ID]);
   });
 
-  it('verifyContractSpaces returns ok when on-disk artefacts + marker rows match — no descriptor needed', async () => {
+  it('verifyContractSpaces returns ok when on-disk artifacts + marker rows match — no descriptor needed', async () => {
     const spaceContractRaw = await readFile(
       join(contractSnapshotDir(fixture.projectMigrationsDir, TEST_HEAD_HASH), 'contract.json'),
       'utf-8',
@@ -216,7 +216,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       },
     );
 
-    // Pin the contract-space artefacts the loader reads. The contract
+    // Pin the contract-space artifacts the loader reads. The contract
     // value here is the same shape the validator will return.
     const spaceContract = createSqlContract({
       target: 'postgres',
@@ -232,7 +232,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       },
     });
     headHash = spaceContract.storage.storageHash;
-    await emitContractSpaceArtefacts(migrationsDir, TEST_SPACE_ID, {
+    await emitContractSpaceArtifacts(migrationsDir, TEST_SPACE_ID, {
       contract: spaceContract as unknown as Record<string, unknown>,
       contractDts: '// rendered .d.ts\nexport interface Contract {}\n',
       headRef: { hash: headHash, invariants: [] },

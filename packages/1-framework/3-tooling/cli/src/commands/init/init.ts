@@ -48,7 +48,7 @@ import {
   renderInitOutro,
 } from './output';
 import { type ProbeOutcome, type ProbeOverrides, probeServerVersion } from './probe-db';
-import { findStaleArtefacts, removeDependency } from './reinit-cleanup';
+import { findStaleArtifacts, removeDependency } from './reinit-cleanup';
 import {
   DEFAULT_SKILL_SOURCES,
   formatSkillInstallCommand,
@@ -175,14 +175,14 @@ export async function runInit(
     { path: '.env.example', content: envExampleContent(inputs.target) },
   ];
 
-  // FR9.1 — on re-init, queue the previously-emitted contract artefacts
+  // FR9.1 — on re-init, queue the previously-emitted contract artifacts
   // for deletion so a target switch (or schema-shape change) does not
   // leave a stale `contract.json` / `contract.d.ts` next to the new
   // schema source. Detection is filesystem-only (no parsing of the
   // previous config) so the cleanup is safe to run before the write
   // phase: each path is checked for existence in the precondition,
   // and missing-on-disk-at-write-time is tolerated.
-  const filesToDelete: string[] = inputs.reinit ? [...findStaleArtefacts(baseDir, schemaDir)] : [];
+  const filesToDelete: string[] = inputs.reinit ? [...findStaleArtifacts(baseDir, schemaDir)] : [];
 
   // `init` delegates the skill to `npx skills add prisma/prisma-next#v<version>`,
   // so a hand-rolled `.agents/skills/prisma-next/SKILL.md` in the project
@@ -245,7 +245,7 @@ export async function runInit(
   }
 
   // FR3.4: idempotent .gitattributes — linguist-generated entries for
-  // the emitted artefacts so GitHub diff stats / code review collapse
+  // the emitted artifacts so GitHub diff stats / code review collapse
   // them by default.
   const gitattributesPath = join(baseDir, '.gitattributes');
   const existingGitattributes = existsSync(gitattributesPath)
@@ -373,7 +373,7 @@ export async function runInit(
     }
   }
 
-  // FR9.1 — delete stale artefacts after the new templates are written.
+  // FR9.1 — delete stale artifacts after the new templates are written.
   // Order is intentional: the names do not collide with `filesToWrite`
   // (we never write `contract.json` from this command — that's `contract
   // emit`'s job), so deletion *after* the writes guarantees we never
@@ -844,7 +844,7 @@ function formatCatalogWarning(
 /**
  * Recognised pnpm error signatures that justify a fallback to npm.
  *
- * These patterns indicate the published artefact itself is at fault
+ * These patterns indicate the published artifact itself is at fault
  * (a leaked `workspace:*` or `catalog:` specifier), not the user's
  * environment — pnpm is faithfully reporting "I cannot resolve this
  * registry version", and npm is willing to install it because npm

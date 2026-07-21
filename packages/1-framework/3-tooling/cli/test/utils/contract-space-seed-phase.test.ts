@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { contractSnapshotDir } from '@prisma-next/migration-tools/contract-snapshot-store';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import {
-  emitContractSpaceArtefacts,
+  emitContractSpaceArtifacts,
   readContractSpaceHeadRef,
   spaceMigrationDirectory,
 } from '@prisma-next/migration-tools/spaces';
@@ -56,7 +56,7 @@ describe('runContractSpaceSeedPhase', () => {
     await rm(migrationsDir, { recursive: true, force: true });
   });
 
-  it('emits on-disk artefacts on first emit and reports action=updated', async () => {
+  it('emits on-disk artifacts on first emit and reports action=updated', async () => {
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
       extensionPacks: [
@@ -84,7 +84,7 @@ describe('runContractSpaceSeedPhase', () => {
   });
 
   it('reports action=unchanged on idempotent re-pin', async () => {
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
       contract: makeContract(HASH_A, { v: 1 }),
       contractDts: '\n',
       headRef: { hash: HASH_A, invariants: [] },
@@ -116,7 +116,7 @@ describe('runContractSpaceSeedPhase', () => {
     // Pre-write the store entry at HASH_A. The seed phase re-emits
     // `refs/head.json` unconditionally, but the store's write-if-absent
     // semantics mean an already-populated hash directory is left as-is.
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
       contract: makeContract(HASH_A, { v: 1 }),
       contractDts: '// first write\n',
       headRef: { hash: HASH_A, invariants: [] },
@@ -144,7 +144,7 @@ describe('runContractSpaceSeedPhase', () => {
   });
 
   it('reports action=updated when descriptor hash differs from on-disk head', async () => {
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
       contract: makeContract(HASH_A, { v: 1 }),
       contractDts: '\n',
       headRef: { hash: HASH_A, invariants: [] },
@@ -235,9 +235,9 @@ describe('runContractSpaceSeedPhase', () => {
     expect(manifest).toBe('{}');
   });
 
-  it('reports action=updated when artefacts unchanged but new migration packages were materialised', async () => {
-    // Pre-emit artefacts at HASH_A so on-disk head matches descriptor.
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
+  it('reports action=updated when artifacts unchanged but new migration packages were materialised', async () => {
+    // Pre-emit artifacts at HASH_A so on-disk head matches descriptor.
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
       contract: makeContract(HASH_A, { v: 1 }),
       contractDts: '\n',
       headRef: { hash: HASH_A, invariants: [] },

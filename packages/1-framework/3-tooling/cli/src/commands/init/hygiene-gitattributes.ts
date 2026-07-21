@@ -13,9 +13,9 @@ import type { TargetId } from './templates/code-templates';
  *   by `init` flows but will be produced by adjacent commands (lower /
  *   migration tooling). Adding them now matches Decision 5
  *   (forward-looking subset) so the file does not need to be amended
- *   every time a new artefact lands.
+ *   every time a new artifact lands.
  *
- * `ARTEFACT_FILENAMES` entries are written relative to the schema
+ * `ARTIFACT_FILENAMES` entries are written relative to the schema
  * directory so a user who runs `init --schema-path db/contract.prisma`
  * gets `db/contract.json linguist-generated` — not the workspace-glob
  * form `<glob>/contract.json` (which would over-match any unrelated
@@ -30,7 +30,7 @@ import type { TargetId } from './templates/code-templates';
  * single schema-dir-relative pattern can reach every snapshot. See
  * `STORE_GITATTRIBUTES_LINES` below.
  */
-const ARTEFACT_FILENAMES: readonly string[] = [
+const ARTIFACT_FILENAMES: readonly string[] = [
   'contract.json',
   'contract.d.ts',
   'ops.json',
@@ -41,7 +41,7 @@ const ATTRIBUTE = 'linguist-generated';
 
 /**
  * Full `.gitattributes` lines for the migration contract snapshot store,
- * already anchored to the migrations root — unlike `ARTEFACT_FILENAMES`,
+ * already anchored to the migrations root — unlike `ARTIFACT_FILENAMES`,
  * these are not combined with the schema-relative prefix.
  */
 const STORE_GITATTRIBUTES_LINES: readonly string[] = [
@@ -54,7 +54,7 @@ const STORE_GITATTRIBUTES_LINES: readonly string[] = [
  * line has the shape `<path> linguist-generated`. The `target` parameter
  * is currently unused but accepted for symmetry with the other hygiene
  * helpers and to leave room for target-specific entries (e.g. a future
- * Mongo-only artefact) without a signature break.
+ * Mongo-only artifact) without a signature break.
  */
 export function requiredGitattributesLines(
   schemaDir: string,
@@ -63,7 +63,7 @@ export function requiredGitattributesLines(
   const dir = schemaDir === '.' ? '' : schemaDir.replace(/\/+$/, '');
   const prefix = dir === '' ? '' : `${dir}/`;
   return [
-    ...ARTEFACT_FILENAMES.map((file) => `${prefix}${file} ${ATTRIBUTE}`),
+    ...ARTIFACT_FILENAMES.map((file) => `${prefix}${file} ${ATTRIBUTE}`),
     ...STORE_GITATTRIBUTES_LINES,
   ];
 }

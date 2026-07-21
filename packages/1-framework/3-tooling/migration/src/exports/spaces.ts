@@ -10,9 +10,9 @@ export {
 export type { SpaceApplyInput } from '../concatenate-space-apply-inputs';
 export { contractSpaceFromJson } from '../contract-space-from-json';
 export {
-  type ContractSpaceArtefactInputs,
-  emitContractSpaceArtefacts,
-} from '../emit-contract-space-artefacts';
+  type ContractSpaceArtifactInputs,
+  emitContractSpaceArtifacts,
+} from '../emit-contract-space-artifacts';
 export {
   type DiskContractSpaceState,
   gatherDiskContractSpaceState,
