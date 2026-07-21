@@ -129,7 +129,7 @@ describe('Postgres rich AST lowering', () => {
     const lowered = adapter.lower(ast, { contract });
 
     expect(lowered.sql).toContain('LEFT JOIN LATERAL');
-    expect(lowered.sql).toContain('json_agg(json_build_object');
+    expect(lowered.sql).toContain('json_agg(jsonb_build_object');
     expect(lowered.sql).toContain('ORDER BY "post_rows"."title" ASC');
     expect(lowered.sql).toContain('LIMIT 10 OFFSET 5');
     expect(lowered.sql).toContain('WHERE "user"."id" = $1');

@@ -644,21 +644,35 @@ function renderWindowFuncExpr(
   return `${fn}(${args}) OVER (${over})`;
 }
 
+/**
+ * Maximum key/value pairs emitted in a single `jsonb_build_object` call. Postgres caps function
+ * arguments at 100, so 50 key/value pairs (100 args) is the largest safe batch; wider objects are
+ * split across multiple `jsonb_build_object(...)` calls and merged with the JSONB `||`
+ * concatenation operator (which plain `json` does not support).
+ */
+const JSONB_BUILD_OBJECT_MAX_PAIRS = 50;
+
 function renderJsonObjectExpr(
   expr: JsonObjectExpr,
   contract: PostgresContract,
   pim: ParamIndexMap,
 ): string {
-  const args = expr.entries
-    .flatMap((entry): [string, string] => {
-      const key = `'${escapeLiteral(entry.key)}'`;
-      if (entry.value.kind === 'literal') {
-        return [key, renderLiteral(entry.value)];
-      }
-      return [key, renderExpr(entry.value, contract, pim)];
-    })
-    .join(', ');
-  return `json_build_object(${args})`;
+  const renderedPairs = expr.entries.map((entry): [string, string] => {
+    const key = `'${escapeLiteral(entry.key)}'`;
+    if (entry.value.kind === 'literal') {
+      return [key, renderLiteral(entry.value)];
+    }
+    return [key, renderExpr(entry.value, contract, pim)];
+  });
+  if (renderedPairs.length === 0) {
+    return 'jsonb_build_object()';
+  }
+  const chunks: string[] = [];
+  for (let i = 0; i < renderedPairs.length; i += JSONB_BUILD_OBJECT_MAX_PAIRS) {
+    const slice = renderedPairs.slice(i, i + JSONB_BUILD_OBJECT_MAX_PAIRS);
+    chunks.push(`jsonb_build_object(${slice.flat().join(', ')})`);
+  }
+  return chunks.join(' || ');
 }
 
 function renderOrderByItems(
