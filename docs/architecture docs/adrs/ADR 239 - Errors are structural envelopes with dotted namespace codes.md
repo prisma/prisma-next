@@ -1,6 +1,6 @@
 # ADR 239 — Errors are structural envelopes with dotted namespace codes
 
-Status: **Proposed**.
+Status: **Accepted**.
 
 Supersedes: [ADR 027 — Error Envelope & Stable Codes](ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md), [ADR 068 — Error mapping to RuntimeError](ADR%20068%20-%20Error%20mapping%20to%20RuntimeError.md).
 
