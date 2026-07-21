@@ -377,8 +377,12 @@ describe('bindWhereExpr', () => {
       if (!(bound instanceof CaseExpr)) {
         throw new Error('Expected CaseExpr');
       }
-      expect(bound.branches[0]?.condition).toBeInstanceOf(BinaryExpr);
-      expect((bound.branches[0]?.condition as BinaryExpr).left).toBeInstanceOf(FunctionCallExpr);
+      const condition = bound.branches[0]?.condition;
+      expect(condition).toBeInstanceOf(BinaryExpr);
+      if (!(condition instanceof BinaryExpr)) {
+        throw new Error('Expected BinaryExpr');
+      }
+      expect(condition.left).toBeInstanceOf(FunctionCallExpr);
       const value = bound.branches[0]?.value;
       expect(value).toBeInstanceOf(CastExpr);
       if (!(value instanceof CastExpr)) {
