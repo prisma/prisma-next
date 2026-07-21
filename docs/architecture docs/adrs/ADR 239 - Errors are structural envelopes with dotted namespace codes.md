@@ -230,6 +230,43 @@ The 46 numeric codes. Grouped by destination namespace; a `↦ merges` note mark
 | PN-MIG-2005 | `errorDataTransformContractMismatch` | `MIGRATION.DATA_TRANSFORM_CONTRACT_MISMATCH` |
 | PN-MIG-2006 | `errorMigrationTargetMismatch` | `MIGRATION.TARGET_MISMATCH` |
 
+### Codes published outside the factory files
+
+Direct `CliStructuredError` constructions and sibling numeric schemes, discovered in the conversion sweep. Same crosswalk contract.
+
+| Retired | Where | New |
+|---|---|---|
+| PN-MIG-2007 | postgres target `errorPostgresMigrationStackMissing` | `MIGRATION.POSTGRES_CONTROL_STACK_MISSING` |
+| PN-MIG-2008 | sqlite target `errorSqliteMigrationStackMissing` | `MIGRATION.SQLITE_CONTROL_STACK_MISSING` |
+| PN-MIG-5001 | contract-space aggregate loader (layout violation) | `MIGRATION.CONTRACT_SPACE_LAYOUT_VIOLATION` |
+| PN-MIG-5002 | contract-space integrity / orphan marker | `MIGRATION.CONTRACT_SPACE_VIOLATION` |
+| PN-CLI-4012 (collision) | `db verify` invalid `--mode` — the same rendered code as the `--config` flag error, two unrelated meanings; the dotted split retires the collision | `CLI.INVALID_VERIFY_MODE` |
+| PN-CLI-5009 | `init` invalid output document | `CLI.INIT_INVALID_OUTPUT_DOCUMENT` |
+| PN-SCHEMA-0001 | SQL schema-verify failure (`SCHEMA` domain's only producer) | `CONTRACT.SCHEMA_VERIFICATION_FAILED` |
+
+The `migration check` failure catalogue (`PN-MIG-CHECK-NNN`) converts to self-describing `MIGRATION.CHECK_*` codes. `PN-MIG-CHECK-002` covered two unrelated violation kinds; the dotted split separates them.
+
+| Retired | New |
+|---|---|
+| PN-MIG-CHECK-001 | `MIGRATION.CHECK_HASH_MISMATCH` |
+| PN-MIG-CHECK-002 (missing file) | `MIGRATION.CHECK_FILE_MISSING` |
+| PN-MIG-CHECK-002 (provided-invariants disagree) | `MIGRATION.CHECK_PROVIDED_INVARIANTS_MISMATCH` |
+| PN-MIG-CHECK-002 (package unloadable) | `MIGRATION.CHECK_PACKAGE_UNLOADABLE` |
+| PN-MIG-CHECK-003 | `MIGRATION.CHECK_UNREACHABLE_MIGRATION` |
+| PN-MIG-CHECK-004 | `MIGRATION.CHECK_DANGLING_REF` |
+| PN-MIG-CHECK-005 | `MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH` |
+| PN-MIG-CHECK-006 | `MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE` |
+| PN-MIG-CHECK-007 | `MIGRATION.CHECK_NOOP_SELF_EDGE` |
+| PN-MIG-CHECK-008 | `MIGRATION.CHECK_ORPHAN_SPACE_DIR` |
+| PN-MIG-CHECK-009 | `MIGRATION.CHECK_DECLARED_BUT_UNMIGRATED` |
+| PN-MIG-CHECK-010 | `MIGRATION.CHECK_HEAD_REF_MISSING` |
+| PN-MIG-CHECK-011 | `MIGRATION.CHECK_HEAD_REF_NOT_IN_GRAPH` |
+| PN-MIG-CHECK-012 | `MIGRATION.CHECK_REF_UNREADABLE` |
+| PN-MIG-CHECK-013 | `MIGRATION.CHECK_TARGET_MISMATCH` |
+| PN-MIG-CHECK-014 | `MIGRATION.CHECK_SPACE_DISJOINTNESS_VIOLATION` |
+| PN-MIG-CHECK-015 | `MIGRATION.CHECK_CONTRACT_UNREADABLE` |
+| PN-MIG-CHECK-016 | `MIGRATION.CHECK_DUPLICATE_MIGRATION_HASH` |
+
 ### Dotted-code reconciliations (no rename except where noted)
 
 - `DRIVER.*` — already dotted; `DRIVER` is promoted to a real namespace (today it silently resolves to category `RUNTIME`). No code strings change.
