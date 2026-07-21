@@ -76,3 +76,14 @@ package.json devDependency version ranges and biome.jsonc schema versions only �
 no framework surface, contract shape, or emitted artefact changes. No user
 action required. Incidental substrate diff only.
 -->
+
+<!--
+Dependabot dev-deps group bump (PR #1006): `changes: []`. dev-dependency version
+bumps only (biome 2.5.2 → 2.5.3, wrangler, @prisma/compute-sdk, pkg-pr-new,
+@cloudflare/vitest-pool-workers), plus the test-only sites biome 2.5.3 newly
+flags via noUnsafeOptionalChaining (`(x?.y as T).z` → `(x!.y as T).z`). The
+`examples/` diff is package.json devDependency version ranges only (wrangler and
+@cloudflare/vitest-pool-workers in bundle-size and the cloudflare-worker example)
+— no framework surface, contract shape, or emitted artefact change. No user
+action required. Incidental substrate diff only.
+-->

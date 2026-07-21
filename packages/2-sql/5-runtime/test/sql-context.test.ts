@@ -505,7 +505,7 @@ describe('applyMutationDefaults', () => {
         value: expect.any(String),
       },
     ]);
-    expect((applied[0]?.value as string).length).toBe(8);
+    expect((applied[0]!.value as string).length).toBe(8);
   });
 
   it('applies update defaults from onUpdate', () => {
@@ -527,7 +527,7 @@ describe('applyMutationDefaults', () => {
         value: expect.any(String),
       },
     ]);
-    expect((applied[0]?.value as string).length).toBe(6);
+    expect((applied[0]!.value as string).length).toBe(6);
   });
 
   it('skips update defaults for empty update payloads', () => {

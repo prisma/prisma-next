@@ -776,6 +776,6 @@ describe('MongoMigrationRunner - per-edge ledger', () => {
       migrationName: '',
       migrationHash: destHash,
     });
-    expect((ledgerEntries[0]?.operations as unknown[]).length).toBe(1);
+    expect((ledgerEntries[0]!.operations as unknown[]).length).toBe(1);
   });
 });

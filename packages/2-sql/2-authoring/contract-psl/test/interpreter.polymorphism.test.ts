@@ -448,7 +448,7 @@ model Bug {
 
       // The variant's own field map points at the base-table column, and the
       // emitter's storage-reference check is satisfied (the bug this fixes).
-      expect((modelsOf(result.value)['Bug']?.storage as SqlModelStorage).fields).toEqual({
+      expect((modelsOf(result.value)['Bug']!.storage as SqlModelStorage).fields).toEqual({
         severity: { column: 'severity' },
       });
     });

@@ -87,7 +87,7 @@ describe('ParamRef codec — AST rewriter propagation', () => {
       codec: { codecId: 'pg/vector@1', typeParams: mutableTypeParams },
     });
     mutableTypeParams.length = 99;
-    expect((ref.codec?.typeParams as { length: number }).length).toBe(1536);
+    expect((ref.codec!.typeParams as { length: number }).length).toBe(1536);
   });
 
   it('ProjectionItem deep-clones codec.typeParams so caller mutations after construction do not leak in', () => {
@@ -97,7 +97,7 @@ describe('ParamRef codec — AST rewriter propagation', () => {
       typeParams: mutableTypeParams,
     });
     mutableTypeParams.length = 99;
-    expect((item.codec?.typeParams as { length: number }).length).toBe(1536);
+    expect((item.codec!.typeParams as { length: number }).length).toBe(1536);
   });
 
   it('ProjectionItem.withCodec replaces the stamped CodecRef', () => {
