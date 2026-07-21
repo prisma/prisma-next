@@ -1,5 +1,7 @@
 # ADR 027 — Error Envelope & Stable Codes
 
+> **Superseded by [ADR 239 — Errors are structural envelopes with dotted namespace codes](ADR%20239%20-%20Errors%20are%20structural%20envelopes%20with%20dotted%20namespace%20codes.md).** The envelope idea survives; its specifics do not. Codes are dotted `NAMESPACE.SUBCODE` names — no numeric `PN-DOMAIN-NNNN` range, and no separate `ErrorCategory` union (the namespace *is* the category). Errors are recognized by a structural predicate, not a shared class. See ADR 239 for the namespace list and the crosswalk from every code defined here.
+
 ## Context
 
 Prisma Next spans lanes (DSL, ORM, raw), runtimes, adapters, migrations, and PPg preflight. Users and agents need machine-parsable, stable errors with actionable detail. Today, SQLSTATEs, driver exceptions, lint violations, and budget overages surface inconsistently. We need a single envelope and a stable code registry so policies, dashboards, and retries work uniformly.
