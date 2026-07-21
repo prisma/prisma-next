@@ -220,6 +220,160 @@ describe('assembleAuthoringContributions', () => {
     );
   });
 
+  it('rejects a type constructor whose strict template references an optional argument without a default', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          id: 'adapter-a',
+          authoring: {
+            type: {
+              Custom: {
+                kind: 'typeConstructor',
+                args: [{ kind: 'string', name: 'name', optional: true }],
+                output: { codecId: 'a/custom@1', nativeType: { kind: 'arg', index: 0 } },
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(
+      'Invalid authoring type constructor "Custom" contributed by descriptor "adapter-a". ' +
+        'output.nativeType references argument 0 ("name"), which is optional but the reference carries no default; ' +
+        'the template cannot resolve when the argument is omitted. ' +
+        'Mark the argument required, or give the template reference a default.',
+    );
+  });
+
+  it('rejects a type constructor whose template references an argument index that does not exist', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          id: 'adapter-a',
+          authoring: {
+            type: {
+              Sized: {
+                kind: 'typeConstructor',
+                args: [{ kind: 'number', name: 'length', integer: true, minimum: 1 }],
+                output: {
+                  codecId: 'a/sized@1',
+                  nativeType: 'sized',
+                  typeParams: { length: { kind: 'arg', index: 2 } },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(
+      'Invalid authoring type constructor "Sized" contributed by descriptor "adapter-a". ' +
+        'output.typeParams.length references argument 2, but the constructor declares 1 argument(s). ' +
+        'Declare the argument or correct the reference index.',
+    );
+  });
+
+  it('rejects a nested type constructor with a dangling arg-ref naming its dotted path', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          id: 'ext-vendor',
+          authoring: {
+            type: {
+              vendor: {
+                Odd: {
+                  kind: 'typeConstructor',
+                  output: { codecId: 'a/odd@1', nativeType: { kind: 'arg', index: 0 } },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(
+      'Invalid authoring type constructor "vendor.Odd" contributed by descriptor "ext-vendor". ' +
+        'output.nativeType references argument 0, but the constructor declares 0 argument(s). ' +
+        'Declare the argument or correct the reference index.',
+    );
+  });
+
+  it('rejects a plain type constructor without an output template', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          id: 'adapter-a',
+          authoring: {
+            type: {
+              Odd: { kind: 'typeConstructor', output: { codecId: 'a/odd@1' } },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(
+      'Invalid authoring type constructor "Odd" contributed by descriptor "adapter-a". ' +
+        'The output declares no storage type template and no entityRefArg; a plain constructor must declare one.',
+    );
+  });
+
+  it('accepts typeParams references to optional arguments without defaults (omitted-key semantics)', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        id: 'adapter-a',
+        authoring: {
+          type: {
+            VarCharish: {
+              kind: 'typeConstructor',
+              args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+              output: {
+                codecId: 'a/varcharish@1',
+                nativeType: 'character varying',
+                typeParams: { length: { kind: 'arg', index: 0 } },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    expect(Object.keys(result.type)).toEqual(['VarCharish']);
+  });
+
+  it('accepts a strict-template reference to an optional argument that carries a default', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        id: 'adapter-a',
+        authoring: {
+          type: {
+            Aliased: {
+              kind: 'typeConstructor',
+              args: [{ kind: 'string', name: 'name', optional: true }],
+              output: {
+                codecId: 'a/custom@1',
+                nativeType: { kind: 'arg', index: 0, default: 'custom' },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    expect(Object.keys(result.type)).toEqual(['Aliased']);
+  });
+
+  it('accepts an entityRefArg constructor without an output template', () => {
+    const result = assembleAuthoringContributions([
+      createDescriptor({
+        id: 'target-a',
+        authoring: {
+          type: {
+            enum: {
+              kind: 'typeConstructor',
+              entityRefArg: { index: 0, entityKind: 'native_enum' },
+              output: { codecId: 'a/enum@1' },
+            },
+          },
+        },
+      }),
+    ]);
+    expect(Object.keys(result.type)).toEqual(['enum']);
+  });
+
   it('assembles the single declared valueObjectStorageType', () => {
     const result = assembleAuthoringContributions([
       createDescriptor({

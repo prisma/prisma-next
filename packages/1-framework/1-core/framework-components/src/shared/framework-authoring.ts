@@ -750,14 +750,17 @@ export interface ScalarTypeConstructorOutput {
 /**
  * Derives the scalar view of an assembled authoring type namespace: every
  * **top-level** type constructor that is instantiable with an empty argument
- * list — all declared args optional, no entity-ref argument, and an output
- * template that resolves without arguments. A bare type name `T` in a schema
- * is semantically the zero-arg instantiation `T()`, so each entry is exactly
- * what that call produces (defaulted template values applied, absent
- * optional-arg typeParams keys omitted). Constructors registered under a
- * namespace segment, constructors with required args, entity-ref
- * constructors, and constructors whose template needs an argument (e.g. an
- * arg-ref `nativeType` with no default) are not scalars and are excluded.
+ * list — all declared args optional and no entity-ref argument. A bare type
+ * name `T` in a schema is semantically the zero-arg instantiation `T()`, so
+ * each entry is exactly what that call produces (defaulted template values
+ * applied, absent optional-arg typeParams keys omitted). Constructors
+ * registered under a namespace segment, constructors with required args, and
+ * entity-ref constructors are not scalars and are excluded.
+ *
+ * Eligibility needs no template inspection: templates that cannot resolve
+ * for their legal call shapes are rejected at the composition boundary by
+ * {@link assertResolvableTypeConstructorTemplates}, so the zero-arg
+ * instantiation below cannot fail for an eligible constructor.
  */
 export function collectScalarTypeConstructors(
   namespace: AuthoringTypeNamespace,
@@ -767,13 +770,105 @@ export function collectScalarTypeConstructors(
     if (!isAuthoringTypeConstructorDescriptor(value)) continue;
     if (value.entityRefArg !== undefined) continue;
     if (value.args?.some((arg) => arg.optional !== true)) continue;
-    // Resolving with the same template machinery the instantiation uses keeps
-    // eligibility and output from drifting — the instantiation below can never
-    // fail for an eligible constructor.
-    if (typeof resolveAuthoringTemplateValue(value.output.nativeType, []) !== 'string') continue;
     result.set(name, instantiateAuthoringTypeConstructor(value, []));
   }
   return result;
+}
+
+function visitTemplateArgRefs(
+  template: AuthoringTemplateValue | undefined,
+  visit: (ref: AuthoringArgRef) => void,
+): void {
+  if (template === undefined) return;
+  if (isAuthoringArgRef(template)) {
+    visit(template);
+    // A reference's fallback is a template of its own; its references are
+    // held to the same rules so a fallback chain always terminates in a
+    // resolvable value.
+    visitTemplateArgRefs(template.default, visit);
+    return;
+  }
+  if (Array.isArray(template)) {
+    for (const value of template) {
+      visitTemplateArgRefs(value, visit);
+    }
+    return;
+  }
+  if (typeof template === 'object' && template !== null) {
+    for (const value of Object.values(template)) {
+      visitTemplateArgRefs(value, visit);
+    }
+  }
+}
+
+/**
+ * Boundary validation for a contributed authoring type namespace: rejects
+ * self-contradictory type-constructor descriptors so read sites (the scalar
+ * view in {@link collectScalarTypeConstructors}, bare-name resolution,
+ * ordinary calls) can instantiate output templates without defensive
+ * guards. Called per contributing component at assembly, which supplies
+ * `contributedBy` for attribution.
+ *
+ * Rules — entity-ref constructors are skipped entirely (their output
+ * derives from the referenced entity, not from resolving a template):
+ *
+ * - A plain constructor must declare the output template naming its
+ *   storage type.
+ * - Every template arg-ref must point at a declared argument index.
+ * - In that template, an arg-ref pointing at an `optional: true` argument
+ *   must carry a `default`: the argument is declared omittable, so a
+ *   defaultless reference could never resolve for the omitted shape.
+ * - Refs inside `typeParams` values are exempt from the default
+ *   requirement: an omitted optional argument resolves to undefined there
+ *   and the key is dropped by design (see
+ *   {@link resolveAuthoringTemplateValue}), e.g. bare `VarChar` emitting no
+ *   length param.
+ */
+export function assertResolvableTypeConstructorTemplates(
+  namespace: AuthoringTypeNamespace,
+  contributedBy: string,
+  path: readonly string[] = [],
+): void {
+  for (const [name, value] of Object.entries(namespace)) {
+    const currentPath = [...path, name];
+    if (!isAuthoringTypeConstructorDescriptor(value)) {
+      assertResolvableTypeConstructorTemplates(value, contributedBy, currentPath);
+      continue;
+    }
+    if (value.entityRefArg !== undefined) continue;
+
+    const args = value.args ?? [];
+    const invalid = (detail: string) =>
+      new Error(
+        `Invalid authoring type constructor "${currentPath.join('.')}" contributed by descriptor "${contributedBy}". ${detail}`,
+      );
+    const checkRefsAt =
+      (field: string, requireDefaultForOptional: boolean) => (ref: AuthoringArgRef) => {
+        const arg = args[ref.index];
+        if (arg === undefined) {
+          throw invalid(
+            `${field} references argument ${ref.index}, but the constructor declares ${args.length} argument(s). Declare the argument or correct the reference index.`,
+          );
+        }
+        if (requireDefaultForOptional && arg.optional === true && ref.default === undefined) {
+          const argLabel = arg.name === undefined ? `${ref.index}` : `${ref.index} ("${arg.name}")`;
+          throw invalid(
+            `${field} references argument ${argLabel}, which is optional but the reference carries no default; the template cannot resolve when the argument is omitted. Mark the argument required, or give the template reference a default.`,
+          );
+        }
+      };
+
+    const storageTypeTemplate = value.output.nativeType;
+    if (storageTypeTemplate === undefined) {
+      throw invalid(
+        'The output declares no storage type template and no entityRefArg; a plain constructor must declare one.',
+      );
+    }
+    visitTemplateArgRefs(storageTypeTemplate, checkRefsAt('output.nativeType', true));
+    for (const [key, template] of Object.entries(value.output.typeParams ?? {})) {
+      visitTemplateArgRefs(template, checkRefsAt(`output.typeParams.${key}`, false));
+    }
+  }
 }
 
 /**

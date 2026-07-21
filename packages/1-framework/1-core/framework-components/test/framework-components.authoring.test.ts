@@ -582,18 +582,6 @@ describe('collectScalarTypeConstructors', () => {
     });
   });
 
-  it('excludes an all-optional constructor whose nativeType references an absent arg with no default', () => {
-    const namespace = {
-      Custom: {
-        kind: 'typeConstructor',
-        args: [{ kind: 'string', name: 'name', optional: true }],
-        output: { codecId: 'pg/custom@1', nativeType: { kind: 'arg', index: 0 } },
-      },
-    } satisfies AuthoringTypeNamespace;
-
-    expect(collectScalarTypeConstructors(namespace).size).toBe(0);
-  });
-
   it('resolves a defaulted nativeType arg-ref in bare form', () => {
     const namespace = {
       Aliased: {
@@ -646,14 +634,6 @@ describe('collectScalarTypeConstructors', () => {
         entityRefArg: { index: 0, entityKind: 'native_enum' },
         output: { codecId: 'pg/enum@1' },
       },
-    } satisfies AuthoringTypeNamespace;
-
-    expect(collectScalarTypeConstructors(namespace).size).toBe(0);
-  });
-
-  it('excludes zero-arg constructors without a literal nativeType', () => {
-    const namespace = {
-      Odd: { kind: 'typeConstructor', output: { codecId: 'pg/odd@1' } },
     } satisfies AuthoringTypeNamespace;
 
     expect(collectScalarTypeConstructors(namespace).size).toBe(0);

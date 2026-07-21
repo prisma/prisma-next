@@ -15,6 +15,7 @@ import type {
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
+  assertResolvableTypeConstructorTemplates,
   collectContributedDescriptorPaths,
   collectScalarTypeConstructors,
   mergeAuthoringNamespaces,
@@ -219,6 +220,7 @@ export function assembleAuthoringContributions(
     }
     if (descriptor.authoring?.type) {
       claimContributedPaths(descriptor.authoring.type, 'typeConstructor', 'type', descriptorId);
+      assertResolvableTypeConstructorTemplates(descriptor.authoring.type, descriptorId);
       mergeAuthoringNamespaces(type, descriptor.authoring.type, [], 'typeConstructor', 'type');
     }
     if (descriptor.authoring?.entityTypes) {
