@@ -70,3 +70,13 @@ package.json devDependency version ranges and biome.jsonc schema versions only â
 no framework surface, contract shape, or emitted artefact changes. No user
 action required. Incidental substrate diff only.
 -->
+
+<!--
+Dependabot runtime-deps group bump (PR #1014): `changes: []`. Dependency version
+bumps only. The `examples/` diff is package.json version ranges in the demo apps
+(isbot in react-router-demo; @radix-ui/react-radio-group, @radix-ui/react-select,
+lucide-react, postcss in retail-store) â€” dependencies of the example applications
+themselves, not of any `@prisma-next/*` package. No framework surface, contract
+shape, or emitted artefact change. No user action required. Incidental substrate
+diff only.
+-->
