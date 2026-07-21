@@ -14,6 +14,7 @@ import {
   JsonArrayAggExpr,
   JsonObjectExpr,
   LiteralExpr,
+  NativeJsonValueProjection,
   OperationExpr,
   OrderByItem,
   OrExpr,
@@ -341,7 +342,9 @@ describe('compileSelectWithIncludes', () => {
       expect(subquerySelect.projection).toEqual([
         ProjectionItem.of(
           relationName,
-          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', expectedAggregate)]),
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('value', new NativeJsonValueProjection(expectedAggregate)),
+          ]),
         ),
       ]);
     }
@@ -504,7 +507,9 @@ describe('compileSelectWithIncludes', () => {
       expect(commentsProjection.expr.query.projection).toEqual([
         ProjectionItem.of(
           'comments',
-          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', AggregateExpr.count())]),
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('value', new NativeJsonValueProjection(AggregateExpr.count())),
+          ]),
         ),
       ]);
     });
@@ -543,8 +548,14 @@ describe('compileSelectWithIncludes', () => {
         ProjectionItem.of(
           'posts',
           JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('recent', ColumnRef.of('posts__combine__recent', 'posts')),
-            JsonObjectExpr.entry('total', ColumnRef.of('posts__combine__total', 'posts')),
+            JsonObjectExpr.entry(
+              'recent',
+              new NativeJsonValueProjection(ColumnRef.of('posts__combine__recent', 'posts')),
+            ),
+            JsonObjectExpr.entry(
+              'total',
+              new NativeJsonValueProjection(ColumnRef.of('posts__combine__total', 'posts')),
+            ),
           ]),
         ),
       ]);
@@ -577,7 +588,9 @@ describe('compileSelectWithIncludes', () => {
       expect(aSelect.projection).toEqual([
         ProjectionItem.of(
           'posts',
-          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', AggregateExpr.count())]),
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('value', new NativeJsonValueProjection(AggregateExpr.count())),
+          ]),
         ),
       ]);
       const bJoin = subquery.joins?.[0];
@@ -587,7 +600,10 @@ describe('compileSelectWithIncludes', () => {
         ProjectionItem.of(
           'posts',
           JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('value', AggregateExpr.sum(ColumnRef.of('posts', 'views'))),
+            JsonObjectExpr.entry(
+              'value',
+              new NativeJsonValueProjection(AggregateExpr.sum(ColumnRef.of('posts', 'views'))),
+            ),
           ]),
         ),
       ]);
@@ -668,10 +684,18 @@ describe('M:N include correlated subquery', () => {
       ProjectionItem.of(
         'tags',
         JsonArrayAggExpr.of(
-          JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('id', ColumnRef.of('tags__rows', 'id')),
-            JsonObjectExpr.entry('name', ColumnRef.of('tags__rows', 'name')),
-          ]),
+          new NativeJsonValueProjection(
+            JsonObjectExpr.fromEntries([
+              JsonObjectExpr.entry(
+                'id',
+                new NativeJsonValueProjection(ColumnRef.of('tags__rows', 'id')),
+              ),
+              JsonObjectExpr.entry(
+                'name',
+                new NativeJsonValueProjection(ColumnRef.of('tags__rows', 'name')),
+              ),
+            ]),
+          ),
           'emptyArray',
         ),
       ),
@@ -737,11 +761,22 @@ describe('M:N include correlated subquery', () => {
       ProjectionItem.of(
         'related',
         JsonArrayAggExpr.of(
-          JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('id', ColumnRef.of('related__rows', 'id')),
-            JsonObjectExpr.entry('name', ColumnRef.of('related__rows', 'name')),
-            JsonObjectExpr.entry('tenant_id', ColumnRef.of('related__rows', 'tenant_id')),
-          ]),
+          new NativeJsonValueProjection(
+            JsonObjectExpr.fromEntries([
+              JsonObjectExpr.entry(
+                'id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'id')),
+              ),
+              JsonObjectExpr.entry(
+                'name',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'name')),
+              ),
+              JsonObjectExpr.entry(
+                'tenant_id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'tenant_id')),
+              ),
+            ]),
+          ),
           'emptyArray',
         ),
       ),
@@ -856,11 +891,22 @@ describe('M:N include correlated subquery', () => {
       ProjectionItem.of(
         'related',
         JsonArrayAggExpr.of(
-          JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('id', ColumnRef.of('related__rows', 'id')),
-            JsonObjectExpr.entry('name', ColumnRef.of('related__rows', 'name')),
-            JsonObjectExpr.entry('tenant_id', ColumnRef.of('related__rows', 'tenant_id')),
-          ]),
+          new NativeJsonValueProjection(
+            JsonObjectExpr.fromEntries([
+              JsonObjectExpr.entry(
+                'id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'id')),
+              ),
+              JsonObjectExpr.entry(
+                'name',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'name')),
+              ),
+              JsonObjectExpr.entry(
+                'tenant_id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'tenant_id')),
+              ),
+            ]),
+          ),
           'emptyArray',
         ),
       ),
@@ -896,12 +942,26 @@ describe('M:N include correlated subquery', () => {
       ProjectionItem.of(
         'related',
         JsonArrayAggExpr.of(
-          JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('id', ColumnRef.of('related__rows', 'id')),
-            JsonObjectExpr.entry('name', ColumnRef.of('related__rows', 'name')),
-            JsonObjectExpr.entry('tenant_id', ColumnRef.of('related__rows', 'tenant_id')),
-            JsonObjectExpr.entry('related', ColumnRef.of('related__rows', 'related')),
-          ]),
+          new NativeJsonValueProjection(
+            JsonObjectExpr.fromEntries([
+              JsonObjectExpr.entry(
+                'id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'id')),
+              ),
+              JsonObjectExpr.entry(
+                'name',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'name')),
+              ),
+              JsonObjectExpr.entry(
+                'tenant_id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'tenant_id')),
+              ),
+              JsonObjectExpr.entry(
+                'related',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'related')),
+              ),
+            ]),
+          ),
           'emptyArray',
         ),
       ),

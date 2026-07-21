@@ -5,6 +5,7 @@ import {
   type AggregateExpr,
   type AnyExpression,
   type AnyFromSource,
+  type AnyJsonValueProjection,
   type AnyParamRef,
   type AnyQueryAst,
   type BinaryExpr,
@@ -17,6 +18,7 @@ import {
   type JoinOnExpr,
   type JsonArrayAggExpr,
   type JsonObjectExpr,
+  type JsonValueProjectionVisitor,
   type ListExpression,
   LiteralExpr,
   type LoweredParam,
@@ -121,6 +123,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function unreachableKind(value: never): string {
+  const candidate: unknown = value;
+  if (
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    'kind' in candidate &&
+    typeof candidate.kind === 'string'
+  ) {
+    return candidate.kind;
+  }
+  return 'unknown';
+}
+
 /**
  * Per-render carrier threaded through every helper. Bundles the param-index map (for `$N` numbering) and the assembled-stack `codecLookup` (for cast policy at the `renderTypedParam` chokepoint). Carrying both on a single value keeps helper signatures stable.
  */
@@ -169,9 +184,7 @@ export function renderLoweredSql(
       break;
     // v8 ignore next 4
     default:
-      throw new Error(
-        `Unsupported AST node kind: ${(node satisfies never as { kind: string }).kind}`,
-      );
+      throw new Error(`Unsupported AST node kind: ${unreachableKind(node)}`);
   }
 
   return Object.freeze({ sql, params: Object.freeze(params) });
@@ -469,9 +482,7 @@ function renderSource(
     }
     // v8 ignore next 4
     default:
-      throw new Error(
-        `Unsupported source node kind: ${(node satisfies never as { kind: string }).kind}`,
-      );
+      throw new Error(`Unsupported source node kind: ${unreachableKind(node)}`);
   }
 }
 
@@ -644,6 +655,19 @@ function renderWindowFuncExpr(
   return `${fn}(${args}) OVER (${over})`;
 }
 
+function renderJsonValueProjection(
+  projection: AnyJsonValueProjection,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
+): string {
+  const visitor: JsonValueProjectionVisitor<string> = {
+    codec: ({ value }) => renderExpr(value, contract, pim),
+    native: ({ value }) => renderExpr(value, contract, pim),
+    document: ({ value }) => renderExpr(value, contract, pim),
+  };
+  return projection.accept(visitor);
+}
+
 function renderJsonObjectExpr(
   expr: JsonObjectExpr,
   contract: PostgresContract,
@@ -652,10 +676,7 @@ function renderJsonObjectExpr(
   const args = expr.entries
     .flatMap((entry): [string, string] => {
       const key = `'${escapeLiteral(entry.key)}'`;
-      if (entry.value.kind === 'literal') {
-        return [key, renderLiteral(entry.value)];
-      }
-      return [key, renderExpr(entry.value, contract, pim)];
+      return [key, renderJsonValueProjection(entry.value, contract, pim)];
     })
     .join(', ');
   return `json_build_object(${args})`;
@@ -680,7 +701,7 @@ function renderJsonArrayAggExpr(
     expr.orderBy && expr.orderBy.length > 0
       ? ` ORDER BY ${renderOrderByItems(expr.orderBy, contract, pim)}`
       : '';
-  const aggregated = `json_agg(${renderExpr(expr.expr, contract, pim)}${aggregateOrderBy})`;
+  const aggregated = `json_agg(${renderJsonValueProjection(expr.expr, contract, pim)}${aggregateOrderBy})`;
   if (expr.onEmpty === 'emptyArray') {
     return `coalesce(${aggregated}, json_build_array())`;
   }
@@ -738,9 +759,7 @@ function renderExpr(expr: AnyExpression, contract: PostgresContract, pim: ParamI
       return renderRawExpr(node, contract, pim);
     // v8 ignore next 4
     default:
-      throw new Error(
-        `Unsupported expression node kind: ${(node satisfies never as { kind: string }).kind}`,
-      );
+      throw new Error(`Unsupported expression node kind: ${unreachableKind(node)}`);
   }
 }
 
@@ -912,9 +931,7 @@ function renderInsertValue(
       return renderExpr(value, contract, pim);
     // v8 ignore next 4
     default:
-      throw new Error(
-        `Unsupported value node in INSERT: ${(value satisfies never as { kind: string }).kind}`,
-      );
+      throw new Error(`Unsupported value node in INSERT: ${unreachableKind(value)}`);
   }
 }
 
@@ -979,9 +996,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
           }
           // v8 ignore next 4
           default:
-            throw new Error(
-              `Unsupported onConflict action: ${(action satisfies never as { kind: string }).kind}`,
-            );
+            throw new Error(`Unsupported onConflict action: ${unreachableKind(action)}`);
         }
       })()
     : '';

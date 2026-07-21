@@ -10,6 +10,7 @@ import {
   JsonObjectExpr,
   ListExpression,
   LiteralExpr,
+  NativeJsonValueProjection,
   NotExpr,
   NullCheckExpr,
   OperationExpr,
@@ -300,7 +301,7 @@ describe('query plan aggregate', () => {
 
     it('rejects JsonObjectExpr', () => {
       const json = JsonObjectExpr.fromEntries([
-        JsonObjectExpr.entry('x', ColumnRef.of('posts', 'id')),
+        JsonObjectExpr.entry('x', new NativeJsonValueProjection(ColumnRef.of('posts', 'id'))),
       ]);
       expect(() => compileWithHaving(json)).toThrow(
         'Unsupported grouped having expression kind "json-object"',
@@ -308,7 +309,7 @@ describe('query plan aggregate', () => {
     });
 
     it('rejects JsonArrayAggExpr', () => {
-      const agg = JsonArrayAggExpr.of(ColumnRef.of('posts', 'id'));
+      const agg = JsonArrayAggExpr.of(new NativeJsonValueProjection(ColumnRef.of('posts', 'id')));
       expect(() => compileWithHaving(agg)).toThrow(
         'Unsupported grouped having expression kind "json-array-agg"',
       );
@@ -404,7 +405,9 @@ describe('query plan aggregate', () => {
     });
 
     it('rejects JsonObjectExpr on right side of binary', () => {
-      const json = JsonObjectExpr.fromEntries([JsonObjectExpr.entry('x', LiteralExpr.of(1))]);
+      const json = JsonObjectExpr.fromEntries([
+        JsonObjectExpr.entry('x', new NativeJsonValueProjection(LiteralExpr.of(1))),
+      ]);
       expect(() => compileWithHaving(BinaryExpr.gte(AggregateExpr.count(), json))).toThrow(
         'Unsupported comparable kind in grouped having: "json-object"',
       );

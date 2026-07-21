@@ -6,15 +6,19 @@ import {
   AndExpr,
   type AnyQueryAst,
   BinaryExpr,
+  CodecJsonValueProjection,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
   ExistsExpr,
   InsertAst,
   InsertOnConflict,
+  JsonArrayAggExpr,
+  JsonDocumentProjection,
   JsonObjectExpr,
   ListExpression,
   LiteralExpr,
+  NativeJsonValueProjection,
   NullCheckExpr,
   OperationExpr,
   OrderByItem,
@@ -99,8 +103,11 @@ describe('Postgres adapter', () => {
         ProjectionItem.of(
           'payload',
           JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('email', ColumnRef.of('user', 'email')),
-            JsonObjectExpr.entry('count', AggregateExpr.count()),
+            JsonObjectExpr.entry(
+              'email',
+              new NativeJsonValueProjection(ColumnRef.of('user', 'email')),
+            ),
+            JsonObjectExpr.entry('count', new NativeJsonValueProjection(AggregateExpr.count())),
           ]),
         ),
         ProjectionItem.of('firstPostId', SubqueryExpr.of(subquery)),
@@ -115,6 +122,37 @@ describe('Postgres adapter', () => {
       '(SELECT "post"."id" AS "id" FROM "post" WHERE "post"."userId" = "user"."id") AS "firstPostId"',
     );
     expect(lowered.sql).toContain(`WHERE "user"."email" = 'a@example.com'`);
+  });
+
+  it.each([
+    {
+      name: 'codec',
+      projection: new CodecJsonValueProjection(ColumnRef.of('user', 'email'), {
+        codecId: 'pg/text@1',
+      }),
+    },
+    {
+      name: 'native',
+      projection: new NativeJsonValueProjection(ColumnRef.of('user', 'email')),
+    },
+    {
+      name: 'document',
+      projection: new JsonDocumentProjection(ColumnRef.of('user', 'email')),
+    },
+  ])('renders $name JSON value projections as structural pass-throughs', ({ projection }) => {
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of(
+        'object',
+        JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', projection)]),
+      ),
+      ProjectionItem.of('array', JsonArrayAggExpr.of(projection)),
+    ]);
+
+    const lowered = adapter.lower(ast, { contract, params: [] });
+
+    expect(lowered.sql).toBe(
+      `SELECT json_build_object('value', "user"."email") AS "object", json_agg("user"."email") AS "array" FROM "user"`,
+    );
   });
 
   it('lowers insert, update, and delete statements with returning clauses', () => {

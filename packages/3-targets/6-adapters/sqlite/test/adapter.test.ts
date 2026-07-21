@@ -3,6 +3,7 @@ import {
   AndExpr,
   type AnyQueryAst,
   BinaryExpr,
+  CodecJsonValueProjection,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
@@ -12,9 +13,11 @@ import {
   InsertOnConflict,
   JoinAst,
   JsonArrayAggExpr,
+  JsonDocumentProjection,
   JsonObjectExpr,
   ListExpression,
   LiteralExpr,
+  NativeJsonValueProjection,
   NullCheckExpr,
   OrderByItem,
   OrExpr,
@@ -411,8 +414,11 @@ describe('SQLite adapter', () => {
         ProjectionItem.of(
           'payload',
           JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('email', ColumnRef.of('user', 'email')),
-            JsonObjectExpr.entry('count', AggregateExpr.count()),
+            JsonObjectExpr.entry(
+              'email',
+              new NativeJsonValueProjection(ColumnRef.of('user', 'email')),
+            ),
+            JsonObjectExpr.entry('count', new NativeJsonValueProjection(AggregateExpr.count())),
           ]),
         ),
       ]);
@@ -421,9 +427,43 @@ describe('SQLite adapter', () => {
       expect(sql).toContain('json_object(\'email\', "user"."email", \'count\', COUNT(*))');
     });
 
+    it.each([
+      {
+        name: 'codec',
+        projection: new CodecJsonValueProjection(ColumnRef.of('user', 'email'), {
+          codecId: 'sqlite/text@1',
+        }),
+      },
+      {
+        name: 'native',
+        projection: new NativeJsonValueProjection(ColumnRef.of('user', 'email')),
+      },
+      {
+        name: 'document',
+        projection: new JsonDocumentProjection(ColumnRef.of('user', 'email')),
+      },
+    ])('renders $name JSON value projections as structural pass-throughs', ({ projection }) => {
+      const ast = SelectAst.from(TableSource.named('user')).withProjection([
+        ProjectionItem.of(
+          'object',
+          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', projection)]),
+        ),
+        ProjectionItem.of('array', JsonArrayAggExpr.of(projection)),
+      ]);
+
+      const { sql } = adapter.lower(ast, { contract });
+
+      expect(sql).toBe(
+        `SELECT json_object('value', "user"."email") AS "object", json_group_array("user"."email") AS "array" FROM "user"`,
+      );
+    });
+
     it('renders json_group_array instead of json_agg', () => {
       const ast = SelectAst.from(TableSource.named('post')).withProjection([
-        ProjectionItem.of('posts', JsonArrayAggExpr.of(ColumnRef.of('post', 'title'))),
+        ProjectionItem.of(
+          'posts',
+          JsonArrayAggExpr.of(new NativeJsonValueProjection(ColumnRef.of('post', 'title'))),
+        ),
       ]);
 
       const { sql } = adapter.lower(ast, { contract });
@@ -434,7 +474,10 @@ describe('SQLite adapter', () => {
       const ast = SelectAst.from(TableSource.named('post')).withProjection([
         ProjectionItem.of(
           'posts',
-          JsonArrayAggExpr.of(ColumnRef.of('post', 'title'), 'emptyArray'),
+          JsonArrayAggExpr.of(
+            new NativeJsonValueProjection(ColumnRef.of('post', 'title')),
+            'emptyArray',
+          ),
         ),
       ]);
 

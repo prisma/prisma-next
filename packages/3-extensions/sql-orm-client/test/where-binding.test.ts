@@ -12,6 +12,7 @@ import {
   JsonObjectExpr,
   ListExpression,
   LiteralExpr,
+  NativeJsonValueProjection,
   NotExpr,
   NullCheckExpr,
   OperationExpr,
@@ -314,24 +315,35 @@ describe('bindWhereExpr', () => {
 
     it('binds inner expressions of JsonObjectExpr', () => {
       const expr = JsonObjectExpr.fromEntries([
-        JsonObjectExpr.entry('sub', SubqueryExpr.of(subqueryWithLiteral())),
+        JsonObjectExpr.entry(
+          'sub',
+          new NativeJsonValueProjection(SubqueryExpr.of(subqueryWithLiteral())),
+        ),
       ]);
       const bound = bindWhereExpr(contract, expr);
 
       expect(bound.kind).toBe('json-object');
       const json = bound as JsonObjectExpr;
-      const innerQuery = (json.entries[0]!.value as SubqueryExpr).query as SelectAst;
+      const projection = json.entries[0]?.value;
+      expect(projection).toBeInstanceOf(NativeJsonValueProjection);
+      if (!(projection instanceof NativeJsonValueProjection)) {
+        throw new Error('Expected NativeJsonValueProjection');
+      }
+      const innerQuery = (projection.value as SubqueryExpr).query as SelectAst;
       const innerWhere = innerQuery.where as BinaryExpr;
       expect(innerWhere.right.kind).toBe('param-ref');
     });
 
     it('binds inner expression of JsonArrayAggExpr', () => {
-      const expr = JsonArrayAggExpr.of(SubqueryExpr.of(subqueryWithLiteral()));
+      const expr = JsonArrayAggExpr.of(
+        new NativeJsonValueProjection(SubqueryExpr.of(subqueryWithLiteral())),
+      );
       const bound = bindWhereExpr(contract, expr);
 
       expect(bound.kind).toBe('json-array-agg');
       const agg = bound as JsonArrayAggExpr;
-      const innerQuery = (agg.expr as SubqueryExpr).query as SelectAst;
+      expect(agg.expr).toBeInstanceOf(NativeJsonValueProjection);
+      const innerQuery = (agg.expr.value as SubqueryExpr).query as SelectAst;
       const innerWhere = innerQuery.where as BinaryExpr;
       expect(innerWhere.right.kind).toBe('param-ref');
     });

@@ -1,7 +1,9 @@
 import type { ParamSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
+import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { CodecRef } from './codec-types';
+import type { AnyJsonValueProjection } from './json-value-projection';
 
 export type Direction = 'asc' | 'desc';
 
@@ -85,7 +87,7 @@ export type JoinOnExpr = EqColJoinOn | AnyExpression;
 export type WhereArg = AnyExpression | ToWhereExpr;
 export type JsonObjectEntry = {
   readonly key: string;
-  readonly value: ProjectionExpr;
+  readonly value: AnyJsonValueProjection;
 };
 
 function frozenArrayCopy<T>(values: readonly T[]): ReadonlyArray<T> {
@@ -103,10 +105,7 @@ function frozenRecordCopy<T>(record: Readonly<Record<string, T>>): Readonly<Reco
 }
 
 function frozenCodecRef(codec: CodecRef): CodecRef {
-  const typeParams =
-    codec.typeParams === undefined
-      ? undefined
-      : (structuredClone(codec.typeParams) as CodecRef['typeParams']);
+  const typeParams = codec.typeParams === undefined ? undefined : structuredClone(codec.typeParams);
   const base = {
     codecId: codec.codecId,
     ...ifDefined('typeParams', typeParams),
@@ -242,17 +241,17 @@ function rewriteUpdateSet(
 ): Record<string, AnyExpression> {
   const result: Record<string, AnyExpression> = {};
   for (const [key, value] of Object.entries(set)) {
-    result[key] = value.rewrite(rewriter as ExpressionRewriter);
+    result[key] = value.rewrite(rewriter);
   }
   return result;
 }
 
-function rewriteLimitOffset<T extends number | AnyExpression | undefined>(
-  value: T,
+function rewriteLimitOffset(
+  value: number | AnyExpression | undefined,
   rewriter: AstRewriter,
-): T {
+): number | AnyExpression | undefined {
   if (value === undefined || typeof value === 'number') return value;
-  return value.rewrite(rewriter) as T;
+  return value.rewrite(rewriter);
 }
 
 function rewriteOnConflict(onConflict: InsertOnConflict, rewriter: AstRewriter): InsertOnConflict {
@@ -306,12 +305,19 @@ abstract class Expression extends AstNode implements ExpressionSource {
     throw new Error(`${this.constructor.name} does not expose a base column reference`);
   }
 
+  private asAnyExpression(): AnyExpression {
+    return blindCast<
+      AnyExpression,
+      'every concrete Expression subclass is included in AnyExpression'
+    >(this);
+  }
+
   toExpr(): AnyExpression {
-    return this as unknown as AnyExpression;
+    return this.asAnyExpression();
   }
 
   not(): NotExpr {
-    return new NotExpr(this as unknown as AnyExpression);
+    return new NotExpr(this.asAnyExpression());
   }
 }
 
@@ -648,9 +654,7 @@ export class OperationExpr extends Expression {
     return new OperationExpr({
       method: this.method,
       self: this.self.rewrite(rewriter),
-      args: this.args.map((arg) => rewriteComparable(arg, rewriter)) as ReadonlyArray<
-        AnyExpression | ParamRef | LiteralExpr
-      >,
+      args: this.args.map((arg) => rewriteComparable(arg, rewriter)),
       returns: this.returns,
       lowering: this.lowering,
     });
@@ -835,7 +839,7 @@ export class JsonObjectExpr extends Expression {
     this.freeze();
   }
 
-  static entry(key: string, value: ProjectionExpr): JsonObjectEntry {
+  static entry(key: string, value: AnyJsonValueProjection): JsonObjectEntry {
     return {
       key,
       value,
@@ -854,12 +858,7 @@ export class JsonObjectExpr extends Expression {
     return new JsonObjectExpr(
       this.entries.map((entry) => ({
         key: entry.key,
-        value:
-          entry.value.kind === 'literal'
-            ? rewriter.literal
-              ? rewriter.literal(entry.value)
-              : entry.value
-            : entry.value.rewrite(rewriter),
+        value: entry.value.rewrite(rewriter),
       })),
     );
   }
@@ -867,14 +866,7 @@ export class JsonObjectExpr extends Expression {
   override fold<T>(folder: ExpressionFolder<T>): T {
     return combineAll(
       folder,
-      this.entries.map(
-        (entry) => () =>
-          entry.value.kind === 'literal'
-            ? folder.literal
-              ? folder.literal(entry.value)
-              : folder.empty
-            : entry.value.fold(folder),
-      ),
+      this.entries.map((entry) => () => entry.value.fold(folder)),
     );
   }
 }
@@ -915,12 +907,12 @@ export class OrderByItem extends AstNode {
 
 export class JsonArrayAggExpr extends Expression {
   readonly kind = 'json-array-agg' as const;
-  readonly expr: AnyExpression;
+  readonly expr: AnyJsonValueProjection;
   readonly onEmpty: 'null' | 'emptyArray';
   readonly orderBy: ReadonlyArray<OrderByItem> | undefined;
 
   constructor(
-    expr: AnyExpression,
+    expr: AnyJsonValueProjection,
     onEmpty: 'null' | 'emptyArray' = 'null',
     orderBy?: ReadonlyArray<OrderByItem>,
   ) {
@@ -932,7 +924,7 @@ export class JsonArrayAggExpr extends Expression {
   }
 
   static of(
-    expr: AnyExpression,
+    expr: AnyJsonValueProjection,
     onEmpty: 'null' | 'emptyArray' = 'null',
     orderBy?: ReadonlyArray<OrderByItem>,
   ): JsonArrayAggExpr {
@@ -2027,7 +2019,8 @@ export function isQueryAst(value: unknown): value is AnyQueryAst {
     typeof value === 'object' &&
     value !== null &&
     'kind' in value &&
-    queryAstKinds.has((value as { kind: string }).kind)
+    typeof value.kind === 'string' &&
+    queryAstKinds.has(value.kind)
   );
 }
 
@@ -2036,7 +2029,8 @@ export function isWhereExpr(value: unknown): value is AnyExpression {
     typeof value === 'object' &&
     value !== null &&
     'kind' in value &&
-    whereExprKinds.has((value as { kind: string }).kind)
+    typeof value.kind === 'string' &&
+    whereExprKinds.has(value.kind)
   );
 }
 
