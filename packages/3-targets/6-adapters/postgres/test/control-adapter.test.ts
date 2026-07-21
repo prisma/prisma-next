@@ -1887,7 +1887,7 @@ describe('PostgresControlAdapter', () => {
       await expect(adapter.readMarker(driver, 'app')).resolves.toBeNull();
     });
 
-    it('throws PN-RUN-3005 when marker row fails validation', async () => {
+    it('throws CONTRACT.MARKER_ROW_CORRUPT when marker row fails validation', async () => {
       const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
       const driver = createMockDriver([
         {
@@ -1902,12 +1902,14 @@ describe('PostgresControlAdapter', () => {
 
       await expect(adapter.readMarker(driver, 'app')).rejects.toSatisfy((err: unknown) => {
         expect(CliStructuredError.is(err)).toBe(true);
-        expect((err as unknown as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+        expect((err as unknown as CliStructuredError).toEnvelope().code).toBe(
+          'CONTRACT.MARKER_ROW_CORRUPT',
+        );
         return true;
       });
     });
 
-    it('throws PN-RUN-3006 when marker read query fails', async () => {
+    it('throws CONTRACT.MARKER_READ_FAILED when marker read query fails', async () => {
       const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
       const driver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
@@ -1922,14 +1924,16 @@ describe('PostgresControlAdapter', () => {
       };
 
       await expect(adapter.readMarker(driver, 'app')).rejects.toSatisfy((err: unknown) => {
-        expect((err as unknown as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3006');
+        expect((err as unknown as CliStructuredError).toEnvelope().code).toBe(
+          'CONTRACT.MARKER_READ_FAILED',
+        );
         return true;
       });
     });
   });
 
   describe('readAllMarkers', () => {
-    it('throws PN-RUN-3005 on first corrupt row', async () => {
+    it('throws CONTRACT.MARKER_ROW_CORRUPT on first corrupt row', async () => {
       const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
       const driver = createMockDriver([
         { match: includes('"information_schema"."tables"'), rows: [{ '?column?': 1 }] },
@@ -1953,7 +1957,9 @@ describe('PostgresControlAdapter', () => {
 
       await expect(adapter.readAllMarkers(driver)).rejects.toSatisfy((err: unknown) => {
         expect(CliStructuredError.is(err)).toBe(true);
-        expect((err as unknown as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+        expect((err as unknown as CliStructuredError).toEnvelope().code).toBe(
+          'CONTRACT.MARKER_ROW_CORRUPT',
+        );
         return true;
       });
     });

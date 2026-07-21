@@ -266,7 +266,7 @@ withTempDir(({ createTempDir }) => {
 
           // Verify error output (errors go to stderr/consoleErrors)
           const errorOutput = consoleErrors.join('\n');
-          expect(errorOutput).toContain('PN-CLI-4');
+          expect(errorOutput).toContain('CLI.FILE_NOT_FOUND');
           expect(errorOutput).toMatch(/file.*not found|not found.*file/i);
         });
       },

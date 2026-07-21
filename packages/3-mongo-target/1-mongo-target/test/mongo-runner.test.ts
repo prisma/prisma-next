@@ -377,7 +377,7 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     }
 
     expect(thrown).toMatchObject({
-      code: '3020',
+      code: 'MIGRATION.RUNNER_FAILED',
       meta: {
         commandKind: 'rawUpdateMany',
         collection: RUN_COLLECTION,

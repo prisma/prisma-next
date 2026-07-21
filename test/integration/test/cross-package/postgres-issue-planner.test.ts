@@ -192,14 +192,16 @@ describe('planIssues', () => {
       expect(calls[2]).toMatchObject({ factoryName: 'setNotNull' });
     });
 
-    it('DataTransformCall.toOp() throws PN-MIG-2001', () => {
+    it('DataTransformCall.toOp() throws MIGRATION.UNFILLED_PLACEHOLDER', () => {
       const result = planAgainst(contractWithStatus(), actualWithoutStatus());
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
       const dtCall = result.value.calls[1]!;
       expect(dtCall.factoryName).toBe('dataTransform');
-      expect(() => dtCall.toOp()).toThrow(expect.objectContaining({ code: '2001', domain: 'MIG' }));
+      expect(() => dtCall.toOp()).toThrow(
+        expect.objectContaining({ code: 'MIGRATION.UNFILLED_PLACEHOLDER' }),
+      );
     });
   });
 

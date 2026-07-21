@@ -133,7 +133,7 @@ describe('migration check ref-resolution error', () => {
 
     expect(exitCode).toBe(2);
     expect(envelope.ok).toBe(false);
-    expect(envelope.code).toBe('PN-RUN-3000');
+    expect(envelope.code).toBe('CONTRACT.VERIFY_FAILED');
     expect(envelope.meta?.['input']).toBe('does-not-exist');
     expect(envelope.meta?.['grammar']).toBe('migration');
   });

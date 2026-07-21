@@ -281,7 +281,7 @@ describe('migration show command', () => {
     const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
     expect(jsonLine).toBeDefined();
     const envelope = JSON.parse(jsonLine!) as { code?: string };
-    expect(envelope.code).toBe('PN-CLI-4004');
+    expect(envelope.code).toBe('CLI.FILE_NOT_FOUND');
   });
 
   it('resolves a migration directory path argument', async () => {
@@ -359,6 +359,6 @@ describe('migration show command', () => {
 
     const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
     const envelope = JSON.parse(jsonLine!) as { code?: string };
-    expect(envelope.code).toBe('PN-CLI-4003');
+    expect(envelope.code).toBe('CONTRACT.VALIDATION_FAILED');
   });
 });

@@ -85,7 +85,7 @@ const PROJECT_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
  * `db init` requires this directory to exist with the extension space
  * already planned in; see Linear TML-2495 for the gotcha. Tests fail
  * early with a clear message rather than the cryptic
- * `PN-MIG-5001 [declaredButUnmigrated] postgis` when the prerequisite
+ * `MIGRATION.CONTRACT_SPACE_LAYOUT_VIOLATION [declaredButUnmigrated] postgis` when the prerequisite
  * step is missing.
  */
 const MIGRATIONS_DIR = join(PROJECT_ROOT, 'migrations');

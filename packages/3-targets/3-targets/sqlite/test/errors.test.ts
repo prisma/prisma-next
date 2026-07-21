@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { errorSqliteMigrationStackMissing } from '../src/core/errors';
 
 describe('errorSqliteMigrationStackMissing', () => {
-  it('renders under the stable PN-MIG-2008 code', () => {
-    expect(errorSqliteMigrationStackMissing('createTable').toEnvelope().code).toBe('PN-MIG-2008');
+  it('renders under the stable MIGRATION.SQLITE_CONTROL_STACK_MISSING code', () => {
+    expect(errorSqliteMigrationStackMissing('createTable').toEnvelope().code).toBe(
+      'MIGRATION.SQLITE_CONTROL_STACK_MISSING',
+    );
   });
 
   it('names the operation that failed in summary, why, and meta', () => {

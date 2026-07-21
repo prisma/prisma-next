@@ -18,7 +18,7 @@ describe('requireLiveDatabase', () => {
       hasDriver: true,
       why: 'needs db',
     });
-    expect(error?.code).toBe('4005');
+    expect(error?.code).toBe('CONFIG.DB_CONNECTION_REQUIRED');
     expect(error?.meta?.['missingFlags']).toEqual(['--db']);
   });
 
@@ -28,7 +28,7 @@ describe('requireLiveDatabase', () => {
       hasDriver: false,
       why: 'needs driver',
     });
-    expect(error?.code).toBe('4005');
+    expect(error?.code).toBe('CONFIG.DB_CONNECTION_REQUIRED');
     expect(error?.meta?.['missingFlags']).toEqual([]);
   });
 
@@ -38,7 +38,7 @@ describe('requireLiveDatabase', () => {
       hasDriver: false,
       why: 'needs both',
     });
-    expect(error?.code).toBe('4005');
+    expect(error?.code).toBe('CONFIG.DB_CONNECTION_REQUIRED');
     expect(error?.meta?.['missingFlags']).toEqual(['--db']);
   });
 });

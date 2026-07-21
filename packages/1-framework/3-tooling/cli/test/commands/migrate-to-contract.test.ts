@@ -223,7 +223,7 @@ describe('migrate --to verifies against the target bundle contract', () => {
       why?: string;
       where?: { path?: string };
     };
-    expect(envelope.code).toBe('PN-CLI-4003');
+    expect(envelope.code).toBe('CONTRACT.VALIDATION_FAILED');
     expect(envelope.summary).toContain('Contract validation failed');
     expect(envelope.where?.path).toContain(endContractRel);
     expect(envelope.why).toContain(endContractRel);
@@ -250,7 +250,7 @@ describe('migrate --to verifies against the target bundle contract', () => {
       summary?: string;
       where?: { path?: string };
     };
-    expect(envelope.code).toBe('PN-CLI-4004');
+    expect(envelope.code).toBe('CLI.FILE_NOT_FOUND');
     expect(envelope.summary).toContain('File not found');
     expect(envelope.where?.path).toContain('contract.json');
     expect(mocks.migrate).not.toHaveBeenCalled();
@@ -273,7 +273,7 @@ describe('migrate --to verifies against the target bundle contract', () => {
       summary?: string;
       where?: { path?: string };
     };
-    expect(envelope.code).toBe('PN-CLI-4003');
+    expect(envelope.code).toBe('CONTRACT.VALIDATION_FAILED');
     expect(envelope.summary).toContain('Contract validation failed');
     expect(envelope.where?.path).toContain('contract.json');
     expect(mocks.migrate).not.toHaveBeenCalled();

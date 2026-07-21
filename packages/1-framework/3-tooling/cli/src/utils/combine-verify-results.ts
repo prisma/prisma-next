@@ -78,7 +78,7 @@ export function combineVerifyResults(
   return {
     result: {
       ok,
-      ...(ok ? {} : { code: appResult.code ?? 'PN-RUN-3010' }),
+      ...(ok ? {} : { code: appResult.code ?? 'CONTRACT.MARKER_REQUIRED' }),
       summary,
       contract: appResult.contract,
       target: appResult.target,

@@ -160,7 +160,7 @@ describe('verifyMongoSchema', () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('PN-RUN-3010');
+      expect(result.code).toBe('CONTRACT.MARKER_REQUIRED');
       expect(result.schema.issues.length).toBeGreaterThan(0);
       expect(result.schema.issues).toContainEqual(expect.objectContaining({ path: ['users'] }));
     });
@@ -179,7 +179,7 @@ describe('verifyMongoSchema', () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('PN-RUN-3010');
+      expect(result.code).toBe('CONTRACT.MARKER_REQUIRED');
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({ path: ['users', 'index:email:1'] }),
       );

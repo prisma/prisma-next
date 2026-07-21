@@ -12,9 +12,10 @@ import { CliStructuredError } from '@prisma-next/errors/control';
  * The `operation` argument is required so every throw site names the operation
  * that actually failed; a new operation cannot inherit a misattributed message.
  *
- * Distinct from `PN-MIG-2001` (placeholder not filled) and `PN-MIG-2005`
- * (data-transform query plan against wrong contract) because the missing
- * input is the stack itself, not the per-operation contract.
+ * Distinct from `MIGRATION.UNFILLED_PLACEHOLDER` (placeholder not filled)
+ * and `MIGRATION.DATA_TRANSFORM_CONTRACT_MISMATCH` (data-transform query
+ * plan against wrong contract) because the missing input is the stack
+ * itself, not the per-operation contract.
  *
  * Lives in `@prisma-next/target-postgres/errors` rather than the shared
  * framework migration errors module because the failure is target-specific:
@@ -23,10 +24,9 @@ import { CliStructuredError } from '@prisma-next/errors/control';
  */
 export function errorPostgresMigrationStackMissing(operation: string): CliStructuredError {
   return new CliStructuredError(
-    '2007',
+    'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
     `PostgresMigration.${operation} requires a control adapter`,
     {
-      domain: 'MIG',
       why: `PostgresMigration.${operation} was invoked on an instance constructed without a ControlStack, so the stored controlAdapter is undefined and the operation cannot lower its plan.`,
       fix: 'Construct the migration via the migration CLI entrypoint (which assembles a ControlStack from the loaded prisma-next.config.ts), or pass a ControlStack containing a Postgres adapter to the migration constructor in test fixtures.',
       meta: { operation },
