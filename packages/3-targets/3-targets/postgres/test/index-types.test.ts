@@ -1,13 +1,3 @@
-/**
- * Postgres index-type registration (TML-3037).
- *
- * `contract infer` prints `@@index(..., type: "gin"/"hash")` for a non-default
- * access method; `validateIndexTypes` rejects any type the target has not
- * registered. These tests prove: (1) the registry carries the six Postgres
- * built-in access methods with permissive options, and (2) a real PSL
- * interpret → build pass accepts a `gin`/`hash` index end-to-end while still
- * rejecting a bogus type — registering real methods must not disable the check.
- */
 import { assembleAuthoringContributions } from '@prisma-next/framework-components/control';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
 import { parse } from '@prisma-next/psl-parser/syntax';
@@ -27,6 +17,9 @@ const assembled = assembleAuthoringContributions([
     authoring: {
       entityTypes: postgresAuthoringEntityTypes,
       pslBlockDescriptors: postgresAuthoringPslBlockDescriptors,
+      type: {
+        Int: { kind: 'typeConstructor', output: { codecId: 'pg/int4@1', nativeType: 'int4' } },
+      },
     },
   },
 ]);
@@ -40,7 +33,6 @@ function interpret(source: string) {
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypeDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
   return interpretPslDocumentToSqlContract({
@@ -49,7 +41,7 @@ function interpret(source: string) {
     sourceId: 'schema.prisma',
     capabilities: {},
     target: postgresTargetDescriptorMeta,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors: scalarTypeDescriptors,
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,

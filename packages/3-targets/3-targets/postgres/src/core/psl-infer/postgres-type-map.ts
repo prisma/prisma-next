@@ -18,7 +18,7 @@ const POSTGRES_TO_PSL: Record<string, string> = {
   decimal: 'Decimal',
   timestamptz: 'DateTime',
   'timestamp with time zone': 'DateTime',
-  jsonb: 'Json',
+  jsonb: 'Jsonb',
   bytea: 'Bytes',
 };
 

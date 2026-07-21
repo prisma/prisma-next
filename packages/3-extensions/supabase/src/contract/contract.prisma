@@ -43,8 +43,8 @@ namespace auth {
     emailChange              Parent?                   @map("email_change")
     emailChangeSentAt        DateTime?                 @map("email_change_sent_at")
     lastSignInAt             DateTime?                 @map("last_sign_in_at")
-    rawAppMetaData           Json?                     @map("raw_app_meta_data")
-    rawUserMetaData          Json?                     @map("raw_user_meta_data")
+    rawAppMetaData           Jsonb?                     @map("raw_app_meta_data")
+    rawUserMetaData          Jsonb?                     @map("raw_user_meta_data")
     isSuperAdmin             Boolean?                  @map("is_super_admin")
     createdAt                DateTime?                 @map("created_at")
     updatedAt                DateTime?                 @map("updated_at")
@@ -81,7 +81,7 @@ namespace auth {
     id           Id        @id(map: "identities_pkey") @default(dbgenerated("gen_random_uuid()"))
     providerId   String    @map("provider_id")
     userId       Id        @map("user_id")
-    identityData Json      @map("identity_data")
+    identityData Jsonb      @map("identity_data")
     provider     String
     lastSignInAt DateTime? @map("last_sign_in_at")
     createdAt    DateTime? @map("created_at")
@@ -157,14 +157,14 @@ namespace auth {
     acceptableClientIds String[]  @default([]) @map("acceptable_client_ids")
     scopes              String[]  @default([])
     pkceEnabled         Boolean   @default(true) @map("pkce_enabled")
-    attributeMapping    Json      @default(dbgenerated("'{}'::jsonb")) @map("attribute_mapping")
-    authorizationParams Json      @default(dbgenerated("'{}'::jsonb")) @map("authorization_params")
+    attributeMapping    Jsonb      @default(dbgenerated("'{}'::jsonb")) @map("attribute_mapping")
+    authorizationParams Jsonb      @default(dbgenerated("'{}'::jsonb")) @map("authorization_params")
     enabled             Boolean   @default(true)
     emailOptional       Boolean   @default(false) @map("email_optional")
     issuer              String?
     discoveryUrl        String?   @map("discovery_url")
     skipNonceCheck      Boolean   @default(false) @map("skip_nonce_check")
-    cachedDiscovery     Json?     @map("cached_discovery")
+    cachedDiscovery     Jsonb?     @map("cached_discovery")
     discoveryCachedAt   DateTime? @map("discovery_cached_at")
     authorizationUrl    String?   @map("authorization_url")
     tokenUrl            String?   @map("token_url")
@@ -242,9 +242,9 @@ namespace auth {
     secret                    String?
     phone                     String?
     lastChallengedAt          DateTime?             @unique(map: "mfa_factors_last_challenged_at_key") @map("last_challenged_at")
-    webAuthnCredential        Json?                 @map("web_authn_credential")
+    webAuthnCredential        Jsonb?                 @map("web_authn_credential")
     webAuthnAaguid            Id?                   @map("web_authn_aaguid")
-    lastWebauthnChallengeData Json?                 @map("last_webauthn_challenge_data")
+    lastWebauthnChallengeData Jsonb?                 @map("last_webauthn_challenge_data")
     mfaChallenges             MfaChallenges[]
     user                      AuthUser              @relation(fields: [userId], references: [id], onDelete: Cascade, map: "mfa_factors_user_id_fkey")
 
@@ -261,7 +261,7 @@ namespace auth {
     verifiedAt          DateTime?  @map("verified_at")
     ipAddress           IpAddress  @map("ip_address")
     otpCode             String?    @map("otp_code")
-    webAuthnSessionData Json?      @map("web_authn_session_data")
+    webAuthnSessionData Jsonb?      @map("web_authn_session_data")
     factor              MfaFactors @relation(fields: [factorId], references: [id], onDelete: Cascade, map: "mfa_challenges_auth_factor_id_fkey", index: false)
 
     @@index([createdAt], map: "mfa_challenge_created_at_idx")
@@ -379,7 +379,7 @@ namespace auth {
     entityId         String       @unique(map: "saml_providers_entity_id_key") @map("entity_id")
     metadataXml      String       @map("metadata_xml")
     metadataUrl      String?      @map("metadata_url")
-    attributeMapping Json?        @map("attribute_mapping")
+    attributeMapping Jsonb?        @map("attribute_mapping")
     createdAt        DateTime?    @map("created_at")
     updatedAt        DateTime?    @map("updated_at")
     nameIdFormat     String?      @map("name_id_format")
@@ -433,7 +433,7 @@ namespace auth {
     id            Id        @id(map: "webauthn_challenges_pkey") @default(dbgenerated("gen_random_uuid()"))
     userId        Id?       @map("user_id")
     challengeType String    @map("challenge_type")
-    sessionData   Json      @map("session_data")
+    sessionData   Jsonb      @map("session_data")
     createdAt     DateTime  @default(now()) @map("created_at")
     expiresAt     DateTime  @map("expires_at")
     user          AuthUser? @relation(fields: [userId], references: [id], onDelete: Cascade, map: "webauthn_challenges_user_id_fkey")
@@ -451,7 +451,7 @@ namespace auth {
     attestationType String    @default("") @map("attestation_type")
     aaguid          Id?
     signCount       BigInt    @default(0) @map("sign_count")
-    transports      Json      @default(dbgenerated("'[]'::jsonb"))
+    transports      Jsonb      @default(dbgenerated("'[]'::jsonb"))
     backupEligible  Boolean   @default(false) @map("backup_eligible")
     backedUp        Boolean   @default(false) @map("backed_up")
     friendlyName    String    @default("") @map("friendly_name")
@@ -559,7 +559,7 @@ namespace storage {
     name          String
     createdAt     DateTime         @default(now()) @map("created_at")
     updatedAt     DateTime         @default(now()) @map("updated_at")
-    metadata      Json             @default(dbgenerated("'{}'::jsonb"))
+    metadata      Jsonb             @default(dbgenerated("'{}'::jsonb"))
     catalogId     Id               @map("catalog_id")
     icebergTables IcebergTables[]
     catalog       BucketsAnalytics @relation(fields: [catalogId], references: [id], onDelete: Cascade, map: "iceberg_namespaces_catalog_id_fkey", index: false)
@@ -625,8 +625,8 @@ namespace storage {
     version                 String
     ownerId                 String?                   @map("owner_id")
     createdAt               DateTime                  @default(now()) @map("created_at")
-    userMetadata            Json?                     @map("user_metadata")
-    metadata                Json?
+    userMetadata            Jsonb?                     @map("user_metadata")
+    metadata                Jsonb?
     s3MultipartUploadsParts S3MultipartUploadsParts[]
     bucket                  StorageBucket             @relation(fields: [bucketId], references: [id], map: "s3_multipart_uploads_bucket_id_fkey", index: false)
 
@@ -661,10 +661,10 @@ namespace storage {
     createdAt      DateTime?      @default(now()) @map("created_at")
     updatedAt      DateTime?      @default(now()) @map("updated_at")
     lastAccessedAt DateTime?      @default(now()) @map("last_accessed_at")
-    metadata       Json?
+    metadata       Jsonb?
     version        String?
     ownerId        String?        @map("owner_id")
-    userMetadata   Json?          @map("user_metadata")
+    userMetadata   Jsonb?          @map("user_metadata")
     bucket         StorageBucket? @relation(fields: [bucketId], references: [id], map: "objects_bucketId_fkey", index: false)
 
     @@index([name], map: "name_prefix_search")
@@ -679,7 +679,7 @@ namespace storage {
     dataType              String         @map("data_type")
     dimension             Int
     distanceMetric        String         @map("distance_metric")
-    metadataConfiguration Json?          @map("metadata_configuration")
+    metadataConfiguration Jsonb?          @map("metadata_configuration")
     createdAt             DateTime       @default(now()) @map("created_at")
     updatedAt             DateTime       @default(now()) @map("updated_at")
     bucket                BucketsVectors @relation(fields: [bucketId], references: [id], map: "vector_indexes_bucket_id_fkey", index: false)

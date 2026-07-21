@@ -1,5 +1,6 @@
 import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import type { CapabilityMatrix } from '../shared/capabilities';
 import { mergeCapabilityMatrices } from '../shared/capabilities';
 import type { Codec } from '../shared/codec';
@@ -102,7 +103,7 @@ export function assertUniqueCodecOwner(options: {
 }): void {
   const existingOwner = options.owners.get(options.codecId);
   if (existingOwner !== undefined) {
-    throw new Error(
+    throw new InternalError(
       `Duplicate ${options.entityLabel} for codecId "${options.codecId}". ` +
         `Descriptor "${options.descriptorId}" conflicts with "${existingOwner}". ` +
         `Each codecId can only have one ${options.entityOwnershipLabel}.`,
@@ -185,7 +186,7 @@ export function assembleAuthoringContributions(
       const key = `${label}:${path}`;
       const existingOwner = pathOwners.get(key);
       if (existingOwner !== undefined) {
-        throw new Error(
+        throw new InternalError(
           `Duplicate authoring ${label} helper "${path}". ` +
             `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
         );
@@ -203,7 +204,7 @@ export function assembleAuthoringContributions(
     const declaredValueObjectStorageType = descriptor.authoring?.valueObjectStorageType;
     if (declaredValueObjectStorageType !== undefined) {
       if (valueObjectStorageDeclaration !== undefined) {
-        throw new Error(
+        throw new InternalError(
           'Duplicate authoring valueObjectStorageType declaration. ' +
             `Descriptor "${descriptorId}" conflicts with "${valueObjectStorageDeclaration.ownerId}". ` +
             'Exactly one composed component may declare the value-object storage type.',
@@ -282,7 +283,7 @@ export function assembleAuthoringContributions(
     valueObjectStorageDeclaration !== undefined &&
     !collectScalarTypeConstructors(typeNamespace).has(valueObjectStorageDeclaration.name)
   ) {
-    throw new Error(
+    throw new InternalError(
       `Invalid authoring valueObjectStorageType "${valueObjectStorageDeclaration.name}" declared by descriptor "${valueObjectStorageDeclaration.ownerId}". ` +
         'The name must be a top-level bare-eligible type constructor in the assembled authoring namespace.',
     );
@@ -318,7 +319,7 @@ export function assembleControlMutationDefaults(
     for (const generatorDescriptor of contributions.generatorDescriptors) {
       const existingOwner = generatorOwners.get(generatorDescriptor.id);
       if (existingOwner !== undefined) {
-        throw new Error(
+        throw new InternalError(
           `Duplicate mutation default generator id "${generatorDescriptor.id}". ` +
             `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
         );
@@ -330,7 +331,7 @@ export function assembleControlMutationDefaults(
     for (const [functionName, handler] of contributions.defaultFunctionRegistry) {
       const existingOwner = functionOwners.get(functionName);
       if (existingOwner !== undefined) {
-        throw new Error(
+        throw new InternalError(
           `Duplicate mutation default function "${functionName}". ` +
             `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
         );
@@ -523,7 +524,7 @@ export function buildExtensionLoadOrder(
   for (const ext of extensions) {
     for (const depId of readDeclaredDependencyIds(ext)) {
       if (!idSet.has(depId)) {
-        throw new Error(
+        throw new InternalError(
           `Extension "${ext.id}" declares a dependency on "${depId}", but "${depId}" is not in the provided extension set. Add the missing space to extensionPacks.`,
         );
       }
@@ -558,7 +559,7 @@ export function buildExtensionLoadOrder(
       .map((e) => e.id)
       .filter((id) => !result.includes(id))
       .sort();
-    throw new Error(
+    throw new InternalError(
       `Extension dependency cycle detected. Cycle members: ${cycleMembers.map((id) => `"${id}"`).join(', ')}.`,
     );
   }

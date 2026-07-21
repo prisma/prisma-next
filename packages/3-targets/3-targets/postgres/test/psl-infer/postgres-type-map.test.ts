@@ -14,7 +14,7 @@ describe('createPostgresTypeMap', () => {
       pslType: 'DateTime',
       nativeType: 'timestamptz',
     });
-    expect(typeMap.resolve('jsonb')).toEqual({ pslType: 'Json', nativeType: 'jsonb' });
+    expect(typeMap.resolve('jsonb')).toEqual({ pslType: 'Jsonb', nativeType: 'jsonb' });
     expect(typeMap.resolve('bytea')).toEqual({ pslType: 'Bytes', nativeType: 'bytea' });
     expect(typeMap.resolve('int8')).toEqual({ pslType: 'BigInt', nativeType: 'int8' });
     expect(typeMap.resolve('uuid')).toEqual({
