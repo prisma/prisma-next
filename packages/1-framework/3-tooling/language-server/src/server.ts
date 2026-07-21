@@ -1,4 +1,4 @@
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findNearestConfigPathForFile } from '@prisma-next/config-loader';
 import type { SymbolTable } from '@prisma-next/psl-parser';
 import { type FormatOptions, format } from '@prisma-next/psl-parser/format';
@@ -66,22 +66,32 @@ interface ProjectState {
   readonly artifacts: ProjectArtifacts;
 }
 
-/**
- * One entry per managed config: either the load in flight or the loaded
- * project — never both, never a settled load without an entry decision.
- */
+/** One entry per managed config — never a settled load without an entry decision. */
 type ManagedProject =
   | {
       readonly status: 'loading';
       readonly load: Promise<ProjectState>;
       /**
-       * Whether a loaded project existed when this load (chain) began — a
-       * failed reload must still clear the markers push clients were shown,
-       * while a failed first load must not publish anything.
+       * The project that was loaded when this load (chain) began. A failed
+       * reload restores it — a broken config edit must not destroy a working
+       * project. A failed first load has no last-good: it serves no project,
+       * leaves its documents unmanaged, and still publishes the config
+       * diagnostic (recorded by the `failed` entry).
        */
-      readonly hadLoadedProject: boolean;
+      readonly lastGood: ProjectState | undefined;
     }
-  | { readonly status: 'loaded'; readonly project: ProjectState };
+  | { readonly status: 'loaded'; readonly project: ProjectState }
+  | { readonly status: 'failed' };
+
+/** The project a new load of this config could fall back to. */
+function lastGoodProject(entry: ManagedProject | undefined): ProjectState | undefined {
+  if (entry === undefined || entry.status === 'failed') {
+    return undefined;
+  }
+  return entry.status === 'loaded' ? entry.project : entry.lastGood;
+}
+
+export const CONFIG_LOAD_FAILED_CODE = 'PRISMA_NEXT_CONFIG_LOAD_FAILED';
 
 const semanticTokenSourceLimit = 100_000;
 
@@ -163,11 +173,7 @@ export function createServer(connection: Connection): LanguageServer {
   async function projectForNearestConfig(uri: string): Promise<ProjectState | undefined> {
     const knownConfigPath = documentConfigPaths.get(uri);
     if (knownConfigPath !== undefined) {
-      const project = await resolveProjectIfLoadable(knownConfigPath);
-      if (project === undefined) {
-        documentConfigPaths.delete(uri);
-      }
-      return project;
+      return resolveProjectIfLoadable(knownConfigPath);
     }
 
     const filePath = filePathFromUri(uri);
@@ -187,25 +193,24 @@ export function createServer(connection: Connection): LanguageServer {
     }
 
     documentConfigPaths.set(uri, configPath);
-    const project = await resolveProjectIfLoadable(configPath);
-    if (project === undefined) {
-      documentConfigPaths.delete(uri);
-    }
-    return project;
+    return resolveProjectIfLoadable(configPath);
   }
 
   async function resolveProjectIfLoadable(configPath: string): Promise<ProjectState | undefined> {
     try {
       return await resolveProject(configPath);
     } catch {
-      stopManagingProject(configPath);
+      // Failure consequences run in the load chain itself, strictly ordered
+      // before any successor load; awaiters never mutate.
       return undefined;
     }
   }
 
   async function resolveProject(configPath: string): Promise<ProjectState> {
     const entry = managedProjects.get(configPath);
-    if (entry === undefined) {
+    // A `failed` entry only records the published config marker — for
+    // project resolution it behaves like absence.
+    if (entry === undefined || entry.status === 'failed') {
       return startProjectLoad(configPath);
     }
     return entry.status === 'loaded' ? entry.project : entry.load;
@@ -217,32 +222,74 @@ export function createServer(connection: Connection): LanguageServer {
 
   // A load replaces the entry with `loading` immediately, so reads during a
   // config reload await the fresh resolution instead of the pre-reload
-  // project. A failed load leaves its entry in place — every awaiter funnels
-  // the failure into `stopManagingProject`, which needs the entry to decide
-  // whether push clears are owed.
+  // project.
   function startProjectLoad(configPath: string): Promise<ProjectState> {
     const existing = managedProjects.get(configPath);
     const previousLoad = existing?.status === 'loading' ? existing.load : undefined;
-    const hadLoadedProject =
-      existing?.status === 'loaded' ||
-      (existing?.status === 'loading' && existing.hadLoadedProject);
+    const lastGood = lastGoodProject(existing);
     const load: Promise<ProjectState> = (previousLoad ?? Promise.resolve(undefined))
       .catch(() => undefined)
       .then(() => loadProject(configPath))
-      .then((project) => {
-        // A load that outlives the last association must not keep a project
-        // entry alive.
-        if (isCurrentLoad(configPath, load)) {
-          if (hasManagedDocuments(configPath)) {
-            managedProjects.set(configPath, { status: 'loaded', project });
-          } else {
-            managedProjects.delete(configPath);
+      .then(
+        (project) => {
+          // Entry replacement is synchronous, so a superseded load's own
+          // continuation stays silent.
+          if (isCurrentLoad(configPath, load)) {
+            if (hasManagedDocuments(configPath)) {
+              managedProjects.set(configPath, { status: 'loaded', project });
+            } else {
+              // A load that outlives the last association must not keep a
+              // project entry alive.
+              managedProjects.delete(configPath);
+            }
+            // Unconditional: clients keep per-server diagnostic state, so an
+            // empty publish is harmless when no marker is outstanding.
+            clearConfigFailure(configPath);
           }
-        }
-        return project;
-      });
-    managedProjects.set(configPath, { status: 'loading', load, hadLoadedProject });
+          return project;
+        },
+        (error: unknown) => {
+          // Same guard as above. All failure consequences live here — the
+          // queue orders this handler strictly before any successor load.
+          if (isCurrentLoad(configPath, load)) {
+            if (!hasManagedDocuments(configPath)) {
+              // No resurrection of the last-good project, no zombie marker.
+              managedProjects.delete(configPath);
+              clearConfigFailure(configPath);
+            } else {
+              publishConfigFailure(configPath, error);
+              if (lastGood !== undefined) {
+                managedProjects.set(configPath, { status: 'loaded', project: lastGood });
+                return lastGood;
+              }
+              managedProjects.set(configPath, { status: 'failed' });
+              unmanageDocuments(configPath);
+            }
+          }
+          throw error;
+        },
+      );
+    managedProjects.set(configPath, { status: 'loading', load, lastGood });
     return load;
+  }
+
+  function publishConfigFailure(configPath: string, error: unknown): void {
+    sendDiagnostics({
+      uri: pathToFileURL(configPath).toString(),
+      diagnostics: [
+        {
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+          message: error instanceof Error ? error.message : String(error),
+          code: CONFIG_LOAD_FAILED_CODE,
+          severity: DiagnosticSeverity.Error,
+          source: 'prisma-next',
+        },
+      ],
+    });
+  }
+
+  function clearConfigFailure(configPath: string): void {
+    sendDiagnostics({ uri: pathToFileURL(configPath).toString(), diagnostics: [] });
   }
 
   function isCurrentLoad(configPath: string, load: Promise<ProjectState>): boolean {
@@ -276,17 +323,12 @@ export function createServer(connection: Connection): LanguageServer {
     return project;
   }
 
-  function stopManagingProject(configPath: string): void {
-    const entry = managedProjects.get(configPath);
-    const hadProject =
-      entry?.status === 'loaded' || (entry?.status === 'loading' && entry.hadLoadedProject);
-    managedProjects.delete(configPath);
+  // A failed first load serves no project: its documents drop their
+  // association and re-resolve (and retry the load) on their next read.
+  function unmanageDocuments(configPath: string): void {
     for (const document of documents.all()) {
       if (documentConfigPaths.get(document.uri) === configPath) {
         documentConfigPaths.delete(document.uri);
-        if (hadProject && !clientCapabilities.pullDiagnostics) {
-          sendDiagnostics({ uri: document.uri, diagnostics: [] });
-        }
       }
     }
   }
@@ -489,7 +531,7 @@ export function createServer(connection: Connection): LanguageServer {
         try {
           await refreshProject(configPath);
         } catch {
-          stopManagingProject(configPath);
+          // Failure consequences live in the load chain; nothing to do here.
           continue;
         }
       }
@@ -588,15 +630,18 @@ export function createServer(connection: Connection): LanguageServer {
     return false;
   }
 
-  // Deletes only loaded entries: an in-flight load settles through the
+  // Deletes only settled entries: an in-flight load settles through the
   // association check in startProjectLoad and cleans up after itself.
   function dropProjectWithoutManagedDocuments(configPath: string): void {
     if (hasManagedDocuments(configPath)) {
       return;
     }
-    if (managedProjects.get(configPath)?.status === 'loaded') {
-      managedProjects.delete(configPath);
+    const entry = managedProjects.get(configPath);
+    if (entry === undefined || entry.status === 'loading') {
+      return;
     }
+    managedProjects.delete(configPath);
+    clearConfigFailure(configPath);
   }
 
   return {

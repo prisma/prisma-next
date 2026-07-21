@@ -196,7 +196,7 @@ behavior is unchanged (same inner function, same seed diagnostics). No consumer 
 
 ### Implement M4: LSP interpreter diagnostics (lazy, mapped, degrading)
 
-**Status:** ► In progress — slice 05 delivered (`958c1fbd0` + `e1f1f584d`, 5/5 SDoD), PR open; complete on merge
+**Status:** ✓ Complete — merged to main as PR #972 (2026-07-14; incl. R2 offset-based span mapping after the framework-vocabulary ratchet)
 
 _Outcomes_
 The LSP serves interpreter diagnostics on pull and push for capability-bearing
@@ -233,7 +233,7 @@ interpret stage.
 
 ### Implement M5: Config-failure surfacing + last-good retention
 
-**Status:** ☐ Not started
+**Status:** ► In progress — slice 06 delivered (`353e5d4e7`, 4/4 SDoD), PR open; complete on merge
 
 _Outcomes_
 A throwing `loadConfig`/`createControlStack` surfaces as a push diagnostic on the

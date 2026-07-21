@@ -1,4 +1,7 @@
-import { temporalAuthoringPresets } from '@prisma-next/family-sql/control';
+import {
+  temporalAuthoringPresets,
+  temporalCodecPresetWithPrecision,
+} from '@prisma-next/family-sql/control';
 import type {
   AuthoringEntityContext,
   AuthoringEntityTypeFactoryOutput,
@@ -627,10 +630,20 @@ export const postgresAuthoringFieldPresets = {
       nativeType: 'timestamptz',
     },
   },
-  temporal: /* @__PURE__ */ temporalAuthoringPresets({
-    codecId: 'pg/timestamptz@1',
-    nativeType: 'timestamptz',
-  }),
+  temporal: {
+    .../* @__PURE__ */ temporalAuthoringPresets({
+      codecId: 'pg/timestamptz@1',
+      nativeType: 'timestamptz',
+    }),
+    timestamp: /* @__PURE__ */ temporalCodecPresetWithPrecision({
+      codecId: 'pg/timestamp@1',
+      nativeType: 'timestamp',
+    }),
+    timestamptz: /* @__PURE__ */ temporalCodecPresetWithPrecision({
+      codecId: 'pg/timestamptz@1',
+      nativeType: 'timestamptz',
+    }),
+  },
   uuidNative: {
     kind: 'fieldPreset',
     output: {

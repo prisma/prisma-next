@@ -1,3 +1,7 @@
+import {
+  temporalAuthoringPresets,
+  temporalCodecPresetWithPrecision,
+} from '@prisma-next/family-sql/control';
 import { describe, expect, it } from 'vitest';
 import { postgresAuthoringFieldPresets } from '../src/core/authoring';
 
@@ -34,5 +38,39 @@ describe('postgresAuthoringFieldPresets', () => {
         id: true,
       },
     });
+  });
+});
+
+describe('postgres temporal per-codec presets', () => {
+  it('registers timestamp against pg/timestamp@1, named for the codec base name', () => {
+    expect(postgresAuthoringFieldPresets.temporal.timestamp).toEqual(
+      temporalCodecPresetWithPrecision({ codecId: 'pg/timestamp@1', nativeType: 'timestamp' }),
+    );
+  });
+
+  it('registers timestamptz against pg/timestamptz@1, named for the codec base name', () => {
+    expect(postgresAuthoringFieldPresets.temporal.timestamptz).toEqual(
+      temporalCodecPresetWithPrecision({ codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }),
+    );
+  });
+
+  it('keeps the createdAt/updatedAt convenience presets alongside the new siblings', () => {
+    expect(postgresAuthoringFieldPresets.temporal).toEqual({
+      ...temporalAuthoringPresets({ codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }),
+      timestamp: temporalCodecPresetWithPrecision({
+        codecId: 'pg/timestamp@1',
+        nativeType: 'timestamp',
+      }),
+      timestamptz: temporalCodecPresetWithPrecision({
+        codecId: 'pg/timestamptz@1',
+        nativeType: 'timestamptz',
+      }),
+    });
+  });
+
+  it('backs updatedAt and timestamptz with the same codec, so the convenience form is a shorthand', () => {
+    expect(postgresAuthoringFieldPresets.temporal.updatedAt.output.codecId).toBe(
+      postgresAuthoringFieldPresets.temporal.timestamptz.output.codecId,
+    );
   });
 });

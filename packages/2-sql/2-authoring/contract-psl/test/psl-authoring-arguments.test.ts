@@ -120,6 +120,42 @@ describe('mapPslHelperArgs argument kinds', () => {
     expect(diagnostics).toHaveLength(1);
   });
 
+  it('parses an option-kind argument as a bare token', () => {
+    const { result, diagnostics } = callMap(
+      [positional('now')],
+      [{ kind: 'option', values: ['now'] }],
+    );
+    expect(result).toEqual(['now']);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it('rejects a quoted string for an option-kind argument', () => {
+    const { result, diagnostics } = callMap(
+      [positional('"now"')],
+      [{ kind: 'option', values: ['now'] }],
+    );
+    expect(result).toBeUndefined();
+    expect(diagnostics[0]?.message).toMatch(/cannot parse argument #1/);
+  });
+
+  it('rejects a number for an option-kind argument', () => {
+    const { result, diagnostics } = callMap(
+      [positional('1')],
+      [{ kind: 'option', values: ['now'] }],
+    );
+    expect(result).toBeUndefined();
+    expect(diagnostics[0]?.message).toMatch(/cannot parse argument #1/);
+  });
+
+  it('rejects an object for an option-kind argument', () => {
+    const { result, diagnostics } = callMap(
+      [positional('{a: 1}')],
+      [{ kind: 'option', values: ['now'] }],
+    );
+    expect(result).toBeUndefined();
+    expect(diagnostics[0]?.message).toMatch(/cannot parse argument #1/);
+  });
+
   it('rejects an unsupported descriptor kind', () => {
     const bogusDescriptor = { kind: 'bogus' } as unknown as AuthoringArgumentDescriptor;
     const { result, diagnostics } = callMap([positional('anything')], [bogusDescriptor]);
