@@ -151,7 +151,7 @@ withTempDir(({ createTempDir }) => {
         // N.06: db update --no-interactive rejects (drift from unmanaged 'age' column
         // makes the planner classify this as destructive)
         const update = await runDbUpdate(ctx, ['--no-interactive']);
-        expect(update.exitCode, 'N.06: --no-interactive rejects destructive').toBe(1);
+        expect(update.exitCode, 'N.06: --no-interactive rejects destructive').toBe(2);
 
         // N.07: db update -y explicitly accepts the destructive plan
         const updateY = await runDbUpdate(ctx, ['-y']);

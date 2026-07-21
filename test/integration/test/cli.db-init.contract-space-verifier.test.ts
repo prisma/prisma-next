@@ -80,8 +80,7 @@ withTempDir(({ createTempDir }) => {
           const errorJson = parseJsonObjectFromCliCapture(consoleOutput) as Record<string, unknown>;
 
           expect(errorJson).toMatchObject({
-            code: 'PN-MIG-5002',
-            domain: 'MIG',
+            code: 'MIGRATION.CONTRACT_SPACE_VIOLATION',
           });
           const meta = errorJson['meta'] as
             | { violations?: Array<{ kind: string; spaceId: string }> }
@@ -131,8 +130,7 @@ withTempDir(({ createTempDir }) => {
 
           const errorJson = parseJsonObjectFromCliCapture(consoleOutput) as Record<string, unknown>;
 
-          expect(String(errorJson['code'])).toMatch(/^PN-MIG-50/);
-          expect(errorJson['domain']).toBe('MIG');
+          expect(String(errorJson['code'])).toMatch(/^MIGRATION\.CONTRACT_SPACE/);
           const meta = errorJson['meta'] as
             | { violations?: Array<{ kind: string; spaceId: string }> }
             | undefined;

@@ -101,7 +101,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
   }
 
   describe('verify (marker-only)', () => {
-    it('returns PN-RUN-3001 when no marker exists', async () => {
+    it('returns CONTRACT.MARKER_MISSING when no marker exists', async () => {
       const instance = createInstance();
       const result = await instance.verify({
         driver: makeDriver(),
@@ -111,7 +111,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('PN-RUN-3001');
+      expect(result.code).toBe('CONTRACT.MARKER_MISSING');
       expect(result.summary).toContain('missing');
     });
 
@@ -133,7 +133,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       expect(result.summary).toContain('matches');
     });
 
-    it('returns PN-RUN-3002 when storage hash differs', async () => {
+    it('returns CONTRACT.MARKER_MISMATCH when storage hash differs', async () => {
       await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
         storageHash: coreHash('sha256:old-hash'),
         profileHash: baseContract.profileHash,
@@ -148,10 +148,10 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('PN-RUN-3002');
+      expect(result.code).toBe('CONTRACT.MARKER_MISMATCH');
     });
 
-    it('returns PN-RUN-3002 when profile hash differs', async () => {
+    it('returns CONTRACT.MARKER_MISMATCH when profile hash differs', async () => {
       await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
         storageHash: baseContract.storage.storageHash,
         profileHash: profileHash('sha256:old-profile'),
@@ -166,7 +166,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('PN-RUN-3002');
+      expect(result.code).toBe('CONTRACT.MARKER_MISMATCH');
     });
   });
 

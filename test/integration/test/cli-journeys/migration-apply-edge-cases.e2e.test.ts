@@ -55,7 +55,7 @@ withTempDir(({ createTempDir }) => {
 
         // Apply with no planned edge for the new contract → failure
         const apply1 = await runMigrate(ctx, ['--json']);
-        expect(apply1.exitCode, 'apply fails').toBe(1);
+        expect(apply1.exitCode, 'apply fails').toBe(2);
         const output = stripAnsi(apply1.stdout);
         expect(output, 'error mentions no path').toMatch(
           /no.*path|no.*migration|not.*found|cannot.*resolve/i,
@@ -107,7 +107,7 @@ withTempDir(({ createTempDir }) => {
 
         // Apply fails because duplicate emails violate the unique constraint
         const applyFail = await runMigrate(ctx, ['--json']);
-        expect(applyFail.exitCode, 'apply fails on duplicate key').toBe(1);
+        expect(applyFail.exitCode, 'apply fails on duplicate key').toBe(2);
 
         // Marker stays at the first migration's target hash
         const marker = await sql(

@@ -202,7 +202,7 @@ describe.sequential('PostgresMigrationRunner - Execution Checks', () => {
       // Should fail because execute step fails (idempotency probe was skipped)
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.failure.code).toBe('EXECUTION_FAILED');
+        expect(result.failure.code).toBe('MIGRATION.EXECUTION_FAILED');
       }
     });
   });

@@ -684,7 +684,7 @@ describe('RawSqlCall', () => {
 });
 
 describe('DataTransformCall', () => {
-  it('toOp() always throws PN-MIG-2001 for the unfilled placeholder', () => {
+  it('toOp() always throws MIGRATION.UNFILLED_PLACEHOLDER for the unfilled placeholder', () => {
     const call = new DataTransformCall(
       'Backfill status',
       'backfill-status:check',
@@ -692,8 +692,7 @@ describe('DataTransformCall', () => {
     );
     expect(() => call.toOp()).toThrow(
       expect.objectContaining({
-        code: '2001',
-        domain: 'MIG',
+        code: 'MIGRATION.UNFILLED_PLACEHOLDER',
         meta: { slot: 'Backfill status' },
       }),
     );

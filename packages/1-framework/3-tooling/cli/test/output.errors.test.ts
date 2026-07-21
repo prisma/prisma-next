@@ -6,15 +6,11 @@ import { parseGlobalFlags } from '../src/utils/global-flags';
 
 const baseError: CliErrorEnvelope = {
   ok: false,
-  code: 'PN-CLI-4020',
-  domain: 'CLI',
+  code: 'MIGRATION.PLANNING_FAILED',
   severity: 'error',
   summary: 'Migration planning failed',
   why: 'Conflicts detected',
   fix: 'Resolve conflicts',
-  where: undefined,
-  meta: undefined,
-  docsUrl: undefined,
 };
 
 const createConflicts = (): readonly CliErrorConflict[] => [
@@ -94,8 +90,7 @@ describe('formatErrorOutput - issues list label and body fallback', () => {
     // PSL interpretation diagnostics stamp `kind` (their diagnostic code) and `message` (their prose).
     const error: CliErrorEnvelope = {
       ...baseError,
-      code: 'PN-RUN-3000',
-      domain: 'RUN',
+      code: 'CONTRACT.VERIFY_FAILED',
       summary: 'Failed to resolve contract source',
       meta: {
         issues: [{ kind: 'PSL_ORPHANED_BACKRELATION', message: 'orphaned backrelation list' }],
@@ -113,8 +108,7 @@ describe('formatErrorOutput - issues list label and body fallback', () => {
     // `path` plus the `expected`/`actual` presence the label derives from.
     const error: CliErrorEnvelope = {
       ...baseError,
-      code: 'PN-RUN-3000',
-      domain: 'RUN',
+      code: 'CONTRACT.VERIFY_FAILED',
       summary: 'Failed to resolve contract source',
       meta: {
         // expected-only → a missing object.
@@ -133,8 +127,7 @@ describe('formatErrorOutput - planner warnings on apply failure', () => {
   it('prints a Warnings block when meta carries plannerWarnings', () => {
     const error: CliErrorEnvelope = {
       ...baseError,
-      code: 'PN-RUN-3020',
-      domain: 'RUN',
+      code: 'MIGRATION.RUNNER_FAILED',
       summary: 'Database schema does not satisfy contract (1 failure)',
       why: 'The resulting database schema does not satisfy the destination contract.',
       fix: 'Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update`',

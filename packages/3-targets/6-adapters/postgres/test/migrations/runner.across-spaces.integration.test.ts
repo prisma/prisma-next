@@ -158,7 +158,7 @@ describe.sequential('PostgresMigrationRunner.execute', () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected failure');
     expect(result.failure.failingSpace).toBe('app');
-    expect(result.failure.code).toBe('PRECHECK_FAILED');
+    expect(result.failure.code).toBe('MIGRATION.PRECHECK_FAILED');
 
     // The first (succeeding) space's writes must have rolled back —
     // the helper table should not exist.

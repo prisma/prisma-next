@@ -58,18 +58,25 @@ describe('result handler', () => {
     expect(onSuccess).toHaveBeenCalledWith('success');
   });
 
-  it('returns exit code 2 for CLI errors', () => {
+  it('returns exit code 2 for a precondition failure', () => {
     const error = errorConfigFileNotFound();
     const result = notOk(error);
     const exitCode = handleResult(result, defaultTestFlags(), createUI());
     expect(exitCode).toBe(2);
   });
 
-  it('returns exit code 1 for RUN errors', () => {
+  it('returns exit code 2 for any other expected failure', () => {
     const error = errorMarkerMissing();
     const result = notOk(error);
     const exitCode = handleResult(result, defaultTestFlags(), createUI());
-    expect(exitCode).toBe(1);
+    expect(exitCode).toBe(2);
+  });
+
+  it('returns exit code 3 for a user-declined prompt', () => {
+    const error = new CliStructuredError('CLI.INIT_USER_ABORTED', 'Init cancelled');
+    const result = notOk(error);
+    const exitCode = handleResult(result, defaultTestFlags(), createUI());
+    expect(exitCode).toBe(3);
   });
 
   it('writes JSON error to stdout when json flag is set', () => {
@@ -89,7 +96,7 @@ describe('result handler', () => {
   });
 
   it('omits fix from JSON envelope when fix equals why', () => {
-    const error = new CliStructuredError('4999', 'Unexpected error', {
+    const error = new CliStructuredError('CLI.UNEXPECTED', 'Unexpected error', {
       why: 'Same message',
       fix: 'Same message',
     });

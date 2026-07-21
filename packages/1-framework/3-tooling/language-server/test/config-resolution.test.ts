@@ -75,7 +75,7 @@ describe('resolveConfigInputs', { timeout: timeouts.coldTransformImport }, () =>
 
     await expect(resolveConfigInputs(configPath)).rejects.toMatchObject({
       name: 'CliStructuredError',
-      code: '4001',
+      code: 'CONFIG.FILE_NOT_FOUND',
     });
   });
 
@@ -86,7 +86,7 @@ describe('resolveConfigInputs', { timeout: timeouts.coldTransformImport }, () =>
 
     await expect(resolveConfigInputs(configPath)).rejects.toMatchObject({
       name: 'CliStructuredError',
-      code: '4009',
+      code: 'CONFIG.VALIDATION_FAILED',
     });
   });
 
@@ -99,7 +99,7 @@ describe('resolveConfigInputs', { timeout: timeouts.coldTransformImport }, () =>
 
     await expect(resolveConfigInputs(configPath)).rejects.toMatchObject({
       name: 'CliStructuredError',
-      code: '4999',
+      code: 'CLI.UNEXPECTED',
     });
   });
 

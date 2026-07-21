@@ -54,7 +54,7 @@ withTempDir(({ createTempDir }) => {
 
         // K.01: db verify (fails — marker missing)
         const verifyFail = await runDbVerify(ctx);
-        expect(verifyFail.exitCode, 'K.01: db verify fails').toBe(1);
+        expect(verifyFail.exitCode, 'K.01: db verify fails').toBe(2);
 
         // K.02: db verify --schema-only (fails — missing tables)
         const schemaVerifyFail = await runDbVerify(ctx, ['--schema-only']);
@@ -103,7 +103,7 @@ withTempDir(({ createTempDir }) => {
 
         // L.01: db verify (fails — hash mismatch)
         const verifyFail = await runDbVerify(ctx);
-        expect(verifyFail.exitCode, 'L.01: db verify fails').toBe(1);
+        expect(verifyFail.exitCode, 'L.01: db verify fails').toBe(2);
 
         // L.02: db verify --schema-only (fails — missing name column)
         const schemaVerifyFail = await runDbVerify(ctx, ['--schema-only']);
@@ -198,7 +198,7 @@ withTempDir(({ createTempDir }) => {
 
         // P2.01: db verify (fails — corrupt marker)
         const verifyFail = await runDbVerify(ctx);
-        expect(verifyFail.exitCode, 'P2.01: db verify fails').toBe(1);
+        expect(verifyFail.exitCode, 'P2.01: db verify fails').toBe(2);
 
         // P2.02: db verify --schema-only (passes — schema is intact)
         const schemaVerify = await runDbVerify(ctx, ['--schema-only']);

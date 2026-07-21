@@ -27,7 +27,7 @@ const ALREADY_CONNECTED_MESSAGE =
 
 interface DriverRuntimeError extends Error {
   readonly code: 'DRIVER.NOT_CONNECTED' | 'DRIVER.ALREADY_CONNECTED';
-  readonly category: 'RUNTIME';
+  readonly category: 'DRIVER';
   readonly severity: 'error';
   readonly details?: Record<string, unknown>;
 }
@@ -44,7 +44,7 @@ function driverError(
   });
   return Object.assign(error, {
     code,
-    category: 'RUNTIME' as const,
+    category: 'DRIVER' as const,
     severity: 'error' as const,
     message,
     details,

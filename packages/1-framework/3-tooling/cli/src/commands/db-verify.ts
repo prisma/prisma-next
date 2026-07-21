@@ -106,8 +106,7 @@ function errorInvalidVerifyMode(options: {
   readonly why: string;
   readonly fix: string;
 }): CliStructuredError {
-  return new CliStructuredError('4012', 'Invalid verify mode', {
-    domain: 'CLI',
+  return new CliStructuredError('CLI.INVALID_VERIFY_MODE', 'Invalid verify mode', {
     why: options.why,
     fix: options.fix,
     docsUrl: 'https://pris.ly/db-verify',
@@ -368,7 +367,7 @@ async function executeDbVerifyCommand(
 
   try {
     // Single-contract marker verification preserved for the existing
-    // marker / target / hash failure surface (`PN-RUN-3001/3002/3003`).
+    // marker / target / hash failure surface (`CONTRACT.MARKER_MISSING/CONTRACT.MARKER_MISMATCH/CONTRACT.TARGET_MISMATCH`).
     // The aggregate verifier (run below for the per-space marker /
     // schema checks) does not duplicate this: it concerns itself with
     // marker-vs-on-disk and orphan-marker drift, not the

@@ -9,7 +9,7 @@
  * - `toOp()` — converts the IR node to a runtime
  *   `SqlMigrationPlanOperation` by delegating to the matching pure factory
  *   under `operations/`. `DataTransformCall.toOp()` always throws
- *   `PN-MIG-2001` because a planner-generated data transform is an
+ *   `MIGRATION.UNFILLED_PLACEHOLDER` because a planner-generated data transform is an
  *   unfilled authoring stub by construction.
  * - `renderTypeScript()` / `importRequirements()` — inherited from
  *   `TsExpression`. Used by `renderCallsToTypeScript` to emit the call as
@@ -1507,7 +1507,7 @@ export class AddNativeEnumValueCall extends PostgresOpFactoryCallNode {
  * A planner-generated data-transform stub. `checkSlot` and `runSlot` name
  * the unfilled authoring slots that the rendered `migration.ts` will expose
  * to the user via `placeholder("…")` calls. `toOp()` always throws
- * `PN-MIG-2001`: the planner cannot lower a stubbed transform to a runtime
+ * `MIGRATION.UNFILLED_PLACEHOLDER`: the planner cannot lower a stubbed transform to a runtime
  * op — the user must fill the rendered `migration.ts` and re-emit.
  */
 export class DataTransformCall extends PostgresOpFactoryCallNode {

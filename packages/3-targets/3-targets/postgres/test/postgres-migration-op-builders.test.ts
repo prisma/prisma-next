@@ -227,15 +227,17 @@ class ExposedMigration extends PostgresMigration<Contract, Contract> {
 
 // The raw JSON fixture import is not structurally assignable to the branded
 // Contract type (NamespaceId brand, etc). The dataTransform case throws
-// PN-MIG-2007 before ever reading the contract, so a blindCast fixture value
-// is sufficient — no live serializer/deserializer seam is needed here.
+// MIGRATION.POSTGRES_CONTROL_STACK_MISSING before ever reading the contract,
+// so a blindCast fixture value is sufficient — no live serializer/deserializer
+// seam is needed here.
 const contract = blindCast<
   FrameworkContract<SqlStorage>,
   'raw JSON fixture import; dataTransform throws before reading the contract'
 >(contractJson);
 
 // ============================================================================
-// (A) No ControlStack: every op-builder throws PN-MIG-2007 synchronously.
+// (A) No ControlStack: every op-builder throws
+// MIGRATION.POSTGRES_CONTROL_STACK_MISSING synchronously.
 // ============================================================================
 
 const cases: ReadonlyArray<{
@@ -399,13 +401,15 @@ const cases: ReadonlyArray<{
 ];
 
 describe('PostgresMigration op-builder methods without a ControlStack', () => {
-  it.each(cases)('$name throws PN-MIG-2007 synchronously', ({ name, run }) => {
+  it.each(cases)('$name throws MIGRATION.POSTGRES_CONTROL_STACK_MISSING synchronously', ({
+    name,
+    run,
+  }) => {
     const m = new ExposedMigration();
     expect(() => run(m)).toThrow(
       expect.objectContaining({
         name: 'CliStructuredError',
-        code: '2007',
-        domain: 'MIG',
+        code: 'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         message: `PostgresMigration.${name} requires a control adapter`,
         meta: { operation: name },
       }),

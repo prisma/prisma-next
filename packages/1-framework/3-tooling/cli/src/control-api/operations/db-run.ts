@@ -286,8 +286,9 @@ function aggregatePlannerWarnings(
  * an extension that was removed from `extensionPacks` without first
  * cleaning up its on-disk migrations / database tables.
  *
- * Returns a {@link CliStructuredError} envelope (code `5002`,
- * `kind: 'orphanMarker'`) for the first orphan it finds, or `null`
+ * Returns a {@link CliStructuredError} envelope (code
+ * `MIGRATION.CONTRACT_SPACE_VIOLATION`, `kind: 'orphanMarker'`) for the
+ * first orphan it finds, or `null`
  * when every marker row maps to a declared contract space. Mirrors the M2
  * `runContractSpaceVerifierMarkerCheck` envelope so downstream
  * tooling (integration tests, JSON consumers) keeps asserting on the
@@ -313,8 +314,7 @@ function detectOrphanMarkers(
     orphans.length === 1
       ? `Orphan contract-space marker detected for "${orphans[0]}"`
       : `Orphan contract-space markers detected for ${orphans.length} spaces`;
-  return new CliStructuredError('5002', summary, {
-    domain: 'MIG',
+  return new CliStructuredError('MIGRATION.CONTRACT_SPACE_VIOLATION', summary, {
     why: `The database has \`_prisma_marker\` rows for spaces (${orphans
       .map((s) => `"${s}"`)
       .join(

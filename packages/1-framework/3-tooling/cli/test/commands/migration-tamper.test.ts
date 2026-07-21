@@ -24,7 +24,7 @@ import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-he
  *
  *   - **Gating commands** (`migrate`, `migration plan`, `migration
  *     status`, `migration new`) refuse via the structured contract-space
- *     integrity envelope (`PN-MIG-5002` + `meta.violations[]`). For
+ *     integrity envelope (`MIGRATION.CONTRACT_SPACE_VIOLATION` + `meta.violations[]`). For
  *     `migrate` the gate is a pure offline check that fires *before*
  *     `client.connect()`, preserving the "refuse before connecting"
  *     safety property — the stub driver is never reached.
@@ -242,14 +242,14 @@ async function captureDiagnostic(
 
 /**
  * Assert the shared contract-space integrity refusal produced by the
- * gating commands: a non-zero exit, the `PN-MIG-5002` structured
+ * gating commands: a non-zero exit, the `MIGRATION.CONTRACT_SPACE_VIOLATION` structured
  * envelope, the tamper carried in `meta.violations[]` (a
  * `hashMismatch` violation against the `app` space),
  * and the human-rendered "Contract-space integrity failure" line.
  */
 function expectIntegrityRefusal(captured: CapturedDiagnostic): void {
   expect(captured.exitCode).not.toBe(0);
-  expect(captured.envelope.code).toBe('PN-MIG-5002');
+  expect(captured.envelope.code).toBe('MIGRATION.CONTRACT_SPACE_VIOLATION');
   expect(captured.envelope.summary).toContain('Contract-space integrity failure');
 
   const violations = captured.envelope.meta?.['violations'] as
@@ -297,7 +297,7 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
     vi.resetModules();
   });
 
-  describe('gating commands refuse via the structured 5002 integrity envelope', () => {
+  describe('gating commands refuse via the structured MIGRATION.CONTRACT_SPACE_VIOLATION integrity envelope', () => {
     it(
       'migrate refuses before connecting — the offline gate fires before client.connect',
       async () => {

@@ -67,7 +67,7 @@ describe('parseGlobalFlags output format', () => {
       parseGlobalFlags({ format: 'pretty', json: true });
     } catch (error) {
       expect(CliStructuredError.is(error)).toBe(true);
-      expect((error as CliStructuredError).code).toBe('4015');
+      expect((error as CliStructuredError).code).toBe('CLI.OUTPUT_FORMAT_CONFLICT');
       expect((error as CliStructuredError).message).toMatch(/--format pretty.*--json/i);
     }
   });
@@ -78,7 +78,7 @@ describe('parseGlobalFlags output format', () => {
       parseGlobalFlags({ format: 'yaml' });
     } catch (error) {
       expect(CliStructuredError.is(error)).toBe(true);
-      expect((error as CliStructuredError).code).toBe('4014');
+      expect((error as CliStructuredError).code).toBe('CLI.INVALID_OUTPUT_FORMAT');
       expect((error as CliStructuredError).message).toMatch(/Invalid --format/i);
       expect((error as CliStructuredError).message).toMatch(/pretty.*json/i);
     }
@@ -94,14 +94,14 @@ describe('parseGlobalFlags output format', () => {
 describe('parseGlobalFlags structured format errors', () => {
   it('errorInvalidOutputFormat round-trips allowed values in meta', () => {
     const error = errorInvalidOutputFormat('yaml');
-    expect(error.toEnvelope().code).toBe('PN-CLI-4014');
+    expect(error.toEnvelope().code).toBe('CLI.INVALID_OUTPUT_FORMAT');
     expect(error.message).toContain('yaml');
     expect(error.message).toContain('pretty, json');
   });
 
-  it('errorOutputFormatMutex round-trips PN-CLI-4015', () => {
+  it('errorOutputFormatMutex round-trips CLI.OUTPUT_FORMAT_CONFLICT', () => {
     const error = errorOutputFormatMutex();
-    expect(error.toEnvelope().code).toBe('PN-CLI-4015');
+    expect(error.toEnvelope().code).toBe('CLI.OUTPUT_FORMAT_CONFLICT');
     expect(error.message).toMatch(/--format pretty.*--json/i);
   });
 });
@@ -141,7 +141,7 @@ describe('parseGlobalFlagsOrExit', () => {
 
     expect(exit).toHaveBeenCalledWith(2);
     const stderr = stderrLines.join('');
-    expect(stderr).toContain('PN-CLI-4015');
+    expect(stderr).toContain('CLI.OUTPUT_FORMAT_CONFLICT');
     expect(stderr).toMatch(/--format pretty.*--json/i);
     expect(stderr).not.toContain('at resolveOutputFormat');
   });

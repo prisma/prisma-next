@@ -281,7 +281,7 @@ withTempDir(({ createTempDir }) => {
 
         // P.04: apply --ref prod fails fast with UNKNOWN_INVARIANT, marker untouched.
         const applyFail = await runMigrate(ctx, ['--to', 'prod', '--json']);
-        expect(applyFail.exitCode, 'P.04: apply exits 1').toBe(1);
+        expect(applyFail.exitCode, 'P.04: apply exits 2').toBe(2);
         const applyEnvelope = parseJsonOutput<{
           meta?: { code?: string; unknown?: readonly string[]; declared?: readonly string[] };
         }>(applyFail);
@@ -305,7 +305,7 @@ withTempDir(({ createTempDir }) => {
 
         // P.06: status --ref prod is fatal too (parity with apply).
         const statusFail = await runMigrationStatus(ctx, ['--to', 'prod', '--json']);
-        expect(statusFail.exitCode, 'P.06: status exits 1').toBe(1);
+        expect(statusFail.exitCode, 'P.06: status exits 2').toBe(2);
         const statusEnvelope = parseJsonOutput<{ meta?: { code?: string } }>(statusFail);
         expect(statusEnvelope.meta?.code, 'P.06: status error code').toBe(
           'MIGRATION.UNKNOWN_INVARIANT',
@@ -381,7 +381,7 @@ withTempDir(({ createTempDir }) => {
         // because the id IS declared somewhere in the graph). The structural path
         // points at the CB-branch edge that doesn't cover it.
         const applyFail = await runMigrate(ctx, ['--to', 'prod', '--json']);
-        expect(applyFail.exitCode, 'Q.05: apply exits 1').toBe(1);
+        expect(applyFail.exitCode, 'Q.05: apply exits 2').toBe(2);
         const envelope = parseJsonOutput<{
           meta?: {
             code?: string;

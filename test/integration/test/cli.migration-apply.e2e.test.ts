@@ -247,7 +247,7 @@ withTempDir(({ createTempDir }) => {
             }
 
             expect(failed).toBe(true);
-            expect(getExitCode()).toBe(1);
+            expect(getExitCode()).toBe(2);
             // In --json mode, error output goes to stdout via ui.output(), not stderr.
             // consoleOutput contains both stdout and stderr; check the combined output.
             const output = stripAnsi(consoleOutput.join('\n'));
@@ -388,7 +388,7 @@ withTempDir(({ createTempDir }) => {
               failed = true;
             }
             expect(failed).toBe(true);
-            expect(getExitCode()).toBe(1);
+            expect(getExitCode()).toBe(2);
 
             // Marker must remain at the first migration hash (resume point).
             const migrationsDir = join(testDir, 'migrations', 'app');

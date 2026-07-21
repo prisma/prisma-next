@@ -24,8 +24,7 @@ import {
 
 describe('CliStructuredError', () => {
   it('creates error with all properties', () => {
-    const error = new CliStructuredError('4001', 'Test error', {
-      domain: 'CLI',
+    const error = new CliStructuredError('CONFIG.FILE_NOT_FOUND', 'Test error', {
       severity: 'error',
       why: 'This is why',
       fix: 'This is how to fix',
@@ -34,9 +33,8 @@ describe('CliStructuredError', () => {
       docsUrl: 'https://example.com/docs',
     });
 
-    expect(error.code).toBe('4001');
+    expect(error.code).toBe('CONFIG.FILE_NOT_FOUND');
     expect(error.message).toBe('Test error');
-    expect(error.domain).toBe('CLI');
     expect(error.severity).toBe('error');
     expect(error.why).toBe('This is why');
     expect(error.fix).toBe('This is how to fix');
@@ -46,11 +44,10 @@ describe('CliStructuredError', () => {
   });
 
   it('creates error with defaults', () => {
-    const error = new CliStructuredError('4001', 'Test error');
+    const error = new CliStructuredError('CONFIG.FILE_NOT_FOUND', 'Test error');
 
-    expect(error.code).toBe('4001');
+    expect(error.code).toBe('CONFIG.FILE_NOT_FOUND');
     expect(error.message).toBe('Test error');
-    expect(error.domain).toBe('CLI');
     expect(error.severity).toBe('error');
     expect(error.why).toBeUndefined();
     expect(error.fix).toBeUndefined();
@@ -59,26 +56,24 @@ describe('CliStructuredError', () => {
     expect(error.docsUrl).toBeUndefined();
   });
 
-  it('converts to envelope with CLI code prefix', () => {
-    const error = new CliStructuredError('4001', 'Test error', { domain: 'CLI' });
+  it('converts to envelope carrying the dotted code as-is', () => {
+    const error = new CliStructuredError('CONFIG.FILE_NOT_FOUND', 'Test error');
     const envelope = error.toEnvelope();
 
-    expect(envelope.code).toBe('PN-CLI-4001');
-    expect(envelope.domain).toBe('CLI');
+    expect(envelope.code).toBe('CONFIG.FILE_NOT_FOUND');
     expect(envelope.summary).toBe('Test error');
   });
 
-  it('converts to envelope with RUN code prefix', () => {
-    const error = new CliStructuredError('3001', 'Test error', { domain: 'RUN' });
+  it('converts to envelope for a different namespace', () => {
+    const error = new CliStructuredError('CONTRACT.MARKER_MISSING', 'Test error');
     const envelope = error.toEnvelope();
 
-    expect(envelope.code).toBe('PN-RUN-3001');
-    expect(envelope.domain).toBe('RUN');
+    expect(envelope.code).toBe('CONTRACT.MARKER_MISSING');
     expect(envelope.summary).toBe('Test error');
   });
 
   it('normalizes fix when fix equals why', () => {
-    const error = new CliStructuredError('4001', 'Test error', {
+    const error = new CliStructuredError('CONFIG.FILE_NOT_FOUND', 'Test error', {
       why: 'Same message',
       fix: 'Same message',
     });
@@ -90,12 +85,12 @@ describe('CliStructuredError', () => {
 
   describe('is() type guard', () => {
     it('returns true for CliStructuredError instances', () => {
-      const error = new CliStructuredError('4001', 'Test error', { domain: 'CLI' });
+      const error = new CliStructuredError('CONFIG.FILE_NOT_FOUND', 'Test error');
       expect(CliStructuredError.is(error)).toBe(true);
     });
 
-    it('returns true for CliStructuredError with RUN domain', () => {
-      const error = new CliStructuredError('3000', 'Test error', { domain: 'RUN' });
+    it('returns true for CliStructuredError from any namespace', () => {
+      const error = new CliStructuredError('CONTRACT.VERIFY_FAILED', 'Test error');
       expect(CliStructuredError.is(error)).toBe(true);
     });
 
@@ -114,8 +109,7 @@ describe('CliStructuredError', () => {
 
     it('returns false for Error with wrong name', () => {
       const error = new Error('Test error') as unknown as Record<string, unknown>;
-      error['code'] = '4001';
-      error['domain'] = 'CLI';
+      error['code'] = 'CONFIG.FILE_NOT_FOUND';
       error['toEnvelope'] = () => ({});
       expect(CliStructuredError.is(error)).toBe(false);
     });
@@ -123,16 +117,6 @@ describe('CliStructuredError', () => {
     it('returns false for Error with missing code', () => {
       const error = new Error('Test error') as unknown as Record<string, unknown>;
       error['name'] = 'CliStructuredError';
-      error['domain'] = 'CLI';
-      error['toEnvelope'] = () => ({});
-      expect(CliStructuredError.is(error)).toBe(false);
-    });
-
-    it('returns false for Error with wrong domain', () => {
-      const error = new Error('Test error') as unknown as Record<string, unknown>;
-      error['name'] = 'CliStructuredError';
-      error['code'] = '4001';
-      error['domain'] = 'OTHER';
       error['toEnvelope'] = () => ({});
       expect(CliStructuredError.is(error)).toBe(false);
     });
@@ -140,8 +124,7 @@ describe('CliStructuredError', () => {
     it('returns false for Error without toEnvelope method', () => {
       const error = new Error('Test error') as unknown as Record<string, unknown>;
       error['name'] = 'CliStructuredError';
-      error['code'] = '4001';
-      error['domain'] = 'CLI';
+      error['code'] = 'CONFIG.FILE_NOT_FOUND';
       expect(CliStructuredError.is(error)).toBe(false);
     });
   });
@@ -150,15 +133,14 @@ describe('CliStructuredError', () => {
 describe('Config Errors', () => {
   it('errorConfigFileNotFound without path omits where', () => {
     const error = errorConfigFileNotFound();
-    expect(error.code).toBe('4001');
+    expect(error.code).toBe('CONFIG.FILE_NOT_FOUND');
     expect(error.where).toBeUndefined();
   });
 
   it('errorConfigFileNotFound creates correct error', () => {
     const error = errorConfigFileNotFound('/path/to/config.ts');
-    expect(error.code).toBe('4001');
+    expect(error.code).toBe('CONFIG.FILE_NOT_FOUND');
     expect(error.message).toBe('Config file not found');
-    expect(error.domain).toBe('CLI');
     expect(error.where?.path).toBe('/path/to/config.ts');
   });
 
@@ -169,15 +151,14 @@ describe('Config Errors', () => {
 
   it('errorConfigFileNotFound without configPath', () => {
     const error = errorConfigFileNotFound();
-    expect(error.code).toBe('4001');
+    expect(error.code).toBe('CONFIG.FILE_NOT_FOUND');
     expect(error.where).toBeUndefined();
   });
 
   it('errorContractConfigMissing creates correct error', () => {
     const error = errorContractConfigMissing();
-    expect(error.code).toBe('4002');
+    expect(error.code).toBe('CONFIG.CONTRACT_MISSING');
     expect(error.message).toBe('Contract configuration missing');
-    expect(error.domain).toBe('CLI');
   });
 
   it('errorContractConfigMissing with custom why', () => {
@@ -187,7 +168,7 @@ describe('Config Errors', () => {
 
   it('errorContractValidationFailed creates correct error', () => {
     const error = errorContractValidationFailed('Missing required field');
-    expect(error.code).toBe('4003');
+    expect(error.code).toBe('CONTRACT.VALIDATION_FAILED');
     expect(error.message).toBe('Contract validation failed');
     expect(error.why).toBe('Missing required field');
   });
@@ -201,7 +182,7 @@ describe('Config Errors', () => {
 
   it('errorFileNotFound creates correct error', () => {
     const error = errorFileNotFound('/path/to/file.ts');
-    expect(error.code).toBe('4004');
+    expect(error.code).toBe('CLI.FILE_NOT_FOUND');
     expect(error.message).toBe('File not found');
     expect(error.where?.path).toBe('/path/to/file.ts');
   });
@@ -222,9 +203,8 @@ describe('Config Errors', () => {
 
   it('errorDatabaseConnectionRequired creates correct error', () => {
     const error = errorDatabaseConnectionRequired();
-    expect(error.code).toBe('4005');
+    expect(error.code).toBe('CONFIG.DB_CONNECTION_REQUIRED');
     expect(error.message).toBe('Database connection is required');
-    expect(error.domain).toBe('CLI');
     expect(error.fix).toContain('Provide `--db <url>`');
   });
 
@@ -247,9 +227,8 @@ describe('Config Errors', () => {
 
   it('errorQueryRunnerFactoryRequired creates correct error', () => {
     const error = errorQueryRunnerFactoryRequired();
-    expect(error.code).toBe('4006');
+    expect(error.code).toBe('CONFIG.QUERY_RUNNER_FACTORY_REQUIRED');
     expect(error.message).toBe('Query runner factory is required');
-    expect(error.domain).toBe('CLI');
   });
 
   it('errorQueryRunnerFactoryRequired with custom why', () => {
@@ -259,9 +238,8 @@ describe('Config Errors', () => {
 
   it('errorFamilyReadMarkerSqlRequired creates correct error', () => {
     const error = errorFamilyReadMarkerSqlRequired();
-    expect(error.code).toBe('4007');
+    expect(error.code).toBe('CONFIG.FAMILY_READ_MARKER_REQUIRED');
     expect(error.message).toBe('Family readMarker() is required');
-    expect(error.domain).toBe('CLI');
   });
 
   it('errorFamilyReadMarkerSqlRequired with custom why', () => {
@@ -271,9 +249,8 @@ describe('Config Errors', () => {
 
   it('errorDriverRequired creates correct error', () => {
     const error = errorDriverRequired();
-    expect(error.code).toBe('4010');
+    expect(error.code).toBe('CONFIG.DRIVER_REQUIRED');
     expect(error.message).toBe('Driver is required for DB-connected commands');
-    expect(error.domain).toBe('CLI');
   });
 
   it('errorDriverRequired with custom why', () => {
@@ -287,7 +264,7 @@ describe('Config Errors', () => {
       { kind: 'conflict-2', summary: 'Summary 2', why: 'Fix 2' },
     ];
     const error = errorMigrationPlanningFailed({ conflicts });
-    expect(error.code).toBe('4020');
+    expect(error.code).toBe('MIGRATION.PLANNING_FAILED');
     expect(error.message).toBe('Migration planning failed');
     expect(error.why).toContain('Summary 1');
     expect(error.why).toContain('Summary 2');
@@ -310,9 +287,8 @@ describe('Config Errors', () => {
 
   it('errorTargetMigrationNotSupported creates correct error', () => {
     const error = errorTargetMigrationNotSupported();
-    expect(error.code).toBe('4021');
+    expect(error.code).toBe('MIGRATION.TARGET_UNSUPPORTED');
     expect(error.message).toBe('Target does not support migrations');
-    expect(error.domain).toBe('CLI');
   });
 
   it('errorTargetMigrationNotSupported with custom why', () => {
@@ -326,9 +302,8 @@ describe('Config Errors', () => {
       format: 'unknown',
       supportedFormats: ['compact', 'detailed'],
     });
-    expect(error.code).toBe('4008');
+    expect(error.code).toBe('CLI.JSON_FORMAT_UNSUPPORTED');
     expect(error.message).toBe('Unsupported JSON format');
-    expect(error.domain).toBe('CLI');
     expect(error.why).toContain('db verify');
     expect(error.why).toContain('unknown');
     expect(error.fix).toContain('compact or detailed');
@@ -342,9 +317,8 @@ describe('Config Errors', () => {
       missingExtensionPacks: ['pgvector'],
       providedComponentIds: ['postgres', 'postgres-adapter'],
     });
-    expect(error.code).toBe('4011');
+    expect(error.code).toBe('CONFIG.MISSING_EXTENSION_PACKS');
     expect(error.message).toBe('Missing extension packs in config');
-    expect(error.domain).toBe('CLI');
     expect(error.why).toContain("'pgvector'");
     expect(error.why).toContain('extension pack');
     expect(error.meta?.['missingExtensionPacks']).toEqual(['pgvector']);
@@ -356,7 +330,7 @@ describe('Config Errors', () => {
       missingExtensionPacks: ['pgvector', 'uuid-ossp'],
       providedComponentIds: ['postgres'],
     });
-    expect(error.code).toBe('4011');
+    expect(error.code).toBe('CONFIG.MISSING_EXTENSION_PACKS');
     expect(error.why).toContain("'pgvector'");
     expect(error.why).toContain("'uuid-ossp'");
     expect(error.meta?.['missingExtensionPacks']).toEqual(['pgvector', 'uuid-ossp']);
@@ -364,7 +338,7 @@ describe('Config Errors', () => {
 
   it('errorConfigValidation creates correct error', () => {
     const error = errorConfigValidation('family');
-    expect(error.code).toBe('4009');
+    expect(error.code).toBe('CONFIG.VALIDATION_FAILED');
     expect(error.message).toBe('Config validation error');
     expect(error.why).toBe('Config must have a "family" field');
   });
@@ -376,8 +350,7 @@ describe('Config Errors', () => {
 
   it('errorMigrationCliInvalidConfigArg creates correct error for missing path', () => {
     const error = errorMigrationCliInvalidConfigArg();
-    expect(error.code).toBe('4012');
-    expect(error.domain).toBe('CLI');
+    expect(error.code).toBe('CLI.CONFIG_ARG_MISSING_PATH');
     expect(error.message).toBe('--config flag requires a path argument');
     expect(error.why).toContain('without a following path argument');
     expect(error.fix).toContain('--config <path>');
@@ -386,21 +359,20 @@ describe('Config Errors', () => {
 
   it('errorMigrationCliInvalidConfigArg surfaces the swallowed flag in why/meta', () => {
     const error = errorMigrationCliInvalidConfigArg({ nextToken: '--dry-run' });
-    expect(error.code).toBe('4012');
+    expect(error.code).toBe('CLI.CONFIG_ARG_MISSING_PATH');
     expect(error.why).toContain('--dry-run');
     expect(error.meta).toEqual({ nextToken: '--dry-run' });
   });
 
-  it('errorMigrationCliUnknownFlag produces a PN-CLI-4013 envelope', () => {
+  it('errorMigrationCliUnknownFlag produces a CLI.UNKNOWN_FLAG envelope', () => {
     const error = errorMigrationCliUnknownFlag({
       flag: '--frobnicate',
       knownFlags: ['--dry-run', '--config', '--help'],
     });
     const envelope = error.toEnvelope();
-    expect(error.code).toBe('4013');
-    expect(error.domain).toBe('CLI');
+    expect(error.code).toBe('CLI.UNKNOWN_FLAG');
     expect(error.message).toBe('Unknown migration CLI flag');
-    expect(envelope.code).toBe('PN-CLI-4013');
+    expect(envelope.code).toBe('CLI.UNKNOWN_FLAG');
     expect(error.why).toContain('--frobnicate');
   });
 
@@ -425,28 +397,28 @@ describe('Config Errors', () => {
     expect(error.fix).toContain('--help');
   });
 
-  it('errorInvalidOutputFormat produces PN-CLI-4014', () => {
+  it('errorInvalidOutputFormat produces CLI.INVALID_OUTPUT_FORMAT', () => {
     const error = errorInvalidOutputFormat('yaml');
     const envelope = error.toEnvelope();
-    expect(error.code).toBe('4014');
-    expect(envelope.code).toBe('PN-CLI-4014');
+    expect(error.code).toBe('CLI.INVALID_OUTPUT_FORMAT');
+    expect(envelope.code).toBe('CLI.INVALID_OUTPUT_FORMAT');
     expect(error.message).toContain('yaml');
     expect(error.message).toContain('pretty, json');
   });
 
-  it('errorOutputFormatMutex produces PN-CLI-4015', () => {
+  it('errorOutputFormatMutex produces CLI.OUTPUT_FORMAT_CONFLICT', () => {
     const error = errorOutputFormatMutex();
     const envelope = error.toEnvelope();
-    expect(error.code).toBe('4015');
-    expect(envelope.code).toBe('PN-CLI-4015');
+    expect(error.code).toBe('CLI.OUTPUT_FORMAT_CONFLICT');
+    expect(envelope.code).toBe('CLI.OUTPUT_FORMAT_CONFLICT');
     expect(error.message).toMatch(/--format pretty.*--json/i);
   });
 
-  it('errorEnumCodecNotInPackStack produces PN-CON-4016', () => {
+  it('errorEnumCodecNotInPackStack produces CONTRACT.ENUM_CODEC_NOT_IN_PACK_STACK', () => {
     const error = errorEnumCodecNotInPackStack({ codecId: 'mongo/string@1' });
     const envelope = error.toEnvelope();
-    expect(error.code).toBe('4016');
-    expect(envelope.code).toBe('PN-CON-4016');
+    expect(error.code).toBe('CONTRACT.ENUM_CODEC_NOT_IN_PACK_STACK');
+    expect(envelope.code).toBe('CONTRACT.ENUM_CODEC_NOT_IN_PACK_STACK');
     expect(error.message).toContain('mongo/string@1');
     expect(error.meta).toEqual({ codecId: 'mongo/string@1' });
   });
@@ -455,9 +427,8 @@ describe('Config Errors', () => {
 describe('Generic Error', () => {
   it('errorUnexpected creates correct error', () => {
     const error = errorUnexpected('Unexpected error occurred');
-    expect(error.code).toBe('4999');
+    expect(error.code).toBe('CLI.UNEXPECTED');
     expect(error.message).toBe('Unexpected error');
-    expect(error.domain).toBe('CLI');
     expect(error.why).toBe('Unexpected error occurred');
   });
 

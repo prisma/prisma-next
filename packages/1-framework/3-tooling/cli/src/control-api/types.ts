@@ -402,7 +402,10 @@ export interface DbInitSuccess {
 /**
  * Failure codes for dbInit operation.
  */
-export type DbInitFailureCode = 'PLANNING_FAILED' | 'MARKER_ORIGIN_MISMATCH' | 'RUNNER_FAILED';
+export type DbInitFailureCode =
+  | 'PLANNING_FAILED'
+  | 'MIGRATION.MARKER_ORIGIN_MISMATCH'
+  | 'RUNNER_FAILED';
 
 /**
  * Failure details for dbInit operation.

@@ -57,7 +57,7 @@ export abstract class SqliteMigration<
    * Materialized SQLite control adapter, created once per migration
    * instance from the injected stack. `undefined` only when the migration
    * was instantiated without a stack (test fixtures); `controlAdapterFor`
-   * throws a PN-MIG-2008 in that case to surface the misuse.
+   * throws a MIGRATION.SQLITE_CONTROL_STACK_MISSING in that case to surface the misuse.
    */
   protected readonly controlAdapter: SqlControlAdapter<'sqlite'> | undefined;
 
@@ -81,7 +81,7 @@ export abstract class SqliteMigration<
   }
 
   /**
-   * Returns the materialized control adapter, or throws a PN-MIG-2008 naming
+   * Returns the materialized control adapter, or throws a MIGRATION.SQLITE_CONTROL_STACK_MISSING naming
    * `operation` when the migration was constructed without a `ControlStack`.
    * Single home for the null-check that every DDL/DML method shares.
    */

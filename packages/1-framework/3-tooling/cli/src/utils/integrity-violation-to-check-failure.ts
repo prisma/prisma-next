@@ -14,7 +14,7 @@ function migrationFileRelative(dirPath: string, fileName: string): string {
 
 /**
  * Map one {@link IntegrityViolation} onto a `migration check` failure row.
- * Sole catalogue mapping from integrity violations to `PN-MIG-CHECK-*`.
+ * Sole catalogue mapping from integrity violations to `MIGRATION.CHECK_*` codes.
  */
 export function integrityViolationToCheckFailure(
   violation: IntegrityViolation,
@@ -31,7 +31,7 @@ export function integrityViolationToCheckFailure(
     case 'hashMismatch':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-001',
+        code: 'MIGRATION.CHECK_HASH_MISMATCH',
         where: migrationFileRelative(
           join(migrationsDir, violation.spaceId, violation.dirName),
           'migration.json',
@@ -42,7 +42,7 @@ export function integrityViolationToCheckFailure(
     case 'providedInvariantsMismatch':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-002',
+        code: 'MIGRATION.CHECK_PROVIDED_INVARIANTS_MISMATCH',
         where: packageRelative(violation.spaceId, violation.dirName),
         why: `Migration "${violation.dirName}" providedInvariants in migration.json disagrees with ops.json.`,
         fix: 'Re-emit the migration package so migration.json and ops.json agree.',
@@ -50,7 +50,7 @@ export function integrityViolationToCheckFailure(
     case 'packageUnloadable':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-002',
+        code: 'MIGRATION.CHECK_PACKAGE_UNLOADABLE',
         where: packageRelative(violation.spaceId, violation.dirName),
         why: `Migration "${violation.dirName}" could not be loaded: ${violation.detail}`,
         fix: 'Re-emit the migration package or restore from version control.',
@@ -58,7 +58,7 @@ export function integrityViolationToCheckFailure(
     case 'sameSourceAndTarget':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-007',
+        code: 'MIGRATION.CHECK_NOOP_SELF_EDGE',
         where: packageRelative(violation.spaceId, violation.dirName),
         why: `Migration "${violation.dirName}" in space "${violation.spaceId}" has source equal to target (${violation.hash}) with no data invariant — a true no-op self-edge.`,
         fix: 'Add a data operation if this self-edge was meant to carry a data invariant, or delete the migration if it is a true no-op.',
@@ -66,7 +66,7 @@ export function integrityViolationToCheckFailure(
     case 'orphanSpaceDir':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-008',
+        code: 'MIGRATION.CHECK_ORPHAN_SPACE_DIR',
         where: spaceRelative(violation.spaceId),
         why: `Contract-space directory "${violation.spaceId}" exists on disk but no extension declares it.`,
         fix: 'Remove the orphan directory, or declare the extension in `extensionPacks`.',
@@ -74,7 +74,7 @@ export function integrityViolationToCheckFailure(
     case 'declaredButUnmigrated':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-009',
+        code: 'MIGRATION.CHECK_DECLARED_BUT_UNMIGRATED',
         where: spaceRelative(violation.spaceId),
         why: `Extension "${violation.spaceId}" is declared in \`extensionPacks\` but has no on-disk migrations directory.`,
         fix: 'Re-emit the extension contract-space artefacts with `prisma-next contract emit` and migration planning, or remove the extension from `extensionPacks` if it is unused.',
@@ -82,7 +82,7 @@ export function integrityViolationToCheckFailure(
     case 'headRefMissing':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-010',
+        code: 'MIGRATION.CHECK_HEAD_REF_MISSING',
         where: refRelative(violation.spaceId, 'head'),
         why: `Head ref \`refs/head.json\` is missing for contract space "${violation.spaceId}".`,
         fix: 'Re-emit the contract-space migrations and head ref artefacts, or restore `refs/head.json` from version control.',
@@ -90,7 +90,7 @@ export function integrityViolationToCheckFailure(
     case 'headRefNotInGraph':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-011',
+        code: 'MIGRATION.CHECK_HEAD_REF_NOT_IN_GRAPH',
         where: refRelative(violation.spaceId, 'head'),
         why: `Head ref ${violation.hash} for contract space "${violation.spaceId}" is not present in its migration graph.`,
         fix: 'Re-emit the contract space migrations, or restore the missing migration package.',
@@ -98,7 +98,7 @@ export function integrityViolationToCheckFailure(
     case 'refUnreadable':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-012',
+        code: 'MIGRATION.CHECK_REF_UNREADABLE',
         where: refRelative(violation.spaceId, violation.refName),
         why: `Ref "${violation.refName}" for contract space "${violation.spaceId}" is unreadable: ${violation.detail}`,
         fix: 'Repair or remove the corrupt ref file.',
@@ -106,7 +106,7 @@ export function integrityViolationToCheckFailure(
     case 'targetMismatch':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-013',
+        code: 'MIGRATION.CHECK_TARGET_MISMATCH',
         where: spaceRelative(violation.spaceId),
         why: `Contract space "${violation.spaceId}" targets "${violation.actual}" but the project targets "${violation.expected}".`,
         fix: 'Update the extension to target the configured database, or change the project target.',
@@ -114,7 +114,7 @@ export function integrityViolationToCheckFailure(
     case 'disjointness':
       return {
         space: 'app',
-        code: 'PN-MIG-CHECK-014',
+        code: 'MIGRATION.CHECK_SPACE_DISJOINTNESS_VIOLATION',
         where: migrationPathRelative(migrationsDir),
         why: `Storage element "${violation.element}" is claimed by multiple contract spaces: ${violation.claimedBy.join(', ')}.`,
         fix: 'Update the contracts so each storage element is owned by exactly one contract space.',
@@ -122,7 +122,7 @@ export function integrityViolationToCheckFailure(
     case 'contractUnreadable':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-015',
+        code: 'MIGRATION.CHECK_CONTRACT_UNREADABLE',
         where: migrationFileRelative(join(migrationsDir, violation.spaceId), 'contract.json'),
         why: `Contract for space "${violation.spaceId}" is unreadable: ${violation.detail}`,
         fix: 'Re-emit the extension contract artefacts, or fix the descriptor producing the invalid contract.',
@@ -130,7 +130,7 @@ export function integrityViolationToCheckFailure(
     case 'duplicateMigrationHash':
       return {
         space: violation.spaceId,
-        code: 'PN-MIG-CHECK-016',
+        code: 'MIGRATION.CHECK_DUPLICATE_MIGRATION_HASH',
         where: spaceRelative(violation.spaceId),
         why: `Multiple migrations in space "${violation.spaceId}" share migrationHash "${violation.migrationHash}" (${violation.dirNames.join(', ')}).`,
         fix: 'Re-emit one of the conflicting packages so each migrationHash is unique.',

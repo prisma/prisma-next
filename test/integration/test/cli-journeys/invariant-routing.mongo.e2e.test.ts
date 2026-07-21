@@ -534,7 +534,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
 
     // Mongo-P.04: apply fails with UNKNOWN_INVARIANT.
     const applyFail = await migrationApply(ctx, ['--to', 'prod', '--json']);
-    expect(applyFail.exitCode, 'Mongo-P.04: apply exits 1').toBe(1);
+    expect(applyFail.exitCode, 'Mongo-P.04: apply exits 2').toBe(2);
     const applyEnvelope = parseJsonOutput<{
       meta?: { code?: string; unknown?: readonly string[]; declared?: readonly string[] };
     }>(applyFail);
@@ -555,7 +555,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
 
     // Mongo-P.06: status --ref also fatal (parity with apply).
     const statusFail = await migrationStatus(ctx, ['--to', 'prod', '--json']);
-    expect(statusFail.exitCode, 'Mongo-P.06: status exits 1').toBe(1);
+    expect(statusFail.exitCode, 'Mongo-P.06: status exits 2').toBe(2);
     const statusEnvelope = parseJsonOutput<{ meta?: { code?: string } }>(statusFail);
     expect(statusEnvelope.meta?.code, 'Mongo-P.06: status error code').toBe(
       'MIGRATION.UNKNOWN_INVARIANT',
@@ -643,7 +643,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
 
     // Mongo-Q.05: apply --ref prod fails with NO_INVARIANT_PATH.
     const applyFail = await migrationApply(ctx, ['--to', 'prod', '--json']);
-    expect(applyFail.exitCode, 'Mongo-Q.05: apply exits 1').toBe(1);
+    expect(applyFail.exitCode, 'Mongo-Q.05: apply exits 2').toBe(2);
     const envelope = parseJsonOutput<{
       meta?: {
         code?: string;

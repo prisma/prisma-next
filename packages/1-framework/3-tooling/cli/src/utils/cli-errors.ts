@@ -360,7 +360,7 @@ export function mapMigrationToolsError(error: MigrationToolsError): CliStructure
  * Shared "needs a live database" precondition for read verbs that consult the
  * marker/ledger (`migration log`, `migration status`). A command needs both a
  * connection string and a control-plane driver; either missing yields the same
- * `PN-CLI-4005` envelope with `meta.missingFlags` (canonical long-form flags
+ * `CONFIG.DB_CONNECTION_REQUIRED` envelope with `meta.missingFlags` (canonical long-form flags
  * per CLI Style Guide §Errors) so callers can react programmatically. Returns
  * `null` when both are present.
  */

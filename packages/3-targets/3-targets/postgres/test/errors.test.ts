@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { errorPostgresMigrationStackMissing } from '../src/core/errors';
 
 describe('errorPostgresMigrationStackMissing', () => {
-  it('renders under the stable PN-MIG-2007 code', () => {
-    expect(errorPostgresMigrationStackMissing('createTable').toEnvelope().code).toBe('PN-MIG-2007');
+  it('renders under the stable MIGRATION.POSTGRES_CONTROL_STACK_MISSING code', () => {
+    expect(errorPostgresMigrationStackMissing('createTable').toEnvelope().code).toBe(
+      'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
+    );
   });
 
   it('names the operation that failed in summary, why, and meta', () => {

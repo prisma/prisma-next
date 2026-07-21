@@ -238,7 +238,7 @@ withTempDir(({ createTempDir }) => {
             '--config',
             configPath,
           ]);
-          expect(result.exitCode, 'ref set exit code').toBe(1);
+          expect(result.exitCode, 'ref set exit code').toBe(2);
           expect(result.output).toContain('not in the migration graph');
           expect(result.output).toContain(HASH_FLOAT);
           expect(refFilesAbsent(appRefsDir(testDir), 'staging')).toBe(true);
@@ -263,7 +263,7 @@ withTempDir(({ createTempDir }) => {
             '--config',
             configPath,
           ]);
-          expect(result.exitCode, 'ref set exit code').toBe(1);
+          expect(result.exitCode, 'ref set exit code').toBe(2);
           expect(result.output).toContain('empty-database sentinel');
           expect(refFilesAbsent(appRefsDir(testDir), 'staging')).toBe(true);
         });
