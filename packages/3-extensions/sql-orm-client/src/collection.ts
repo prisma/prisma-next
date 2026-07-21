@@ -2144,6 +2144,8 @@ export class Collection<
             collection.namespaceId,
             collection.tableName,
             collection.state.filters,
+            collection.state.variantName,
+            collection.modelName,
           ),
           annotationsMap,
         );

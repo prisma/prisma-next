@@ -90,7 +90,9 @@ interface FeaturePredicate {
 
 interface FeatureCountCollection {
   where(predicate: (task: FeaturePredicate) => unknown): FeatureCountCollection;
+  include(relation: 'assignee'): FeatureCountCollection;
   updateCount(data: { title: string }): Promise<number>;
+  deleteAll(): { toArray(): Promise<Record<string, unknown>[]> };
   deleteCount(): Promise<number>;
 }
 
@@ -456,6 +458,38 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     expect(
       collectColumnRefs(exists.subquery.where).filter(
         (ref) => ref.table === 'features' && ref.column === 'assignee_id',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('deleteAll with includes after variant(Feature) scopes MTI predicates through the write subquery', async () => {
+    const { collection, runtime } = createReturningMixedPolyCollection();
+    runtime.setNextResults([[], []]);
+
+    const mixedPoly = blindCast<
+      MixedPolyCountCollection,
+      'mixed poly test contract patches Task variants outside the static fixture type'
+    >(collection);
+    const rows = await mixedPoly
+      .variant('Feature')
+      .where((task) => task.priority.gt(1))
+      .include('assignee')
+      .deleteAll()
+      .toArray();
+
+    expect(rows).toEqual([]);
+    expect(runtime.executions).toHaveLength(2);
+    expectSelectWithFeatureJoin(runtime.executions[0]!.plan.ast);
+
+    const writeAst = runtime.executions[1]!.plan.ast;
+    expect(writeAst.kind).toBe('delete');
+    if (writeAst.kind !== 'delete') {
+      throw new Error('Expected a DELETE plan');
+    }
+    const exists = expectExistsWithFeatureJoin(writeAst.where);
+    expect(
+      collectColumnRefs(exists.subquery.where).filter(
+        (ref) => ref.table === 'features' && ref.column === 'priority',
       ),
     ).toHaveLength(1);
   });
