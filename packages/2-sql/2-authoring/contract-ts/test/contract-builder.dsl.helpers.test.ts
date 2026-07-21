@@ -144,8 +144,9 @@ const postgresTargetPack = {
         args: [{ kind: 'string' }, { kind: 'stringArray' }],
         output: {
           codecId: 'app/test-enum@1',
-          nativeType: { kind: 'arg', index: 0 },
+          nativeType: 'enum',
           typeParams: {
+            name: { kind: 'arg', index: 0 },
             values: { kind: 'arg', index: 1 },
           },
         },
@@ -591,12 +592,12 @@ describe('contract DSL helper vocabulary', () => {
     expect(documentScopedTypes(contract)?.['Role']).toEqual({
       kind: 'codec-instance',
       codecId: 'app/test-enum@1',
-      nativeType: 'role',
-      typeParams: { values: ['USER', 'ADMIN'] },
+      nativeType: 'enum',
+      typeParams: { name: 'role', values: ['USER', 'ADMIN'] },
     });
     expect(unboundTables(contract.storage)['app_user']!.columns['role']).toMatchObject({
       codecId: 'app/test-enum@1',
-      nativeType: 'role',
+      nativeType: 'enum',
       typeRef: 'Role',
     });
   });
@@ -707,8 +708,9 @@ describe('contract DSL helper vocabulary', () => {
               args: [{ kind: 'string' }, { kind: 'stringArray' }],
               output: {
                 codecId: 'conflict/enum@1',
-                nativeType: { kind: 'arg', index: 0 },
+                nativeType: 'enum',
                 typeParams: {
+                  name: { kind: 'arg', index: 0 },
                   values: { kind: 'arg', index: 1 },
                 },
               },

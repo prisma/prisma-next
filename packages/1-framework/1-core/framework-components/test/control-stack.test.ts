@@ -220,30 +220,6 @@ describe('assembleAuthoringContributions', () => {
     );
   });
 
-  it('rejects a type constructor whose strict template references an optional argument without a default', () => {
-    expect(() =>
-      assembleAuthoringContributions([
-        createDescriptor({
-          id: 'adapter-a',
-          authoring: {
-            type: {
-              Custom: {
-                kind: 'typeConstructor',
-                args: [{ kind: 'string', name: 'name', optional: true }],
-                output: { codecId: 'a/custom@1', nativeType: { kind: 'arg', index: 0 } },
-              },
-            },
-          },
-        }),
-      ]),
-    ).toThrow(
-      'Invalid authoring type constructor "Custom" contributed by descriptor "adapter-a". ' +
-        'output.nativeType references argument 0 ("name"), which is optional but the reference carries no default; ' +
-        'the template cannot resolve when the argument is omitted. ' +
-        'Mark the argument required, or give the template reference a default.',
-    );
-  });
-
   it('rejects a type constructor whose template references an argument index that does not exist', () => {
     expect(() =>
       assembleAuthoringContributions([
@@ -281,7 +257,11 @@ describe('assembleAuthoringContributions', () => {
               vendor: {
                 Odd: {
                   kind: 'typeConstructor',
-                  output: { codecId: 'a/odd@1', nativeType: { kind: 'arg', index: 0 } },
+                  output: {
+                    codecId: 'a/odd@1',
+                    nativeType: 'odd',
+                    typeParams: { size: { kind: 'arg', index: 0 } },
+                  },
                 },
               },
             },
@@ -290,7 +270,36 @@ describe('assembleAuthoringContributions', () => {
       ]),
     ).toThrow(
       'Invalid authoring type constructor "vendor.Odd" contributed by descriptor "ext-vendor". ' +
-        'output.nativeType references argument 0, but the constructor declares 0 argument(s). ' +
+        'output.typeParams.size references argument 0, but the constructor declares 0 argument(s). ' +
+        'Declare the argument or correct the reference index.',
+    );
+  });
+
+  it('rejects a dangling arg-ref inside an arg-ref default', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          id: 'adapter-a',
+          authoring: {
+            type: {
+              Sized: {
+                kind: 'typeConstructor',
+                args: [{ kind: 'number', name: 'length', integer: true, optional: true }],
+                output: {
+                  codecId: 'a/sized@1',
+                  nativeType: 'sized',
+                  typeParams: {
+                    length: { kind: 'arg', index: 0, default: { kind: 'arg', index: 5 } },
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(
+      'Invalid authoring type constructor "Sized" contributed by descriptor "adapter-a". ' +
+        'output.typeParams.length references argument 5, but the constructor declares 1 argument(s). ' +
         'Declare the argument or correct the reference index.',
     );
   });
@@ -333,27 +342,6 @@ describe('assembleAuthoringContributions', () => {
       }),
     ]);
     expect(Object.keys(result.type)).toEqual(['VarCharish']);
-  });
-
-  it('accepts a strict-template reference to an optional argument that carries a default', () => {
-    const result = assembleAuthoringContributions([
-      createDescriptor({
-        id: 'adapter-a',
-        authoring: {
-          type: {
-            Aliased: {
-              kind: 'typeConstructor',
-              args: [{ kind: 'string', name: 'name', optional: true }],
-              output: {
-                codecId: 'a/custom@1',
-                nativeType: { kind: 'arg', index: 0, default: 'custom' },
-              },
-            },
-          },
-        },
-      }),
-    ]);
-    expect(Object.keys(result.type)).toEqual(['Aliased']);
   });
 
   it('accepts an entityRefArg constructor without an output template', () => {

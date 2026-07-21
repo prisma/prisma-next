@@ -237,37 +237,35 @@ describe('authoring template resolution', () => {
       kind: 'typeConstructor',
       output: {
         codecId: 'test/text@1',
-        nativeType: {
-          kind: 'arg',
-          index: 0,
-          path: ['nativeType'],
-          default: 'text',
+        nativeType: 'text',
+        typeParams: {
+          label: {
+            kind: 'arg',
+            index: 0,
+            path: ['label'],
+            default: 'fallback',
+          },
         },
       },
     } as const;
 
-    const args = [Object.create({ nativeType: 'prototype-text' })];
+    const args = [Object.create({ label: 'prototype-label' })];
 
     expect(instantiateAuthoringTypeConstructor(descriptor, args)).toEqual({
       codecId: 'test/text@1',
       nativeType: 'text',
+      typeParams: { label: 'fallback' },
     });
   });
 
-  it('rejects resolved nativeType values that are not strings', () => {
+  it('rejects instantiation of an output template without a nativeType', () => {
     const descriptor = {
       kind: 'typeConstructor',
-      output: {
-        codecId: 'test/text@1',
-        nativeType: {
-          kind: 'arg',
-          index: 0,
-        },
-      },
+      output: { codecId: 'test/text@1' },
     } as const;
 
-    expect(() => instantiateAuthoringTypeConstructor(descriptor, [123])).toThrow(
-      /Resolved authoring nativeType must be a string/,
+    expect(() => instantiateAuthoringTypeConstructor(descriptor, [])).toThrow(
+      /declares no nativeType; only entity-ref constructors may omit it/,
     );
   });
 
@@ -579,23 +577,6 @@ describe('collectScalarTypeConstructors', () => {
       codecId: 'sql/varchar@1',
       nativeType: 'character varying',
       typeParams: { length: 191 },
-    });
-  });
-
-  it('resolves a defaulted nativeType arg-ref in bare form', () => {
-    const namespace = {
-      Aliased: {
-        kind: 'typeConstructor',
-        args: [{ kind: 'string', name: 'name', optional: true }],
-        output: {
-          codecId: 'pg/custom@1',
-          nativeType: { kind: 'arg', index: 0, default: 'custom' },
-        },
-      },
-    } satisfies AuthoringTypeNamespace;
-
-    expect(Object.fromEntries(collectScalarTypeConstructors(namespace))).toEqual({
-      Aliased: { codecId: 'pg/custom@1', nativeType: 'custom' },
     });
   });
 
