@@ -405,6 +405,9 @@ export class FunctionSource extends FromSource {
     ordinality = false,
   ) {
     super();
+    if (columnAliases?.length === 0) {
+      throw new Error('FunctionSource column aliases must not be empty');
+    }
     if (columnAliases !== undefined && alias === undefined) {
       throw new Error('FunctionSource column aliases require a table alias');
     }

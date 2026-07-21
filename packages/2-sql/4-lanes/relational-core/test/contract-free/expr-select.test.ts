@@ -62,6 +62,12 @@ describe('FunctionSource', () => {
     );
   });
 
+  it('rejects an empty column-alias list', () => {
+    expect(() => FunctionSource.of('unnest', [], 'u').withColumnAliases([])).toThrow(
+      'FunctionSource column aliases must not be empty',
+    );
+  });
+
   it('preserves configuration while rewriting arguments', () => {
     const originalArg = ParamRef.of('before');
     const replacementArg = ParamRef.of('after');
