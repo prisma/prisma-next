@@ -32,6 +32,7 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import type { MongoIncludeExpr } from './collection-state';
 import { emptyCollectionState, type MongoCollectionState } from './collection-state';
 import { compileMongoQuery } from './compile';
@@ -42,6 +43,7 @@ import {
   type FieldAccessor,
   type FieldOperation,
 } from './field-accessor';
+import { ormError } from './orm-errors';
 import type {
   DefaultModelRow,
   IncludedRow,
@@ -231,12 +233,18 @@ class MongoCollectionImpl<
     ] as MongoModelDefinition;
     const relation = model.relations?.[relationName];
     if (!relation) {
-      throw new Error(`Unknown relation "${relationName}" on model "${this.#modelName as string}"`);
+      throw ormError(
+        'ORM.RELATION_UNKNOWN',
+        `Unknown relation "${relationName}" on model "${this.#modelName as string}"`,
+        { meta: { model: this.#modelName, relation: relationName } },
+      );
     }
 
     if (!('on' in relation)) {
-      throw new Error(
+      throw ormError(
+        'ORM.INCLUDE_UNSUPPORTED',
         `Relation "${relationName}" is an embed relation — only reference relations can be included`,
+        { meta: { model: this.#modelName, relation: relationName } },
       );
     }
 
@@ -249,7 +257,11 @@ class MongoCollectionImpl<
       ref.on.localFields.length !== 1 ||
       ref.on.targetFields.length !== 1
     ) {
-      throw new Error(`Compound references are not yet supported: relation "${relationName}"`);
+      throw ormError(
+        'ORM.INCLUDE_UNSUPPORTED',
+        `Compound references are not yet supported: relation "${relationName}"`,
+        { meta: { model: this.#modelName, relation: relationName } },
+      );
     }
 
     const targetModelName = ref.to.model;
@@ -257,7 +269,9 @@ class MongoCollectionImpl<
       | MongoModelDefinition
       | undefined;
     if (!targetModel) {
-      throw new Error(`Target model "${targetModelName}" not found for relation "${relationName}"`);
+      throw new InternalError(
+        `Target model "${targetModelName}" not found for relation "${relationName}"`,
+      );
     }
 
     const includeExpr: MongoIncludeExpr = {
@@ -474,14 +488,18 @@ class MongoCollectionImpl<
       const ops = input.update(accessor);
       const idOp = ops.find((op) => op.field === '_id');
       if (idOp) {
-        throw new Error('Mutation payloads cannot modify `_id`');
+        throw ormError('ORM.FIELD_IMMUTABLE', 'Mutation payloads cannot modify `_id`', {
+          meta: { field: '_id' },
+        });
       }
       const dotPathOp = ops.find((op) => op.field.includes('.'));
       if (dotPathOp) {
-        throw new Error(
+        throw ormError(
+          'ORM.OPERATION_UNSUPPORTED',
           `upsert() does not support dot-path field operations (found "${dotPathOp.field}"). ` +
             'Dot-path updates conflict with $setOnInsert on the insert path, producing incomplete documents. ' +
             'Use top-level field operations instead.',
+          { meta: { method: 'upsert', field: dotPathOp.field } },
         );
       }
       updateDoc = compileFieldOperations(ops, (field, value, operator) =>
@@ -548,7 +566,9 @@ class MongoCollectionImpl<
       | MongoModelDefinition
       | undefined;
     if (!model) {
-      throw new Error(`Unknown model: "${this.#modelName}".`);
+      throw ormError('ORM.MODEL_UNKNOWN', `Unknown model: "${this.#modelName}".`, {
+        meta: { model: this.#modelName },
+      });
     }
     return compileMongoQuery<IncludedRow<TContract, ModelName, TIncludes>>(
       this.#collectionName,
@@ -642,7 +662,9 @@ class MongoCollectionImpl<
     const result: Record<string, MongoValue> = {};
     for (const [key, value] of Object.entries(data)) {
       if (key === '_id' && value !== undefined) {
-        throw new Error('Mutation payloads cannot modify `_id`');
+        throw ormError('ORM.FIELD_IMMUTABLE', 'Mutation payloads cannot modify `_id`', {
+          meta: { field: '_id' },
+        });
       }
       if (value !== undefined) {
         result[key] = this.#wrapFieldValue(value, fields[key]);
@@ -675,7 +697,9 @@ class MongoCollectionImpl<
       const ops = dataOrCallback(accessor);
       const idOp = ops.find((op) => op.field === '_id');
       if (idOp) {
-        throw new Error('Mutation payloads cannot modify `_id`');
+        throw ormError('ORM.FIELD_IMMUTABLE', 'Mutation payloads cannot modify `_id`', {
+          meta: { field: '_id' },
+        });
       }
       if (ops.length === 0) {
         return { $set: {} };
@@ -759,8 +783,10 @@ class MongoCollectionImpl<
 
   #requireFilters(methodName: string): void {
     if (this.#state.filters.length === 0) {
-      throw new Error(
+      throw ormError(
+        'ORM.WHERE_MISSING',
         `${methodName}() requires a .where() filter. Call .where() before .${methodName}()`,
+        { meta: { method: methodName } },
       );
     }
   }
@@ -771,16 +797,20 @@ class MongoCollectionImpl<
       this.#state.limit !== undefined ||
       this.#state.offset !== undefined
     ) {
-      throw new Error(
+      throw ormError(
+        'ORM.OPERATION_UNSUPPORTED',
         `${methodName}() does not support orderBy/skip/take. Remove windowing before calling .${methodName}()`,
+        { meta: { method: methodName, reason: 'windowing' } },
       );
     }
   }
 
   #rejectIncludes(methodName: string): void {
     if (this.#state.includes.length > 0) {
-      throw new Error(
+      throw ormError(
+        'ORM.OPERATION_UNSUPPORTED',
         `${methodName}() does not support .include(). Remove includes before calling .${methodName}()`,
+        { meta: { method: methodName, reason: 'includes' } },
       );
     }
   }

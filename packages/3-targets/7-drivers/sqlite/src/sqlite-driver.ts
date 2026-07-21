@@ -18,10 +18,7 @@ export type SqliteBinding = { readonly kind: 'path'; readonly path: string };
 export type SqliteRuntimeDriver = RuntimeDriverInstance<'sql', 'sqlite'> & SqlDriver<SqliteBinding>;
 
 interface DriverRuntimeError extends Error {
-  readonly code:
-    | 'DRIVER.NOT_CONNECTED'
-    | 'DRIVER.ALREADY_CONNECTED'
-    | 'DRIVER.EXPLAIN_NOT_SUPPORTED';
+  readonly code: 'DRIVER.NOT_CONNECTED' | 'DRIVER.ALREADY_CONNECTED';
   readonly category: 'DRIVER';
   readonly severity: 'error';
   readonly details?: Record<string, unknown>;

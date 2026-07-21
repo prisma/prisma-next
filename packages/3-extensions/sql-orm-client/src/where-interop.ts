@@ -2,6 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyExpression, ToWhereExpr, WhereArg } from '@prisma-next/sql-relational-core/ast';
 import { isWhereExpr } from '@prisma-next/sql-relational-core/ast';
+import { ormError } from './orm-errors';
 import { bindWhereExpr } from './where-binding';
 
 interface NormalizeWhereArgOptions {
@@ -24,8 +25,10 @@ export function normalizeWhereArg(
     return undefined;
   }
   if (arg === null) {
-    throw new Error(
+    throw ormError(
+      'ORM.ARGUMENT_INVALID',
       'WhereArg cannot be null. Pass undefined or a valid WhereExpr/ToWhereExpr payload.',
+      { meta: { argument: 'where' } },
     );
   }
 

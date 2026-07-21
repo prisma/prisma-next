@@ -32,6 +32,7 @@ import {
   OrExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { blindCast } from '@prisma-next/utils/casts';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import {
   isToOneCardinality,
   resolvePolymorphismInfo,
@@ -45,6 +46,7 @@ import {
   type RowEnvelope,
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
+import { ormError } from './orm-errors';
 import { compileSelect, compileSelectWithIncludes } from './query-plan';
 import {
   type CollectionContext,
@@ -211,8 +213,10 @@ export function reloadMutationRowsByIdentities<Row>(options: {
 
   const identityColumns = resolveRowIdentityColumns(contract, namespaceId, tableName);
   if (identityColumns.length === 0) {
-    throw new Error(
+    throw ormError(
+      'ORM.ROW_IDENTITY_MISSING',
       `Cannot load includes for the mutation result on model "${modelName}": table "${tableName}" has no primary key or unique constraint to key the include read-back on.`,
+      { meta: { model: modelName, table: tableName } },
     );
   }
 
@@ -585,13 +589,13 @@ async function decodeCombineIncludePayload(
 
 function parseCombineEnvelope(include: IncludeExpr, raw: unknown): Record<string, unknown> {
   if (raw === null || raw === undefined) {
-    throw new Error(
+    throw new InternalError(
       `combine() envelope for include "${include.relationName}" is missing (got ${raw === null ? 'null' : 'undefined'}); the correlated subquery should always produce a JSON object — this indicates a planner or decoder bug.`,
     );
   }
   const parsed = parseIncludePayload(raw);
   if (!isPlainObjectEnvelope(parsed)) {
-    throw new Error(
+    throw new InternalError(
       `combine() envelope for include "${include.relationName}" has unexpected shape (expected object, got ${describeEnvelopeShape(parsed)}); this indicates a planner or decoder bug.`,
     );
   }
@@ -642,7 +646,7 @@ function decodeScalarIncludePayload(
   }
   const parsed = parseIncludePayload(raw);
   if (!isPlainObjectEnvelope(parsed)) {
-    throw new Error(
+    throw new InternalError(
       `scalar() envelope for include "${include.relationName}" has unexpected shape (expected object, got ${describeEnvelopeShape(parsed)}); this indicates a planner or decoder bug.`,
     );
   }
@@ -662,7 +666,7 @@ function parseIncludedRows(include: IncludeExpr, value: unknown): Record<string,
   const rows: Record<string, unknown>[] = [];
   for (const item of parsed) {
     if (!isPlainObjectEnvelope(item)) {
-      throw new Error(
+      throw new InternalError(
         `Include row envelope for relation "${include.relationName}" has unexpected shape (expected object, got ${describeEnvelopeShape(item)}); this indicates a planner or decoder bug.`,
       );
     }
