@@ -87,7 +87,16 @@ test('pgNumeric: column helper preserves typed codecFactory + composite params',
   const col = pgNumericColumn({ precision: 10, scale: 2 });
   expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgNumericCodec>();
   expectTypeOf(col.typeParams).toEqualTypeOf<{
-    readonly precision: number;
+    readonly precision?: number;
+    readonly scale?: number;
+  }>();
+});
+
+test('pgNumeric: column helper accepts no-args call (default params)', () => {
+  const col = pgNumericColumn();
+  expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgNumericCodec>();
+  expectTypeOf(col.typeParams).toEqualTypeOf<{
+    readonly precision?: number;
     readonly scale?: number;
   }>();
 });

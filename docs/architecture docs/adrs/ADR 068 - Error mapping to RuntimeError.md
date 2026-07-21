@@ -1,5 +1,7 @@
 # ADR 068 — Error mapping to RuntimeError
 
+> **Superseded by [ADR 239 — Errors are structural envelopes with dotted namespace codes](ADR%20239%20-%20Errors%20are%20structural%20envelopes%20with%20dotted%20namespace%20codes.md).** The `E.NAMESPACE.SUBCODE` spelling is dropped for dotted `NAMESPACE.SUBCODE`. The mapping this ADR describes — vendor and driver failures normalized to stable codes, provenance preserved — survives and moves onto the new scheme, with source detail carried in the envelope's `cause` field.
+
 ## Decision
 
 Introduce a deterministic translation layer that maps source-specific failures (database, driver, adapter, compile profile, lane) into the canonical `RuntimeError` envelope and stable codes defined in ADR 027. This mapping is target-aware but lane-neutral and must be reproducible across environments.

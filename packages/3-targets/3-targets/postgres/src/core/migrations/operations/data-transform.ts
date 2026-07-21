@@ -21,7 +21,7 @@
  *
  * The factory accepts lazy closures (`() => SqlQueryPlan | Buildable`),
  * invokes each one, asserts that its `meta.storageHash` matches the
- * `contract` it was handed (→ `PN-MIG-2005` on mismatch), and lowers the
+ * `contract` it was handed (→ `MIGRATION.DATA_TRANSFORM_CONTRACT_MISMATCH` on mismatch), and lowers the
  * plan via the supplied control adapter to a serialized `{sql, params}`
  * payload.
  *

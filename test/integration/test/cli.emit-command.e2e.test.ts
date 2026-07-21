@@ -150,7 +150,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'throws error with PN-CLI code when config file is missing',
+      'throws error with CONFIG.FILE_NOT_FOUND code when config file is missing',
       async () => {
         // Set up test directory from fixtures (but we'll use a non-existent config)
         const testSetup = setupTestDirectoryFromFixtures(
@@ -184,7 +184,7 @@ withTempDir(({ createTempDir }) => {
 
         const parsed = JSON.parse(errorOutput);
         expect(parsed).toMatchObject({
-          code: 'PN-CLI-4001',
+          code: 'CONFIG.FILE_NOT_FOUND',
           summary: expect.any(String),
           why: expect.any(String),
           fix: expect.any(String),
@@ -194,7 +194,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'throws error with PN-CLI code when contract config is missing',
+      'throws error with CONFIG.CONTRACT_MISSING code when contract config is missing',
       async () => {
         // Set up test directory from fixtures with no-contract config
         const testSetup = setupTestDirectoryFromFixtures(
@@ -227,7 +227,7 @@ withTempDir(({ createTempDir }) => {
 
         const parsed = JSON.parse(errorOutput);
         expect(parsed).toMatchObject({
-          code: expect.stringMatching(/^PN-CLI-/),
+          code: 'CONFIG.CONTRACT_MISSING',
           summary: expect.any(String),
           why: expect.any(String),
           fix: expect.any(String),

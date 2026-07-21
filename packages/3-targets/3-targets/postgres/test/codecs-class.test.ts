@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
+  PG_DATE_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
   PG_INET_CODEC_ID,
@@ -23,6 +24,7 @@ import {
 import {
   pgBitDescriptor,
   pgBoolDescriptor,
+  pgDateDescriptor,
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgInetDescriptor,
@@ -154,6 +156,86 @@ describe('codecs-class', () => {
 
     it('renderOutputType returns Numeric<precision> when scale absent', () => {
       expect(pgNumericDescriptor.renderOutputType?.({ precision: 10 })).toBe('Numeric<10>');
+    });
+  });
+
+  describe('pg/numeric@1 with no typeParams (unbounded numeric / bare Decimal)', () => {
+    const codec = pgNumericDescriptor.factory({})(instanceCtx);
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_NUMERIC_CODEC_ID);
+    });
+
+    it('encodes and decodes strings verbatim with no precision/scale supplied', async () => {
+      expect(await codec.encode('123.45', callCtx)).toBe('123.45');
+      expect(await codec.decode('123.45', callCtx)).toBe('123.45');
+    });
+
+    it('renderOutputType returns undefined when precision is absent', () => {
+      expect(pgNumericDescriptor.renderOutputType?.({})).toBeUndefined();
+    });
+  });
+
+  describe('pg/date@1', () => {
+    const codec = pgDateDescriptor.factory()(instanceCtx);
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_DATE_CODEC_ID);
+    });
+
+    it('decode normalizes a local-midnight Date into canonical UTC midnight', async () => {
+      // Simulates what the pg driver hands the codec for a `date` column: a
+      // `Date` built at *local* midnight (postgres-date's `getDate`), e.g.
+      // `new Date(2024, 0, 15)`. Regardless of the process's timezone, decode
+      // must recover the same calendar date at UTC midnight.
+      const localMidnight = new Date(2024, 0, 15);
+      const decoded = await codec.decode(localMidnight, callCtx);
+      expect(decoded.getTime()).toBe(Date.UTC(2024, 0, 15));
+    });
+
+    it('encode formats the UTC calendar date as YYYY-MM-DD, independent of local getters', async () => {
+      const utcMidnight = new Date(Date.UTC(2024, 0, 15));
+      expect(await codec.encode(utcMidnight, callCtx)).toBe('2024-01-15');
+    });
+
+    it('round-trips a calendar date through encode -> decode unchanged', async () => {
+      const original = new Date(Date.UTC(2024, 0, 15));
+      const wireText = await codec.encode(original, callCtx);
+      // The driver would parse `wireText` back into a Date; decode
+      // canonicalizes whatever it receives to the same UTC-midnight instant.
+      const roundTripped = await codec.decode(new Date(2024, 0, 15), callCtx);
+      expect(wireText).toBe('2024-01-15');
+      expect(roundTripped.getTime()).toBe(original.getTime());
+    });
+
+    it('encodeJson/decodeJson round-trip the YYYY-MM-DD representation', () => {
+      const instant = new Date(Date.UTC(2024, 0, 15));
+      expect(codec.encodeJson(instant)).toBe('2024-01-15');
+      expect(codec.decodeJson('2024-01-15')).toEqual(instant);
+    });
+
+    it('throws on invalid JSON input', () => {
+      expect(() => codec.decodeJson(42)).toThrow(/Expected date string for pg\/date@1/);
+      expect(() => codec.decodeJson('not-a-date')).toThrow(/Invalid date string for pg\/date@1/);
+      expect(() => codec.decodeJson('2024-01-15T10:30:00Z')).toThrow(
+        /Invalid date string for pg\/date@1/,
+      );
+    });
+
+    it('throws on calendar-invalid dates instead of silently normalizing them', () => {
+      expect(() => codec.decodeJson('2024-02-31')).toThrow(/Invalid date string for pg\/date@1/);
+      expect(() => codec.decodeJson('2024-13-01')).toThrow(/Invalid date string for pg\/date@1/);
+      expect(() => codec.decodeJson('0024-01-15')).toThrow(/Invalid date string for pg\/date@1/);
+    });
+
+    it('still accepts a valid calendar date', () => {
+      expect(codec.decodeJson('2024-01-15')).toEqual(new Date(Date.UTC(2024, 0, 15)));
+    });
+
+    it('exposes equality-order traits and the date target/native types', () => {
+      expect(pgDateDescriptor.traits).toEqual(['equality', 'order']);
+      expect(pgDateDescriptor.targetTypes).toEqual(['date']);
+      expect(pgDateDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('date');
     });
   });
 

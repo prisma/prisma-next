@@ -342,7 +342,7 @@ describe('formatSchemaVerifyOutput', () => {
 
   const createResult = (): VerifyDatabaseSchemaResult => ({
     ok: false,
-    code: 'PN-SCHEMA-0001',
+    code: 'CONTRACT.SCHEMA_VERIFICATION_FAILED',
     summary: 'Database schema does not satisfy contract (1 failure)',
     contract: {
       storageHash: 'sha256:test',
@@ -452,7 +452,7 @@ describe('formatSchemaVerifyOutput', () => {
     const output = formatSchemaVerifyOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('(PN-SCHEMA-0001)');
+    expect(stripped).toContain('(CONTRACT.SCHEMA_VERIFICATION_FAILED)');
   });
 
   it('renders the issues header first and the summary line last', () => {
@@ -682,7 +682,7 @@ describe('formatSchemaVerifyJson', () => {
   it('includes every issue', () => {
     const result: VerifyDatabaseSchemaResult = {
       ok: false,
-      code: 'PN-SCHEMA-0001',
+      code: 'CONTRACT.SCHEMA_VERIFICATION_FAILED',
       summary: 'Database schema does not satisfy contract',
       contract: {
         storageHash: 'sha256:test',
@@ -715,7 +715,7 @@ describe('formatSchemaVerifyJson', () => {
     const parsed = JSON.parse(output) as VerifyDatabaseSchemaResult;
 
     expect(parsed.ok).toBe(false);
-    expect(parsed.code).toBe('PN-SCHEMA-0001');
+    expect(parsed.code).toBe('CONTRACT.SCHEMA_VERIFICATION_FAILED');
     expect(parsed.schema.issues).toHaveLength(2);
     expect(parsed.meta?.strict).toBe(true);
   });
@@ -723,7 +723,7 @@ describe('formatSchemaVerifyJson', () => {
   it('includes the unclaimed list as a top-level field', () => {
     const result: VerifyDatabaseSchemaResult = {
       ok: false,
-      code: 'PN-RUN-3010',
+      code: 'CONTRACT.MARKER_REQUIRED',
       summary: 'Database schema has 1 unclaimed element (not in any contract)',
       contract: {
         storageHash: 'sha256:test',

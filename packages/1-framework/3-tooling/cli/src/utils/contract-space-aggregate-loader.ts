@@ -20,7 +20,7 @@ import { toDeclaredExtensionsFromRaw } from './extension-pack-inputs';
 
 const CONTRACT_SPACES_DOCS_URL = 'https://pris.ly/contract-spaces';
 
-function contractSpaceError5002(
+function contractSpaceViolationError(
   summary: string,
   options: {
     readonly why: string;
@@ -28,8 +28,7 @@ function contractSpaceError5002(
     readonly violations: readonly IntegrityViolation[];
   },
 ): CliStructuredError {
-  return new CliStructuredError('5002', summary, {
-    domain: 'MIG',
+  return new CliStructuredError('MIGRATION.CONTRACT_SPACE_VIOLATION', summary, {
     why: options.why,
     fix: options.fix,
     docsUrl: CONTRACT_SPACES_DOCS_URL,
@@ -38,7 +37,7 @@ function contractSpaceError5002(
 }
 
 /**
- * Build the `5002` structured-error envelope for a contract-space
+ * Build the `MIGRATION.CONTRACT_SPACE_VIOLATION` structured-error envelope for a contract-space
  * target mismatch. Shared between the declared-extension precheck (the
  * descriptor's configured target disagrees with the project target) and
  * the on-disk-contract check surfaced by `checkIntegrity`.
@@ -48,7 +47,7 @@ function targetMismatchError(
   expected: string,
   actual: string,
 ): CliStructuredError {
-  return contractSpaceError5002(`Contract-space target mismatch for "${spaceId}"`, {
+  return contractSpaceViolationError(`Contract-space target mismatch for "${spaceId}"`, {
     why: `Space "${spaceId}" targets "${actual}" but the project's adapter targets "${expected}".`,
     fix: 'Update the extension descriptor to target the configured database, or change the project adapter.',
     violations: [{ kind: 'targetMismatch', spaceId, expected, actual }],
@@ -89,9 +88,10 @@ function describeIntegrityViolation(violation: IntegrityViolation): string {
 /**
  * Map the integrity violations `checkIntegrity` reports into a single
  * CLI structured-error envelope, preserving the error codes the prior
- * throw-on-load loader emitted: `5001` (layout drift, bundled) and
- * `5002` (target / disjointness / contract-validation / structural
- * integrity). Returns `null` when there is nothing to refuse on.
+ * throw-on-load loader emitted: `MIGRATION.CONTRACT_SPACE_LAYOUT_VIOLATION`
+ * (layout drift, bundled) and `MIGRATION.CONTRACT_SPACE_VIOLATION` (target /
+ * disjointness / contract-validation / structural integrity). Returns
+ * `null` when there is nothing to refuse on.
  *
  * Precedence reproduces the prior loader's first-failure ordering:
  * layout drift first (every offence bundled into one envelope), then
@@ -113,8 +113,7 @@ export function mapIntegrityViolations(
       layout.length === 1
         ? 'Contract-space layout violation detected'
         : `Contract-space layout violations detected (${layout.length})`;
-    return new CliStructuredError('5001', summary, {
-      domain: 'MIG',
+    return new CliStructuredError('MIGRATION.CONTRACT_SPACE_LAYOUT_VIOLATION', summary, {
       why: `The on-disk \`migrations/\` directory and your \`extensionPacks\` declaration are not in agreement.\n${lines.join('\n')}`,
       fix: 'Declare the extension in `extensionPacks` and re-emit its contract-space artefacts, or remove the orphan `migrations/<space>` directory.',
       docsUrl: CONTRACT_SPACES_DOCS_URL,
@@ -133,7 +132,7 @@ export function mapIntegrityViolations(
 
   const disjointness = violations.find((v) => v.kind === 'disjointness');
   if (disjointness && disjointness.kind === 'disjointness') {
-    return contractSpaceError5002(
+    return contractSpaceViolationError(
       `Contract-space disjointness violation: storage element "${disjointness.element}" claimed by multiple spaces`,
       {
         why: `Spaces ${disjointness.claimedBy.map((s) => `"${s}"`).join(', ')} all claim the storage element "${disjointness.element}". Each storage element must be owned by exactly one contract space.`,
@@ -145,7 +144,7 @@ export function mapIntegrityViolations(
 
   const contractUnreadable = violations.find((v) => v.kind === 'contractUnreadable');
   if (contractUnreadable && contractUnreadable.kind === 'contractUnreadable') {
-    return contractSpaceError5002(
+    return contractSpaceViolationError(
       `Contract-space contract validation failed for "${contractUnreadable.spaceId}"`,
       {
         why: contractUnreadable.detail,
@@ -160,7 +159,7 @@ export function mapIntegrityViolations(
   // is still computed; the gate just renders one envelope).
   const structural = violations[0]!;
   const spaceId = 'spaceId' in structural ? structural.spaceId : '*';
-  return contractSpaceError5002(`Contract-space integrity failure for "${spaceId}"`, {
+  return contractSpaceViolationError(`Contract-space integrity failure for "${spaceId}"`, {
     why: describeIntegrityViolation(structural),
     fix: 'Re-emit the affected migration package(s) or restore the on-disk `migrations/` directory from version control.',
     violations: [structural],

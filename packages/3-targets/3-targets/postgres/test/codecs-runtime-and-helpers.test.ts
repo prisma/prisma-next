@@ -5,6 +5,7 @@ import {
   PG_BOOL_CODEC_ID,
   PG_BYTEA_CODEC_ID,
   PG_CHAR_CODEC_ID,
+  PG_DATE_CODEC_ID,
   PG_ENUM_CODEC_ID,
   PG_FLOAT_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
@@ -34,6 +35,7 @@ import {
   pgByteaDescriptor,
   pgCharColumn,
   pgCharDescriptor,
+  pgDateColumn,
   pgEnumDescriptor,
   pgFloat4Column,
   pgFloat8Column,
@@ -348,12 +350,24 @@ describe('column helpers', () => {
     expect(spec.codecFactory(instanceCtx).id).toBe(PG_JSONB_CODEC_ID);
   });
 
-  it('pgNumericColumn packages a ColumnSpec for pg/numeric@1 (params required)', () => {
+  it('pgNumericColumn packages a ColumnSpec for pg/numeric@1', () => {
     const spec = pgNumericColumn({ precision: 10, scale: 2 });
     expect(spec.codecId).toBe(PG_NUMERIC_CODEC_ID);
     expect(spec.nativeType).toBe('numeric');
     expect(spec.typeParams).toEqual({ precision: 10, scale: 2 });
     expect(spec.codecFactory(instanceCtx).id).toBe(PG_NUMERIC_CODEC_ID);
+  });
+
+  it('pgNumericColumn defaults typeParams to {} when called with no args (unbounded numeric / bare Decimal)', () => {
+    const spec = pgNumericColumn();
+    expect(spec.typeParams).toEqual({});
+  });
+
+  it('pgDateColumn packages a ColumnSpec for pg/date@1', () => {
+    const spec = pgDateColumn();
+    expect(spec.codecId).toBe(PG_DATE_CODEC_ID);
+    expect(spec.nativeType).toBe('date');
+    expect(spec.codecFactory(instanceCtx).id).toBe(PG_DATE_CODEC_ID);
   });
 
   it('pgTextColumn packages a ColumnSpec for pg/text@1', () => {

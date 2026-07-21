@@ -27,7 +27,7 @@ function makeResult(args: {
 }): VerifyDatabaseSchemaResult {
   return {
     ok: args.ok,
-    ...(args.ok ? {} : { code: 'PN-RUN-3010' }),
+    ...(args.ok ? {} : { code: 'CONTRACT.MARKER_REQUIRED' }),
     summary: args.ok ? 'Database schema satisfies contract' : 'does not satisfy',
     contract: { storageHash: 'sha256:x' },
     target: { expected: 'mongo' },
@@ -69,7 +69,7 @@ describe('scopeVerifyResultToSpace', () => {
     // so the runner still fails on genuine drift.
     expect(scoped.schema.issues).toEqual([expect.objectContaining({ path: ['junk'] })]);
     expect(scoped.ok).toBe(false);
-    expect(scoped.code).toBe('PN-RUN-3010');
+    expect(scoped.code).toBe('CONTRACT.MARKER_REQUIRED');
   });
 
   it('flips ok to true when the only failures were sibling collections', () => {

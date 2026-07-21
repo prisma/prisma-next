@@ -50,7 +50,7 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
       const driver = createDriver();
       await expect(driver.acquireConnection()).rejects.toMatchObject({
         code: 'DRIVER.NOT_CONNECTED',
-        category: 'RUNTIME',
+        category: 'DRIVER',
         message: useBeforeConnectMessage,
       });
     });
@@ -59,7 +59,7 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
       const driver = createDriver();
       await expect(driver.query('select 1')).rejects.toMatchObject({
         code: 'DRIVER.NOT_CONNECTED',
-        category: 'RUNTIME',
+        category: 'DRIVER',
         message: useBeforeConnectMessage,
       });
     });
@@ -70,7 +70,7 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
       const iterator = iter[Symbol.asyncIterator]();
       await expect(iterator.next()).rejects.toMatchObject({
         code: 'DRIVER.NOT_CONNECTED',
-        category: 'RUNTIME',
+        category: 'DRIVER',
         message: useBeforeConnectMessage,
       });
     });
@@ -80,7 +80,7 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
       expect(driver.explain).toBeDefined();
       await expect(driver.explain!({ sql: 'select 1' })).rejects.toMatchObject({
         code: 'DRIVER.NOT_CONNECTED',
-        category: 'RUNTIME',
+        category: 'DRIVER',
         message: useBeforeConnectMessage,
       });
     });
@@ -144,7 +144,7 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
           await driver.connect(binding);
           await expect(driver.connect(binding)).rejects.toMatchObject({
             code: 'DRIVER.ALREADY_CONNECTED',
-            category: 'RUNTIME',
+            category: 'DRIVER',
             message:
               'Postgres driver already connected. Call close() before reconnecting with a new binding.',
           });
@@ -239,11 +239,11 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
 
           await expect(driver.acquireConnection()).rejects.toMatchObject({
             code: 'DRIVER.NOT_CONNECTED',
-            category: 'RUNTIME',
+            category: 'DRIVER',
           });
           await expect(driver.query('select 1')).rejects.toMatchObject({
             code: 'DRIVER.NOT_CONNECTED',
-            category: 'RUNTIME',
+            category: 'DRIVER',
           });
         },
         timeouts.spinUpPpgDev,

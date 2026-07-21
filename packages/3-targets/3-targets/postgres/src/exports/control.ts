@@ -9,6 +9,7 @@ import type {
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { postgresResolveDefault } from '../core/default-normalizer';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import { contractToPostgresDatabaseSchemaNode } from '../core/migrations/contract-to-postgres-database-schema-node';
 import { diffPostgresSchema } from '../core/migrations/diff-database-schema';
@@ -64,6 +65,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           annotationNamespace: 'pg',
           ...ifDefined('expandNativeType', expander),
           renderDefault: postgresRenderDefault,
+          resolveDefault: postgresResolveDefault,
         });
       },
     },

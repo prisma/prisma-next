@@ -79,7 +79,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 
-import { getAttribute, mapFieldNamesToColumns } from './psl-attribute-parsing';
+import { getAttribute, getNamedArgument, mapFieldNamesToColumns } from './psl-attribute-parsing';
 import type { ColumnDescriptor } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
@@ -103,7 +103,7 @@ import {
   interpretRelationAttribute,
   type ModelBackrelationCandidate,
   normalizeReferentialAction,
-  validateNavigationListFieldAttributes,
+  validateBackrelationFieldAttributes,
 } from './psl-relation-resolution';
 import {
   baseModelSpec,
@@ -668,6 +668,21 @@ interface BuildModelNodeResult {
   readonly modelAttributeEntities: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
+/**
+ * The owning side of a relation is the one that declares `fields`/`references` on its
+ * `@relation` attribute — those name the FK columns. A singular model-typed field whose
+ * `@relation` carries only a name (or nothing at all) is the back side: infer prints exactly
+ * that shape for a 1:1 back-relation whenever the FK needs disambiguating (two FKs between the
+ * same table pair, or a self-referencing unique FK). Checking for the attribute's mere presence
+ * would misclassify that back side as the owning side.
+ */
+function relationAttributeDeclaresOwningSide(relationAttribute: ResolvedAttribute): boolean {
+  return (
+    getNamedArgument(relationAttribute, 'fields') !== undefined ||
+    getNamedArgument(relationAttribute, 'references') !== undefined
+  );
+}
+
 function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult {
   const { model, mapping, sourceId, diagnostics } = input;
   const tableName = mapping.tableName;
@@ -726,10 +741,20 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
 
   const resultBackrelationCandidates: ModelBackrelationCandidate[] = [];
   for (const field of Object.values(model.fields)) {
-    if (!field.list || !input.modelNames.has(field.typeName)) {
+    if (!input.modelNames.has(field.typeName)) {
       continue;
     }
-    const attributesValid = validateNavigationListFieldAttributes({
+    const relationAttribute = getAttribute(field.attributes, 'relation');
+    if (
+      !field.list &&
+      relationAttribute &&
+      relationAttributeDeclaresOwningSide(relationAttribute)
+    ) {
+      // The owning side of the relation: it declares fields/references and is
+      // lowered separately below, by the `relationAttributes` FK-building loop.
+      continue;
+    }
+    const attributesValid = validateBackrelationFieldAttributes({
       modelName: model.name,
       field,
       sourceId,
@@ -739,7 +764,6 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       familyId: input.familyId,
       targetId: input.targetId,
     });
-    const relationAttribute = getAttribute(field.attributes, 'relation');
     let relationName: string | undefined;
     if (relationAttribute) {
       const parsedRelation = interpretRelationAttribute({
@@ -786,6 +810,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       tableName,
       field,
       targetModelName: field.typeName,
+      isList: field.list,
       ...ifDefined('relationName', relationName),
     });
   }
@@ -1092,6 +1117,13 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
           span: relationAttribute.field.span,
         });
       }
+      continue;
+    }
+
+    if (!relationAttributeDeclaresOwningSide(relationAttribute.relation)) {
+      // A singular model-typed field whose `@relation` carries only a name (or nothing) is the
+      // back side of a 1:1 relation, already lowered above via backrelationCandidates. It is
+      // not the owning side, so it has no fields/references to validate here.
       continue;
     }
 
@@ -2349,16 +2381,26 @@ export function interpretPslDocumentToSqlContract(
     fkRelationMetadata,
   });
   const modelIdColumns = new Map<string, readonly string[]>();
+  const modelUniqueColumnSets = new Map<string, readonly (readonly string[])[]>();
   for (const modelNode of modelNodes) {
     if (modelNode.id) {
       modelIdColumns.set(modelNode.modelName, modelNode.id.columns);
     }
+    const uniqueColumnSets: (readonly string[])[] = [];
+    if (modelNode.id) {
+      uniqueColumnSets.push(modelNode.id.columns);
+    }
+    for (const unique of modelNode.uniques ?? []) {
+      uniqueColumnSets.push(unique.columns);
+    }
+    modelUniqueColumnSets.set(modelNode.modelName, uniqueColumnSets);
   }
   applyBackrelationCandidates({
     backrelationCandidates,
     fkRelationsByPair,
     fkRelationsByDeclaringModel,
     modelIdColumns,
+    modelUniqueColumnSets,
     modelRelations,
     diagnostics,
     sourceId,

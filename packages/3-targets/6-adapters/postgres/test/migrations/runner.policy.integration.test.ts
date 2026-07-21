@@ -99,7 +99,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.failure.code).toBe('POLICY_VIOLATION');
+        expect(result.failure.code).toBe('MIGRATION.POLICY_VIOLATION');
         expect(result.failure.summary).toMatch(/destructive/i);
         expect(result.failure.why).toMatch(/additive/i);
       }
@@ -171,7 +171,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.failure.code).toBe('POLICY_VIOLATION');
+        expect(result.failure.code).toBe('MIGRATION.POLICY_VIOLATION');
         expect(result.failure.summary).toMatch(/data/i);
         expect(result.failure.why).toMatch(/additive/i);
         expect(result.failure.meta).toMatchObject({
@@ -257,7 +257,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
       // We expect SCHEMA_VERIFY_FAILED, not POLICY_VIOLATION
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.failure.code).toBe('SCHEMA_VERIFY_FAILED');
+        expect(result.failure.code).toBe('MIGRATION.SCHEMA_VERIFY_FAILED');
       }
     });
   });

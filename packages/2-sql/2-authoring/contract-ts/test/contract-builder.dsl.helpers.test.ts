@@ -9,6 +9,8 @@ import { createTestSqlNamespace } from '../../../1-core/contract/test/test-suppo
 import { defineContract, rel } from '../src/contract-builder';
 import { modelsOf } from './contract-test-helpers';
 import { documentScopedTypes } from './cross-ref-helpers';
+import { nanoidIdPresetMirror, nanoidPresetMirror } from './nanoid-preset-mirror';
+import { sqlTimestampPresetMirror } from './temporal-preset-mirror';
 import { unboundTables } from './unbound-tables';
 
 type PortableSqlCodecTypes = {
@@ -34,6 +36,12 @@ const sqlFamilyPack = {
         output: { codecId: 'sql/timestamp@1', nativeType: 'timestamp' },
       },
       temporal: {
+        // createdAt/updatedAt here are independent portable fixtures, NOT
+        // mirrors of family-sql's `temporalAuthoringPresets` — that factory
+        // hardcodes `now()` over a target codec, while these use the invented
+        // portable `sql/timestamp@1` with `CURRENT_TIMESTAMP`. There is nothing
+        // to anchor them to, by design. Only `timestamp` below mirrors a real
+        // factory, and it is anchored.
         createdAt: {
           kind: 'fieldPreset',
           output: {
@@ -53,6 +61,11 @@ const sqlFamilyPack = {
             },
           },
         },
+        // From test/temporal-preset-mirror.ts, which family-sql's
+        // temporal-codec-presets.test.ts asserts deep-equals the real factory
+        // output — so a factory change cannot leave these tests passing
+        // against a preset that no longer ships.
+        timestamp: sqlTimestampPresetMirror,
       },
       uuidString: {
         kind: 'fieldPreset',
@@ -62,23 +75,7 @@ const sqlFamilyPack = {
           typeParams: { length: 36 },
         },
       },
-      nanoid: {
-        kind: 'fieldPreset',
-        args: [
-          {
-            kind: 'object',
-            optional: true,
-            properties: {
-              size: { kind: 'number', optional: true, integer: true, minimum: 2, maximum: 255 },
-            },
-          },
-        ],
-        output: {
-          codecId: 'sql/char@1',
-          nativeType: 'character',
-          typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
-        },
-      },
+      nanoid: nanoidPresetMirror,
       id: {
         uuidv4String: {
           kind: 'fieldPreset',
@@ -100,31 +97,7 @@ const sqlFamilyPack = {
             id: true,
           },
         },
-        nanoid: {
-          kind: 'fieldPreset',
-          args: [
-            {
-              kind: 'object',
-              optional: true,
-              properties: {
-                size: { kind: 'number', optional: true, integer: true, minimum: 2, maximum: 255 },
-              },
-            },
-          ],
-          output: {
-            codecId: 'sql/char@1',
-            nativeType: 'character',
-            typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
-            executionDefaults: {
-              onCreate: {
-                kind: 'generator',
-                id: 'nanoid',
-                params: { size: { kind: 'arg', index: 0, path: ['size'] } },
-              },
-            },
-            id: true,
-          },
-        },
+        nanoid: nanoidIdPresetMirror,
       },
     },
   },
@@ -803,5 +776,110 @@ describe('contract DSL helper vocabulary', () => {
     } finally {
       delete (Object.prototype as Record<string, unknown>)['polluted'];
     }
+  });
+
+  it('resolves temporal.timestamp precision and phase tokens, incl. zero-arg and undefined-hole calls', () => {
+    defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+      },
+      ({ field }) => {
+        const nowPhase = { kind: 'generator', id: 'timestampNow' };
+        const fullState = field.temporal.timestamp(3, 'now', 'now').build();
+        const zeroArgState = field.temporal.timestamp().build();
+        const holeState = field.temporal.timestamp(undefined, undefined, 'now').build();
+
+        expectTypeOf(fullState.descriptor?.codecId).toEqualTypeOf<'sql/timestamp@1' | undefined>();
+
+        expect(fullState.descriptor).toEqual({
+          codecId: 'sql/timestamp@1',
+          nativeType: 'timestamp',
+          typeParams: { precision: 3 },
+        });
+        expect(fullState.executionDefaults).toEqual({ onCreate: nowPhase, onUpdate: nowPhase });
+
+        expect(zeroArgState.descriptor).toEqual({
+          codecId: 'sql/timestamp@1',
+          nativeType: 'timestamp',
+        });
+        expect(zeroArgState.descriptor).not.toHaveProperty('typeParams');
+        expect(zeroArgState.executionDefaults).toBeUndefined();
+
+        expect(holeState.descriptor).not.toHaveProperty('typeParams');
+        expect(holeState.executionDefaults).toEqual({ onUpdate: nowPhase });
+
+        return { models: {} };
+      },
+    );
+  });
+
+  // A column with precision but deliberately no execution defaults — the
+  // documented spelling for "timestamp column, no auto-update behavior".
+  it('resolves temporal.timestamp(3) to a precision column with no execution defaults', () => {
+    defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+      },
+      ({ field }) => {
+        const state = field.temporal.timestamp(3).build();
+
+        expect(state.descriptor).toEqual({
+          codecId: 'sql/timestamp@1',
+          nativeType: 'timestamp',
+          typeParams: { precision: 3 },
+        });
+        expect(state.executionDefaults).toBeUndefined();
+
+        return { models: {} };
+      },
+    );
+  });
+
+  it('regression: field.nanoid() is legal with zero args, resolving size to its declared default', () => {
+    defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+      },
+      ({ field }) => {
+        const state = field.nanoid().build();
+        expect(state.descriptor?.typeParams).toEqual({ length: 21 });
+        return { models: {} };
+      },
+    );
+  });
+
+  it('regression: field.id.nanoid({size}, {name}) still resolves via the named-constraint overload', () => {
+    const contract = defineContract(
+      {
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+      },
+      ({ field, model }) => ({
+        models: {
+          ShortLink: model('ShortLink', {
+            fields: {
+              id: field.id.nanoid({ size: 16 }, { name: 'short_link_pkey' }),
+            },
+          }).sql({
+            table: 'short_link',
+          }),
+        },
+      }),
+    );
+
+    expect(unboundTables(contract.storage)['short_link']!.primaryKey).toEqual({
+      columns: ['id'],
+      name: 'short_link_pkey',
+    });
+    expect(unboundTables(contract.storage)['short_link']!.columns['id']).toMatchObject({
+      typeParams: { length: 16 },
+    });
   });
 });

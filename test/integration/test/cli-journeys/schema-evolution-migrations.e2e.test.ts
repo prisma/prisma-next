@@ -156,7 +156,7 @@ withTempDir(({ createTempDir }) => {
 
         // X.03: migration show with non-existent prefix
         const showNotFound = await runMigrationShow(ctx, ['sha256:nonexistent123']);
-        expect(showNotFound.exitCode, 'X.03: show not found').toBe(1);
+        expect(showNotFound.exitCode, 'X.03: show not found').toBe(2);
       },
       timeouts.spinUpPpgDev,
     );
@@ -200,7 +200,7 @@ withTempDir(({ createTempDir }) => {
         // the migration chain root (planned from ∅→additive, but marker is at base).
         // Then db update recovers by applying the schema directly.
         const apply = await runMigrate(ctx);
-        expect(apply.exitCode, 'Z.03: migration apply rejects marker mismatch').toBe(1);
+        expect(apply.exitCode, 'Z.03: migration apply rejects marker mismatch').toBe(2);
 
         const update = await runDbUpdate(ctx);
         expect(update.exitCode, 'Z.03: db update recovery').toBe(0);

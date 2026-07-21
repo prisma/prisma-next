@@ -135,7 +135,7 @@ describe('nullability-tightening backfill', async () => {
     if (result.kind !== 'success') return;
 
     // Accessing operations throws because the DataTransformCall stub's
-    // toOp() unconditionally throws PN-MIG-2001 — the user must fill the
+    // toOp() unconditionally throws MIGRATION.UNFILLED_PLACEHOLDER — the user must fill the
     // rendered migration.ts before the plan is executable. This mirrors
     // Postgres's behavior.
     expect(() => result.plan.operations).toThrowError(/unfilled/i);

@@ -38,7 +38,7 @@ describe('Postgres call classes - construction + toOp parity', () => {
     });
   });
 
-  it('DataTransformCall carries its slot names and a caller-supplied operationClass; toOp throws PN-MIG-2001', () => {
+  it('DataTransformCall carries its slot names and a caller-supplied operationClass; toOp throws MIGRATION.UNFILLED_PLACEHOLDER', () => {
     const call = new DataTransformCall('Backfill', 'slot-check', 'slot-run', 'widening');
 
     expect(call.checkSlot).toBe('slot-check');

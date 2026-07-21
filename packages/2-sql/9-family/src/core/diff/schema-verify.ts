@@ -300,7 +300,7 @@ export function verifySqlSchemaByDiff(
       : undefined;
   return {
     ok,
-    ...(ok ? {} : { code: 'PN-SCHEMA-0001' }),
+    ...(ok ? {} : { code: 'CONTRACT.SCHEMA_VERIFICATION_FAILED' }),
     summary: ok
       ? 'Database schema satisfies contract'
       : `Database schema does not satisfy contract (${failCount} failure${failCount === 1 ? '' : 's'})`,

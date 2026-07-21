@@ -9,12 +9,14 @@ import {
 } from './authoring';
 import { postgresQualifyColumnType } from './codecs';
 import { postgresTargetDescriptorMetaRuntime } from './descriptor-meta-runtime';
+import { postgresIndexTypes } from './index-types';
 import { DEFAULT_NAMESPACE_ID } from './namespace-ids';
 import { postgresCreateNamespace } from './postgres-schema';
 
 const postgresTargetDescriptorMetaBase = {
   ...postgresTargetDescriptorMetaRuntime,
   defaultNamespaceId: DEFAULT_NAMESPACE_ID,
+  indexTypes: postgresIndexTypes,
   authoring: {
     type: postgresAuthoringTypes,
     field: postgresAuthoringFieldPresets,

@@ -10,6 +10,8 @@
  * that import PSL AST types from the control entrypoint.
  */
 
+import type { AuthoringOption } from './option-descriptor';
+
 export interface PslPosition {
   readonly offset: number;
   readonly line: number;
@@ -146,9 +148,7 @@ export interface PslBlockParamValue {
   readonly required?: boolean;
 }
 
-export interface PslBlockParamOption {
-  readonly kind: 'option';
-  readonly values: readonly string[];
+export interface PslBlockParamOption extends AuthoringOption {
   readonly required?: boolean;
 }
 

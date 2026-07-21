@@ -1182,6 +1182,38 @@ describe('contractToSchemaIR — resolved leaf values', () => {
     expect(columns['plain']!.resolvedDefault).toBeUndefined();
   });
 
+  it('passes the raw default through resolveDefault when supplied', () => {
+    // Without a target-supplied `resolveDefault`, the contract's raw
+    // default becomes the resolved default unchanged — this is what a
+    // target that never normalizes (e.g. one with no literal-vs-function
+    // ambiguity in its default syntax) gets by omitting the hook. Proves
+    // the hook actually runs, and runs with the resolved (`[]`-suffixed for
+    // arrays) native type, not the base one.
+    const storage = unboundStorage('sha256:test' as StorageHashBase<string>, {
+      T: table({
+        columns: {
+          tags: col({
+            nativeType: 'text',
+            many: true,
+            default: { kind: 'function', expression: "'{}'::text[]" },
+          }),
+        },
+      }),
+    });
+
+    const result = contractToSchemaIR(wrap(storage), {
+      renderDefault: testRenderer,
+      resolveDefault: (def, resolvedNativeType) =>
+        def.kind === 'function' && resolvedNativeType === 'text[]'
+          ? { kind: 'literal', value: [] }
+          : def,
+    });
+    expect(result.tables['T']!.columns['tags']!.resolvedDefault).toEqual({
+      kind: 'literal',
+      value: [],
+    });
+  });
+
   it('check nodes carry the value-set resolved permittedValues', () => {
     const valueSetName = 'T_status_values';
     const ns = createTestSqlNamespace({

@@ -380,8 +380,8 @@ describe('DataTransformCall', () => {
       'email',
     );
 
-  it('toOp() throws PN-MIG-2001 (unfilled placeholder)', () => {
-    expect(() => makeCall().toOp()).toThrowError(/PN-MIG-2001|unfilled/i);
+  it('toOp() throws MIGRATION.UNFILLED_PLACEHOLDER (unfilled placeholder)', () => {
+    expect(() => makeCall().toOp()).toThrowError(/MIGRATION.UNFILLED_PLACEHOLDER|unfilled/i);
   });
 
   it('renderTypeScript() emits a dataTransform({...}) call with a placeholder run slot', () => {

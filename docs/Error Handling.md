@@ -2,6 +2,8 @@
 
 This document defines shared error concepts for Prisma Next so we can be consistent across packages and planes (CLI, migration planning, query planning, runtime execution).
 
+See [ADR 239 — Errors are structural envelopes with dotted namespace codes](architecture%20docs/adrs/ADR%20239%20-%20Errors%20are%20structural%20envelopes%20with%20dotted%20namespace%20codes.md) for the concrete code format, namespace list, and the `StructuredError` mechanism that implements the taxonomy below.
+
 ## Goals
 
 - **Make error handling composable** across modular packages (domain/layer/plane).
@@ -59,6 +61,8 @@ Examples:
 Recommended handling:
 - **Throw and fail fast**.
 - Only catch at the outermost boundary for crash reporting / last-resort formatting, without disguising the issue as an “expected failure”.
+
+**Bugs throw `InternalError`**, never a structured envelope. Use `InternalError` and `assertNever` from `@prisma-next/utils/internal-error`; `assertNever` also gives a compile-time exhaustiveness check for switches over discriminated unions. A `throw new Error(...)` is neither a structured failure nor a labeled bug, so it's banned by the `no-bare-throw` lint ratchet — convert bare throws to one of the two paths above.
 
 ## Representation in this codebase
 
@@ -119,19 +123,21 @@ See:
 
 CLI commands use structured errors and convert them to a `Result` at the command boundary. Non-structured errors propagate (fail fast) to preserve stack traces.
 
+`CliStructuredError` implements the structural `StructuredError` interface from `@prisma-next/utils/structured-error` (ADR 239), so it's recognizable by `isStructuredError` across the control/execution plane split, not just by its own class.
+
 See:
-- `packages/1-framework/1-core/control-plane/src/errors.ts` (`CliStructuredError`)
+- `packages/1-framework/1-core/errors/src/control.ts` (`CliStructuredError`)
 - `packages/1-framework/3-tooling/cli/src/utils/result.ts` (`performAction`)
 - `docs/CLI Style Guide.md` ("Errors", exit codes)
 
 ### Plan/build-time failures: stable RuntimeError codes
 
-Plan-building failures are represented as `RuntimeError` with stable codes like `PLAN.INVALID` and `PLAN.UNSUPPORTED`.
+Plan-building failures are represented as a `RuntimeErrorEnvelope` with a dotted `NAMESPACE.SUBCODE` code (e.g. `PLAN.*`, `CONTRACT.*`, `LINT.*`, `BUDGET.*`, `DRIVER.*`, `MIGRATION.*`, `ORM.*`); see `RuntimeErrorEnvelope`/`runtimeError` in `packages/1-framework/1-core/framework-components/src/shared/runtime-error.ts`.
 
-Migration runner failures use stable `MigrationRunnerErrorCode` values (e.g., `EXECUTION_FAILED`, `SCHEMA_VERIFY_FAILED`, `PRECHECK_FAILED`, `POSTCHECK_FAILED`) returned as part of `Result<MigrationRunnerSuccessValue, MigrationRunnerFailure>`. This follows the pattern described in "Provide stable codes for 'expected failures'" (see Guidelines section below) where stable codes enable deterministic error handling at system boundaries.
+Migration runner failures use stable `SqlMigrationRunnerErrorCode` values, all under the `MIGRATION.*` namespace (e.g., `MIGRATION.EXECUTION_FAILED`, `MIGRATION.SCHEMA_VERIFY_FAILED`, `MIGRATION.PRECHECK_FAILED`, `MIGRATION.POSTCHECK_FAILED`) returned as part of `Result<SqlMigrationRunnerSuccessValue, SqlMigrationRunnerFailure>`. This follows the pattern described in "Provide stable codes for 'expected failures'" (see Guidelines section below) where stable codes enable deterministic error handling at system boundaries.
 
 See:
-- `packages/2-sql/3-tooling/family/src/core/migrations/types.ts` (`MigrationRunnerErrorCode`, `MigrationRunnerFailure`)
+- `packages/2-sql/9-family/src/core/migrations/types.ts` (`SqlMigrationRunnerErrorCode`, `SqlMigrationRunnerFailure`)
 - SQL lane helpers that throw these for invalid builder usage/capability gating.
 
 ### Runtime execution: streaming API throws on failure
@@ -164,7 +170,7 @@ Boundaries include:
 
 ### 3) Provide stable codes for “expected failures”
 
-- “Failure” surfaces should use stable codes (e.g., `PN-CLI-4xxx`, `PLAN.INVALID`, `BUDGET.*`).
+- “Failure” surfaces should use stable dotted codes (e.g., `CONFIG.FILE_NOT_FOUND`, `MIGRATION.PRECHECK_FAILED`, `BUDGET.ROWS_EXCEEDED`).
 - Codes are how agents/CI should match and branch—not brittle string matching.
 
 ### 4) Preserve stacks where they matter

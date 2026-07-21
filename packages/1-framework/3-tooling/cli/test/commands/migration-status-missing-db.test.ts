@@ -69,7 +69,7 @@ describe('migration status missing-DB precondition', () => {
     await runAndCaptureExit(() => executeCommand(createMigrationStatusCommand(), ['--json']));
     const envelope = firstJsonLine<CliErrorEnvelope>(consoleOutput);
 
-    expect(envelope.code).toBe('PN-CLI-4005');
+    expect(envelope.code).toBe('CONFIG.DB_CONNECTION_REQUIRED');
     expect(envelope.meta?.['missingFlags']).toEqual(['--db']);
   });
 
@@ -86,7 +86,7 @@ describe('migration status missing-DB precondition', () => {
     );
     const envelope = firstJsonLine<CliErrorEnvelope>(consoleOutput);
 
-    expect(envelope.code).toBe('PN-CLI-4005');
+    expect(envelope.code).toBe('CONFIG.DB_CONNECTION_REQUIRED');
     expect(envelope.meta?.['missingFlags']).toEqual([]);
   });
 });

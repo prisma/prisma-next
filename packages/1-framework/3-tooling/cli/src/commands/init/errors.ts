@@ -6,8 +6,7 @@ import { CliStructuredError } from '../../utils/cli-errors';
  * the user was never given the choice — `--force` is the contract.
  */
 export function errorInitReinitNeedsForce(): CliStructuredError {
-  return new CliStructuredError('5002', 'Project is already initialized', {
-    domain: 'CLI',
+  return new CliStructuredError('CLI.INIT_REINIT_NEEDS_FORCE', 'Project is already initialized', {
     why: 'A `prisma-next.config.ts` already exists in this directory. Re-running `init` would overwrite the scaffolded files; in non-interactive mode `init` will not do that without `--force`.',
     fix: 'Pass `--force` to overwrite the existing scaffold, or run `init` interactively to confirm.',
     docsUrl: 'https://prisma-next.dev/docs/cli/init',
@@ -42,8 +41,7 @@ export function errorInitMissingFlags(options: {
       }
     })
     .join(' ');
-  return new CliStructuredError('5003', 'Missing required flags', {
-    domain: 'CLI',
+  return new CliStructuredError('CLI.INIT_MISSING_FLAGS', 'Missing required flags', {
     why: `${options.why} Missing required flag(s): ${flagList}.`,
     fix: `Re-run with the missing flag(s) supplied, e.g. \`prisma-next init --yes ${fixList}\`. Use \`prisma-next init --help\` to see every flag.`,
     docsUrl: 'https://prisma-next.dev/docs/cli/init',
@@ -60,13 +58,16 @@ export function errorInitInvalidFlagValue(options: {
   readonly value: string;
   readonly allowed: readonly string[];
 }): CliStructuredError {
-  return new CliStructuredError('5004', `Invalid value for --${options.flag}`, {
-    domain: 'CLI',
-    why: `\`--${options.flag} ${options.value}\` is not one of: ${options.allowed.join(', ')}.`,
-    fix: `Use one of: ${options.allowed.map((v) => `--${options.flag} ${v}`).join(', ')}.`,
-    docsUrl: 'https://prisma-next.dev/docs/cli/init',
-    meta: { flag: options.flag, value: options.value, allowed: options.allowed },
-  });
+  return new CliStructuredError(
+    'CLI.INIT_INVALID_FLAG_VALUE',
+    `Invalid value for --${options.flag}`,
+    {
+      why: `\`--${options.flag} ${options.value}\` is not one of: ${options.allowed.join(', ')}.`,
+      fix: `Use one of: ${options.allowed.map((v) => `--${options.flag} ${v}`).join(', ')}.`,
+      docsUrl: 'https://prisma-next.dev/docs/cli/init',
+      meta: { flag: options.flag, value: options.value, allowed: options.allowed },
+    },
+  );
 }
 
 /**
@@ -81,23 +82,26 @@ export function errorInitAuthoringSchemaPathMismatch(options: {
   readonly expectedExtension: string;
 }): CliStructuredError {
   const expectedAuthoring = options.expectedExtension === '.ts' ? 'typescript' : 'psl';
-  return new CliStructuredError('5014', 'Authoring and schema path do not match', {
-    domain: 'CLI',
-    why:
-      `\`--authoring ${options.authoring}\` requires a schema file ending in ${options.expectedExtension}, ` +
-      `but \`--schema-path ${options.schemaPath}\` ends in ${options.actualExtension}.`,
-    fix:
-      `Use a matching pair, for example \`--authoring ${expectedAuthoring} --schema-path <path>${options.expectedExtension}\`, ` +
-      'or change `--authoring` to match the path you supplied. ' +
-      'You can also omit `--schema-path` to use the default for the chosen authoring.',
-    docsUrl: 'https://prisma-next.dev/docs/cli/init',
-    meta: {
-      authoring: options.authoring,
-      schemaPath: options.schemaPath,
-      actualExtension: options.actualExtension,
-      expectedExtension: options.expectedExtension,
+  return new CliStructuredError(
+    'CLI.INIT_AUTHORING_SCHEMA_PATH_MISMATCH',
+    'Authoring and schema path do not match',
+    {
+      why:
+        `\`--authoring ${options.authoring}\` requires a schema file ending in ${options.expectedExtension}, ` +
+        `but \`--schema-path ${options.schemaPath}\` ends in ${options.actualExtension}.`,
+      fix:
+        `Use a matching pair, for example \`--authoring ${expectedAuthoring} --schema-path <path>${options.expectedExtension}\`, ` +
+        'or change `--authoring` to match the path you supplied. ' +
+        'You can also omit `--schema-path` to use the default for the chosen authoring.',
+      docsUrl: 'https://prisma-next.dev/docs/cli/init',
+      meta: {
+        authoring: options.authoring,
+        schemaPath: options.schemaPath,
+        actualExtension: options.actualExtension,
+        expectedExtension: options.expectedExtension,
+      },
     },
-  });
+  );
 }
 
 /**
@@ -108,8 +112,7 @@ export function errorInitAuthoringSchemaPathMismatch(options: {
  * 3 (USER_ABORTED).
  */
 export function errorInitUserAborted(): CliStructuredError {
-  return new CliStructuredError('5006', 'Init cancelled', {
-    domain: 'CLI',
+  return new CliStructuredError('CLI.INIT_USER_ABORTED', 'Init cancelled', {
     why: 'The interactive prompt was cancelled before all required inputs were supplied. No files were modified.',
     fix: 'Re-run `prisma-next init` and complete the prompts, or pass the required inputs as flags (see `--help`) for a non-interactive run.',
     severity: 'info',
@@ -125,12 +128,15 @@ export function errorInitUserAborted(): CliStructuredError {
  * mode is supposed to prevent.
  */
 export function errorInitStrictProbeWithoutProbe(): CliStructuredError {
-  return new CliStructuredError('5005', '`--strict-probe` requires `--probe-db`', {
-    domain: 'CLI',
-    why: '`--strict-probe` only changes how a *failed* probe is reported; without `--probe-db` no probe is attempted in the first place. (`init` is offline-by-default — it never opens a connection to your database without explicit consent.)',
-    fix: 'Add `--probe-db` to opt in to the probe, or drop `--strict-probe` if you do not need the version check.',
-    docsUrl: 'https://prisma-next.dev/docs/cli/init',
-  });
+  return new CliStructuredError(
+    'CLI.INIT_STRICT_PROBE_WITHOUT_PROBE',
+    '`--strict-probe` requires `--probe-db`',
+    {
+      why: '`--strict-probe` only changes how a *failed* probe is reported; without `--probe-db` no probe is attempted in the first place. (`init` is offline-by-default — it never opens a connection to your database without explicit consent.)',
+      fix: 'Add `--probe-db` to opt in to the probe, or drop `--strict-probe` if you do not need the version check.',
+      docsUrl: 'https://prisma-next.dev/docs/cli/init',
+    },
+  );
 }
 
 /**
@@ -152,8 +158,7 @@ export function errorInitInstallFailed(options: {
     trimmed.length === 0
       ? 'The package manager exited with an error and no recoverable fallback applied.'
       : `The package manager exited with: ${trimmed[0]}`;
-  return new CliStructuredError('5007', 'Failed to install dependencies', {
-    domain: 'CLI',
+  return new CliStructuredError('CLI.INIT_INSTALL_FAILED', 'Failed to install dependencies', {
     why,
     fix: `Install manually:\n  ${options.addCommand}\n  ${options.addDevCommand}\nThen run \`${options.emitCommand}\` to emit the contract.`,
     docsUrl: 'https://prisma-next.dev/docs/cli/init',
@@ -179,8 +184,7 @@ export function errorInitInvalidManifest(options: {
   readonly path: string;
   readonly cause: string;
 }): CliStructuredError {
-  return new CliStructuredError('5010', `Failed to parse ${options.path}`, {
-    domain: 'CLI',
+  return new CliStructuredError('CLI.INIT_INVALID_MANIFEST', `Failed to parse ${options.path}`, {
     why: `\`${options.path}\` is not valid JSON: ${options.cause}`,
     fix: `Fix the JSON syntax in \`${options.path}\` (a missing comma or unbalanced brace is the most common cause), then re-run \`prisma-next init\`.`,
     docsUrl: 'https://prisma-next.dev/docs/cli/init',
@@ -206,8 +210,7 @@ export function errorInitInvalidTsconfig(options: {
   readonly path: string;
   readonly cause: string;
 }): CliStructuredError {
-  return new CliStructuredError('5011', `Failed to parse ${options.path}`, {
-    domain: 'CLI',
+  return new CliStructuredError('CLI.INIT_INVALID_TSCONFIG', `Failed to parse ${options.path}`, {
     why: `\`${options.path}\` is not valid JSON or JSONC: ${options.cause}`,
     fix: `Fix the syntax in \`${options.path}\` and re-run \`prisma-next init\`. \`init\` accepts JSONC (comments and trailing commas) but cannot recover from unbalanced braces or missing commas.`,
     docsUrl: 'https://prisma-next.dev/docs/cli/init',
@@ -233,8 +236,7 @@ export function errorInitProbeFailed(options: {
   readonly cause: string;
   readonly filesWritten: readonly string[];
 }): CliStructuredError {
-  return new CliStructuredError('5012', 'Database probe failed', {
-    domain: 'CLI',
+  return new CliStructuredError('CLI.INIT_PROBE_FAILED', 'Database probe failed', {
     why: `\`--probe-db\` could not complete and \`--strict-probe\` was set: ${options.cause}`,
     fix: 'Confirm `DATABASE_URL` points at a reachable server, or drop `--strict-probe` to treat probe failures as warnings.',
     docsUrl: 'https://prisma-next.dev/docs/cli/init',
@@ -256,8 +258,7 @@ export function errorInitEmitFailed(options: {
   readonly filesWritten: readonly string[];
   readonly cause: string;
 }): CliStructuredError {
-  return new CliStructuredError('5008', 'Failed to emit contract', {
-    domain: 'CLI',
+  return new CliStructuredError('CLI.INIT_EMIT_FAILED', 'Failed to emit contract', {
     why: `\`prisma-next contract emit\` failed: ${options.cause}`,
     fix: `Inspect your contract file, fix the underlying issue, then re-run \`${options.emitCommand}\`. Pass \`-v\` for the full error envelope.`,
     docsUrl: 'https://prisma-next.dev/docs/cli/contract-emit',
@@ -284,18 +285,21 @@ export function errorInitSkillInstallFailed(options: {
   readonly filesWritten: readonly string[];
   readonly cause: string;
 }): CliStructuredError {
-  return new CliStructuredError('5013', 'Failed to install Prisma Next skills', {
-    domain: 'CLI',
-    why: `\`${options.skillInstallCommand}\` exited with an error: ${options.cause}`,
-    fix:
-      'Either:\n' +
-      `  - Re-run \`prisma-next init --no-skill${options.filesWritten.length > 0 ? ' --force' : ''}\` to skip the skill install for this run, or\n` +
-      `  - Fix the underlying issue (network, npm registry, \`npx skills\` on PATH) and install manually:\n      ${options.skillInstallCommand}`,
-    docsUrl: 'https://prisma-next.dev/docs/cli/init#skills',
-    meta: {
-      filesWritten: options.filesWritten,
-      skillInstallCommand: options.skillInstallCommand,
-      cause: options.cause,
+  return new CliStructuredError(
+    'CLI.INIT_SKILL_INSTALL_FAILED',
+    'Failed to install Prisma Next skills',
+    {
+      why: `\`${options.skillInstallCommand}\` exited with an error: ${options.cause}`,
+      fix:
+        'Either:\n' +
+        `  - Re-run \`prisma-next init --no-skill${options.filesWritten.length > 0 ? ' --force' : ''}\` to skip the skill install for this run, or\n` +
+        `  - Fix the underlying issue (network, npm registry, \`npx skills\` on PATH) and install manually:\n      ${options.skillInstallCommand}`,
+      docsUrl: 'https://prisma-next.dev/docs/cli/init#skills',
+      meta: {
+        filesWritten: options.filesWritten,
+        skillInstallCommand: options.skillInstallCommand,
+        cause: options.cause,
+      },
     },
-  });
+  );
 }

@@ -4,7 +4,7 @@
  * - `renderOps` lowers each variant via its pure factory and pins the
  *   id/operationClass/target.details shape exposed to runners.
  * - `RawSqlCall` is returned verbatim by `renderOps`.
- * - `DataTransformCall` always throws PN-MIG-2001 from `renderOps` because
+ * - `DataTransformCall` always throws MIGRATION.UNFILLED_PLACEHOLDER from `renderOps` because
  *   the planner can only emit unfilled stubs.
  * - `TypeScriptRenderablePostgresMigration` routes `operations` through
  *   `renderOps` and `renderTypeScript()` through `renderCallsToTypeScript`.
@@ -223,7 +223,7 @@ describe('renderOps', () => {
     expect(rendered).toBe(op);
   });
 
-  it('throws PN-MIG-2001 on DataTransformCall (always an unfilled stub at plan time)', () => {
+  it('throws MIGRATION.UNFILLED_PLACEHOLDER on DataTransformCall (always an unfilled stub at plan time)', () => {
     const call = new DataTransformCall('Backfill', 'check', 'run');
 
     expect(() => renderOps([call])).toThrow(/Unfilled migration placeholder/);

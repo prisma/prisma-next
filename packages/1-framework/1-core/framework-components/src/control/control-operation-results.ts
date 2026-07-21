@@ -1,9 +1,9 @@
 import type { SchemaDiffIssue } from './schema-diff';
 
-export const VERIFY_CODE_MARKER_MISSING = 'PN-RUN-3001';
-export const VERIFY_CODE_HASH_MISMATCH = 'PN-RUN-3002';
-export const VERIFY_CODE_TARGET_MISMATCH = 'PN-RUN-3003';
-export const VERIFY_CODE_SCHEMA_FAILURE = 'PN-RUN-3010';
+export const VERIFY_CODE_MARKER_MISSING = 'CONTRACT.MARKER_MISSING';
+export const VERIFY_CODE_HASH_MISMATCH = 'CONTRACT.MARKER_MISMATCH';
+export const VERIFY_CODE_TARGET_MISMATCH = 'CONTRACT.TARGET_MISMATCH';
+export const VERIFY_CODE_SCHEMA_FAILURE = 'CONTRACT.SCHEMA_VERIFICATION_FAILED';
 
 export interface OperationContext {
   readonly contractPath?: string;

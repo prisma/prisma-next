@@ -113,11 +113,11 @@ withTempDir(({ createTempDir }) => {
 
         // E.03: db update --no-interactive (without -y) — fails with destructive changes
         const noInteractive = await runDbUpdate(ctx, ['--no-interactive']);
-        expect(noInteractive.exitCode, 'E.03: non-interactive destructive fails').toBe(1);
+        expect(noInteractive.exitCode, 'E.03: non-interactive destructive fails').toBe(2);
 
         // E.04: db update --json — destructive changes, no prompt, returns error
         const jsonDestructive = await runDbUpdate(ctx, ['--json']);
-        expect(jsonDestructive.exitCode, 'E.04: json destructive error').toBe(1);
+        expect(jsonDestructive.exitCode, 'E.04: json destructive error').toBe(2);
         const jsonError = parseJsonOutput(jsonDestructive);
         expect(jsonError, 'E.04: error envelope').toMatchObject({ ok: false });
 

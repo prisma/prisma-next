@@ -125,7 +125,7 @@ describe('dataTransform factory', () => {
     ]);
   });
 
-  it('propagates PN-MIG-2001 when a closure is a placeholder (never reaches the adapter)', async () => {
+  it('propagates MIGRATION.UNFILLED_PLACEHOLDER when a closure is a placeholder (never reaches the adapter)', async () => {
     lowerToExecuteRequestMock.mockResolvedValue({
       sql: 'X',
       params: [],
@@ -138,13 +138,12 @@ describe('dataTransform factory', () => {
         makeAdapter(),
       ),
     ).rejects.toMatchObject({
-      code: '2001',
-      domain: 'MIG',
+      code: 'MIGRATION.UNFILLED_PLACEHOLDER',
       meta: { slot: 'not-yet-filled:run' },
     });
   });
 
-  it('throws PN-MIG-2005 when a plan storageHash does not match the contract', async () => {
+  it('throws MIGRATION.DATA_TRANSFORM_CONTRACT_MISMATCH when a plan storageHash does not match the contract', async () => {
     lowerToExecuteRequestMock.mockResolvedValue({ sql: 'X', params: [] });
     try {
       await dataTransform(
@@ -157,8 +156,7 @@ describe('dataTransform factory', () => {
     } catch (error) {
       expect(CliStructuredError.is(error)).toBe(true);
       const e = error as CliStructuredError;
-      expect(e.code).toBe('2005');
-      expect(e.domain).toBe('MIG');
+      expect(e.code).toBe('MIGRATION.DATA_TRANSFORM_CONTRACT_MISMATCH');
       expect(e.meta).toMatchObject({
         dataTransformName: 'mismatched',
         expected: CONTRACT_HASH,

@@ -767,7 +767,7 @@ describe('migration read-verb missing-DB error shape parity (D2 lock)', () => {
     vi.restoreAllMocks();
   });
 
-  it('migration log and migration status produce the same PN-CLI-4005 code and meta.missingFlags shape when no db is configured', async () => {
+  it('migration log and migration status produce the same CONFIG.DB_CONNECTION_REQUIRED code and meta.missingFlags shape when no db is configured', async () => {
     const noDbConfig = {
       family: { familyId: 'sql', create: vi.fn() },
       target: {
@@ -810,8 +810,8 @@ describe('migration read-verb missing-DB error shape parity (D2 lock)', () => {
       statusCommandMocks.cleanup();
     }
 
-    expect(logEnvelope.code).toBe('PN-CLI-4005');
-    expect(statusEnvelope?.code).toBe('PN-CLI-4005');
+    expect(logEnvelope.code).toBe('CONFIG.DB_CONNECTION_REQUIRED');
+    expect(statusEnvelope?.code).toBe('CONFIG.DB_CONNECTION_REQUIRED');
     expect(logEnvelope.meta?.['missingFlags']).toEqual(['--db']);
     expect(statusEnvelope?.meta?.['missingFlags']).toEqual(['--db']);
   });

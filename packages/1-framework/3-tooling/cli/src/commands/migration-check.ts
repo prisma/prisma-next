@@ -87,7 +87,7 @@ function checkFileExists(
   if (!existsSync(join(dirPath, fileName))) {
     return {
       space: spaceId,
-      code: 'PN-MIG-CHECK-002',
+      code: 'MIGRATION.CHECK_FILE_MISSING',
       where: migrationFileRelative(dirPath, fileName),
       why: `${fileName} is missing from ${dirName}`,
       fix: 'Re-emit the migration package or restore from version control.',
@@ -101,8 +101,8 @@ function checkFileExists(
  * absent store entry is not an issue (runner independence, ADR 199 — a
  * package dir with only `migration.json` + `ops.json` is legitimate); a
  * present entry whose inner `storage.storageHash` disagrees with
- * `pkg.metadata.to` is `PN-MIG-CHECK-005`; an unparseable store entry is
- * `PN-MIG-CHECK-006`.
+ * `pkg.metadata.to` is `MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH`; an unparseable store
+ * entry (or a malformed `to`) is `MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE`.
  */
 async function checkSnapshotConsistency(
   spaceId: string,
@@ -115,7 +115,7 @@ async function checkSnapshotConsistency(
   } catch {
     return {
       space: spaceId,
-      code: 'PN-MIG-CHECK-006',
+      code: 'MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE',
       where: migrationPathRelative(pkg.dirPath),
       why: `Migration "${pkg.dirName}" declares to="${pkg.metadata.to}", which is not a well-formed contract snapshot hash.`,
       fix: 'Re-emit the migration package so migration.json declares a valid `sha256:<64hex>` to-hash.',
@@ -131,7 +131,7 @@ async function checkSnapshotConsistency(
     }
     return {
       space: spaceId,
-      code: 'PN-MIG-CHECK-006',
+      code: 'MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE',
       where: migrationPathRelative(pkg.dirPath),
       why: `Migration "${pkg.dirName}" has an unparseable contract snapshot at ${snapshotDir}/contract.json.`,
       fix: 'Restore migrations/snapshots/ from version control, or re-run the command that produced this migration to regenerate its snapshot.',
@@ -143,7 +143,7 @@ async function checkSnapshotConsistency(
   if (typeof snapshotHash === 'string' && snapshotHash !== pkg.metadata.to) {
     return {
       space: spaceId,
-      code: 'PN-MIG-CHECK-005',
+      code: 'MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH',
       where: migrationPathRelative(pkg.dirPath),
       why: `Migration "${pkg.dirName}" declares to=${pkg.metadata.to} but its contract snapshot has storageHash=${snapshotHash}`,
       fix: 'Re-emit the migration package so migration.json and its contract snapshot agree.',
@@ -242,7 +242,7 @@ function checkReachability(space: CheckSpace): readonly CheckFailure[] {
     if (!isReachable) {
       failures.push({
         space: space.spaceId,
-        code: 'PN-MIG-CHECK-003',
+        code: 'MIGRATION.CHECK_UNREACHABLE_MIGRATION',
         where: migrationPathRelative(pkg.dirPath),
         why: `Migration "${pkg.dirName}" starts from ${pkg.metadata.from} which no other migration produces`,
         fix: 'This migration is unreachable in the graph. Delete it or re-emit a connecting migration.',
@@ -258,7 +258,7 @@ function checkDanglingRefs(space: CheckSpace): readonly CheckFailure[] {
     if (!space.graph.nodes.has(entry.hash)) {
       failures.push({
         space: space.spaceId,
-        code: 'PN-MIG-CHECK-004',
+        code: 'MIGRATION.CHECK_DANGLING_REF',
         where: relative(process.cwd(), join(space.refsDir, `${name}.json`)),
         why: `Ref "${name}" points at ${entry.hash} which does not exist in the migration graph`,
         fix: `Update the ref with \`prisma-next ref set ${name} <valid-hash>\` or delete it.`,
@@ -555,7 +555,7 @@ async function checkSingleTarget(
       matchedPkg = hits[0]!.pkg;
     } else if (bestParseFailure !== undefined) {
       // The ref didn't resolve in any in-scope space — surface the most informative
-      // parse failure through the shared ref-resolution envelope (PN-RUN-3000) the
+      // parse failure through the shared ref-resolution envelope (CONTRACT.VERIFY_FAILED) the
       // earlier work established, rather than a bespoke string. (Ref-resolved-but-
       // no-package falls through to the "not found on disk" result below.)
       return { error: mapRefResolutionError(bestParseFailure), exitCode: PRECONDITION };
@@ -584,7 +584,7 @@ async function checkSingleTarget(
   if (!verification.ok) {
     failures.push({
       space: matchedSpace.spaceId,
-      code: 'PN-MIG-CHECK-001',
+      code: 'MIGRATION.CHECK_HASH_MISMATCH',
       where: migrationFileRelative(matchedPkg.dirPath, 'migration.json'),
       why: `Stored hash ${verification.storedHash} does not match recomputed hash ${verification.computedHash}`,
       fix: 'Re-emit the migration package or restore from version control.',

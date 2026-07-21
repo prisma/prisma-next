@@ -906,7 +906,7 @@ describe('runInit hygiene + tsconfig (FR2 / FR3)', { timeout: timeouts.databaseO
         meta?: { path?: string };
       };
       expect(envelope.ok).toBe(false);
-      expect(envelope.code).toBe('PN-CLI-5010');
+      expect(envelope.code).toBe('CLI.INIT_INVALID_MANIFEST');
       expect(envelope.meta?.path).toBe('package.json');
     } finally {
       spy.mockRestore();
@@ -1322,7 +1322,7 @@ describe('runInit (non-interactive, FR1)', { timeout: timeouts.databaseOperation
       expect(exit).toBe(INIT_EXIT_PRECONDITION);
       const envelope = JSON.parse(writes.join('').trim()) as { ok: false; code: string };
       expect(envelope.ok).toBe(false);
-      expect(envelope.code).toBe('PN-CLI-5014');
+      expect(envelope.code).toBe('CLI.INIT_AUTHORING_SCHEMA_PATH_MISMATCH');
       expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
       expect(existsSync(join(tmpDir, 'prisma/schema.prisma'))).toBe(false);
     } finally {
@@ -1351,7 +1351,7 @@ describe('runInit (non-interactive, FR1)', { timeout: timeouts.databaseOperation
       expect(exit).toBe(INIT_EXIT_PRECONDITION);
       const envelope = JSON.parse(writes.join('').trim()) as { ok: false; code: string };
       expect(envelope.ok).toBe(false);
-      expect(envelope.code).toBe('PN-CLI-5014');
+      expect(envelope.code).toBe('CLI.INIT_AUTHORING_SCHEMA_PATH_MISMATCH');
       expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
       expect(existsSync(join(tmpDir, 'prisma/contract.ts'))).toBe(false);
     } finally {
@@ -1636,7 +1636,7 @@ describe('runInit (--json output, FR1.5 / FR10.2)', { timeout: timeouts.database
     const stdoutText = captured.join('').trim();
     const parsed = JSON.parse(stdoutText) as Record<string, unknown>;
     expect(parsed['ok']).toBe(false);
-    expect(parsed['code']).toBe('PN-CLI-5003');
+    expect(parsed['code']).toBe('CLI.INIT_MISSING_FLAGS');
     expect((parsed['meta'] as Record<string, unknown>)['missingFlags'] as string[]).toContain(
       'target',
     );
@@ -1780,7 +1780,7 @@ describe('runInit pnpm → npm install fallback (FR7.2)', {
         meta: { filesWritten: string[]; stderr: string[] };
       };
       expect(parsed.ok).toBe(false);
-      expect(parsed.code).toBe('PN-CLI-5007');
+      expect(parsed.code).toBe('CLI.INIT_INSTALL_FAILED');
       expect(parsed.meta.filesWritten).toEqual(
         expect.arrayContaining(['prisma-next.config.ts', 'src/prisma/contract.prisma']),
       );
@@ -1807,7 +1807,7 @@ describe('runInit pnpm → npm install fallback (FR7.2)', {
         code: string;
       };
       expect(parsed.ok).toBe(false);
-      expect(parsed.code).toBe('PN-CLI-5007');
+      expect(parsed.code).toBe('CLI.INIT_INSTALL_FAILED');
     } finally {
       restore();
     }
@@ -1838,7 +1838,7 @@ describe('runInit emit failure (F02 / F07)', { timeout: timeouts.databaseOperati
     rmSync(tmpDir, { recursive: true, force: true });
   }, timeouts.databaseOperation);
 
-  it('exits EMIT_FAILED with PN-CLI-5008 and surfaces the underlying cause', async () => {
+  it('exits EMIT_FAILED with CLI.INIT_EMIT_FAILED and surfaces the underlying cause', async () => {
     const { executeContractEmit } = await import(
       '../../../src/control-api/operations/contract-emit'
     );
@@ -1863,7 +1863,7 @@ describe('runInit emit failure (F02 / F07)', { timeout: timeouts.databaseOperati
         meta: { cause: string; filesWritten: string[] };
       };
       expect(parsed.ok).toBe(false);
-      expect(parsed.code).toBe('PN-CLI-5008');
+      expect(parsed.code).toBe('CLI.INIT_EMIT_FAILED');
       expect(parsed.meta.cause).toContain('contract.prisma is invalid');
       expect(parsed.meta.filesWritten).toEqual(expect.arrayContaining(['prisma-next.config.ts']));
     } finally {
@@ -2234,7 +2234,7 @@ describe('runInit hostile inputs (FR6)', { timeout: timeouts.databaseOperation }
     expect(merged).toContain('vitest/globals');
   });
 
-  it('exits PRECONDITION on an unparseable tsconfig.json with PN-CLI-5011 (FR6.1)', async () => {
+  it('exits PRECONDITION on an unparseable tsconfig.json with CLI.INIT_INVALID_TSCONFIG (FR6.1)', async () => {
     // Bare JSON syntax error (unclosed brace) — well beyond JSONC tolerance.
     writeFileSync(join(tmpDir, 'tsconfig.json'), '{ "compilerOptions": { "strict": true ');
 
@@ -2257,7 +2257,7 @@ describe('runInit hostile inputs (FR6)', { timeout: timeouts.databaseOperation }
         meta?: { path?: string };
       };
       expect(envelope.ok).toBe(false);
-      expect(envelope.code).toBe('PN-CLI-5011');
+      expect(envelope.code).toBe('CLI.INIT_INVALID_TSCONFIG');
       expect(envelope.meta?.path).toBe('tsconfig.json');
     } finally {
       spy.mockRestore();
@@ -2290,7 +2290,7 @@ describe('runInit hostile inputs (FR6)', { timeout: timeouts.databaseOperation }
   });
 
   it('leaves the project byte-identical when a malformed package.json aborts init (FR6.2)', async () => {
-    // The `runInit hygiene` block already locks in the PN-CLI-5010 surface;
+    // The `runInit hygiene` block already locks in the CLI.INIT_INVALID_MANIFEST surface;
     // here we additionally lock in the FR6.2 atomicity contract — no
     // partial scaffold survives the precondition failure.
     const brokenPkg = '{ "name": "broken", ';
@@ -2335,25 +2335,38 @@ describe('hasDirectDep (FR2.1)', () => {
 });
 
 describe('exitCodeForError', () => {
-  it('maps PN-CLI-5009 (invalid output document) to INTERNAL_ERROR, not PRECONDITION', () => {
-    expect(exitCodeForError({ code: '5009' })).toBe(INIT_EXIT_INTERNAL_ERROR);
-    expect(exitCodeForError({ code: '5009' })).not.toBe(INIT_EXIT_PRECONDITION);
+  it('maps CLI.INIT_INVALID_OUTPUT_DOCUMENT (invalid output document) to INTERNAL_ERROR, not PRECONDITION', () => {
+    expect(exitCodeForError({ code: 'CLI.INIT_INVALID_OUTPUT_DOCUMENT' })).toBe(
+      INIT_EXIT_INTERNAL_ERROR,
+    );
+    expect(exitCodeForError({ code: 'CLI.INIT_INVALID_OUTPUT_DOCUMENT' })).not.toBe(
+      INIT_EXIT_PRECONDITION,
+    );
   });
 
   it('maps unrecognised internal codes to INTERNAL_ERROR (default branch)', () => {
-    expect(exitCodeForError({ code: '5999' })).toBe(INIT_EXIT_INTERNAL_ERROR);
-    expect(exitCodeForError({ code: '9000' })).toBe(INIT_EXIT_INTERNAL_ERROR);
+    expect(exitCodeForError({ code: 'CLI.UNKNOWN_FUTURE_CODE' })).toBe(INIT_EXIT_INTERNAL_ERROR);
+    expect(exitCodeForError({ code: 'SOMETHING.ELSE' })).toBe(INIT_EXIT_INTERNAL_ERROR);
   });
 
   it('maps user-facing precondition codes to PRECONDITION', () => {
-    for (const code of ['5002', '5003', '5004', '5005', '5010', '5011', '5012', '5014']) {
+    for (const code of [
+      'CLI.INIT_REINIT_NEEDS_FORCE',
+      'CLI.INIT_MISSING_FLAGS',
+      'CLI.INIT_INVALID_FLAG_VALUE',
+      'CLI.INIT_STRICT_PROBE_WITHOUT_PROBE',
+      'CLI.INIT_INVALID_MANIFEST',
+      'CLI.INIT_INVALID_TSCONFIG',
+      'CLI.INIT_PROBE_FAILED',
+      'CLI.INIT_AUTHORING_SCHEMA_PATH_MISMATCH',
+    ]) {
       expect(exitCodeForError({ code })).toBe(INIT_EXIT_PRECONDITION);
     }
   });
 
   it('maps lifecycle codes to their dedicated exit codes', () => {
-    expect(exitCodeForError({ code: '5006' })).toBe(INIT_EXIT_USER_ABORTED);
-    expect(exitCodeForError({ code: '5007' })).toBe(INIT_EXIT_INSTALL_FAILED);
-    expect(exitCodeForError({ code: '5008' })).toBe(INIT_EXIT_EMIT_FAILED);
+    expect(exitCodeForError({ code: 'CLI.INIT_USER_ABORTED' })).toBe(INIT_EXIT_USER_ABORTED);
+    expect(exitCodeForError({ code: 'CLI.INIT_INSTALL_FAILED' })).toBe(INIT_EXIT_INSTALL_FAILED);
+    expect(exitCodeForError({ code: 'CLI.INIT_EMIT_FAILED' })).toBe(INIT_EXIT_EMIT_FAILED);
   });
 });

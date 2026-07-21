@@ -79,7 +79,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
       expect(result.ok).toBe(false);
       const failure = result.assertNotOk();
-      expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
+      expect(failure.code).toBe('MIGRATION.SCHEMA_VERIFY_FAILED');
 
       await expectNoMarkerOrLedgerWrites(driver!);
     });
@@ -109,7 +109,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
       expect(result.ok).toBe(false);
       const failure = result.assertNotOk();
-      expect(failure.code).toBe('PRECHECK_FAILED');
+      expect(failure.code).toBe('MIGRATION.PRECHECK_FAILED');
       expect(failure.summary).toMatch(/precheck/i);
 
       await expectNoMarkerOrLedgerWrites(driver!);
@@ -164,7 +164,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
       expect(result.ok).toBe(false);
       const failure = result.assertNotOk();
-      expect(failure.code).toBe('LEGACY_MARKER_SHAPE');
+      expect(failure.code).toBe('MIGRATION.LEGACY_MARKER_SHAPE');
       expect(failure.summary).toMatch(/legacy marker-table shape/i);
       expect(failure.summary).toMatch(/dbInit/);
       expect(failure.summary).toMatch(/prisma_contract\.marker/);
@@ -233,7 +233,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
       expect(result.ok).toBe(false);
       const failure = result.assertNotOk();
-      expect(failure.code).toBe('MARKER_ORIGIN_MISMATCH');
+      expect(failure.code).toBe('MIGRATION.MARKER_ORIGIN_MISMATCH');
       expect(failure.summary).toMatch(/does not match plan origin/i);
 
       const markerRow = await driver!.query<{ core_hash: string; profile_hash: string }>(
@@ -312,7 +312,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
       expect(result.ok).toBe(false);
       const failure = result.assertNotOk();
-      expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
+      expect(failure.code).toBe('MIGRATION.SCHEMA_VERIFY_FAILED');
 
       await expectNoMarkerOrLedgerWrites(driver!);
 
@@ -384,7 +384,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
       expect(result.ok).toBe(false);
       const failure = result.assertNotOk();
-      expect(failure.code).toBe('POSTCHECK_FAILED');
+      expect(failure.code).toBe('MIGRATION.POSTCHECK_FAILED');
       expect(failure.summary).toMatch(/table\.test_table/i);
       expect(failure.summary).toMatch(/postcheck/i);
 
@@ -455,7 +455,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
       expect(result.ok).toBe(false);
       const failure = result.assertNotOk();
-      expect(failure.code).toBe('EXECUTION_FAILED');
+      expect(failure.code).toBe('MIGRATION.EXECUTION_FAILED');
       expect(failure.summary).toMatch(/Operation table\.user failed during execution/i);
       expect(failure.meta).toMatchObject({
         operationId: 'table.user',
@@ -545,7 +545,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
       expect(result.ok).toBe(false);
       const failure = result.assertNotOk();
-      expect(failure.code).toBe('EXECUTION_FAILED');
+      expect(failure.code).toBe('MIGRATION.EXECUTION_FAILED');
       expect(failure.meta).toMatchObject({
         operationId: 'insert.duplicate',
         stepDescription: 'insert duplicate email',

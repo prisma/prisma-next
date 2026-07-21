@@ -375,7 +375,7 @@ withTempDir(({ createTempDir }) => {
             expect((await runContractEmit(ctx)).exitCode).toBe(0);
 
             const plan = await runMigrationPlan(ctx, ['--json']);
-            expect(plan.exitCode).toBe(1);
+            expect(plan.exitCode).toBe(2);
             const err = parseJsonOutput<PlanJsonResult>(plan);
             expect(err.meta?.code).toBe('MIGRATION.HASH_NOT_IN_GRAPH');
             expect(err.fix).toMatch(/--from/);
@@ -394,7 +394,7 @@ withTempDir(({ createTempDir }) => {
             stripDbSnapshot(ctx);
 
             const plan = await runMigrationPlan(ctx, ['--json']);
-            expect(plan.exitCode).toBe(1);
+            expect(plan.exitCode).toBe(2);
             const err = parseJsonOutput<PlanJsonResult>(plan);
             expect(err.meta?.code).toBe('MIGRATION.SNAPSHOT_MISSING');
             expect(err.fix).toMatch(/db update --advance-ref db/);

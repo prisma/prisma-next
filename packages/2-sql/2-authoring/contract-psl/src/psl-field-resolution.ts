@@ -347,6 +347,13 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     if (field.typeContractSpaceId !== undefined && relationAttribute) {
       continue;
     }
+    // A model-typed, non-list field with no `@relation` is the back side of a
+    // 1:1 relation — the owning side always carries `@relation(fields: [...],
+    // references: [...])`. It is lowered separately, via the interpreter's
+    // backrelation-candidate matching, not as a scalar column here.
+    if (isModelField) {
+      continue;
+    }
 
     const isValueObjectField = compositeTypeNames.has(field.typeName);
     const isListField = field.list;

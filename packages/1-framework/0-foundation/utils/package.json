@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/utils",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -14,8 +14,8 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "devDependencies": {
-    "@prisma-next/tsconfig": "workspace:0.15.0",
-    "@prisma-next/tsdown": "workspace:0.15.0",
+    "@prisma-next/tsconfig": "workspace:0.16.0",
+    "@prisma-next/tsdown": "workspace:0.16.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
@@ -40,11 +40,13 @@
     "./casts": "./dist/casts.mjs",
     "./defined": "./dist/defined.mjs",
     "./hash-content": "./dist/hash-content.mjs",
+    "./internal-error": "./dist/internal-error.mjs",
     "./json": "./dist/json.mjs",
     "./promise": "./dist/promise.mjs",
     "./redact-db-url": "./dist/redact-db-url.mjs",
     "./result": "./dist/result.mjs",
     "./simplify-deep": "./dist/simplify-deep.mjs",
+    "./structured-error": "./dist/structured-error.mjs",
     "./types": "./dist/types.mjs",
     "./package.json": "./package.json"
   },

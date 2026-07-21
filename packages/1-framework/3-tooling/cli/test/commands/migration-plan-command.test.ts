@@ -738,7 +738,7 @@ describe('migration plan command', () => {
       mocks.createControlStack.mockReturnValue({});
     }
 
-    it('returns pendingPlaceholders result when plan.operations throws PN-MIG-2001', async () => {
+    it('returns pendingPlaceholders result when plan.operations throws MIGRATION.UNFILLED_PLACEHOLDER', async () => {
       setupClassBasedConfig(() => {
         throw errorUnfilledPlaceholder('backfill-users-status:check');
       });

@@ -563,7 +563,7 @@ export class DropIndexCall extends SqliteOpFactoryCallNode {
  * any future strategy that needs a placeholder data step can construct one
  * with its own id/label.
  *
- * `toOp()` always throws `PN-MIG-2001`: the planner cannot lower a stubbed
+ * `toOp()` always throws `MIGRATION.UNFILLED_PLACEHOLDER`: the planner cannot lower a stubbed
  * transform to a runtime op — the user must edit the rendered
  * `migration.ts` and re-emit.
  */

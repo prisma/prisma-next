@@ -55,7 +55,7 @@ async function writePinnedExtensionDir(testDir: string): Promise<string> {
   // The on-disk head ref's `invariants` and the migration package's
   // `providedInvariants` must both round-trip through
   // `deriveProvidedInvariants` (M2.5b loader integrity gate, error
-  // PN-MIG-5002). The test extension's baseline op carries an
+  // MIGRATION.CONTRACT_SPACE_VIOLATION). The test extension's baseline op carries an
   // `invariantId`, so the derivation produces `[TEST_BASELINE_INVARIANT_ID]`
   // — match that on disk for both the head ref and migration metadata.
   await emitContractSpaceArtifacts(migrationsDir, EXT_SPACE_ID, {

@@ -60,7 +60,7 @@ export function scopeVerifyResultToSpace(
   return {
     ...envelope,
     ok,
-    ...(ok ? {} : { code: result.code ?? 'PN-RUN-3010' }),
+    ...(ok ? {} : { code: result.code ?? 'CONTRACT.MARKER_REQUIRED' }),
     summary: ok ? 'Database schema satisfies contract' : result.summary,
     schema: { ...result.schema, issues },
   };

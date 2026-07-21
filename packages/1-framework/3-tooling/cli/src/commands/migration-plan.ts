@@ -122,7 +122,7 @@ async function runPlannerLeg(
       );
     }
   } catch (e) {
-    if (CliStructuredError.is(e) && e.domain === 'MIG' && e.code === '2001') {
+    if (CliStructuredError.is(e) && e.code === 'MIGRATION.UNFILLED_PLACEHOLDER') {
       hasPlaceholders = true;
     } else {
       throw e;

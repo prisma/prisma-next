@@ -102,8 +102,8 @@ describe('constraintExistsAst — pg_constraint EXISTS check builder', () => {
       expect(inner.joins).toHaveLength(1);
       const join = inner.joins?.[0];
       expect(join?.joinType).toBe('inner');
-      expect((join?.source as TableSource).name).toBe('pg_namespace');
-      expect((join?.source as TableSource).alias).toBe('n');
+      expect((join!.source as TableSource).name).toBe('pg_namespace');
+      expect((join!.source as TableSource).alias).toBe('n');
 
       const where = inner.where as AndExpr;
       expect(where.kind).toBe('and');

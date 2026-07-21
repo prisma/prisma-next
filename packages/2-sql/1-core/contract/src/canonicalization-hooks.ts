@@ -14,7 +14,7 @@ const preserveEmptyPatterns = [
   // A column default's literal payload is data, not shape — `{ kind:
   // 'literal', value: false }` (or `value: []`) must survive the
   // default-omission walk or the emitted contract fails its own
-  // validation on the next read (PN-CLI-4003 on `Boolean @default(false)`).
+  // validation on the next read (CONTRACT.VALIDATION_FAILED on `Boolean @default(false)`).
   ['storage', 'namespaces', '*', 'entries', 'table', '*', 'columns', '*', 'default', 'value'],
 ] as const satisfies readonly PathPattern[];
 
