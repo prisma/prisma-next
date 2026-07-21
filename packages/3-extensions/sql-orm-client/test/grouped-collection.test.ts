@@ -1,4 +1,12 @@
-import { AggregateExpr, type BinaryExpr } from '@prisma-next/sql-relational-core/ast';
+import {
+  AggregateExpr,
+  type AnyExpression,
+  type BinaryExpr,
+  CaseExpr,
+  CastExpr,
+  FunctionCallExpr,
+  LiteralExpr,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createCollectionFor } from './collection-fixtures';
 import { isSelectAst } from './helpers';
@@ -40,6 +48,35 @@ describe('GroupedCollection', () => {
     const totalViewsProjection = firstAst.projection.find((item) => item.alias === 'totalViews');
     expect(totalViewsProjection?.expr.kind).toBe('aggregate');
     expect((totalViewsProjection!.expr as AggregateExpr).fn).toBe('sum');
+  });
+
+  it.each<{ kind: string; expression: AnyExpression }>([
+    {
+      kind: 'function-call',
+      expression: FunctionCallExpr.of('lower', [LiteralExpr.of('value')]),
+    },
+    {
+      kind: 'cast',
+      expression: CastExpr.as(LiteralExpr.of('value'), 'text'),
+    },
+    {
+      kind: 'case',
+      expression: CaseExpr.of([
+        {
+          condition: LiteralExpr.of(true),
+          value: LiteralExpr.of('value'),
+        },
+      ]),
+    },
+  ])('rejects $kind expressions in grouped HAVING', async ({ kind, expression }) => {
+    const { collection } = createCollectionFor('Post');
+
+    await expect(
+      collection
+        .groupBy('userId')
+        .having(() => expression)
+        .aggregate((aggregate) => ({ count: aggregate.count() })),
+    ).rejects.toThrow(`Unsupported grouped having expression kind "${kind}"`);
   });
 
   it('groupBy().aggregate() validates selector shape and non-empty spec', async () => {

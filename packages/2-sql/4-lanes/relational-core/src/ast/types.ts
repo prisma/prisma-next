@@ -52,6 +52,9 @@ export interface ExprVisitor<R> {
   operation(expr: OperationExpr): R;
   aggregate(expr: AggregateExpr): R;
   windowFunc(expr: WindowFuncExpr): R;
+  functionCall(expr: FunctionCallExpr): R;
+  cast(expr: CastExpr): R;
+  case(expr: CaseExpr): R;
   jsonObject(expr: JsonObjectExpr): R;
   jsonArrayAgg(expr: JsonArrayAggExpr): R;
   binary(expr: BinaryExpr): R;
@@ -825,6 +828,127 @@ export class WindowFuncExpr extends Expression {
       ...this.args.map((arg) => () => arg.fold(folder)),
       ...(this.partitionBy ?? []).map((expr) => () => expr.fold(folder)),
       ...(this.orderBy ?? []).map((orderItem) => () => orderItem.expr.fold(folder)),
+    ]);
+  }
+}
+
+export class FunctionCallExpr extends Expression {
+  readonly kind = 'function-call' as const;
+  readonly fn: string;
+  readonly args: ReadonlyArray<AnyExpression>;
+
+  constructor(fn: string, args: ReadonlyArray<AnyExpression>) {
+    super();
+    this.fn = fn;
+    this.args = frozenArrayCopy(args);
+    this.freeze();
+  }
+
+  static of(fn: string, args: ReadonlyArray<AnyExpression>): FunctionCallExpr {
+    return new FunctionCallExpr(fn, args);
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.functionCall(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return new FunctionCallExpr(
+      this.fn,
+      this.args.map((arg) => arg.rewrite(rewriter)),
+    );
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    return combineAll(
+      folder,
+      this.args.map((arg) => () => arg.fold(folder)),
+    );
+  }
+}
+
+export class CastExpr extends Expression {
+  readonly kind = 'cast' as const;
+  readonly expr: AnyExpression;
+  readonly targetType: string;
+
+  constructor(expr: AnyExpression, targetType: string) {
+    super();
+    this.expr = expr;
+    this.targetType = targetType;
+    this.freeze();
+  }
+
+  static as(expr: AnyExpression, targetType: string): CastExpr {
+    return new CastExpr(expr, targetType);
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.cast(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return new CastExpr(this.expr.rewrite(rewriter), this.targetType);
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    return this.expr.fold(folder);
+  }
+}
+
+export interface CaseBranch {
+  readonly condition: AnyExpression;
+  readonly value: AnyExpression;
+}
+
+export class CaseExpr extends Expression {
+  readonly kind = 'case' as const;
+  readonly branches: ReadonlyArray<Readonly<CaseBranch>>;
+  readonly elseExpr: AnyExpression | undefined;
+
+  constructor(branches: ReadonlyArray<CaseBranch>, elseExpr?: AnyExpression) {
+    super();
+    if (branches.length === 0) {
+      throw new Error('CaseExpr requires at least one branch');
+    }
+    this.branches = frozenArrayCopy(
+      branches.map((branch) =>
+        Object.freeze({
+          condition: branch.condition,
+          value: branch.value,
+        }),
+      ),
+    );
+    this.elseExpr = elseExpr;
+    this.freeze();
+  }
+
+  static of(branches: ReadonlyArray<CaseBranch>, elseExpr?: AnyExpression): CaseExpr {
+    return new CaseExpr(branches, elseExpr);
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.case(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return new CaseExpr(
+      this.branches.map((branch) => ({
+        condition: branch.condition.rewrite(rewriter),
+        value: branch.value.rewrite(rewriter),
+      })),
+      this.elseExpr?.rewrite(rewriter),
+    );
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    const elseExpr = this.elseExpr;
+    return combineAll(folder, [
+      ...this.branches.flatMap((branch) => [
+        () => branch.condition.fold(folder),
+        () => branch.value.fold(folder),
+      ]),
+      ...(elseExpr === undefined ? [] : [() => elseExpr.fold(folder)]),
     ]);
   }
 }
@@ -1983,6 +2107,9 @@ export type AnyExpression =
   | OperationExpr
   | AggregateExpr
   | WindowFuncExpr
+  | FunctionCallExpr
+  | CastExpr
+  | CaseExpr
   | JsonObjectExpr
   | JsonArrayAggExpr
   | ListExpression

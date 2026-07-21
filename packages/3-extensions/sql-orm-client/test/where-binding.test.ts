@@ -2,10 +2,13 @@ import {
   AggregateExpr,
   AndExpr,
   BinaryExpr,
+  CaseExpr,
+  CastExpr,
   ColumnRef,
   DerivedTableSource,
   EqColJoinOn,
   ExistsExpr,
+  FunctionCallExpr,
   IdentifierRef,
   JoinAst,
   JsonArrayAggExpr,
@@ -346,6 +349,61 @@ describe('bindWhereExpr', () => {
       const innerQuery = (agg.expr.value as SubqueryExpr).query as SelectAst;
       const innerWhere = innerQuery.where as BinaryExpr;
       expect(innerWhere.right.kind).toBe('param-ref');
+    });
+
+    it('preserves nested scalar projection expressions while binding inner subqueries', () => {
+      const expr = CaseExpr.of(
+        [
+          {
+            condition: BinaryExpr.eq(
+              FunctionCallExpr.of('length', [ColumnRef.of('users', 'email')]),
+              LiteralExpr.of(1),
+            ),
+            value: CastExpr.as(
+              FunctionCallExpr.of('coalesce', [
+                SubqueryExpr.of(subqueryWithLiteral()),
+                LiteralExpr.of('fallback'),
+              ]),
+              'text',
+            ),
+          },
+        ],
+        CastExpr.as(LiteralExpr.of('missing'), 'text'),
+      );
+
+      const bound = bindWhereExpr(contract, expr);
+
+      expect(bound).toBeInstanceOf(CaseExpr);
+      if (!(bound instanceof CaseExpr)) {
+        throw new Error('Expected CaseExpr');
+      }
+      expect(bound.branches[0]?.condition).toBeInstanceOf(BinaryExpr);
+      expect((bound.branches[0]?.condition as BinaryExpr).left).toBeInstanceOf(FunctionCallExpr);
+      const value = bound.branches[0]?.value;
+      expect(value).toBeInstanceOf(CastExpr);
+      if (!(value instanceof CastExpr)) {
+        throw new Error('Expected CastExpr');
+      }
+      expect(value.expr).toBeInstanceOf(FunctionCallExpr);
+      if (!(value.expr instanceof FunctionCallExpr)) {
+        throw new Error('Expected FunctionCallExpr');
+      }
+      const nestedSubquery = value.expr.args[0];
+      expect(nestedSubquery).toBeInstanceOf(SubqueryExpr);
+      if (!(nestedSubquery instanceof SubqueryExpr)) {
+        throw new Error('Expected SubqueryExpr');
+      }
+      const innerWhere = nestedSubquery.query.where;
+      expect(innerWhere).toBeInstanceOf(BinaryExpr);
+      if (!(innerWhere instanceof BinaryExpr)) {
+        throw new Error('Expected BinaryExpr');
+      }
+      expect(innerWhere.right).toMatchObject({
+        kind: 'param-ref',
+        value: 100,
+        codec: { codecId: 'pg/int4@1' },
+      });
+      expect(bound.elseExpr).toBeInstanceOf(CastExpr);
     });
 
     it('binds inner expressions of top-level ListExpression', () => {

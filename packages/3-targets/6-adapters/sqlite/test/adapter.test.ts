@@ -3,12 +3,15 @@ import {
   AndExpr,
   type AnyQueryAst,
   BinaryExpr,
+  CaseExpr,
+  CastExpr,
   CodecJsonValueProjection,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
   DerivedTableSource,
   ExistsExpr,
+  FunctionCallExpr,
   InsertAst,
   InsertOnConflict,
   JoinAst,
@@ -455,6 +458,72 @@ describe('SQLite adapter', () => {
 
       expect(sql).toBe(
         `SELECT json_object('value', "user"."email") AS "object", json_group_array("user"."email") AS "array" FROM "user"`,
+      );
+    });
+
+    it('renders nested scalar projection expressions with exact precedence', () => {
+      const decision = CaseExpr.of(
+        [
+          {
+            condition: BinaryExpr.eq(
+              FunctionCallExpr.of('lower', [ColumnRef.of('user', 'email')]),
+              ParamRef.of('a@example.com'),
+            ),
+            value: CastExpr.as(
+              FunctionCallExpr.of('concat', [ColumnRef.of('user', 'email'), ParamRef.of('!')]),
+              'text',
+            ),
+          },
+          {
+            condition: NullCheckExpr.isNull(ColumnRef.of('user', 'metadata')),
+            value: FunctionCallExpr.of('coalesce', [
+              ColumnRef.of('user', 'email'),
+              LiteralExpr.of('missing'),
+            ]),
+          },
+        ],
+        CastExpr.as(ParamRef.of('fallback'), 'text'),
+      );
+      const ast = SelectAst.from(TableSource.named('user')).withProjection([
+        ProjectionItem.of('zero', FunctionCallExpr.of('random', [])),
+        ProjectionItem.of('decision', NullCheckExpr.isNotNull(decision)),
+      ]);
+
+      const { sql } = adapter.lower(ast, { contract });
+
+      expect(sql).toBe(
+        `SELECT random() AS "zero", CASE WHEN lower("user"."email") = ? THEN CAST(concat("user"."email", ?) AS text) WHEN "user"."metadata" IS NULL THEN coalesce("user"."email", 'missing') ELSE CAST(? AS text) END IS NOT NULL AS "decision" FROM "user"`,
+      );
+    });
+
+    it.each([
+      {
+        name: 'function call',
+        expression: FunctionCallExpr.of('lower', [ColumnRef.of('user', 'email')]),
+        sql: 'lower("user"."email")',
+      },
+      {
+        name: 'cast',
+        expression: CastExpr.as(ColumnRef.of('user', 'email'), 'text'),
+        sql: 'CAST("user"."email" AS text)',
+      },
+      {
+        name: 'searched CASE',
+        expression: CaseExpr.of([
+          {
+            condition: BinaryExpr.eq(ColumnRef.of('user', 'id'), LiteralExpr.of(1)),
+            value: LiteralExpr.of('found'),
+          },
+        ]),
+        sql: `CASE WHEN "user"."id" = 1 THEN 'found' END`,
+      },
+    ])('treats $name expressions as atomic under null checks', ({ expression, sql }) => {
+      const ast = SelectAst.from(TableSource.named('user')).withProjection([
+        ProjectionItem.of('value', NullCheckExpr.isNotNull(expression)),
+      ]);
+
+      expect(adapter.lower(ast, { contract }).sql).toBe(
+        `SELECT ${sql} IS NOT NULL AS "value" FROM "user"`,
       );
     });
 

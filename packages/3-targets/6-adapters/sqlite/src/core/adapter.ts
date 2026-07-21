@@ -8,8 +8,11 @@ import type {
   AnyJsonValueProjection,
   AnyQueryAst,
   BinaryExpr,
+  CaseExpr,
+  CastExpr,
   ColumnRef,
   DeleteAst,
+  FunctionCallExpr,
   InsertAst,
   InsertValue,
   JoinAst,
@@ -304,6 +307,12 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
       return renderAggregateExpr(node, contract);
     case 'window-func':
       return renderWindowFuncExpr(node, contract);
+    case 'function-call':
+      return renderFunctionCallExpr(node, contract);
+    case 'cast':
+      return renderCastExpr(node, contract);
+    case 'case':
+      return renderCaseExpr(node, contract);
     case 'json-object':
       return renderJsonObjectExpr(node, contract);
     case 'json-array-agg':
@@ -406,10 +415,38 @@ function renderSubqueryExpr(expr: SubqueryExpr, contract?: SqliteContract): stri
   return `(${renderSelect(expr.query, contract)})`;
 }
 
+function requiresNullCheckGrouping(kind: AnyExpression['kind']): boolean {
+  switch (kind) {
+    case 'operation':
+    case 'subquery':
+      return true;
+    case 'column-ref':
+    case 'identifier-ref':
+    case 'aggregate':
+    case 'window-func':
+    case 'function-call':
+    case 'cast':
+    case 'case':
+    case 'json-object':
+    case 'json-array-agg':
+    case 'binary':
+    case 'and':
+    case 'or':
+    case 'exists':
+    case 'null-check':
+    case 'not':
+    case 'param-ref':
+    case 'prepared-param-ref':
+    case 'literal':
+    case 'list':
+    case 'raw-expr':
+      return false;
+  }
+}
+
 function renderNullCheck(expr: NullCheckExpr, contract?: SqliteContract): string {
   const rendered = renderExpr(expr.expr, contract);
-  const renderedExpr =
-    expr.expr.kind === 'operation' || expr.expr.kind === 'subquery' ? `(${rendered})` : rendered;
+  const renderedExpr = requiresNullCheckGrouping(expr.expr.kind) ? `(${rendered})` : rendered;
   return expr.isNull ? `${renderedExpr} IS NULL` : `${renderedExpr} IS NOT NULL`;
 }
 
@@ -499,6 +536,27 @@ function renderWindowFuncExpr(expr: WindowFuncExpr, contract?: SqliteContract): 
       : '';
   const over = [partitionClause, orderClause].filter((part) => part.length > 0).join(' ');
   return `${fn}(${args}) OVER (${over})`;
+}
+
+function renderFunctionCallExpr(expr: FunctionCallExpr, contract?: SqliteContract): string {
+  const args = expr.args.map((arg) => renderExpr(arg, contract)).join(', ');
+  return `${expr.fn}(${args})`;
+}
+
+function renderCastExpr(expr: CastExpr, contract?: SqliteContract): string {
+  return `CAST(${renderExpr(expr.expr, contract)} AS ${expr.targetType})`;
+}
+
+function renderCaseExpr(expr: CaseExpr, contract?: SqliteContract): string {
+  const branches = expr.branches
+    .map(
+      (branch) =>
+        `WHEN ${renderExpr(branch.condition, contract)} THEN ${renderExpr(branch.value, contract)}`,
+    )
+    .join(' ');
+  const elseClause =
+    expr.elseExpr === undefined ? '' : ` ELSE ${renderExpr(expr.elseExpr, contract)}`;
+  return `CASE ${branches}${elseClause} END`;
 }
 
 function renderJsonValueProjection(

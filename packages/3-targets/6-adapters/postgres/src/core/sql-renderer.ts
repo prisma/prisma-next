@@ -9,9 +9,12 @@ import {
   type AnyParamRef,
   type AnyQueryAst,
   type BinaryExpr,
+  type CaseExpr,
+  type CastExpr,
   type ColumnRef,
   collectOrderedParamRefs,
   type DeleteAst,
+  type FunctionCallExpr,
   type InsertAst,
   type InsertValue,
   type JoinAst,
@@ -529,6 +532,9 @@ function isAtomicExpressionKind(kind: AnyExpression['kind']): boolean {
     case 'literal':
     case 'aggregate':
     case 'window-func':
+    case 'function-call':
+    case 'cast':
+    case 'case':
     case 'json-object':
     case 'json-array-agg':
     case 'list':
@@ -655,6 +661,31 @@ function renderWindowFuncExpr(
   return `${fn}(${args}) OVER (${over})`;
 }
 
+function renderFunctionCallExpr(
+  expr: FunctionCallExpr,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
+): string {
+  const args = expr.args.map((arg) => renderExpr(arg, contract, pim)).join(', ');
+  return `${expr.fn}(${args})`;
+}
+
+function renderCastExpr(expr: CastExpr, contract: PostgresContract, pim: ParamIndexMap): string {
+  return `CAST(${renderExpr(expr.expr, contract, pim)} AS ${expr.targetType})`;
+}
+
+function renderCaseExpr(expr: CaseExpr, contract: PostgresContract, pim: ParamIndexMap): string {
+  const branches = expr.branches
+    .map(
+      (branch) =>
+        `WHEN ${renderExpr(branch.condition, contract, pim)} THEN ${renderExpr(branch.value, contract, pim)}`,
+    )
+    .join(' ');
+  const elseClause =
+    expr.elseExpr === undefined ? '' : ` ELSE ${renderExpr(expr.elseExpr, contract, pim)}`;
+  return `CASE ${branches}${elseClause} END`;
+}
+
 function renderJsonValueProjection(
   projection: AnyJsonValueProjection,
   contract: PostgresContract,
@@ -723,6 +754,12 @@ function renderExpr(expr: AnyExpression, contract: PostgresContract, pim: ParamI
       return renderAggregateExpr(node, contract, pim);
     case 'window-func':
       return renderWindowFuncExpr(node, contract, pim);
+    case 'function-call':
+      return renderFunctionCallExpr(node, contract, pim);
+    case 'cast':
+      return renderCastExpr(node, contract, pim);
+    case 'case':
+      return renderCaseExpr(node, contract, pim);
     case 'json-object':
       return renderJsonObjectExpr(node, contract, pim);
     case 'json-array-agg':

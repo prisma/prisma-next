@@ -76,6 +76,10 @@ function validateGroupedComparable(value: AnyExpression): AnyExpression {
     case 'aggregate':
     case 'operation':
       return value;
+    case 'function-call':
+    case 'cast':
+    case 'case':
+      throw new Error(`Unsupported comparable kind in grouped having: "${value.kind}"`);
     case 'list':
       if (value.values.some((entry) => entry.kind === 'param-ref')) {
         throw ormError(
@@ -122,6 +126,9 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
     operation: rejectHavingExpr,
     aggregate: rejectHavingExpr,
     windowFunc: rejectHavingExpr,
+    functionCall: rejectHavingExpr,
+    cast: rejectHavingExpr,
+    case: rejectHavingExpr,
     jsonObject: rejectHavingExpr,
     jsonArrayAgg: rejectHavingExpr,
     literal: rejectHavingExpr,
