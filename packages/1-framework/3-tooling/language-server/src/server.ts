@@ -1,5 +1,6 @@
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findNearestConfigPathForFile } from '@prisma-next/config-loader';
+import { CliStructuredError } from '@prisma-next/errors/control';
 import type { SymbolTable } from '@prisma-next/psl-parser';
 import { type FormatOptions, format } from '@prisma-next/psl-parser/format';
 import { join } from 'pathe';
@@ -279,13 +280,20 @@ export function createServer(connection: Connection): LanguageServer {
       diagnostics: [
         {
           range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
-          message: error instanceof Error ? error.message : String(error),
+          message: configFailureMessage(error),
           code: CONFIG_LOAD_FAILED_CODE,
           severity: DiagnosticSeverity.Error,
           source: 'prisma-next',
         },
       ],
     });
+  }
+
+  function configFailureMessage(error: unknown): string {
+    if (CliStructuredError.is(error)) {
+      return error.why ?? error.message;
+    }
+    return error instanceof Error ? error.message : String(error);
   }
 
   function clearConfigFailure(configPath: string): void {
