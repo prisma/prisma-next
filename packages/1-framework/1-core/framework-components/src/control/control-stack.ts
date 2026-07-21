@@ -45,7 +45,7 @@ export interface AssembledAuthoringContributions {
   readonly entityTypes: AuthoringEntityTypeNamespace;
   readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
   readonly modelAttributes: AuthoringModelAttributeDescriptorNamespace;
-  /** The single {@link AuthoringContributions.valueObjectStorageType} declared across the composed components, validated at assembly against the merged `type` namespace. Absent when no component declares one. */
+  /** The single {@link AuthoringContributions.valueObjectStorageType} declared across the composed components, validated at assembly against the merged `type` namespace. */
   readonly valueObjectStorageType?: string;
 }
 

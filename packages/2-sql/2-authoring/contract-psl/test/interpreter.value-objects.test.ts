@@ -458,11 +458,8 @@ model User {
       sourceId: 'schema.prisma',
     });
 
-    // Contributions without a valueObjectStorageType declaration: even
-    // though the scalar map still contains Jsonb/Json entries, the family
-    // layer must not fall back to hardcoded type names — the field is
-    // skipped, matching the pre-existing behavior for stacks without
-    // value-object storage.
+    // The scalar map still contains Jsonb/Json entries; the family layer
+    // must not fall back to hardcoded type names.
     const result = interpretPslDocumentToSqlContract({
       ...document,
       authoringContributions: { type: postgresScalarAuthoringTypes },

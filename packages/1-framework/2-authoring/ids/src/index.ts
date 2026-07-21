@@ -37,7 +37,7 @@ function nanoidStorage(params?: Record<string, unknown>): GeneratedStorage {
 
 type BuiltinGeneratorMetadata = {
   readonly applicableCodecIds: readonly string[];
-  /** The single source of the {@link GeneratedStorage} this generator's TS spec helper bundles, resolved from the helper's params (nanoid sizes its storage from `size`). */
+  /** The single source of the {@link GeneratedStorage} this generator's TS spec helper bundles. */
   readonly generatedStorage: (params?: Record<string, unknown>) => GeneratedStorage;
 };
 

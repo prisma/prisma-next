@@ -353,7 +353,6 @@ export const sqliteScalarColumnDescriptors = new Map([
   ['Bytes', { codecId: 'sqlite/blob@1', nativeType: 'blob' }],
 ] as const);
 
-/** The sqlite base scalars in unified-namespace form: top-level zero-arg type constructors. */
 export const sqliteScalarAuthoringTypes: AuthoringTypeNamespace = Object.fromEntries(
   [...sqliteScalarColumnDescriptors].map(([name, { codecId, nativeType }]) => [
     name,

@@ -373,10 +373,8 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     };
 
     if (isValueObjectField) {
-      // Value objects store in the assembled `valueObjectStorageType`
-      // declared by the composed components (postgres: Jsonb, sqlite: Json).
-      // A stack that declares none has no value-object storage and the
-      // field is skipped.
+      // A stack that declares no valueObjectStorageType has no value-object
+      // storage — the field is skipped.
       descriptor =
         valueObjectStorageTypeName !== undefined
           ? scalarColumnDescriptors.get(valueObjectStorageTypeName)

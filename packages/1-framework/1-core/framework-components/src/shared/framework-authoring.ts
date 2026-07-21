@@ -475,7 +475,7 @@ export interface AuthoringContributions {
    * top-level bare-eligible entry (see
    * {@link collectScalarTypeConstructors}), and exposes the single value to
    * family interpreters — so family layers never hardcode a target's type
-   * names. Undefined when the component declares no value-object storage.
+   * names.
    */
   readonly valueObjectStorageType?: string;
 }
@@ -767,11 +767,8 @@ export function collectScalarTypeConstructors(
     if (!isAuthoringTypeConstructorDescriptor(value)) continue;
     if (value.entityRefArg !== undefined) continue;
     if (value.args?.some((arg) => arg.optional !== true)) continue;
-    // Bare eligibility beyond all-optional args: the output template must
-    // resolve without arguments. Reusing the same template machinery the
-    // instantiation uses keeps eligibility and output from drifting — a
-    // missing template or an arg-ref with no default resolves to a
-    // non-string here and is excluded, so the instantiation below can never
+    // Resolving with the same template machinery the instantiation uses keeps
+    // eligibility and output from drifting — the instantiation below can never
     // fail for an eligible constructor.
     if (typeof resolveAuthoringTemplateValue(value.output.nativeType, []) !== 'string') continue;
     result.set(name, instantiateAuthoringTypeConstructor(value, []));

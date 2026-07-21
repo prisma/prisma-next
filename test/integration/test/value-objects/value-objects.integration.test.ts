@@ -88,7 +88,6 @@ function interpretMongoPsl(schema: string) {
   });
 }
 
-/** The scalar map in unified-namespace form. */
 const postgresScalarAuthoringTypes = Object.fromEntries(
   [...postgresScalarTypeDescriptors].map(([name, { codecId, nativeType }]) => [
     name,
@@ -112,7 +111,7 @@ function interpretSqlPsl(schema: string) {
     sourceId: 'test.prisma',
     target: postgresTarget,
     scalarColumnDescriptors: postgresScalarTypeDescriptors,
-    // Mirrors the real postgres adapter declaration: value objects store as Jsonb.
+    // Mirrors the real postgres adapter declaration.
     authoringContributions: {
       type: postgresScalarAuthoringTypes,
       valueObjectStorageType: 'Jsonb',

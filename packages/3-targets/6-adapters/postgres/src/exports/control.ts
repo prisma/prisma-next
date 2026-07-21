@@ -16,7 +16,6 @@ import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
 
 const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
   ...postgresAdapterDescriptorMeta,
-  // Value-object fields store as jsonb on postgres.
   authoring: { type: postgresAuthoringTypes, valueObjectStorageType: 'Jsonb' },
   controlMutationDefaults: {
     defaultFunctionRegistry: createPostgresDefaultFunctionRegistry(),
