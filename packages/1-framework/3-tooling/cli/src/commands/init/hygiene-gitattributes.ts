@@ -54,7 +54,7 @@ const STORE_GITATTRIBUTES_LINES: readonly string[] = [
  * line has the shape `<path> linguist-generated`. The `target` parameter
  * is currently unused but accepted for symmetry with the other hygiene
  * helpers and to leave room for target-specific entries (e.g. a future
- * Mongo-only artifact) without a signature break.
+ * family-specific artifact) without a signature break.
  */
 export function requiredGitattributesLines(
   schemaDir: string,

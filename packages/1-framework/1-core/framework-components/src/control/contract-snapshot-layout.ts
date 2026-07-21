@@ -1,3 +1,5 @@
+import { InternalError } from '@prisma-next/utils/internal-error';
+
 export const CONTRACT_SNAPSHOTS_DIRNAME = 'snapshots';
 
 const STORAGE_HASH_PATTERN = /^sha256:([0-9a-f]{64})$/;
@@ -5,7 +7,7 @@ const STORAGE_HASH_PATTERN = /^sha256:([0-9a-f]{64})$/;
 /** Strip the `sha256:` prefix from a storage hash for use as a directory name. */
 export function storageHashHex(storageHash: string): string {
   if (!STORAGE_HASH_PATTERN.test(storageHash)) {
-    throw new Error(
+    throw new InternalError(
       `Invalid storage hash "${storageHash}": expected "sha256:" followed by 64 lowercase hex characters`,
     );
   }

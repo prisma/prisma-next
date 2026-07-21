@@ -47,3 +47,11 @@ changes:
         - "./start-contract'"
         - "./end-contract'"
       anyMatch: true
+---
+
+Also in this release, the ORM client's internal `throw new Error(...)` sites
+were converted to a structured-error scheme (`ORM.*` codes via `structuredError`,
+or `InternalError` for invariants). These are internal throw sites: the errors
+are still `Error` instances with unchanged message text, so application code
+that catches them by message or by `instanceof Error` is unaffected. No action
+required beyond the migration contract-snapshot layout change above.
