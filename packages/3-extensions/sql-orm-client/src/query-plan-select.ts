@@ -397,7 +397,7 @@ function wrapWithRowNumberDedup(options: {
   return SelectAst.from(DerivedTableSource.as(rankedAlias, inner))
     .withProjection(
       base.projection.map((item) =>
-        ProjectionItem.of(item.alias, ColumnRef.of(rankedAlias, item.alias)),
+        ProjectionItem.of(item.alias, ColumnRef.of(rankedAlias, item.alias), item.codec),
       ),
     )
     .withWhere(BinaryExpr.eq(ColumnRef.of(rankedAlias, rnAlias), LiteralExpr.of(1)));
@@ -1042,7 +1042,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   // outer SELECT so `aggregateOrderBy` (which still references `rowsAlias`)
   // can resolve them when the outer wrap materialises `(childRows) AS rowsAlias`.
   const outerHiddenOrderProjection = hiddenOrderProjection.map((proj) =>
-    ProjectionItem.of(proj.alias, ColumnRef.of(distinctAlias, proj.alias)),
+    ProjectionItem.of(proj.alias, ColumnRef.of(distinctAlias, proj.alias), proj.codec),
   );
 
   const childProjection: ReadonlyArray<ProjectionItem> = [

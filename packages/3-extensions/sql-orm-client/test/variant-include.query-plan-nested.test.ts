@@ -103,7 +103,7 @@ describe('nested variant-owned include correlation', () => {
     const deduped = SelectAst.from(DerivedTableSource.as('tasks__ranked', ranked))
       .withProjection(
         baseProjection.map((item) =>
-          ProjectionItem.of(item.alias, ColumnRef.of('tasks__ranked', item.alias)),
+          ProjectionItem.of(item.alias, ColumnRef.of('tasks__ranked', item.alias), item.codec),
         ),
       )
       .withWhere(

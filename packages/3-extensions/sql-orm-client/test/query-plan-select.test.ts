@@ -318,6 +318,31 @@ describe('compileSelectWithIncludes', () => {
     expect(childRows.limit).toBe(2);
   });
 
+  it('preserves complete codec metadata through row-number dedup', () => {
+    const codec: CodecRef = {
+      codecId: 'pg/vector@1',
+      typeParams: { length: 3 },
+      many: true,
+    };
+    const contract = structuredClone(baseContract);
+    Object.assign(contract.storage.namespaces.public.entries.table.posts.columns.embedding, codec);
+    const { collection } = createCollection();
+    const state = collection.include('posts', (posts) =>
+      posts.select('embedding').distinct('embedding'),
+    ).state;
+
+    const plan = compileSelectWithIncludes(contract, 'public', 'users', state);
+    expectSelectAst(plan.ast);
+
+    const postsProjection = plan.ast.projection.find((item) => item.alias === 'posts');
+    expectSubqueryExpr(postsProjection?.expr);
+    expectDerivedTableSource(postsProjection.expr.query.from);
+
+    const dedupedRows = postsProjection.expr.query.from.query;
+    const embeddingProjection = dedupedRows.projection.find((item) => item.alias === 'embedding');
+    expect(embeddingProjection?.codec).toEqual(codec);
+  });
+
   // Each scalar reducer lowers to a correlated subquery whose
   // projection is the `json_build_object('value', AGG(...))` envelope.
   // The JSON wrapper lets the value travel through the existing
@@ -912,13 +937,13 @@ describe('M:N include correlated subquery', () => {
       ),
     ]);
 
-    // Dedup filter SELECT: keep rn = 1, forwarding scalar columns (no codec) up
-    // from the ranked layer.
+    // Dedup filter SELECT: keep rn = 1, forwarding scalar columns and their
+    // codecs from the ranked layer.
     const dedupFilter = SelectAst.from(DerivedTableSource.as('related__ranked', ranked))
       .withProjection([
-        ProjectionItem.of('id', ColumnRef.of('related__ranked', 'id')),
-        ProjectionItem.of('name', ColumnRef.of('related__ranked', 'name')),
-        ProjectionItem.of('tenant_id', ColumnRef.of('related__ranked', 'tenant_id')),
+        proj('id', 'related__ranked', 'id', 'projects'),
+        proj('name', 'related__ranked', 'name', 'projects'),
+        proj('tenant_id', 'related__ranked', 'tenant_id', 'projects'),
       ])
       .withWhere(
         BinaryExpr.eq(ColumnRef.of('related__ranked', '__prisma_distinct_rn'), LiteralExpr.of(1)),

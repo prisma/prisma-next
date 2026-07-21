@@ -1451,9 +1451,9 @@ export class ProjectionItem extends AstNode {
   readonly alias: string;
   readonly expr: ProjectionExpr;
   /**
-   * Codec identity for the projected cell. Decode-side dispatch resolves the per-instance codec through `contractCodecs.forCodecRef(codec)` — content-keyed memoisation collapses repeated lookups for the same logical column onto one shared {@link Codec}.
+   * Codec identity for any known projected result, whether read directly from a contract column or forwarded through a query wrapper. Decode-side dispatch resolves the per-instance codec through `contractCodecs.forCodecRef(codec)` — content-keyed memoisation collapses repeated lookups for the same logical result onto one shared {@link Codec}.
    *
-   * Stays `undefined` for non-column-bound projections (computed expressions, subqueries, raw aliases) whose decoded type the runtime cannot infer from a single contract column.
+   * Stays `undefined` only when the projected result's codec is unknown, such as computed expressions, subqueries, or raw aliases whose decoded type the runtime cannot infer.
    */
   readonly codec: CodecRef | undefined;
 
