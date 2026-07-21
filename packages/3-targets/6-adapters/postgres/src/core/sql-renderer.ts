@@ -481,7 +481,13 @@ function renderSource(
     case 'function-source': {
       const args = node.args.map((arg) => renderExpr(arg, contract, pim)).join(', ');
       const call = `${node.fn}(${args})`;
-      return node.alias !== undefined ? `${call} AS ${quoteIdentifier(node.alias)}` : call;
+      const ordinality = node.ordinality ? ' WITH ORDINALITY' : '';
+      const alias = node.alias === undefined ? '' : ` AS ${quoteIdentifier(node.alias)}`;
+      const columnAliases =
+        node.columnAliases === undefined
+          ? ''
+          : `(${node.columnAliases.map((column) => quoteIdentifier(column)).join(', ')})`;
+      return `${call}${ordinality}${alias}${columnAliases}`;
     }
     // v8 ignore next 4
     default:

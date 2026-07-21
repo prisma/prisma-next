@@ -161,11 +161,15 @@ describe('ast/select', () => {
     const fromArg = param('tbl', 'from_fn_p');
     const joinArg = param('col', 'join_fn_p');
 
-    const ast = SelectAst.from(FunctionSource.of('pragma_table_info', [fromArg], 'pti'))
+    const ast = SelectAst.from(
+      FunctionSource.of('pragma_table_info', [fromArg], 'pti')
+        .withColumnAliases(['name', 'ord'])
+        .withOrdinality(),
+    )
       .addProjection('name', col('pti', 'name'))
       .withJoins([
         JoinAst.inner(
-          FunctionSource.of('some_fn', [joinArg], 'fn'),
+          FunctionSource.of('some_fn', [joinArg], 'fn').withColumnAliases(['col']),
           EqColJoinOn.of(col('pti', 'name'), col('fn', 'col')),
         ),
       ]);
@@ -177,11 +181,15 @@ describe('ast/select', () => {
     const fromCol = col('outer', 'tbl');
     const joinCol = col('outer', 'col');
 
-    const ast = SelectAst.from(FunctionSource.of('pragma_table_info', [fromCol], 'pti'))
+    const ast = SelectAst.from(
+      FunctionSource.of('pragma_table_info', [fromCol], 'pti')
+        .withColumnAliases(['name', 'ord'])
+        .withOrdinality(),
+    )
       .addProjection('name', col('pti', 'name'))
       .withJoins([
         JoinAst.inner(
-          FunctionSource.of('some_fn', [joinCol], 'fn'),
+          FunctionSource.of('some_fn', [joinCol], 'fn').withColumnAliases(['col']),
           EqColJoinOn.of(col('pti', 'name'), col('fn', 'col')),
         ),
       ]);

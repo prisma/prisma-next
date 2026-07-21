@@ -12,6 +12,7 @@ import {
   DerivedTableSource,
   ExistsExpr,
   FunctionCallExpr,
+  FunctionSource,
   InsertAst,
   InsertOnConflict,
   JoinAst,
@@ -213,6 +214,44 @@ describe('SQLite adapter', () => {
 
       const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('FROM "user" AS "u"');
+    });
+
+    it.each([
+      {
+        name: 'without arguments or alias',
+        source: FunctionSource.of('json_each', []),
+        sql: 'SELECT 1 AS "value" FROM json_each()',
+      },
+      {
+        name: 'with arguments and alias',
+        source: FunctionSource.of('json_each', [ParamRef.of('[1, 2]')], 'entry'),
+        sql: 'SELECT 1 AS "value" FROM json_each(?) AS "entry"',
+      },
+    ])('preserves legacy function-source SQL $name', ({ source, sql }) => {
+      const ast = SelectAst.from(source).withProjection([
+        ProjectionItem.of('value', LiteralExpr.of(1)),
+      ]);
+
+      expect(adapter.lower(ast, { contract }).sql).toBe(sql);
+    });
+
+    it.each([
+      {
+        name: 'WITH ORDINALITY',
+        source: FunctionSource.of('json_each', []).withOrdinality(),
+        error: 'SQLite does not support WITH ORDINALITY on function sources',
+      },
+      {
+        name: 'returned-column aliases',
+        source: FunctionSource.of('json_each', [], 'entry').withColumnAliases(['value']),
+        error: 'SQLite does not support returned-column aliases on function sources',
+      },
+    ])('rejects function sources with $name', ({ source, error }) => {
+      const ast = SelectAst.from(source).withProjection([
+        ProjectionItem.of('value', LiteralExpr.of(1)),
+      ]);
+
+      expect(() => adapter.lower(ast, { contract })).toThrow(error);
     });
 
     it('renders subquery in projection', () => {

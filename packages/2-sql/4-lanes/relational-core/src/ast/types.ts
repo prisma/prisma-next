@@ -394,12 +394,25 @@ export class FunctionSource extends FromSource {
   readonly fn: string;
   readonly args: ReadonlyArray<AnyExpression>;
   readonly alias: string | undefined;
+  readonly columnAliases: ReadonlyArray<string> | undefined;
+  readonly ordinality: boolean;
 
-  protected constructor(fn: string, args: ReadonlyArray<AnyExpression>, alias?: string) {
+  protected constructor(
+    fn: string,
+    args: ReadonlyArray<AnyExpression>,
+    alias?: string,
+    columnAliases?: ReadonlyArray<string>,
+    ordinality = false,
+  ) {
     super();
+    if (columnAliases !== undefined && alias === undefined) {
+      throw new Error('FunctionSource column aliases require a table alias');
+    }
     this.fn = fn;
     this.args = frozenArrayCopy(args);
     this.alias = alias;
+    this.columnAliases = columnAliases === undefined ? undefined : frozenArrayCopy(columnAliases);
+    this.ordinality = ordinality;
     this.freeze();
   }
 
@@ -407,10 +420,25 @@ export class FunctionSource extends FromSource {
     return new FunctionSource(fn, args, alias);
   }
 
+  withColumnAliases(columnAliases: ReadonlyArray<string>): FunctionSource {
+    return new FunctionSource(this.fn, this.args, this.alias, columnAliases, this.ordinality);
+  }
+
+  withOrdinality(): FunctionSource {
+    if (this.ordinality) return this;
+    return new FunctionSource(this.fn, this.args, this.alias, this.columnAliases, true);
+  }
+
   override rewrite(rewriter: AstRewriter): AnyFromSource {
     const rewrittenArgs = this.args.map((arg) => rewriteComparable(arg, rewriter));
     if (rewrittenArgs.every((arg, i) => arg === this.args[i])) return this;
-    return new FunctionSource(this.fn, rewrittenArgs, this.alias);
+    return new FunctionSource(
+      this.fn,
+      rewrittenArgs,
+      this.alias,
+      this.columnAliases,
+      this.ordinality,
+    );
   }
 
   override toFromSource(): AnyFromSource {

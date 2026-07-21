@@ -14,6 +14,7 @@ import {
   DeleteAst,
   ExistsExpr,
   FunctionCallExpr,
+  FunctionSource,
   InsertAst,
   InsertOnConflict,
   JsonArrayAggExpr,
@@ -420,6 +421,64 @@ describe('Postgres adapter', () => {
     const sql = adapter.lower(ast, { contract, params: [] }).sql;
 
     expect(sql).toContain('FROM "user" AS "u"');
+  });
+
+  it.each([
+    {
+      name: 'without arguments or alias',
+      source: FunctionSource.of('rows', []),
+      sql: 'SELECT 1 AS "value" FROM rows()',
+    },
+    {
+      name: 'with arguments and alias',
+      source: FunctionSource.of('rows', [LiteralExpr.of(1), LiteralExpr.of(2)], 'r'),
+      sql: 'SELECT 1 AS "value" FROM rows(1, 2) AS "r"',
+    },
+    {
+      name: 'with ordinality',
+      source: FunctionSource.of('rows', []).withOrdinality(),
+      sql: 'SELECT 1 AS "value" FROM rows() WITH ORDINALITY',
+    },
+    {
+      name: 'with returned-column aliases',
+      source: FunctionSource.of('rows', [], 'r').withColumnAliases(['value', 'position']),
+      sql: 'SELECT 1 AS "value" FROM rows() AS "r"("value", "position")',
+    },
+  ])('renders function sources $name', ({ source, sql }) => {
+    const ast = SelectAst.from(source).withProjection([
+      ProjectionItem.of('value', LiteralExpr.of(1)),
+    ]);
+
+    expect(adapter.lower(ast, { contract, params: [] }).sql).toBe(sql);
+  });
+
+  it('renders rewritten parameterized function sources with ordinality and column aliases', () => {
+    const originalArg = ParamRef.of([1, 2], {
+      name: 'input',
+      codec: { codecId: 'pg/int4@1', many: true },
+    });
+    const replacementArg = ParamRef.of([3, 4], {
+      name: 'rewrittenInput',
+      codec: { codecId: 'pg/int4@1', many: true },
+    });
+    const source = FunctionSource.of('unnest', [originalArg], 'u')
+      .withColumnAliases(['element', 'ord'])
+      .withOrdinality()
+      .rewrite({ paramRef: () => replacementArg });
+
+    expect(source).toBeInstanceOf(FunctionSource);
+    if (!(source instanceof FunctionSource)) {
+      throw new Error('Expected FunctionSource');
+    }
+    expect(source.args).toEqual([replacementArg]);
+
+    const ast = SelectAst.from(source).withProjection([
+      ProjectionItem.of('element', ColumnRef.of('u', 'element')),
+    ]);
+
+    expect(adapter.lower(ast, { contract, params: [] }).sql).toBe(
+      'SELECT "u"."element" AS "element" FROM unnest($1::integer[]) WITH ORDINALITY AS "u"("element", "ord")',
+    );
   });
 
   it('renders empty OR as FALSE', () => {

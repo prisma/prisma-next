@@ -283,6 +283,12 @@ function renderSource(source: AnyFromSource, contract: SqliteContract): string {
     case 'derived-table-source':
       return `(${renderSelect(node.query, contract)}) AS ${quoteIdentifier(node.alias)}`;
     case 'function-source': {
+      if (node.ordinality) {
+        throw new Error('SQLite does not support WITH ORDINALITY on function sources');
+      }
+      if (node.columnAliases !== undefined) {
+        throw new Error('SQLite does not support returned-column aliases on function sources');
+      }
       const args = node.args.map((arg) => renderExpr(arg, contract)).join(', ');
       const call = `${node.fn}(${args})`;
       return node.alias !== undefined ? `${call} AS ${quoteIdentifier(node.alias)}` : call;
