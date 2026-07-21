@@ -112,6 +112,21 @@ describe('mongo() facade', () => {
     expect(mocks.createMongoRuntime).not.toHaveBeenCalled();
   });
 
+  it('forwards custom collections to mongoOrm', () => {
+    // mongoOrm is mocked here, so a plain class stands in for a Collection
+    // subclass; the cast satisfies the brand-typed registry.
+    class FakeRepository {}
+    mongo({
+      contract: fakeContract,
+      url: 'mongodb://localhost:27017/mydb',
+      collections: { User: FakeRepository as never },
+    });
+
+    expect(mocks.mongoOrm).toHaveBeenCalledWith(
+      expect.objectContaining({ collections: { User: FakeRepository } }),
+    );
+  });
+
   it('builds the runtime exactly once on the first runtime() call from a url', async () => {
     const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
 

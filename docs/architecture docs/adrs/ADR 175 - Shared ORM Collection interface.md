@@ -2,6 +2,8 @@
 
 > **Note (later supersession):** this ADR was written before [ADR 183 — Aggregation pipeline only, never find API](ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md). On the Mongo family, ORM reads compile to aggregation pipelines (`AggregateCommand`) only — `FindCommand` is not a peer compilation target. Wherever this ADR pairs `FindCommand / AggregateCommand`, read `AggregateCommand` only.
 
+> **Status update:** the custom-collection half of the Mongo target has landed: `@prisma-next/mongo-orm` exports an extendable `Collection` class, `mongoOrm({ collections })` / `mongo({ collections })` register subclasses by model name, and chaining preserves the subclass (clone-through-`this.constructor`, as in the SQL ORM). The shared-interface *extraction* (a framework-level `Collection` both families implement) remains future work per "spike then extract".
+
 ## At a glance
 
 The same chaining API works for both families. The consumer doesn't know (or care) whether the data lives in Postgres or MongoDB:
@@ -28,9 +30,9 @@ const feed = await db.Post
 const user = await db.User.byEmail('alice@example.com').first();
 ```
 
-**Mongo ORM (target — not yet implemented):**
+**Mongo ORM (shipped — custom collections + chaining; the callback where-DSL is still SQL-only):**
 ```typescript
-const db = mongoOrm({ contract, runtime });
+const db = mongoOrm({ contract, executor, collections: { User: UserCollection } });
 
 // Same custom collection pattern
 class UserCollection extends Collection<Contract, 'User'> {
@@ -38,11 +40,12 @@ class UserCollection extends Collection<Contract, 'User'> {
   byEmail(email: string) { return this.where({ email }); }
 }
 
-// Identical chaining API — compiles to MongoQueryPlan instead of SqlQueryPlan
+// Same chaining shape — compiles to MongoQueryPlan instead of SqlQueryPlan.
+// where/orderBy take Mongo's object forms until the where-DSL generalizes.
 const tasks = await db.tasks
-  .where((task) => task.assigneeId.eq('u1'))
+  .where({ assigneeId: 'u1' })
   .include('assignee')
-  .orderBy([(task) => task.createdAt.desc()])
+  .orderBy({ createdAt: -1 })
   .take(10)
   .all();
 
