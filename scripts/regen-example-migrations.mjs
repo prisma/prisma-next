@@ -13,14 +13,20 @@
  *      overrides only the `contract` field to point at the migration's
  *      `contract.prisma`. This keeps `extensions`, `db`, and `family` correct
  *      for every family without any per-family template.
- *   2. Runs `prisma-next contract emit --config <tmp-config> --output-path <dir>`
+ *   2. Runs `prisma-next contract emit --config <tmp-config> --output-path <tmp-dir>`
  *      to emit fresh `contract.json` + `contract.d.ts` for that migration's
- *      end state, then renames both to `end-contract.*`.
- *   3. For non-baseline migrations: copies the predecessor's freshly-emitted
- *      `end-contract.{json,d.ts}` to this migration's `start-contract.{json,d.ts}`.
- *   4. Rewrites the `from:` and `to:` sha256 literals in `migration.ts` to
- *      the newly-emitted hashes so the migration re-emits correct metadata.
- *   5. Runs `tsx migration.ts` from the example package root to regenerate
+ *      end state into a scratch directory, then writes them into the
+ *      migrations-root-wide content-addressed store
+ *      (`migrations/snapshots/<hex>/`, write-if-absent) under the freshly
+ *      emitted hash. The predecessor's end state is already in the store
+ *      under its own hash (chain order guarantees it was written on the
+ *      previous iteration), so there is nothing to copy for the start side.
+ *   3. Rewrites the `endContract` / `startContract` (and `Contract as End` /
+ *      `Contract as Start`) import specifiers in `migration.ts` to the
+ *      store's specifiers for the (possibly new) hashes, keyed on those
+ *      fixed import bindings rather than on whatever hex is currently there
+ *      — a no-op when the hash hasn't changed since the last regen.
+ *   4. Runs `tsx migration.ts` from the example package root to regenerate
  *      `ops.json` + `migration.json`. NOTE: `migration.ts` carries its
  *      operations as a static `override get operations()` getter; this step
  *      SERIALIZES that getter — it does NOT call `MigrationPlanner.plan()`.
@@ -29,14 +35,17 @@
  *      the planner suites + `migration plan` e2e + a golden diff of real
  *      `plan()` output vs these committed ops. See
  *      `docs/onboarding/fixtures-emit-and-check.md`.
- *   6. Biome-formats all touched JSON files via stdin (bypassing biome's
+ *   5. Biome-formats the touched JSON files via stdin (bypassing biome's
  *      `files.includes` exclusion globs — same technique as
  *      `regen-extension-migrations.mjs`; see that file's JSDoc for rationale).
+ *      The store's `contract.json` is written pre-canonicalized by
+ *      `writeContractSnapshot` and is not biome-formatted (its single-line
+ *      canonical form is the committed shape).
  *
- * Idempotence: on a second run with no schema changes the emitted contracts are
- * byte-identical to the ones on disk (after biome formatting on the first run),
- * so the hash rewrites are no-ops, `migration.ts` is not touched, and the tsx
- * re-run produces no diff.
+ * Idempotence: on a second run with no schema changes the emitted contract is
+ * byte-identical to the store entry already on disk (write-if-absent is a
+ * no-op), so the specifier rewrite is a no-op and the tsx re-run produces no
+ * diff.
  *
  * Usage:
  *   node scripts/regen-example-migrations.mjs
@@ -46,16 +55,25 @@
 
 import { execFileSync } from 'node:child_process';
 import {
-  copyFileSync,
   existsSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
-  renameSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  contractSnapshotJsonSpecifier,
+  contractSnapshotTypesSpecifier,
+} from '@prisma-next/framework-components/control';
+import {
+  snapshotsImportPathFrom,
+  writeContractSnapshot,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const biome = join(repoRoot, 'node_modules', '.bin', 'biome');
@@ -202,6 +220,40 @@ function rewriteMigrationHashes(migrationTsPath, newFromHash, newToHash) {
   return true;
 }
 
+/**
+ * Rewrite the store specifiers in a migration.ts's contract import block —
+ * `endContract` / `Contract as End` always, `startContract` /
+ * `Contract as Start` when `fromHash` is non-null — to point at the
+ * freshly-emitted hashes. Keyed on the fixed import bindings the renderers
+ * always emit rather than on whatever hex the specifier currently encodes,
+ * so it is idempotent regardless of the previous hash.
+ */
+function rewriteContractSnapshotSpecifiers(source, snapshotsImportPath, toHash, fromHash) {
+  let updated = source
+    .replace(
+      /(import\s+endContract\s+from\s+')[^']*(')/,
+      `$1${contractSnapshotJsonSpecifier(snapshotsImportPath, toHash)}$2`,
+    )
+    .replace(
+      /(import\s+type\s*\{\s*Contract\s+as\s+End\s*\}\s+from\s+')[^']*(')/,
+      `$1${contractSnapshotTypesSpecifier(snapshotsImportPath, toHash)}$2`,
+    );
+
+  if (fromHash !== null) {
+    updated = updated
+      .replace(
+        /(import\s+startContract\s+from\s+')[^']*(')/,
+        `$1${contractSnapshotJsonSpecifier(snapshotsImportPath, fromHash)}$2`,
+      )
+      .replace(
+        /(import\s+type\s*\{\s*Contract\s+as\s+Start\s*\}\s+from\s+')[^']*(')/,
+        `$1${contractSnapshotTypesSpecifier(snapshotsImportPath, fromHash)}$2`,
+      );
+  }
+
+  return updated;
+}
+
 // ---------------------------------------------------------------------------
 // Per-migration and per-chain logic
 // ---------------------------------------------------------------------------
@@ -247,7 +299,8 @@ function buildTempConfigSource(schemaSrc, realConfigAbsPath, contractFamily) {
 }
 
 /**
- * Emit the contract from a migration dir's `contract.prisma`.
+ * Emit the contract from a migration dir's `contract.prisma` into a scratch
+ * directory and read the result back.
  *
  * A temporary config file is written into `migrationDir`, used for the emit
  * call, and deleted immediately after. It imports the example's real
@@ -256,10 +309,13 @@ function buildTempConfigSource(schemaSrc, realConfigAbsPath, contractFamily) {
  * independent of where the temp file sits). All other config (extensions, db,
  * family) comes from the real config unchanged.
  *
- * The emit produces `contract.json` + `contract.d.ts` inside `migrationDir`;
- * the caller renames them to `end-contract.*`.
+ * The emit target is a fresh `mkdtemp` directory rather than `migrationDir`
+ * itself: the migration package directory no longer carries a contract copy
+ * of its own (it resolves via the store), so the emitted `contract.json` /
+ * `contract.d.ts` are read into memory and the scratch directory is removed
+ * before returning.
  *
- * Returns the freshly-emitted storageHash.
+ * Returns `{ storageHash, contractJson, contractDts }`.
  */
 function emitMigrationContract(exampleDir, migrationDir, realConfigAbsPath, contractFamily) {
   const prismaNextBin = join(exampleDir, 'node_modules', '.bin', 'prisma-next');
@@ -282,14 +338,15 @@ function emitMigrationContract(exampleDir, migrationDir, realConfigAbsPath, cont
   // independent of the temp file's location.
   const tmpConfigPath = join(migrationDir, '.prisma-next-regen.config.ts');
   const tmpConfig = buildTempConfigSource(schemaSrc, realConfigAbsPath, contractFamily ?? 'mongo');
-
   writeFileSync(tmpConfigPath, tmpConfig, 'utf8');
+
+  const tmpEmitDir = mkdtempSync(join(tmpdir(), 'pn-regen-example-'));
 
   let emitOutput;
   try {
     emitOutput = execFileSync(
       prismaNextBin,
-      ['contract', 'emit', '--config', tmpConfigPath, '--output-path', migrationDir, '--quiet'],
+      ['contract', 'emit', '--config', tmpConfigPath, '--output-path', tmpEmitDir, '--quiet'],
       { cwd: exampleDir, encoding: 'utf8', env: childEnv },
     );
   } finally {
@@ -304,6 +361,7 @@ function emitMigrationContract(exampleDir, migrationDir, realConfigAbsPath, cont
   try {
     parsed = JSON.parse(emitOutput);
   } catch {
+    rmSync(tmpEmitDir, { recursive: true, force: true });
     throw new Error(
       `regen-example-migrations: prisma-next emit produced non-JSON output for ${migrationDir}:\n${emitOutput}`,
     );
@@ -311,12 +369,19 @@ function emitMigrationContract(exampleDir, migrationDir, realConfigAbsPath, cont
 
   const storageHash = parsed?.storageHash;
   if (typeof storageHash !== 'string' || !storageHash.startsWith('sha256:')) {
+    rmSync(tmpEmitDir, { recursive: true, force: true });
     throw new Error(
       `regen-example-migrations: emit output missing storageHash for ${migrationDir}:\n${emitOutput}`,
     );
   }
 
-  return storageHash;
+  try {
+    const contractJson = JSON.parse(readFileSync(join(tmpEmitDir, 'contract.json'), 'utf8'));
+    const contractDts = readFileSync(join(tmpEmitDir, 'contract.d.ts'), 'utf8');
+    return { storageHash, contractJson, contractDts };
+  } finally {
+    rmSync(tmpEmitDir, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -324,61 +389,52 @@ function emitMigrationContract(exampleDir, migrationDir, realConfigAbsPath, cont
  *
  * @param {string}        exampleDir         - Absolute path to the example package root.
  * @param {string}        migrationDir       - Absolute path to this migration dir.
- * @param {string|null}   prevEndDir         - Predecessor migration dir (null for baseline).
+ * @param {string}        migrationsRootDir  - Absolute path to the migrations root (parent of `app/`); where `snapshots/` lives.
  * @param {string|null}   prevHash           - Predecessor's freshly-emitted storageHash (null for baseline).
  * @param {string}        realConfigAbsPath  - Absolute path to the example's real config file.
  * @param {'mongo'|'sql'} contractFamily     - Which contract provider to use.
  * @returns {string} The freshly-emitted storageHash for this migration's end state.
  */
-function processMigration(
+async function processMigration(
   exampleDir,
   migrationDir,
-  prevEndDir,
+  migrationsRootDir,
   prevHash,
   realConfigAbsPath,
   contractFamily,
 ) {
-  const newHash = emitMigrationContract(
-    exampleDir,
-    migrationDir,
-    realConfigAbsPath,
-    contractFamily,
-  );
+  const {
+    storageHash: newHash,
+    contractJson,
+    contractDts,
+  } = emitMigrationContract(exampleDir, migrationDir, realConfigAbsPath, contractFamily);
 
-  // Rename contract.{json,d.ts} → end-contract.{json,d.ts}
-  for (const ext of ['json', 'd.ts']) {
-    const emitted = join(migrationDir, `contract.${ext}`);
-    const dest = join(migrationDir, `end-contract.${ext}`);
-    if (!existsSync(emitted)) {
-      throw new Error(`regen-example-migrations: emit did not produce ${emitted}`);
-    }
-    renameSync(emitted, dest);
-  }
+  // The predecessor's end state (== this migration's start state) was
+  // already written to the store on the previous chain iteration;
+  // write-if-absent makes this call for `newHash` the only write needed.
+  await writeContractSnapshot(migrationsRootDir, newHash, { contractJson, contractDts });
 
-  // Normalise trailing newline on end-contract.json then biome-format it
-  const endContractJsonPath = join(migrationDir, 'end-contract.json');
-  const endContractJson = readFileSync(endContractJsonPath, 'utf8');
-  if (!endContractJson.endsWith('\n')) {
-    writeFileSync(endContractJsonPath, `${endContractJson}\n`, 'utf8');
-  }
-  biomeFormatInPlace(endContractJsonPath);
-
-  // Copy predecessor's end-contract to this migration's start-contract
-  if (prevEndDir !== null) {
-    for (const ext of ['json', 'd.ts']) {
-      copyFileSync(
-        join(prevEndDir, `end-contract.${ext}`),
-        join(migrationDir, `start-contract.${ext}`),
-      );
-    }
-  }
-
-  // Rewrite from:/to: hashes in migration.ts
   const migrationTsPath = join(migrationDir, 'migration.ts');
   if (!existsSync(migrationTsPath)) {
     throw new Error(`regen-example-migrations: no migration.ts in ${migrationDir}`);
   }
+
+  // Defensive: a no-op for every migration.ts in this repo today (all are
+  // the contract-JSON-import shape), kept in case a pre-dedup hash-literal
+  // shape is ever reintroduced.
   rewriteMigrationHashes(migrationTsPath, prevHash, newHash);
+
+  const snapshotsImportPath = snapshotsImportPathFrom(migrationDir, migrationsRootDir);
+  const migrationTsSrc = readFileSync(migrationTsPath, 'utf8');
+  const rewrittenMigrationTs = rewriteContractSnapshotSpecifiers(
+    migrationTsSrc,
+    snapshotsImportPath,
+    newHash,
+    prevHash,
+  );
+  if (rewrittenMigrationTs !== migrationTsSrc) {
+    writeFileSync(migrationTsPath, rewrittenMigrationTs, 'utf8');
+  }
 
   // Re-run tsx migration.ts to regenerate ops.json + migration.json
   const tsx = join(exampleDir, 'node_modules', '.bin', 'tsx');
@@ -407,9 +463,10 @@ function processMigration(
  * Walk all migration subdirectories of a chain in lexicographic order
  * (timestamped names are lexicographically chronological) and process each.
  */
-function processChain(chain) {
+async function processChain(chain) {
   const exampleDir = resolve(repoRoot, chain.exampleDir);
   const chainDir = resolve(exampleDir, chain.migrationsDir);
+  const migrationsRootDir = dirname(chainDir);
   const realConfigAbsPath = resolve(repoRoot, chain.realConfigPath);
 
   let dirNames;
@@ -427,22 +484,20 @@ function processChain(chain) {
     return;
   }
 
-  let prevEndDir = null;
   let prevHash = null;
 
   const contractFamily = chain.contractFamily ?? 'mongo';
 
   for (const dirName of dirNames) {
     const migrationDir = join(chainDir, dirName);
-    prevHash = processMigration(
+    prevHash = await processMigration(
       exampleDir,
       migrationDir,
-      prevEndDir,
+      migrationsRootDir,
       prevHash,
       realConfigAbsPath,
       contractFamily,
     );
-    prevEndDir = migrationDir;
   }
 
   process.stdout.write(
@@ -450,11 +505,11 @@ function processChain(chain) {
   );
 }
 
-function main() {
+async function main() {
   let errors = 0;
   for (const chain of CHAINS) {
     try {
-      processChain(chain);
+      await processChain(chain);
     } catch (err) {
       process.stderr.write(`${err.message}\n`);
       errors++;
@@ -465,4 +520,4 @@ function main() {
   }
 }
 
-main();
+await main();
