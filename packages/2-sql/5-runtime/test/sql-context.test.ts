@@ -299,7 +299,7 @@ describe('contract/stack validation errors', () => {
     );
   });
 
-  it('throws RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR when contract references a generator the stack does not provide', () => {
+  it('throws RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING when contract references a generator the stack does not provide', () => {
     const contractWithUnknownGenerator: Contract<SqlStorage> = {
       ...testContract,
       storage: new SqlStorage({
@@ -339,7 +339,7 @@ describe('contract/stack validation errors', () => {
       createExecutionContext({ contract: contractWithUnknownGenerator, stack: createStack() }),
     ).toThrow(
       expect.objectContaining({
-        code: 'RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR',
+        code: 'RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING',
         category: 'RUNTIME',
         severity: 'error',
         details: expect.objectContaining({
@@ -394,7 +394,7 @@ describe('contract/stack validation errors', () => {
       createExecutionContext({ contract: contractWithMissingGenerators, stack: createStack() }),
     ).toThrow(
       expect.objectContaining({
-        code: 'RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR',
+        code: 'RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING',
         details: expect.objectContaining({
           ids: expect.arrayContaining(['gen-a', 'gen-b']),
         }),
