@@ -140,8 +140,8 @@ importers:
         specifier: ^25.1.2
         version: 25.1.2
       '@codingame/monaco-vscode-theme-defaults-default-extension':
-        specifier: ^25.1.2
-        version: 25.1.2
+        specifier: ^34.0.3
+        version: 34.0.3
       '@codingame/monaco-vscode-theme-service-override':
         specifier: ^25.1.2
         version: 25.1.2
@@ -5561,6 +5561,9 @@ packages:
 
   '@codingame/monaco-vscode-theme-defaults-default-extension@25.1.2':
     resolution: {integrity: sha512-0vTMFiC89YSDSmjFckuQBUKwRuFNtsILNO3k0PBiSLN/MW+VDItjJpiVLXC42+rUWlGgY2lYxOneGVa5slCV1w==}
+
+  '@codingame/monaco-vscode-theme-defaults-default-extension@34.0.3':
+    resolution: {integrity: sha512-KHmlLMbwm446snfXCQmJCl13WvZxMtanLnCHFRlO6Nn3wKdwW8xVCJFwk0XW479AwtIsdp1EZ9DfSoxgjJ7UKw==}
 
   '@codingame/monaco-vscode-theme-service-override@25.1.2':
     resolution: {integrity: sha512-hsTwl6YYTiheFuQMmCmiEGLIdIdgYaf8Z85XWyxe6YgPtDaYGnp0fGSOXKA9/bf0JtuynzoLKtUUfDupK/A7Tw==}
@@ -11051,6 +11054,10 @@ snapshots:
   '@codingame/monaco-vscode-theme-defaults-default-extension@25.1.2':
     dependencies:
       '@codingame/monaco-vscode-api': 25.1.2
+
+  '@codingame/monaco-vscode-theme-defaults-default-extension@34.0.3':
+    dependencies:
+      '@codingame/monaco-vscode-api': 34.0.3
 
   '@codingame/monaco-vscode-theme-service-override@25.1.2':
     dependencies:

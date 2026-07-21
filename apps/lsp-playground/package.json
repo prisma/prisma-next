@@ -21,7 +21,7 @@
     "@codingame/monaco-vscode-keybindings-service-override": "^34.0.3",
     "@codingame/monaco-vscode-log-service-override": "^25.1.2",
     "@codingame/monaco-vscode-textmate-service-override": "^25.1.2",
-    "@codingame/monaco-vscode-theme-defaults-default-extension": "^25.1.2",
+    "@codingame/monaco-vscode-theme-defaults-default-extension": "^34.0.3",
     "@codingame/monaco-vscode-theme-service-override": "^25.1.2",
     "@prisma-next/adapter-postgres": "workspace:0.15.0",
     "@prisma-next/driver-postgres": "workspace:0.15.0",
