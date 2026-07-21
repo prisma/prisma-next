@@ -24,8 +24,8 @@ Each row names exactly one capability. Where an operator/command/stage set was p
 | [Types & values](scorecard/02-types-and-values.md) | 14 |
 | [PSL schema language](scorecard/03-psl-schema-language.md) | 44 |
 | [Contract emission & authoring](scorecard/04-contract-emission-and-authoring.md) | 12 |
-| [SQL query builder](scorecard/05-sql-query-builder.md) | 45 |
-| [SQL ORM client](scorecard/06-sql-orm-client.md) | 49 |
+| [SQL query builder](scorecard/05-sql-query-builder.md) | 46 |
+| [SQL ORM client](scorecard/06-sql-orm-client.md) | 50 |
 | [MongoDB query & ORM](scorecard/07-mongodb-query-and-orm.md) | 80 |
 | [Relations](scorecard/08-relations.md) | 19 |
 | [Filtering](scorecard/09-filtering.md) | 24 |
@@ -34,7 +34,7 @@ Each row names exactly one capability. Where an operator/command/stage set was p
 | [Nested writes & atomic ops](scorecard/12-nested-writes-and-atomic-ops.md) | 25 |
 | [Raw & typed SQL](scorecard/13-raw-and-typed-sql.md) | 9 |
 | [Transactions](scorecard/14-transactions.md) | 9 |
-| [Migrations](scorecard/15-migrations.md) | 122 |
+| [Migrations](scorecard/15-migrations.md) | 123 |
 | [Introspection (`contract infer`)](scorecard/16-introspection.md) | 26 |
 | [CLI commands](scorecard/17-cli-commands.md) | 32 |
 | [Extensions](scorecard/18-extensions.md) | 15 |
@@ -46,8 +46,16 @@ The Migrations file gathers all twelve `Migrations — *` sub-topics (workflow; 
 
 ## Coverage summary
 
-Group structure (23 groups): Targets & connection; Types & values; PSL schema language; Contract emission & authoring; SQL query builder; SQL ORM client; MongoDB query & ORM; Relations; Filtering; Ordering & pagination; Aggregation & grouping; Nested writes & atomic ops; Raw & typed SQL; Transactions; Migrations — workflow; Migrations — columns & types; Migrations — IDs, PKs & autoincrement; Migrations — foreign keys; Migrations — indexes & unique; Migrations — enums; Migrations — defaults; Migrations — native types; Migrations — extensions; Migrations — views; Migrations — existing-data safety; Migrations — schema filters; Introspection (`contract infer`); CLI commands; Extensions; Observability & lifecycle.
+Group structure (30 groups): Targets & connection; Types & values; PSL schema language; Contract emission & authoring; SQL query builder; SQL ORM client; MongoDB query & ORM; Relations; Filtering; Ordering & pagination; Aggregation & grouping; Nested writes & atomic ops; Raw & typed SQL; Transactions; Migrations — workflow; Migrations — columns & types; Migrations — IDs, PKs & autoincrement; Migrations — foreign keys; Migrations — indexes & unique; Migrations — enums; Migrations — defaults; Migrations — native types; Migrations — extensions; Migrations — views; Migrations — existing-data safety; Migrations — schema filters; Introspection (`contract infer`); CLI commands; Extensions; Observability & lifecycle.
 
 Verdicts are computed per feature row across the three DB columns; the tallies below count individual non-`—` cells.
 
-Across 582 atomic feature rows (one capability each): `✅` 414, `🟡` 478, `🧪` 12, `❌` 235 (and 604 `—` n/a cells).
+Across 585 atomic feature rows (one capability each), spanning 1,755 per-database cells (585 rows × 3 databases): `✅` 415, `🟡` 484, `🧪` 12, `❌` 237 (and 607 `—` n/a cells).
+
+Per-database tallies:
+
+| Database | ✅ | 🟡 | 🧪 | ❌ | — |
+| --- | --- | --- | --- | --- | --- |
+| Postgres | 221 | 136 | 4 | 105 | 119 |
+| SQLite | 85 | 231 | 4 | 98 | 167 |
+| MongoDB | 109 | 117 | 4 | 34 | 321 |

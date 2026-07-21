@@ -34,7 +34,7 @@ Legend:
 | RLS `role` block | ✅ | — | — | `test/integration/test/rls-ts-walking-skeleton.integration.test.ts` |
 | RLS `rls` block | ✅ | — | — | `test/integration/test/rls-ts-walking-skeleton.integration.test.ts` |
 | RLS `policy` block | ✅ | — | — | `test/integration/test/rls-ts-walking-skeleton.integration.test.ts` |
-| Native `@db.*` types | ✅ | (affinity) 🟡 | — | `packages/3-targets/6-adapters/postgres/test/migrations/native-array-columns.integration.test.ts` |
+| Native `@db.*` types (SQLite: mapped via type affinity) | ✅ | 🟡 | — | `packages/3-targets/6-adapters/postgres/test/migrations/native-array-columns.integration.test.ts` |
 | `@default(autoincrement())` | 🟡 | ✅ | — | `test/e2e/framework/test/sqlite/migrations/additive.test.ts` (`INTEGER PRIMARY KEY`) |
 | `@default(now())` | 🟡 | ✅ | — | `test/e2e/framework/test/sqlite/migrations/widening.test.ts` (`round-trips a now() default`) |
 | `@default(uuid())` | ✅ | 🟡 | — | `packages/3-targets/6-adapters/postgres/test/migrations/planner.uuid.integration.test.ts` |

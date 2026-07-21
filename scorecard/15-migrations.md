@@ -20,7 +20,8 @@ Legend:
 | Idempotent re-apply (no-op when in sync) | ✅ | 🟡 | ✅ | `test/integration/test/cli.migration-apply.e2e.test.ts` (`re-run after success is a no-op`); `test/integration/test/mongo/migration-e2e.test.ts` (`idempotent re-apply`) |
 | Multiple migrations in DAG order | ✅ | 🟡 | — | `test/integration/test/cli.migration-apply.e2e.test.ts` (`applies multiple migrations in DAG order`) |
 | Resume after partial apply | ✅ | 🟡 | — | `test/integration/test/cli.migration-apply.e2e.test.ts` (`resumes from last successful migration after failure`) |
-| Drift detection / pre-DDL guard | ✅ | 🟡 | ✅ | `test/integration/test/cli.migrate-drift-check.e2e.test.ts`; `test/integration/test/mongo/aggregate-e2e.test.ts` (`per-space verify isolates extension drift`) |
+| Drift detection (schema verify reports drift) | ✅ | 🟡 | ✅ | `test/integration/test/cli.migrate-drift-check.e2e.test.ts`; `test/integration/test/mongo/aggregate-e2e.test.ts` (`per-space verify isolates extension drift`) |
+| Pre-DDL guard (apply refuses to run on drift) | ✅ | 🟡 | 🟡 | `test/integration/test/cli.migrate-drift-check.e2e.test.ts` (`refuses cold-clone drift`, `MIGRATION.MARKER_MISMATCH`) |
 | Migration ledger / history persistence | ✅ | 🟡 | ✅ | `test/integration/test/migration-ledger/*`; `test/integration/test/mongo/migration-e2e.test.ts` (`records a ledger entry`) |
 | Ref advancement — `ref set` | ✅ | 🟡 | — | `test/integration/test/cli.db-ref-advancement.e2e.test.ts` (`advances an explicit ref on the default database`); `test/integration/test/cli.migrate-ref-advancement.e2e.test.ts` |
 | Ref advancement — `ref delete` | 🟡 | 🟡 | — | |
@@ -53,7 +54,7 @@ Legend:
 | `dropDefault` | 🟡 | 🟡 | — | |
 | Column change preserves data | ✅ | ✅ | — | `packages/3-targets/6-adapters/postgres/test/migrations/planner.reconciliation.integration.test.ts`; `test/e2e/framework/test/sqlite/migrations/destructive.test.ts` (`preserves data`) |
 | Convert scalar column to array (Postgres) | ✅ | — | — | `packages/3-targets/6-adapters/postgres/test/migrations/native-array-columns.integration.test.ts` |
-| JSON column + DB-level JSON default | ✅ | ✅ | — | `test/e2e/framework/test/dml.test.ts` (`typed jsonb/json`); `test/e2e/framework/test/sqlite/sql-builder.test.ts` (`json survives insert and select`) |
+| JSON column (typed jsonb/json round-trip) | ✅ | ✅ | — | `test/e2e/framework/test/dml.test.ts` (`typed jsonb/json`); `test/e2e/framework/test/sqlite/sql-builder.test.ts` (`json survives insert and select`) |
 | SQLite table rebuild (`recreateTable`) | — | ✅ | — | `test/e2e/framework/test/sqlite/migrations/widening.test.ts`; `test/e2e/framework/test/sqlite/migrations/fk-preservation.test.ts` |
 | Descending index column ordering | ❌ | ❌ | — | |
 | Partial index column ordering | ❌ | ❌ | — | |
@@ -112,7 +113,7 @@ Legend:
 | Index rename to default | 🟡 | 🟡 | 🟡 | |
 | Index rename to custom | 🟡 | 🟡 | 🟡 | |
 | Descending index details | ❌ | ❌ | — | |
-| Partial index details | ❌ | ❌ | (partial ignored) 🟡 | |
+| Partial index details (Mongo: partial filter ignored) | ❌ | ❌ | 🟡 | |
 | Opclass index details | ❌ | ❌ | — | |
 
 ## Migrations — enums
@@ -131,7 +132,7 @@ Legend:
 
 | Feature | Postgres | SQLite | MongoDB | Prisma Next evidence |
 | --- | --- | --- | --- | --- |
-| Literal defaults migrated | ✅ | ✅ | — | `test/e2e/framework/test/dml.test.ts` (`applies literal defaults`); `test/e2e/framework/test/sqlite/migrations/additive.test.ts` (`default values`) |
+| Literal defaults migrated | ✅ | ✅ | — | `test/e2e/framework/test/dml.test.ts` (`applies literal defaults` — schema provisioned via `db init` migration apply, defaults filled by the database); `test/e2e/framework/test/sqlite/migrations/additive.test.ts` (`default values`) |
 | `now()` / current-timestamp default | 🟡 | ✅ | — | `test/e2e/framework/test/sqlite/migrations/widening.test.ts` (`round-trips a now() default`) |
 | `uuid()` default (no drift) | ✅ | 🟡 | — | `packages/3-targets/6-adapters/postgres/test/migrations/planner.uuid.integration.test.ts` |
 | Integer default (no drift) | 🟡 | ✅ | — | `test/e2e/framework/test/sqlite/migrations/default-drift.test.ts` (`verifies an integer @default(42) without drift`) |
@@ -144,7 +145,7 @@ Legend:
 
 | Feature | Postgres | SQLite | MongoDB | Prisma Next evidence |
 | --- | --- | --- | --- | --- |
-| Create native `@db.*`-typed columns | ✅ | — | — | `packages/3-targets/6-adapters/postgres/test/migrations/native-array-columns.integration.test.ts` |
+| Create native `@db.*`-typed columns (non-array, e.g. `@db.VarChar`, `@db.Uuid`) | 🟡 | — | — | |
 | Native array columns | ✅ | — | — | `packages/3-targets/6-adapters/postgres/test/migrations/native-array-columns.integration.test.ts` |
 | SQLite rejects native `@db.*` types | — | 🟡 | — | |
 | Safe type-change classification | ❌ | ❌ | — | |

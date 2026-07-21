@@ -23,7 +23,8 @@ Legend:
 | `lateralJoin` (capability-gated) | 🟡 | — | — | |
 | `outerLateralJoin` (capability-gated) | 🟡 | — | — | |
 | `where(...)` predicate | ✅ | ✅ | — | `test/integration/test/sql-builder/where.test.ts`; `test/e2e/framework/test/sqlite/sql-builder.test.ts` (`WHERE filter`) |
-| `orderBy(...)` (direction + nulls placement) | ✅ | ✅ | — | `test/integration/test/sql-builder/order-by.test.ts`; `packages/3-targets/6-adapters/postgres/test/migrations/order-by-enum.integration.test.ts` (`sorts NULLs last`) |
+| `orderBy(...)` direction (asc/desc) | ✅ | ✅ | — | `test/integration/test/sql-builder/order-by.test.ts`; `test/e2e/framework/test/sqlite/sql-builder.test.ts` (`ORDER BY`) |
+| `orderBy(...)` nulls placement (`nulls: first/last`) | 🟡 | 🟡 | — | |
 | `groupBy` | ✅ | 🟡 | — | `test/integration/test/sql-builder/group-by.test.ts` (`GROUP BY with COUNT`) |
 | `having` | ✅ | 🟡 | — | `test/integration/test/sql-builder/group-by.test.ts` (`HAVING filters groups`) |
 | `limit` | ✅ | ✅ | — | `test/integration/test/sql-builder/pagination.test.ts` (`LIMIT restricts row count`); `test/e2e/framework/test/sqlite/sql-builder.test.ts` (`LIMIT and OFFSET`) |
@@ -36,7 +37,7 @@ Legend:
 | `EXISTS` composition | ✅ | 🟡 | — | `test/integration/test/sql-builder/subquery.test.ts` (`EXISTS filters to rows with matching subquery`) |
 | `IN` composition | ✅ | 🟡 | — | `test/integration/test/sql-builder/subquery.test.ts` (`IN with subquery and parameters in both parent and subquery`) |
 | `eq` function | ✅ | ✅ | — | `test/integration/test/sql-builder/where.test.ts` (`eq filters to matching row`); `test/e2e/framework/test/sqlite/sql-builder.test.ts` (`WHERE filter`) |
-| `ne` function | ✅ | 🟡 | — | `test/integration/test/sql-builder/where.test.ts` (`ne(col, null) produces IS NOT NULL`) |
+| `ne` function | ✅ | 🟡 | — | `test/integration/test/sql-builder/subquery.test.ts` (`IN with subquery and parameters in both parent and subquery` — `fns.ne(f.name, 'Bob')` filters out the non-matching row) |
 | `gt` function | ✅ | 🟡 | — | `test/integration/test/sql-builder/where.test.ts` (`gt filters rows`) |
 | `gte` function | 🟡 | 🟡 | — | |
 | `lt` function | ✅ | 🟡 | — | `test/integration/test/sql-builder/where.test.ts` (`lt filters rows`) |

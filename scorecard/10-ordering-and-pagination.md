@@ -13,7 +13,7 @@ Legend:
 | Feature | Postgres | SQLite | MongoDB | Prisma Next evidence |
 | --- | --- | --- | --- | --- |
 | `orderBy` direction (asc/desc) | ✅ | ✅ | ✅ | `test/integration/test/sql-builder/order-by.test.ts`; `test/e2e/framework/test/sqlite/sql-builder.test.ts` (`ORDER BY`); `test/integration/test/mongo/orm.test.ts` |
-| `orderBy` nulls first/last placement | ✅ | 🟡 | — | `packages/3-targets/6-adapters/postgres/test/migrations/order-by-enum.integration.test.ts` (`sorts NULLs last (ASC)`) |
+| `orderBy` nulls first/last placement | 🟡 | 🟡 | — | |
 | `limit` (builder) | ✅ | ✅ | — | `test/integration/test/sql-builder/pagination.test.ts`; `test/e2e/framework/test/sqlite/sql-builder.test.ts` |
 | `offset` (builder) | ✅ | ✅ | — | `test/integration/test/sql-builder/pagination.test.ts`; `test/e2e/framework/test/sqlite/sql-builder.test.ts` |
 | ORM `take` | ✅ | ✅ | ✅ | `test/integration/test/sql-orm-client/pagination.test.ts`; `test/e2e/framework/test/sqlite/orm.test.ts`; `test/integration/test/mongo/orm.test.ts` |

@@ -13,7 +13,7 @@ Legend:
 | Feature | Postgres | SQLite | MongoDB | Prisma Next evidence |
 | --- | --- | --- | --- | --- |
 | Equality `eq` | ✅ | ✅ | ✅ | `test/integration/test/sql-builder/where.test.ts`; `test/e2e/framework/test/sqlite/sql-builder.test.ts`; `test/integration/test/mongo/orm.test.ts` |
-| Comparison `ne` | ✅ | 🟡 | 🟡 | `test/integration/test/sql-builder/where.test.ts` (`ne(col, null) produces IS NOT NULL`) |
+| Comparison `ne` | ✅ | 🟡 | 🟡 | `test/integration/test/sql-builder/subquery.test.ts` (`IN with subquery and parameters in both parent and subquery` — `fns.ne(f.name, 'Bob')` filters out the non-matching row) |
 | Comparison `gt` | ✅ | 🟡 | 🟡 | `test/integration/test/sql-builder/where.test.ts` (`gt filters rows`) |
 | Comparison `gte` | 🟡 | 🟡 | 🟡 | |
 | Comparison `lt` | ✅ | 🟡 | 🟡 | `test/integration/test/sql-builder/where.test.ts` (`lt filters rows`) |

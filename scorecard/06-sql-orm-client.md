@@ -15,11 +15,12 @@ Legend:
 | `where(...)` (callback / where input / shorthand) | ✅ | ✅ | — | `test/integration/test/sql-orm-client/mn-filter.test.ts`; `test/e2e/framework/test/sqlite/orm.test.ts` (`findMany › with filter`) |
 | `select(...)` projection | ✅ | ✅ | — | `test/integration/test/sql-orm-client/include.test.ts`; `test/e2e/framework/test/sqlite/orm.test.ts` |
 | `orderBy(...)` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/self-relations.test.ts` (`orderBy on a depth-1 self-relation`); `test/e2e/framework/test/sqlite/orm.test.ts` (`with ordering`) |
-| `take` / `skip` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/pagination.test.ts`; `test/e2e/framework/test/sqlite/orm.test.ts` (`with take and skip`) |
+| `take` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/pagination.test.ts` (`take() and skip() apply limit and offset`); `test/e2e/framework/test/sqlite/orm.test.ts` (`with take and skip`) |
+| `skip` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/pagination.test.ts` (`take() and skip() apply limit and offset`); `test/e2e/framework/test/sqlite/orm.test.ts` (`with take and skip`) |
 | `cursor(...)` keyset pagination | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/pagination.test.ts` (`cursor() applies forward and backward boundaries`) |
 | `distinct` / `distinctOn` | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/pagination.test.ts` (`distinct()`, `distinctOn()`) |
 | `first()` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/first.test.ts`; `test/e2e/framework/test/sqlite/orm.test.ts` (`findFirst`) |
-| `all()` (streamed results) | ✅ | ✅ | — | `test/integration/test/sql-orm-client/include.test.ts`; `test/e2e/framework/test/sqlite/orm.test.ts` (`findMany › returns all rows`) |
+| `all()` result retrieval | ✅ | ✅ | — | `test/integration/test/sql-orm-client/include.test.ts`; `test/integration/test/sql-orm-client/codec-async.test.ts` (`for await` iteration over `all()`); `test/e2e/framework/test/sqlite/orm.test.ts` (`findMany › returns all rows`) |
 | `create` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/create.test.ts`; `test/e2e/framework/test/sqlite/orm.test.ts` (`create`) |
 | `createAll` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/create.test.ts`; `test/e2e/framework/test/sqlite/orm.test.ts` (`createAll`) |
 | `createCount` | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/create.test.ts` (`createCount`) |
