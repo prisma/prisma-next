@@ -1973,13 +1973,14 @@ export class Collection<
       ...emptyState(),
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
+      variantName: this.state.variantName,
     };
     const countCompiled = compileSelect(
       this.contract,
       this.namespaceId,
       this.tableName,
       countState,
-      undefined,
+      this.modelName,
     );
     const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
@@ -1993,6 +1994,8 @@ export class Collection<
         this.tableName,
         mappedData,
         this.state.filters,
+        this.state.variantName,
+        this.modelName,
       ),
       annotationsMap,
     );
@@ -2141,6 +2144,8 @@ export class Collection<
             collection.namespaceId,
             collection.tableName,
             collection.state.filters,
+            collection.state.variantName,
+            collection.modelName,
           ),
           annotationsMap,
         );
@@ -2182,13 +2187,14 @@ export class Collection<
       ...emptyState(),
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
+      variantName: this.state.variantName,
     };
     const countCompiled = compileSelect(
       this.contract,
       this.namespaceId,
       this.tableName,
       countState,
-      undefined,
+      this.modelName,
     );
     const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
@@ -2196,7 +2202,14 @@ export class Collection<
     ).toArray();
 
     const compiled = mergeAnnotations(
-      compileDeleteCount(this.contract, this.namespaceId, this.tableName, this.state.filters),
+      compileDeleteCount(
+        this.contract,
+        this.namespaceId,
+        this.tableName,
+        this.state.filters,
+        this.state.variantName,
+        this.modelName,
+      ),
       annotationsMap,
     );
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();

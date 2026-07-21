@@ -135,6 +135,10 @@ Incidental substrate diff only.
 -->
 
 <!--
+TML-2979 (MTI variant predicates in count writes): `changes: []`. The `packages/3-extensions/sql-orm-client` diff fixes internal query planning and adds regression coverage; it changes no public API, contract shape, emitted artefact, extension-authoring surface, adapter API, or downstream source translation. Incidental substrate diff only.
+-->
+
+<!--
 ADR 175 Mongo custom collections (PR #936): `@prisma-next/mongo-orm` exports the
 extendable `Collection` class (previously the package-private implementation behind
 the `MongoCollection` interface), a `MONGO_ORM_COLLECTION_BRAND` brand (type-level plus a
