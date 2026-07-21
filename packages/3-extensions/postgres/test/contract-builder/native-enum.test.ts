@@ -4,12 +4,13 @@
  * shape-matching what the PSL `native_enum` + `pg.enum(Ref)` path produces
  * (see `psl-pg-enum-column.test.ts` in `@prisma-next/target-postgres`):
  *
- *   1. The declared entity lands in `entries.native_enum` and its derived
- *      value-set lands in `entries.valueSet`, keyed by the entity NAME (not
- *      the Postgres type name — they differ when `.map()` is used), in both
- *      the default namespace (`public`) and a named schema (`auth`) — proving
- *      the deferred column descriptor's entity is harvested into `packEntities`
- *      at build time.
+ *   1. The declared entity lands in `entries.native_enum` keyed by its PHYSICAL
+ *      Postgres type name (ADR 221 coordinate `entityName`), while its derived
+ *      value-set lands in `entries.valueSet` keyed by the entity NAME (the two
+ *      keys differ when `.map()` is used), in both the default namespace
+ *      (`public`) and a named schema (`auth`) — proving the deferred column
+ *      descriptor's entity is harvested into the namespace's entries at build
+ *      time.
  *   2. The column resolves to `{ codecId: 'pg/enum@1', nativeType,
  *      typeParams.typeName, valueSet ref }`, with `nativeType` from the mapped
  *      Postgres type name (schema-qualified for `auth`, bare for `public`) and
@@ -53,8 +54,9 @@ function namespace(namespaces: Record<string, unknown>, id: string): PostgresSch
 }
 
 describe('nativeEnum + pg.enum (TS native-enum authoring)', () => {
-  it('name === type name (no .map): keys entries by name, bare column in public', () => {
-    // Role has no `.map`, so entity name and Postgres type name are both `Role`.
+  it('name === type name (no .map): entity keyed by type name (== name), bare column in public', () => {
+    // Role has no `.map`, so entity name and Postgres type name are both `Role`
+    // — the entity's physical-name entry key coincides with the handle here.
     const Role = nativeEnum('Role', 'user', 'admin');
 
     const contract = defineContract({
@@ -89,9 +91,10 @@ describe('nativeEnum + pg.enum (TS native-enum authoring)', () => {
     expect(ns.table['accounts']?.checks ?? []).toEqual([]);
   });
 
-  it('name !== type name (.map): keys entries by name, mapped type name in the column, in public', () => {
-    // AalLevel maps to Postgres type `aal_level`: the entries key stays the
-    // entity NAME (`AalLevel`), but `nativeType` is the mapped type name.
+  it('name !== type name (.map): keys entries by physical type name, mapped type name in the column, in public', () => {
+    // AalLevel maps to Postgres type `aal_level`: the entity entry keys by the
+    // PHYSICAL type name (`aal_level`); the value-set stays keyed by the entity
+    // NAME (`AalLevel`), and `nativeType` is the mapped type name.
     const AalLevel = nativeEnum('AalLevel', 'aal1', 'aal2', 'aal3').map('aal_level');
 
     const contract = defineContract({
@@ -106,9 +109,10 @@ describe('nativeEnum + pg.enum (TS native-enum authoring)', () => {
     });
 
     const ns = namespace(contract.storage.namespaces, 'public');
-    // Keyed by NAME, not the mapped type name.
-    expect(ns.entries.native_enum?.['AalLevel']).toEqual(AalLevel.entity);
-    expect(ns.entries.native_enum?.['aal_level']).toBeUndefined();
+    // Entity keyed by the mapped PHYSICAL type name, not the handle.
+    expect(ns.entries.native_enum?.['aal_level']).toEqual(AalLevel.entity);
+    expect(ns.entries.native_enum?.['AalLevel']).toBeUndefined();
+    // The value-set stays keyed by the handle.
     expect(ns.valueSet?.['AalLevel']).toEqual({
       kind: 'valueSet',
       values: ['aal1', 'aal2', 'aal3'],
@@ -148,7 +152,7 @@ describe('nativeEnum + pg.enum (TS native-enum authoring)', () => {
     });
 
     const ns = namespace(contract.storage.namespaces, 'auth');
-    expect(ns.entries.native_enum?.['AalLevel']).toEqual(AalLevel.entity);
+    expect(ns.entries.native_enum?.['aal_level']).toEqual(AalLevel.entity);
     expect(ns.valueSet?.['AalLevel']).toEqual({
       kind: 'valueSet',
       values: ['aal1', 'aal2', 'aal3'],
@@ -170,7 +174,7 @@ describe('nativeEnum + pg.enum (TS native-enum authoring)', () => {
 
     // The public namespace is untouched — the entity is scoped to `auth` only.
     const publicNs = namespace(contract.storage.namespaces, 'public');
-    expect(publicNs.entries.native_enum?.['AalLevel']).toBeUndefined();
+    expect(publicNs.entries.native_enum?.['aal_level']).toBeUndefined();
   });
 
   it('rejects an empty member list', () => {

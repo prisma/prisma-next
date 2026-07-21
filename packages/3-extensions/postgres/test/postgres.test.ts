@@ -33,12 +33,17 @@ vi.mock('pg', () => {
 
     connect = connectSpy;
     end = poolEndSpy;
+    totalCount = 0;
+    idleCount = 0;
+    waitingCount = 0;
   }
 
   class Client {
     connect = vi.fn().mockResolvedValue(undefined);
     query = vi.fn().mockResolvedValue({ rows: [], rowCount: 0 });
     end = vi.fn().mockResolvedValue(undefined);
+    escapeIdentifier = vi.fn();
+    escapeLiteral = vi.fn();
   }
 
   return { Pool, Client };

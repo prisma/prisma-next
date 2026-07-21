@@ -27,13 +27,13 @@ const createMockDriver = (
       // Add table_name to each column for batched query grouping
       return { rows: columns.map((col) => ({ ...col, table_name: 'user' })) as Row[] };
     }
-    if (sql.includes('PRIMARY KEY')) {
+    if (sql.includes("contype = 'p'")) {
       return { rows: [] as Row[] };
     }
-    if (sql.includes('FOREIGN KEY')) {
+    if (sql.includes("contype = 'f'")) {
       return { rows: [] as Row[] };
     }
-    if (sql.includes('UNIQUE')) {
+    if (sql.includes("contype = 'u'")) {
       return { rows: [] as Row[] };
     }
     if (sql.includes('pg_indexes')) {

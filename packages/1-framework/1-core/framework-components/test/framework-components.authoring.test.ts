@@ -6,6 +6,7 @@ import type {
   AuthoringTypeNamespace,
 } from '../src/shared/framework-authoring';
 import {
+  assertNoCrossRegistryCollisions,
   classifyEnumMemberType,
   hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
@@ -476,6 +477,345 @@ describe('authoring template resolution', () => {
     );
   });
 
+  it('validates option-kind arguments', () => {
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'field.test',
+        [{ kind: 'option', values: ['now'] }],
+        ['now'],
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejects an option-kind argument value not in the descriptor values', () => {
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'field.test',
+        [{ kind: 'option', values: ['now'] }],
+        ['later'],
+      ),
+    ).toThrow(/Authoring helper argument at field\.test\[0\] must be one of: now/);
+  });
+
+  it('rejects a non-string value for an option-kind argument', () => {
+    expect(() =>
+      validateAuthoringHelperArguments('field.test', [{ kind: 'option', values: ['now'] }], [42]),
+    ).toThrow(/Authoring helper argument at field\.test\[0\] must be one of: now/);
+  });
+
+  it('rejects a missing required option-kind argument', () => {
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'field.test',
+        [{ kind: 'option', values: ['now'] }],
+        [undefined],
+      ),
+    ).toThrow(/Missing required authoring helper argument at field\.test\[0\]/);
+  });
+
+  it('allows an omitted optional option-kind argument', () => {
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'field.test',
+        [{ kind: 'option', values: ['now'], optional: true }],
+        [undefined],
+      ),
+    ).not.toThrow();
+  });
+
+  describe('resolveAuthoringTemplateValue with a select node', () => {
+    it('resolves the case the argument value selects, recursively', () => {
+      expect(
+        resolveAuthoringTemplateValue(
+          {
+            kind: 'select',
+            index: 0,
+            cases: { now: { kind: 'generator', id: { kind: 'arg', index: 1 } } },
+          },
+          ['now', 'timestampNow'],
+        ),
+      ).toEqual({ kind: 'generator', id: 'timestampNow' });
+    });
+
+    it('throws when the resolved value has no case', () => {
+      expect(() =>
+        resolveAuthoringTemplateValue({ kind: 'select', index: 0, cases: { now: 'resolved' } }, [
+          'later',
+        ]),
+      ).toThrow(/Authoring template select has no case for value "later"/);
+    });
+
+    it('resolves undefined for an absent argument', () => {
+      expect(
+        resolveAuthoringTemplateValue({ kind: 'select', index: 0, cases: { now: 'resolved' } }, [
+          undefined,
+        ]),
+      ).toBeUndefined();
+    });
+
+    it('walks path into an object argument before selecting', () => {
+      expect(
+        resolveAuthoringTemplateValue(
+          { kind: 'select', index: 0, path: ['mode'], cases: { now: 'resolved' } },
+          [{ mode: 'now' }],
+        ),
+      ).toBe('resolved');
+    });
+
+    it('omits an executionDefaults phase whose select argument is absent', () => {
+      const descriptor = {
+        kind: 'fieldPreset',
+        args: [{ name: 'onCreate', kind: 'option', values: ['now'], optional: true }],
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          executionDefaults: {
+            onCreate: { kind: 'select', index: 0, cases: { now: { kind: 'generator', id: 'g' } } },
+          },
+        },
+      } as const;
+
+      expect(instantiateAuthoringFieldPreset(descriptor, [undefined])).not.toHaveProperty(
+        'executionDefaults',
+      );
+      expect(instantiateAuthoringFieldPreset(descriptor, ['now']).executionDefaults).toEqual({
+        onCreate: { kind: 'generator', id: 'g' },
+      });
+    });
+  });
+
+  describe('select templates validated against option arguments at registration', () => {
+    const presetWith = (args: readonly unknown[], onCreate: unknown): Record<string, unknown> => ({
+      stamped: {
+        kind: 'fieldPreset',
+        args,
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          executionDefaults: { onCreate },
+        },
+      },
+    });
+    const check = (fieldNamespace: Record<string, unknown>) => () =>
+      assertNoCrossRegistryCollisions({}, fieldNamespace as never);
+
+    it('accepts a select whose cases exactly cover the option values', () => {
+      expect(
+        check(
+          presetWith([{ name: 'onCreate', kind: 'option', values: ['now'], optional: true }], {
+            kind: 'select',
+            index: 0,
+            cases: { now: { kind: 'generator', id: 'g' } },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it('rejects a select missing a case for a declared option value', () => {
+      expect(
+        check(
+          presetWith(
+            [{ name: 'onCreate', kind: 'option', values: ['now', 'later'], optional: true }],
+            { kind: 'select', index: 0, cases: { now: { kind: 'generator', id: 'g' } } },
+          ),
+        ),
+      ).toThrow(
+        /Authoring field helper "stamped" option argument "onCreate" allows \[now, later\] but the select template has no case for: later/,
+      );
+    });
+
+    it('rejects a select carrying a case no option value can reach', () => {
+      expect(
+        check(
+          presetWith([{ name: 'onCreate', kind: 'option', values: ['now'], optional: true }], {
+            kind: 'select',
+            index: 0,
+            cases: {
+              now: { kind: 'generator', id: 'g' },
+              later: { kind: 'generator', id: 'g' },
+            },
+          }),
+        ),
+      ).toThrow(
+        /Authoring field helper "stamped" select template has case\(s\) not allowed by option argument "onCreate": later/,
+      );
+    });
+
+    it('rejects a select whose argument is not an option', () => {
+      expect(
+        check(
+          presetWith([{ name: 'onCreate', kind: 'string', optional: true }], {
+            kind: 'select',
+            index: 0,
+            cases: { now: { kind: 'generator', id: 'g' } },
+          }),
+        ),
+      ).toThrow(
+        /Authoring field helper "stamped" select template references argument #1, which is kind "string"; select requires an option argument/,
+      );
+    });
+
+    it('rejects a select referencing an undeclared argument position', () => {
+      expect(
+        check(
+          presetWith([], {
+            kind: 'select',
+            index: 0,
+            cases: { now: { kind: 'generator', id: 'g' } },
+          }),
+        ),
+      ).toThrow(
+        /Authoring field helper "stamped" select template references argument #1, but the helper declares no argument at that position/,
+      );
+    });
+
+    it('validates a select that paths into an object-argument option property', () => {
+      const objectArg = {
+        kind: 'object',
+        optional: true,
+        properties: { mode: { kind: 'option', values: ['now'] } },
+      };
+      expect(
+        check(
+          presetWith([objectArg], {
+            kind: 'select',
+            index: 0,
+            path: ['mode'],
+            cases: { now: { kind: 'generator', id: 'g' } },
+          }),
+        ),
+      ).not.toThrow();
+      expect(
+        check(
+          presetWith([objectArg], {
+            kind: 'select',
+            index: 0,
+            path: ['mode'],
+            cases: { sometime: { kind: 'generator', id: 'g' } },
+          }),
+        ),
+      ).toThrow(/has no case for: now/);
+    });
+  });
+
+  describe('execution-defaults phase omission', () => {
+    it('omits a phase whose template resolves to undefined', () => {
+      const descriptor = {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          executionDefaults: {
+            onCreate: { kind: 'arg', index: 0 },
+            onUpdate: { kind: 'generator', id: 'timestampNow' },
+          },
+        },
+      } as const;
+
+      expect(instantiateAuthoringFieldPreset(descriptor, [undefined]).executionDefaults).toEqual({
+        onUpdate: { kind: 'generator', id: 'timestampNow' },
+      });
+    });
+
+    it('omits executionDefaults entirely when every phase resolves to undefined', () => {
+      const descriptor = {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          executionDefaults: {
+            onCreate: { kind: 'arg', index: 0 },
+            onUpdate: { kind: 'arg', index: 1 },
+          },
+        },
+      } as const;
+
+      const result = instantiateAuthoringFieldPreset(descriptor, [undefined, undefined]);
+      expect(result).not.toHaveProperty('executionDefaults');
+    });
+
+    it('carries only the defined phase when one of two resolves to undefined', () => {
+      const descriptor = {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          executionDefaults: {
+            onCreate: { kind: 'arg', index: 0 },
+            onUpdate: { kind: 'arg', index: 1 },
+          },
+        },
+      } as const;
+
+      expect(
+        instantiateAuthoringFieldPreset(descriptor, [
+          { kind: 'generator', id: 'timestampNow' },
+          undefined,
+        ]).executionDefaults,
+      ).toEqual({ onCreate: { kind: 'generator', id: 'timestampNow' } });
+    });
+  });
+
+  describe('empty resolved typeParams omission', () => {
+    it('omits typeParams when the resolved value has no keys', () => {
+      const descriptor = {
+        kind: 'typeConstructor',
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          typeParams: { precision: { kind: 'arg', index: 0 } },
+        },
+      } as const;
+
+      expect(instantiateAuthoringTypeConstructor(descriptor, [undefined])).toEqual({
+        codecId: 'test/timestamp@1',
+        nativeType: 'timestamp',
+      });
+    });
+
+    it('keeps typeParams when the resolved value has at least one key', () => {
+      const descriptor = {
+        kind: 'typeConstructor',
+        output: {
+          codecId: 'test/timestamp@1',
+          nativeType: 'timestamp',
+          typeParams: { precision: { kind: 'arg', index: 0 } },
+        },
+      } as const;
+
+      expect(instantiateAuthoringTypeConstructor(descriptor, [3])).toEqual({
+        codecId: 'test/timestamp@1',
+        nativeType: 'timestamp',
+        typeParams: { precision: 3 },
+      });
+    });
+  });
+
+  it('regression: a static executionDefaults template (e.g. temporalAuthoringPresets shape) resolves unchanged', () => {
+    const descriptor = {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'test/timestamp@1',
+        nativeType: 'timestamp',
+        executionDefaults: {
+          onCreate: { kind: 'generator', id: 'timestampNow' },
+          onUpdate: { kind: 'generator', id: 'timestampNow' },
+        },
+      },
+    } as const;
+
+    expect(instantiateAuthoringFieldPreset(descriptor, [])).toEqual({
+      descriptor: { codecId: 'test/timestamp@1', nativeType: 'timestamp' },
+      nullable: false,
+      executionDefaults: {
+        onCreate: { kind: 'generator', id: 'timestampNow' },
+        onUpdate: { kind: 'generator', id: 'timestampNow' },
+      },
+      id: false,
+      unique: false,
+    });
+  });
+
   it('stringifies primitive function default expressions', () => {
     const descriptor = {
       kind: 'fieldPreset',
@@ -506,7 +846,14 @@ describe('classifyEnumMemberType', () => {
   };
 
   function testBlock(parameters: Record<string, PslExtensionBlockParamValue>): PslExtensionBlock {
-    return { kind: 'enum', name: 'TestEnum', parameters, blockAttributes: [], span: testSpan };
+    return {
+      kind: 'enum',
+      keyword: 'enum',
+      name: 'TestEnum',
+      parameters,
+      blockAttributes: [],
+      span: testSpan,
+    };
   }
 
   const bare: PslExtensionBlockParamValue = { kind: 'bare', span: testSpan };

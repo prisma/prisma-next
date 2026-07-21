@@ -23,7 +23,7 @@ import type {
   VerifierOutcome,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import { dispositionForCategory } from '@prisma-next/framework-components/control';
+import { dispositionForCategory, issueOutcome } from '@prisma-next/framework-components/control';
 import { isStorageTypeInstance, type SqlStorage } from '@prisma-next/sql-contract/types';
 import { RelationalSchemaNodeKind, type SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -101,10 +101,10 @@ export function classifySqlDiffIssue(
   issue: SchemaDiffIssue,
   granularityOf: (nodeKind: string) => DiffSubjectGranularity,
 ): VerifierIssueCategory {
-  if (issue.reason === 'not-found') {
+  if (issueOutcome(issue) === 'not-found') {
     return 'declaredMissing';
   }
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     const granularity = classifyDiffSubjectGranularity(issue, granularityOf);
     if (granularity === 'entity' || granularity === 'namespace') {
       return 'extraTopLevelObject';
@@ -173,7 +173,7 @@ export function computeSqlDiffVerdict(input: SqlDiffVerdictInput): SqlDiffVerdic
   for (const issue of input.issues) {
     if (
       !input.strict &&
-      issue.reason === 'not-expected' &&
+      issueOutcome(issue) === 'not-expected' &&
       isStrictOnlyExtra(issue, input.granularityOf)
     ) {
       continue;
@@ -215,9 +215,9 @@ export interface StorageTypeVerdictInput {
 /**
  * Runs the codec `verifyType` hooks the way the legacy walk did: once per
  * contract namespace with tables, against that namespace's paired actual
- * node (the hook reads namespace-scoped state such as
- * `nativeEnumTypeNames` off it). Issue dispositions grade against the
- * contract default policy, matching the legacy `pushTypeNode` semantics.
+ * node (the hook reads namespace-scoped state such as `enums` off it).
+ * Issue dispositions grade against the contract default policy, matching
+ * the legacy `pushTypeNode` semantics.
  */
 export interface StorageTypeVerdict {
   readonly failures: readonly SchemaDiffIssue[];

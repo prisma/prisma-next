@@ -65,10 +65,8 @@ describe('verifyPostgresNamespacePresence', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
       path: ['database', 'auth'],
-      reason: 'not-found',
       expected: { nodeKind: 'postgres-namespace', schemaName: 'auth' },
     });
-    expect(issues[0]?.message).toContain('auth');
   });
 
   it('does not emit missing_schema when the introspected list already contains the namespace', () => {
@@ -105,7 +103,7 @@ describe('verifyPostgresNamespacePresence', () => {
     const issues = verifyPostgresNamespacePresence({ contract, schema });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ path: ['database', 'auth'], reason: 'not-found' });
+    expect(issues[0]).toMatchObject({ path: ['database', 'auth'] });
   });
 
   it('emits a not-found issue for every declared-but-absent namespace in coordinate-sorted order', () => {

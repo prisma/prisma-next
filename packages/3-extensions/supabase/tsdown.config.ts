@@ -5,7 +5,6 @@ export default defineConfig({
     pack: 'src/exports/pack.ts',
     runtime: 'src/exports/runtime.ts',
     contract: 'src/exports/contract.ts',
-    'test/utils': 'test/supabase-bootstrap.ts',
   },
   // Keep manual exports to preserve stable root/subpath mapping.
   exports: { enabled: false },

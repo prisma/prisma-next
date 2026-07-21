@@ -172,7 +172,13 @@ describe('expandNativeType hooks via descriptor-meta', () => {
   });
 
   describe('identityHooks', () => {
-    const identityCodecIds = ['pg/json@1', 'pg/jsonb@1', 'pg/bytea@1', 'pg/uuid@1'] as const;
+    const identityCodecIds = [
+      'pg/json@1',
+      'pg/jsonb@1',
+      'pg/bytea@1',
+      'pg/uuid@1',
+      'pg/inet@1',
+    ] as const;
 
     for (const codecId of identityCodecIds) {
       it(`${codecId} returns nativeType unchanged`, () => {
@@ -189,6 +195,14 @@ describe('storage entries', () => {
     expect(storage).toEqual(
       expect.arrayContaining([
         { typeId: 'pg/uuid@1', familyId: 'sql', targetId: 'postgres', nativeType: 'uuid' },
+      ]),
+    );
+  });
+
+  it('includes pg/inet@1 with nativeType inet', () => {
+    expect(storage).toEqual(
+      expect.arrayContaining([
+        { typeId: 'pg/inet@1', familyId: 'sql', targetId: 'postgres', nativeType: 'inet' },
       ]),
     );
   });

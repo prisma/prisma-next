@@ -5,22 +5,38 @@ import { nodePslSpan } from '../resolve';
 import type { FieldAttributeAst, ModelAttributeAst } from '../syntax/ast/attributes';
 import type { AttributeArgAst } from '../syntax/ast/expressions';
 import { ATTRIBUTE_DIAGNOSTIC_CODE } from './combinators/diagnostic';
-import type { ArgType, AttributeSpec, InterpretCtx, OptionalArgType, Param } from './types';
+import type {
+  ArgType,
+  AttributeSpec,
+  InterpretCtx,
+  OptionalArgType,
+  Param,
+  PositionalParam,
+} from './types';
 
-export function interpretAttribute<Out>(
-  attrNode: FieldAttributeAst | ModelAttributeAst,
-  spec: AttributeSpec<Out>,
+// The positional/named argument-binding for an attribute or a function call. `name` labels the
+// callee in binding diagnostics (`Attribute "<name>" …`); `span` anchors the arity diagnostics
+// (too-many / missing) that have no per-argument node to point at.
+export interface ArgBindingSpec {
+  readonly name: string;
+  readonly positional: readonly PositionalParam<unknown>[];
+  readonly named: Readonly<Record<string, Param<unknown>>>;
+}
+
+export function interpretArgs(
+  args: Iterable<AttributeArgAst>,
+  spec: ArgBindingSpec,
   ctx: InterpretCtx,
-): Result<Out, readonly PslDiagnostic[]> {
+  span: PslSpan,
+): Result<Record<string, unknown>, readonly PslDiagnostic[]> {
   const diagnostics: PslDiagnostic[] = [];
-  const attributeSpan = nodePslSpan(attrNode.syntax, ctx.sourceFile);
 
   const output: Record<string, unknown> = {};
   const seen = new Set<string>();
   let positionalSlot = 0;
   let reportedExcess = false;
 
-  for (const arg of attrNode.argList()?.args() ?? []) {
+  for (const arg of args) {
     const name = arg.name()?.name();
 
     let key: string;
@@ -33,7 +49,7 @@ export function interpretAttribute<Out>(
             diagnostic(
               `Attribute "${spec.name}" received too many positional arguments`,
               ctx,
-              attributeSpan,
+              span,
             ),
           );
           reportedExcess = true;
@@ -89,11 +105,7 @@ export function interpretAttribute<Out>(
       return;
     }
     diagnostics.push(
-      diagnostic(
-        `Attribute "${spec.name}" is missing required argument "${key}"`,
-        ctx,
-        attributeSpan,
-      ),
+      diagnostic(`Attribute "${spec.name}" is missing required argument "${key}"`, ctx, span),
     );
   };
 
@@ -108,11 +120,22 @@ export function interpretAttribute<Out>(
   if (diagnostics.length > 0) {
     return notOk<readonly PslDiagnostic[]>(diagnostics);
   }
+  return ok(output);
+}
+
+export function interpretAttribute<Out>(
+  attrNode: FieldAttributeAst | ModelAttributeAst,
+  spec: AttributeSpec<Out>,
+  ctx: InterpretCtx,
+): Result<Out, readonly PslDiagnostic[]> {
+  const attributeSpan = nodePslSpan(attrNode.syntax, ctx.sourceFile);
+  const bound = interpretArgs(attrNode.argList()?.args() ?? [], spec, ctx, attributeSpan);
+  if (!bound.ok) return notOk<readonly PslDiagnostic[]>(bound.failure);
 
   const value = blindCast<
     Out,
     'The engine builds the output object structurally from the spec; TypeScript cannot relate the dynamically-keyed record to the spec-inferred output type.'
-  >(output);
+  >(bound.value);
   if (spec.refine !== undefined) {
     const refineDiagnostics = spec.refine(value, ctx);
     if (refineDiagnostics.length > 0) {

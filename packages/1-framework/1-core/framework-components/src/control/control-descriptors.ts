@@ -14,6 +14,7 @@ import type {
   ControlFamilyInstance,
   ControlTargetInstance,
 } from './control-instances';
+import type { ContractSpace } from './control-spaces';
 import type { ControlStack } from './control-stack';
 import type { EmissionSpi } from './emission-types';
 
@@ -85,5 +86,6 @@ export interface ControlExtensionDescriptor<
     TTargetId
   > = ControlExtensionInstance<TFamilyId, TTargetId>,
 > extends ExtensionDescriptor<TFamilyId, TTargetId> {
+  readonly contractSpace?: ContractSpace;
   create(): TExtensionInstance;
 }

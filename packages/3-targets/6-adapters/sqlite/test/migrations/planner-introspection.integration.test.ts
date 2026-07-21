@@ -247,8 +247,6 @@ describe('SQLite planner + introspection round-trip', () => {
                 columns: ['id'],
               },
               onDelete: 'cascade',
-              constraint: true,
-              index: true,
             },
           ],
         }),

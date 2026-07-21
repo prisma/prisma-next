@@ -77,9 +77,7 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users') });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.failures).toEqual([
-        expect.objectContaining({ path: ['users'], reason: 'not-found' }),
-      ]);
+      expect(result.failures).toEqual([expect.objectContaining({ path: ['users'] })]);
     });
 
     it('warns on extra collection in non-strict mode', () => {
@@ -88,9 +86,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.failures).toEqual([]);
-      expect(result.warnings).toEqual([
-        expect.objectContaining({ path: ['users'], reason: 'not-expected' }),
-      ]);
+      expect(result.warnings).toEqual([expect.objectContaining({ path: ['users'] })]);
     });
 
     it('fails on extra collection in strict mode', () => {
@@ -98,9 +94,7 @@ describe('diffMongoSchemas', () => {
       const expected = emptyIR;
       const result = diffMongoSchemasManaged(live, expected, true);
 
-      expect(result.failures).toEqual([
-        expect.objectContaining({ path: ['users'], reason: 'not-expected' }),
-      ]);
+      expect(result.failures).toEqual([expect.objectContaining({ path: ['users'] })]);
       expect(result.warnings).toEqual([]);
     });
   });
@@ -127,7 +121,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.failures).toEqual([
-        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-equal' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'] }),
       ]);
     });
 
@@ -140,7 +134,7 @@ describe('diffMongoSchemas', () => {
 
       expect(result.failures).toEqual([]);
       expect(result.warnings).toEqual([
-        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-expected' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'] }),
       ]);
     });
 
@@ -152,7 +146,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, true);
 
       expect(result.failures).toEqual([
-        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-expected' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'] }),
       ]);
     });
   });
@@ -178,9 +172,7 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users', { validator: validator(schema1) }) });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.failures).toEqual([
-        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-found' }),
-      ]);
+      expect(result.failures).toEqual([expect.objectContaining({ path: ['users', 'validator'] })]);
     });
 
     it('warns on extra validator in non-strict mode', () => {
@@ -189,9 +181,7 @@ describe('diffMongoSchemas', () => {
       const result = diffMongoSchemasManaged(live, expected, false);
 
       expect(result.failures).toEqual([]);
-      expect(result.warnings).toEqual([
-        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-expected' }),
-      ]);
+      expect(result.warnings).toEqual([expect.objectContaining({ path: ['users', 'validator'] })]);
     });
 
     it('fails on extra validator in strict mode', () => {
@@ -199,9 +189,7 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users') });
       const result = diffMongoSchemasManaged(live, expected, true);
 
-      expect(result.failures).toEqual([
-        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-expected' }),
-      ]);
+      expect(result.failures).toEqual([expect.objectContaining({ path: ['users', 'validator'] })]);
     });
 
     it('fails on schema mismatch', () => {
@@ -209,9 +197,7 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ users: coll('users', { validator: validator(schema2) }) });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.failures).toEqual([
-        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-equal' }),
-      ]);
+      expect(result.failures).toEqual([expect.objectContaining({ path: ['users', 'validator'] })]);
     });
 
     it('fails when validationLevel differs', () => {
@@ -273,9 +259,7 @@ describe('diffMongoSchemas', () => {
       const expected = ir({ logs: coll('logs', { options: differentOpts }) });
       const result = diffMongoSchemasManaged(live, expected, false);
 
-      expect(result.failures).toEqual([
-        expect.objectContaining({ path: ['logs', 'options'], reason: 'not-equal' }),
-      ]);
+      expect(result.failures).toEqual([expect.objectContaining({ path: ['logs', 'options'] })]);
     });
   });
 
@@ -327,10 +311,9 @@ describe('diffMongoSchemas', () => {
       expect(result.failures.length).toBeGreaterThanOrEqual(1);
       expect(result.failures).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ path: ['events', 'index:createdAt:1'], reason: 'not-equal' }),
+          expect.objectContaining({ path: ['events', 'index:createdAt:1'] }),
           expect.objectContaining({
             path: ['events', 'index:createdAt:1'],
-            reason: 'not-expected',
           }),
         ]),
       );

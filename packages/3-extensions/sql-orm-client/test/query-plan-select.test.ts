@@ -963,7 +963,7 @@ describe('compileSelect MTI JOINs', () => {
     ColumnRef.of('features', 'id'),
   );
 
-  it('base query LEFT JOINs MTI variant tables with table-qualified aliases', () => {
+  it('explicit selection controls MTI projections while implicit selection retains them', () => {
     const contract = buildMixedPolyContract();
     const tasksBaseProjection = projectionFor(contract, 'tasks', [
       'id',
@@ -987,9 +987,23 @@ describe('compileSelect MTI JOINs', () => {
       ),
     ];
 
-    const plan = compileSelect(contract, 'public', 'tasks', emptyState(), 'Task');
+    const implicitPlan = compileSelect(contract, 'public', 'tasks', emptyState(), 'Task');
+    const omittedMtiPlan = compileSelect(
+      contract,
+      'public',
+      'tasks',
+      { ...emptyState(), selectedFields: ['id', 'title'] },
+      'Task',
+    );
+    const selectedMtiPlan = compileSelect(
+      contract,
+      'public',
+      'tasks',
+      { ...emptyState(), selectedFields: ['id', 'priority'] },
+      'Task',
+    );
 
-    expect(plan.ast).toEqual(
+    expect(implicitPlan.ast).toEqual(
       SelectAst.from(TableSource.named('tasks', undefined, 'public'))
         .withProjection([...tasksBaseProjection, ...featuresMtiProjection])
         .withSelectAllIntent({ table: 'tasks' })
@@ -997,6 +1011,20 @@ describe('compileSelect MTI JOINs', () => {
           JoinAst.left(TableSource.named('features', undefined, 'public'), featuresJoinOn),
         ]),
     );
+
+    expectSelectAst(omittedMtiPlan.ast);
+    expect(
+      omittedMtiPlan.ast.projection
+        .map((item) => item.alias)
+        .filter((alias) => alias.startsWith('features__')),
+    ).toEqual([]);
+
+    expectSelectAst(selectedMtiPlan.ast);
+    const selectedAliases = selectedMtiPlan.ast.projection.map((item) => item.alias);
+    expect(selectedAliases.filter((alias) => alias.startsWith('features__'))).toEqual([
+      'features__priority',
+    ]);
+    expect(selectedAliases).not.toContain('priority');
   });
 
   it('variant query INNER JOINs the specific MTI variant table', () => {
@@ -1085,6 +1113,7 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
       relatedModelName: relation.relatedModelName,
       relatedTableName: relation.relatedTableName,
       relatedNamespaceId: relation.relatedNamespaceId,
+      localTableName: relation.localTableName,
       targetColumn: relation.targetColumn,
       localColumn: relation.localColumn,
       cardinality: relation.cardinality,
@@ -1125,24 +1154,73 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
     expect(aliases).toContain('plan');
   });
 
-  it('MTI-target include left-joins variant tables and projects variant_table__column', () => {
+  it('MTI-target include selection controls variant projections while implicit selection retains them', () => {
     const contract = buildMixedPolyContract();
-    const state = stateWithInclude(includeFor(contract, 'Project', 'tasks'));
+    const implicitState = stateWithInclude(includeFor(contract, 'Project', 'tasks'));
+    const omittedMtiState = stateWithInclude(
+      includeFor(contract, 'Project', 'tasks', {
+        ...emptyState(),
+        selectedFields: ['id', 'title'],
+      }),
+    );
+    const selectedMtiState = stateWithInclude(
+      includeFor(contract, 'Project', 'tasks', {
+        ...emptyState(),
+        selectedFields: ['id', 'priority'],
+      }),
+    );
 
-    const plan = compileSelectWithIncludes(contract, 'public', 'projects_tbl', state, 'Project');
-    const childRows = childRowsSelectFor(plan, 'tasks');
+    const implicitPlan = compileSelectWithIncludes(
+      contract,
+      'public',
+      'projects_tbl',
+      implicitState,
+      'Project',
+    );
+    const implicitChildRows = childRowsSelectFor(implicitPlan, 'tasks');
 
-    expect(childRows.joins).toEqual([
+    expect(implicitChildRows.joins).toEqual([
       JoinAst.left(
         TableSource.named('features', undefined, 'public'),
         EqColJoinOn.of(ColumnRef.of('tasks', 'id'), ColumnRef.of('features', 'id')),
       ),
     ]);
+    expect(projectionAliases(implicitChildRows)).toEqual([
+      'id',
+      'title',
+      'type',
+      'severity',
+      'project_id',
+      'parent_id',
+      'assignee_id',
+      'features__priority',
+      'features__assignee_id',
+    ]);
 
-    const aliases = projectionAliases(childRows);
-    expect(aliases).toContain('type');
-    expect(aliases).toContain('severity');
-    expect(aliases).toContain('features__priority');
+    const omittedMtiPlan = compileSelectWithIncludes(
+      contract,
+      'public',
+      'projects_tbl',
+      omittedMtiState,
+      'Project',
+    );
+    const omittedMtiChildRows = childRowsSelectFor(omittedMtiPlan, 'tasks');
+    expect(
+      projectionAliases(omittedMtiChildRows).filter((alias) => alias.startsWith('features__')),
+    ).toEqual([]);
+
+    const selectedMtiPlan = compileSelectWithIncludes(
+      contract,
+      'public',
+      'projects_tbl',
+      selectedMtiState,
+      'Project',
+    );
+    const selectedMtiAliases = projectionAliases(childRowsSelectFor(selectedMtiPlan, 'tasks'));
+    expect(selectedMtiAliases.filter((alias) => alias.startsWith('features__'))).toEqual([
+      'features__priority',
+    ]);
+    expect(selectedMtiAliases).not.toContain('priority');
   });
 
   it('variant-narrowed MTI-target include inner-joins only the named variant', () => {

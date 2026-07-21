@@ -70,6 +70,7 @@ export interface IncludeExpr {
   readonly relatedModelName: string;
   readonly relatedNamespaceId: string;
   readonly relatedTableName: string;
+  readonly localTableName: string;
   readonly targetColumn: string;
   readonly localColumn: string;
   readonly cardinality: RelationCardinalityTag | undefined;
@@ -1502,6 +1503,77 @@ export type RelationNames<
         : K;
     }[keyof RelationsOf<TContract, ModelName, NsId>]) &
   string;
+
+type IsUnion<T, Whole = T> = T extends Whole ? ([Whole] extends [T] ? false : true) : never;
+
+type IsSingletonString<T> = [T] extends [string]
+  ? string extends T
+    ? false
+    : IsUnion<T> extends true
+      ? false
+      : true
+  : false;
+
+type SelectedVariantNames<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  VariantName,
+  NsId extends string,
+> = [VariantName] extends [string]
+  ? string extends VariantName
+    ? VariantNames<TContract, ModelName, NsId>
+    : VariantName
+  : never;
+
+type VariantDeclaredRelationKeys<
+  TContract extends Contract<SqlStorage>,
+  VariantName extends string,
+  NsId extends string,
+> = VariantName extends string ? keyof RelationsOf<TContract, VariantName, NsId> : never;
+
+type SelectedVariantDeclaredRelationKeys<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  VariantName,
+  NsId extends string,
+> = VariantDeclaredRelationKeys<
+  TContract,
+  SelectedVariantNames<TContract, ModelName, VariantName, NsId>,
+  NsId
+>;
+
+export type VariantAwareIncludeRelationNames<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  VariantName,
+  NsId extends string = never,
+> =
+  IsSingletonString<VariantName> extends true
+    ?
+        | RelationNames<TContract, Extract<VariantName, string>, NsId>
+        | Exclude<
+            RelationNames<TContract, ModelName, NsId>,
+            keyof RelationsOf<TContract, Extract<VariantName, string>, NsId>
+          >
+    : [VariantName] extends [string]
+      ? Exclude<
+          RelationNames<TContract, ModelName, NsId>,
+          SelectedVariantDeclaredRelationKeys<TContract, ModelName, VariantName, NsId>
+        >
+      : RelationNames<TContract, ModelName, NsId>;
+
+export type IncludeRelationOwner<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  VariantName,
+  RelName extends string,
+  NsId extends string = never,
+> =
+  IsSingletonString<VariantName> extends true
+    ? RelName extends keyof RelationsOf<TContract, Extract<VariantName, string>, NsId>
+      ? Extract<VariantName, string>
+      : ModelName
+    : ModelName;
 
 type RelationModelName<Relation> = Relation extends {
   readonly to: { readonly model: infer To extends string };

@@ -2,6 +2,23 @@ import { createHash } from 'node:crypto';
 
 export type RlsPolicyOperation = 'select' | 'insert' | 'update' | 'delete' | 'all';
 
+/**
+ * Which predicate each RLS operation admits, mirroring Postgres: SELECT and
+ * DELETE decide row visibility/eligibility with `USING` only; INSERT
+ * validates the new row with `WITH CHECK` only; UPDATE and ALL take either
+ * or both. Single-homed here so the PSL lowering and the TS handle
+ * constructors enforce the same matrix.
+ */
+export const POLICY_OPERATION_PREDICATES: Readonly<
+  Record<RlsPolicyOperation, { readonly using: boolean; readonly withCheck: boolean }>
+> = {
+  select: { using: true, withCheck: false },
+  insert: { using: false, withCheck: true },
+  update: { using: true, withCheck: true },
+  delete: { using: true, withCheck: false },
+  all: { using: true, withCheck: true },
+};
+
 export interface ContentHashParts {
   readonly using?: string;
   readonly withCheck?: string;

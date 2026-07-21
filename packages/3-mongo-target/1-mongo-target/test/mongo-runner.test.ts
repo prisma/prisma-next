@@ -475,9 +475,7 @@ describe('MongoMigrationRunner schema verification', () => {
     expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
     expect(failure.why).toMatch(/destination contract/);
     expect(failure.meta?.['issues']).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ path: ['rogue'], reason: 'not-expected' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ path: ['rogue'] })]),
     );
     expect(calls).toEqual({ initMarker: 0, updateMarker: 0, writeLedgerEntry: 0 });
   });
@@ -778,6 +776,6 @@ describe('MongoMigrationRunner - per-edge ledger', () => {
       migrationName: '',
       migrationHash: destHash,
     });
-    expect((ledgerEntries[0]?.operations as unknown[]).length).toBe(1);
+    expect((ledgerEntries[0]!.operations as unknown[]).length).toBe(1);
   });
 });

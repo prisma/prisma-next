@@ -8,10 +8,7 @@
  */
 
 import type { ColumnDefault } from '@prisma-next/contract/types';
-import type {
-  ExpectationFailureReason,
-  SchemaDiffIssue,
-} from '@prisma-next/framework-components/control';
+import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import {
   PrimaryKey,
   SqlCheckConstraintIR,
@@ -146,18 +143,14 @@ export function table(input: {
   });
 }
 
-/** Builds a `SchemaDiffIssue` directly — the shape `diffSchemas` produces, minus needing a real tree to diff. */
+/** Builds a `SchemaDiffIssue` directly — the shape `diffSchemas` produces, minus needing a real tree to diff. The change kind derives from presence: `expected` only is a create, `actual` only a drop, both an alter. */
 export function issue(input: {
   readonly path: readonly string[];
-  readonly reason: ExpectationFailureReason;
   readonly expected?: unknown;
   readonly actual?: unknown;
-  readonly message?: string;
 }): SchemaDiffIssue {
   return {
     path: input.path,
-    reason: input.reason,
-    message: input.message ?? `${input.reason}: ${input.path.join('/')}`,
     ...(input.expected !== undefined ? { expected: input.expected } : {}),
     ...(input.actual !== undefined ? { actual: input.actual } : {}),
   } as SchemaDiffIssue;

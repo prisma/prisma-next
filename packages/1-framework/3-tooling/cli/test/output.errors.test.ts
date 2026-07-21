@@ -89,32 +89,43 @@ describe('formatErrorOutput - conflicts', () => {
   });
 });
 
-describe('formatErrorOutput - issues list label fallback', () => {
-  it('labels a PSL-diagnostic issue by its `kind` and a schema-diff issue by its `reason`', () => {
-    // The `meta.issues` channel is shared: PSL interpretation diagnostics stamp
-    // `kind` (their diagnostic code); schema-diff issues carry no `kind` and stamp
-    // `reason` instead. The renderer prefers `kind`, falls back to `reason`, then
-    // to a generic `issue` label.
+describe('formatErrorOutput - issues list label and body fallback', () => {
+  it('renders a PSL-diagnostic issue as `[kind] message`', () => {
+    // PSL interpretation diagnostics stamp `kind` (their diagnostic code) and `message` (their prose).
     const error: CliErrorEnvelope = {
       ...baseError,
       code: 'PN-RUN-3000',
       domain: 'RUN',
       summary: 'Failed to resolve contract source',
       meta: {
-        issues: [
-          { kind: 'PSL_ORPHANED_BACKRELATION_LIST', message: 'orphaned backrelation list' },
-          { reason: 'not-found', message: 'Table "post" is missing from database' },
-          { message: 'issue with neither kind nor reason' },
-        ],
+        issues: [{ kind: 'PSL_ORPHANED_BACKRELATION', message: 'orphaned backrelation list' }],
       },
     };
 
     const flags = parseGlobalFlags({ verbose: true, 'no-color': true });
     const stripped = stripAnsi(formatErrorOutput(error, flags));
 
-    expect(stripped).toContain('[PSL_ORPHANED_BACKRELATION_LIST] orphaned backrelation list');
-    expect(stripped).toContain('[not-found] Table "post" is missing from database');
-    expect(stripped).toContain('[issue] issue with neither kind nor reason');
+    expect(stripped).toContain('[PSL_ORPHANED_BACKRELATION] orphaned backrelation list');
+  });
+
+  it('renders a schema-diff issue (no `message`) with a presence-derived `[missing] path/joined/with/slashes` label', () => {
+    // Schema-diff issues (SchemaDiffIssue) carry no `message`; they stamp
+    // `path` plus the `expected`/`actual` presence the label derives from.
+    const error: CliErrorEnvelope = {
+      ...baseError,
+      code: 'PN-RUN-3000',
+      domain: 'RUN',
+      summary: 'Failed to resolve contract source',
+      meta: {
+        // expected-only → a missing object.
+        issues: [{ path: ['public', 'post'], expected: {} }],
+      },
+    };
+
+    const flags = parseGlobalFlags({ verbose: true, 'no-color': true });
+    const stripped = stripAnsi(formatErrorOutput(error, flags));
+
+    expect(stripped).toContain('[missing] public/post');
   });
 });
 

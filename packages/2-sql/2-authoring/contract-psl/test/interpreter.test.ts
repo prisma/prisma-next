@@ -167,6 +167,7 @@ describe('interpretPslDocumentToSqlContract', () => {
           [
             'slugid',
             {
+              signature: {},
               lower: () => ({
                 ok: true as const,
                 value: {

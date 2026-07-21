@@ -332,10 +332,12 @@ describe('formatIntrospectJson', () => {
 });
 
 describe('formatSchemaVerifyOutput', () => {
+  // A minimal node to carry presence — the formatter derives the missing/extra/
+  // mismatch label from which sides are set, not from any stored field.
+  const node = { id: 'x', nodeKind: 'x', isEqualTo: () => true, children: () => [] };
   const missingTableIssue: SchemaDiffIssue = {
     path: ['post'],
-    reason: 'not-found',
-    message: 'post',
+    expected: node,
   };
 
   const createResult = (): VerifyDatabaseSchemaResult => ({
@@ -376,8 +378,7 @@ describe('formatSchemaVerifyOutput', () => {
   it('renders every issue, each on its own line', () => {
     const diffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_abc'],
-      reason: 'not-found',
-      message: 'public/profiles/policy_abc',
+      expected: node,
     };
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
@@ -390,8 +391,10 @@ describe('formatSchemaVerifyOutput', () => {
     const output = formatSchemaVerifyOutput(result, flags);
     const lines = output.split('\n').map(stripAnsi);
 
-    const issueLineIndex = lines.findIndex((line) => line.includes(missingTableIssue.message));
-    const diffLineIndex = lines.findIndex((line) => line.includes(diffIssue.message));
+    const issueLineIndex = lines.findIndex((line) =>
+      line.includes(missingTableIssue.path.join('/')),
+    );
+    const diffLineIndex = lines.findIndex((line) => line.includes(diffIssue.path.join('/')));
 
     expect(issueLineIndex).toBeGreaterThanOrEqual(0);
     expect(diffLineIndex).toBeGreaterThan(issueLineIndex);
@@ -426,8 +429,7 @@ describe('formatSchemaVerifyOutput', () => {
           issues: [
             {
               path: ['database', 'public', 'legacy_jobs'],
-              reason: 'not-found',
-              message: 'database/public/legacy_jobs',
+              expected: node,
             },
           ],
         },
@@ -561,8 +563,7 @@ describe('formatSchemaVerifyOutput', () => {
         issues: [
           {
             path: ['public', 'profiles', policyWireName],
-            reason: 'not-found',
-            message: `RLS policy "${policyWireName}" on table "profiles" is missing from the database`,
+            expected: node,
           },
         ],
       },
@@ -694,13 +695,9 @@ describe('formatSchemaVerifyJson', () => {
         issues: [
           {
             path: ['post'],
-            reason: 'not-found',
-            message: 'Table "post" is missing',
           },
           {
             path: ['public', 'profiles', 'policy_abc'],
-            reason: 'not-found',
-            message: 'RLS policy "policy_abc" is missing from the database',
           },
         ],
       },

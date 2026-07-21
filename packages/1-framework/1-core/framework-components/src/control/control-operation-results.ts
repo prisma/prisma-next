@@ -39,20 +39,6 @@ export interface VerifyDatabaseResult {
 }
 
 /**
- * The three ways an actual state can fail an expectation: it contains a node
- * that was not expected, lacks a node that was expected, or holds a node that
- * is not equal to the expected one. Expected is the desired side and actual the
- * current side of whatever comparison produced the issue — contract-vs-database,
- * or contract-vs-contract in an offline plan — so the vocabulary is
- * comparison-relative and never ambiguous about a base.
- *
- * The failure reason is a structural characteristic carried as a declared
- * field: consumers filter on `reason`, never by enumerating kind strings or
- * family-invented node codes.
- */
-export type ExpectationFailureReason = 'not-expected' | 'not-found' | 'not-equal';
-
-/**
  * The issue-based schema-verify result. `ok` derives from the FAILURE list
  * only: a verify passes exactly when `schema.issues` is empty, post
  * strict-gating and control-policy disposition.

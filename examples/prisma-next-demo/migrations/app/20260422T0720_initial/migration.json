@@ -1,7 +1,7 @@
 {
   "from": null,
-  "to": "sha256:9f49f8f9e51a9cc016f1ec2098ebae9406521a3cc2cf00207adc795078333d8b",
+  "to": "sha256:6c96d4165531a6e68599368aa8d4de3d90d1c7e592c7143cd167d69feee89dc0",
   "providedInvariants": [],
   "createdAt": "2026-06-19T15:33:14.992Z",
-  "migrationHash": "sha256:e378fb4a78ab84e289d0459fed63ab0341613e14433ab4d7cc3a2528948a7ee2"
+  "migrationHash": "sha256:0b134cbb7c8bccbccc9afd7c7284739c9ba6a07e578af1a6710c952817a39a84"
 }

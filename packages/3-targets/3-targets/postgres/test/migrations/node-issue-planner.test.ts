@@ -1,13 +1,13 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { buildPostgresPlanDiff } from '../../src/core/migrations/diff-database-schema';
 import {
   coalesceSubtreeIssues,
   mapNodeIssueToCall,
-  nodeIssueOrder,
   planIssues as planNodeIssues,
 } from '../../src/core/migrations/issue-planner';
 import { PostgresSchema } from '../../src/core/postgres-schema';
@@ -68,7 +68,6 @@ function rootOf(tables: Record<string, PostgresTableSchemaNode>): PostgresDataba
       public: new PostgresNamespaceSchemaNode({
         schemaName: 'public',
         tables,
-        nativeEnumTypeNames: [],
       }),
     },
     roles: [],
@@ -139,8 +138,6 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
           {
             source: { namespaceId: 'public', tableName: 'post', columns: ['userId'] },
             target: { namespaceId: 'public', tableName: 'user', columns: ['id'] },
-            constraint: true,
-            index: true,
           },
         ],
         uniques: [{ columns: ['slug'] }],
@@ -170,6 +167,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);
@@ -201,6 +199,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);
@@ -233,6 +232,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);
@@ -253,6 +253,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
       orphan: new PostgresTableSchemaNode({
         name: 'orphan',
@@ -264,6 +265,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
         uniques: [],
         indexes: [],
         policies: [],
+        rlsEnabled: false,
       }),
     });
     const calls = planFor(contract, actual);
@@ -277,12 +279,9 @@ describe('mapNodeIssueToCall — synthesized namespace issue', () => {
     const namespace = new PostgresNamespaceSchemaNode({
       schemaName: 'auth',
       tables: {},
-      nativeEnumTypeNames: [],
     });
     const issue: SchemaDiffIssue = {
       path: ['database', 'auth'],
-      reason: 'not-found',
-      message: 'missing: database/auth',
       expected: namespace,
     };
     const ctx = {
@@ -300,7 +299,217 @@ describe('mapNodeIssueToCall — synthesized namespace issue', () => {
     if (!result.ok) throw new Error('expected ok');
     expect(result.value.map((c) => c.factoryName)).toEqual(['createSchema']);
     expect(result.value[0]).toMatchObject({ factoryName: 'createSchema', schemaName: 'auth' });
-    expect(nodeIssueOrder(issue)).toBe(1);
+  });
+});
+
+describe('planNodeIssues — dependency-graph ordering', () => {
+  const fkToUser = new SqlForeignKeyIR({
+    columns: ['userId'],
+    referencedTable: 'user',
+    referencedColumns: ['id'],
+    referencedSchema: 'public',
+    resolvedReferencedNamespace: 'public',
+    // Mirrors what the introspection adapter stamps (`postgresTableDependsOn`):
+    // the FK depends on its referenced table's node.
+    dependsOn: [
+      [
+        { nodeKind: 'postgres-database', id: 'database' },
+        { nodeKind: 'postgres-namespace', id: 'public' },
+        { nodeKind: 'postgres-table', id: 'user' },
+      ],
+    ],
+  });
+
+  function postWithFk(): PostgresTableSchemaNode {
+    return new PostgresTableSchemaNode({
+      name: 'post',
+      columns: {
+        id: { name: 'id', nativeType: 'uuid', nullable: false, resolvedNativeType: 'uuid' },
+        userId: { name: 'userId', nativeType: 'uuid', nullable: false, resolvedNativeType: 'uuid' },
+      },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [fkToUser],
+      uniques: [],
+      indexes: [],
+      policies: [],
+      rlsEnabled: false,
+    });
+  }
+
+  function userTableNode(): PostgresTableSchemaNode {
+    return new PostgresTableSchemaNode({
+      name: 'user',
+      columns: {
+        id: { name: 'id', nativeType: 'uuid', nullable: false, resolvedNativeType: 'uuid' },
+      },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      policies: [],
+      rlsEnabled: false,
+    });
+  }
+
+  // Contract keeps `post` (its FK to `user` removed) and drops `user`. On the
+  // way down the dependent op (DROP CONSTRAINT on post's FK) must precede the
+  // dependency op (DROP TABLE user) — the graph reverses the edge for drops.
+  it('drops a foreign key before the referenced table it depends on', () => {
+    const contract = makeContract({
+      post: {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      },
+    });
+    const actual = rootOf({ post: postWithFk(), user: userTableNode() });
+    const factoryNames = planFor(contract, actual).map((c) => c.factoryName);
+    expect(factoryNames).toContain('dropConstraint');
+    expect(factoryNames).toContain('dropTable');
+    expect(factoryNames.indexOf('dropConstraint')).toBeLessThan(factoryNames.indexOf('dropTable'));
+  });
+
+  const legacyColumnChain = [
+    { nodeKind: 'postgres-database', id: 'database' },
+    { nodeKind: 'postgres-namespace', id: 'public' },
+    { nodeKind: 'postgres-table', id: 'account' },
+    { nodeKind: 'sql-column', id: 'column:legacy' },
+  ];
+
+  // A surviving table whose `legacy` column — plus the FK, unique, and index
+  // built on it — are all dropped. Postgres auto-drops the constraint/index
+  // when the column goes, so each object's `DROP` (no `IF EXISTS`) must run
+  // before the `DROP COLUMN`; the own-column edges reverse on the way down to
+  // enforce that. Without the edges the topo tiebreak sorts `column:legacy`
+  // first and the plan errors at apply time.
+  it('drops a column-backed FK, unique, and index before the column itself', () => {
+    const contract = makeContract({
+      account: {
+        columns: {
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      },
+    });
+    const actual = rootOf({
+      account: new PostgresTableSchemaNode({
+        name: 'account',
+        columns: {
+          id: { name: 'id', nativeType: 'uuid', nullable: false, resolvedNativeType: 'uuid' },
+          email: { name: 'email', nativeType: 'text', nullable: false, resolvedNativeType: 'text' },
+          legacy: {
+            name: 'legacy',
+            nativeType: 'uuid',
+            nullable: true,
+            resolvedNativeType: 'uuid',
+          },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [
+          {
+            columns: ['legacy'],
+            referencedTable: 'org',
+            referencedColumns: ['id'],
+            referencedSchema: 'public',
+            name: 'account_legacy_fkey',
+            dependsOn: [legacyColumnChain],
+          },
+        ],
+        uniques: [
+          { columns: ['legacy'], name: 'account_legacy_key', dependsOn: [legacyColumnChain] },
+        ],
+        indexes: [
+          {
+            columns: ['legacy'],
+            unique: false,
+            name: 'account_legacy_idx',
+            dependsOn: [legacyColumnChain],
+          },
+        ],
+        policies: [],
+        rlsEnabled: false,
+      }),
+    });
+    const factoryNames = planFor(contract, actual).map((c) => c.factoryName);
+    const dropColumnAt = factoryNames.indexOf('dropColumn');
+    expect(dropColumnAt).toBeGreaterThanOrEqual(0);
+    // The FK and the unique both lower to `dropConstraint`.
+    expect(factoryNames.filter((n) => n === 'dropConstraint')).toHaveLength(2);
+    expect(factoryNames.lastIndexOf('dropConstraint')).toBeLessThan(dropColumnAt);
+    expect(factoryNames.indexOf('dropIndex')).toBeGreaterThanOrEqual(0);
+    expect(factoryNames.indexOf('dropIndex')).toBeLessThan(dropColumnAt);
+  });
+});
+
+describe('mapNodeIssueToCall — table rlsEnabled drift', () => {
+  const ctx = {
+    toContract: makeContract({ user: userTable }),
+    fromContract: null,
+    schemaName: 'public',
+    codecHooks: new Map(),
+    storageTypes: {},
+    schema: undefined as never,
+    policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] as const },
+    frameworkComponents: [],
+  };
+
+  function tableNode(rlsEnabled: boolean): PostgresTableSchemaNode {
+    return new PostgresTableSchemaNode({
+      name: 'user',
+      columns: { id: { name: 'id', nativeType: 'uuid', nullable: false } },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      policies: [],
+      rlsEnabled,
+    });
+  }
+
+  function notEqualIssue(
+    expected: PostgresTableSchemaNode,
+    actual: PostgresTableSchemaNode,
+  ): SchemaDiffIssue {
+    return {
+      path: ['database', 'public', 'user'],
+      expected,
+      actual,
+    };
+  }
+
+  it('maps expected-on / actual-off to enableRowLevelSecurity', () => {
+    const result = mapNodeIssueToCall(notEqualIssue(tableNode(true), tableNode(false)), ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.map((c) => c.factoryName)).toEqual(['enableRowLevelSecurity']);
+  });
+
+  it('maps expected-off / actual-on to disableRowLevelSecurity', () => {
+    const result = mapNodeIssueToCall(notEqualIssue(tableNode(false), tableNode(true)), ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.value.map((c) => c.factoryName)).toEqual(['disableRowLevelSecurity']);
+  });
+
+  it('fails loud on a table not-equal where rlsEnabled matches on both sides (a second attribute drifted)', () => {
+    // The differ pairs table nodes by name and `isEqualTo` compares name +
+    // rlsEnabled, so this state cannot arise today — the guard makes the
+    // "rlsEnabled is the only attribute" coupling explicit: a not-equal with
+    // no rlsEnabled delta means an unhandled second attribute drifted, and we
+    // fail rather than silently emit a bogus enable/disable.
+    const result = mapNodeIssueToCall(notEqualIssue(tableNode(true), tableNode(true)), ctx);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected notOk');
+    expect(result.failure.summary).toMatch(/unhandled table-attribute drift/i);
   });
 });
 

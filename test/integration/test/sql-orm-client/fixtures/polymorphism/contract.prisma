@@ -17,6 +17,7 @@
 //   Project  --tasks(1:N)--> Task
 //   Ticket   --owner(N:1)--> User
 //   Person   <--reporter(N:1)-- Task
+//   Person   <--assignee(N:1)-- Bug (STI) / Feature (MTI)
 //   TaskComment <--comments(1:N)-- Task
 
 model Task {
@@ -35,13 +36,19 @@ model Task {
 }
 
 model Bug {
-  severity String
+  severity   String
+  assigneeId Int?   @map("bug_assignee_person_id")
+
+  assignee Person? @relation(fields: [assigneeId], references: [id])
 
   @@base(Task, "bug")
 }
 
 model Feature {
-  priority Int
+  priority   Int
+  assigneeId Int? @map("feature_assignee_person_id")
+
+  assignee Person? @relation(fields: [assigneeId], references: [id])
 
   @@base(Task, "feature")
   @@map("features")

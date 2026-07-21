@@ -19,7 +19,12 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { postgresAuthoringEntityTypes } from './authoring';
 import { PG_INT_CODEC_ID, PG_TEXT_CODEC_ID } from './codec-ids';
-import { nativeEnumEntityKind, policyEntityKind, roleEntityKind } from './entity-kinds';
+import {
+  nativeEnumEntityKind,
+  policyEntityKind,
+  rlsEnablementEntityKind,
+  roleEntityKind,
+} from './entity-kinds';
 import { PostgresSchema } from './postgres-schema';
 
 const POSTGRES_AUTHORING_CTX: AuthoringEntityContext = {
@@ -73,6 +78,7 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     super(storageTypesHydrators, [
       policyEntityKind,
       roleEntityKind,
+      rlsEnablementEntityKind,
       nativeEnumEntityKind,
       ...extraPackEntityKinds,
     ]);
@@ -110,9 +116,8 @@ export class PostgresContractSerializer extends SqlContractSerializerBase<Contra
     const { storage, ...rest } = contract;
     const namespacesJson: Record<string, JsonObject> = {};
     // Each namespace serializes to its id, its schema-kind tag, and the
-    // base's generic entries walk. Native enums are excluded upstream —
-    // carried non-enumerable on `PostgresSchema.entries`, so the walk
-    // never sees them.
+    // base's generic entries walk — every enumerable kind on
+    // `PostgresSchema.entries`, including `native_enum`.
     for (const [nsId, ns] of Object.entries(storage.namespaces)) {
       const isUnboundSlot = ns.id === UNBOUND_NAMESPACE_ID;
       namespacesJson[nsId] = {

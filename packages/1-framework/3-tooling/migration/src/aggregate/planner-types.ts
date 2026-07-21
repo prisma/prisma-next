@@ -120,6 +120,16 @@ export interface AggregateMigrationEdgeRef {
   readonly from: string;
   readonly to: string;
   readonly operationCount: number;
+  /**
+   * Contract IR JSON of the edge's destination state, threaded from the
+   * bundle's on-disk `end-contract.json` snapshot (`resolveRecordedPath`)
+   * or the space's destination contract (`planFromDiff`). Runners persist it as the
+   * edge's ledger-linked contract row so database tooling can render
+   * model-level diffs per applied migration; an edge's *before* state is
+   * the previous row's snapshot by chain construction. Absent when the
+   * source bundle carries no snapshot.
+   */
+  readonly destinationContractJson?: unknown;
 }
 
 export interface PerSpacePlan {

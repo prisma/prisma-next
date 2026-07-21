@@ -1,11 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { TableSource } from '@prisma-next/sql-relational-core/ast';
-import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { orm } from '../src/orm';
-import { createMockRuntime, type MockRuntime } from './helpers';
+import { buildTestContextFromContract, createMockRuntime, type MockRuntime } from './helpers';
 
 function storageTable(columns: string[]) {
   const cols: Record<string, { codecId: string; nativeType: string; nullable: boolean }> = {};
@@ -89,6 +88,7 @@ const twoNamespaceContract = blindCast<Contract<SqlStorage>, 'hand-built multi-n
     },
   },
 });
+const twoNamespaceContext = buildTestContextFromContract(twoNamespaceContract);
 
 type RelationCollection = {
   create(values: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -101,11 +101,7 @@ function setup(): { db: TwoNamespaceOrm; runtime: MockRuntime } {
   const db = blindCast<TwoNamespaceOrm, 'loose runtime view of the namespaced orm client'>(
     orm({
       runtime,
-      context: blindCast<ExecutionContext<Contract<SqlStorage>>, 'stub execution context'>({
-        contract: twoNamespaceContract,
-        applyMutationDefaults: () => [],
-        codecDescriptors: { descriptorFor: () => ({ traits: ['equality'] }) },
-      }),
+      context: twoNamespaceContext,
     }),
   );
   return { db, runtime };

@@ -36,8 +36,6 @@ function createRefActionContract(
       tableName: 'user',
       columns: ['id'],
     },
-    constraint: true,
-    index: true,
     ...(onDelete !== undefined && { onDelete }),
     ...(onUpdate !== undefined && { onUpdate }),
   };
@@ -90,7 +88,6 @@ const emptySchema = new PostgresDatabaseSchemaNode({
     public: new PostgresNamespaceSchemaNode({
       schemaName: 'public',
       tables: {},
-      nativeEnumTypeNames: [],
     }),
   },
   pgVersion: '',

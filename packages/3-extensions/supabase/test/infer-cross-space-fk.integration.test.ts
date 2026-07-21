@@ -35,7 +35,7 @@ import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import supabasePack from '../src/exports/pack';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 describe('contract infer — cross-space FK into the Supabase pack', () => {
   let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -57,7 +57,7 @@ describe('contract infer — cross-space FK into the Supabase pack', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (client) => {
-        await bootstrapSupabaseShim(client);
+        await setUpSupabaseMockSchema(client);
         await client.query(`
           CREATE TABLE public.users (
             id    uuid NOT NULL PRIMARY KEY,

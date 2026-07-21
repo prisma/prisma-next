@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/driver-postgres",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -15,25 +15,25 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
-    "@prisma-next/contract": "workspace:0.14.0",
-    "@prisma-next/errors": "workspace:0.14.0",
-    "@prisma-next/framework-components": "workspace:0.14.0",
-    "@prisma-next/sql-contract": "workspace:0.14.0",
-    "@prisma-next/sql-errors": "workspace:0.14.0",
-    "@prisma-next/sql-operations": "workspace:0.14.0",
-    "@prisma-next/sql-relational-core": "workspace:0.14.0",
-    "@prisma-next/utils": "workspace:0.14.0",
-    "arktype": "^2.2.0",
+    "@prisma-next/contract": "workspace:0.15.0",
+    "@prisma-next/errors": "workspace:0.15.0",
+    "@prisma-next/framework-components": "workspace:0.15.0",
+    "@prisma-next/sql-contract": "workspace:0.15.0",
+    "@prisma-next/sql-errors": "workspace:0.15.0",
+    "@prisma-next/sql-operations": "workspace:0.15.0",
+    "@prisma-next/sql-relational-core": "workspace:0.15.0",
+    "@prisma-next/utils": "workspace:0.15.0",
+    "arktype": "^2.2.2",
     "pg": "catalog:",
-    "pg-cursor": "^2.20.0"
+    "pg-cursor": "^2.21.0"
   },
   "devDependencies": {
-    "@prisma-next/test-utils": "workspace:0.14.0",
-    "@prisma-next/tsconfig": "workspace:0.14.0",
+    "@prisma-next/test-utils": "workspace:0.15.0",
+    "@prisma-next/tsconfig": "workspace:0.15.0",
     "@types/pg": "catalog:",
     "@types/pg-cursor": "^2.4.6",
     "pg-mem": "^3.0.5",
-    "@prisma-next/tsdown": "workspace:0.14.0",
+    "@prisma-next/tsdown": "workspace:0.15.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

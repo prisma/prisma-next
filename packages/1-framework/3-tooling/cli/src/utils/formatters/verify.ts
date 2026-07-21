@@ -8,26 +8,27 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { bold, cyan, dim, green, magenta, red, yellow } from 'colorette';
 import type { GlobalFlags } from '../global-flags';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
 
-/** Human-readable label for each failure reason, prefixed onto an issue's message for display. */
-const REASON_LABEL: Record<ExpectationFailureReason, string> = {
+/** Human-readable label for each outcome, prefixed onto an issue's message for display. */
+const OUTCOME_LABEL: Record<ExpectationFailureReason, string> = {
   'not-found': 'missing',
   'not-expected': 'extra',
   'not-equal': 'mismatch',
 };
 
 /**
- * The issue's display text: its own message (the differ's `path`), prefixed
- * with a human label for why it's flagged. Turning `reason` into a label is
- * this formatter's job, not the differ's — the differ's issue is data
- * (`path` + `reason` + nodes), not prose.
+ * The issue's display text: its own path, prefixed with a human label for
+ * why it's flagged. Turning the presence-derived outcome (and the path) into
+ * prose is this formatter's job, not the differ's — the differ's issue is
+ * data (`path` + nodes), not prose.
  */
 function formatIssueMessage(issue: SchemaDiffIssue): string {
-  return `${REASON_LABEL[issue.reason]}: ${issue.message}`;
+  return `${OUTCOME_LABEL[issueOutcome(issue)]}: ${issue.path.join('/')}`;
 }
 
 // ============================================================================

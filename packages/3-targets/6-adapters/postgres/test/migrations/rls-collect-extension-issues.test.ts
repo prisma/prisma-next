@@ -1,4 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { buildPostgresPlanDiff } from '@prisma-next/target-postgres/diff-database-schema';
 import {
@@ -9,6 +10,7 @@ import {
   PostgresDatabaseSchemaNode,
   PostgresNamespaceSchemaNode,
   PostgresPolicySchemaNode,
+  PostgresRlsEnablement,
   PostgresRlsPolicy,
   PostgresSchema,
   PostgresTableSchemaNode,
@@ -82,9 +84,9 @@ function schemaWithPolicies(policies: PostgresRlsPolicy[]): PostgresDatabaseSche
             uniques: [],
             indexes: [],
             policies: policies.map(toPolicyNode),
+            rlsEnabled: false,
           }),
         },
-        nativeEnumTypeNames: [],
       }),
     },
     pgVersion: 'unknown',
@@ -110,6 +112,12 @@ function buildContract(policies: readonly PostgresRlsPolicy[]): Contract<SqlStor
         }),
       },
       policy: policyEntries,
+      rls: {
+        [TABLE_NAME]: new PostgresRlsEnablement({
+          tableName: TABLE_NAME,
+          namespaceId: SCHEMA_NAME,
+        }),
+      },
     },
   });
   return {
@@ -150,7 +158,7 @@ describe('buildPostgresPlanDiff — RLS drift detection', () => {
     const issues = policyDiffIssues(buildContract([]), schemaWithPolicies([managedPolicy()]));
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.reason).toBe('not-expected');
+    expect(issueOutcome(issues[0]!)).toBe('not-expected');
     expect(issues[0]?.actual).toMatchObject({ name: WIRE_NAME });
   });
 
@@ -158,7 +166,7 @@ describe('buildPostgresPlanDiff — RLS drift detection', () => {
     const issues = policyDiffIssues(buildContract([]), schemaWithPolicies([externalPolicy()]));
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.reason).toBe('not-expected');
+    expect(issueOutcome(issues[0]!)).toBe('not-expected');
     expect(issues[0]?.actual).toMatchObject({ name: 'legacy_admin_policy' });
   });
 

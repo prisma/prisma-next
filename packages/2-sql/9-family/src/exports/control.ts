@@ -21,6 +21,7 @@ export type {
 export type {
   ContractToSchemaIROptions,
   DefaultRenderer,
+  DefaultResolver,
   EnumNamespaceSchemaResolver,
   NativeTypeExpander,
 } from '../core/migrations/contract-to-schema-ir';
@@ -31,7 +32,7 @@ export {
   detectDestructiveChanges,
   resolveValueSetValues,
 } from '../core/migrations/contract-to-schema-ir';
-export type { ControlPolicySubject } from '../core/migrations/control-policy';
+export type { ControlPolicySubject, SuppressionRecord } from '../core/migrations/control-policy';
 export {
   controlPolicyForCall,
   partitionCallsByControlPolicy,
@@ -87,6 +88,8 @@ export type {
 } from '../core/migrations/types';
 export {
   temporalAuthoringPresets,
+  temporalCodecPreset,
+  temporalCodecPresetWithPrecision,
   timestampNowControlDescriptor,
 } from '../core/timestamp-now-generator';
 

@@ -25,6 +25,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import { issueOutcome, orderIssuesByDependencies } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { DdlTableConstraint } from '@prisma-next/sql-relational-core/ast';
@@ -45,6 +46,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
+import type { PostgresNativeEnumSchemaNode } from '../schema-ir/postgres-native-enum-schema-node';
 import type { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import { PostgresSchemaNodeKind } from '../schema-ir/schema-node-kinds';
 import { quoteIdentifier } from '../sql-utils';
@@ -57,19 +59,24 @@ import { resolveNamespaceIdForDdlSchema } from './control-policy';
 import {
   AddColumnCall,
   AddForeignKeyCall,
+  AddNativeEnumValueCall,
   AddPrimaryKeyCall,
   AddUniqueCall,
   AlterColumnTypeCall,
   CreateIndexCall,
+  CreateNativeEnumTypeCall,
   CreateSchemaCall,
   CreateTableCall,
+  DisableRowLevelSecurityCall,
   DropCheckConstraintCall,
   DropColumnCall,
   DropConstraintCall,
   DropDefaultCall,
   DropIndexCall,
+  DropNativeEnumTypeCall,
   DropNotNullCall,
   DropTableCall,
+  EnableRowLevelSecurityCall,
   type PostgresOpFactoryCall,
   SetDefaultCall,
   SetNotNullCall,
@@ -130,6 +137,7 @@ export interface IssuePlannerValue {
 type CallCategory =
   | 'dep'
   | 'drop'
+  | 'dropType'
   | 'table'
   | 'rlsEnable'
   | 'rlsPolicy'
@@ -145,12 +153,23 @@ type CallCategory =
  * legacy walk-schema planner's emission order so `db init` and `db update`
  * produce byte-identical plans for the shared shape (deps → drops → tables
  * → columns → alters → PKs → uniques → indexes → FKs).
+ *
+ * `dropType` (DROP TYPE for a managed native enum) is its own bucket, ordered
+ * after the general drop bucket: a type can only be dropped once every table
+ * whose column uses it is gone. A column→enum edge would make this precise,
+ * but `coalesceSubtreeIssues` removes the column issue under a whole-table
+ * drop, so the edge never reaches the graph; the coarse bucket stands in until
+ * that edge lands (the coordinate work is a later slice).
  */
 function classifyCall(call: PostgresOpFactoryCall): CallCategory {
   switch (call.factoryName) {
     case 'createExtension':
     case 'createSchema':
+    case 'createNativeEnumType':
+    case 'addNativeEnumValue':
       return 'dep';
+    case 'dropNativeEnumType':
+      return 'dropType';
     case 'dropTable':
     case 'dropColumn':
     case 'dropConstraint':
@@ -163,6 +182,7 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
     case 'createTable':
       return 'table';
     case 'enableRowLevelSecurity':
+    case 'disableRowLevelSecurity':
       return 'rlsEnable';
     case 'createRlsPolicy':
       return 'rlsPolicy';
@@ -247,17 +267,22 @@ function locationForCall(call: PostgresOpFactoryCall): SqlPlannerConflict['locat
     typeName?: string;
   };
   const location: {
-    table?: string;
+    entityKind?: string;
+    entityName?: string;
     column?: string;
     index?: string;
     constraint?: string;
-    type?: string;
   } = {};
-  if (anyCall.tableName) location.table = anyCall.tableName;
+  if (anyCall.tableName) {
+    location.entityKind = 'table';
+    location.entityName = anyCall.tableName;
+  } else if (anyCall.typeName) {
+    location.entityKind = 'native_enum';
+    location.entityName = anyCall.typeName;
+  }
   if (anyCall.columnName) location.column = anyCall.columnName;
   if (anyCall.indexName) location.index = anyCall.indexName;
   if (anyCall.constraintName) location.constraint = anyCall.constraintName;
-  if (anyCall.typeName) location.type = anyCall.typeName;
   return Object.keys(location).length > 0 ? (location as SqlPlannerConflictLocation) : undefined;
 }
 
@@ -355,52 +380,6 @@ export function columnTypeChanged(expected: SqlColumnIR, actual: SqlColumnIR): b
 }
 
 // ----------------------------------------------------------------------------
-// Node-keyed issue ordering (re-keys ISSUE_KIND_ORDER on nodeKind + reason)
-// ----------------------------------------------------------------------------
-
-/**
- * Re-keys the legacy `ISSUE_KIND_ORDER` on `(nodeKind, reason)`, numbers
- * preserved so the dependency intent stays legible. Final emission order is
- * fixed downstream by `classifyCall` bucketing (dep → drop → table → column →
- * recipe → alter → primaryKey → unique → index → foreignKey), so this only
- * breaks ties within a bucket.
- */
-export function nodeIssueOrder(issue: SchemaDiffIssue): number {
-  const node = issueNode(issue);
-  if (node === undefined) return 99;
-  switch (node.nodeKind) {
-    case PostgresSchemaNodeKind.namespace:
-      return 1;
-    case RelationalSchemaNodeKind.foreignKey:
-      return issue.reason === 'not-expected' ? 10 : 60;
-    case RelationalSchemaNodeKind.unique:
-      return issue.reason === 'not-expected' ? 11 : 51;
-    case RelationalSchemaNodeKind.primaryKey:
-      return issue.reason === 'not-expected' ? 12 : 50;
-    case RelationalSchemaNodeKind.index:
-      return issue.reason === 'not-expected' ? 13 : 52;
-    case RelationalSchemaNodeKind.columnDefault:
-      if (issue.reason === 'not-expected') return 14;
-      return issue.reason === 'not-found' ? 42 : 43;
-    case RelationalSchemaNodeKind.column:
-      if (issue.reason === 'not-expected') return 15;
-      return issue.reason === 'not-found' ? 30 : 40;
-    case PostgresSchemaNodeKind.table:
-      return issue.reason === 'not-expected' ? 16 : 20;
-    case RelationalSchemaNodeKind.check:
-      if (issue.reason === 'not-found') return 53;
-      return issue.reason === 'not-expected' ? 55 : 54;
-    default:
-      return 99;
-  }
-}
-
-/** Deterministic tiebreak within an order bucket: the diff path already encodes schema → table → child. */
-export function nodeIssueKey(issue: SchemaDiffIssue): string {
-  return issue.path.join(' ');
-}
-
-// ----------------------------------------------------------------------------
 // Subtree coalescing (the planner's responsibility per the differ's contract)
 // ----------------------------------------------------------------------------
 
@@ -417,7 +396,7 @@ export function coalesceSubtreeIssues<TNode extends DiffableNode = DiffableNode>
   issues: readonly SchemaDiffIssue<TNode>[],
 ): readonly SchemaDiffIssue<TNode>[] {
   const collapsingPaths = issues
-    .filter((issue) => issue.reason === 'not-found' || issue.reason === 'not-expected')
+    .filter((issue) => issueOutcome(issue) !== 'not-equal')
     .map((issue) => issue.path);
   if (collapsingPaths.length === 0) return issues;
   return issues.filter(
@@ -465,6 +444,7 @@ function fkSpecFromNode(fk: SqlForeignKeyIR, tableName: string): ForeignKeySpec 
  */
 function buildCreateTableCallsFromNode(
   schemaName: string,
+  ddlSchemaName: string,
   table: PostgresTableSchemaNode,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): PostgresOpFactoryCall[] {
@@ -509,6 +489,13 @@ function buildCreateTableCallsFromNode(
     const constraintName = unique.name ?? `${table.name}_${unique.columns.join('_')}_key`;
     calls.push(new AddUniqueCall(schemaName, table.name, constraintName, [...unique.columns]));
   }
+  // Marker-driven: a newly-created table that is RLS-controlled enables RLS
+  // as part of its creation bundle. The policy set never decides this. The
+  // resolved schema (not the emission sentinel) binds into the op's
+  // relrowsecurity checks.
+  if (table.rlsEnabled) {
+    calls.push(new EnableRowLevelSecurityCall(ddlSchemaName, table.name));
+  }
   return calls;
 }
 
@@ -516,27 +503,157 @@ function nodeConflict(kind: SqlPlannerConflict['kind'], message: string): SqlPla
   return issueConflict(kind, message);
 }
 
+/**
+ * True when `actualMembers` (the live database's ordered members) is a
+ * strict, order-preserving prefix of `expectedMembers` (the contract's) —
+ * the database already carries every contract member, in declaration
+ * order, and the contract declares at least one member the database still
+ * lacks. Any other relationship — a renamed value, a removed value, a
+ * reordering, or the database holding members the contract lacks — is not
+ * a suffix append.
+ */
+function isNativeEnumSuffixAppend(
+  actualMembers: readonly string[],
+  expectedMembers: readonly string[],
+): boolean {
+  if (actualMembers.length >= expectedMembers.length) return false;
+  return actualMembers.every((member, index) => member === expectedMembers[index]);
+}
+
+/** Operator-worded refusal for a native-enum member change beyond a suffix append (design ruling — tests match this verbatim). */
+function nativeEnumMemberChangeRefusal(options: {
+  readonly ddlSchemaName: string;
+  readonly typeName: string;
+  readonly expectedMembers: readonly string[];
+  readonly actualMembers: readonly string[];
+}): string {
+  return (
+    `Native enum type "${options.ddlSchemaName}"."${options.typeName}" changed beyond appending new values ` +
+    `(contract declares [${options.expectedMembers.join(', ')}], database has [${options.actualMembers.join(', ')}]). ` +
+    "Prisma Next does not modify a native enum's existing values (rename, removal, reorder) — " +
+    'see https://pris.ly/d/postgres-native-enums. Author the change manually with `migration new`.'
+  );
+}
+
+/**
+ * Managed native-enum issue -> op lowering. A missing declared type creates
+ * it; an unclaimed live type drops it (ownership-scoped upstream by
+ * `retainUnownedExtras`, destructiveness gated by the operation-class
+ * policy); a paired member-value mismatch lowers to one `ALTER TYPE ... ADD
+ * VALUE` per appended member when the database's members are a strict,
+ * order-preserving prefix of the contract's — any other change (rename,
+ * removal, reorder, or the database holding members the contract lacks) is
+ * refused with a NAMED diagnostic, never a silent no-op and never a
+ * drop-and-recreate.
+ */
+function mapNativeEnumNodeIssue(
+  issue: SchemaDiffIssue,
+  ctx: StrategyContext,
+): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
+  const ddlSchemaName = issueSchemaName(issue);
+  if (ddlSchemaName === undefined) {
+    return notOk(
+      nodeConflict(
+        'unsupportedOperation',
+        `Enum issue has no schema in its path: ${issue.path.join('/')}`,
+      ),
+    );
+  }
+  const schemaName = emissionSchemaName(ctx, ddlSchemaName);
+  if (issueOutcome(issue) === 'not-found') {
+    const expected = blindCast<
+      PostgresNativeEnumSchemaNode,
+      'a not-found native-enum issue always carries the expected PostgresNativeEnumSchemaNode'
+    >(issue.expected);
+    return ok([new CreateNativeEnumTypeCall(schemaName, expected.typeName, expected.members)]);
+  }
+  if (issueOutcome(issue) === 'not-expected') {
+    const actual = blindCast<
+      PostgresNativeEnumSchemaNode,
+      'a not-expected native-enum issue always carries the actual PostgresNativeEnumSchemaNode'
+    >(issue.actual);
+    return ok([new DropNativeEnumTypeCall(schemaName, actual.typeName)]);
+  }
+  const expected = blindCast<
+    PostgresNativeEnumSchemaNode,
+    'a not-equal native-enum issue carries both sides; the expected node names the type'
+  >(issue.expected);
+  const actual = blindCast<
+    PostgresNativeEnumSchemaNode,
+    'a not-equal native-enum issue carries both sides'
+  >(issue.actual);
+  if (isNativeEnumSuffixAppend(actual.members, expected.members)) {
+    const appendedValues = expected.members.slice(actual.members.length);
+    return ok(
+      appendedValues.map(
+        (value) => new AddNativeEnumValueCall(schemaName, expected.typeName, value),
+      ),
+    );
+  }
+  return notOk(
+    nodeConflict(
+      'unsupportedOperation',
+      nativeEnumMemberChangeRefusal({
+        ddlSchemaName,
+        typeName: expected.typeName,
+        expectedMembers: expected.members,
+        actualMembers: actual.members,
+      }),
+    ),
+  );
+}
+
 function mapTableNodeIssue(
   issue: SchemaDiffIssue,
   schemaName: string,
+  // The diff tree's RESOLVED physical schema. Enablement ops bind it into
+  // their `pg_class`/`pg_namespace` checks (the emission sentinel would
+  // never match a live nspname), mirroring the schema the retired
+  // policy-half enable resolved via `resolveDdlSchemaForNamespaceStorage`.
+  ddlSchemaName: string,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issue.reason === 'not-found') {
+  if (issueOutcome(issue) === 'not-found') {
     const table = blindCast<
       PostgresTableSchemaNode,
       'a not-found table issue always carries the expected PostgresTableSchemaNode'
     >(issue.expected);
-    return ok(buildCreateTableCallsFromNode(schemaName, table, codecHooks));
+    return ok(buildCreateTableCallsFromNode(schemaName, ddlSchemaName, table, codecHooks));
   }
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     const table = blindCast<
       PostgresTableSchemaNode,
       'a not-expected table issue always carries the actual PostgresTableSchemaNode'
     >(issue.actual);
     return ok([new DropTableCall(schemaName, table.name)]);
   }
-  // Unreachable: PostgresTableSchemaNode.isEqualTo is identity.
-  return notOk(nodeConflict('unsupportedOperation', `Unexpected table drift: ${issue.message}`));
+  // A paired table `not-equal` means enablement drift TODAY, because
+  // `isEqualTo` compares only name + `rlsEnabled`. Key on the actual
+  // expected-vs-actual `rlsEnabled` delta rather than assuming it: emit ENABLE
+  // when it flipped on, DISABLE when it flipped off, and fail loud when
+  // `rlsEnabled` matches on both sides — that means a second table attribute
+  // drifted into `isEqualTo` and this mapper does not yet handle it. The
+  // expected side is authoritative (marker-driven, never the policy set).
+  const expected = blindCast<
+    PostgresTableSchemaNode,
+    'a not-equal table issue always carries the expected PostgresTableSchemaNode'
+  >(issue.expected);
+  const actual = blindCast<
+    PostgresTableSchemaNode,
+    'a not-equal table issue always carries the actual PostgresTableSchemaNode'
+  >(issue.actual);
+  if (expected.rlsEnabled && !actual.rlsEnabled) {
+    return ok([new EnableRowLevelSecurityCall(ddlSchemaName, expected.name)]);
+  }
+  if (!expected.rlsEnabled && actual.rlsEnabled) {
+    return ok([new DisableRowLevelSecurityCall(ddlSchemaName, expected.name)]);
+  }
+  return notOk(
+    nodeConflict(
+      'unsupportedOperation',
+      `unhandled table-attribute drift on "${expected.name}": table not-equal with no rlsEnabled delta (a second table attribute drifted)`,
+    ),
+  );
 }
 
 function mapColumnNodeIssue(
@@ -545,7 +662,7 @@ function mapColumnNodeIssue(
   tableName: string,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issue.reason === 'not-found') {
+  if (issueOutcome(issue) === 'not-found') {
     const column = blindCast<
       SqlColumnIR,
       'a not-found column issue always carries the expected column node'
@@ -554,7 +671,7 @@ function mapColumnNodeIssue(
       new AddColumnCall(schemaName, tableName, renderColumnDdl(column.name, column, codecHooks)),
     ]);
   }
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     const column = blindCast<
       SqlColumnIR,
       'a not-expected column issue always carries the actual column node'
@@ -597,7 +714,7 @@ function mapColumnDefaultNodeIssue(
   tableName: string,
   columnName: string,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     return ok([new DropDefaultCall(schemaName, tableName, columnName)]);
   }
   // not-found (SET DEFAULT, additive) or not-equal (SET DEFAULT, widening).
@@ -614,7 +731,7 @@ function mapColumnDefaultNodeIssue(
       tableName,
       columnName,
       defaultSql,
-      issue.reason === 'not-equal' ? 'widening' : 'additive',
+      issueOutcome(issue) === 'not-equal' ? 'widening' : 'additive',
     ),
   ]);
 }
@@ -624,7 +741,7 @@ function mapPrimaryKeyNodeIssue(
   schemaName: string,
   tableName: string,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issue.reason === 'not-found') {
+  if (issueOutcome(issue) === 'not-found') {
     const pk = blindCast<
       { readonly columns: readonly string[]; readonly name?: string },
       'a not-found primary-key issue always carries the expected PrimaryKey node'
@@ -632,7 +749,7 @@ function mapPrimaryKeyNodeIssue(
     const constraintName = pk.name ?? `${tableName}_pkey`;
     return ok([new AddPrimaryKeyCall(schemaName, tableName, constraintName, [...pk.columns])]);
   }
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     const pk = blindCast<
       { readonly name?: string },
       'a not-expected primary-key issue always carries the actual PrimaryKey node'
@@ -641,7 +758,7 @@ function mapPrimaryKeyNodeIssue(
       new DropConstraintCall(schemaName, tableName, pk.name ?? `${tableName}_pkey`, 'primaryKey'),
     ]);
   }
-  return notOk(nodeConflict('indexIncompatible', issue.message));
+  return notOk(nodeConflict('indexIncompatible', issue.path.join('/')));
 }
 
 function mapForeignKeyNodeIssue(
@@ -649,14 +766,14 @@ function mapForeignKeyNodeIssue(
   schemaName: string,
   tableName: string,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issue.reason === 'not-found') {
+  if (issueOutcome(issue) === 'not-found') {
     const fk = blindCast<
       SqlForeignKeyIR,
       'a not-found foreign-key issue always carries the expected foreign-key node'
     >(issue.expected);
     return ok([new AddForeignKeyCall(schemaName, tableName, fkSpecFromNode(fk, tableName))]);
   }
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     const fk = blindCast<
       SqlForeignKeyIR,
       'a not-expected foreign-key issue always carries the actual foreign-key node'
@@ -664,7 +781,7 @@ function mapForeignKeyNodeIssue(
     const name = fk.name ?? `${tableName}_${fk.columns.join('_')}_fkey`;
     return ok([new DropConstraintCall(schemaName, tableName, name, 'foreignKey')]);
   }
-  return notOk(nodeConflict('foreignKeyConflict', issue.message));
+  return notOk(nodeConflict('foreignKeyConflict', issue.path.join('/')));
 }
 
 function mapUniqueNodeIssue(
@@ -672,7 +789,7 @@ function mapUniqueNodeIssue(
   schemaName: string,
   tableName: string,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issue.reason === 'not-found') {
+  if (issueOutcome(issue) === 'not-found') {
     const unique = blindCast<
       SqlUniqueIR,
       'a not-found unique issue always carries the expected unique node'
@@ -680,7 +797,7 @@ function mapUniqueNodeIssue(
     const name = unique.name ?? `${tableName}_${unique.columns.join('_')}_key`;
     return ok([new AddUniqueCall(schemaName, tableName, name, [...unique.columns])]);
   }
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     const unique = blindCast<
       SqlUniqueIR,
       'a not-expected unique issue always carries the actual unique node'
@@ -688,7 +805,7 @@ function mapUniqueNodeIssue(
     const name = unique.name ?? `${tableName}_${unique.columns.join('_')}_key`;
     return ok([new DropConstraintCall(schemaName, tableName, name, 'unique')]);
   }
-  return notOk(nodeConflict('indexIncompatible', issue.message));
+  return notOk(nodeConflict('indexIncompatible', issue.path.join('/')));
 }
 
 function mapIndexNodeIssue(
@@ -696,7 +813,7 @@ function mapIndexNodeIssue(
   schemaName: string,
   tableName: string,
 ): Result<readonly PostgresOpFactoryCall[], SqlPlannerConflict> {
-  if (issue.reason === 'not-found') {
+  if (issueOutcome(issue) === 'not-found') {
     const index = blindCast<
       SqlIndexIR,
       'a not-found index issue always carries the expected index node'
@@ -707,7 +824,7 @@ function mapIndexNodeIssue(
     if (index.options !== undefined) extras.options = index.options;
     return ok([new CreateIndexCall(schemaName, tableName, indexName, [...index.columns], extras)]);
   }
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     const index = blindCast<
       SqlIndexIR,
       'a not-expected index issue always carries the actual index node'
@@ -715,7 +832,7 @@ function mapIndexNodeIssue(
     const indexName = index.name ?? defaultIndexName(tableName, index.columns);
     return ok([new DropIndexCall(schemaName, tableName, indexName)]);
   }
-  return notOk(nodeConflict('indexIncompatible', issue.message));
+  return notOk(nodeConflict('indexIncompatible', issue.path.join('/')));
 }
 
 function mapCheckNodeIssue(
@@ -727,7 +844,7 @@ function mapCheckNodeIssue(
   // the default mapper handles directly; check_missing / check_mismatch are
   // consumed by `checkConstraintPlanCallStrategy` (drop+recreate), so reaching
   // here for them means the strategy did not run — a conflict.
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     const check = blindCast<
       { readonly name: string },
       'a not-expected check issue always carries the actual check node'
@@ -737,15 +854,15 @@ function mapCheckNodeIssue(
   return notOk(
     nodeConflict(
       'unsupportedOperation',
-      `Check constraint drift on "${tableName}" — handled by checkConstraintPlanCallStrategy: ${issue.message}`,
+      `Check constraint drift on "${tableName}" — handled by checkConstraintPlanCallStrategy: ${issue.path.join('/')}`,
     ),
   );
 }
 
 /**
  * Maps one node-typed diff issue to its migration call(s), dispatching on the
- * node's `nodeKind` + `issue.reason`, reading nodes and resolving column DDL
- * from `codecRef` via `column-ddl-rendering.ts`.
+ * node's `nodeKind` and the issue's presence-derived `issueOutcome`, reading
+ * nodes and resolving column DDL from `codecRef` via `column-ddl-rendering.ts`.
  */
 export function mapNodeIssueToCall(
   issue: SchemaDiffIssue,
@@ -756,14 +873,14 @@ export function mapNodeIssueToCall(
     return notOk(
       nodeConflict(
         'unsupportedOperation',
-        `Issue carries neither an expected nor an actual node: ${issue.message}`,
+        `Issue carries neither an expected nor an actual node: ${issue.path.join('/')}`,
       ),
     );
   }
   if (node.nodeKind === PostgresSchemaNodeKind.namespace) {
-    if (issue.reason !== 'not-found') {
+    if (issueOutcome(issue) !== 'not-found') {
       return notOk(
-        nodeConflict('unsupportedOperation', `Unexpected namespace drift: ${issue.message}`),
+        nodeConflict('unsupportedOperation', `Unexpected namespace drift: ${issue.path.join('/')}`),
       );
     }
     const namespace = blindCast<
@@ -773,13 +890,17 @@ export function mapNodeIssueToCall(
     return ok([new CreateSchemaCall(namespace.schemaName)]);
   }
 
+  if (node.nodeKind === PostgresSchemaNodeKind.nativeEnum) {
+    return mapNativeEnumNodeIssue(issue, ctx);
+  }
+
   const ddlSchemaName = issueSchemaName(issue);
   const tableName = issueTableName(issue);
   if (ddlSchemaName === undefined || tableName === undefined) {
     return notOk(
       nodeConflict(
         'unsupportedOperation',
-        `Issue has no schema/table in its path: ${issue.message}`,
+        `Issue has no schema/table in its path: ${issue.path.join('/')}`,
       ),
     );
   }
@@ -787,7 +908,7 @@ export function mapNodeIssueToCall(
 
   switch (node.nodeKind) {
     case PostgresSchemaNodeKind.table:
-      return mapTableNodeIssue(issue, schemaName, ctx.codecHooks);
+      return mapTableNodeIssue(issue, schemaName, ddlSchemaName, ctx.codecHooks);
     case RelationalSchemaNodeKind.column:
       return mapColumnNodeIssue(issue, schemaName, tableName, ctx.codecHooks);
     case RelationalSchemaNodeKind.columnDefault: {
@@ -796,7 +917,7 @@ export function mapNodeIssueToCall(
         return notOk(
           nodeConflict(
             'unsupportedOperation',
-            `Default issue has no column in its path: ${issue.message}`,
+            `Default issue has no column in its path: ${issue.path.join('/')}`,
           ),
         );
       }
@@ -890,13 +1011,12 @@ export function planIssues(
     }
   }
 
-  const sorted = [...remaining].sort((a, b) => {
-    const kindDelta = nodeIssueOrder(a) - nodeIssueOrder(b);
-    if (kindDelta !== 0) return kindDelta;
-    const keyA = nodeIssueKey(a);
-    const keyB = nodeIssueKey(b);
-    return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
-  });
+  // Dependency-graph order: a topological sort over the issues' `dependsOn`
+  // cross-links and containment edges (the ordering law drives edge direction
+  // by presence), path-tiebroken for determinism. `classifyCall` bucketing
+  // downstream fixes the coarse cross-entity DDL sequence; this settles the
+  // order within each bucket (notably the teardown order among drops).
+  const sorted = orderIssuesByDependencies(remaining);
 
   const defaultCalls: PostgresOpFactoryCall[] = [];
   const conflicts: SqlPlannerConflict[] = [];
@@ -944,6 +1064,9 @@ export function planIssues(
   const calls: PostgresOpFactoryCall[] = [
     ...byCategory('dep'),
     ...byCategory('drop'),
+    // DROP TYPE after every table drop — a managed enum type can only go once
+    // no live column still uses it.
+    ...byCategory('dropType'),
     ...byCategory('table'),
     ...byCategory('column'),
     ...gatedRecipe,
@@ -952,6 +1075,10 @@ export function planIssues(
     ...byCategory('unique'),
     ...byCategory('index'),
     ...byCategory('foreignKey'),
+    // Enablement changes run after all relational DDL (the table must exist)
+    // and before the policy calls the planner appends after `planIssues` —
+    // the same position the retired imperative enable-on-first-policy used.
+    ...byCategory('rlsEnable'),
   ];
 
   return ok({ calls });

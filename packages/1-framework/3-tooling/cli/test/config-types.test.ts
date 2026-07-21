@@ -200,6 +200,7 @@ describe('defineConfig', () => {
         type: {},
         entityTypes: {},
         pslBlockDescriptors: {},
+        modelAttributes: {},
       },
       codecLookup: {
         get: () => undefined,

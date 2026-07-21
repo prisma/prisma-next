@@ -91,6 +91,17 @@ describe('SqliteControlAdapter.introspect', () => {
     expect(fks[0]!.referencedTable).toBe('authors');
     expect(fks[0]!.referencedColumns).toEqual(['id']);
     expect(fks[0]!.onDelete).toBe('cascade');
+    expect(fks[0]!.dependsOn).toEqual([
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'authors' },
+      ],
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'posts' },
+        { nodeKind: 'sql-column', id: 'column:author_id' },
+      ],
+    ]);
     await driver.close();
   });
 

@@ -1,21 +1,19 @@
 import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { SqlSchemaDiffResult } from '@prisma-next/family-sql/control';
 import { buildNativeTypeExpander } from '@prisma-next/family-sql/control';
-import {
-  classifyDiffSubjectGranularity,
-  resolveSemanticSatisfaction,
-} from '@prisma-next/family-sql/diff';
+import { classifyDiffSubjectGranularity } from '@prisma-next/family-sql/diff';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
-import { diffSchemas } from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import { diffSchemas, issueOutcome } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { postgresResolveDefault } from '../default-normalizer';
 import type { PostgresContract } from '../postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
-import { PostgresTableSchemaNode } from '../schema-ir/postgres-table-schema-node';
 import {
   postgresDiffSubjectGranularity,
   type SqlSchemaDiffNode,
@@ -23,67 +21,36 @@ import {
 import { contractToPostgresDatabaseSchemaNode } from './contract-to-postgres-database-schema-node';
 import { resolvePostgresNodeIssueControlPolicySubject } from './control-policy';
 
+/**
+ * Whether a diff issue's subject node is cluster-scoped — it carries its own
+ * `namespaceId` field (only role and policy diff nodes do) and that
+ * coordinate is the unbound sentinel, meaning the node is not owned by any
+ * schema/namespace. A role node is always cluster-scoped (roles are
+ * cluster-level objects); a policy node's `namespaceId` is always its
+ * table's resolved DDL schema, never the sentinel. Namespace-ownership
+ * scoping (which compares `issue.path[1]` against the set of DDL schemas
+ * the contract owns) makes no sense for a cluster-scoped subject — its path
+ * segment at that index is the object's own name, not a schema name — so
+ * such an issue bypasses that scoping entirely.
+ */
+function isClusterScopedIssue(issue: SchemaDiffIssue): boolean {
+  const node = issue.expected ?? issue.actual;
+  return node !== undefined && nodeNamespaceId(node) === UNBOUND_NAMESPACE_ID;
+}
+
+function nodeNamespaceId(node: DiffableNode): string | undefined {
+  if (!Object.hasOwn(node, 'namespaceId')) return undefined;
+  return blindCast<
+    { namespaceId: string },
+    'presence of an own namespaceId field was just checked via Object.hasOwn'
+  >(node).namespaceId;
+}
+
 function ownedSchemaNames(expected: PostgresDatabaseSchemaNode): ReadonlySet<string> {
   const policyNamespaces = Object.values(expected.namespaces).flatMap((ns) =>
     Object.values(ns.tables).flatMap((t) => t.policies.map((p) => p.namespaceId)),
   );
   return new Set([...policyNamespaces, ...expected.existingSchemas]);
-}
-
-/**
- * Applies the family's semantic-satisfaction normalization across a Postgres
- * tree pair: every actual table with an expected counterpart (paired by
- * namespace id, then table id) gets its unique/index child lists adjusted;
- * everything else passes through untouched.
- */
-export function normalizePostgresActualForDiff(
-  expected: PostgresDatabaseSchemaNode,
-  actual: PostgresDatabaseSchemaNode,
-): PostgresDatabaseSchemaNode {
-  const namespaces: Record<string, PostgresNamespaceSchemaNode> = {};
-  for (const [nsId, actualNs] of Object.entries(actual.namespaces)) {
-    const expectedNs = expected.namespaces[nsId];
-    if (expectedNs === undefined) {
-      namespaces[nsId] = actualNs;
-      continue;
-    }
-    const tables: Record<string, PostgresTableSchemaNode> = {};
-    for (const [tableName, actualTable] of Object.entries(actualNs.tables)) {
-      const expectedTable = expectedNs.tables[tableName];
-      if (expectedTable === undefined) {
-        tables[tableName] = actualTable;
-        continue;
-      }
-      const adjusted = resolveSemanticSatisfaction({
-        expectedUniques: expectedTable.uniques,
-        expectedIndexes: expectedTable.indexes,
-        actualUniques: actualTable.uniques,
-        actualIndexes: actualTable.indexes,
-      });
-      tables[tableName] = new PostgresTableSchemaNode({
-        name: actualTable.name,
-        columns: actualTable.columns,
-        foreignKeys: actualTable.foreignKeys,
-        uniques: adjusted.actualUniques,
-        indexes: adjusted.actualIndexes,
-        ...ifDefined('primaryKey', actualTable.primaryKey),
-        ...ifDefined('annotations', actualTable.annotations),
-        ...ifDefined('checks', actualTable.checks),
-        policies: [...actualTable.policies],
-      });
-    }
-    namespaces[nsId] = new PostgresNamespaceSchemaNode({
-      schemaName: actualNs.schemaName,
-      tables,
-      nativeEnumTypeNames: actualNs.nativeEnumTypeNames,
-    });
-  }
-  return new PostgresDatabaseSchemaNode({
-    namespaces,
-    roles: [...actual.roles],
-    existingSchemas: [...actual.existingSchemas],
-    pgVersion: actual.pgVersion,
-  });
 }
 
 /**
@@ -113,10 +80,17 @@ function pruneTableLessNamespaces(
 }
 
 /**
- * Resolves a verdict-diff issue's subject table's declared control policy
- * directly from the contract, by delegating to the same node-typed resolver
+ * Resolves a verdict-diff issue's subject's declared control policy directly
+ * from the contract, by delegating to the same node-typed resolver
  * ({@link resolvePostgresNodeIssueControlPolicySubject}) the planner uses to
- * gate DDL calls. `undefined` when the issue resolves to no contract table.
+ * gate DDL calls. `undefined` when the issue resolves to no contract subject.
+ *
+ * A role issue resolves through that same resolver to `external`
+ * unconditionally (see its role branch), regardless of the contract's own
+ * default policy: a role is referenced by the contract but not owned, and
+ * `external`'s existing semantics — a missing declared subject still fails,
+ * every extra is suppressed — are exactly the wanted asymmetric grading for
+ * a cluster object the framework does not own.
  */
 function resolveControlPolicy(
   issue: SchemaDiffIssue,
@@ -133,11 +107,11 @@ function resolveControlPolicy(
 /**
  * The Postgres full-tree node diff for the family verify verdict: derive
  * the expected tree (resolved leaf values, expander threaded, FK schemas
- * resolved, table-less namespaces pruned), normalize the actual tree for
- * semantic satisfaction, run the generic
- * differ, and scope out `not-expected` findings under namespaces the
- * contract does not own. Ownership is role-aware, mirroring the legacy
- * decomposition: relational extras check the PRUNED owned set (the legacy
+ * resolved, table-less namespaces pruned), run the generic
+ * differ over the trees as derived, and scope out `not-expected` findings under namespaces the
+ * contract does not own. Ownership scoping bypasses cluster-scoped subjects
+ * (roles today), mirroring the legacy decomposition: relational extras check
+ * the PRUNED owned set (the legacy
  * per-namespace walk never visited a table-less namespace, so its live
  * relational contents are invisible), while `structural` extras (RLS
  * policies) check the FULL owned set (the legacy policy diff governed
@@ -145,7 +119,7 @@ function resolveControlPolicy(
  * shrink because a namespace declares no tables). The codec `verifyType`
  * hooks run once per contract namespace with tables against that
  * namespace's paired actual node (the hooks read namespace-scoped state
- * such as `nativeEnumTypeNames`).
+ * such as `nativeEnums`).
  */
 export function diffPostgresSchema(input: {
   readonly contract: Contract<SqlStorage>;
@@ -162,16 +136,17 @@ export function diffPostgresSchema(input: {
   const fullExpected = contractToPostgresDatabaseSchemaNode(postgresContract, {
     annotationNamespace: 'pg',
     ...ifDefined('expandNativeType', expandNativeType),
+    resolveDefault: postgresResolveDefault,
   });
   const expected = pruneTableLessNamespaces(fullExpected);
-  const normalizedActual = normalizePostgresActualForDiff(expected, actual);
   const relationalOwned = ownedSchemaNames(expected);
   const structuralOwned = ownedSchemaNames(fullExpected);
-  const issues = diffSchemas(expected, normalizedActual).filter((issue) => {
-    if (issue.reason !== 'not-expected') return true;
+  const issues = diffSchemas(expected, actual).filter((issue) => {
+    if (issueOutcome(issue) !== 'not-expected') return true;
+    if (isClusterScopedIssue(issue)) return true;
+    const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;
-    const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
     const owned = granularity === 'structural' ? structuralOwned : relationalOwned;
     return owned.has(namespaceSegment);
   });
@@ -208,7 +183,6 @@ function padActualNamespaces(
       namespaces[schemaName] = new PostgresNamespaceSchemaNode({
         schemaName,
         tables: {},
-        nativeEnumTypeNames: [],
       });
       padded = true;
     }
@@ -225,17 +199,17 @@ function padActualNamespaces(
 export interface PostgresPlanDiff {
   /** The desired ("end") tree — resolved leaf values (incl. `codecRef`) on every column, table-less namespaces pruned. */
   readonly expected: PostgresDatabaseSchemaNode;
-  /** The live ("start") tree, padded with empty namespaces and normalized for semantic satisfaction against `expected`. */
+  /** The live ("start") tree, padded with empty namespaces so a missing schema's tables pair. */
   readonly actual: PostgresDatabaseSchemaNode;
-  /** The one node diff over the two trees: relational + policy drift, role-aware ownership filtered. */
+  /** The one node diff over the two trees: relational + policy drift, cluster-scope-aware ownership filtered. */
   readonly issues: readonly SchemaDiffIssue<SqlSchemaDiffNode>[];
 }
 
 /**
  * The Postgres planner's diff input: the SAME tree-building
  * `diffPostgresSchema` uses (expander threaded, FK schemas resolved,
- * table-less namespaces pruned, actual normalized for semantic satisfaction,
- * role-aware ownership filter) plus actual namespace padding (so a missing
+ * table-less namespaces pruned, cluster-scope-aware ownership filter) plus
+ * actual namespace padding (so a missing
  * schema's tables surface as `not-found` instead of a swallowed namespace
  * `not-found`). One differ drives both verify and plan; this is the
  * plan-side derivation. The single issue list covers tables / columns /
@@ -258,23 +232,24 @@ export function buildPostgresPlanDiff(input: {
   const projectionOptions = {
     annotationNamespace: 'pg',
     ...ifDefined('expandNativeType', expandNativeType),
+    resolveDefault: postgresResolveDefault,
   };
   const fullExpected = contractToPostgresDatabaseSchemaNode(postgresContract, projectionOptions);
   const expected = pruneTableLessNamespaces(fullExpected);
   const paddedActual = padActualNamespaces(expected, actual);
-  const normalizedActual = normalizePostgresActualForDiff(expected, paddedActual);
   const relationalOwned = ownedSchemaNames(expected);
   const structuralOwned = ownedSchemaNames(fullExpected);
   const issues = blindCast<
     readonly SchemaDiffIssue<SqlSchemaDiffNode>[],
     'both trees are PostgresDatabaseSchemaNodes, so every diff-issue node is a SqlSchemaDiffNode'
-  >(diffSchemas(expected, normalizedActual)).filter((issue) => {
-    if (issue.reason !== 'not-expected') return true;
+  >(diffSchemas(expected, paddedActual)).filter((issue) => {
+    if (issueOutcome(issue) !== 'not-expected') return true;
+    if (isClusterScopedIssue(issue)) return true;
+    const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
     const namespaceSegment = issue.path[1];
     if (namespaceSegment === undefined) return true;
-    const granularity = classifyDiffSubjectGranularity(issue, postgresDiffSubjectGranularity);
     const owned = granularity === 'structural' ? structuralOwned : relationalOwned;
     return owned.has(namespaceSegment);
   });
-  return { expected, actual: normalizedActual, issues };
+  return { expected, actual: paddedActual, issues };
 }

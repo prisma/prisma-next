@@ -74,6 +74,7 @@ function profilesTable(options?: { readonly idNullable?: boolean }): PostgresTab
     uniques: [],
     indexes: [],
     policies: [],
+    rlsEnabled: false,
   });
 }
 
@@ -81,7 +82,6 @@ function publicNamespace(options?: { readonly idNullable?: boolean }): PostgresN
   return new PostgresNamespaceSchemaNode({
     schemaName: 'public',
     tables: { profiles: profilesTable(options) },
-    nativeEnumTypeNames: [],
   });
 }
 
@@ -105,9 +105,9 @@ function enumsNamespaceWithStrayTable(
         uniques: [],
         indexes: [],
         policies: policy === undefined ? [] : [policy],
+        rlsEnabled: false,
       }),
     },
-    nativeEnumTypeNames: [],
   });
 }
 

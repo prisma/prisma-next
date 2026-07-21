@@ -14,6 +14,7 @@ import {
   PG_FLOAT_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
+  PG_INET_CODEC_ID,
   PG_INT_CODEC_ID,
   PG_INT2_CODEC_ID,
   PG_INT4_CODEC_ID,
@@ -218,6 +219,7 @@ export const postgresAdapterDescriptorMeta = {
         [PG_JSONB_CODEC_ID]: identityHooks,
         [PG_BYTEA_CODEC_ID]: identityHooks,
         [PG_UUID_CODEC_ID]: identityHooks,
+        [PG_INET_CODEC_ID]: identityHooks,
       },
     },
     storage: [
@@ -285,6 +287,7 @@ export const postgresAdapterDescriptorMeta = {
       { typeId: PG_JSONB_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'jsonb' },
       { typeId: PG_BYTEA_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'bytea' },
       { typeId: PG_UUID_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'uuid' },
+      { typeId: PG_INET_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'inet' },
     ],
     queryOperationTypes: {
       import: {

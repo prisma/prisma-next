@@ -24,7 +24,13 @@ import {
  * node's `nodeKind`.
  */
 function diffNode(id: string, kind?: string): DiffableNode & { readonly kind?: string } {
-  return { id, isEqualTo: () => true, children: () => [], ...ifDefined('kind', kind) };
+  return {
+    id,
+    nodeKind: kind ?? 'unclassified',
+    isEqualTo: () => true,
+    children: () => [],
+    ...ifDefined('kind', kind),
+  };
 }
 
 /** A fake classifier keyed on the fixture nodes' `kind`, standing in for a real family/target one. */
@@ -49,8 +55,6 @@ const classifyEntityKind: SchemaEntityKindClassifier = (issue) => {
 function extraTableIssue(name: string): SchemaDiffIssue {
   return {
     path: ['database', 'public', name],
-    reason: 'not-expected',
-    message: `extra: ${name}`,
     actual: diffNode(name, 'table'),
   };
 }
@@ -58,8 +62,6 @@ function extraTableIssue(name: string): SchemaDiffIssue {
 function extraColumnIssueUnder(tableName: string, columnName: string): SchemaDiffIssue {
   return {
     path: ['database', 'public', tableName, `column:${columnName}`],
-    reason: 'not-expected',
-    message: `extra column: ${columnName}`,
     actual: diffNode(`column:${columnName}`, 'column'),
   };
 }
@@ -67,8 +69,6 @@ function extraColumnIssueUnder(tableName: string, columnName: string): SchemaDif
 function extraPolicyIssue(tableName: string, policyName: string): SchemaDiffIssue {
   return {
     path: ['database', 'public', tableName, policyName],
-    reason: 'not-expected',
-    message: `RLS policy '${policyName}' is present in the database but not in the contract`,
     actual: diffNode(policyName, 'policy'),
   };
 }
@@ -77,8 +77,6 @@ function extraPolicyIssue(tableName: string, policyName: string): SchemaDiffIssu
 function extraCollectionIssue(name: string): SchemaDiffIssue {
   return {
     path: [name],
-    reason: 'not-expected',
-    message: `Extra collection "${name}" exists in the database but not in the contract`,
     actual: diffNode(name),
   };
 }
@@ -134,8 +132,6 @@ describe('stripExtraFindings', () => {
   it('a real missing/mismatch failure survives the strip', () => {
     const missingColumn: SchemaDiffIssue = {
       path: ['database', 'public', 'user', 'column:email'],
-      reason: 'not-found',
-      message: 'm',
       expected: diffNode('column:email', 'column'),
     };
     const result = makeResult({
@@ -240,8 +236,6 @@ describe('collectExtraElementCoordinates', () => {
         extraTableIssue('orphan_table'),
         {
           path: ['database', 'tenant_b', 'orphan_table'],
-          reason: 'not-expected',
-          message: 'extra: orphan_table',
           actual: diffNode('orphan_table', 'table'),
         },
       ],

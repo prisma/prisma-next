@@ -4,7 +4,7 @@ import { findPathWithDecision } from '../../migration-graph';
 import type { MigrationOps, OnDiskMigrationPackage } from '../../package';
 import { requireHeadRef } from '../aggregate';
 import type { ContractMarkerRecordLike } from '../marker-types';
-import type { PerSpacePlan } from '../planner-types';
+import type { AggregateMigrationEdgeRef, PerSpacePlan } from '../planner-types';
 import type { AggregateContractSpace } from '../types';
 
 /**
@@ -75,13 +75,7 @@ export function resolveRecordedPath(input: ResolveRecordedPathInputs): ResolveRe
 
   const pathOps: MigrationOps[number][] = [];
   const providedInvariantsSet = new Set<string>();
-  const edgeRefs: Array<{
-    migrationHash: string;
-    dirName: string;
-    from: string;
-    to: string;
-    operationCount: number;
-  }> = [];
+  const edgeRefs: AggregateMigrationEdgeRef[] = [];
   for (const edge of outcome.decision.selectedPath) {
     const pkg = packagesByMigrationHash.get(edge.migrationHash);
     if (!pkg) {
@@ -97,6 +91,9 @@ export function resolveRecordedPath(input: ResolveRecordedPathInputs): ResolveRe
       from: edge.from,
       to: edge.to,
       operationCount: pkg.ops.length,
+      ...(pkg.endContractJson !== undefined
+        ? { destinationContractJson: pkg.endContractJson }
+        : {}),
     });
   }
 

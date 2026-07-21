@@ -6,6 +6,12 @@ import type {
 import { describe, expect, it } from 'vitest';
 import { entityNamesDeclaredBy, scopeVerifyResultToSpace } from '../src/core/scope-verify-result';
 
+const NODE = { id: 'x', nodeKind: 'mongo-collection', isEqualTo: () => true, children: () => [] };
+/** An extra (live-only) finding — a drop, by presence. */
+const extra = (path: readonly string[]): SchemaDiffIssue => ({ path, actual: NODE });
+/** A missing (declared-only) finding — a create, by presence. */
+const missing = (path: readonly string[]): SchemaDiffIssue => ({ path, expected: NODE });
+
 function makeContract(collections: readonly string[]): Contract {
   const entries: Record<string, Record<string, unknown>> = {
     collection: Object.fromEntries(collections.map((name) => [name, {}])),
@@ -54,19 +60,14 @@ describe('scopeVerifyResultToSpace', () => {
   it('drops a sibling space’s extra collection, keeps the undeclared extra, and stays failing', () => {
     const result = makeResult({
       ok: false,
-      issues: [
-        { path: ['cipher_state'], reason: 'not-expected', message: 'extra' },
-        { path: ['junk'], reason: 'not-expected', message: 'extra' },
-      ],
+      issues: [extra(['cipher_state']), extra(['junk'])],
     });
 
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
 
     // The sibling's collection is dropped; the truly undeclared `junk` stays,
     // so the runner still fails on genuine drift.
-    expect(scoped.schema.issues).toEqual([
-      expect.objectContaining({ path: ['junk'], reason: 'not-expected' }),
-    ]);
+    expect(scoped.schema.issues).toEqual([expect.objectContaining({ path: ['junk'] })]);
     expect(scoped.ok).toBe(false);
     expect(scoped.code).toBe('PN-RUN-3010');
   });
@@ -74,7 +75,7 @@ describe('scopeVerifyResultToSpace', () => {
   it('flips ok to true when the only failures were sibling collections', () => {
     const result = makeResult({
       ok: false,
-      issues: [{ path: ['cipher_state'], reason: 'not-expected', message: 'extra' }],
+      issues: [extra(['cipher_state'])],
     });
 
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
@@ -91,7 +92,7 @@ describe('scopeVerifyResultToSpace', () => {
     // still fails on its own drift.
     const result = makeResult({
       ok: false,
-      issues: [{ path: ['cipher_state', 'column:ssn'], reason: 'not-found', message: 'missing' }],
+      issues: [missing(['cipher_state', 'column:ssn'])],
     });
 
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));
@@ -109,10 +110,7 @@ describe('scopeVerifyResultToSpace', () => {
     // being mistaken for the sibling's whole-collection extra.
     const result = makeResult({
       ok: false,
-      issues: [
-        { path: ['cipher_state', 'index:secret:1'], reason: 'not-expected', message: 'extra' },
-        { path: ['user', 'column:email'], reason: 'not-found', message: 'missing' },
-      ],
+      issues: [extra(['cipher_state', 'index:secret:1']), missing(['user', 'column:email'])],
     });
 
     const scoped = scopeVerifyResultToSpace(result, new Set(['cipher_state']));

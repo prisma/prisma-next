@@ -39,7 +39,7 @@ describe('GroupedCollection', () => {
     }
     const totalViewsProjection = firstAst.projection.find((item) => item.alias === 'totalViews');
     expect(totalViewsProjection?.expr.kind).toBe('aggregate');
-    expect((totalViewsProjection?.expr as AggregateExpr).fn).toBe('sum');
+    expect((totalViewsProjection!.expr as AggregateExpr).fn).toBe('sum');
   });
 
   it('groupBy().aggregate() validates selector shape and non-empty spec', async () => {

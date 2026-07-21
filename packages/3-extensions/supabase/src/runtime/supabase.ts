@@ -8,6 +8,7 @@ import type {
 } from '@prisma-next/framework-components/runtime';
 import {
   buildNamespacedNativeEnums,
+  isPgPool,
   type NamespacedNativeEnums,
 } from '@prisma-next/postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
@@ -33,10 +34,11 @@ import {
 import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { createRemoteJWKSet, type JWTVerifyResult, jwtVerify } from 'jose';
+import { createRemoteJWKSet, decodeProtectedHeader, type JWTVerifyResult, jwtVerify } from 'jose';
 import type { Client } from 'pg';
 import { Pool } from 'pg';
 import extensionContractJson from '../contract/contract.json' with { type: 'json' };
+import { isSupabaseRole, SUPABASE_JWT_ROLE_CLAIM, SupabaseRole } from '../contract/roles';
 import { supabaseRuntimeDescriptor } from './descriptor';
 import type { SupabaseExtensionContract } from './ext-contract-type';
 import type { SupabaseRoleBinding, SupabaseRuntime } from './supabase-runtime';
@@ -48,9 +50,6 @@ type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof orm<T
 
 export class SupabaseConfigError extends Error {
   override readonly name = 'SupabaseConfigError';
-  constructor(message: string) {
-    super(message);
-  }
 }
 
 export class InvalidJwtError extends Error {
@@ -206,10 +205,46 @@ function resolveKeyMaterial<TContract extends Contract<SqlStorage>>(
   throw new SupabaseConfigError('Either jwtSecret or jwksUrl is required');
 }
 
+/**
+ * Pre-verification check that the token's signing algorithm can possibly
+ * match the configured key material. Without it the mismatch surfaces as a
+ * jose internal ("Key for the ES256 algorithm must be one of type
+ * CryptoKey... Received an instance of Uint8Array") that never names the
+ * actual problem: current Supabase projects sign ES256 via JWKS by default,
+ * while `supabase status` still prints a JWT_SECRET that only fits legacy
+ * HS256 projects. Returns `undefined` when the pairing is plausible or the
+ * header is unreadable (jwtVerify then produces the canonical error).
+ */
+function algKeyMismatchReason(jwt: string, kind: KeyMaterial['kind']): string | undefined {
+  let alg: string | undefined;
+  try {
+    alg = decodeProtectedHeader(jwt).alg;
+  } catch {
+    return undefined;
+  }
+  if (alg === undefined) return undefined;
+  const asymmetric = /^(?:ES|RS|PS)\d{3}$/.test(alg) || alg === 'EdDSA' || alg === 'Ed25519';
+  if (kind === 'secret' && asymmetric) {
+    return (
+      `token is signed with ${alg} but this client is configured with jwtSecret (HS256). ` +
+      'Current Supabase projects sign with asymmetric keys by default — configure ' +
+      'jwksUrl (https://<project>/auth/v1/.well-known/jwks.json) instead of jwtSecret.'
+    );
+  }
+  if (kind === 'jwks' && alg.startsWith('HS')) {
+    return (
+      `token is signed with ${alg} (a symmetric algorithm) but this client is configured ` +
+      'with jwksUrl. A legacy HS256 Supabase project needs jwtSecret (the JWT_SECRET from ' +
+      '`supabase status`) instead of jwksUrl.'
+    );
+  }
+  return undefined;
+}
+
 function toPool<TContract extends Contract<SqlStorage>>(
   options: SupabaseOptions<TContract>,
 ): { pool: Pool; owned: boolean } | undefined {
-  if (options.pg instanceof Pool) {
+  if (options.pg !== undefined && isPgPool(options.pg)) {
     return { pool: options.pg, owned: false };
   }
   if (typeof options.url === 'string') {
@@ -294,6 +329,10 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
   });
 
   async function verifyJwt(jwt: string): Promise<JWTVerifyResult> {
+    const mismatch = algKeyMismatchReason(jwt, keyMaterial.kind);
+    if (mismatch !== undefined) {
+      throw new InvalidJwtError(mismatch);
+    }
     try {
       if (keyMaterial.kind === 'secret') {
         return await jwtVerify(jwt, keyMaterial.key);
@@ -341,7 +380,10 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
     return buildRoleBoundDbWithContext(binding, context, runtime);
   }
 
-  const serviceRoleBinding: SupabaseRoleBinding = { role: 'service_role', claims: {} };
+  const serviceRoleBinding: SupabaseRoleBinding = {
+    role: SupabaseRole.members.ServiceRole,
+    claims: {},
+  };
 
   // The Supabase-internal contract (auth/storage) as a separate secondary root.
   // It is contract-bound: a plan built against it carries the extension's
@@ -401,18 +443,17 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
 
     async asUser(jwt: string): Promise<RoleBoundDb<TContract>> {
       const { payload } = await verifyJwt(jwt);
-      const rawRole = payload['role'];
-      const roleStr = typeof rawRole === 'string' ? rawRole : 'authenticated';
-      const role: SupabaseRoleBinding['role'] =
-        roleStr === 'anon' || roleStr === 'authenticated' || roleStr === 'service_role'
-          ? roleStr
-          : 'authenticated';
+      const rawRole = payload[SUPABASE_JWT_ROLE_CLAIM];
+      const roleStr = typeof rawRole === 'string' ? rawRole : SupabaseRole.members.Authenticated;
+      const role: SupabaseRoleBinding['role'] = isSupabaseRole(roleStr)
+        ? roleStr
+        : SupabaseRole.members.Authenticated;
       const binding: SupabaseRoleBinding = { role, claims: payload };
       return buildRoleBoundDb(binding);
     },
 
     asAnon(): RoleBoundDb<TContract> {
-      return buildRoleBoundDb({ role: 'anon', claims: {} });
+      return buildRoleBoundDb({ role: SupabaseRole.members.Anon, claims: {} });
     },
 
     asServiceRole(): ServiceRoleDb<TContract> {

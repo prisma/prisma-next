@@ -86,19 +86,19 @@ describe('SqlForeignKeyIR', () => {
         columns: ['user_id'],
         referencedTable: 'users',
         referencedColumns: ['id'],
-        referencedSchema: '__unbound__',
+        referencedSchema: 'app_ns',
         resolvedReferencedNamespace: 'public',
       });
-      expect(fk.referencedSchema).toBe('__unbound__');
+      expect(fk.referencedSchema).toBe('app_ns');
       expect(fk.id).toBe('foreign-key:user_id->public.users(id)');
     });
 
-    it('an unbound-namespace expected FK pairs with an introspected public FK by id', () => {
+    it('an expected FK with a resolved namespace pairs with an introspected public FK by id', () => {
       const expected = new SqlForeignKeyIR({
         columns: ['user_id'],
         referencedTable: 'users',
         referencedColumns: ['id'],
-        referencedSchema: '__unbound__',
+        referencedSchema: 'app_ns',
         resolvedReferencedNamespace: 'public',
       });
       const actual = new SqlForeignKeyIR({
@@ -195,6 +195,62 @@ describe('SqlForeignKeyIR', () => {
         onUpdate: 'setNull',
       });
       expect(a.isEqualTo(b)).toBe(false);
+    });
+  });
+
+  describe('dependsOn', () => {
+    const dependsOn = [
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'users' },
+      ],
+    ];
+
+    it('is readable when supplied', () => {
+      const fk = new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+        dependsOn,
+      });
+      expect(fk.dependsOn).toEqual(dependsOn);
+    });
+
+    it('is absent when not supplied', () => {
+      const fk = new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+      });
+      expect(fk.dependsOn).toBeUndefined();
+    });
+
+    it('is non-enumerable — excluded from JSON and structural equality', () => {
+      const fk = new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+        dependsOn,
+      });
+      expect(Object.keys(fk)).not.toContain('dependsOn');
+      expect(JSON.parse(JSON.stringify(fk))).not.toHaveProperty('dependsOn');
+    });
+
+    it('is ignored by isEqualTo', () => {
+      const a = new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+        onDelete: 'cascade',
+        dependsOn,
+      });
+      const b = new SqlForeignKeyIR({
+        columns: ['user_id'],
+        referencedTable: 'users',
+        referencedColumns: ['id'],
+        onDelete: 'cascade',
+      });
+      expect(a.isEqualTo(b)).toBe(true);
     });
   });
 });

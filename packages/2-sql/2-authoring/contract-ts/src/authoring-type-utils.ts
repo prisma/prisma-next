@@ -2,6 +2,7 @@ import type {
   AuthoringArgumentDescriptor,
   AuthoringFieldPresetDescriptor,
 } from '@prisma-next/framework-components/authoring';
+import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { ScalarFieldBuilder, ScalarFieldState } from './contract-dsl';
 
 export type UnionToIntersection<U> = (U extends unknown ? (value: U) => void : never) extends (
@@ -25,14 +26,28 @@ export type OptionalObjectArgumentKeys<
   readonly [K in keyof Properties]: Properties[K] extends { readonly optional: true } ? K : never;
 }[keyof Properties];
 
-export type ObjectArgumentType<Properties extends Record<string, AuthoringArgumentDescriptor>> = {
-  readonly [K in Exclude<
-    keyof Properties,
-    OptionalObjectArgumentKeys<Properties>
-  >]: ArgTypeFromDescriptor<Properties[K]>;
-} & {
-  readonly [K in OptionalObjectArgumentKeys<Properties>]?: ArgTypeFromDescriptor<Properties[K]>;
-};
+type RequiredObjectArgumentKeys<Properties extends Record<string, AuthoringArgumentDescriptor>> =
+  Exclude<keyof Properties, OptionalObjectArgumentKeys<Properties>>;
+
+/**
+ * When every property is optional the result must be a plain weak type rather
+ * than `{} & { … }`: TypeScript's weak-type check rejects an object sharing
+ * none of the target's properties, but only when the target is weak — and an
+ * intersection with `{}` is not. The TS authoring surface runs no runtime
+ * argument validation, so this check is the only thing rejecting a foreign key
+ * such as `field.nanoid({ bogus: 1 })`.
+ */
+export type ObjectArgumentType<Properties extends Record<string, AuthoringArgumentDescriptor>> = [
+  RequiredObjectArgumentKeys<Properties>,
+] extends [never]
+  ? {
+      readonly [K in OptionalObjectArgumentKeys<Properties>]?: ArgTypeFromDescriptor<Properties[K]>;
+    }
+  : {
+      readonly [K in RequiredObjectArgumentKeys<Properties>]: ArgTypeFromDescriptor<Properties[K]>;
+    } & {
+      readonly [K in OptionalObjectArgumentKeys<Properties>]?: ArgTypeFromDescriptor<Properties[K]>;
+    };
 
 export type ArgTypeFromDescriptor<Arg extends AuthoringArgumentDescriptor> = Arg extends {
   readonly kind: 'string';
@@ -45,20 +60,38 @@ export type ArgTypeFromDescriptor<Arg extends AuthoringArgumentDescriptor> = Arg
       : Arg extends { readonly kind: 'stringArray' }
         ? readonly string[]
         : Arg extends {
-              readonly kind: 'object';
-              readonly properties: infer Properties extends Record<
-                string,
-                AuthoringArgumentDescriptor
-              >;
+              readonly kind: 'option';
+              readonly values: infer Values extends readonly string[];
             }
-          ? ObjectArgumentType<Properties>
-          : never;
+          ? Values[number]
+          : Arg extends {
+                readonly kind: 'object';
+                readonly properties: infer Properties extends Record<
+                  string,
+                  AuthoringArgumentDescriptor
+                >;
+              }
+            ? ObjectArgumentType<Properties>
+            : never;
 
-export type TupleFromArgumentDescriptors<Args extends readonly AuthoringArgumentDescriptor[]> = {
-  readonly [K in keyof Args]: Args[K] extends AuthoringArgumentDescriptor
-    ? ArgTypeFromDescriptor<Args[K]>
-    : never;
-};
+/**
+ * Recursive rewrite (not a mapped tuple type) so a descriptor marked
+ * `optional: true` gets an optional tuple slot (`Type?`), letting callers
+ * omit it and every optional arg after it. Required args must precede
+ * optional args in a descriptor's `args` list — TypeScript rejects an
+ * optional tuple element followed by a required one, and the runtime
+ * (`validateAuthoringHelperArguments`'s `minimumArgs`) already treats an
+ * optional-before-required arg as effectively required.
+ */
+export type TupleFromArgumentDescriptors<Args extends readonly AuthoringArgumentDescriptor[]> =
+  Args extends readonly [
+    infer Head extends AuthoringArgumentDescriptor,
+    ...infer Tail extends readonly AuthoringArgumentDescriptor[],
+  ]
+    ? Head extends { readonly optional: true }
+      ? readonly [ArgTypeFromDescriptor<Head>?, ...TupleFromArgumentDescriptors<Tail>]
+      : readonly [ArgTypeFromDescriptor<Head>, ...TupleFromArgumentDescriptors<Tail>]
+    : readonly [];
 
 export type SupportsNamedConstraintOptions<Descriptor extends AuthoringFieldPresetDescriptor> =
   Descriptor['output'] extends { readonly id: true }
@@ -114,9 +147,11 @@ export type FieldBuilderFromPresetDescriptor<
   ConstraintName extends string | undefined = undefined,
 > = ScalarFieldBuilder<
   ScalarFieldState<
-    ResolveTemplateValue<Descriptor['output']['codecId'], Args> extends string
-      ? ResolveTemplateValue<Descriptor['output']['codecId'], Args>
-      : string,
+    ColumnTypeDescriptor<
+      ResolveTemplateValue<Descriptor['output']['codecId'], Args> extends string
+        ? ResolveTemplateValue<Descriptor['output']['codecId'], Args>
+        : string
+    >,
     undefined,
     ResolveTemplateValue<Descriptor['output']['nullable'], Args> extends true ? true : false,
     undefined,
@@ -141,17 +176,29 @@ export type FieldHelperFunctionWithoutNamedConstraint<
     ) => FieldBuilderFromPresetDescriptor<Descriptor, Params>
   : () => FieldBuilderFromPresetDescriptor<Descriptor, readonly []>;
 
+/**
+ * An intersection of two call signatures rather than one rest-tuple signature
+ * with a trailing `options?`. Once optional descriptors yield optional tuple
+ * slots, `Params` can infer as the empty tuple, and a single-argument call
+ * such as `field.id.nanoid({ size: 16 })` would bind its preset argument to
+ * the trailing optional `options` parameter. Resolving the no-options
+ * signature first, and falling through to the options-required signature only
+ * when the argument list cannot satisfy it, keeps both spellings working.
+ */
 export type FieldHelperFunctionWithNamedConstraint<
   Descriptor extends AuthoringFieldPresetDescriptor,
 > = Descriptor extends {
   readonly args: infer Args extends readonly AuthoringArgumentDescriptor[];
 }
-  ? <
-      const Params extends TupleFromArgumentDescriptors<Args>,
-      const Name extends string | undefined = undefined,
-    >(
-      ...args: [...params: Params, options?: NamedConstraintSpec<Name>]
-    ) => FieldBuilderFromPresetDescriptor<Descriptor, Params, Name>
+  ? (<const Params extends TupleFromArgumentDescriptors<Args>>(
+      ...args: Params
+    ) => FieldBuilderFromPresetDescriptor<Descriptor, Params>) &
+      (<
+        const Params extends TupleFromArgumentDescriptors<Args>,
+        const Name extends string | undefined = undefined,
+      >(
+        ...args: [...params: Params, options: NamedConstraintSpec<Name>]
+      ) => FieldBuilderFromPresetDescriptor<Descriptor, Params, Name>)
   : <const Name extends string | undefined = undefined>(
       options?: NamedConstraintSpec<Name>,
     ) => FieldBuilderFromPresetDescriptor<Descriptor, readonly [], Name>;

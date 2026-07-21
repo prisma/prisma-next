@@ -1,12 +1,18 @@
-import type { DiffableNode } from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
-import { assertNode, SqlSchemaIRNode } from './sql-schema-ir-node';
+import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 export interface PrimaryKeyInput {
   readonly columns: readonly string[];
   readonly name?: string;
+  /**
+   * The key's own column nodes, as root-anchored chains. The derivation
+   * stamps them so the primary key is dropped before the columns it is built
+   * on. Never compared by `isEqualTo`.
+   */
+  readonly dependsOn?: readonly SchemaNodeRef[];
 }
 
 /**
@@ -27,11 +33,14 @@ export class PrimaryKey extends SqlSchemaIRNode implements DiffableNode {
 
   readonly columns: readonly string[];
   declare readonly name?: string;
+  /** See {@link PrimaryKeyInput.dependsOn}. Non-enumerable so it stays out of JSON and structural equality, matching `SqlColumnIR.codecRef`. */
+  declare readonly dependsOn?: readonly SchemaNodeRef[];
 
   constructor(input: PrimaryKeyInput) {
     super();
     this.columns = input.columns;
     if (input.name !== undefined) this.name = input.name;
+    defineNonEnumerable(this, 'dependsOn', input.dependsOn);
     freezeNode(this);
   }
 

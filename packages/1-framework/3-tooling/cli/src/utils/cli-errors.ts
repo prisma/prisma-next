@@ -287,7 +287,18 @@ export function errorPathUnreachable(failure: MigrateFailure): CliStructuredErro
   // Plan-then-apply recovery. The planner destination is the missing edge's
   // target; `migration plan --to` (built for arbitrary targets) makes this a
   // real command, so the diagnostic that sends you here is now honest.
+  //
+  // Never-planned spaces have an EMPTY migration graph, and contract-ref
+  // resolution only resolves full hashes against graph nodes — a
+  // `--to <hash>` remediation would reject its own input. `migration plan`
+  // without `--to` targets the working contract (the same contract the app
+  // space's synthesized head ref carries), so the bare form is the one that
+  // runs verbatim.
+  const neverPlanned = meta['kind'] === 'neverPlanned';
   const planCommand = (() => {
+    if (neverPlanned) {
+      return 'prisma-next migration plan --name <slug>';
+    }
     if (planFromHash !== null && targetHash !== null) {
       return `prisma-next migration plan --from ${planFromHash} --to ${targetHash} --name <slug>`;
     }
@@ -300,7 +311,9 @@ export function errorPathUnreachable(failure: MigrateFailure): CliStructuredErro
     return 'prisma-next migration plan';
   })();
   const applyCommand =
-    targetHash !== null ? `prisma-next migrate --to ${targetHash}` : 'prisma-next migrate';
+    targetHash !== null && !neverPlanned
+      ? `prisma-next migrate --to ${targetHash}`
+      : 'prisma-next migrate';
   return errorRuntime(failure.summary, {
     why:
       failure.why ??

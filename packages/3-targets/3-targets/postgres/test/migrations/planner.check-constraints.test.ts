@@ -151,9 +151,8 @@ const defaultCtx = {
   storageTypes: {},
 };
 
-/** Node-typed check-constraint issue, matching the shape the one differ produces. */
+/** Node-typed check-constraint issue, matching the shape the one differ produces. The change kind derives from which of `expectedValues`/`actualValues` are supplied. */
 function checkIssue(options: {
-  readonly reason: 'not-found' | 'not-expected' | 'not-equal';
   readonly expectedValues?: readonly string[];
   readonly actualValues?: readonly string[];
 }): SchemaDiffIssue {
@@ -176,8 +175,6 @@ function checkIssue(options: {
       : undefined;
   return {
     path,
-    reason: options.reason,
-    message: `check drift on "${TABLE_NAME}"`,
     ...(expected !== undefined ? { expected } : {}),
     ...(actual !== undefined ? { actual } : {}),
   };
@@ -187,7 +184,7 @@ describe('checkConstraintPlanCallStrategy', () => {
   it('emits AddCheckConstraintCall when contract has a check absent from live schema', () => {
     const contract = makeContractWithCheck(['active', 'inactive']);
     const result = checkConstraintPlanCallStrategy(
-      [checkIssue({ reason: 'not-found', expectedValues: ['active', 'inactive'] })],
+      [checkIssue({ expectedValues: ['active', 'inactive'] })],
       {
         ...defaultCtx,
         toContract: contract,
@@ -216,7 +213,6 @@ describe('checkConstraintPlanCallStrategy', () => {
     const result = checkConstraintPlanCallStrategy(
       [
         checkIssue({
-          reason: 'not-equal',
           expectedValues: ['active', 'inactive', 'pending'],
           actualValues: ['active', 'inactive'],
         }),
@@ -251,7 +247,7 @@ describe('checkConstraintPlanCallStrategy', () => {
   it('emits DropCheckConstraintCall when live has a check absent from contract', () => {
     const contract = makeContractWithoutCheck();
     const result = checkConstraintPlanCallStrategy(
-      [checkIssue({ reason: 'not-expected', actualValues: ['active', 'inactive'] })],
+      [checkIssue({ actualValues: ['active', 'inactive'] })],
       {
         ...defaultCtx,
         toContract: contract,
@@ -272,7 +268,7 @@ describe('checkConstraintPlanCallStrategy', () => {
   it('emits no calls and consumes the issue when value sets match (no-op)', () => {
     const contract = makeContractWithCheck(['active', 'inactive']);
     const result = checkConstraintPlanCallStrategy(
-      [checkIssue({ reason: 'not-found', expectedValues: ['active', 'inactive'] })],
+      [checkIssue({ expectedValues: ['active', 'inactive'] })],
       {
         ...defaultCtx,
         toContract: contract,
@@ -295,7 +291,7 @@ describe('planIssues — check constraint strategy', () => {
     const contract = makeContractWithoutCheck();
     const result = planIssues({
       ...defaultCtx,
-      issues: [checkIssue({ reason: 'not-expected', actualValues: ['active', 'inactive'] })],
+      issues: [checkIssue({ actualValues: ['active', 'inactive'] })],
       toContract: contract,
       fromContract: null,
       schema: schemaWithCheck(['active', 'inactive']),
@@ -315,7 +311,7 @@ describe('planIssues — check constraint strategy', () => {
     const contract = makeContractWithCheck(['active', 'inactive']);
     const result = planIssues({
       ...defaultCtx,
-      issues: [checkIssue({ reason: 'not-found', expectedValues: ['active', 'inactive'] })],
+      issues: [checkIssue({ expectedValues: ['active', 'inactive'] })],
       toContract: contract,
       fromContract: null,
       schema: schemaWithoutCheck(),
@@ -337,7 +333,6 @@ describe('planIssues — check constraint strategy', () => {
       ...defaultCtx,
       issues: [
         checkIssue({
-          reason: 'not-equal',
           expectedValues: ['active', 'inactive', 'pending'],
           actualValues: ['active', 'inactive'],
         }),

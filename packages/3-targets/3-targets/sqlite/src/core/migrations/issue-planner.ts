@@ -21,6 +21,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import { issueOutcome, orderIssuesByDependencies } from '@prisma-next/framework-components/control';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import {
   RelationalSchemaNodeKind,
@@ -64,51 +65,6 @@ import {
 export type { CallMigrationStrategy, StrategyContext };
 
 // ============================================================================
-// Node-keyed issue ordering (dependency order)
-// ============================================================================
-
-/**
- * Re-keys the legacy `ISSUE_KIND_ORDER` (kind string → priority number) on
- * `(nodeKind, reason)`. Numbers are preserved from the legacy table so the
- * dependency intent stays legible; the final emission order is actually
- * fixed downstream by category bucketing (create-table → add-column →
- * create-index → recreate → drop-column → drop-index → drop-table), so this
- * only breaks ties within a single bucket.
- */
-export function nodeIssueOrder(issue: SchemaDiffIssue): number {
-  const node = issueNode(issue);
-  if (node === undefined) return 99;
-  switch (node.nodeKind) {
-    case RelationalSchemaNodeKind.foreignKey:
-      return issue.reason === 'not-expected' ? 10 : 60;
-    case RelationalSchemaNodeKind.unique:
-      return issue.reason === 'not-expected' ? 11 : 51;
-    case RelationalSchemaNodeKind.primaryKey:
-      return issue.reason === 'not-expected' ? 12 : 50;
-    case RelationalSchemaNodeKind.index:
-      return issue.reason === 'not-expected' ? 13 : 52;
-    case RelationalSchemaNodeKind.columnDefault:
-      if (issue.reason === 'not-expected') return 14;
-      return issue.reason === 'not-found' ? 42 : 43;
-    case RelationalSchemaNodeKind.column:
-      if (issue.reason === 'not-expected') return 15;
-      return issue.reason === 'not-found' ? 30 : 40;
-    case RelationalSchemaNodeKind.table:
-      return issue.reason === 'not-expected' ? 16 : 20;
-    case RelationalSchemaNodeKind.check:
-      if (issue.reason === 'not-found') return 53;
-      return issue.reason === 'not-expected' ? 54 : 55;
-    default:
-      return 99;
-  }
-}
-
-/** Deterministic tiebreak within an order bucket: the diff path itself already encodes table → child → grandchild. */
-export function nodeIssueKey(issue: SchemaDiffIssue): string {
-  return issue.path.join(' ');
-}
-
-// ============================================================================
 // Subtree coalescing — the planner's responsibility per the differ's contract
 // ============================================================================
 
@@ -126,7 +82,9 @@ export function coalesceSubtreeIssues(
   issues: readonly SchemaDiffIssue[],
 ): readonly SchemaDiffIssue[] {
   const collapsingPaths = issues
-    .filter((issue) => issue.reason === 'not-found' || issue.reason === 'not-expected')
+    .filter(
+      (issue) => issueOutcome(issue) === 'not-found' || issueOutcome(issue) === 'not-expected',
+    )
     .map((issue) => issue.path);
   if (collapsingPaths.length === 0) return issues;
   return issues.filter(
@@ -180,12 +138,11 @@ export function tableSpecFromNode(table: SqlTableIR): SqliteTableSpec {
     ...(u.name !== undefined ? { name: u.name } : {}),
   }));
   // Every FK node on the expected tree is constraint-bearing by construction
-  // (contractToSchemaIR filters `constraint: false` FKs out before they ever
-  // become nodes — those only ever contribute an index, never an FK node).
+  // (a persisted `foreignKeys[]` entry is a constraint; a non-constraint FK
+  // contributes only a backing index, never an FK node).
   const foreignKeys: SqliteForeignKeySpec[] = table.foreignKeys.map((fk) => ({
     columns: fk.columns,
     references: { table: fk.referencedTable, columns: fk.referencedColumns },
-    constraint: true,
     ...(fk.name !== undefined ? { name: fk.name } : {}),
     ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
     ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
@@ -216,7 +173,9 @@ function issueConflict(
 }
 
 function issueLocation(tableName: string, columnName?: string): SqlPlannerConflictLocation {
-  return columnName !== undefined ? { table: tableName, column: columnName } : { table: tableName };
+  return columnName !== undefined
+    ? { entityKind: 'table', entityName: tableName, column: columnName }
+    : { entityKind: 'table', entityName: tableName };
 }
 
 /**
@@ -272,14 +231,14 @@ function buildCreateTableCalls(table: SqlTableIR): SqliteOpFactoryCall[] {
 function mapTableIssue(
   issue: SchemaDiffIssue,
 ): Result<readonly SqliteOpFactoryCall[], SqlPlannerConflict> {
-  if (issue.reason === 'not-found') {
+  if (issueOutcome(issue) === 'not-found') {
     const table = blindCast<
       SqlTableIR,
       'a not-found table issue always carries the expected table node'
     >(issue.expected);
     return ok(buildCreateTableCalls(table));
   }
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     const table = blindCast<
       SqlTableIR,
       'a not-expected table issue always carries the actual table node'
@@ -290,7 +249,9 @@ function mapTableIssue(
   }
   // Unreachable: SqlTableIR.isEqualTo is identity, so a paired table can
   // never mismatch — kept for exhaustiveness against a future node change.
-  return notOk(issueConflict('unsupportedOperation', `Unexpected table drift: ${issue.message}`));
+  return notOk(
+    issueConflict('unsupportedOperation', `Unexpected table drift: ${issue.path.join('/')}`),
+  );
 }
 
 function mapColumnIssue(
@@ -302,11 +263,11 @@ function mapColumnIssue(
     return notOk(
       issueConflict(
         'unsupportedOperation',
-        `Column issue has no table in its path: ${issue.message}`,
+        `Column issue has no table in its path: ${issue.path.join('/')}`,
       ),
     );
   }
-  if (issue.reason === 'not-found') {
+  if (issueOutcome(issue) === 'not-found') {
     const column = blindCast<
       SqlColumnIR,
       'a not-found column issue always carries the expected column node'
@@ -319,7 +280,7 @@ function mapColumnIssue(
     const inline = table !== undefined && isInlineAutoincrementPrimaryKeyNode(table, column);
     return ok([new AddColumnCall(tableName, columnSpecFromNode(column, inline))]);
   }
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     const column = blindCast<
       SqlColumnIR,
       'a not-expected column issue always carries the actual column node'
@@ -338,7 +299,7 @@ function mapColumnIssue(
     'a not-equal column issue always carries the actual column node'
   >(issue.actual);
   const kind = columnTypeChanged(expected, actual) ? 'typeMismatch' : 'nullabilityConflict';
-  return notOk(issueConflict(kind, issue.message, issueLocation(tableName, expected.name)));
+  return notOk(issueConflict(kind, issue.path.join('/'), issueLocation(tableName, expected.name)));
 }
 
 function mapIndexIssue(
@@ -349,11 +310,11 @@ function mapIndexIssue(
     return notOk(
       issueConflict(
         'unsupportedOperation',
-        `Index issue has no table in its path: ${issue.message}`,
+        `Index issue has no table in its path: ${issue.path.join('/')}`,
       ),
     );
   }
-  if (issue.reason === 'not-found') {
+  if (issueOutcome(issue) === 'not-found') {
     const index = blindCast<
       SqlIndexIR,
       'a not-found index issue always carries the expected index node'
@@ -361,7 +322,7 @@ function mapIndexIssue(
     const indexName = index.name ?? defaultIndexName(tableName, index.columns);
     return ok([new CreateIndexCall(tableName, indexName, index.columns)]);
   }
-  if (issue.reason === 'not-expected') {
+  if (issueOutcome(issue) === 'not-expected') {
     const index = blindCast<
       SqlIndexIR,
       'a not-expected index issue always carries the actual index node'
@@ -372,7 +333,7 @@ function mapIndexIssue(
   // not-equal: index type/options/uniqueness drift. SQLite can't ALTER an
   // index in place and the legacy planner never absorbed this into a
   // recreate either — surfaces as a conflict, matching `index_mismatch`.
-  return notOk(issueConflict('indexIncompatible', issue.message, issueLocation(tableName)));
+  return notOk(issueConflict('indexIncompatible', issue.path.join('/'), issueLocation(tableName)));
 }
 
 export function mapNodeIssueToCall(
@@ -384,7 +345,7 @@ export function mapNodeIssueToCall(
     return notOk(
       issueConflict(
         'unsupportedOperation',
-        `Issue carries neither an expected nor an actual node: ${issue.message}`,
+        `Issue carries neither an expected nor an actual node: ${issue.path.join('/')}`,
       ),
     );
   }
@@ -399,12 +360,12 @@ export function mapNodeIssueToCall(
     case RelationalSchemaNodeKind.primaryKey:
     case RelationalSchemaNodeKind.foreignKey:
     case RelationalSchemaNodeKind.unique:
-      return notOk(issueConflict(absorbedConflictKind(node.nodeKind), issue.message));
+      return notOk(issueConflict(absorbedConflictKind(node.nodeKind), issue.path.join('/')));
     case RelationalSchemaNodeKind.check:
       return notOk(
         issueConflict(
           'unsupportedOperation',
-          `SQLite does not support CHECK constraint DDL: ${issue.message}`,
+          `SQLite does not support CHECK constraint DDL: ${issue.path.join('/')}`,
         ),
       );
     default:
@@ -501,13 +462,12 @@ export function planIssues(
     }
   }
 
-  const sorted = [...remaining].sort((a, b) => {
-    const kindDelta = nodeIssueOrder(a) - nodeIssueOrder(b);
-    if (kindDelta !== 0) return kindDelta;
-    const keyA = nodeIssueKey(a);
-    const keyB = nodeIssueKey(b);
-    return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
-  });
+  // Dependency-graph order: a topological sort over the issues' `dependsOn`
+  // cross-links and containment edges (edge direction from the ordering law's
+  // presence rule), path-tiebroken for determinism. `classifyCall` bucketing
+  // downstream fixes the coarse create/recreate/drop sequence; this settles
+  // the order within each bucket.
+  const sorted = orderIssuesByDependencies(remaining);
 
   const defaultCalls: SqliteOpFactoryCall[] = [];
   const conflicts: SqlPlannerConflict[] = [];
@@ -597,8 +557,12 @@ function conflictKindForCall(call: SqliteOpFactoryCall): SqlPlannerConflict['kin
 }
 
 function locationForCall(call: SqliteOpFactoryCall): SqlPlannerConflictLocation | undefined {
-  const location: { table?: string; column?: string; index?: string } = {};
-  if ('tableName' in call) location.table = call.tableName;
+  const location: { entityKind?: string; entityName?: string; column?: string; index?: string } =
+    {};
+  if ('tableName' in call) {
+    location.entityKind = 'table';
+    location.entityName = call.tableName;
+  }
   if ('columnName' in call) location.column = call.columnName;
   if ('indexName' in call) location.index = call.indexName;
   return Object.keys(location).length > 0 ? (location as SqlPlannerConflictLocation) : undefined;

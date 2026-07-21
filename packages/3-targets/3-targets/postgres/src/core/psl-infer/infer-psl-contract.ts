@@ -2,6 +2,7 @@ import type { ColumnDefault } from '@prisma-next/contract/types';
 import type { SqlDescribedContractSpace } from '@prisma-next/family-sql/control';
 import type {
   DefaultMappingOptions,
+  EnumInfo,
   PslNativeTypeAttribute,
   PslPrinterOptions,
   PslTypeMap,
@@ -13,6 +14,8 @@ import {
   inferRelations,
   mapDefault,
   parseRawDefault,
+  toEnumMemberName,
+  toEnumName,
   toFieldName,
   toModelName,
   toNamedTypeName,
@@ -22,12 +25,15 @@ import type {
   PslAttribute,
   PslAttributeArgument,
   PslDocumentAst,
+  PslExtensionBlock,
+  PslExtensionBlockParamValue,
   PslField,
   PslFieldAttribute,
   PslModel,
   PslModelAttribute,
   PslNamedTypeDeclaration,
   PslSpan,
+  PslTypeConstructorCall,
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
 import {
@@ -156,6 +162,15 @@ type ForeignKeyResolution = {
   readonly extraRelationsByTable: ReadonlyMap<string, readonly RelationField[]>;
   /** Synthetic field-name maps for cross-space-referenced pack tables, merged into `fieldNamesByTable`. */
   readonly crossSpaceFieldNamesByTable: ReadonlyMap<string, TableColumnFieldNameMap>;
+  /** Dangling foreign keys dropped per host table, kept so the model can explain the drop. */
+  readonly danglingForeignKeysByTable: ReadonlyMap<string, readonly DanglingForeignKeyInfo[]>;
+};
+
+/** A foreign key dropped because its target lives outside the introspected scope. */
+type DanglingForeignKeyInfo = {
+  readonly columns: readonly string[];
+  readonly referencedSchema: string | undefined;
+  readonly referencedTable: string;
 };
 
 /**
@@ -192,6 +207,7 @@ function resolveForeignKeys(
   const resultTables: Record<string, SqlTableIR> = {};
   const extraRelationsByTable = new Map<string, RelationField[]>();
   const crossSpaceFieldNamesByTable = new Map<string, TableColumnFieldNameMap>();
+  const danglingForeignKeysByTable = new Map<string, DanglingForeignKeyInfo[]>();
 
   for (const [tableName, table] of Object.entries(tables)) {
     const keptForeignKeys: SqlForeignKeyIR[] = [];
@@ -225,7 +241,7 @@ function resolveForeignKeys(
             (columnName) => table.columns[columnName]?.nullable ?? false,
           );
           const relationField: RelationField = {
-            ...buildChildRelationField(fieldName, target.modelName, fk, optional),
+            ...buildChildRelationField(fieldName, target.modelName, fk, optional, undefined, table),
             typeNamespaceId: target.namespaceId,
             typeContractSpaceId: target.spaceId,
           };
@@ -242,9 +258,22 @@ function resolveForeignKeys(
 
       // Not a pack-owned coordinate: keep the foreign key if the referenced
       // table survived introspection (local), otherwise drop it while keeping
-      // the scalar column (dangling).
+      // the scalar column (dangling) — recording it so the model can explain
+      // the drop instead of the relation vanishing without a trace.
       if (tables[fk.referencedTable] !== undefined) {
         keptForeignKeys.push(fk);
+      } else {
+        const dangling: DanglingForeignKeyInfo = {
+          columns: fk.columns,
+          referencedSchema: fk.referencedSchema,
+          referencedTable: fk.referencedTable,
+        };
+        const existingDangling = danglingForeignKeysByTable.get(tableName);
+        if (existingDangling) {
+          existingDangling.push(dangling);
+        } else {
+          danglingForeignKeysByTable.set(tableName, [dangling]);
+        }
       }
     }
 
@@ -254,7 +283,12 @@ function resolveForeignKeys(
         : new SqlTableIR({ ...table, foreignKeys: keptForeignKeys });
   }
 
-  return { tables: resultTables, extraRelationsByTable, crossSpaceFieldNamesByTable };
+  return {
+    tables: resultTables,
+    extraRelationsByTable,
+    crossSpaceFieldNamesByTable,
+    danglingForeignKeysByTable,
+  };
 }
 
 /**
@@ -288,19 +322,42 @@ export function inferPostgresPslContract(
   const namespaces = Object.values(tree.namespaces);
   const owners = describedContractOwners(describedContracts ?? []);
 
-  // Native Postgres enums (CREATE TYPE … AS ENUM) are not adoptable by
-  // `contract infer`; throw an actionable diagnostic naming the type(s). Enum
-  // names live on each namespace node's `nativeEnumTypeNames`.
-  const enumTypeNames = [...new Set(namespaces.flatMap((ns) => ns.nativeEnumTypeNames))];
-  if (enumTypeNames.length > 0) {
-    const names = enumTypeNames.join(', ');
-    throw new Error(
-      `contract infer: the database contains native Postgres enum type(s): ${names}. ` +
-        'Native Postgres enums (CREATE TYPE … AS ENUM) are not adoptable by contract infer. ' +
-        'Drop the native type and replace each column with a text column carrying a CHECK constraint, ' +
-        `then re-run contract infer. The domain enum (enum Name { @@type("pg/text@1") … }) authoring ` +
-        'surface generates the required check automatically.',
-    );
+  // Native enum adoption: each namespace's introspected `enums` nodes become
+  // `native_enum` blocks + `pg.enum(<Name>)` columns, minus the types a
+  // described pack contract already declares (resolved through the same
+  // `owners` / `describedContractOwners` coordinate map as table subtraction —
+  // `elementCoordinates` keys `entries.native_enum` by physical type name, no
+  // enum-specific index). An inferred block carries no explicit `control` and
+  // inherits the contract's `defaultControl`; under `defaultControl: 'managed'`
+  // the planner owns the type's create/drop lifecycle and `db verify` reports
+  // member drift (#949). A suffix-appended member plans `ALTER TYPE ... ADD
+  // VALUE`; any other member change (rename, removal, reorder) is refused
+  // with a named diagnostic — see `docs/reference/postgres-native-enums.md`.
+  const enumDefinitions = new Map<string, readonly string[]>();
+  const packOwnedEnumTypesByNamespace = new Map<string, Map<string, string>>();
+  const enumNamespaceNames = new Set<string>();
+  for (const namespace of namespaces) {
+    for (const { typeName, members } of namespace.nativeEnums) {
+      const owner = owners.get(
+        coordinateKey({
+          namespaceId: namespace.schemaName,
+          entityKind: 'native_enum',
+          entityName: typeName,
+        }),
+      );
+      if (owner !== undefined) {
+        const owned = packOwnedEnumTypesByNamespace.get(namespace.schemaName) ?? new Map();
+        // Columns reference the type either bare or schema-qualified —
+        // `format_type` qualifies a type outside the connection's
+        // search_path — so both spellings are owned.
+        owned.set(typeName, owner.spaceId);
+        owned.set(`${namespace.schemaName}.${typeName}`, owner.spaceId);
+        packOwnedEnumTypesByNamespace.set(namespace.schemaName, owned);
+        continue;
+      }
+      enumDefinitions.set(typeName, members);
+      enumNamespaceNames.add(namespace.schemaName);
+    }
   }
 
   // Stopgap (TML-2958): flatten the schema-IR *tree* into the single `{ tables }`
@@ -311,7 +368,9 @@ export function inferPostgresPslContract(
   // single introspected namespace, and a same-named table in two schemas has no
   // unambiguous single-bucket model, so we throw rather than silently drop one.
   const tables: Record<string, SqlTableIR> = {};
+  const tableNamespaceNames = new Set<string>();
   for (const namespace of namespaces) {
+    const ownedEnumTypes = packOwnedEnumTypesByNamespace.get(namespace.schemaName);
     for (const [tableName, table] of Object.entries(namespace.tables)) {
       if (
         owners.has(
@@ -331,38 +390,100 @@ export function inferPostgresPslContract(
             'output is a later slice).',
         );
       }
+      if (ownedEnumTypes !== undefined) {
+        for (const column of Object.values(table.columns)) {
+          const owningSpaceId = ownedEnumTypes.get(column.nativeType);
+          if (owningSpaceId !== undefined) {
+            throw new Error(
+              `contract infer: column "${tableName}"."${column.name}" is typed by native enum ` +
+                `type "${column.nativeType}", which extension pack space "${owningSpaceId}" ` +
+                'already describes. A cross-space enum-typed column has no authorable PSL form ' +
+                "yet; describe the table in that pack's contract or retype the column before " +
+                're-running contract infer.',
+            );
+          }
+        }
+      }
       tables[tableName] = new SqlTableIR(table);
+      tableNamespaceNames.add(namespace.schemaName);
     }
   }
+
+  // Namespace wrap (pinned during shaping): a `native_enum` block only lowers
+  // inside an explicit `namespace { … }` block — the interpreter skips
+  // extension entities in the unspecified top-level bucket — so enum-bearing
+  // output wraps everything in the introspected schema's name. Enum-free
+  // output stays flat and byte-identical to the prior inference.
+  let wrapNamespaceName: string | undefined;
+  if (enumDefinitions.size > 0) {
+    const contentNamespaces = new Set([...enumNamespaceNames, ...tableNamespaceNames]);
+    if (contentNamespaces.size > 1) {
+      throw new Error(
+        'contract infer: native enum adoption with content across multiple schemas is not yet ' +
+          'supported (single-namespace PSL inference emits one `namespace { … }` block; ' +
+          `multi-namespace output is a later slice). Schemas: ${[...contentNamespaces]
+            .sort()
+            .join(', ')}.`,
+      );
+    }
+    wrapNamespaceName = [...contentNamespaces][0];
+  }
+
   const {
     tables: resolvedTables,
     extraRelationsByTable,
     crossSpaceFieldNamesByTable,
+    danglingForeignKeysByTable,
   } = resolveForeignKeys(tables, owners);
   const schemaIR = new SqlSchemaIR({ tables: resolvedTables });
 
+  // Live introspection reports an enum column's nativeType schema-qualified
+  // whenever the type sits outside the connection's search_path (`format_type`
+  // semantics; e.g. `auth.aal_level`), while `pg_type.typname` — the
+  // definitions key — is always bare. Register the qualified spelling as an
+  // alias so those columns resolve; block emission stays keyed on the bare
+  // name (one block per type).
+  const enumTypeNames = new Set(enumDefinitions.keys());
+  if (wrapNamespaceName !== undefined) {
+    for (const typeName of enumDefinitions.keys()) {
+      enumTypeNames.add(`${wrapNamespaceName}.${typeName}`);
+    }
+  }
+  const enumInfo: EnumInfo = {
+    typeNames: enumTypeNames,
+    definitions: enumDefinitions,
+  };
   const options: PslPrinterOptions = {
-    typeMap: createPostgresTypeMap(new Set()),
+    typeMap: createPostgresTypeMap(enumInfo.typeNames),
     defaultMapping: createPostgresDefaultMapping(),
     parseRawDefault,
+    ...(enumDefinitions.size > 0 ? { enumInfo } : {}),
   };
 
-  return buildPslDocumentAst(schemaIR, options, {
-    extraRelationsByTable,
-    crossSpaceFieldNamesByTable,
-  });
+  return buildPslDocumentAst(
+    schemaIR,
+    options,
+    {
+      extraRelationsByTable,
+      crossSpaceFieldNamesByTable,
+      danglingForeignKeysByTable,
+    },
+    wrapNamespaceName,
+  );
 }
 
-function buildPslDocumentAst(
+export function buildPslDocumentAst(
   schemaIR: SqlSchemaIR,
   options: PslPrinterOptions,
   foreignKeyExtras: Pick<
     ForeignKeyResolution,
-    'extraRelationsByTable' | 'crossSpaceFieldNamesByTable'
+    'extraRelationsByTable' | 'crossSpaceFieldNamesByTable' | 'danglingForeignKeysByTable'
   >,
+  namespaceName?: string,
 ): PslDocumentAst {
   const { typeMap, defaultMapping, parseRawDefault: rawDefaultParser } = options;
-  const { extraRelationsByTable, crossSpaceFieldNamesByTable } = foreignKeyExtras;
+  const { extraRelationsByTable, crossSpaceFieldNamesByTable, danglingForeignKeysByTable } =
+    foreignKeyExtras;
 
   const modelNames = buildTopLevelNameMap(
     Object.keys(schemaIR.tables),
@@ -374,7 +495,23 @@ function buildPslDocumentAst(
   const modelNameMap = new Map(
     [...modelNames].map(([tableName, result]) => [tableName, result.name]),
   );
-  const reservedNamedTypeNames = createReservedNamedTypeNames(modelNames);
+
+  const { enumNameMap: bareEnumNameMap, enumBlocks } = buildNativeEnumBlocks(
+    options.enumInfo?.definitions ?? new Map(),
+    modelNames,
+  );
+
+  // Columns reference an enum type bare or schema-qualified (`format_type`
+  // qualifies types outside the search_path); alias the qualified spelling
+  // onto the same PSL name. Blocks stay keyed on the bare name.
+  const enumNameMap = new Map(bareEnumNameMap);
+  if (namespaceName !== undefined) {
+    for (const [typeName, pslName] of bareEnumNameMap) {
+      enumNameMap.set(`${namespaceName}.${typeName}`, pslName);
+    }
+  }
+
+  const reservedNamedTypeNames = createReservedNamedTypeNames(modelNames, enumNameMap);
 
   // Cross-space entries are seeded first so a real local table of the same
   // bare name (an existing single-namespace-flat-bucket limitation, not new
@@ -385,7 +522,7 @@ function buildPslDocumentAst(
     ...buildFieldNamesByTable(schemaIR.tables),
   ]);
   const { relationsByTable } = inferRelations(schemaIR.tables, modelNameMap);
-  const namedTypes = seedNamedTypeRegistry(schemaIR, typeMap, new Map(), reservedNamedTypeNames);
+  const namedTypes = seedNamedTypeRegistry(schemaIR, typeMap, enumNameMap, reservedNamedTypeNames);
 
   const models: PslModel[] = [];
   for (const table of Object.values(schemaIR.tables)) {
@@ -393,7 +530,7 @@ function buildPslDocumentAst(
       buildModel(
         table,
         typeMap,
-        new Map(),
+        enumNameMap,
         fieldNamesByTable,
         namedTypes,
         defaultMapping,
@@ -402,6 +539,7 @@ function buildPslDocumentAst(
           ...(relationsByTable.get(table.name) ?? []),
           ...(extraRelationsByTable.get(table.name) ?? []),
         ],
+        danglingForeignKeysByTable.get(table.name) ?? [],
       ),
     );
   }
@@ -421,19 +559,20 @@ function buildPslDocumentAst(
       : undefined;
 
   // Inferred PSL nodes will eventually be routed into per-namespace buckets
-  // matching the source storage; for now we synthesise a single
-  // `__unspecified__` bucket so round-tripping the AST through the framework
-  // printer (which emits the synthesised bucket at top level with no
-  // `namespace { … }` wrapper) preserves the existing introspection output
-  // verbatim.
+  // matching the source storage; for now everything lands in a single bucket.
+  // Without a `namespaceName` that bucket is the synthesised `__unspecified__`
+  // one, which the framework printer emits at top level with no
+  // `namespace { … }` wrapper — preserving the existing flat introspection
+  // output verbatim. With a `namespaceName` (enum-bearing output) the bucket
+  // is a real named namespace, printed as an explicit block.
   const ast: PslDocumentAst = {
     kind: 'document',
     sourceId: '<sql-schema-ir>',
     namespaces: [
       makePslNamespace({
         kind: 'namespace',
-        name: UNSPECIFIED_PSL_NAMESPACE_ID,
-        entries: makePslNamespaceEntries(sortedModels, [], []),
+        name: namespaceName ?? UNSPECIFIED_PSL_NAMESPACE_ID,
+        entries: makePslNamespaceEntries(sortedModels, [], enumBlocks),
         span: SYNTHETIC_SPAN,
       }),
     ],
@@ -442,6 +581,88 @@ function buildPslDocumentAst(
   };
 
   return ast;
+}
+
+type NativeEnumBlockResult = {
+  /** Native enum type name → PSL block name, for `pg.enum(<Name>)` field refs. */
+  readonly enumNameMap: ReadonlyMap<string, string>;
+  readonly enumBlocks: readonly PslExtensionBlock[];
+};
+
+/**
+ * Builds one `native_enum` extension-block AST node per introspected enum
+ * definition. Block names go through the shared top-level transform
+ * (`toEnumName`, intra-enum collisions throw like model collisions) and are
+ * then reserved against the model names — an enum whose PSL name a model
+ * already claims gets a numeric suffix, with `@@map` carrying the real type
+ * name. Members print as explicit `member = "value"` pairs: the member name
+ * is the sanitized value (deduplicated within the block), the JSON-encoded
+ * value carries the truth verbatim.
+ */
+function buildNativeEnumBlocks(
+  definitions: ReadonlyMap<string, readonly string[]>,
+  modelNames: ReadonlyMap<string, TopLevelNameResult>,
+): NativeEnumBlockResult {
+  const enumNames = buildTopLevelNameMap(
+    [...definitions.keys()].sort(),
+    toEnumName,
+    'enum',
+    'enum type',
+  );
+
+  const usedTopLevelNames = new Set<string>(PSL_SCALAR_TYPE_NAMES);
+  for (const result of modelNames.values()) {
+    usedTopLevelNames.add(result.name);
+  }
+
+  const enumNameMap = new Map<string, string>();
+  const enumBlocks: PslExtensionBlock[] = [];
+  for (const [typeName, result] of enumNames) {
+    const name = createUniqueFieldName(result.name, usedTopLevelNames);
+    usedTopLevelNames.add(name);
+    enumNameMap.set(typeName, name);
+    enumBlocks.push(buildNativeEnumBlock(name, typeName, definitions.get(typeName) ?? []));
+  }
+
+  return { enumNameMap, enumBlocks };
+}
+
+function buildNativeEnumBlock(
+  name: string,
+  typeName: string,
+  values: readonly string[],
+): PslExtensionBlock {
+  const usedMemberNames = new Set<string>();
+  const parameters: Record<string, PslExtensionBlockParamValue> = {};
+  for (const value of values) {
+    const memberName = createUniqueFieldName(toEnumMemberName(value), usedMemberNames);
+    usedMemberNames.add(memberName);
+    parameters[memberName] = { kind: 'value', raw: JSON.stringify(value), span: SYNTHETIC_SPAN };
+  }
+
+  return {
+    kind: 'native_enum',
+    keyword: 'native_enum',
+    name,
+    parameters,
+    blockAttributes:
+      name === typeName
+        ? []
+        : [
+            {
+              name: 'map',
+              args: [
+                {
+                  kind: 'positional',
+                  value: `"${escapePslString(typeName)}"`,
+                  span: SYNTHETIC_SPAN,
+                },
+              ],
+              span: SYNTHETIC_SPAN,
+            },
+          ],
+    span: SYNTHETIC_SPAN,
+  };
 }
 
 function buildModel(
@@ -453,6 +674,7 @@ function buildModel(
   defaultMapping: DefaultMappingOptions | undefined,
   rawDefaultParser: PslPrinterOptions['parseRawDefault'],
   relationFields: readonly RelationField[],
+  danglingForeignKeys: readonly DanglingForeignKeyInfo[],
 ): PslModel {
   const { name: modelName, map: mapName } = toModelName(table.name);
   const fieldNameMap = fieldNamesByTable.get(table.name);
@@ -520,7 +742,9 @@ function buildModel(
       const indexFieldNames = index.columns.map((columnName) =>
         resolveColumnFieldName(fieldNamesByTable, table.name, columnName),
       );
-      modelAttributes.push(buildModelConstraintAttribute('index', indexFieldNames, index.name));
+      modelAttributes.push(
+        buildModelConstraintAttribute('index', indexFieldNames, index.name, index.type),
+      );
     }
   }
 
@@ -528,13 +752,23 @@ function buildModel(
     modelAttributes.push(buildMapAttribute('model', mapName));
   }
 
-  // Surface introspection advisory: tables without a primary key cannot serve
-  // as the right-hand side of a `findUnique`-style query downstream, so the
-  // user should add an `@id`. This warning is part of the emitted SQL output
-  // and is asserted byte-for-byte, so keep the exact wording.
-  const comment = table.primaryKey
-    ? undefined
-    : '// WARNING: This table has no primary key in the database';
+  // Surface introspection advisories the user would otherwise have no way to
+  // discover from the emitted PSL alone. Both warnings are part of the
+  // emitted SQL output and are asserted byte-for-byte, so keep the exact
+  // wording; a table hitting both is combined onto the single comment line
+  // `PslModel.comment` supports.
+  const warnings: string[] = [];
+  if (!table.primaryKey) {
+    // Tables without a primary key cannot serve as the right-hand side of a
+    // `findUnique`-style query downstream, so the user should add an `@id`.
+    warnings.push('This table has no primary key in the database');
+  }
+  if (danglingForeignKeys.length > 0) {
+    warnings.push(
+      buildDanglingForeignKeyWarning(danglingForeignKeys, fieldNamesByTable, table.name),
+    );
+  }
+  const comment = warnings.length > 0 ? `// WARNING: ${warnings.join(' ')}` : undefined;
 
   return {
     kind: 'model',
@@ -544,6 +778,35 @@ function buildModel(
     span: SYNTHETIC_SPAN,
     ...(comment !== undefined ? { comment } : {}),
   };
+}
+
+/**
+ * Explains a foreign key `resolveForeignKeys` dropped as dangling: the
+ * database enforces it, but its target lives outside the introspected
+ * schema, so infer has no model to point a relation at. The suggested fix
+ * targets the common cause — an unconfigured extension pack's schema
+ * (e.g. Supabase's `auth`).
+ */
+function buildDanglingForeignKeyWarning(
+  danglingForeignKeys: readonly DanglingForeignKeyInfo[],
+  fieldNamesByTable: ReadonlyMap<string, TableColumnFieldNameMap>,
+  tableName: string,
+): string {
+  const descriptions = danglingForeignKeys.map((fk) => {
+    const fieldNames = fk.columns.map((columnName) =>
+      resolveColumnFieldName(fieldNamesByTable, tableName, columnName),
+    );
+    const target =
+      fk.referencedSchema !== undefined
+        ? `${fk.referencedSchema}.${fk.referencedTable}`
+        : fk.referencedTable;
+    return `"${fieldNames.join(', ')}" -> "${target}"`;
+  });
+  return (
+    `Foreign key ${descriptions.join(', ')} exists in the database, but its target schema is ` +
+    'outside the introspected scope, so no relation field was generated. If the target schema ' +
+    'is described by an extension pack, add it to extensionPacks and re-run infer.'
+  );
 }
 
 function buildScalarField(
@@ -582,10 +845,21 @@ function buildScalarField(
     };
   }
 
+  // An enum-typed column emits the `pg.enum(<Name>)` type-constructor call —
+  // the Phase-1 authoring form a `native_enum` ref field takes — not a bare
+  // name substitution. The printer renders `typeConstructor` when present and
+  // composes `?`/`[]` exactly like any other field type.
   let typeName = resolution.pslType;
+  let typeConstructor: PslTypeConstructorCall | undefined;
   const enumPslName = enumNameMap.get(column.nativeType);
   if (enumPslName) {
     typeName = enumPslName;
+    typeConstructor = {
+      kind: 'typeConstructor',
+      path: ['pg', 'enum'],
+      args: [positionalArg(enumPslName)],
+      span: SYNTHETIC_SPAN,
+    };
   }
   if (resolution.nativeTypeAttribute && !enumPslName) {
     typeName = resolveNamedTypeName(namedTypes, resolution);
@@ -597,7 +871,32 @@ function buildScalarField(
     attributes.push(buildSimpleConstraintFieldAttribute('id', singlePkConstraintName));
   }
 
-  if (column.default !== undefined) {
+  if (
+    column.default === undefined &&
+    column.resolvedDefault?.kind === 'function' &&
+    column.resolvedDefault.expression === 'autoincrement()'
+  ) {
+    // An identity column: a `resolvedDefault` with no raw `default` is the
+    // only introspected shape the control adapter produces for
+    // `GENERATED ... AS IDENTITY` (Postgres reports no `column_default`;
+    // the adapter stamps `autoincrement()` directly). There is no
+    // `identity` field on the column IR — this pairing is the marker.
+    attributes.push(parseDefaultAttributeString('@default(autoincrement())'));
+  } else if (column.many === true && column.resolvedDefault?.kind === 'literal') {
+    // A list column's default must print from `resolvedDefault`: the raw SQL
+    // text (e.g. `'{}'::text[]`) only parses to `dbgenerated(...)`, which the
+    // interpreter rejects on a list column (lists accept literal defaults
+    // only). PSL literal-list elements are string/number/boolean only, so a
+    // resolved value holding anything else has no spelling — the default is
+    // then omitted, which verify reports as a live-only "extra", not a
+    // false mismatch.
+    const formatted = Array.isArray(column.resolvedDefault.value)
+      ? formatPslListLiteralValue(column.resolvedDefault.value)
+      : undefined;
+    if (formatted !== undefined) {
+      attributes.push(parseDefaultAttributeString(`@default(${formatted})`));
+    }
+  } else if (column.default !== undefined) {
     const parsed = parseColumnDefault(column.default, column.nativeType, rawDefaultParser);
     if (parsed) {
       const result = mapDefault(parsed, defaultMapping);
@@ -624,6 +923,7 @@ function buildScalarField(
     kind: 'field',
     name: fieldName,
     typeName,
+    ...ifDefined('typeConstructor', typeConstructor),
     optional: column.nullable,
     list: column.many === true,
     attributes,
@@ -673,6 +973,9 @@ function buildRelationField(
     if (rel.fkName) {
       args.push(namedArg('map', `"${escapePslString(rel.fkName)}"`));
     }
+    if (rel.index === false) {
+      args.push(namedArg('index', 'false'));
+    }
   } else if (rel.relationName) {
     args.push(namedArg('name', `"${escapePslString(rel.relationName)}"`));
   }
@@ -693,14 +996,26 @@ function buildRelationField(
   };
 }
 
+/**
+ * `indexType` carries a non-default index access method (e.g. `hash`) —
+ * introspection already drops `btree` (the Postgres default) to `undefined`
+ * (see the postgres control adapter), so this only ever fires for a real
+ * non-default index, matching the same `@@index(type: "...")` argument
+ * `contract-to-schema-ir.ts` reads back into the FK-backing-index
+ * expectation `db verify` checks against the live database.
+ */
 function buildModelConstraintAttribute(
   name: 'id' | 'unique' | 'index',
   fields: readonly string[],
   constraintName?: string,
+  indexType?: string,
 ): PslModelAttribute {
   const args: PslAttributeArgument[] = [positionalArg(`[${fields.join(', ')}]`)];
   if (constraintName !== undefined) {
     args.push(namedArg('map', `"${escapePslString(constraintName)}"`));
+  }
+  if (indexType !== undefined) {
+    args.push(namedArg('type', `"${escapePslString(indexType)}"`));
   }
   return buildAttribute('model', name, args);
 }
@@ -769,6 +1084,27 @@ function escapePslString(value: string): string {
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n')
     .replace(/\r/g, '\\r');
+}
+
+/**
+ * Formats a resolved literal-default array as PSL literal-list syntax
+ * (`[1, 2, 3]`, `["a", "b"]`, `[]`). PSL's list-literal grammar only accepts
+ * string/number/boolean elements, so any other element (e.g. `null`, a
+ * nested array/object) makes the value unrepresentable and this returns
+ * `undefined`.
+ */
+function formatPslListLiteralValue(elements: readonly unknown[]): string | undefined {
+  const parts: string[] = [];
+  for (const element of elements) {
+    if (typeof element === 'string') {
+      parts.push(`"${escapePslString(element)}"`);
+    } else if (typeof element === 'number' || typeof element === 'boolean') {
+      parts.push(String(element));
+    } else {
+      return undefined;
+    }
+  }
+  return `[${parts.join(', ')}]`;
 }
 
 /**
@@ -894,11 +1230,15 @@ function buildTopLevelNameMap(
 
 function createReservedNamedTypeNames(
   modelNames: ReadonlyMap<string, TopLevelNameResult>,
+  enumNameMap: ReadonlyMap<string, string>,
 ): Set<string> {
   const reservedNames = new Set<string>(PSL_SCALAR_TYPE_NAMES);
 
   for (const result of modelNames.values()) {
     reservedNames.add(result.name);
+  }
+  for (const enumPslName of enumNameMap.values()) {
+    reservedNames.add(enumPslName);
   }
 
   return reservedNames;

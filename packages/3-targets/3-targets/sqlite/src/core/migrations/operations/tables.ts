@@ -1,6 +1,7 @@
 import type { MigrationOperationClass } from '@prisma-next/family-sql/control';
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { RelationalSchemaNodeKind, type SqlColumnIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { tableExistsAst } from '../../../contract-free/checks';
@@ -201,15 +202,14 @@ export async function recreateTable(
  * issues that triggered it. Lives next to `recreateTable` so the planner
  * (which has the issues) can produce the same description the factory
  * used to build inline. Keeping the formatting target-side keeps
- * `RecreateTableCall` issue-free at the IR layer. Each `SchemaDiffIssue`
- * already carries a differ-generated `message`, so this is a plain join
- * rather than a per-kind message builder.
+ * `RecreateTableCall` issue-free at the IR layer. `SchemaDiffIssue` carries
+ * no rendered message, so this renders one from each issue's path.
  */
 export function buildRecreateSummary(
   tableName: string,
   issues: readonly SchemaDiffIssue[],
 ): string {
-  const messages = issues.map((i) => i.message).join('; ');
+  const messages = issues.map((i) => i.path.join('/')).join('; ');
   return `Recreates table ${tableName} to apply schema changes: ${messages}`;
 }
 
@@ -295,7 +295,7 @@ export function buildRecreatePostchecks(
 
   for (const issue of issues) {
     const nodeKind = nodeKindOf(issue);
-    if (nodeKind === RelationalSchemaNodeKind.column && issue.reason === 'not-equal') {
+    if (nodeKind === RelationalSchemaNodeKind.column && issueOutcome(issue) === 'not-equal') {
       const columnName = columnNameFromNode(issue);
       if (columnName === undefined) continue;
       const c = escapeLiteral(columnName);
@@ -326,7 +326,7 @@ export function buildRecreatePostchecks(
       const columnName = columnNameFromDefaultIssuePath(issue);
       if (columnName === undefined) continue;
       const c = escapeLiteral(columnName);
-      if (issue.reason === 'not-expected') {
+      if (issueOutcome(issue) === 'not-expected') {
         checks.push({
           description: `verify "${columnName}" has no default on "${tableName}"`,
           sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value IS NULL`,

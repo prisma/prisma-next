@@ -43,6 +43,12 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import {
+  pgByteaDecodeJson,
+  pgByteaEncodeJson,
+  pgDateDecode,
+  pgDateDecodeJson,
+  pgDateEncode,
+  pgDateEncodeJson,
   pgIntervalDecode,
   pgJsonbDecode,
   pgJsonbEncode,
@@ -62,10 +68,12 @@ import {
   PG_BOOL_CODEC_ID,
   PG_BYTEA_CODEC_ID,
   PG_CHAR_CODEC_ID,
+  PG_DATE_CODEC_ID,
   PG_ENUM_CODEC_ID,
   PG_FLOAT_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
+  PG_INET_CODEC_ID,
   PG_INT_CODEC_ID,
   PG_INT2_CODEC_ID,
   PG_INT4_CODEC_ID,
@@ -89,14 +97,14 @@ import { PostgresNativeEnum } from './postgres-native-enum';
 
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
-type NumericParams = { readonly precision: number; readonly scale?: number };
+type NumericParams = { readonly precision?: number; readonly scale?: number };
 
 const lengthParamsSchema = arktype({
   'length?': 'number.integer > 0',
 }) satisfies StandardSchemaV1<LengthParams>;
 
 const numericParamsSchema = arktype({
-  precision: 'number.integer > 0 & number.integer <= 1000',
+  'precision?': 'number.integer > 0 & number.integer <= 1000',
   'scale?': 'number.integer >= 0',
 }) satisfies StandardSchemaV1<NumericParams>;
 
@@ -112,6 +120,7 @@ const PG_INT8_META = { db: { sql: { postgres: { nativeType: 'bigint' } } } } as 
 const PG_FLOAT4_META = { db: { sql: { postgres: { nativeType: 'real' } } } } as const;
 const PG_FLOAT8_META = { db: { sql: { postgres: { nativeType: 'double precision' } } } } as const;
 const PG_NUMERIC_META = { db: { sql: { postgres: { nativeType: 'numeric' } } } } as const;
+const PG_DATE_META = { db: { sql: { postgres: { nativeType: 'date' } } } } as const;
 const PG_TIMESTAMP_META = {
   db: { sql: { postgres: { nativeType: 'timestamp without time zone' } } },
 } as const;
@@ -615,10 +624,17 @@ export class PgNumericCodec extends CodecImpl<
     return pgNumericDecode(wire);
   }
   encodeJson(value: string): JsonValue {
-    return value;
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      throw new TypeError('pg/numeric@1 database JSON value must be a finite number');
+    }
+    return number;
   }
   decodeJson(json: JsonValue): string {
-    return json as string;
+    if (typeof json !== 'number') {
+      throw new TypeError('pg/numeric@1 database JSON value must be a number');
+    }
+    return pgNumericDecode(json);
   }
 }
 
@@ -638,11 +654,56 @@ export class PgNumericDescriptor extends CodecDescriptorImpl<NumericParams> {
 
 export const pgNumericDescriptor = new PgNumericDescriptor();
 
-export const pgNumericColumn = (params: NumericParams) =>
+export const pgNumericColumn = (params: NumericParams = {}) =>
   column(pgNumericDescriptor.factory(params), pgNumericDescriptor.codecId, params, 'numeric');
 
 pgNumericColumn satisfies ColumnHelperFor<PgNumericDescriptor>;
 pgNumericColumn satisfies ColumnHelperForStrict<PgNumericDescriptor>;
+
+/**
+ * A Postgres `date` has no time-of-day or timezone component. This codec
+ * canonicalizes its JS-level value as a `Date` at UTC midnight, so its
+ * round-trip is independent of the process's local timezone — see
+ * `pgDateEncode`/`pgDateDecode` in `codec-helpers.ts`.
+ */
+export class PgDateCodec extends CodecImpl<
+  typeof PG_DATE_CODEC_ID,
+  readonly ['equality', 'order'],
+  Date | string,
+  Date
+> {
+  async encode(value: Date, _ctx: CodecCallContext): Promise<string> {
+    return pgDateEncode(value);
+  }
+  async decode(wire: Date, _ctx: CodecCallContext): Promise<Date> {
+    return pgDateDecode(wire);
+  }
+  encodeJson(value: Date): JsonValue {
+    return pgDateEncodeJson(value);
+  }
+  decodeJson(json: JsonValue): Date {
+    return pgDateDecodeJson(json);
+  }
+}
+
+export class PgDateDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_DATE_CODEC_ID;
+  override readonly traits = ['equality', 'order'] as const;
+  override readonly targetTypes = ['date'] as const;
+  override readonly meta = PG_DATE_META;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => PgDateCodec {
+    return () => new PgDateCodec(this);
+  }
+}
+
+export const pgDateDescriptor = new PgDateDescriptor();
+
+export const pgDateColumn = () =>
+  column(pgDateDescriptor.factory(), pgDateDescriptor.codecId, undefined, 'date');
+
+pgDateColumn satisfies ColumnHelperFor<PgDateDescriptor>;
+pgDateColumn satisfies ColumnHelperForStrict<PgDateDescriptor>;
 
 export class PgTimestampCodec extends CodecImpl<
   typeof PG_TIMESTAMP_CODEC_ID,
@@ -921,17 +982,10 @@ export class PgByteaCodec extends CodecImpl<
       : new Uint8Array(wire.buffer, wire.byteOffset, wire.byteLength);
   }
   encodeJson(value: Uint8Array): JsonValue {
-    return Buffer.from(value).toString('base64');
+    return pgByteaEncodeJson(value);
   }
   decodeJson(json: JsonValue): Uint8Array {
-    if (typeof json !== 'string') {
-      throw new Error(`Expected base64 string for pg/bytea@1, got ${typeof json}`);
-    }
-    const decoded = Buffer.from(json, 'base64');
-    if (decoded.toString('base64') !== json) {
-      throw new Error(`Invalid base64 string for pg/bytea@1 (length: ${json.length})`);
-    }
-    return new Uint8Array(decoded);
+    return pgByteaDecodeJson(json);
   }
 }
 
@@ -994,6 +1048,47 @@ export const pgUuidColumn = () =>
 
 pgUuidColumn satisfies ColumnHelperFor<PgUuidDescriptor>;
 pgUuidColumn satisfies ColumnHelperForStrict<PgUuidDescriptor>;
+
+const PG_INET_META = { db: { sql: { postgres: { nativeType: 'inet' } } } } as const;
+
+export class PgInetCodec extends CodecImpl<
+  typeof PG_INET_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string
+> {
+  async encode(value: string, _ctx: CodecCallContext): Promise<string> {
+    return value;
+  }
+  async decode(wire: string, _ctx: CodecCallContext): Promise<string> {
+    return wire;
+  }
+  encodeJson(value: string): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): string {
+    return blindCast<string, 'inet columns serialize to JSON as their wire string form'>(json);
+  }
+}
+
+export class PgInetDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_INET_CODEC_ID;
+  override readonly traits = ['equality', 'order'] as const;
+  override readonly targetTypes = ['inet'] as const;
+  override readonly meta = PG_INET_META;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => PgInetCodec {
+    return () => new PgInetCodec(this);
+  }
+}
+
+export const pgInetDescriptor = new PgInetDescriptor();
+
+export const pgInetColumn = () =>
+  column(pgInetDescriptor.factory(), pgInetDescriptor.codecId, undefined, 'inet');
+
+pgInetColumn satisfies ColumnHelperFor<PgInetDescriptor>;
+pgInetColumn satisfies ColumnHelperForStrict<PgInetDescriptor>;
 
 export class PgIntervalCodec extends CodecImpl<
   typeof PG_INTERVAL_CODEC_ID,
@@ -1241,6 +1336,8 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgNumericDescriptor,
+  // PSL `@db.Date` binding is deferred to remove-db-attributes' `Date` type; pin it via codecId, not a second targetTypes activation here.
+  pgDateDescriptor,
   pgTimestampDescriptor,
   pgTimestamptzDescriptor,
   pgTimeDescriptor,
@@ -1250,6 +1347,7 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   pgVarbitDescriptor,
   pgByteaDescriptor,
   pgUuidDescriptor,
+  pgInetDescriptor,
   pgIntervalDescriptor,
   pgJsonDescriptor,
   pgJsonbDescriptor,

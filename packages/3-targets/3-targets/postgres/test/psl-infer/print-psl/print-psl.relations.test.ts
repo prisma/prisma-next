@@ -63,6 +63,61 @@ describe('printPsl', () => {
     `);
   });
 
+  it('stamps index: false when the FK column has no live backing index, unique, or PK', () => {
+    const schemaIR = new SqlSchemaIR({
+      tables: {
+        user: {
+          name: 'user',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+        post: {
+          name: 'post',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+            user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [
+            {
+              columns: ['user_id'],
+              referencedTable: 'user',
+              referencedColumns: ['id'],
+            },
+          ],
+          uniques: [],
+          indexes: [],
+        },
+      },
+    });
+    const result = printPslFromSql(schemaIR);
+    expect(result).toMatchInlineSnapshot(`
+      "// use prisma-next
+      // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+
+      model User {
+        id    Int    @id
+        posts Post[]
+
+        @@map("user")
+      }
+
+      model Post {
+        id     Int  @id
+        userId Int  @map("user_id")
+        user   User @relation(fields: [userId], references: [id], index: false)
+
+        @@map("post")
+      }
+      "
+    `);
+  });
+
   it('schema with 1:1 relation (FK column is unique)', () => {
     const schemaIR = new SqlSchemaIR({
       tables: {
@@ -229,7 +284,7 @@ describe('printPsl', () => {
         id        Int        @id
         name      String
         managerId Int?       @map("manager_id")
-        manager   Employee?  @relation(name: "ManagerEmployees", fields: [managerId], references: [id])
+        manager   Employee?  @relation(name: "ManagerEmployees", fields: [managerId], references: [id], index: false)
         employees Employee[] @relation(name: "ManagerEmployees")
 
         @@map("employee")
@@ -303,8 +358,8 @@ describe('printPsl', () => {
         id          Int  @id
         senderId    Int  @map("sender_id")
         recipientId Int  @map("recipient_id")
-        sender      User @relation(name: "message_sender_fk", fields: [senderId], references: [id], map: "message_sender_fk")
-        recipient   User @relation(name: "message_recipient_fk", fields: [recipientId], references: [id], map: "message_recipient_fk")
+        sender      User @relation(name: "message_sender_fk", fields: [senderId], references: [id], map: "message_sender_fk", index: false)
+        recipient   User @relation(name: "message_recipient_fk", fields: [recipientId], references: [id], map: "message_recipient_fk", index: false)
 
         @@map("message")
       }
@@ -380,7 +435,7 @@ describe('printPsl', () => {
         id                Int     @id
         productCategoryId Int     @map("product_category_id")
         productProductId  Int     @map("product_product_id")
-        product           Product @relation(fields: [productCategoryId, productProductId], references: [categoryId, productId])
+        product           Product @relation(fields: [productCategoryId, productProductId], references: [categoryId, productId], index: false)
 
         @@map("review")
       }
@@ -432,8 +487,8 @@ describe('printPsl', () => {
       // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model Parent {
-        id     Int     @id
-        childs Child[]
+        id       Int     @id
+        children Child[]
 
         @@map("parent")
       }
@@ -441,7 +496,7 @@ describe('printPsl', () => {
       model Child {
         id       Int    @id
         parentId Int    @map("parent_id")
-        parent   Parent @relation(fields: [parentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+        parent   Parent @relation(fields: [parentId], references: [id], onDelete: Cascade, onUpdate: Cascade, index: false)
 
         @@map("child")
       }
@@ -498,7 +553,7 @@ describe('printPsl', () => {
       model Member {
         id     Int  @id
         teamId Int  @map("team_id")
-        team   Team @relation(fields: [teamId], references: [id], map: "member_team_id_fkey")
+        team   Team @relation(fields: [teamId], references: [id], map: "member_team_id_fkey", index: false)
 
         @@map("member")
       }

@@ -13,7 +13,7 @@ function makeResult(overrides: {
 }): VerifyDatabaseSchemaResult {
   const defaultIssues: readonly SchemaDiffIssue[] = overrides.ok
     ? []
-    : [{ path: [overrides.spaceId], reason: 'not-found', message: overrides.summary }];
+    : [{ path: [overrides.spaceId] }];
   const result: VerifyDatabaseSchemaResult = {
     ok: overrides.ok,
     summary: overrides.summary,
@@ -109,10 +109,7 @@ describe('combineVerifyResults', () => {
           spaceId: 'cipher',
           ok: false,
           summary: 'Schema verification found 2 issue(s)',
-          issues: [
-            { path: ['a'], reason: 'not-found', message: 'missing a' },
-            { path: ['b'], reason: 'not-found', message: 'missing b' },
-          ],
+          issues: [{ path: ['a'] }, { path: ['b'] }],
         }),
       ],
     ]);
@@ -215,13 +212,9 @@ describe('combineVerifyResults', () => {
   it('concatenates issues from all spaces into the combined result', () => {
     const appDiffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_app_abc'],
-      reason: 'not-found',
-      message: "RLS policy 'policy_app_abc' is missing from the database",
     };
     const extDiffIssue: SchemaDiffIssue = {
       path: ['public', 'audit_log', 'policy_cipher_def'],
-      reason: 'not-expected',
-      message: "RLS policy 'policy_cipher_def' is present in the database but not in the contract",
     };
 
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([

@@ -54,6 +54,24 @@ changes:
         - "renderValueTypeFor"
         - "renderOutputType"
       anyMatch: true
+  - id: sql-codec-json-result-decoding
+    summary: |
+      SQL `encodeJson` / `decodeJson` now use the exact scalar shape produced by the corresponding
+      database inside JSON values. SQL include decoding calls `decodeJson`; ordinary column decoding
+      continues to call `decode`. Update custom SQL codecs whose database JSON representation differs
+      from their normal driver wire representation, then re-emit committed contracts and defaults.
+      Built-in representation changes are: `pg/bytea@1` base64 -> `\\x`-prefixed hex,
+      `pg/numeric@1` string -> JSON number, `pg/timestamp@1` UTC `Z` suffix -> no timezone suffix,
+      `pg/timestamptz@1` UTC `Z` suffix -> `+00:00`, `sqlite/bigint@1` string -> JSON number,
+      `pg/vector@1` JSON array -> Postgres vector text, and `pg/geometry@1` GeoJSON object -> HEXEWKB
+      text. SQLite cannot represent BLOB values inside its native JSON values; such queries still fail
+      at the database boundary rather than receiving a synthetic codec representation.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "encodeJson"
+        - "decodeJson"
+      anyMatch: true
   - id: mongo-derive-json-schema-value-sets-param
     summary: |
       `deriveJsonSchema` / `derivePolymorphicJsonSchema` (from `@prisma-next/mongo-contract-psl`) now
@@ -209,7 +227,262 @@ changes:
         - "verifyType:"
         - "verifyType("
       anyMatch: true
+  - id: policy-target-models-require-rls-attribute
+    summary: |
+      If your extension's contract space authors `policy_select` blocks (PSL), each block's
+      `target` model must now declare `@@rls`; `contract emit` / `build:contract-space` fails
+      with `PSL_EXTENSION_TARGET_MODEL_MISSING_ATTRIBUTE` otherwise. Add `@@rls` to the
+      policy-bearing models and re-emit; the contract gains an `rls` marker entity
+      (`entries.rls[tableName]`) and a new storage hash.
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "policy_select"
+      anyMatch: true
+  - id: postgres-table-schema-node-rls-enabled-required
+    summary: |
+      `PostgresTableSchemaNodeInput.rlsEnabled` (from `@prisma-next/target-postgres/types`) is
+      now a required boolean, and `isEqualTo` compares it alongside the table name. Every
+      `new PostgresTableSchemaNode({ ... })` construction in your extension (planner tests,
+      diff-tree fixtures, tooling) must supply it explicitly - `false` for a table that is not
+      RLS-controlled. The expected side derives the value from the contract's `entries.rls`
+      marker; the actual side from `pg_class.relrowsecurity` at introspection.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "new PostgresTableSchemaNode("
+      anyMatch: true
+  - id: authoring-contributions-model-attributes-slot
+    summary: |
+      `AuthoringContributions` gains a `modelAttributes` slot and the assembled control-stack
+      shape (`AssembledAuthoringContributions`) is now five fields - code that constructs the
+      assembled shape literally (e.g. a stubbed `ContractSourceContext.authoringContributions`
+      in tests) must add `modelAttributes: {}`. New SPI for pack authors: a target/extension
+      pack can contribute declarative `@@` model attributes via
+      `AuthoringContributions.modelAttributes` (an `AuthoringModelAttributeDescriptor` carries
+      the bare attribute name, an ADR-231 `modelAttribute()` spec, and a lowering that files an
+      entity into the namespace's `entries[attribute][key]`), and a PSL block descriptor can
+      declare `requiresModelAttribute: { parameter, attribute }` to demand that the model
+      named by a ref parameter carries a bare `@@` attribute.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "AssembledAuthoringContributions"
+        - "authoringContributions: {"
+      anyMatch: true
+  - id: native-enum-serialized-in-contract-json
+    summary: |
+      `native_enum` entities now serialize into an extension's emitted `contract.json` (previously they
+      were authoring-time-only — stripped on emit, leaving only the derived `valueSet`). If your
+      extension declares native Postgres enums — `native_enum` blocks in a `.prisma` contract, or
+      `pg.enum(...)` / `nativeEnum(...)` columns in the TypeScript DSL — re-emit your bundled contract
+      (`prisma-next contract emit`) and commit the result, so the `entries.native_enum` maps and the
+      recomputed `storageHash` land in your checked-in `contract.{json,d.ts}`. Re-emitting is what makes
+      your pack's enum type names visible in the published contract: a consumer running `contract infer`
+      with your pack in the stack subtracts your pack-owned enum types by matching those serialized type
+      names, so an un-re-emitted contract leaves the consumer re-declaring types your pack already owns.
+      The change is backward compatible (a pre-existing contract still hydrates), so re-emit at your
+      next release rather than urgently.
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "native_enum"
+        - "pg.enum("
+        - "nativeEnum("
+      anyMatch: true
+  - id: native-enum-entry-keyed-by-physical-type-name
+    summary: |
+      A serialized `native_enum` entry is now keyed by its physical Postgres type name — the `@@map`
+      value, or the declared type name when unmapped — not the TS-facing PascalCase name it previously
+      used (`entries.native_enum.aal_level`, not `entries.native_enum.AalLevel`). This aligns the
+      `native_enum` key with every other storage entry (a table keys by its physical name) per ADR 221.
+      If your extension declares native Postgres enums, re-emit your bundled contract
+      (`prisma-next contract emit`) and commit the result so the re-keyed `entries.native_enum` map and
+      the recomputed `storageHash` land in your checked-in `contract.{json,d.ts}`. If your extension code
+      addresses a `native_enum` entry by key
+      (`contract.storage.namespaces[<ns>].entries.native_enum[<name>]`), switch that key from the
+      PascalCase type name to the physical type name.
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "native_enum"
+        - "pg.enum("
+        - "nativeEnum("
+      anyMatch: true
+  - id: scalar-field-state-descriptor-generic
+    summary: |
+      `ScalarFieldState` (from `@prisma-next/sql-contract-ts/contract-builder`) changes its first
+      type parameter from the codec-id string (`CodecId extends string = string`) to the full column
+      descriptor type (`Descriptor extends ColumnTypeDescriptor = ColumnTypeDescriptor`), so field
+      states preserve the whole descriptor type — including a native-enum entity's member literal
+      tuple — instead of only the codec id. If your extension names `ScalarFieldState<...>` with
+      positional generics, wrap the codec id in the descriptor type: `ScalarFieldState<'pg/text@1',
+      ...>` becomes `ScalarFieldState<ColumnTypeDescriptor<'pg/text@1'>, ...>` (import
+      `ColumnTypeDescriptor` from `@prisma-next/framework-components/codec`); the remaining six
+      parameters are unchanged. Two narrowing ride-alongs can surface in exact-type test assertions:
+      built contract types now keep a descriptor's literal `nativeType`/`typeParams` (previously
+      widened to `string`), and `pg.enum(handle)` (from `@prisma-next/postgres`) returns a descriptor
+      whose `entityRef` is non-optional and whose `entityRef.entity` is `PostgresNativeEnum<Members>`
+      instead of `unknown`. Both remain assignable everywhere the old types were accepted — update
+      `expectTypeOf`-style equality assertions to the narrowed types; do not re-widen production
+      types to satisfy them.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "ScalarFieldState"
+      anyMatch: true
+  - id: schema-ir-fk-unbound-referenced-schema-absent
+    summary: |
+      The family's `contractToSchemaIR` (from `@prisma-next/family-sql/control`) no longer stamps
+      `referencedSchema` on a derived `SqlForeignKeyIR` whose target is the unbound namespace — the
+      field is now absent for that case (it previously carried the `__unbound__` sentinel). Namespace
+      identity is answered by the namespace node's new `isUnbound` getter (on `NamespaceBase` /
+      `SqlNamespace`), never by comparing an id against the sentinel. If your extension rebuilds a
+      target schema-IR tree from a `contractToSchemaIR`-derived one and reconstructs each
+      `SqlForeignKeyIR` (as the Postgres target does in `contractToPostgresDatabaseSchemaNode`),
+      default the absent value back to the target's own coordinate for the unbound slot:
+      `referencedSchema: fk.referencedSchema ?? UNBOUND_NAMESPACE_ID`. Extensions that read
+      `referencedSchema` only for bound (named-schema) FK targets need no change — absence already
+      meant "unbound" downstream.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "SqlForeignKeyIR"
+        - "referencedSchema"
+      anyMatch: true
+  - id: supabase-pack-contract-complete
+    summary: |
+      The `@prisma-next/extension-supabase` shipped contract is now the complete, introspection-generated
+      description of everything Supabase owns — every `auth` (23) and `storage` (10) table of the
+      reference platform version (supabase/postgres:17.6.1.106), all 10 native enum types, and the three
+      roles — up from the previous 5-table minimum. All additive and still `external`: composing apps
+      re-emit and pick up the new pack storageHash; `db.asServiceRole().supabase.{sql,orm}` now exposes
+      the full owned table set; extension-aware `contract infer` omits correspondingly more. `db verify`
+      now requires the full owned set to exist in the live database — real Supabase projects have them;
+      a local or CI stand-in database should restore the pack's reference fixture: `bootstrapSupabaseShim`
+      from `@prisma-next/extension-supabase/test/utils` now does exactly that (it restores the complete
+      reference schema — all Supabase schemas and roles — instead of a hand-authored 5-table subset), so
+      shim users need no change beyond re-running. The curated `/contract` model handles (AuthUser,
+      AuthIdentity, AuthSession, StorageBucket, StorageObject) are unchanged.
+    detection:
+      glob: "**/*.{ts,mts,cts,tsx,prisma,json}"
+      contains:
+        - "@prisma-next/extension-supabase"
+      anyMatch: true
+  - id: psl-relation-index-argument
+    summary: |
+      PSL's `@relation(...)` gained an optional boolean `index` argument that lowers onto the foreign
+      key's existing IR `index` flag: `@relation(fields: [x], references: [y], index: false)` declares
+      the FK without the derived backing-index expectation, for databases whose FK columns genuinely
+      have no physical index (previously unexpressible in PSL — verify would report the synthesized
+      index `not-found`). `contract infer` now emits `index: false` automatically for FKs it introspects
+      without a live backing index, using the same column-key predicate verify uses (shared helper
+      `backingIndexColumnKeys`/`isBackedByColumnKeys` in `@prisma-next/family-sql`). Purely additive —
+      omitted `index` keeps the default `true`; existing contracts re-emit byte-identically.
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "@relation"
+      anyMatch: true
+  - id: contract-canonicalization-preserves-false
+    summary: |
+      The contract canonicalizer no longer strips `value: false` from resolved default-value objects
+      (bare `false` was treated as an omittable empty value, so a `@default(false)` column lost its
+      default in the emitted `contract.json` and never round-tripped against live introspection).
+      Re-emitting a contract that has boolean-`false` column defaults changes its emitted JSON (the
+      default is now present) and therefore its storageHash. No authoring-surface change; re-emit and
+      commit the refreshed artifacts.
+    detection:
+      glob: "**/*.prisma"
+      contains:
+        - "@default(false)"
+      anyMatch: true
+  - id: sql-array-columns-round-trip
+    summary: |
+      Fixes for scalar-list (array) columns and introspection fidelity that can change emitted/derived
+      artifacts for affected schemas: (1) the family's `contractToSchemaIR` now keeps an array column's
+      `nativeType` as the bare element type with `many: true` (previously it baked `"text[]"` into
+      `nativeType`, so every list column verified `not-equal` against live introspection); (2) Postgres
+      introspection now excludes expression-keyed indexes (e.g. on `lower(email)`) and no longer
+      collides a unique and non-unique index over identical columns; (3) `contract infer` carries a
+      non-default index access method through as `@@index(..., type: "<method>")` — note the type must
+      be registered in the stack's IndexTypeRegistry to emit. Extensions that snapshot introspection
+      output or assert on derived schema-IR for array/expression-indexed tables should re-run and
+      refresh expectations.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "contractToSchemaIR"
+        - "introspect"
+      anyMatch: true
+  - id: postgres-inet-codec
+    summary: |
+      The postgres target gains a `pg/inet@1` codec (transparent string carrier, like `pg/uuid@1`):
+      `inet` columns are now authorable as `String @db.Inet` in PSL and representable in contracts,
+      and `contract infer` maps an introspected `inet` column to `String @db.Inet` instead of
+      `Unsupported("inet")`. Purely additive — no existing contract changes; re-running `contract
+      infer` against a database with inet columns now includes them in the output.
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "inet"
+        - "db.Inet"
+      anyMatch: true
+  - id: psl-role-block
+    summary: |
+      PSL gains a standalone `role` block on the postgres target, authored inside the explicit
+      unbound namespace: `namespace unbound { role anon {} }` (name-only, no parameters) lowers to a
+      first-class `PostgresRole` entity in the contract's `__unbound__` storage slot
+      (`control: 'external'` — roles are referenced, never owned; the planner emits no role DDL and
+      `db verify` checks existence via `pg_roles`). The unbound namespace's purpose is late binding
+      (search_path-resolved tables); roles are declared there because they are cluster-scoped and
+      belong to no schema. To make this authorable, the "no `namespace unbound { }` alongside named
+      namespaces" restriction is narrowed to models: a blocks-only unbound namespace is legal next
+      to named namespaces, while one containing models next to named namespaces stays rejected
+      (`PSL_RESERVED_NAMESPACE_NAME`). A `role` block anywhere else — a named namespace or the
+      document top level — is rejected with `PSL_ROLE_BLOCK_OUTSIDE_UNBOUND_NAMESPACE`. Purely
+      additive for existing contracts.
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "role "
+        - "AuthoringPslBlockDescriptor"
+      anyMatch: true
+  - id: supabase-pack-contract-declares-roles
+    summary: |
+      The `@prisma-next/extension-supabase` shipped contract now declares Supabase's three standard
+      Postgres roles (`anon`, `authenticated`, `service_role`) as first-class `role` entities with
+      `control: 'external'`. `db verify` on a project composing the pack now fails with a `not-found`
+      schema issue naming each declared role the live database lacks. Real Supabase databases always
+      have these roles, so hosted projects need no change; a local or CI database that stands in for
+      Supabase must create them — `bootstrapSupabaseShim` from
+      `@prisma-next/extension-supabase/test/utils` already does. The public
+      `SupabaseRoleBinding['role']` type is unchanged (`'anon' | 'authenticated' | 'service_role'`);
+      it is now derived from the `SupabaseRole` Prisma Next enum handle's values; the contract declares the roles via the
+      new PSL `role` blocks inside `namespace unbound { }` (see the `psl-role-block` entry).
+    detection:
+      glob: "**/*.{ts,mts,cts,tsx,prisma,json}"
+      contains:
+        - "@prisma-next/extension-supabase"
+      anyMatch: true
 ---
+<!--
+Release bump to 0.15.0 (PR #988): the version bump itself. Every
+`packages/3-extensions/*/package.json` advances to 0.15.0 (version field +
+`workspace:` specifier lockstep; one stray `workspace:*` in target-postgres
+normalized to the pinned form). No SPI, contract shape, or emitted artefact
+change beyond the pack version stamp. No extension-author action beyond the
+normal dependency upgrade this recipe covers. Incidental substrate diff only.
+-->
+
+<!--
+TML-2503 (extension-supabase Slice E — launch close-out, PR #985): docs only.
+The `packages/3-extensions/` touch is `packages/3-extensions/supabase/README.md` —
+the package README corrected to as-built (runtime usage, JWT validation modes, the
+service_role admin root, unsupported scope). No SPI, contract shape, or emitted
+artefact change. Incidental substrate diff only.
+-->
+
 <!--
 TML-2787 (M:N slice 3): namespace-scoped execution-default refs land in
 `@prisma-next/sql-orm-client` (nested writes through a junction, the
@@ -430,6 +703,22 @@ changed or removed. No extension-author action required. Incidental substrate di
 -->
 
 <!--
+TML-2960 (no-emit native-enum column typing): a `field.column(pg.enum(handle))`
+column now types as its member-value literal union in `typeof contract` (the
+no-emit path), matching what the emit path already produced. The
+`packages/3-extensions/` diff is the feature itself plus its type test:
+`postgres/src/contract/native-enum.ts` makes `pg.enum()` generic over the
+handle's members (returning a descriptor whose `entityRef.entity` is
+`PostgresNativeEnum<Members>`), and
+`postgres/test/contract-builder/native-enum-typeof.test-d.ts` pins the
+resulting `typeof contract` types. Runtime values and emitted
+`contract.{json,d.ts}` are byte-identical. The extension-author-facing type
+reshape this rides on (`ScalarFieldState`'s first generic) is recorded in the
+`scalar-field-state-descriptor-generic` entry above; beyond that, no
+extension-author action. Incidental substrate diff only.
+-->
+
+<!--
 TML-2828 (variant relations on the narrowed accessor, PR #933): the
 `packages/3-extensions/` diff is confined to `@prisma-next/sql-orm-client` (itself an
 extension). The `.variant('X')`-narrowed predicate accessor now surfaces relations the
@@ -441,6 +730,76 @@ coordinates (variant table for MTI, base table for STI), and
 EXISTS. Purely additive to the ORM client's query surface; no extension-author SPI
 (`@prisma-next/contract`, `@prisma-next/framework-components`, …) changed. No
 extension-author action required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2883 (rls-ts-authoring): Postgres RLS is now authorable in the TypeScript DSL,
+producing contracts wire-name-identical to the PSL `policy_*` / `@@rls` equivalents.
+The `packages/3-extensions/` diff is additive: `@prisma-next/postgres` gains
+`src/contract/rls.ts` (frozen branded handles from `policySelect` / `policyInsert` /
+`policyUpdate` / `policyDelete` / `policyAll` / `rlsEnabled(model)` / `role(name)`;
+predicates are opaque strings); its `defineContract` accepts an optional
+`entities?: readonly RlsEntityHandle[]` input. The lowering is target-side: the
+generic contract build groups `entities` handles by the pack that registered each
+`entityKind` and calls the pack's batch hook (`lowerEntityHandles`, a SQL-family
+contributions extension exported from
+`@prisma-next/sql-contract/entity-handle-lowering-hook`), which target-postgres
+implements beside its PSL lowering. A TS-declared `role(name)` lands in
+`entries.role` under the `__unbound__` namespace, identical to a PSL `role` block
+(roles are cluster-scoped). `@prisma-next/extension-supabase` gains `anon` /
+`authenticated` role-handle exports from `/contract`. Supporting additive exports
+only elsewhere: `buildContractDefinition` from
+`@prisma-next/sql-contract-ts/contract-builder`; `formatRlsPolicyWireName` +
+`POLICY_OPERATION_PREDICATES` from `@prisma-next/target-postgres/rls-canonicalize`.
+`entities` is the sole public channel for attaching pack entities; the internal
+`packEntities` input never had a real author and was removed (test-only, never
+documented as user-facing), so no extension-author action is required. Incidental
+substrate diff only.
+-->
+
+<!--
+Dependabot runtime-deps group bump (PR #962): the packages/3-extensions/
+diff is package.json dependency version ranges only (arktype ^2.2.2 /
+~2.2.2). No extension-facing API, contract shape, or emitted artefact
+changes. No user action required. Incidental substrate diff only.
+-->
+
+<!--
+pg binding resolution by structure, not instanceof (PR #969): the
+`packages/3-extensions/` diff is a bug fix plus additive exports. The postgres
+extension (`@prisma-next/postgres`) gains two net-new `/runtime` exports —
+`isPgPool` / `isPgClient`, structural type guards that identify a `pg`
+Pool/Client by shape instead of `instanceof`. `resolvePostgresBinding` and the
+`@prisma-next/extension-supabase` `toPool` helper now use them, so a
+caller-supplied pool that came from a duplicated `pg` copy in an app bundle
+resolves correctly instead of throwing `Unable to determine pg binding type`
+at boot. The change only accepts inputs the old `instanceof` check rejected —
+nothing that resolved before resolves differently — and the two guards are
+additive. No extension-author action required. Incidental substrate diff only.
+-->
+
+<!--
+TML-2980 (variant-declared SQL ORM includes, PR #976): the `packages/3-extensions/` diff fixes the existing `.variant().include()` API inside `@prisma-next/sql-orm-client` so singleton variant narrowing can include relations declared by that variant, with union-valued narrowing rejecting shadowed ambiguous names. Mutation `RETURNING` rows now also map variant-owned physical columns back to their domain field names, matching reads and the existing static row type. No extension-author SPI, contract shape, syntax, or configuration changed, and existing consumers need no code migration. Incidental substrate diff only.
+-->
+
+<!--
+postgres-rls project close-out (PR #979): the packages/3-extensions/ diff is
+one documentation link in the supabase README — the RLS pointer into the
+now-deleted projects/postgres-rls/ directory re-pointed at the promoted
+ADR 234 and the Adapters & Targets subsystem doc, with the surface names
+updated to the shipped forms. No code, API, contract shape, or emitted
+artefact changes. No extension-author action required. Incidental docs-only
+diff.
+-->
+
+<!--
+PR #915 (middleware doc-comment lifecycle fixes): comments-only. The only
+`packages/3-extensions/` touch is doc comments in
+`packages/3-extensions/middleware-cache/src/cache-middleware.ts`, correcting
+stale claims about the cache-hit lifecycle (a hit skips only the driver call
+and per-row `onRow` hooks; `beforeExecute` has already run, `afterExecute`
+still fires; `decodeRow` still runs). No SPI or behavioural change.
+No user action required. Incidental substrate diff only.
 -->
 
 <!--
