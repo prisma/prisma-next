@@ -41,6 +41,13 @@
 - **Hands to:** TML-3061 receives a review-clean public AST foundation with authoritative output-codec propagation, tested target renderers, and no target-specific codec execution.
 - **Focus:** Tests first for the known row-number-dedup loss using parameterized/many codec metadata; audit every projection reconstruction with `rg`; convert touched-file bare casts per the no-bare-casts skill; run final gates and verify forbidden-scope greps. Do not absorb descriptor, canonical JSON, aggregate, fixture, or prototype work.
 
+### Dispatch 6: post-rebase lint compatibility
+
+- **Outcome:** The touched where-binding regression remains semantically identical while satisfying the newer `main` lint rule against unsafe optional chaining.
+- **Builds on:** Dispatch 5's complete implementation and the final rebase onto the merged planning PR plus current `main`.
+- **Hands to:** A branch with no actionable local validation defect; the separately accepted PostgreSQL infrastructure flake remains disclosed to CI/reviewers.
+- **Focus:** Change only the unsafe test assertion, preserve its type/nesting evidence, run the focused test and SQL ORM lint/typecheck, and commit with sign-off. No production behavior, broader test cleanup, or retry-based infrastructure work.
+
 ## Dispatch-INVEST check
 
 | Dispatch | Independent handoff | One coherent outcome | Binary verification |
@@ -50,8 +57,9 @@
 | 3 | Scalar expression nodes are usable independently of target descriptors. | One expression-vocabulary family. | Exhaustiveness, traversal, and both renderer suites pass. |
 | 4 | Function-source ordinality is usable independently by later array planning. | One source-vocabulary extension. | Source invariants and PostgreSQL/SQLite behavior tests pass. |
 | 5 | Output codec metadata survives wrappers and the slice is review-ready. | One propagation invariant plus its final proof. | Regression test, reconstruction sweep, and final gates pass. |
+| 6 | The rebased touched test satisfies the current lint invariant. | One post-rebase compatibility correction. | Focused test and SQL ORM lint/typecheck pass. |
 
-All five dispatches are sequential because they share the same AST discriminants and renderer exhaustiveness surface. Parallel execution would create write/write conflicts and make consumer migrations compile against moving types.
+Dispatches 1–5 are sequential because they share the same AST discriminants and renderer exhaustiveness surface. Parallel execution would create write/write conflicts and make consumer migrations compile against moving types. Dispatch 6 is a small post-rebase remediation discovered only after the planning PR merged and `main` advanced.
 
 ## Validation gates
 
