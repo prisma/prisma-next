@@ -67,13 +67,15 @@ Every application that consumes Prisma Next uses the same shape:
 │       ├── contract.d.ts             ← emitted by `contract emit` — do not edit
 │       └── db.ts                     ← runtime entry; the rest of `src/` imports from here
 └── migrations/
+    ├── snapshots/                    ← content-addressed contract store, shared across spaces
+    │   └── <hex>/
+    │       ├── contract.json
+    │       └── contract.d.ts
     └── app/                          ← created on first `migration plan` / `db init`
         ├── refs/head.json
         └── <timestamp>_<slug>/
             ├── migration.json
             ├── ops.json
-            ├── end-contract.json
-            ├── end-contract.d.ts
             └── migration.ts
 ```
 

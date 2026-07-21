@@ -334,9 +334,9 @@ export interface SqlMigrationPlannerPlanOptions {
    * or `null` for reconciliation flows that have no prior contract.
    *
    * Required at every call site so the structural fact "I have a prior
-   * contract / I don't" is visible in the type. `migration plan` reads
-   * the predecessor bundle's `end-contract.json` from disk and passes
-   * the parsed value; `db update` / `db init` reconcile against the
+   * contract / I don't" is visible in the type. `migration plan` reads the
+   * predecessor's contract from the snapshot store by its storage hash and
+   * passes the parsed value; `db update` / `db init` reconcile against the
    * live schema and pass `null`. Strategies that
    * need from/to column-shape comparisons (unsafe type change, nullability
    * tightening) use this to decide whether to emit `dataTransform`

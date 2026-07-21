@@ -17,9 +17,7 @@
       "!**/*.svg",
       "!**/contract.json",
       "!**/migrations/*/*/migration.json",
-      "!**/migrations/*/*/ops.json",
-      "!**/migrations/*/*/end-contract.json",
-      "!**/migrations/*/*/start-contract.json"
+      "!**/migrations/*/*/ops.json"
     ]
   },
   "formatter": {

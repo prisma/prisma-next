@@ -279,10 +279,10 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
   });
 
   it('loads a package whose directory holds only migration.json + ops.json', async () => {
-    // Runner-side independence: the migration loader must not require
-    // sibling `start-contract.json` / `end-contract.json` files to be
-    // present on disk. Contracts are author-time conveniences, not
-    // structural inputs to the runner. The stored manifest carries the
+    // Runner-side independence: the migration loader must not require a
+    // resolvable snapshot store entry to be present on disk. Contracts
+    // are author-time conveniences, not structural inputs to the runner.
+    // The stored manifest carries the
     // storage-hash bookends (`from`, `to`) which is all the runner needs
     // to walk the migration graph.
     const { readdir } = await import('node:fs/promises');
@@ -864,7 +864,7 @@ describe('copyFilesWithRename', () => {
     expect(await readFile(join(destDir, 'contract.d.ts'), 'utf-8')).toBe(dtsPayload);
   });
 
-  it('renames destination filenames according to destName (source → start-contract.*)', async () => {
+  it('renames destination filenames according to destName (source → renamed.*)', async () => {
     const sourceDir = join(tmpDir, 'src/prisma');
     await mkdir(sourceDir, { recursive: true });
     const sourceJson = join(sourceDir, 'contract.json');
@@ -875,12 +875,12 @@ describe('copyFilesWithRename', () => {
     const destDir = join(tmpDir, 'migrations/20260225T1430_renamed');
 
     await copyFilesWithRename(destDir, [
-      { sourcePath: sourceJson, destName: 'start-contract.json' },
-      { sourcePath: sourceDts, destName: 'start-contract.d.ts' },
+      { sourcePath: sourceJson, destName: 'renamed.json' },
+      { sourcePath: sourceDts, destName: 'renamed.d.ts' },
     ]);
 
-    expect(await readFile(join(destDir, 'start-contract.json'), 'utf-8')).toBe('{"renamed":true}');
-    expect(await readFile(join(destDir, 'start-contract.d.ts'), 'utf-8')).toBe('// dts');
+    expect(await readFile(join(destDir, 'renamed.json'), 'utf-8')).toBe('{"renamed":true}');
+    expect(await readFile(join(destDir, 'renamed.d.ts'), 'utf-8')).toBe('// dts');
   });
 
   it('creates the destination directory if it does not already exist', async () => {

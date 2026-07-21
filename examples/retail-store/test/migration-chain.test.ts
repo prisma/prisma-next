@@ -40,7 +40,7 @@ function namespacedMongoContract(contract: MongoContract): MongoContract {
     return contract;
   }
   const { collections, storageHash, ...rest } = storage as FlatMongoStorage;
-  // Test-only rewrap of a legacy on-disk end-contract.json whose storageHash
+  // Test-only rewrap of a legacy on-disk contract snapshot whose storageHash
   // is a plain string. MongoContract's storage carries a branded StorageHash;
   // the brand is purely a type-level marker and the runtime payload is
   // identical, so a structural rewrap is safe here.
@@ -66,8 +66,18 @@ function loadMigration(dirName: string): {
 } {
   const dir = resolve(import.meta.dirname, '../migrations/app', dirName);
   const ops = JSON.parse(readFileSync(resolve(dir, 'ops.json'), 'utf8'));
+  const metadata = JSON.parse(readFileSync(resolve(dir, 'migration.json'), 'utf8')) as {
+    to: string;
+  };
+  const snapshotHex = metadata.to.replace(/^sha256:/, '');
+  const snapshotPath = resolve(
+    import.meta.dirname,
+    '../migrations/snapshots',
+    snapshotHex,
+    'contract.json',
+  );
   const endContract = namespacedMongoContract(
-    JSON.parse(readFileSync(resolve(dir, 'end-contract.json'), 'utf8')) as MongoContract,
+    JSON.parse(readFileSync(snapshotPath, 'utf8')) as MongoContract,
   );
   return { ops, endContract };
 }

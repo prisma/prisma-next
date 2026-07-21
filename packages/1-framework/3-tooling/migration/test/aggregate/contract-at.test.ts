@@ -111,7 +111,7 @@ describe('AggregateContractSpace.contractAt', () => {
     );
   });
 
-  it('reads end-contract from the matching graph-node package without refName', async () => {
+  it('reads the destination contract from the matching graph-node package without refName', async () => {
     const space = spaceWithPackages([
       createAttestedPackage('20260101T0000_init', { from: null, to: HASH_B }),
     ]);
@@ -174,7 +174,7 @@ describe('AggregateContractSpace.contractAt', () => {
     });
   });
 
-  it('throws when deserializeContract rejects the parsed end-contract', async () => {
+  it('throws when deserializeContract rejects the parsed destination contract', async () => {
     const space = spaceWithPackages(
       [createAttestedPackage('20260101T0000_init', { from: null, to: HASH_B })],
       () => {

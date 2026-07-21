@@ -42,12 +42,11 @@ import type { OperationContext } from './control-operation-results';
  * writer output (defined in `@prisma-next/migration-tools/io`).
  *
  * The manifest carries identity (`from`, `to`, `migrationHash`) but
- * not the full contract IRs themselves. The destination contract for a
- * migration lives in the sibling `end-contract.json` on disk; the
- * predecessor's contract lives in its own directory's `end-contract.json`.
- * The runner depends only on `migration.json` + `ops.json` per package
- * (plus the project-root / per-space `contract.json` head). See
- * `docs/architecture docs/subsystems/7. Migration System.md`.
+ * not the full contract IRs themselves. The destination and predecessor
+ * contracts resolve by hash through the shared content-addressed store
+ * at `migrations/snapshots/<hex>/contract.json`. The runner depends only
+ * on `migration.json` + `ops.json` per package (plus the project-root
+ * head contract). See `docs/architecture docs/subsystems/7. Migration System.md`.
  */
 export interface MigrationMetadata {
   readonly migrationHash: string;
@@ -437,8 +436,9 @@ export interface MigrationPlanner<
      * Required at every call site to make the structural fact "I have a
      * prior contract / I don't" visible in the type. Reconciliation
      * commands (`db init`, `db update`) introspect a live schema and pass
-     * `null`; authoring commands (`migration plan`) load the previous
-     * bundle's `end-contract.json` from disk and pass the parsed value.
+     * `null`; authoring commands (`migration plan`) read the predecessor's
+     * contract from the snapshot store by its storage hash and pass the
+     * parsed value.
      */
     readonly fromContract: Contract | null;
     /**

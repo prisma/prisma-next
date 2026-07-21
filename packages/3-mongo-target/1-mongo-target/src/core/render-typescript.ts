@@ -36,12 +36,12 @@ const BASE_IMPORTS: readonly ImportRequirement[] = [
 
 /**
  * Render a list of Mongo `OpFactoryCall`s as a `migration.ts` source string.
- * The result is shebanged, imports the committed contract JSON
- * (`end-contract.json`, plus `start-contract.json` for a non-baseline
- * migration), extends `Migration<Start, End>` (or `Migration<never, End>` for
- * a baseline) from `@prisma-next/family-mongo`, assigns the JSON to
- * `endContractJson` / `startContractJson`, and implements `operations`. The
- * `Migration` base derives `describe()` from those fields.
+ * The result is shebanged, imports the contract JSON from the shared
+ * snapshot store (the destination contract, plus the source contract for a
+ * non-baseline migration), extends `Migration<Start, End>` (or
+ * `Migration<never, End>` for a baseline) from `@prisma-next/family-mongo`,
+ * assigns the JSON to `endContractJson` / `startContractJson`, and implements
+ * `operations`. The `Migration` base derives `describe()` from those fields.
  *
  * The walk is polymorphic: each call node contributes its own
  * `renderTypeScript()` expression and declares its own `importRequirements()`.

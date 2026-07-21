@@ -138,7 +138,7 @@ async function executeDbUpdateCommand(
           errorUnexpected(
             `No migration bundle found for --to "${options.to}" (resolved hash: ${targetHash})`,
             {
-              why: `The ref resolved successfully but no on-disk migration package has an end-contract hash matching ${targetHash}.`,
+              why: `The ref resolved successfully but no on-disk migration package has a destination (\`to\`) hash matching ${targetHash}.`,
               fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
             },
           ),

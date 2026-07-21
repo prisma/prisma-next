@@ -448,7 +448,7 @@ describe('resolveToForPlan', () => {
     }
   });
 
-  it('resolves a full hash that is a graph node via the bundle end-contract artifacts', async () => {
+  it('resolves a full hash that is a graph node via the bundle destination contract artifacts', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
     const contractAt = vi
       .fn()

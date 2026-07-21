@@ -5,7 +5,7 @@
  * supplies the control adapter from the migration's injected stack:
  *
  * ```ts
- * import endContract from './end-contract.json' with { type: 'json' };
+ * import endContract from '../../snapshots/93f07d1b…c9e1e5a2/contract.json' with { type: 'json' };
  *
  * class M extends Migration {
  *   override get operations() {

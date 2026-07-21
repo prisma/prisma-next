@@ -153,10 +153,8 @@ async function directoryExists(p: string): Promise<boolean> {
  * The destination directory is created (with `recursive: true`) if it
  * does not already exist. Each source path is copied byte-for-byte into
  * `destDir/<destName>`; missing sources throw `ENOENT`. The helper is
- * intentionally generic: callers own the list of files (e.g. a contract
- * emitter's emitted output) and the naming convention (e.g. renaming
- * the destination contract to `end-contract.*` and the source contract
- * to `start-contract.*`).
+ * intentionally generic: callers own the list of files and the naming
+ * convention for the copies.
  */
 export async function copyFilesWithRename(
   destDir: string,

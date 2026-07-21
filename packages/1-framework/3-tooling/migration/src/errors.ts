@@ -421,7 +421,7 @@ export function errorBundleNotFoundForGraphNode(
     ? `No migration bundle found for reference "${explicitLabel}" (resolved hash: ${hash})`
     : `No migration bundle found for graph node ${hash}`;
   return new MigrationToolsError('MIGRATION.BUNDLE_NOT_FOUND_FOR_GRAPH_NODE', summary, {
-    why: `The hash ${hash} is a graph node but no on-disk migration package has an end-contract hash matching it.`,
+    why: `The hash ${hash} is a graph node but no on-disk migration package has a destination (\`to\`) hash matching it.`,
     fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
     details: { hash, ...(explicitLabel ? { explicitLabel } : {}) },
   });

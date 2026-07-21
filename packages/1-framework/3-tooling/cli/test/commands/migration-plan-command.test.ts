@@ -160,7 +160,7 @@ function buildResolutionSpace(
           'MIGRATION.BUNDLE_NOT_FOUND_FOR_GRAPH_NODE',
           `No migration bundle found for graph node ${hash}`,
           {
-            why: `The hash ${hash} is a graph node but no on-disk migration package has an end-contract hash matching it.`,
+            why: `The hash ${hash} is a graph node but no on-disk migration package has a destination (\`to\`) hash matching it.`,
             fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
             details: { hash },
           },
@@ -168,8 +168,8 @@ function buildResolutionSpace(
       }
 
       const { readFile } = await import('node:fs/promises');
-      const jsonPath = join(matchingBundle.dirPath, 'end-contract.json');
-      const dtsPath = join(matchingBundle.dirPath, 'end-contract.d.ts');
+      const jsonPath = join(matchingBundle.dirPath, 'predecessor-snapshot.json');
+      const dtsPath = join(matchingBundle.dirPath, 'predecessor-snapshot.d.ts');
       try {
         const [rawJson, contractDts] = await Promise.all([
           readFile(jsonPath, 'utf-8'),
@@ -861,7 +861,7 @@ describe('migration plan command', () => {
     it('resolves an explicit --from and --to independently', async () => {
       setupBaseConfig();
       mocks.readFile.mockImplementation(async (path: string) => {
-        if (typeof path === 'string' && path.endsWith('end-contract.json')) {
+        if (typeof path === 'string' && path.endsWith('predecessor-snapshot.json')) {
           return makeContractJson(OLD_HASH);
         }
         return makeContractJson(NEW_HASH);
@@ -888,7 +888,7 @@ describe('migration plan command', () => {
       expect(result.to).toBe(NEW_HASH);
       // An explicit --from that resolves to a graph node relies on the
       // predecessor's end contract already being in the store under its own
-      // hash — migration plan writes no start-contract snapshot for it.
+      // hash — migration plan writes no predecessor snapshot for it.
       expect(mocks.writeContractSnapshot).not.toHaveBeenCalledWith(
         '/tmp/test/migrations',
         OLD_HASH,
@@ -950,7 +950,7 @@ describe('migration plan command', () => {
     it('writes only the destination snapshot when --from resolves via graph node (the predecessor is already in the store)', async () => {
       setupBaseConfig();
       mocks.readFile.mockImplementation(async (path: string) => {
-        if (typeof path === 'string' && path.endsWith('end-contract.json')) {
+        if (typeof path === 'string' && path.endsWith('predecessor-snapshot.json')) {
           return makeContractJson(OLD_HASH);
         }
         return makeContractJson(NEW_HASH);
@@ -971,7 +971,7 @@ describe('migration plan command', () => {
       });
     });
 
-    it('surfaces a structured file-not-found error when the predecessor end-contract.json is missing', async () => {
+    it('surfaces a structured file-not-found error when the predecessor snapshot is missing', async () => {
       // Locks the spec acceptance criterion for TML-2512: `migration plan`
       // must surface a clear structured CLI error (not a raw ENOENT crash)
       // when it cannot read the previous migration's destination contract
@@ -982,7 +982,7 @@ describe('migration plan command', () => {
       setupBaseConfig();
 
       mocks.readFile.mockImplementation(async (path: string) => {
-        if (typeof path === 'string' && path.endsWith('end-contract.json')) {
+        if (typeof path === 'string' && path.endsWith('predecessor-snapshot.json')) {
           const err = new Error(`ENOENT: no such file or directory, open '${path}'`) as Error & {
             code: string;
           };
@@ -1000,7 +1000,7 @@ describe('migration plan command', () => {
       );
 
       const message = [...localConsoleOutput, ...consoleErrors].join('\n');
-      expect(message).toContain('end-contract.json');
+      expect(message).toContain('predecessor-snapshot.json');
       expect(message).toContain('20260301T0900_prev');
       expect(message).toContain(
         'Restore migrations/snapshots/ from version control, or re-run the command that produced this migration to regenerate its snapshot.',

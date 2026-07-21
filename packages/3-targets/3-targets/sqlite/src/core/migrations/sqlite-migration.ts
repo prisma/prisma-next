@@ -40,8 +40,9 @@ type Op = SqlMigrationPlanOperation<SqlitePlanTargetDetails>;
  * through every call.
  *
  * Binds the framework base's `Start` / `End` contract generics so a subclass
- * that assigns its `start-contract.json` / `end-contract.json` imports gets
- * fully-typed view accessors: `this.endContract` is a `SqliteContractView<End>`
+ * that assigns its snapshot-store `contract.json` imports to
+ * `startContractJson` / `endContractJson` gets fully-typed view accessors:
+ * `this.endContract` is a `SqliteContractView<End>`
  * (sole namespace unwrapped to the root — `this.endContract.table.<name>`),
  * built lazily from the JSON fields via the shared `MigrationContractViews`
  * helper. Mirrors `MongoMigration`'s view getters; the framework base derives

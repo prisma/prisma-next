@@ -183,7 +183,7 @@ describe('migrate --to verifies against the target bundle contract', () => {
     vi.resetModules();
   });
 
-  it('applies the target bundle end-contract when --to names an older graph node', async () => {
+  it('applies the target bundle destination contract when --to names an older graph node', async () => {
     const { createMigrateCommand } = await import('../../src/commands/migrate');
     const cwd = await setupAppliedState();
     tempDirs.push(cwd);

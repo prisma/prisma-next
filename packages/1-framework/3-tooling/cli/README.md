@@ -952,15 +952,14 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <contract>]
 2. Reads existing migrations from `config.migrations.dir` (default: `migrations/`)
 3. Determines the starting point: `--from <contract>` if provided, otherwise the `db` ref (greenfield when absent)
 4. Diffs the starting contract against the destination using the target's migration planner
-5. Scaffolds a new migration package: `migration.ts` (containing `placeholder(...)` lambdas for any data transforms), `migration.json` (with a content-addressed `migrationHash` over the planned ops, or over `[]` when the planner could not lower any calls because of placeholders), `ops.json` (the planned ops, or `[]` in the placeholder-blocked case), and contract bookends. The package is **always** fully attested — there is no draft state on disk.
+5. Scaffolds a new migration package: `migration.ts` (containing `placeholder(...)` lambdas for any data transforms), `migration.json` (with a content-addressed `migrationHash` over the planned ops, or over `[]` when the planner could not lower any calls because of placeholders), and `ops.json` (the planned ops, or `[]` in the placeholder-blocked case). The bookend contracts are written write-if-absent into the shared snapshot store at `migrations/snapshots/<hex>/contract.{json,d.ts}`. The package is **always** fully attested — there is no draft state on disk.
 6. If the plan has unfilled `placeholder(...)` slots, the command returns a successful `pendingPlaceholders` envelope (a warning, not a failure) asking the developer to fill in the slots before re-emitting. The on-disk `ops.json` is `[]` and `migrationHash` is the hash of `(metadata, [])`, so applying the migration as-written will not advance the storage hash to the intended destination — the runner's destination-hash post-check surfaces this as a state mismatch. After filling in the placeholders, run `node migrations/<dir>/migration.ts` to re-emit `ops.json` and the corresponding `migrationHash`. `PN-MIG-2001` is raised only at self-emit time when a slot is still unfilled.
 
 **Outputs:**
 - `migrations/<dir>/migration.ts` — editable migration source (with `placeholder(...)` slots when the planner inserted them)
 - `migrations/<dir>/migration.json` — fully attested metadata (`migrationHash: string`, never null)
 - `migrations/<dir>/ops.json` — planned operations (empty list `[]` if placeholders blocked the planner)
-- `migrations/<dir>/start-contract.{json,d.ts}` — bookend from the "from" side (when applicable)
-- `migrations/<dir>/end-contract.{json,d.ts}` — bookend from the "to" side
+- `migrations/snapshots/<hex>/contract.{json,d.ts}` — bookend contracts, written write-if-absent, keyed by each contract's storage hash (one entry for `from` when applicable, one for `to`)
 
 **Branching with `--from` and `--to`:** Use `--from` to create a migration edge from a specific contract hash instead of the default starting point. Use `--to` to plan toward any resolved contract — including a rollback via `<migration-dir>^` — instead of the emitted contract. This enables branched migration graphs and arbitrary-target (including reverse) edges without editing contract source.
 
@@ -1028,7 +1027,7 @@ prisma-next migrate [--db <url>] [--to <contract>] [--config <path>] [--json] [-
 
 **Options:**
 - `--db <url>`: Database connection string (optional; defaults to `config.db.connection`)
-- `--to <contract>`: Target contract reference (hash, prefix, ref name, migration directory, `<dir>^`, or filesystem path). When omitted, applies toward the emitted `contract.json`. When `--to` resolves to an on-disk graph node, verification and apply use that bundle's `end-contract.json` — so a planned rollback or other arbitrary-target edge applies without editing contract source.
+- `--to <contract>`: Target contract reference (hash, prefix, ref name, migration directory, `<dir>^`, or filesystem path). When omitted, applies toward the emitted `contract.json`. When `--to` resolves to an on-disk graph node, verification and apply use the snapshot store entry for that node's hash — so a planned rollback or other arbitrary-target edge applies without editing contract source.
 - `--ref <name>`: Target a named ref from `migrations/refs.json` instead of the current contract hash
 - `--config <path>`: Path to `prisma-next.config.ts`
 - `--json`: Output as JSON object

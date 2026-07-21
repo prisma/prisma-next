@@ -289,8 +289,9 @@ async function executeMigrationPlanCommand(
   let toStorageHash: string = rawStorageHash;
 
   // When `--to <ref>` resolves a non-default destination, these carry its raw
-  // artifacts so the planned package's `end-contract.*` is written from the
-  // resolved target rather than copied from the emitted `contract.json`.
+  // artifacts so the planned package's destination snapshot store entry is
+  // written from the resolved target rather than copied from the emitted
+  // `contract.json`.
   let toArtifacts: { contractJson: unknown; contractDts: string } | null = null;
 
   let fromContract: Contract | null = null;
@@ -353,7 +354,7 @@ async function executeMigrationPlanCommand(
 
   // `--to <ref>` swaps the planner destination to an arbitrary resolved
   // contract (e.g. an ancestor / rollback target). The from-side resolution
-  // above is untouched; only the destination + its emitted `end-contract.*`
+  // above is untouched; only the destination + its snapshot store entry
   // change.
   if (options.to !== undefined) {
     const toResolution = await resolveToForPlan(options.to, {
