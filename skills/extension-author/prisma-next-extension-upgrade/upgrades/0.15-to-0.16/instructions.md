@@ -26,6 +26,15 @@ changes:
 ---
 
 <!--
+Release bump to 0.16.0 (PR #1019): the version bump itself. Every
+`packages/3-extensions/*/package.json` advances to 0.16.0 (version field +
+`workspace:` specifier lockstep). The bump commit touches only `package.json`
+files and `pnpm-lock.yaml` — no SPI, contract shape, or emitted artefact change
+beyond the pack version stamp. No extension-author action beyond the normal
+dependency upgrade this recipe covers. Incidental substrate diff only.
+-->
+
+<!--
 TML-3037 (contract infer output round-trips through contract emit): the
 `packages/3-extensions/supabase` diff is this repo's own pack regenerating
 under the three fixes recorded as `changes[]` entries above, plus two changes

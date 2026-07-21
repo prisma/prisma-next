@@ -24,6 +24,15 @@ changes:
 ---
 
 <!--
+Release bump to 0.16.0 (PR #1019): the version bump itself. Every workspace
+`package.json` advances to 0.16.0 (version field + `workspace:` specifier
+lockstep). The bump commit touches only `package.json` files and
+`pnpm-lock.yaml` — no source, contract shape, or emitted artefact change. No
+user action beyond the normal dependency upgrade this recipe covers. Incidental
+substrate diff only.
+-->
+
+<!--
 TML-3027 (foreign keys and indexes are discrete contract entities): emitted
 contract-shape change. `contract emit` now materializes the per-FK `constraint`/
 `index` authoring booleans into discrete entities — a `foreignKeys[]` entry is the
