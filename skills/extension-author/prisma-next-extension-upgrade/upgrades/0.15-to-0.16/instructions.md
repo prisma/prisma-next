@@ -69,3 +69,12 @@ biome 2.5.2 dev-dependency bump plus the code sites biome 2.5 newly flags
 shape, emitted artefact, or extension-authoring surface change. Incidental
 substrate diff only.
 -->
+
+<!--
+Dependabot dev-deps group bump (PR #1006): `changes: []`. The
+`packages/3-extensions/` diff is test-only — the `sql-orm-client` tests updated
+from `(x?.y as T).z` to `(x!.y as T).z` to satisfy biome 2.5.3's stricter
+noUnsafeOptionalChaining (biome 2.5.2 → 2.5.3 dev-dependency bump). No SPI,
+contract shape, emitted artefact, or extension-authoring surface change.
+Incidental substrate diff only.
+-->
