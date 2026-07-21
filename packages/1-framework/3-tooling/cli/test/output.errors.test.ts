@@ -98,14 +98,14 @@ describe('formatErrorOutput - issues list label and body fallback', () => {
       domain: 'RUN',
       summary: 'Failed to resolve contract source',
       meta: {
-        issues: [{ kind: 'PSL_ORPHANED_BACKRELATION_LIST', message: 'orphaned backrelation list' }],
+        issues: [{ kind: 'PSL_ORPHANED_BACKRELATION', message: 'orphaned backrelation list' }],
       },
     };
 
     const flags = parseGlobalFlags({ verbose: true, 'no-color': true });
     const stripped = stripAnsi(formatErrorOutput(error, flags));
 
-    expect(stripped).toContain('[PSL_ORPHANED_BACKRELATION_LIST] orphaned backrelation list');
+    expect(stripped).toContain('[PSL_ORPHANED_BACKRELATION] orphaned backrelation list');
   });
 
   it('renders a schema-diff issue (no `message`) with a presence-derived `[missing] path/joined/with/slashes` label', () => {

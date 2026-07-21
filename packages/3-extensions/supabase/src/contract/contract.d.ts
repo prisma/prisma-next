@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:4fd3b6b5481531b6fc23e6f3a97061908a8efaab460a56e3c334ef2483c9dfdb'>;
+  StorageHashBase<'sha256:1856d476008cdfac9fd383f74be8015f6cb313515966c3c6cba4067f5bc15858'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -1750,11 +1750,19 @@ type ContractBase = Omit<
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', readonly []>;
+                  };
                 };
                 readonly scopes: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', readonly []>;
+                  };
                 };
                 readonly pkce_enabled: {
                   readonly nativeType: 'bool';
@@ -1769,11 +1777,19 @@ type ContractBase = Omit<
                   readonly nativeType: 'jsonb';
                   readonly codecId: 'pg/jsonb@1';
                   readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: "'{}'::jsonb";
+                  };
                 };
                 readonly authorization_params: {
                   readonly nativeType: 'jsonb';
                   readonly codecId: 'pg/jsonb@1';
                   readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: "'{}'::jsonb";
+                  };
                 };
                 readonly enabled: {
                   readonly nativeType: 'bool';
@@ -2764,7 +2780,18 @@ type ContractBase = Omit<
                 readonly name: 'one_time_tokens_pkey';
               };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                {
+                  readonly columns: readonly ['relates_to'];
+                  readonly name: 'one_time_tokens_relates_to_hash_idx';
+                  readonly type: 'hash';
+                },
+                {
+                  readonly columns: readonly ['token_hash'];
+                  readonly name: 'one_time_tokens_token_hash_hash_idx';
+                  readonly type: 'hash';
+                },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -3669,6 +3696,10 @@ type ContractBase = Omit<
                   readonly nativeType: 'jsonb';
                   readonly codecId: 'pg/jsonb@1';
                   readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: "'[]'::jsonb";
+                  };
                 };
                 readonly backup_eligible: {
                   readonly nativeType: 'bool';
@@ -4012,6 +4043,10 @@ type ContractBase = Omit<
                   readonly nativeType: 'jsonb';
                   readonly codecId: 'pg/jsonb@1';
                   readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: "'{}'::jsonb";
+                  };
                 };
                 readonly catalog_id: {
                   readonly nativeType: 'uuid';

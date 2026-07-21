@@ -10,7 +10,7 @@ Everything the pack declares is `control: 'external'`. Under `external`, `db ver
 
 ## What the contract deliberately does not declare
 
-Machine-readable versions of these lists live in `scripts/generate-contract.ts` (`COLUMN_OMISSIONS` / `DEFAULT_OMISSIONS` / `INDEX_OMISSIONS`), each with the full reasoning; this is the audit summary.
+Machine-readable versions of these lists live in `scripts/generate-contract.ts` (`COLUMN_OMISSIONS` / `DEFAULT_OMISSIONS`), each with the full reasoning; this is the audit summary.
 
 **Columns (2):**
 
@@ -19,12 +19,12 @@ Machine-readable versions of these lists live in `scripts/generate-contract.ts` 
 | `storage.buckets.allowed_mime_types` | `text[]` nullable | PSL has no nullable-list syntax (`String[]?` is invalid) |
 | `storage.objects.path_tokens` | `text[]` nullable | Same; also `GENERATED ALWAYS`, so not user-writable regardless |
 
-**Column defaults (7):** `auth.users.phone` (`DEFAULT NULL` no-op), `auth.custom_oauth_providers.acceptable_client_ids`/`scopes` (list defaults have no PSL execution-default form), and `auth.custom_oauth_providers.attribute_mapping`/`authorization_params`, `auth.webauthn_credentials.transports`, `storage.iceberg_namespaces.metadata` (JSON-literal defaults resolve to different shapes on the authored vs introspected side). Column types are declared in full; only the `@default` is dropped.
+**Column defaults (3):** `auth.users.phone` (`DEFAULT NULL` is a no-op, but round-trips through the raw-default parser as an explicit `@default(null)`, which the interpreter rejects); `auth.custom_oauth_providers.acceptable_client_ids` and `.scopes` (both `text[]` with `DEFAULT '{}'::text[]`, printed as `@default(dbgenerated("'{}'::text[]"))` — the interpreter rejects any function-kind default on a list field, and a `dbgenerated(...)` default is always function-kind at authoring time). Column type is declared in full for all three; only the `@default` is dropped. The jsonb `dbgenerated(...)` defaults that used to widen this list (TML-3037) are declared again — `db verify`'s permanent-drift disagreement is fixed generically, at the postgres target's `SchemaIR` construction, so it needs no authoring-side omission.
 
 **Indexes:**
 
 - The reference's 8 partial unique indexes (`WHERE`-predicated, on `auth.users` token columns, `auth.mfa_factors`, `storage.buckets_analytics`) are not declared — the inferrer never promotes an index-level unique into `@@unique`, and a predicate-less declaration would misdeclare.
-- `auth.one_time_tokens`' two `USING hash` indexes are not declared — `hash` is not a registered index type on this stack (`IndexTypeRegistry` is pack-populated; the postgres target registers none).
+- `auth.one_time_tokens`' two `USING hash` indexes are declared (`@@index(..., type: "hash")`) — the postgres target registers `hash` as a built-in index type (TML-3037).
 - 16 foreign keys whose source columns have **no live backing index** are declared with `@relation(..., index: false)` — real Supabase does not index those FK columns, and the default FK-derived index expectation would otherwise fail verify. (This PSL argument and the inferrer support for it shipped with this contract.)
 
 **Generated columns** (`auth.users.confirmed_at`, `auth.identities.email`): declared as ordinary columns. Introspection reports them identically on the authored and live sides, so verify is clean; the contract does not record the generation expression.
