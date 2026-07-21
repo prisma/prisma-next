@@ -75,6 +75,26 @@ describe('filterNoBareThrowDiags', () => {
     assert.deepEqual(filterNoBareThrowDiags([]), []);
     assert.deepEqual(filterNoBareThrowDiags([{ category: 'lint', message: 'something' }]), []);
   });
+
+  it('does not count plugin fixtures or repo tooling scripts', () => {
+    const msg = 'no-bare-throw: bare `throw new Error(...)`';
+    const diags = [
+      {
+        category: 'plugin',
+        message: msg,
+        location: { path: 'biome-plugins/fixtures/throw-positive.ts' },
+      },
+      { category: 'plugin', message: msg, location: { path: 'scripts/lint-throws.mjs' } },
+      { category: 'plugin', message: msg, location: { path: 'scripts/bump-minor.ts' } },
+      { category: 'plugin', message: msg, location: { path: 'packages/x/src/scripts.ts' } },
+      { category: 'plugin', message: msg, location: { path: 'packages/x/src/thing.ts' } },
+    ];
+    const kept = filterNoBareThrowDiags(diags);
+    assert.deepEqual(
+      kept.map((d) => d.location.path),
+      ['packages/x/src/scripts.ts', 'packages/x/src/thing.ts'],
+    );
+  });
 });
 
 describe('lint-throws — skip on main', () => {

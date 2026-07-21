@@ -29,12 +29,20 @@ const BIOME_CONFIG = join(REAL_REPO_ROOT, 'biome.jsonc');
 // Git root: process.cwd() so tests can override by setting cwd.
 const GIT_ROOT = process.cwd();
 
+// Paths the ratchet does not count: plugin fixtures exist to fire the
+// diagnostic on purpose, and repo tooling scripts cannot import
+// structuredError/InternalError (they run standalone, pre-build), so the
+// ban would prescribe an impossible fix there. The plugin still reports
+// both; only the CI count ignores them.
+const UNCOUNTED_PATH_RE = /biome-plugins\/fixtures\/|(^|\/)scripts\/[^/]+\.(mjs|ts)$/;
+
 export function filterNoBareThrowDiags(diagnostics) {
   return diagnostics.filter(
     (d) =>
       d.category === 'plugin' &&
       typeof d.message === 'string' &&
-      d.message.startsWith('no-bare-throw: '),
+      d.message.startsWith('no-bare-throw: ') &&
+      !UNCOUNTED_PATH_RE.test(d.location?.path ?? ''),
   );
 }
 
