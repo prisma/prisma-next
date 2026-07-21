@@ -9,9 +9,7 @@ changes:
       subpath never worked from npm — the shim reads fixture `.sql` files that were never
       published, so every call failed with ENOENT before touching a database. There is no
       working code to migrate: delete the import and whatever test setup called
-      `bootstrapSupabaseShim`. Test against Supabase's own tooling instead — `supabase start`
-      / `supabase db reset` for a local stack, and `supabase test db` (pgTAP) for asserting
-      RLS behaviour (for example that `anon` cannot see a row).
+      `bootstrapSupabaseShim`.
     detection:
       glob: "**/*.{ts,mts,cts,js,mjs}"
       contains:
@@ -67,4 +65,14 @@ Supabase example env template (TML-2503): docs-only. The `examples/` touch adds
 acceptance lane already reads (`DATABASE_URL`, `SUPABASE_JWT_SECRET`). Nothing
 loads the file — it documents what to export. No framework surface, contract
 shape, or emitted artefact change. Incidental substrate diff only.
+-->
+
+<!--
+Dependabot dev-deps group bump (PR #961): dev-dependency version bumps only
+(biome 2.5.2, wrangler, @types/react, @cloudflare/* and friends), plus the
+biome.jsonc schema-version alignment and the handful of code sites biome 2.5
+newly flags (useOptionalChain / noProto in tests). The `examples/` diff is
+package.json devDependency version ranges and biome.jsonc schema versions only —
+no framework surface, contract shape, or emitted artefact changes. No user
+action required. Incidental substrate diff only.
 -->

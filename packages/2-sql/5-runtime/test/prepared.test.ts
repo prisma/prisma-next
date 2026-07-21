@@ -178,7 +178,7 @@ describe('runtime.prepare', () => {
     // CodecRef, not just the codecId — so parameterized codecs survive.
     const refs = ps.ast.collectParamRefs();
     const preparedRef = refs.find((r) => r.kind === 'prepared-param-ref');
-    if (!preparedRef || preparedRef.kind !== 'prepared-param-ref') {
+    if (preparedRef?.kind !== 'prepared-param-ref') {
       throw new Error('expected one prepared-param-ref');
     }
     expect(preparedRef.codec).toEqual({

@@ -262,7 +262,7 @@ export function extractLookupResult(
   readonly as: string;
   readonly modelName: string;
 } {
-  if (!result || result._brand !== 'mongo-query-builder/lookup-result@1') {
+  if (result?._brand !== 'mongo-query-builder/lookup-result@1') {
     throw new Error(
       'lookup() callback must return the result of `from(name).on(cb).as(name)`. ' +
         'Returning a hand-rolled options object is not supported.',

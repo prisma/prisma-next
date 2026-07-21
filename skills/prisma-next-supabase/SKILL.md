@@ -210,36 +210,6 @@ The concept: the runtime needs a **direct, session-capable** Postgres connection
 
 `.env` carries `DATABASE_URL` and the JWT key source. For current projects that is `SUPABASE_JWKS_URL` — `https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json` (local stack: `http://127.0.0.1:54321/auth/v1/.well-known/jwks.json`). Only legacy HS256 projects use `SUPABASE_JWT_SECRET` (Project Settings → API → JWT Secret) — and note `supabase status` prints a `JWT_SECRET` even on ES256 projects, so don't infer the mode from its presence; check the JWKS endpoint or a token's header `alg`.
 
-## Workflow — Testing your RLS policies
-
-The concept: test RLS against the real thing — the Supabase CLI's local stack. RLS is enforced by policies *and* grants, so a test database whose grants differ from a real project can pass policies that production denies (and vice versa); only the actual stack is faithful. Users already run the CLI for local dev, and it ships a test runner:
-
-- `supabase start` / `supabase db reset` boot and reset the local containers; run `prisma-next db init` (or `migrate`) against the local `DATABASE_URL` to apply your contract.
-- `supabase test db` runs [pgTAP](https://pgtap.org/) tests from `supabase/tests/` — the right altitude for RLS assertions ("`anon` cannot see this row"):
-
-```sql
--- supabase/tests/profile-rls.test.sql
-begin;
-select plan(2);
-
--- Seed as the superuser (bypasses RLS): one auth user + their profile.
-insert into auth.users (id) values ('00000000-0000-0000-0000-000000000001');
-insert into public.profile (id, username, "userId")
-  values (gen_random_uuid(), 'alice', '00000000-0000-0000-0000-000000000001');
-
-set local role anon;
-select is((select count(*)::int from public.profile), 0, 'anon sees no profiles (no anon policy matches)');
-
-set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
-select is((select count(*)::int from public.profile where "userId" = auth.uid()), 1, 'owner reads exactly their profile');
-
-select * from finish();
-rollback;
-```
-
-- End-to-end runtime behavior (JWT verification, role binding, `RoleBoundDb` queries) is exercised by your app's own integration tests against the same local stack — see `examples/supabase/test/real-supabase.acceptance.test.ts` for the canonical shape.
-
 ## Common Pitfalls
 
 1. **Using the transaction pooler (port 6543).** Session GUC role binding requires a session-capable connection — use the session pooler (5432) or the direct connection.
@@ -263,7 +233,7 @@ rollback;
 
 ## Reference Files
 
-- `examples/supabase` — the canonical runnable app: config, contract, `db.ts`, hermetic + acceptance tests, README.
+- `examples/supabase` — the canonical runnable app: config, contract, `db.ts`, acceptance tests, README.
 - `packages/3-extensions/supabase/README.md` — package-level reference (JWT modes, role-binding model, unsupported scope).
 - `packages/3-extensions/supabase/src/runtime/supabase.ts` — the authoritative options/type surface (`SupabaseOptions`, `RoleBoundDb`, `ServiceRoleDb`).
 

@@ -723,7 +723,7 @@ class MongoCollectionImpl<
     let currentField: ContractField | undefined = parts[0] ? fields[parts[0]] : undefined;
 
     for (let i = 1; i < parts.length; i++) {
-      if (!currentField || currentField.type.kind !== 'valueObject') return value;
+      if (currentField?.type.kind !== 'valueObject') return value;
       const voName = currentField.type.name;
       const voDef = domainValueObjectsAtDefaultNamespace(this.#contract.domain)?.[voName];
       if (!voDef) return value;
