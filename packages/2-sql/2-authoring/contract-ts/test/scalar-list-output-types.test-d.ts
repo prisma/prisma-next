@@ -40,8 +40,8 @@ const bareFamilyPack: FamilyPackRef<'sql'> = {
   version: '0.0.1',
 };
 
-// Declare a precisely-typed column descriptor so the CodecId literal ('pg/text@1')
-// flows through ScalarFieldState<CodecId> and into FieldOutputType.
+// Declare a precisely-typed column descriptor so the codecId literal ('pg/text@1')
+// flows through ScalarFieldState's descriptor generic and into FieldOutputType.
 declare const textColumn: ColumnTypeDescriptor<'pg/text@1'>;
 
 const definition = {

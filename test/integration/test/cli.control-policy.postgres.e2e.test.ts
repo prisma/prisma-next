@@ -327,7 +327,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'observed: zero DDL; verifier warns without failing on declared drift',
+      'observed: zero DDL; verifier passes despite declared drift',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           const { testSetup, configPath } = await setupControlPolicyPostgresFixture(
@@ -352,9 +352,12 @@ withTempDir(({ createTempDir }) => {
           );
           expect(exitCode).toBe(0);
           expect(parsed['ok']).toBe(true);
-          const schema = parsed['schema'] as { counts: { warn: number; fail: number } };
-          expect(schema.counts.warn).toBeGreaterThan(0);
-          expect(schema.counts.fail).toBe(0);
+          // Under the `observed` control policy the dropped table warns but does
+          // not fail: the verify passes AND the warning is surfaced in the
+          // output (watch-without-failing, not silent suppression).
+          const schema = parsed['schema'] as { summary: string; warnings: readonly string[] };
+          expect(schema.summary).toBe('Database schema satisfies contract');
+          expect(schema.warnings.some((w) => w.includes('legacy_jobs'))).toBe(true);
         });
       },
       timeouts.spinUpPpgDev,
@@ -373,7 +376,7 @@ withTempDir(({ createTempDir }) => {
           await runDbUpdate(testSetup, ['--config', configPath, '--dry-run', '--no-color']);
           const dryRunOutput = stripAnsi(consoleOutput.join('\n'));
           expect(dryRunOutput).toContain('Warnings:');
-          expect(dryRunOutput).toContain('control policy suppressed: createTable(auth.sessions)');
+          expect(dryRunOutput).toContain('control policy suppressed: table "auth.sessions"');
 
           consoleOutput.length = 0;
           const applyStartIndex = consoleOutput.length;
@@ -384,7 +387,7 @@ withTempDir(({ createTempDir }) => {
           ]);
           const applyOutput = stripAnsi(consoleOutput.slice(applyStartIndex).join('\n'));
           expect(applyOutput).toContain('Warnings:');
-          expect(applyOutput).toContain('control policy suppressed: createTable(auth.sessions)');
+          expect(applyOutput).toContain('control policy suppressed: table "auth.sessions"');
           expect(applyExitCode).not.toBe(0);
           expect(await tableExists(connectionString, 'auth', 'sessions')).toBe(false);
         });

@@ -24,6 +24,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
+import { PostgresNativeEnum } from '../src/core/postgres-native-enum';
 import { PostgresRlsPolicy } from '../src/core/postgres-rls-policy';
 import { PostgresRole } from '../src/core/postgres-role';
 import { PostgresSchema, postgresCreateNamespace } from '../src/core/postgres-schema';
@@ -77,8 +78,6 @@ function makeContractWithTablesJson() {
                       tableName: 'user',
                       columns: ['id'],
                     },
-                    constraint: true,
-                    index: true,
                   },
                 ],
               },
@@ -392,6 +391,7 @@ describe('role + policy round-trip', () => {
     expect(role).toBeInstanceOf(PostgresRole);
     expect(role?.name).toBe('app_user');
     expect(role?.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
+    expect(role?.control).toBe('external');
 
     // RLS policies preserved with prefix + full name both distinct
     expect(Object.keys(ns.policy)).toHaveLength(2);
@@ -475,6 +475,44 @@ describe('role + policy round-trip', () => {
     expect(ns).toBeInstanceOf(PostgresSchema);
   });
 
+  it('round-trips a roles-only unbound slot (does not collapse to PostgresSchema.unbound)', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {},
+              role: {
+                anon: { kind: 'role', name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const contract = serializer.deserializeContract(input);
+    const ns = contract.storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(ns).not.toBe(PostgresSchema.unbound);
+    expect(ns?.entries['role']).toMatchObject({
+      anon: { kind: 'role', name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID, control: 'external' },
+    });
+
+    const reserialized = serializer.serializeContract(contract);
+    const reserializedUnbound = (
+      reserialized as { storage: { namespaces: Record<string, unknown> } }
+    ).storage.namespaces[UNBOUND_NAMESPACE_ID];
+    expect(reserializedUnbound).toMatchObject({
+      id: UNBOUND_NAMESPACE_ID,
+      kind: 'postgres-unbound-schema',
+      entries: {
+        role: { anon: { kind: 'role', name: 'anon', namespaceId: UNBOUND_NAMESPACE_ID } },
+      },
+    });
+  });
+
   it('rejects a malformed policy entry (bad operation literal)', () => {
     const serializer = new PostgresContractSerializer();
     const input = createSqlContract({
@@ -503,6 +541,49 @@ describe('role + policy round-trip', () => {
     });
 
     expect(() => serializer.deserializeContract(input)).toThrow();
+  });
+
+  it('rejects a malformed role entry (non-external control)', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: {
+              table: {},
+              role: {
+                app_user: {
+                  kind: 'role',
+                  name: 'app_user',
+                  namespaceId: UNBOUND_NAMESPACE_ID,
+                  control: 'managed', // invalid — roles are external-only
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(() => serializer.deserializeContract(input)).toThrow();
+  });
+
+  it('serialized role carries its control policy, defaulted to external', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = makeContractWithRolesAndPolicies();
+
+    const contract = serializer.deserializeContract(input);
+    const json = serializer.serializeContract(contract);
+    const reparsed = JSON.parse(JSON.stringify(json));
+
+    const role = reparsed.storage.namespaces[UNBOUND_NAMESPACE_ID].entries.role['app_user'];
+    expect(role).toEqual({
+      kind: 'role',
+      name: 'app_user',
+      namespaceId: UNBOUND_NAMESPACE_ID,
+      control: 'external',
+    });
   });
 
   it('serialized policy matches expected shape', () => {
@@ -561,6 +642,238 @@ describe('role + policy round-trip', () => {
                   operation: 'select',
                   roles: ['app_user'],
                   // permissive missing
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(() => serializer.deserializeContract(input)).toThrow();
+  });
+});
+
+describe('native_enum + valueSet round-trip', () => {
+  function makeContractWithNativeEnum() {
+    const base = createSqlContract({
+      storage: {
+        namespaces: {
+          auth: {
+            id: 'auth',
+            entries: { table: {} },
+          },
+        },
+      },
+    });
+    return {
+      ...base,
+      storage: {
+        ...base.storage,
+        namespaces: {
+          auth: {
+            ...base.storage.namespaces['auth']!,
+            entries: {
+              ...base.storage.namespaces['auth']!.entries,
+              native_enum: {
+                AalLevel: {
+                  kind: 'postgres-enum',
+                  typeName: 'aal_level',
+                  members: ['aal1', 'aal2', 'aal3'],
+                  control: 'external',
+                },
+              },
+              valueSet: {
+                AalLevel: { kind: 'valueSet', values: ['aal1', 'aal2', 'aal3'] },
+              },
+            },
+          },
+        },
+      },
+    };
+  }
+
+  it('deserializes the native_enum entity and preserves the derived valueSet', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = makeContractWithNativeEnum();
+
+    const contract = serializer.deserializeContract(input);
+    const ns = contract.storage.namespaces['auth'] as PostgresSchema;
+    expect(ns).toBeInstanceOf(PostgresSchema);
+
+    const nativeEnum = ns.entries.native_enum?.['aal_level'];
+    expect(nativeEnum).toBeInstanceOf(PostgresNativeEnum);
+    expect(nativeEnum?.typeName).toBe('aal_level');
+    expect(nativeEnum?.members).toEqual(['aal1', 'aal2', 'aal3']);
+    expect(nativeEnum?.control).toBe('external');
+
+    const valueSet = ns.valueSet?.['AalLevel'];
+    expect(valueSet?.values).toEqual(['aal1', 'aal2', 'aal3']);
+  });
+
+  it('round-trips the native_enum entity through JSON — entity and derived valueSet both survive', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = makeContractWithNativeEnum();
+
+    const contract = serializer.deserializeContract(input);
+    const json = serializer.serializeContract(contract);
+    const reparsed = JSON.parse(JSON.stringify(json));
+    const roundTripped = serializer.deserializeContract(reparsed);
+
+    const ns = roundTripped.storage.namespaces['auth'] as PostgresSchema;
+    expect(ns).toBeInstanceOf(PostgresSchema);
+
+    const nativeEnum = ns.entries.native_enum?.['aal_level'];
+    expect(nativeEnum).toBeInstanceOf(PostgresNativeEnum);
+    expect(nativeEnum?.typeName).toBe('aal_level');
+    expect(nativeEnum?.members).toEqual(['aal1', 'aal2', 'aal3']);
+    expect(nativeEnum?.control).toBe('external');
+
+    const valueSet = ns.valueSet?.['AalLevel'];
+    expect(valueSet?.values).toEqual(['aal1', 'aal2', 'aal3']);
+  });
+
+  it('serialized namespace entries include native_enum alongside valueSet', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = makeContractWithNativeEnum();
+
+    const contract = serializer.deserializeContract(input);
+    const json = serializer.serializeContract(contract);
+    const reparsed = JSON.parse(JSON.stringify(json));
+
+    const ns = reparsed.storage.namespaces['auth'];
+    expect(ns.entries.native_enum.aal_level).toEqual({
+      kind: 'postgres-enum',
+      typeName: 'aal_level',
+      members: ['aal1', 'aal2', 'aal3'],
+      control: 'external',
+    });
+    expect(ns.entries.valueSet.AalLevel).toEqual({
+      kind: 'valueSet',
+      values: ['aal1', 'aal2', 'aal3'],
+    });
+  });
+
+  it('a contract.json with no native_enum key hydrates unchanged (absent-key tolerance)', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          auth: {
+            id: 'auth',
+            entries: {
+              table: {},
+              valueSet: {
+                AalLevel: { kind: 'valueSet', values: ['aal1', 'aal2', 'aal3'] },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const contract = serializer.deserializeContract(input);
+    const ns = contract.storage.namespaces['auth'] as PostgresSchema;
+    expect(ns).toBeInstanceOf(PostgresSchema);
+    expect(ns.entries.native_enum).toBeUndefined();
+    expect(ns.valueSet?.['AalLevel']?.values).toEqual(['aal1', 'aal2', 'aal3']);
+
+    const json = serializer.serializeContract(contract);
+    const reparsed = JSON.parse(JSON.stringify(json));
+    expect(reparsed.storage.namespaces.auth.entries.native_enum).toBeUndefined();
+  });
+
+  it('an enum-free contract serializes byte-identically (regression pin)', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          auth: {
+            id: 'auth',
+            entries: {
+              table: {
+                sessions: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [],
+                  foreignKeys: [],
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const contract = serializer.deserializeContract(input);
+    const json = serializer.serializeContract(contract);
+    const reparsed = JSON.parse(JSON.stringify(json));
+
+    expect(reparsed.storage.namespaces.auth).toEqual({
+      id: 'auth',
+      kind: 'postgres-schema',
+      entries: {
+        table: {
+          sessions: {
+            columns: {
+              id: {
+                nativeType: 'int4',
+                codecId: 'pg/int4@1',
+                nullable: false,
+              },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+    });
+  });
+
+  it('rejects a malformed native_enum entry (a non-string member)', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          auth: {
+            id: 'auth',
+            entries: {
+              table: {},
+              native_enum: {
+                AalLevel: {
+                  kind: 'postgres-enum',
+                  typeName: 'aal_level',
+                  members: [{ name: 'aal1' }],
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(() => serializer.deserializeContract(input)).toThrow();
+  });
+
+  it('rejects a native_enum entry with the wrong kind literal', () => {
+    const serializer = new PostgresContractSerializer();
+    const input = createSqlContract({
+      storage: {
+        namespaces: {
+          auth: {
+            id: 'auth',
+            entries: {
+              table: {},
+              native_enum: {
+                AalLevel: {
+                  kind: 'enum',
+                  typeName: 'aal_level',
+                  members: ['aal1'],
                 },
               },
             },

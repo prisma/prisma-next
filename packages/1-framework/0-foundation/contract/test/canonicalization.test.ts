@@ -41,11 +41,15 @@ function canonicalizeContract(
   return canonicalizeContractRaw(contract, { ...identityOptions, ...options });
 }
 
+// `constraint`/`index` below are illustrative boolean fields exercising the
+// generic empty-value preservation mechanism — not a claim about the real
+// SQL contract's `ForeignKey` shape, which (post FK1) never carries them.
 const sqlPreserveEmptyPatterns = [
   ['storage', 'namespaces', '*', 'entries', 'table'],
   ['storage', 'namespaces', '*', 'entries', 'table', '*'],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', ['uniques', 'indexes', 'foreignKeys']],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', 'foreignKeys', ['constraint', 'index']],
+  ['storage', 'namespaces', '*', 'entries', 'table', '*', 'columns', '*', 'default', 'value'],
 ] as const satisfies readonly PathPattern[];
 
 const sqlSortTargets = [
@@ -331,6 +335,50 @@ describe('default omission', () => {
     );
     const idField = drillDomainModel(result, 'User', 'fields', 'id');
     expect(idField).not.toHaveProperty('generated');
+  });
+
+  it('preserves a literal false column default value via the family hook', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          task: {
+            columns: {
+              done: {
+                codecId: 'pg/bool@1',
+                nativeType: 'bool',
+                nullable: false,
+                default: { kind: 'literal', value: false },
+              },
+            },
+          },
+        }),
+      }),
+      { shouldPreserveEmpty: sqlPreserveEmpty },
+    );
+    const done = drill(unboundTables(result), 'task', 'columns', 'done');
+    expect(done['default']).toEqual({ kind: 'literal', value: false });
+  });
+
+  it('preserves a literal empty-array column default value via the family hook', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          task: {
+            columns: {
+              labels: {
+                codecId: 'pg/text_array@1',
+                nativeType: 'text[]',
+                nullable: false,
+                default: { kind: 'literal', value: [] },
+              },
+            },
+          },
+        }),
+      }),
+      { shouldPreserveEmpty: sqlPreserveEmpty },
+    );
+    const labels = drill(unboundTables(result), 'task', 'columns', 'labels');
+    expect(labels['default']).toEqual({ kind: 'literal', value: [] });
   });
 
   it('strips onDelete: noAction and onUpdate: noAction', () => {

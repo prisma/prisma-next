@@ -1,5 +1,11 @@
 import { CliStructuredError } from '@prisma-next/errors/control';
 import type { SqlControlDriverInstance } from '@prisma-next/sql-contract/types';
+import {
+  PrimaryKey,
+  SqlForeignKeyIR,
+  SqlIndexIR,
+  SqlUniqueIR,
+} from '@prisma-next/sql-schema-ir/types';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import type {
   PostgresDatabaseSchemaNode,
@@ -8,7 +14,11 @@ import type {
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
-import { PostgresControlAdapter, parsePgReloptions } from '../src/core/control-adapter';
+import {
+  PostgresControlAdapter,
+  parsePgNameArray,
+  parsePgReloptions,
+} from '../src/core/control-adapter';
 
 /**
  * These tests introspect a single schema, so the root holds exactly one
@@ -139,7 +149,7 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return {
               rows: [
                 {
@@ -151,10 +161,10 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -181,10 +191,9 @@ describe('PostgresControlAdapter', () => {
       expect(tablesOf(result)['user']?.columns['id']?.nativeType).toBe('int4');
       expect(tablesOf(result)['user']?.columns['email']?.nativeType).toBe('character varying(255)');
       expect(tablesOf(result)['user']?.columns['id']?.nullable).toBe(false);
-      expect(tablesOf(result)['user']?.primaryKey).toEqual({
-        columns: ['id'],
-        name: 'user_pkey',
-      });
+      expect(tablesOf(result)['user']?.primaryKey).toEqual(
+        new PrimaryKey({ columns: ['id'], name: 'user_pkey' }),
+      );
     });
 
     it('handles character varying without length', async () => {
@@ -212,13 +221,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -267,13 +276,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -322,13 +331,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -377,13 +386,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -442,13 +451,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -493,9 +502,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('PRIMARY KEY'), rows: [] },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -592,9 +601,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('PRIMARY KEY'), rows: [] },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -641,7 +650,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [
             {
               table_name: 'post',
@@ -652,7 +661,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('FOREIGN KEY'),
+          match: includes("contype = 'f'"),
           rows: [
             {
               table_name: 'post',
@@ -667,7 +676,7 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -676,13 +685,26 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['post']?.foreignKeys).toEqual([
-        {
+        new SqlForeignKeyIR({
           columns: ['user_id'],
           referencedTable: 'user',
           referencedSchema: 'public',
           referencedColumns: ['id'],
           name: 'post_user_id_fkey',
-        },
+        }),
+      ]);
+      expect(tablesOf(result)['post']?.foreignKeys[0]?.dependsOn).toEqual([
+        [
+          { nodeKind: 'postgres-database', id: 'database' },
+          { nodeKind: 'postgres-namespace', id: 'public' },
+          { nodeKind: 'postgres-table', id: 'user' },
+        ],
+        [
+          { nodeKind: 'postgres-database', id: 'database' },
+          { nodeKind: 'postgres-namespace', id: 'public' },
+          { nodeKind: 'postgres-table', id: 'post' },
+          { nodeKind: 'sql-column', id: 'column:user_id' },
+        ],
       ]);
     });
 
@@ -716,7 +738,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [
             {
               table_name: 'order',
@@ -727,7 +749,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('FOREIGN KEY'),
+          match: includes("contype = 'f'"),
           rows: [
             {
               table_name: 'order',
@@ -753,7 +775,7 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -762,14 +784,14 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['order']?.foreignKeys).toEqual([
-        {
+        new SqlForeignKeyIR({
           columns: ['user_id', 'account_id'],
           referencedTable: 'account',
           referencedSchema: 'public',
           referencedColumns: ['user_id', 'id'],
           name: 'order_account_fkey',
           onDelete: 'cascade',
-        },
+        }),
       ]);
     });
 
@@ -803,7 +825,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [
             {
               table_name: 'user',
@@ -813,9 +835,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
         {
-          match: (sql) => sql.includes("constraint_type = 'UNIQUE'"),
+          match: (sql) => sql.includes("contype = 'u'"),
           rows: [
             {
               table_name: 'user',
@@ -833,10 +855,7 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['user']?.uniques).toEqual([
-        {
-          columns: ['email'],
-          name: 'user_email_key',
-        },
+        new SqlUniqueIR({ columns: ['email'], name: 'user_email_key' }),
       ]);
     });
 
@@ -870,12 +889,12 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [],
         },
-        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
         {
-          match: (sql) => sql.includes("constraint_type = 'UNIQUE'"),
+          match: (sql) => sql.includes("contype = 'u'"),
           rows: [
             {
               table_name: 'user',
@@ -899,10 +918,7 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['user']?.uniques).toEqual([
-        {
-          columns: ['email', 'tenant_id'],
-          name: 'user_email_tenant_key',
-        },
+        new SqlUniqueIR({ columns: ['email', 'tenant_id'], name: 'user_email_tenant_key' }),
       ]);
     });
 
@@ -936,7 +952,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [
             {
               table_name: 'user',
@@ -946,8 +962,8 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         {
           match: includes('pg_indexes'),
           rows: [
@@ -967,11 +983,7 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['user']?.indexes).toEqual([
-        {
-          columns: ['name'],
-          name: 'user_name_idx',
-          unique: false,
-        },
+        new SqlIndexIR({ columns: ['name'], name: 'user_name_idx', unique: false }),
       ]);
     });
 
@@ -1005,11 +1017,11 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [],
         },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         {
           match: includes('pg_indexes'),
           rows: [
@@ -1036,15 +1048,15 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['user']?.indexes).toEqual([
-        {
+        new SqlIndexIR({
           columns: ['email', 'tenant_id'],
           name: 'user_email_tenant_idx',
           unique: false,
-        },
+        }),
       ]);
     });
 
-    it('skips index rows with null attname', async () => {
+    it('excludes an index entirely when any key has a null attname (expression key)', async () => {
       const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
       const mockDriver: SqlControlDriverInstance<'postgres'> = {
         familyId: 'sql',
@@ -1069,7 +1081,7 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return {
               rows: [
                 {
@@ -1081,10 +1093,10 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -1122,8 +1134,119 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(tablesOf(result)['user']?.indexes).toHaveLength(1);
-      expect(tablesOf(result)['user']?.indexes[0]?.columns).toEqual(['id']);
+      // A key with `attname: null` means an expression key Postgres reports
+      // with an unresolvable attribute number. Keeping the index with just
+      // its real-column keys would silently misrepresent a multi-column
+      // expression index as a shorter plain-column one, which can collide
+      // with an unrelated real index on that shorter column list — the
+      // whole index is excluded instead (see PostgresControlAdapter's
+      // `introspectSchema` index-processing comment).
+      expect(tablesOf(result)['user']?.indexes).toHaveLength(0);
+    });
+
+    it('keeps only the unique index when a unique and a plain index share one column tuple', async () => {
+      const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+      const mockDriver: SqlControlDriverInstance<'postgres'> = {
+        familyId: 'sql',
+        targetId: 'postgres',
+        query: async <Row = Record<string, unknown>>(sql: string) => {
+          if (sql.includes('information_schema.tables')) {
+            return { rows: [{ table_name: 'user' }] as unknown as Row[] };
+          }
+          if (sql.includes('information_schema.columns')) {
+            return {
+              rows: [
+                {
+                  table_name: 'user',
+                  column_name: 'id',
+                  data_type: 'integer',
+                  udt_name: 'int4',
+                  is_nullable: 'NO',
+                  character_maximum_length: null,
+                  numeric_precision: null,
+                  numeric_scale: null,
+                },
+                {
+                  table_name: 'user',
+                  column_name: 'email',
+                  data_type: 'text',
+                  udt_name: 'text',
+                  is_nullable: 'NO',
+                  character_maximum_length: null,
+                  numeric_precision: null,
+                  numeric_scale: null,
+                },
+              ] as unknown as Row[],
+            };
+          }
+          if (sql.includes("contype = 'p'")) {
+            return {
+              rows: [
+                {
+                  table_name: 'user',
+                  constraint_name: 'user_pkey',
+                  column_name: 'id',
+                  ordinal_position: 1,
+                },
+              ] as unknown as Row[],
+            };
+          }
+          if (sql.includes("contype = 'f'")) {
+            return { rows: [] as unknown as Row[] };
+          }
+          if (sql.includes("contype = 'u'")) {
+            return { rows: [] as unknown as Row[] };
+          }
+          if (sql.includes('pg_indexes')) {
+            return {
+              rows: [
+                {
+                  tablename: 'user',
+                  indexname: 'user_email_unique_idx',
+                  indisunique: true,
+                  attname: 'email',
+                  index_position: 1,
+                },
+                {
+                  tablename: 'user',
+                  indexname: 'user_email_plain_idx',
+                  indisunique: false,
+                  attname: 'email',
+                  index_position: 1,
+                },
+              ] as unknown as Row[],
+            };
+          }
+          if (sql.includes('pg_extension')) {
+            return { rows: [] as unknown as Row[] };
+          }
+          if (sql.includes('version()')) {
+            return {
+              rows: [{ version: 'PostgreSQL 15.1' }] as unknown as Row[],
+            };
+          }
+          return { rows: [] as unknown as Row[] };
+        },
+        close: async () => {},
+      };
+
+      const result = await adapter.introspect(mockDriver);
+
+      // Postgres permits a unique index and a plain index coexisting on the
+      // identical column list; the schema differ's diff-tree node id for an
+      // index is the column tuple alone, so keeping both would produce two
+      // same-tree siblings with the same id ("duplicate id among siblings").
+      // The unique one wins (it is a strict superset of what the plain one
+      // would add).
+      const indexes = tablesOf(result)['user']?.indexes;
+      expect(indexes).toHaveLength(1);
+      expect(indexes?.[0]).toEqual(
+        expect.objectContaining({
+          name: 'user_email_unique_idx',
+          unique: true,
+          columns: ['email'],
+        }),
+      );
     });
 
     it('handles custom schema name', async () => {
@@ -1235,13 +1358,13 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -1290,7 +1413,7 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('PRIMARY KEY')) {
+          if (sql.includes("contype = 'p'")) {
             return {
               rows: [
                 {
@@ -1302,10 +1425,10 @@ describe('PostgresControlAdapter', () => {
               ] as unknown as Row[],
             };
           }
-          if (sql.includes('FOREIGN KEY')) {
+          if (sql.includes("contype = 'f'")) {
             return { rows: [] as unknown as Row[] };
           }
-          if (sql.includes('UNIQUE')) {
+          if (sql.includes("contype = 'u'")) {
             return { rows: [] as unknown as Row[] };
           }
           if (sql.includes('pg_indexes')) {
@@ -1326,9 +1449,7 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(tablesOf(result)['user']?.primaryKey).toEqual({
-        columns: ['id'],
-      });
+      expect(tablesOf(result)['user']?.primaryKey).toEqual(new PrimaryKey({ columns: ['id'] }));
       expect(tablesOf(result)['user']?.primaryKey?.name).toBeUndefined();
     });
 
@@ -1407,9 +1528,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('PRIMARY KEY'), rows: [] },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -1455,7 +1576,7 @@ describe('PostgresControlAdapter', () => {
           ],
         },
         {
-          match: includes('PRIMARY KEY'),
+          match: includes("contype = 'p'"),
           rows: [
             {
               table_name: 'user',
@@ -1471,9 +1592,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('FOREIGN KEY'), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
         {
-          match: (sql) => sql.includes("constraint_type = 'UNIQUE'"),
+          match: (sql) => sql.includes("contype = 'u'"),
           rows: [
             {
               table_name: 'user',
@@ -1490,11 +1611,81 @@ describe('PostgresControlAdapter', () => {
 
       const result = await adapter.introspect(mockDriver);
 
-      expect(tablesOf(result)['user']?.primaryKey).toEqual({
-        columns: ['tenant_id', 'id'],
-        name: 'user_pkey',
-      });
+      expect(tablesOf(result)['user']?.primaryKey).toEqual(
+        new PrimaryKey({ columns: ['tenant_id', 'id'], name: 'user_pkey' }),
+      );
       expect(tablesOf(result)['user']?.uniques).toEqual([]);
+    });
+
+    it('stamps normalized resolvedNativeType and parsed resolvedDefault on columns', async () => {
+      const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
+      const mockDriver = createMockDriver([
+        { match: includes('information_schema.tables'), rows: [{ table_name: 'doc' }] },
+        {
+          match: includes('information_schema.columns'),
+          rows: [
+            {
+              table_name: 'doc',
+              column_name: 'status',
+              data_type: 'text',
+              udt_name: 'text',
+              is_nullable: 'NO',
+              column_default: "'draft'::text",
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              table_name: 'doc',
+              column_name: 'created_at',
+              data_type: 'timestamp with time zone',
+              udt_name: 'timestamptz',
+              is_nullable: 'NO',
+              column_default: 'now()',
+              formatted_type: 'timestamp with time zone',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+            {
+              table_name: 'doc',
+              column_name: 'tags',
+              data_type: 'ARRAY',
+              udt_name: '_text',
+              is_nullable: 'YES',
+              column_default: null,
+              formatted_type: 'text[]',
+              character_maximum_length: null,
+              numeric_precision: null,
+              numeric_scale: null,
+            },
+          ],
+        },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
+        { match: includes('pg_indexes'), rows: [] },
+        { match: includes('pg_extension'), rows: [] },
+        { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
+      ]);
+
+      const result = await adapter.introspect(mockDriver);
+      const columns = tablesOf(result)['doc']?.columns;
+
+      expect(columns?.['status']?.default).toBe("'draft'::text");
+      expect(columns?.['status']?.resolvedNativeType).toBe('text');
+      expect(columns?.['status']?.resolvedDefault).toEqual({ kind: 'literal', value: 'draft' });
+
+      expect(columns?.['created_at']?.resolvedNativeType).toBe('timestamptz');
+      expect(columns?.['created_at']?.resolvedDefault).toEqual({
+        kind: 'function',
+        expression: 'now()',
+      });
+
+      expect(columns?.['tags']?.many).toBe(true);
+      expect(columns?.['tags']?.nativeType).toBe('text');
+      expect(columns?.['tags']?.resolvedNativeType).toBe('text[]');
+      expect(columns?.['tags']?.resolvedDefault).toBeUndefined();
     });
   });
 
@@ -1519,9 +1710,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('PRIMARY KEY'), rows: [] },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -1556,9 +1747,9 @@ describe('PostgresControlAdapter', () => {
             },
           ],
         },
-        { match: includes('PRIMARY KEY'), rows: [] },
-        { match: includes('FOREIGN KEY'), rows: [] },
-        { match: includes('UNIQUE'), rows: [] },
+        { match: includes("contype = 'p'"), rows: [] },
+        { match: includes("contype = 'f'"), rows: [] },
+        { match: includes("contype = 'u'"), rows: [] },
         { match: includes('pg_indexes'), rows: [] },
         { match: includes('pg_extension'), rows: [] },
         { match: includes('version()'), rows: [{ version: 'PostgreSQL 15.1' }] },
@@ -1617,6 +1808,50 @@ describe('PostgresControlAdapter', () => {
     it('returns undefined for a null or empty input', () => {
       expect(parsePgReloptions(null, 'item_body_idx')).toBeUndefined();
       expect(parsePgReloptions([], 'item_body_idx')).toBeUndefined();
+    });
+  });
+
+  describe('parsePgNameArray', () => {
+    it('passes a real JS array through as strings', () => {
+      expect(parsePgNameArray(['a', 'b'])).toEqual(['a', 'b']);
+    });
+
+    it('parses an unquoted array literal', () => {
+      expect(parsePgNameArray('{draft,review,done}')).toEqual(['draft', 'review', 'done']);
+    });
+
+    it('returns empty for an empty literal, non-strings, and non-literals', () => {
+      expect(parsePgNameArray('{}')).toEqual([]);
+      expect(parsePgNameArray(42)).toEqual([]);
+      expect(parsePgNameArray('not-a-literal')).toEqual([]);
+    });
+
+    it('parses a quoted element containing whitespace', () => {
+      expect(parsePgNameArray('{"in progress",done}')).toEqual(['in progress', 'done']);
+    });
+
+    it('parses a quoted element containing a comma', () => {
+      expect(parsePgNameArray('{"a,b",c}')).toEqual(['a,b', 'c']);
+    });
+
+    it('parses a quoted element containing an escaped double quote', () => {
+      expect(parsePgNameArray('{"say \\"hi\\"",plain}')).toEqual(['say "hi"', 'plain']);
+    });
+
+    it('parses a quoted element containing an escaped backslash', () => {
+      expect(parsePgNameArray('{"back\\\\slash"}')).toEqual(['back\\slash']);
+    });
+
+    it('parses a quoted element containing braces', () => {
+      expect(parsePgNameArray('{"{curly}",other}')).toEqual(['{curly}', 'other']);
+    });
+
+    it('does not trim significant leading/trailing whitespace inside quotes', () => {
+      expect(parsePgNameArray('{" padded "}')).toEqual([' padded ']);
+    });
+
+    it('rejects an unterminated quoted element', () => {
+      expect(parsePgNameArray('{"unterminated}')).toEqual([]);
     });
   });
 

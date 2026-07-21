@@ -1,20 +1,11 @@
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
-import type { DefaultFunctionLoweringHandler } from '@prisma-next/sql-contract-psl';
+import type { ControlMutationDefaultEntry } from '@prisma-next/framework-components/control';
 
-const slugidDefaultHandler: DefaultFunctionLoweringHandler = ({ call, context }) => {
-  if (call.args.length > 0) {
-    return {
-      ok: false,
-      diagnostic: {
-        code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-        message: `Default function "${call.name}" for field "${context.modelName}.${context.fieldName}" does not accept arguments.`,
-        sourceId: context.sourceId,
-        span: call.span,
-      },
-    };
-  }
-
-  return {
+// `slugid()` takes no arguments; the empty signature makes arity a grammar concern, so any
+// `slugid(...)` call fails as invalid attribute syntax before the lower runs.
+const slugidEntry: ControlMutationDefaultEntry = {
+  signature: {},
+  lower: () => ({
     ok: true,
     value: {
       kind: 'execution',
@@ -23,7 +14,8 @@ const slugidDefaultHandler: DefaultFunctionLoweringHandler = ({ call, context })
         id: 'slugid',
       },
     },
-  };
+  }),
+  usageSignatures: ['slugid()'],
 };
 
 const slugidDefaultsPack: SqlControlExtensionDescriptor<'postgres'> = {
@@ -34,9 +26,7 @@ const slugidDefaultsPack: SqlControlExtensionDescriptor<'postgres'> = {
   targetId: 'postgres',
 
   controlMutationDefaults: {
-    defaultFunctionRegistry: new Map([
-      ['slugid', { lower: slugidDefaultHandler, usageSignatures: ['slugid()'] }],
-    ]),
+    defaultFunctionRegistry: new Map([['slugid', slugidEntry]]),
     generatorDescriptors: [{ id: 'slugid', applicableCodecIds: ['pg/text@1'] }],
   },
   create() {

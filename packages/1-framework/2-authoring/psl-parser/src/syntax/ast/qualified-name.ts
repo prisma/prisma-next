@@ -76,6 +76,12 @@ export class QualifiedNameAst implements AstNode {
     return segments;
   }
 
+  /** True iff this is a single unqualified identifier whose text equals `name`. */
+  isSimpleName(name: string): boolean {
+    if (this.dot() !== undefined || this.colon() !== undefined) return false;
+    return this.identifier()?.token()?.text === name;
+  }
+
   /**
    * Flags a malformed name with more qualifier segments than allowed (a second
    * `:`-space or a second `.`-namespace).

@@ -37,6 +37,18 @@ export interface PslPrinterOptions {
 export type RelationField = {
   readonly fieldName: string;
   readonly typeName: string;
+  /**
+   * Namespace qualifier for a cross-space relation (e.g. `"auth"` for a
+   * relation into `supabase:auth.AuthUser`). Absent for a same-namespace
+   * relation.
+   */
+  readonly typeNamespaceId?: string | undefined;
+  /**
+   * Contract-space qualifier for a relation into another stack extension
+   * pack's contract space (e.g. `"supabase"`). Absent for a same-space
+   * relation.
+   */
+  readonly typeContractSpaceId?: string | undefined;
   readonly referencedTableName?: string | undefined;
   readonly optional: boolean;
   readonly list: boolean;
@@ -46,4 +58,6 @@ export type RelationField = {
   readonly references?: readonly string[] | undefined;
   readonly onDelete?: string | undefined;
   readonly onUpdate?: string | undefined;
+  /** `false` when the FK's source columns have no live backing index; omitted (the default) otherwise. */
+  readonly index?: boolean | undefined;
 };

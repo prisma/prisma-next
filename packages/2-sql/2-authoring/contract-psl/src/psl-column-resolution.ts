@@ -1,10 +1,17 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ExecutionMutationDefaultPhases,
+  ValueSetRef,
+} from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringEntityTypeDescriptor,
+  AuthoringEntityTypeNamespace,
+  AuthoringFieldNamespace,
   AuthoringFieldPresetDescriptor,
   AuthoringTypeConstructorDescriptor,
+  AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
 import {
   hasRegisteredFieldNamespace,
@@ -15,44 +22,48 @@ import {
   isAuthoringTypeConstructorDescriptor,
   validateAuthoringHelperArguments,
 } from '@prisma-next/framework-components/authoring';
+import type { AnyCodecDescriptor, CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   ControlMutationDefaultRegistry,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type {
   FieldSymbol,
+  ModelSymbol,
   PslSpan,
   ResolvedAttribute,
   ResolvedTypeConstructorCall,
 } from '@prisma-next/psl-parser';
-import {
-  ArrayLiteralAst,
-  BooleanLiteralExprAst,
-  type ExpressionAst,
-  NumberLiteralExprAst,
-  StringLiteralExprAst,
-} from '@prisma-next/psl-parser/syntax';
-import { blindCast } from '@prisma-next/utils/casts';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 
+import { lowerDefaultFunctionWithRegistry } from './default-function-registry';
 import {
-  lowerDefaultFunctionWithRegistry,
-  parseDefaultFunctionCall,
-} from './default-function-registry';
-import {
-  getPositionalArgumentEntry,
   getPositionalArguments,
   parseOptionalNumericArguments,
   parseOptionalSingleIntegerArgument,
   pushInvalidAttributeArgument,
-  unquoteStringLiteral,
 } from './psl-attribute-parsing';
 import { mapPslHelperArgs } from './psl-authoring-arguments';
+import {
+  buildDefaultSpec,
+  findFieldAttributeNode,
+  interpretFieldAttribute,
+} from './sql-attribute-specs';
 
 export type ColumnDescriptor = {
   readonly codecId: string;
   readonly nativeType: string;
   readonly typeRef?: string;
   readonly typeParams?: Record<string, unknown> | undefined;
+  /**
+   * Storage-plane value-set ref, set only by an entity-ref type constructor
+   * (e.g. `pg.enum(Ref)`) resolving `Ref` against a document-local
+   * value-set-deriving entity. Threaded straight onto the `StorageColumn` —
+   * this is what drives value-set → codec typing (`computeColumnType`
+   * gating on `column.valueSet`); every other resolution path leaves it
+   * unset.
+   */
+  readonly valueSet?: ValueSetRef;
 };
 
 export function toNamedTypeFieldDescriptor(
@@ -70,18 +81,19 @@ export function getAuthoringTypeConstructor(
   contributions: AuthoringContributions | undefined,
   path: readonly string[],
 ): AuthoringTypeConstructorDescriptor | undefined {
-  let current: unknown = contributions?.type;
+  let current: AuthoringTypeConstructorDescriptor | AuthoringTypeNamespace | undefined =
+    contributions?.type;
 
   for (const segment of path) {
-    if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+    if (typeof current !== 'object' || current === null || 'kind' in current) {
       return undefined;
     }
-    current = blindCast<Record<string, unknown>, 'narrowed by preceding typeof/null/array guards'>(
-      current,
-    )[segment];
+    current = current[segment];
   }
 
-  return isAuthoringTypeConstructorDescriptor(current) ? current : undefined;
+  return current !== undefined && isAuthoringTypeConstructorDescriptor(current)
+    ? current
+    : undefined;
 }
 
 /**
@@ -99,18 +111,17 @@ export function getAuthoringEntity(
   contributions: AuthoringContributions | undefined,
   path: readonly string[],
 ): AuthoringEntityTypeDescriptor | undefined {
-  let current: unknown = contributions?.entityTypes;
+  let current: AuthoringEntityTypeDescriptor | AuthoringEntityTypeNamespace | undefined =
+    contributions?.entityTypes;
 
   for (const segment of path) {
-    if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+    if (typeof current !== 'object' || current === null || 'kind' in current) {
       return undefined;
     }
-    current = blindCast<Record<string, unknown>, 'narrowed by preceding typeof/null/array guards'>(
-      current,
-    )[segment];
+    current = current[segment];
   }
 
-  return isAuthoringEntityTypeDescriptor(current) ? current : undefined;
+  return current !== undefined && isAuthoringEntityTypeDescriptor(current) ? current : undefined;
 }
 
 /**
@@ -122,18 +133,17 @@ export function getAuthoringFieldPreset(
   contributions: AuthoringContributions | undefined,
   path: readonly string[],
 ): AuthoringFieldPresetDescriptor | undefined {
-  let current: unknown = contributions?.field;
+  let current: AuthoringFieldPresetDescriptor | AuthoringFieldNamespace | undefined =
+    contributions?.field;
 
   for (const segment of path) {
-    if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+    if (typeof current !== 'object' || current === null || 'kind' in current) {
       return undefined;
     }
-    current = blindCast<Record<string, unknown>, 'narrowed by preceding typeof/null/array guards'>(
-      current,
-    )[segment];
+    current = current[segment];
   }
 
-  return isAuthoringFieldPresetDescriptor(current) ? current : undefined;
+  return current !== undefined && isAuthoringFieldPresetDescriptor(current) ? current : undefined;
 }
 
 /**
@@ -384,6 +394,140 @@ export function instantiateFieldPreset(input: {
 }
 
 /**
+ * Result of a codec descriptor's `columnFromEntity` authoring hook — the
+ * per-column params derived from the entity a type constructor's
+ * `entityRefArg` resolved to. `nativeType` mirrors what the codec's own
+ * params-aware `metaFor` derives from `typeParams` at render time, so the
+ * column's declared native type and the render-time cast agree.
+ */
+interface EntityRefColumnFromEntityResult {
+  readonly typeParams?: Record<string, unknown>;
+  readonly nativeType: string;
+}
+
+interface EntityRefResolvingCodecDescriptor extends AnyCodecDescriptor {
+  readonly columnFromEntity: (entity: unknown) => EntityRefColumnFromEntityResult | undefined;
+}
+
+/**
+ * Structural check for a codec descriptor exposing the authoring-time
+ * `columnFromEntity` hook a type constructor's `entityRefArg` resolves
+ * through (e.g. the `pg/enum@1` codec descriptor). No casts.
+ */
+function hasColumnFromEntityHook(
+  descriptor: AnyCodecDescriptor,
+): descriptor is EntityRefResolvingCodecDescriptor {
+  return 'columnFromEntity' in descriptor && typeof descriptor.columnFromEntity === 'function';
+}
+
+/**
+ * Resolves a type-constructor call whose descriptor declares an
+ * `entityRefArg` (e.g. `pg.enum(AalLevel)`): extracts the call's sole
+ * positional-argument ref string, resolves it against the field's
+ * namespace's already-lowered extension entities (keyed by the declared
+ * `entityRefArg.entityKind`, then block name), and converts the resolved
+ * entity to column params via the `columnFromEntity` authoring hook on the
+ * codec descriptor registered for `descriptor.output.codecId`. The `nativeType`
+ * / `typeParams.typeName` `columnFromEntity` returns are bare — schema
+ * qualification (e.g. `auth.aal_level`) is a target concern, applied later
+ * when the target builds the field's namespace. A `valueSet` ref is
+ * attached when the same namespace derived a value-set under the same block
+ * name (the generic `deriveValueSet` mechanism), scoped to the field's own
+ * namespace.
+ */
+function resolveEntityRefTypeConstructorCall(input: {
+  readonly call: ResolvedTypeConstructorCall;
+  readonly descriptor: AuthoringTypeConstructorDescriptor;
+  readonly namespaceId: string | undefined;
+  readonly namespaceExtensionEntities:
+    | Readonly<Record<string, Readonly<Record<string, unknown>>>>
+    | undefined;
+  readonly codecLookup: CodecLookup | undefined;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly entityLabel: string;
+}): ResolveFieldTypeResult {
+  const entityRefArg = input.descriptor.entityRefArg;
+  if (entityRefArg === undefined) {
+    throw new Error(
+      'resolveEntityRefTypeConstructorCall called with a descriptor that does not declare an entityRefArg. This is an interpreter bug.',
+    );
+  }
+
+  const helperPath = input.call.path.join('.');
+  const positionalArgs = input.call.args.filter((arg) => arg.kind === 'positional');
+  const ref = positionalArgs[entityRefArg.index]?.value;
+  if (input.call.args.length !== 1 || positionalArgs.length !== 1 || ref === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `${input.entityLabel} type constructor "${helperPath}" expects exactly one positional argument naming the referenced entity`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return { ok: false, alreadyReported: true };
+  }
+
+  const reportUnknownRef = (): ResolveFieldTypeResult => {
+    input.diagnostics.push({
+      code: 'PSL_UNKNOWN_ENTITY_REF',
+      message: `${input.entityLabel} type constructor "${helperPath}(${ref})" does not resolve — no entity named "${ref}" was found in namespace "${input.namespaceId ?? '(unspecified)'}"`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return { ok: false, alreadyReported: true };
+  };
+
+  const entity = input.namespaceExtensionEntities?.[entityRefArg.entityKind]?.[ref];
+  if (entity === undefined) {
+    return reportUnknownRef();
+  }
+
+  const codecId = input.descriptor.output.codecId;
+  const codecDescriptor = input.codecLookup?.descriptorFor?.(codecId);
+  if (codecDescriptor === undefined || !hasColumnFromEntityHook(codecDescriptor)) {
+    throw new Error(
+      `Type constructor "${helperPath}" registers codecId "${codecId}" with an entity-ref argument, but its codec descriptor has no "columnFromEntity" authoring hook. This is a contributor bug in the pack registering "${helperPath}", not a user-schema error.`,
+    );
+  }
+
+  const resolved = codecDescriptor.columnFromEntity(entity);
+  if (resolved === undefined) {
+    return reportUnknownRef();
+  }
+
+  const derivedValueSet = input.namespaceExtensionEntities?.['valueSet']?.[ref];
+  if (derivedValueSet !== undefined && input.namespaceId === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `${input.entityLabel} type constructor "${helperPath}(${ref})" resolves to a value-set-typed entity, but the field has no resolvable namespace to scope the value-set ref to`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return { ok: false, alreadyReported: true };
+  }
+
+  const valueSet: ValueSetRef | undefined =
+    derivedValueSet !== undefined && input.namespaceId !== undefined
+      ? {
+          plane: 'storage',
+          entityKind: 'valueSet',
+          namespaceId: input.namespaceId,
+          entityName: ref,
+        }
+      : undefined;
+
+  return {
+    ok: true,
+    descriptor: {
+      codecId,
+      nativeType: resolved.nativeType,
+      ...(resolved.typeParams !== undefined ? { typeParams: resolved.typeParams } : {}),
+      ...(valueSet !== undefined ? { valueSet } : {}),
+    },
+  };
+}
+
+/**
  * Contract contributions a field preset adds beyond the bare storage-type triple. Set when a field is resolved through the field-preset dispatch path; absent when resolved through the type-constructor path or as a scalar/enum/named-type lookup.
  */
 export type FieldPresetContributions = {
@@ -414,6 +558,28 @@ export function resolveFieldTypeDescriptor(input: {
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly entityLabel: string;
+  /**
+   * The field's namespace id — required to build a `valueSet` ref (`{
+   * namespaceId, entityName, … }`) when an entity-ref type constructor
+   * resolves the field's type. Storage value-sets are namespace-scoped, so
+   * the ref must point at the value-set derived in the SAME namespace the
+   * field's own column lives in.
+   */
+  readonly namespaceId?: string;
+  /**
+   * Extension entities already lowered for this namespace (the exact shape
+   * `lowerExtensionBlocksForNamespace` in the interpreter produces), keyed
+   * by entries-slot discriminator then block name. Consulted only when a
+   * type constructor's descriptor declares an `entityRefArg` (e.g.
+   * `pg.enum(Ref)`); every other resolution path ignores it.
+   */
+  readonly namespaceExtensionEntities?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  /**
+   * Codec-id-keyed descriptor lookup — consulted only when a type
+   * constructor's descriptor declares an `entityRefArg`, to reach the
+   * registered codec's `columnFromEntity` authoring hook.
+   */
+  readonly codecLookup?: CodecLookup;
 }): ResolveFieldTypeResult {
   // Avoid cascading unsupported-type diagnostics after invalid qualification.
   if (input.field.malformedType) {
@@ -455,6 +621,19 @@ export function resolveFieldTypeDescriptor(input: {
       input.authoringContributions,
       input.field.typeConstructor.path,
     );
+
+    if (typeDescriptor?.entityRefArg) {
+      return resolveEntityRefTypeConstructorCall({
+        call: input.field.typeConstructor,
+        descriptor: typeDescriptor,
+        namespaceId: input.namespaceId,
+        namespaceExtensionEntities: input.namespaceExtensionEntities,
+        codecLookup: input.codecLookup,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        entityLabel: input.entityLabel,
+      });
+    }
 
     if (
       !typeDescriptor &&
@@ -563,6 +742,7 @@ export const NATIVE_TYPE_SPECS: Readonly<Record<string, NativeTypeSpec>> = {
     nativeType: 'character',
   },
   'db.Uuid': { args: 'noArgs', baseType: 'String', codecId: 'pg/uuid@1', nativeType: 'uuid' },
+  'db.Inet': { args: 'noArgs', baseType: 'String', codecId: 'pg/inet@1', nativeType: 'inet' },
   'db.SmallInt': { args: 'noArgs', baseType: 'Int', codecId: 'pg/int2@1', nativeType: 'int2' },
   'db.Real': { args: 'noArgs', baseType: 'Float', codecId: 'pg/float4@1', nativeType: 'float4' },
   'db.Numeric': {
@@ -697,63 +877,12 @@ export function resolveDbNativeTypeAttribute(input: {
   }
 }
 
-export function parseDefaultLiteralValue(expression: string): ColumnDefault | undefined {
-  const trimmed = expression.trim();
-  if (trimmed === 'true' || trimmed === 'false') {
-    return { kind: 'literal', value: trimmed === 'true' };
-  }
-  const numericValue = Number(trimmed);
-  if (!Number.isNaN(numericValue) && trimmed.length > 0 && !/^(['"]).*\1$/.test(trimmed)) {
-    return { kind: 'literal', value: numericValue };
-  }
-  if (/^(['"]).*\1$/.test(trimmed)) {
-    return { kind: 'literal', value: unquoteStringLiteral(trimmed) };
-  }
-  return undefined;
-}
-
-/**
- * Result of interpreting a list-field `@default(...)` expression:
- * - `{ kind: 'array', value }` — an array-literal default (possibly empty)
- * - `{ kind: 'scalar' }` — a scalar literal where an array was expected
- * - `undefined` — not an array of literals (e.g. a function call like `now()`),
- *   so the caller falls through to function-default handling.
- */
-type ListDefaultParse =
-  | { readonly kind: 'array'; readonly value: readonly (string | number | boolean)[] }
-  | { readonly kind: 'scalar' }
-  | undefined;
-
-function decodeLiteralElement(element: ExpressionAst): string | number | boolean | undefined {
-  if (element instanceof StringLiteralExprAst) return element.value();
-  if (element instanceof NumberLiteralExprAst) return element.value();
-  if (element instanceof BooleanLiteralExprAst) return element.value();
-  return undefined;
-}
-
-function parseListDefaultExpression(expression: ExpressionAst | undefined): ListDefaultParse {
-  if (expression === undefined) return undefined;
-  if (
-    expression instanceof StringLiteralExprAst ||
-    expression instanceof NumberLiteralExprAst ||
-    expression instanceof BooleanLiteralExprAst
-  ) {
-    return { kind: 'scalar' };
-  }
-  if (!(expression instanceof ArrayLiteralAst)) return undefined;
-  const value: (string | number | boolean)[] = [];
-  for (const element of expression.elements()) {
-    const decoded = decodeLiteralElement(element);
-    if (decoded === undefined) return undefined;
-    value.push(decoded);
-  }
-  return { kind: 'array', value };
-}
-
 export function lowerDefaultForField(input: {
   readonly modelName: string;
   readonly fieldName: string;
-  readonly defaultAttribute: ResolvedAttribute;
+  readonly field: FieldSymbol;
+  readonly model: ModelSymbol;
+  readonly sourceFile: SourceFile;
   readonly columnDescriptor: ColumnDescriptor;
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly sourceId: string;
@@ -764,117 +893,85 @@ export function lowerDefaultForField(input: {
   readonly defaultValue?: ColumnDefault;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
 } {
-  const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'positional');
-  const namedEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'named');
+  const node = findFieldAttributeNode(input.field, 'default');
+  if (node === undefined) return {};
+  const spec = buildDefaultSpec({
+    isList: input.isList ?? false,
+    registry: input.defaultFunctionRegistry,
+  });
+  const interpreted = interpretFieldAttribute({
+    node,
+    spec,
+    model: input.model,
+    field: input.field,
+    sourceFile: input.sourceFile,
+    sourceId: input.sourceId,
+    diagnostics: input.diagnostics,
+  });
+  if (interpreted === undefined) return {};
+  const value = interpreted.value;
 
-  if (namedEntries.length > 0 || positionalEntries.length !== 1) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-      message: `Field "${input.modelName}.${input.fieldName}" requires exactly one positional @default(...) expression.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
+  if (Array.isArray(value)) {
+    return { defaultValue: { kind: 'literal', value: [...value] } };
   }
 
-  const expressionEntry = getPositionalArgumentEntry(input.defaultAttribute);
-  if (!expressionEntry) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
-      message: `Field "${input.modelName}.${input.fieldName}" requires a positional @default(...) expression.`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
-
-  if (input.isList) {
-    const listParse = parseListDefaultExpression(expressionEntry.expression);
-    if (listParse?.kind === 'array') {
-      return { defaultValue: { kind: 'literal', value: [...listParse.value] } };
-    }
-    if (listParse?.kind === 'scalar') {
-      input.diagnostics.push({
-        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
-        message: `Field "${input.modelName}.${input.fieldName}" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.`,
+  if (typeof value === 'object') {
+    const lowered = lowerDefaultFunctionWithRegistry({
+      call: value,
+      registry: input.defaultFunctionRegistry,
+      context: {
         sourceId: input.sourceId,
-        span: input.defaultAttribute.span,
+        modelName: input.modelName,
+        fieldName: input.fieldName,
+        columnCodecId: input.columnDescriptor.codecId,
+      },
+    });
+
+    if (!lowered.ok) {
+      input.diagnostics.push(lowered.diagnostic);
+      return {};
+    }
+
+    if (lowered.value.kind === 'storage') {
+      return { defaultValue: lowered.value.defaultValue };
+    }
+
+    const generatorDescriptor = input.generatorDescriptorById.get(lowered.value.generated.id);
+    if (!generatorDescriptor) {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+        message: `Default generator "${lowered.value.generated.id}" is not available in the composed mutation default registry.`,
+        sourceId: input.sourceId,
+        span: value.span,
       });
       return {};
     }
-    // Not a literal at all (e.g. a function call) — fall through to the
-    // function-default path, which the list execution-default guard rejects.
+
+    // Preset-only generators (e.g. `timestampNow`) co-register their codec through the preset descriptor, so they don't carry an `applicableCodecIds` list. Such a generator surfacing on the `@default(...)` lowering path is itself the bug — emit a diagnostic pointing the user at the correct authoring surface.
+    if (generatorDescriptor.applicableCodecIds === undefined) {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+        message: `Default generator "${generatorDescriptor.id}" is not applicable to "@default(...)" lowering. Use the corresponding field preset (e.g. \`temporal.${generatorDescriptor.id === 'timestampNow' ? 'updatedAt' : generatorDescriptor.id}()\`) instead.`,
+        sourceId: input.sourceId,
+        span: value.span,
+      });
+      return {};
+    }
+
+    if (!generatorDescriptor.applicableCodecIds.includes(input.columnDescriptor.codecId)) {
+      input.diagnostics.push({
+        code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+        message: `Default generator "${generatorDescriptor.id}" is not applicable to "${input.modelName}.${input.fieldName}" with codecId "${input.columnDescriptor.codecId}".`,
+        sourceId: input.sourceId,
+        span: value.span,
+      });
+      return {};
+    }
+
+    return { executionDefaults: { onCreate: lowered.value.generated } };
   }
 
-  const literalDefault = parseDefaultLiteralValue(expressionEntry.value);
-  if (literalDefault) {
-    return { defaultValue: literalDefault };
-  }
-
-  const defaultFunctionCall = parseDefaultFunctionCall(expressionEntry.value, expressionEntry.span);
-  if (!defaultFunctionCall) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_VALUE',
-      message: `Unsupported default value "${expressionEntry.value}"`,
-      sourceId: input.sourceId,
-      span: input.defaultAttribute.span,
-    });
-    return {};
-  }
-
-  const lowered = lowerDefaultFunctionWithRegistry({
-    call: defaultFunctionCall,
-    registry: input.defaultFunctionRegistry,
-    context: {
-      sourceId: input.sourceId,
-      modelName: input.modelName,
-      fieldName: input.fieldName,
-      columnCodecId: input.columnDescriptor.codecId,
-    },
-  });
-
-  if (!lowered.ok) {
-    input.diagnostics.push(lowered.diagnostic);
-    return {};
-  }
-
-  if (lowered.value.kind === 'storage') {
-    return { defaultValue: lowered.value.defaultValue };
-  }
-
-  const generatorDescriptor = input.generatorDescriptorById.get(lowered.value.generated.id);
-  if (!generatorDescriptor) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
-      message: `Default generator "${lowered.value.generated.id}" is not available in the composed mutation default registry.`,
-      sourceId: input.sourceId,
-      span: expressionEntry.span,
-    });
-    return {};
-  }
-
-  // Preset-only generators (e.g. `timestampNow`) co-register their codec through the preset descriptor, so they don't carry an `applicableCodecIds` list. Such a generator surfacing on the `@default(...)` lowering path is itself the bug — emit a diagnostic pointing the user at the correct authoring surface.
-  if (generatorDescriptor.applicableCodecIds === undefined) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
-      message: `Default generator "${generatorDescriptor.id}" is not applicable to "@default(...)" lowering. Use the corresponding field preset (e.g. \`temporal.${generatorDescriptor.id === 'timestampNow' ? 'updatedAt' : generatorDescriptor.id}()\`) instead.`,
-      sourceId: input.sourceId,
-      span: expressionEntry.span,
-    });
-    return {};
-  }
-
-  if (!generatorDescriptor.applicableCodecIds.includes(input.columnDescriptor.codecId)) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
-      message: `Default generator "${generatorDescriptor.id}" is not applicable to "${input.modelName}.${input.fieldName}" with codecId "${input.columnDescriptor.codecId}".`,
-      sourceId: input.sourceId,
-      span: expressionEntry.span,
-    });
-    return {};
-  }
-
-  return { executionDefaults: { onCreate: lowered.value.generated } };
+  return { defaultValue: { kind: 'literal', value } };
 }
 
 export function resolveColumnDescriptor(

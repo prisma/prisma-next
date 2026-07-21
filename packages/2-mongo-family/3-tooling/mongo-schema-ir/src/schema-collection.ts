@@ -13,7 +13,8 @@ export interface MongoSchemaCollectionCtorOptions {
 }
 
 export class MongoSchemaCollection extends MongoSchemaIRNode {
-  readonly kind = 'collection' as const;
+  readonly nodeKind = 'collection' as const;
+  readonly id: string;
   readonly name: string;
   readonly indexes: ReadonlyArray<MongoSchemaIndex>;
   readonly validator?: MongoSchemaValidator | undefined;
@@ -21,6 +22,7 @@ export class MongoSchemaCollection extends MongoSchemaIRNode {
 
   constructor(options: MongoSchemaCollectionCtorOptions) {
     super();
+    this.id = options.name;
     this.name = options.name;
     this.indexes = options.indexes ?? [];
     this.validator = options.validator;

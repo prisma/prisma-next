@@ -1,7 +1,7 @@
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type {
-  SchemaIssue,
+  SchemaDiffIssue,
   SchemaVerifier,
   SchemaVerifyOptions,
   SchemaVerifyResult,
@@ -40,7 +40,7 @@ export abstract class MongoSchemaVerifierBase<
 > implements SchemaVerifier<TContract, TSchema>
 {
   verifySchema(options: SchemaVerifyOptions<TContract, TSchema>): SchemaVerifyResult {
-    const issues: SchemaIssue[] = [];
+    const issues: SchemaDiffIssue[] = [];
     issues.push(...this.verifyCommonMongoSchema(options));
     issues.push(...this.verifyTargetExtensions(options));
     return { ok: issues.length === 0, issues };
@@ -64,8 +64,8 @@ export abstract class MongoSchemaVerifierBase<
 
   protected verifyCommonMongoSchema(
     options: SchemaVerifyOptions<TContract, TSchema>,
-  ): readonly SchemaIssue[] {
-    const issues: SchemaIssue[] = [];
+  ): readonly SchemaDiffIssue[] {
+    const issues: SchemaDiffIssue[] = [];
     const { namespaces } = options.contract.storage;
     const namespaceIds = Object.keys(namespaces).sort();
     for (const namespaceId of namespaceIds) {
@@ -96,7 +96,7 @@ export abstract class MongoSchemaVerifierBase<
     readonly schema: TSchema;
     readonly namespaceId: string;
     readonly namespace: Namespace;
-  }): readonly SchemaIssue[];
+  }): readonly SchemaDiffIssue[];
 
   /**
    * Target-specific extensions — Atlas-only kinds, target-only
@@ -105,5 +105,5 @@ export abstract class MongoSchemaVerifierBase<
    */
   protected abstract verifyTargetExtensions(
     options: SchemaVerifyOptions<TContract, TSchema>,
-  ): readonly SchemaIssue[];
+  ): readonly SchemaDiffIssue[];
 }

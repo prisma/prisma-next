@@ -1,5 +1,4 @@
 import type {
-  EnumInfo,
   PslNativeTypeAttribute,
   PslTypeMap,
   PslTypeResolution,
@@ -32,6 +31,7 @@ const PRESERVED_NATIVE_TYPES: Record<
   char: { pslType: 'String', attributeName: 'db.Char' },
   varchar: { pslType: 'String', attributeName: 'db.VarChar' },
   uuid: { pslType: 'String', attributeName: 'db.Uuid' },
+  inet: { pslType: 'String', attributeName: 'db.Inet' },
   int2: { pslType: 'Int', attributeName: 'db.SmallInt' },
   smallint: { pslType: 'Int', attributeName: 'db.SmallInt' },
   float4: { pslType: 'Float', attributeName: 'db.Real' },
@@ -126,32 +126,4 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
       return { unsupported: true, nativeType };
     },
   };
-}
-
-export function extractEnumInfo(annotations?: Record<string, unknown>): EnumInfo {
-  const pgAnnotations = annotations?.['pg'] as Record<string, unknown> | undefined;
-  const nativeEnumTypeNames = pgAnnotations?.['nativeEnumTypeNames'];
-
-  const typeNames = new Set<string>();
-  const definitions = new Map<string, readonly string[]>();
-
-  if (Array.isArray(nativeEnumTypeNames)) {
-    for (const name of nativeEnumTypeNames) {
-      if (typeof name === 'string') {
-        typeNames.add(name);
-      }
-    }
-  }
-
-  return { typeNames, definitions };
-}
-
-export function extractEnumTypeNames(annotations?: Record<string, unknown>): ReadonlySet<string> {
-  return extractEnumInfo(annotations).typeNames;
-}
-
-export function extractEnumDefinitions(
-  annotations?: Record<string, unknown>,
-): ReadonlyMap<string, readonly string[]> {
-  return extractEnumInfo(annotations).definitions;
 }

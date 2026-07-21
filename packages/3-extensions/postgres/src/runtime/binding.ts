@@ -1,5 +1,10 @@
 import type { Client, Pool } from 'pg';
-import { Client as PgClient, Pool as PgPool } from 'pg';
+
+export const isPgPool = (pg: Pool | Client): pg is Pool =>
+  'totalCount' in pg && 'idleCount' in pg && 'waitingCount' in pg;
+
+export const isPgClient = (pg: Pool | Client): pg is Client =>
+  'escapeIdentifier' in pg && 'escapeLiteral' in pg;
 
 export type PostgresBinding =
   | { readonly kind: 'url'; readonly url: string }
@@ -72,11 +77,11 @@ export function resolvePostgresBinding(options: PostgresBindingInput): PostgresB
     throw new Error('Invariant violation: expected pg binding after validation');
   }
 
-  if (pgBinding instanceof PgPool) {
+  if (isPgPool(pgBinding)) {
     return { kind: 'pgPool', pool: pgBinding };
   }
 
-  if (pgBinding instanceof PgClient) {
+  if (isPgClient(pgBinding)) {
     return { kind: 'pgClient', client: pgBinding };
   }
 

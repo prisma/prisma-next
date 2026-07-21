@@ -75,7 +75,7 @@ describe('ast/insert', () => {
       .withOnConflict(onConflict);
 
     expect(insertAst.onConflict?.columns).toEqual([col('user', 'id')]);
-    expect((insertAst.onConflict?.action as DoUpdateSetConflictAction).set).toEqual({
+    expect((insertAst.onConflict!.action as DoUpdateSetConflictAction).set).toEqual({
       email: param(2, 'updatedEmail'),
     });
   });

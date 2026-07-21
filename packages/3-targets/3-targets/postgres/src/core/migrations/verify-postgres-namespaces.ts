@@ -1,10 +1,13 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { DEFAULT_NAMESPACE_ID } from '../namespace-ids';
 import { isPostgresSchema } from '../postgres-schema';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
+import { PostgresNamespaceSchemaNode } from '../schema-ir/postgres-namespace-schema-node';
+import type { SqlSchemaDiffNode } from '../schema-ir/schema-node-kinds';
 
 /**
  * Resolves the live-database schema name for a given namespace
@@ -43,16 +46,17 @@ function existingSchemasFromSchema(schema: SqlSchemaIRNode): readonly string[] {
   if (PostgresDatabaseSchemaNode.is(schema)) {
     return schema.existingSchemas;
   }
-  return ['public'];
+  return [DEFAULT_NAMESPACE_ID];
 }
 
 /**
- * Emits a `missing_schema` issue for every contract-declared Postgres
- * namespace whose live container does not yet exist. The planner's
- * `collectSchemaIssues` prepends these to the relational findings so a
- * multi-schema plan emits `CREATE SCHEMA` before the tables that need it —
- * a planner-only concern (verify already rejects via the `missing_table` a
- * missing schema produces), so this is not part of the shared diff.
+ * Emits a `postgres-namespace` `not-found` diff issue for every
+ * contract-declared Postgres namespace whose live container does not yet
+ * exist. The planner prepends these (node-typed, synthesized) to the
+ * relational diff issues so a multi-schema plan emits `CREATE SCHEMA`
+ * before the tables that need it — a planner-only concern (verify already
+ * rejects via the `not-found` table issues a missing schema already
+ * produces), so this is not part of the shared diff.
  *
  * A namespace's live container is the schema returned by its
  * polymorphic `ddlSchemaName(storage)` method — named schemas resolve
@@ -63,29 +67,34 @@ function existingSchemasFromSchema(schema: SqlSchemaIRNode): readonly string[] {
  * introspected list. `public` is suppressed implicitly because the
  * introspection (or its sensible default) always carries it.
  *
- * Each emitted issue stamps `namespaceId` with the contract namespace
- * coordinate so the downstream `mapIssueToCall` re-resolves the DDL
- * schema name through the same polymorphic path — keeping the
- * coordinate, not the resolved name, as the issue's stable identity.
+ * Each emitted issue's path is `['database', ddlName]` — an ancestor of
+ * every table path under that schema, so it must never be run through
+ * `coalesceSubtreeIssues` alongside the table diff (it would swallow the
+ * table-level `not-found` issues that drive `CREATE TABLE`); the planner
+ * adds these AFTER coalescing the relational issues, and they are not
+ * subject to sibling-space ownership scoping (mirrors the retired
+ * coordinate walk, which prepended namespace issues after that filter).
  */
 export function verifyPostgresNamespacePresence(input: {
   readonly contract: Contract<SqlStorage>;
   readonly schema: SqlSchemaIRNode;
-}): readonly SchemaIssue[] {
+}): readonly SchemaDiffIssue<SqlSchemaDiffNode>[] {
   const { contract, schema } = input;
   const existing = new Set(existingSchemasFromSchema(schema));
-  const issues: SchemaIssue[] = [];
+  const issues: SchemaDiffIssue<SqlSchemaDiffNode>[] = [];
   const namespaceIds = Object.keys(contract.storage.namespaces).sort();
   for (const namespaceId of namespaceIds) {
     if (namespaceId === UNBOUND_NAMESPACE_ID) continue;
     const ddlName = resolveDdlSchemaName(contract.storage, namespaceId);
     if (ddlName === UNBOUND_NAMESPACE_ID) continue;
     if (existing.has(ddlName)) continue;
+    const namespace = new PostgresNamespaceSchemaNode({
+      schemaName: ddlName,
+      tables: {},
+    });
     issues.push({
-      kind: 'missing_schema',
-      reason: 'not-found',
-      namespaceId,
-      message: `Schema "${ddlName}" is missing from database`,
+      path: ['database', ddlName],
+      expected: namespace,
     });
   }
   return issues;

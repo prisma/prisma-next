@@ -6,6 +6,7 @@
  * `column()` is a trivial, non-polymorphic packager. Generic over `R` (the codec instance type returned by the descriptor's curried factory) and `P` (the typeParams record). The framework does NOT try to infer `R` and `P` from a descriptor — that path is the variance trap. Per-codec helpers absorb the descriptor relationship instead and tie themselves to their descriptor via `satisfies ColumnHelperFor<D>` or `satisfies ColumnHelperForStrict<D>`.
  */
 
+import type { ValueSetRef } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from './codec-descriptor';
 import type { CodecInstanceContext } from './codec-types';
 
@@ -21,6 +22,29 @@ export type ColumnTypeDescriptor<TCodecId extends string = string> = {
   readonly nativeType: string;
   readonly typeParams?: Record<string, unknown> | undefined;
   readonly typeRef?: string;
+  /**
+   * Storage-plane value-set ref, set by an authoring path that resolves a
+   * field's type against a value-set-deriving entity (e.g. a PSL entity-ref
+   * type constructor like `pg.enum(Ref)`, or a TS `enumType` handle).
+   * Threaded straight onto the storage node this descriptor builds, where it
+   * drives value-set → codec typing. Every codec's own descriptor leaves this
+   * unset.
+   */
+  readonly valueSet?: ValueSetRef;
+  readonly entityRef?: EntityRef;
+};
+
+/**
+ * Late-resolved pack-entity reference — a field on the type descriptor it is
+ * declared on: `entityKind`/`entityName` identify a pack entity whose final
+ * placement depends on data not yet known when the descriptor carrying this
+ * reference is built — e.g. an owning namespace resolved only once the
+ * surrounding structure is assembled.
+ */
+export type EntityRef = {
+  readonly entityKind: string;
+  readonly entityName: string;
+  readonly entity: unknown;
 };
 
 /**

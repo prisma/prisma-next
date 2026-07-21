@@ -41,6 +41,16 @@ interface PolyStorage {
           readonly codecId: 'pg/int4@1';
           readonly nullable: true;
         };
+        readonly parent_id: {
+          readonly nativeType: 'int4';
+          readonly codecId: 'pg/int4@1';
+          readonly nullable: true;
+        };
+        readonly assignee_id: {
+          readonly nativeType: 'int4';
+          readonly codecId: 'pg/int4@1';
+          readonly nullable: true;
+        };
       };
       primaryKey: { columns: readonly ['id'] };
       uniques: readonly [];
@@ -57,6 +67,29 @@ interface PolyStorage {
         readonly priority: {
           readonly nativeType: 'int4';
           readonly codecId: 'pg/int4@1';
+          readonly nullable: false;
+        };
+        readonly assignee_id: {
+          readonly nativeType: 'int4';
+          readonly codecId: 'pg/int4@1';
+          readonly nullable: true;
+        };
+      };
+      primaryKey: { columns: readonly ['id'] };
+      uniques: readonly [];
+      indexes: readonly [];
+      foreignKeys: readonly [];
+    };
+    readonly assignees: {
+      columns: {
+        readonly id: {
+          readonly nativeType: 'int4';
+          readonly codecId: 'pg/int4@1';
+          readonly nullable: false;
+        };
+        readonly name: {
+          readonly nativeType: 'text';
+          readonly codecId: 'pg/text@1';
           readonly nullable: false;
         };
       };
@@ -126,8 +159,21 @@ type PolyModels = {
         readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
         readonly nullable: true;
       };
+      readonly parentId: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: true;
+      };
     };
-    readonly relations: R;
+    readonly relations: {
+      readonly subtasks: {
+        readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+        readonly cardinality: '1:N';
+        readonly on: {
+          readonly localFields: readonly ['id'];
+          readonly targetFields: readonly ['parentId'];
+        };
+      };
+    };
     readonly storage: {
       readonly table: 'tasks';
       readonly fields: {
@@ -135,6 +181,7 @@ type PolyModels = {
         readonly title: { readonly column: 'title' };
         readonly type: { readonly column: 'type' };
         readonly projectId: { readonly column: 'project_id' };
+        readonly parentId: { readonly column: 'parent_id' };
       };
     };
     readonly discriminator: { readonly field: 'type' };
@@ -149,12 +196,29 @@ type PolyModels = {
         readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
         readonly nullable: true;
       };
+      readonly assigneeId: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: true;
+      };
     };
-    readonly relations: R;
+    readonly relations: {
+      readonly assignee: {
+        readonly to: {
+          readonly namespace: '__unbound__' & NamespaceId;
+          readonly model: 'Assignee';
+        };
+        readonly cardinality: 'N:1';
+        readonly on: {
+          readonly localFields: readonly ['assigneeId'];
+          readonly targetFields: readonly ['id'];
+        };
+      };
+    };
     readonly storage: {
       readonly table: 'tasks';
       readonly fields: {
         readonly severity: { readonly column: 'severity' };
+        readonly assigneeId: { readonly column: 'assignee_id' };
       };
     };
     readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
@@ -165,15 +229,52 @@ type PolyModels = {
         readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
         readonly nullable: false;
       };
+      readonly assigneeId: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: true;
+      };
     };
-    readonly relations: R;
+    readonly relations: {
+      readonly assignee: {
+        readonly to: {
+          readonly namespace: '__unbound__' & NamespaceId;
+          readonly model: 'Assignee';
+        };
+        readonly cardinality: 'N:1';
+        readonly on: {
+          readonly localFields: readonly ['assigneeId'];
+          readonly targetFields: readonly ['id'];
+        };
+      };
+    };
     readonly storage: {
       readonly table: 'features';
       readonly fields: {
         readonly priority: { readonly column: 'priority' };
+        readonly assigneeId: { readonly column: 'assignee_id' };
       };
     };
     readonly base: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+  };
+  readonly Assignee: {
+    readonly fields: {
+      readonly id: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+        readonly nullable: false;
+      };
+      readonly name: {
+        readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+        readonly nullable: false;
+      };
+    };
+    readonly relations: R;
+    readonly storage: {
+      readonly table: 'assignees';
+      readonly fields: {
+        readonly id: { readonly column: 'id' };
+        readonly name: { readonly column: 'name' };
+      };
+    };
   };
   readonly PlainModel: {
     readonly fields: {
@@ -429,6 +530,40 @@ test('where without a variant exposes only base fields on the predicate model', 
 });
 
 // ---------------------------------------------------------------------------
+// Variant-declared relations: `t.variant('X').where(...)` exposes a relation
+// declared on variant X, alongside relations declared on the base model.
+// ---------------------------------------------------------------------------
+
+test('where after variant("Feature") exposes the MTI variant relation and keeps a base relation', () => {
+  projects.include('tasks', (tasks) =>
+    tasks.variant('Feature').where((task) => {
+      expectTypeOf(task).toHaveProperty('assignee');
+      expectTypeOf(task).toHaveProperty('subtasks');
+      return task.assignee.some();
+    }),
+  );
+});
+
+test('where after variant("Bug") exposes the STI variant relation', () => {
+  projects.include('tasks', (tasks) =>
+    tasks.variant('Bug').where((task) => {
+      expectTypeOf(task).toHaveProperty('assignee');
+      return task.assignee.some();
+    }),
+  );
+});
+
+test('where without a variant does not expose the variant-declared relation', () => {
+  projects.include('tasks', (tasks) =>
+    tasks.where((task) => {
+      // @ts-expect-error assignee is a variant-declared relation, absent on the base predicate model
+      task.assignee;
+      return task.title.isNotNull();
+    }),
+  );
+});
+
+// ---------------------------------------------------------------------------
 // `first()` mirrors `where()`: its callback predicate is variant-aware, so
 // `t.variant('X').first(t => t.variantField…)` exposes variant X's fields.
 // ---------------------------------------------------------------------------
@@ -514,4 +649,129 @@ test('createModelAccessor without a selected variant returns the base accessor',
   expectTypeOf(task).toHaveProperty('title');
   // @ts-expect-error priority is an MTI variant field, absent without a selected variant
   task.priority;
+});
+
+// ---------------------------------------------------------------------------
+// Variant-declared includes: a singleton variant owns its declared relations,
+// while union-valued narrowing exposes only base relations safe for every
+// possible runtime variant.
+// ---------------------------------------------------------------------------
+
+test('include after variant("Feature") uses the MTI variant relation owner', () => {
+  const included = tasks.variant('Feature').include('assignee');
+  type Assignee = RowOfCollection<typeof included>['assignee'];
+  expectTypeOf<Assignee>().toEqualTypeOf<DefaultModelRow<PolyContract, 'Assignee'> | null>();
+});
+
+test('include after variant("Bug") uses the STI variant relation owner', () => {
+  const included = tasks.variant('Bug').include('assignee');
+  type Assignee = RowOfCollection<typeof included>['assignee'];
+  expectTypeOf<Assignee>().toEqualTypeOf<DefaultModelRow<PolyContract, 'Assignee'> | null>();
+});
+
+test('include after variant("Feature") keeps an unshadowed base relation', () => {
+  const included = tasks.variant('Feature').include('subtasks');
+  type Subtasks = RowOfCollection<typeof included>['subtasks'];
+  expectTypeOf<Subtasks>().toExtend<readonly unknown[]>();
+  expectTypeOf<Subtasks[number]['type']>().toEqualTypeOf<'bug' | 'feature'>();
+});
+
+test('include without narrowing rejects a variant-declared relation', () => {
+  // @ts-expect-error assignee is declared only by Task variants
+  tasks.include('assignee');
+});
+
+declare const taskVariantName: 'Bug' | 'Feature';
+
+test('include after union-valued narrowing keeps an unshadowed base relation', () => {
+  const included = tasks.variant(taskVariantName).include('subtasks');
+  type Subtasks = RowOfCollection<typeof included>['subtasks'];
+  expectTypeOf<Subtasks>().toExtend<readonly unknown[]>();
+});
+
+test('include after union-valued narrowing rejects variant-owned relations', () => {
+  // @ts-expect-error union-valued variant state exposes no variant-owned includes
+  tasks.variant(taskVariantName).include('assignee');
+});
+
+type CollisionModels = Omit<PolyModels, 'Task' | 'Bug' | 'Feature'> & {
+  readonly Task: Omit<PolyModels['Task'], 'relations'> & {
+    readonly relations: PolyModels['Task']['relations'] & {
+      readonly owner: {
+        readonly to: {
+          readonly namespace: '__unbound__' & NamespaceId;
+          readonly model: 'Assignee';
+        };
+        readonly cardinality: '1:N';
+        readonly on: {
+          readonly localFields: readonly ['id'];
+          readonly targetFields: readonly ['id'];
+        };
+      };
+      readonly blocked: {
+        readonly to: {
+          readonly namespace: '__unbound__' & NamespaceId;
+          readonly model: 'Assignee';
+        };
+        readonly cardinality: '1:N';
+        readonly on: {
+          readonly localFields: readonly ['id'];
+          readonly targetFields: readonly ['id'];
+        };
+      };
+    };
+  };
+  readonly Feature: Omit<PolyModels['Feature'], 'relations'> & {
+    readonly relations: PolyModels['Feature']['relations'] & {
+      readonly owner: {
+        readonly to: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Task' };
+        readonly cardinality: 'N:1';
+        readonly on: {
+          readonly localFields: readonly ['assigneeId'];
+          readonly targetFields: readonly ['id'];
+        };
+      };
+    };
+  };
+  readonly Bug: Omit<PolyModels['Bug'], 'relations'> & {
+    readonly relations: PolyModels['Bug']['relations'] & {
+      readonly blocked: never;
+    };
+  };
+};
+
+type CollisionContract = Omit<PolyContract, 'domain'> & {
+  readonly domain: {
+    readonly namespaces: {
+      readonly __unbound__: { readonly models: CollisionModels };
+    };
+  };
+};
+
+declare const collisionTasks: Collection<CollisionContract, 'Task'>;
+
+test('singleton variant include chooses its shadowing target and cardinality', () => {
+  const included = collisionTasks.variant('Feature').include('owner');
+  type Owner = RowOfCollection<typeof included>['owner'];
+  expectTypeOf<Owner>().not.toExtend<readonly unknown[]>();
+  expectTypeOf<NonNullable<Owner>>().toHaveProperty('title');
+});
+
+test('union-valued narrowing rejects a base relation shadowed by one possible variant', () => {
+  // @ts-expect-error Feature shadows owner, so the base owner relation is not common-safe
+  collisionTasks.variant(taskVariantName).include('owner');
+});
+
+test('non-navigable variant declaration shadows a same-named base relation', () => {
+  // @ts-expect-error Bug declares blocked as non-navigable and must not fall back to Task.blocked
+  collisionTasks.variant('Bug').include('blocked');
+});
+
+test('singleton variant keeps a base relation not declared by that variant', () => {
+  collisionTasks.variant('Feature').include('blocked');
+});
+
+test('union-valued narrowing rejects a base relation shadowed by a non-navigable member', () => {
+  // @ts-expect-error Bug shadows blocked, so it is unsafe for Bug | Feature state
+  collisionTasks.variant(taskVariantName).include('blocked');
 });

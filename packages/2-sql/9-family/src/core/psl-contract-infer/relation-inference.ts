@@ -1,3 +1,7 @@
+import {
+  backingIndexColumnKeys,
+  isBackedByColumnKeys,
+} from '@prisma-next/sql-contract/foreign-key-materialization';
 import type { SqlForeignKeyIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { deriveBackRelationFieldName, deriveRelationFieldName, pluralize } from './name-transforms';
 import type { RelationField } from './printer-config';
@@ -71,6 +75,7 @@ export function inferRelations(
         fk,
         childOptional,
         relationName,
+        table,
       );
 
       addRelationField(relationsByTable, childTableName, childRelField);
@@ -136,15 +141,38 @@ function deriveRelationName(
   return fk.columns.join('_');
 }
 
-function buildChildRelationField(
+/**
+ * Builds the child-side {@link RelationField} for a single foreign key:
+ * `typeName` is the parent model name, `fields`/`references` are the FK's raw
+ * columns, and `onDelete`/`onUpdate` are normalized to their PSL spelling.
+ * Exported so a caller resolving a foreign key against a model outside
+ * `tables` (e.g. a cross-space reference into another contract) can reuse the
+ * same normalization instead of duplicating it.
+ *
+ * `hostTable` is the table the FK is declared on (i.e. `table`, not the
+ * referenced parent) — its own indexes/uniques/primary key are what a
+ * backing index for this FK would be. When none of them exactly match the
+ * FK's source columns (in order), `index: false` is stamped so the emitted
+ * `@relation` opts out of the framework's default derived backing-index
+ * expectation, matching what `db verify` will find live. Passing the table
+ * is optional so existing single-FK callers (e.g. cross-space resolution
+ * before a host table reference is threaded through) can omit it and keep
+ * the framework default.
+ */
+export function buildChildRelationField(
   fieldName: string,
   parentModelName: string,
   fk: SqlForeignKeyIR,
   optional: boolean,
   relationName?: string,
+  hostTable?: SqlTableIR,
 ): RelationField {
   const onDelete = fk.onDelete && fk.onDelete !== DEFAULT_ON_DELETE ? fk.onDelete : undefined;
   const onUpdate = fk.onUpdate && fk.onUpdate !== DEFAULT_ON_UPDATE ? fk.onUpdate : undefined;
+  const index =
+    hostTable && !isBackedByColumnKeys(fk.columns, backingIndexColumnKeys(hostTable))
+      ? false
+      : undefined;
 
   return {
     fieldName,
@@ -158,6 +186,7 @@ function buildChildRelationField(
     references: fk.referencedColumns,
     onDelete: onDelete ? REFERENTIAL_ACTION_PSL[onDelete] : undefined,
     onUpdate: onUpdate ? REFERENTIAL_ACTION_PSL[onUpdate] : undefined,
+    index,
   };
 }
 

@@ -113,7 +113,7 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
     expect(matched).toBe(false);
   });
 
-  it('writeLedgerEntry lowers to an INSERT with jsonb operations', async () => {
+  it('writeLedgerEntry lowers to a single plain INSERT when no snapshot is given', async () => {
     const driver = createCapturingDriver();
     await adapter.writeLedgerEntry(driver, 'app', {
       edgeId: 'edge-1',
@@ -124,6 +124,7 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
       operations: [{ id: 'op-1' }],
     });
 
+    expect(driver.calls).toHaveLength(1);
     const { sql, params } = driver.calls[0]!;
     expect(sql).toBe(
       'INSERT INTO "prisma_contract"."ledger" ("space", "migration_name", "migration_hash", ' +
@@ -137,5 +138,33 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
       'sha256:from',
       'sha256:to',
     ]);
+  });
+
+  it('writeLedgerEntry upserts the destination contract by hash before the ledger row', async () => {
+    const driver = createCapturingDriver();
+    await adapter.writeLedgerEntry(driver, 'app', {
+      edgeId: 'edge-1',
+      from: 'sha256:from',
+      to: 'sha256:to',
+      migrationName: '002_add_post',
+      migrationHash: 'sha256:mig',
+      operations: [],
+      destinationContractJson: { models: ['user', 'post'] },
+    });
+
+    expect(driver.calls).toHaveLength(2);
+    // Contract store first, keyed by the destination hash; DO NOTHING makes
+    // a rollback cycle revisiting the same contract a no-op.
+    const contractUpsert = driver.calls[0]!;
+    expect(contractUpsert.sql).toBe(
+      'INSERT INTO "prisma_contract"."contract" ("core_hash", "contract_json") ' +
+        'VALUES ($1, $2::jsonb) ON CONFLICT ("core_hash") DO NOTHING',
+    );
+    expect(contractUpsert.params[0]).toBe('sha256:to');
+    expect(contractUpsert.params[1]).toBe(JSON.stringify({ models: ['user', 'post'] }));
+
+    const ledgerInsert = driver.calls[1]!;
+    expect(ledgerInsert.sql).toContain('INSERT INTO "prisma_contract"."ledger"');
+    expect(ledgerInsert.sql).not.toContain('RETURNING');
   });
 });

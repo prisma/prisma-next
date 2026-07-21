@@ -22,6 +22,7 @@ const tableInput = {
   foreignKeys: [],
   uniques: [],
   indexes: [],
+  rlsEnabled: false,
 };
 
 describe('PostgresTableSchemaNode', () => {
@@ -37,6 +38,7 @@ describe('PostgresTableSchemaNode', () => {
       foreignKeys: [],
       uniques: [],
       indexes: [],
+      rlsEnabled: false,
     });
     expect(table.id).toBe('orders');
   });
@@ -49,14 +51,132 @@ describe('PostgresTableSchemaNode', () => {
     expect(a.isEqualTo(other)).toBe(false);
   });
 
-  it('children() returns its policies', () => {
-    const table = new PostgresTableSchemaNode({ ...tableInput, policies: [basePolicy] });
-    expect(table.children()).toEqual([basePolicy]);
+  it('carries rlsEnabled as supplied', () => {
+    const enabled = new PostgresTableSchemaNode({ ...tableInput, rlsEnabled: true, policies: [] });
+    const disabled = new PostgresTableSchemaNode({ ...tableInput, policies: [] });
+    expect(enabled.rlsEnabled).toBe(true);
+    expect(disabled.rlsEnabled).toBe(false);
   });
 
-  it('children() returns empty array when no policies', () => {
+  it('isEqualTo compares rlsEnabled: nodes differing only in rlsEnabled are NOT equal (the first table-attribute comparison)', () => {
+    const enabled = new PostgresTableSchemaNode({ ...tableInput, rlsEnabled: true, policies: [] });
+    const disabled = new PostgresTableSchemaNode({ ...tableInput, policies: [] });
+    expect(enabled.isEqualTo(disabled)).toBe(false);
+    expect(disabled.isEqualTo(enabled)).toBe(false);
+  });
+
+  it('isEqualTo holds for same name and same rlsEnabled regardless of other structure', () => {
+    const a = new PostgresTableSchemaNode({
+      ...tableInput,
+      rlsEnabled: true,
+      policies: [basePolicy],
+    });
+    const b = new PostgresTableSchemaNode({
+      name: 'profiles',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsEnabled: true,
+      policies: [],
+    });
+    expect(a.isEqualTo(b)).toBe(true);
+  });
+
+  it('rlsEnabled adds no children()', () => {
+    const table = new PostgresTableSchemaNode({ ...tableInput, rlsEnabled: true, policies: [] });
+    expect(table.children()).toEqual([table.columns['id'], table.columns['user_id']]);
+  });
+
+  it('children() returns columns plus policies when there are no other constraints', () => {
+    const table = new PostgresTableSchemaNode({ ...tableInput, policies: [basePolicy] });
+    expect(table.children()).toEqual([table.columns['id'], table.columns['user_id'], basePolicy]);
+  });
+
+  it('children() returns only columns when there are no policies or constraints', () => {
     const table = new PostgresTableSchemaNode({ ...tableInput, policies: [] });
+    expect(table.children()).toEqual([table.columns['id'], table.columns['user_id']]);
+  });
+
+  it('children() returns empty array for a table with no columns, constraints, or policies', () => {
+    const table = new PostgresTableSchemaNode({
+      name: 'empty',
+      columns: {},
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      rlsEnabled: false,
+      policies: [],
+    });
     expect(table.children()).toEqual([]);
+  });
+
+  it('children() composes columns, primary key, foreign keys, uniques, indexes, checks, and policies in that order', () => {
+    const table = new PostgresTableSchemaNode({
+      name: 'orders',
+      columns: {
+        id: { name: 'id', nativeType: 'int4', nullable: false },
+        user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        status: { name: 'status', nativeType: 'text', nullable: false },
+      },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [{ columns: ['user_id'], referencedTable: 'users', referencedColumns: ['id'] }],
+      uniques: [{ columns: ['user_id', 'status'] }],
+      indexes: [{ columns: ['status'], unique: false }],
+      checks: [{ name: 'chk_status', column: 'status', permittedValues: ['active', 'inactive'] }],
+      rlsEnabled: false,
+      policies: [basePolicy],
+    });
+
+    const children = table.children();
+    expect(children.map((c) => c.id)).toEqual([
+      'column:id',
+      'column:user_id',
+      'column:status',
+      'primary-key',
+      'foreign-key:user_id->.users(id)',
+      'unique:user_id,status',
+      'index:status',
+      'check:chk_status',
+      basePolicy.id,
+    ]);
+  });
+
+  it('children() order is deterministic across repeated calls', () => {
+    const table = new PostgresTableSchemaNode({
+      name: 'orders',
+      columns: {
+        id: { name: 'id', nativeType: 'int4', nullable: false },
+        user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+      },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [{ columns: ['user_id'], referencedTable: 'users', referencedColumns: ['id'] }],
+      uniques: [],
+      indexes: [],
+      rlsEnabled: false,
+      policies: [basePolicy],
+    });
+
+    expect(table.children().map((c) => c.id)).toEqual(table.children().map((c) => c.id));
+  });
+
+  it('a primary key sentinel id never collides with a column, constraint, or policy id under the same table', () => {
+    const table = new PostgresTableSchemaNode({
+      name: 'orders',
+      columns: {
+        id: { name: 'id', nativeType: 'int4', nullable: false },
+      },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      checks: [],
+      rlsEnabled: false,
+      policies: [basePolicy],
+    });
+
+    const ids = table.children().map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('policies defaults to empty when not supplied', () => {

@@ -1,5 +1,5 @@
 import type {
-  SchemaIssue,
+  SchemaDiffIssue,
   SchemaVerifier,
   SchemaVerifyOptions,
   SchemaVerifyResult,
@@ -9,7 +9,7 @@ import type {
  * SQL family `SchemaVerifier` abstract base. Centralises the SQL-shared
  * walk (table-by-table + column-by-column matching keyed by
  * `(namespace.id, name)`, FK / unique / index comparisons via the
- * existing helpers in `verify-helpers.ts`) and exposes a protected hook
+ * shared satisfaction helpers in `sql-schema-diff.ts`) and exposes a protected hook
  * for target extensions (Postgres functions, RLS policies, future
  * target-only kinds).
  *
@@ -29,7 +29,7 @@ export abstract class SqlSchemaVerifierBase<TContract, TSchema>
   implements SchemaVerifier<TContract, TSchema>
 {
   verifySchema(options: SchemaVerifyOptions<TContract, TSchema>): SchemaVerifyResult {
-    const issues: SchemaIssue[] = [];
+    const issues: SchemaDiffIssue[] = [];
     issues.push(...this.verifyCommonSqlSchema(options));
     issues.push(...this.verifyTargetExtensions(options));
     return { ok: issues.length === 0, issues };
@@ -43,7 +43,7 @@ export abstract class SqlSchemaVerifierBase<TContract, TSchema>
    */
   protected abstract verifyCommonSqlSchema(
     options: SchemaVerifyOptions<TContract, TSchema>,
-  ): readonly SchemaIssue[];
+  ): readonly SchemaDiffIssue[];
 
   /**
    * Target-specific extensions — e.g. Postgres functions, future RLS
@@ -52,5 +52,5 @@ export abstract class SqlSchemaVerifierBase<TContract, TSchema>
    */
   protected abstract verifyTargetExtensions(
     options: SchemaVerifyOptions<TContract, TSchema>,
-  ): readonly SchemaIssue[];
+  ): readonly SchemaDiffIssue[];
 }

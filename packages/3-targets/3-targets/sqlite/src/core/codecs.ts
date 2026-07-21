@@ -294,11 +294,18 @@ export class SqliteBigintCodec extends CodecImpl<
     return BigInt(wire);
   }
   encodeJson(value: bigint): JsonValue {
-    return value.toString();
+    const number = Number(value);
+    if (!Number.isSafeInteger(number)) {
+      throw new TypeError('sqlite/bigint@1 database JSON value must be a safe integer');
+    }
+    return number;
   }
   decodeJson(json: JsonValue): bigint {
-    if (typeof json !== 'string' && typeof json !== 'number') {
-      throw new TypeError('sqlite/bigint@1 contract value must be a string or number');
+    if (typeof json !== 'number') {
+      throw new TypeError('sqlite/bigint@1 database JSON value must be a number');
+    }
+    if (!Number.isSafeInteger(json)) {
+      throw new TypeError('sqlite/bigint@1 database JSON value must be a safe integer');
     }
     return BigInt(json);
   }

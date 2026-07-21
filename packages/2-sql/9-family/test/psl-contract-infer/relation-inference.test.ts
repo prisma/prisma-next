@@ -1,19 +1,19 @@
-import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { inferRelations } from '../../src/core/psl-contract-infer/relation-inference';
 
 describe('inferRelations', () => {
   it('infers 1:N relation from FK', () => {
     const tables: Record<string, SqlTableIR> = {
-      user: {
+      user: new SqlTableIR({
         name: 'user',
         columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
         primaryKey: { columns: ['id'] },
         foreignKeys: [],
         uniques: [],
         indexes: [],
-      },
-      post: {
+      }),
+      post: new SqlTableIR({
         name: 'post',
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -23,7 +23,7 @@ describe('inferRelations', () => {
         foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
         uniques: [],
         indexes: [],
-      },
+      }),
     };
     const modelNameMap = new Map([
       ['user', 'User'],
@@ -52,15 +52,15 @@ describe('inferRelations', () => {
 
   it('detects 1:1 when FK column has unique constraint', () => {
     const tables: Record<string, SqlTableIR> = {
-      user: {
+      user: new SqlTableIR({
         name: 'user',
         columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
         primaryKey: { columns: ['id'] },
         foreignKeys: [],
         uniques: [],
         indexes: [],
-      },
-      profile: {
+      }),
+      profile: new SqlTableIR({
         name: 'profile',
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -70,7 +70,7 @@ describe('inferRelations', () => {
         foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
         uniques: [{ columns: ['user_id'] }],
         indexes: [],
-      },
+      }),
     };
     const modelNameMap = new Map([
       ['user', 'User'],
@@ -89,15 +89,15 @@ describe('inferRelations', () => {
 
   it('detects 1:1 when FK columns match PK columns', () => {
     const tables: Record<string, SqlTableIR> = {
-      user: {
+      user: new SqlTableIR({
         name: 'user',
         columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
         primaryKey: { columns: ['id'] },
         foreignKeys: [],
         uniques: [],
         indexes: [],
-      },
-      user_detail: {
+      }),
+      user_detail: new SqlTableIR({
         name: 'user_detail',
         columns: {
           user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
@@ -106,7 +106,7 @@ describe('inferRelations', () => {
         foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
         uniques: [],
         indexes: [],
-      },
+      }),
     };
     const modelNameMap = new Map([
       ['user', 'User'],
@@ -124,7 +124,7 @@ describe('inferRelations', () => {
 
   it('detects 1:1 when composite FK columns match a composite unique constraint', () => {
     const tables: Record<string, SqlTableIR> = {
-      account: {
+      account: new SqlTableIR({
         name: 'account',
         columns: {
           tenant_id: { name: 'tenant_id', nativeType: 'int4', nullable: false },
@@ -134,8 +134,8 @@ describe('inferRelations', () => {
         foreignKeys: [],
         uniques: [],
         indexes: [],
-      },
-      profile: {
+      }),
+      profile: new SqlTableIR({
         name: 'profile',
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -152,7 +152,7 @@ describe('inferRelations', () => {
         ],
         uniques: [{ columns: ['tenant_id', 'account_id'] }],
         indexes: [],
-      },
+      }),
     };
     const modelNameMap = new Map([
       ['account', 'Account'],
@@ -170,15 +170,15 @@ describe('inferRelations', () => {
 
   it('produces named relations for multiple FKs to same parent', () => {
     const tables: Record<string, SqlTableIR> = {
-      user: {
+      user: new SqlTableIR({
         name: 'user',
         columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
         primaryKey: { columns: ['id'] },
         foreignKeys: [],
         uniques: [],
         indexes: [],
-      },
-      message: {
+      }),
+      message: new SqlTableIR({
         name: 'message',
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -202,7 +202,7 @@ describe('inferRelations', () => {
         ],
         uniques: [],
         indexes: [],
-      },
+      }),
     };
     const modelNameMap = new Map([
       ['user', 'User'],
@@ -221,15 +221,15 @@ describe('inferRelations', () => {
 
   it('falls back to generated relation names for unnamed duplicate FKs', () => {
     const tables: Record<string, SqlTableIR> = {
-      user: {
+      user: new SqlTableIR({
         name: 'user',
         columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
         primaryKey: { columns: ['id'] },
         foreignKeys: [],
         uniques: [],
         indexes: [],
-      },
-      message: {
+      }),
+      message: new SqlTableIR({
         name: 'message',
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -243,7 +243,7 @@ describe('inferRelations', () => {
         ],
         uniques: [],
         indexes: [],
-      },
+      }),
     };
     const modelNameMap = new Map([
       ['user', 'User'],
@@ -260,7 +260,7 @@ describe('inferRelations', () => {
 
   it('handles self-referencing FKs', () => {
     const tables: Record<string, SqlTableIR> = {
-      category: {
+      category: new SqlTableIR({
         name: 'category',
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -272,7 +272,7 @@ describe('inferRelations', () => {
         ],
         uniques: [],
         indexes: [],
-      },
+      }),
     };
     const modelNameMap = new Map([['category', 'Category']]);
     const { relationsByTable } = inferRelations(tables, modelNameMap);
@@ -298,15 +298,15 @@ describe('inferRelations', () => {
 
   it('includes onDelete/onUpdate when non-default', () => {
     const tables: Record<string, SqlTableIR> = {
-      parent: {
+      parent: new SqlTableIR({
         name: 'parent',
         columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
         primaryKey: { columns: ['id'] },
         foreignKeys: [],
         uniques: [],
         indexes: [],
-      },
-      child: {
+      }),
+      child: new SqlTableIR({
         name: 'child',
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -324,7 +324,7 @@ describe('inferRelations', () => {
         ],
         uniques: [],
         indexes: [],
-      },
+      }),
     };
     const modelNameMap = new Map([
       ['parent', 'Parent'],
@@ -341,7 +341,7 @@ describe('inferRelations', () => {
 
   it('falls back to table names and creates parent relation state when the model map is incomplete', () => {
     const tables: Record<string, SqlTableIR> = {
-      audit: {
+      audit: new SqlTableIR({
         name: 'audit',
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -353,7 +353,7 @@ describe('inferRelations', () => {
         ],
         uniques: [{ columns: ['marker'] }],
         indexes: [],
-      },
+      }),
     };
 
     const { relationsByTable } = inferRelations(tables, new Map());
@@ -374,17 +374,124 @@ describe('inferRelations', () => {
     });
   });
 
-  it('falls back to a numeric suffix when relation names still collide after appending the model name', () => {
+  it('stamps index: false when the FK columns have no live backing index', () => {
     const tables: Record<string, SqlTableIR> = {
-      user: {
+      user: new SqlTableIR({
         name: 'user',
         columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
         primaryKey: { columns: ['id'] },
         foreignKeys: [],
         uniques: [],
         indexes: [],
-      },
-      audit: {
+      }),
+      post: new SqlTableIR({
+        name: 'post',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        uniques: [],
+        indexes: [],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['post', 'Post'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const postRelations = relationsByTable.get('post');
+    expect(postRelations![0]).toMatchObject({ fieldName: 'user', index: false });
+  });
+
+  it('leaves index unset when a live non-unique index backs the FK columns', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      post: new SqlTableIR({
+        name: 'post',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        uniques: [],
+        indexes: [{ columns: ['user_id'], unique: false }],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['post', 'Post'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const postRelations = relationsByTable.get('post');
+    expect(postRelations![0]?.index).toBeUndefined();
+  });
+
+  it('stamps index: false when a live index exists but in a different column order', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: {
+          tenant_id: { name: 'tenant_id', nativeType: 'int4', nullable: false },
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['tenant_id', 'id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      post: new SqlTableIR({
+        name: 'post',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          tenant_id: { name: 'tenant_id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [
+          {
+            columns: ['tenant_id', 'user_id'],
+            referencedTable: 'user',
+            referencedColumns: ['tenant_id', 'id'],
+          },
+        ],
+        uniques: [],
+        // Same columns, reversed order: does not satisfy the FK's (tenant_id, user_id) order.
+        indexes: [{ columns: ['user_id', 'tenant_id'], unique: false }],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['post', 'Post'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const postRelations = relationsByTable.get('post');
+    expect(postRelations![0]).toMatchObject({ index: false });
+  });
+
+  it('falls back to a numeric suffix when relation names still collide after appending the model name', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      audit: new SqlTableIR({
         name: 'audit',
         columns: {
           id: { name: 'id', nativeType: 'int4', nullable: false },
@@ -397,7 +504,7 @@ describe('inferRelations', () => {
         foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
         uniques: [],
         indexes: [],
-      },
+      }),
     };
     const modelNameMap = new Map([
       ['user', 'User'],

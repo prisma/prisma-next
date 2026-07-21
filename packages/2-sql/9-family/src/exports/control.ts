@@ -15,8 +15,13 @@ export { assembleAuthoringContributions } from '@prisma-next/framework-component
 export { extractCodecControlHooks } from '../core/assembly';
 export type { SqlControlFamilyInstance } from '../core/control-instance';
 export type {
+  SqlControlTargetDescriptor,
+  SqlDescribedContractSpace,
+} from '../core/control-target-descriptor';
+export type {
   ContractToSchemaIROptions,
   DefaultRenderer,
+  DefaultResolver,
   EnumNamespaceSchemaResolver,
   NativeTypeExpander,
 } from '../core/migrations/contract-to-schema-ir';
@@ -27,7 +32,7 @@ export {
   detectDestructiveChanges,
   resolveValueSetValues,
 } from '../core/migrations/contract-to-schema-ir';
-export type { ControlPolicySubject } from '../core/migrations/control-policy';
+export type { ControlPolicySubject, SuppressionRecord } from '../core/migrations/control-policy';
 export {
   controlPolicyForCall,
   partitionCallsByControlPolicy,
@@ -35,6 +40,7 @@ export {
 } from '../core/migrations/control-policy';
 export type { PlanFieldEventOperationsOptions } from '../core/migrations/field-event-planner';
 export { planFieldEventOperations } from '../core/migrations/field-event-planner';
+export { buildNativeTypeExpander } from '../core/migrations/native-type-expander';
 export {
   createMigrationPlan,
   plannerFailure,
@@ -44,6 +50,11 @@ export {
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
 export type {
+  SqlSchemaDiffFn,
+  SqlSchemaDiffInput,
+  SqlSchemaDiffResult,
+} from '../core/migrations/schema-differ';
+export type {
   CodecControlHooks,
   CreateSqlMigrationPlanOptions,
   ExpandNativeTypeInput,
@@ -52,7 +63,6 @@ export type {
   ResolveIdentityValueInput,
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
-  SqlControlTargetDescriptor,
   SqlMigrationPlan,
   SqlMigrationPlanContractInfo,
   SqlMigrationPlanner,
@@ -78,6 +88,8 @@ export type {
 } from '../core/migrations/types';
 export {
   temporalAuthoringPresets,
+  temporalCodecPreset,
+  temporalCodecPresetWithPrecision,
   timestampNowControlDescriptor,
 } from '../core/timestamp-now-generator';
 

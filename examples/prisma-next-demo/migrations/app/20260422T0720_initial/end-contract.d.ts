@@ -35,7 +35,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:9f49f8f9e51a9cc016f1ec2098ebae9406521a3cc2cf00207adc795078333d8b'>;
+  StorageHashBase<'sha256:6c96d4165531a6e68599368aa8d4de3d90d1c7e592c7143cd167d69feee89dc0'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:6dcd81f86735007ae62319a6ecb5c147052e6792d7c5a2b9e396b45823090f28'>;
 export type ProfileHash =
@@ -295,8 +295,6 @@ type ContractBase = Omit<
                     readonly tableName: 'task';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -334,8 +332,6 @@ type ContractBase = Omit<
                     readonly tableName: 'task';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -382,7 +378,9 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                { readonly columns: readonly ['userId']; readonly name: 'post_userId_idx' },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -395,8 +393,6 @@ type ContractBase = Omit<
                     readonly tableName: 'user';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -417,7 +413,10 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['postId', 'tagId'] };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                { readonly columns: readonly ['postId']; readonly name: 'post_tag_postId_idx' },
+                { readonly columns: readonly ['tagId']; readonly name: 'post_tag_tagId_idx' },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -430,8 +429,6 @@ type ContractBase = Omit<
                     readonly tableName: 'post';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
                 {
                   readonly source: {
@@ -444,8 +441,6 @@ type ContractBase = Omit<
                     readonly tableName: 'tag';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -515,7 +510,9 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                { readonly columns: readonly ['userId']; readonly name: 'task_userId_idx' },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -528,8 +525,6 @@ type ContractBase = Omit<
                     readonly tableName: 'user';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -575,13 +570,13 @@ type ContractBase = Omit<
             };
           };
           readonly valueSet: {
-            readonly user_type: {
-              readonly kind: 'valueSet';
-              readonly values: readonly ['admin', 'user'];
-            };
             readonly Priority: {
               readonly kind: 'valueSet';
               readonly values: readonly ['low', 'high', 'urgent'];
+            };
+            readonly user_type: {
+              readonly kind: 'valueSet';
+              readonly values: readonly ['admin', 'user'];
             };
           };
         };

@@ -11,6 +11,7 @@ import {
   type AuthoringContributions,
   type AuthoringEntityContext,
   type AuthoringEntityTypeNamespace,
+  type AuthoringFieldPresetDescriptor,
   type AuthoringPslBlockDescriptorNamespace,
   type PslExtensionBlock,
   resolveEnumCodecId,
@@ -18,12 +19,21 @@ import {
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
+  ControlMutationDefaultEntry,
   ControlMutationDefaults,
   DefaultFunctionLoweringContext,
-  ParsedDefaultFunctionCall,
+  TypedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
-import type { SymbolTable } from '@prisma-next/psl-parser';
-import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
+import type { FuncCallSig, SymbolTable } from '@prisma-next/psl-parser';
+import {
+  buildSymbolTable,
+  int,
+  num,
+  oneOf,
+  optional,
+  rangeToPslSpan,
+  str,
+} from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import type { SqlNamespaceBase, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
@@ -160,7 +170,7 @@ export const testEnumEntityContributions = {
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;
-  readonly span: ParsedDefaultFunctionCall['span'];
+  readonly span: TypedDefaultFunctionCall['span'];
   readonly message: string;
 }) {
   return {
@@ -186,38 +196,6 @@ function executionGenerator(id: string, params?: Record<string, unknown>) {
       },
     },
   };
-}
-
-function expectNoArgs(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-  readonly usage: string;
-}) {
-  if (input.call.args.length === 0) {
-    return undefined;
-  }
-  return invalidArgumentDiagnostic({
-    context: input.context,
-    span: input.call.span,
-    message: `Default function "${input.call.name}" does not accept arguments. Use ${input.usage}.`,
-  });
-}
-
-function parseIntegerArgument(raw: string): number | undefined {
-  const trimmed = raw.trim();
-  if (!/^-?\d+$/.test(trimmed)) {
-    return undefined;
-  }
-  const value = Number(trimmed);
-  if (!Number.isInteger(value)) {
-    return undefined;
-  }
-  return value;
-}
-
-function parseStringLiteral(raw: string): string | undefined {
-  const match = raw.trim().match(/^(['"])(.*)\1$/s);
-  return match?.[2];
 }
 
 export const postgresEnumInferenceCodecs = {
@@ -265,6 +243,7 @@ export const pgvectorAuthoringContributions = {
   entityTypes: {},
   field: {},
   pslBlockDescriptors: {},
+  modelAttributes: {},
   type: {
     pgvector: {
       Vector: {
@@ -415,7 +394,13 @@ export function createPostgresTestContext(
     composedExtensionPacks: [],
     composedExtensionContracts: new Map(),
     scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
-    authoringContributions: { field: {}, type: {}, entityTypes: {}, pslBlockDescriptors: {} },
+    authoringContributions: {
+      field: {},
+      type: {},
+      entityTypes: {},
+      pslBlockDescriptors: {},
+      modelAttributes: {},
+    },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
     resolvedInputs: [],
@@ -424,137 +409,85 @@ export function createPostgresTestContext(
   };
 }
 
+const nowSig: FuncCallSig = {};
+const autoincrementSig: FuncCallSig = {};
+const ulidSig: FuncCallSig = {};
+const uuidSig: FuncCallSig = {
+  positional: [{ key: 'version', type: optional(oneOf(num(4), num(7))) }],
+};
+const cuidSig: FuncCallSig = { positional: [{ key: 'version', type: num(2) }] };
+const nanoidSig: FuncCallSig = {
+  positional: [{ key: 'size', type: optional(int({ min: 2, max: 255 })) }],
+};
+const dbgeneratedSig: FuncCallSig = { positional: [{ key: 'expression', type: str() }] };
+
 export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefaults {
   return {
-    defaultFunctionRegistry: new Map([
+    defaultFunctionRegistry: new Map<string, ControlMutationDefaultEntry>([
       [
         'autoincrement',
         {
-          lower: ({ call, context }) => {
-            const noArgs = expectNoArgs({ call, context, usage: '`autoincrement()`' });
-            if (noArgs) return noArgs;
-            return {
-              ok: true as const,
-              value: {
-                kind: 'storage' as const,
-                defaultValue: { kind: 'function' as const, expression: 'autoincrement()' },
-              },
-            };
-          },
+          signature: autoincrementSig,
+          lower: () => ({
+            ok: true as const,
+            value: {
+              kind: 'storage' as const,
+              defaultValue: { kind: 'function' as const, expression: 'autoincrement()' },
+            },
+          }),
           usageSignatures: ['autoincrement()'],
         },
       ],
       [
         'now',
         {
-          lower: ({ call, context }) => {
-            const noArgs = expectNoArgs({ call, context, usage: '`now()`' });
-            if (noArgs) return noArgs;
-            return {
-              ok: true as const,
-              value: {
-                kind: 'storage' as const,
-                defaultValue: { kind: 'function' as const, expression: 'now()' },
-              },
-            };
-          },
+          signature: nowSig,
+          lower: () => ({
+            ok: true as const,
+            value: {
+              kind: 'storage' as const,
+              defaultValue: { kind: 'function' as const, expression: 'now()' },
+            },
+          }),
           usageSignatures: ['now()'],
         },
       ],
       [
         'uuid',
         {
-          lower: ({ call, context }) => {
-            if (call.args.length === 0) return executionGenerator('uuidv4');
-            if (call.args.length !== 1) {
-              return invalidArgumentDiagnostic({
-                context,
-                span: call.span,
-                message:
-                  'Default function "uuid" accepts at most one version argument: `uuid()`, `uuid(4)`, or `uuid(7)`.',
-              });
-            }
-            const version = parseIntegerArgument(call.args[0]?.raw ?? '');
-            if (version === 4) return executionGenerator('uuidv4');
-            if (version === 7) return executionGenerator('uuidv7');
-            return invalidArgumentDiagnostic({
-              context,
-              span: call.args[0]?.span ?? call.span,
-              message:
-                'Default function "uuid" supports only `uuid()`, `uuid(4)`, or `uuid(7)` in SQL PSL provider v1.',
-            });
-          },
+          signature: uuidSig,
+          lower: ({ call }) =>
+            call.args['version'] === 7
+              ? executionGenerator('uuidv7')
+              : executionGenerator('uuidv4'),
           usageSignatures: ['uuid()', 'uuid(4)', 'uuid(7)'],
         },
       ],
       [
         'cuid',
         {
-          lower: ({ call, context }) => {
-            if (call.args.length === 0) {
-              return {
-                ok: false as const,
-                diagnostic: {
-                  code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-                  message:
-                    'Default function "cuid()" is not supported in SQL PSL provider v1. Use `cuid(2)` instead.',
-                  sourceId: context.sourceId,
-                  span: call.span,
-                },
-              };
-            }
-            if (call.args.length !== 1) {
-              return invalidArgumentDiagnostic({
-                context,
-                span: call.span,
-                message: 'Default function "cuid" accepts exactly one version argument: `cuid(2)`.',
-              });
-            }
-            const version = parseIntegerArgument(call.args[0]?.raw ?? '');
-            if (version === 2) return executionGenerator('cuid2');
-            return invalidArgumentDiagnostic({
-              context,
-              span: call.args[0]?.span ?? call.span,
-              message: 'Default function "cuid" supports only `cuid(2)` in SQL PSL provider v1.',
-            });
-          },
+          signature: cuidSig,
+          lower: () => executionGenerator('cuid2'),
           usageSignatures: ['cuid(2)'],
         },
       ],
       [
         'ulid',
         {
-          lower: ({ call, context }) => {
-            const noArgs = expectNoArgs({ call, context, usage: '`ulid()`' });
-            if (noArgs) return noArgs;
-            return executionGenerator('ulid');
-          },
+          signature: ulidSig,
+          lower: () => executionGenerator('ulid'),
           usageSignatures: ['ulid()'],
         },
       ],
       [
         'nanoid',
         {
-          lower: ({ call, context }) => {
-            if (call.args.length === 0) return executionGenerator('nanoid');
-            if (call.args.length !== 1) {
-              return invalidArgumentDiagnostic({
-                context,
-                span: call.span,
-                message:
-                  'Default function "nanoid" accepts at most one size argument: `nanoid()` or `nanoid(<2-255>)`.',
-              });
-            }
-            const size = parseIntegerArgument(call.args[0]?.raw ?? '');
-            if (size !== undefined && size >= 2 && size <= 255) {
-              return executionGenerator('nanoid', { size });
-            }
-            return invalidArgumentDiagnostic({
-              context,
-              span: call.args[0]?.span ?? call.span,
-              message:
-                'Default function "nanoid" size argument must be an integer between 2 and 255.',
-            });
+          signature: nanoidSig,
+          lower: ({ call }) => {
+            const size = call.args['size'];
+            return typeof size === 'number'
+              ? executionGenerator('nanoid', { size })
+              : executionGenerator('nanoid');
           },
           usageSignatures: ['nanoid()', 'nanoid(<2-255>)'],
         },
@@ -562,27 +495,13 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
       [
         'dbgenerated',
         {
+          signature: dbgeneratedSig,
           lower: ({ call, context }) => {
-            if (call.args.length !== 1) {
+            const expression = call.args['expression'];
+            if (typeof expression !== 'string' || expression.trim().length === 0) {
               return invalidArgumentDiagnostic({
                 context,
                 span: call.span,
-                message:
-                  'Default function "dbgenerated" requires exactly one string argument: `dbgenerated("...")`.',
-              });
-            }
-            const rawExpression = parseStringLiteral(call.args[0]?.raw ?? '');
-            if (rawExpression === undefined) {
-              return invalidArgumentDiagnostic({
-                context,
-                span: call.args[0]?.span ?? call.span,
-                message: 'Default function "dbgenerated" argument must be a string literal.',
-              });
-            }
-            if (rawExpression.trim().length === 0) {
-              return invalidArgumentDiagnostic({
-                context,
-                span: call.args[0]?.span ?? call.span,
                 message: 'Default function "dbgenerated" argument cannot be empty.',
               });
             }
@@ -590,10 +509,7 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
               ok: true as const,
               value: {
                 kind: 'storage' as const,
-                defaultValue: {
-                  kind: 'function' as const,
-                  expression: rawExpression,
-                },
+                defaultValue: { kind: 'function' as const, expression },
               },
             };
           },
@@ -700,3 +616,144 @@ export function buildEnumCapturingFactory(): {
   };
   return { createNamespace, capturedEnumTypes };
 }
+
+/**
+ * Hand-written mirrors of family-sql's temporal authoring factories —
+ * `temporalCodecPresetWithPrecision` / `temporalCodecPreset` below, and
+ * `temporalAuthoringPresets` (the `createdAt`/`updatedAt` convenience pair)
+ * further down.
+ *
+ * They are hand-written because this package cannot import family-sql:
+ * family-sql declares `@prisma-next/sql-contract-psl` as a devDependency, so
+ * the reverse import would be a cycle.
+ *
+ * They are kept honest by `family-sql/test/temporal-codec-presets.test.ts`,
+ * which imports each mirror below and asserts it deep-equals the factory
+ * output. That assertion — not the target-pack registration tests, whose two
+ * sides both derive from the factory — is what fails if a factory change
+ * leaves these stale.
+ */
+const TEMPORAL_MIRROR_PRECISION_ARG = {
+  name: 'precision',
+  kind: 'number',
+  optional: true,
+  integer: true,
+  minimum: 0,
+} as const;
+const TEMPORAL_MIRROR_ON_CREATE_ARG = {
+  name: 'onCreate',
+  kind: 'option',
+  values: ['now'],
+  optional: true,
+} as const;
+const TEMPORAL_MIRROR_ON_UPDATE_ARG = {
+  name: 'onUpdate',
+  kind: 'option',
+  values: ['now'],
+  optional: true,
+} as const;
+const TEMPORAL_MIRROR_NOW_PHASE = { kind: 'generator', id: 'timestampNow' } as const;
+
+export const temporalCodecPresetMirrors = {
+  pgTimestamp: {
+    kind: 'fieldPreset',
+    args: [
+      TEMPORAL_MIRROR_PRECISION_ARG,
+      TEMPORAL_MIRROR_ON_CREATE_ARG,
+      TEMPORAL_MIRROR_ON_UPDATE_ARG,
+    ],
+    output: {
+      codecId: 'pg/timestamp@1',
+      nativeType: 'timestamp',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+      executionDefaults: {
+        onCreate: { kind: 'select', index: 1, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onUpdate: { kind: 'select', index: 2, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+      },
+    },
+  },
+  pgTimestamptz: {
+    kind: 'fieldPreset',
+    args: [
+      TEMPORAL_MIRROR_PRECISION_ARG,
+      TEMPORAL_MIRROR_ON_CREATE_ARG,
+      TEMPORAL_MIRROR_ON_UPDATE_ARG,
+    ],
+    output: {
+      codecId: 'pg/timestamptz@1',
+      nativeType: 'timestamptz',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+      executionDefaults: {
+        onCreate: { kind: 'select', index: 1, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onUpdate: { kind: 'select', index: 2, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+      },
+    },
+  },
+  sqliteDatetime: {
+    kind: 'fieldPreset',
+    args: [TEMPORAL_MIRROR_ON_CREATE_ARG, TEMPORAL_MIRROR_ON_UPDATE_ARG],
+    output: {
+      codecId: 'sqlite/datetime@1',
+      nativeType: 'text',
+      executionDefaults: {
+        onCreate: { kind: 'select', index: 0, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+        onUpdate: { kind: 'select', index: 1, cases: { now: TEMPORAL_MIRROR_NOW_PHASE } },
+      },
+    },
+  },
+} as const satisfies Record<string, AuthoringFieldPresetDescriptor>;
+
+/**
+ * Mirrors of `temporalAuthoringPresets(...)` — the `createdAt`/`updatedAt`
+ * convenience pair — per target codec. Anchored by the same family-sql test as
+ * {@link temporalCodecPresetMirrors}.
+ *
+ * The slice's headline guarantee (`temporal.updatedAt()` is byte-identical to
+ * `temporal.timestamptz(onCreate: now, onUpdate: now)`) is asserted through
+ * these, so an unanchored mirror here would let the parity tests prove a
+ * fiction of `updatedAt` identical to the real `timestamptz`.
+ */
+export const temporalConvenienceMirrors = {
+  postgres: {
+    createdAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'pg/timestamptz@1',
+        nativeType: 'timestamptz',
+        default: { kind: 'function', expression: 'now()' },
+      },
+    },
+    updatedAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'pg/timestamptz@1',
+        nativeType: 'timestamptz',
+        executionDefaults: {
+          onCreate: TEMPORAL_MIRROR_NOW_PHASE,
+          onUpdate: TEMPORAL_MIRROR_NOW_PHASE,
+        },
+      },
+    },
+  },
+  sqlite: {
+    createdAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'sqlite/datetime@1',
+        nativeType: 'text',
+        default: { kind: 'function', expression: 'now()' },
+      },
+    },
+    updatedAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'sqlite/datetime@1',
+        nativeType: 'text',
+        executionDefaults: {
+          onCreate: TEMPORAL_MIRROR_NOW_PHASE,
+          onUpdate: TEMPORAL_MIRROR_NOW_PHASE,
+        },
+      },
+    },
+  },
+} as const satisfies Record<string, Record<string, AuthoringFieldPresetDescriptor>>;

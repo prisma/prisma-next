@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createPostgresTypeMap,
-  extractEnumDefinitions,
-  extractEnumTypeNames,
-} from '../../src/core/psl-infer/postgres-type-map';
+import { createPostgresTypeMap } from '../../src/core/psl-infer/postgres-type-map';
 
 describe('createPostgresTypeMap', () => {
   const typeMap = createPostgresTypeMap();
@@ -25,6 +21,11 @@ describe('createPostgresTypeMap', () => {
       pslType: 'String',
       nativeType: 'uuid',
       nativeTypeAttribute: { name: 'db.Uuid' },
+    });
+    expect(typeMap.resolve('inet')).toEqual({
+      pslType: 'String',
+      nativeType: 'inet',
+      nativeTypeAttribute: { name: 'db.Inet' },
     });
   });
 
@@ -127,47 +128,5 @@ describe('createPostgresTypeMap', () => {
     expect(enumTypeMap.resolve('status')).toEqual({ pslType: 'status', nativeType: 'status' });
     // Non-enum still resolves normally
     expect(enumTypeMap.resolve('text')).toEqual({ pslType: 'String', nativeType: 'text' });
-  });
-});
-
-describe('extractEnumTypeNames', () => {
-  it('extracts enum type names from nativeEnumTypeNames annotation', () => {
-    const annotations = {
-      pg: {
-        nativeEnumTypeNames: ['user_role', 'status'],
-      },
-    };
-    const result = extractEnumTypeNames(annotations);
-    expect(result).toEqual(new Set(['user_role', 'status']));
-  });
-
-  it('returns empty set for no annotations', () => {
-    expect(extractEnumTypeNames(undefined)).toEqual(new Set());
-    expect(extractEnumTypeNames({})).toEqual(new Set());
-  });
-
-  it('returns empty set when nativeEnumTypeNames is absent', () => {
-    const annotations = { pg: { schema: 'public', version: '15.1' } };
-    expect(extractEnumTypeNames(annotations)).toEqual(new Set());
-  });
-
-  it('ignores non-string entries in nativeEnumTypeNames', () => {
-    const annotations = {
-      pg: {
-        nativeEnumTypeNames: ['user_role', 42, null, 'status'],
-      },
-    };
-    expect(extractEnumTypeNames(annotations)).toEqual(new Set(['user_role', 'status']));
-  });
-});
-
-describe('extractEnumDefinitions', () => {
-  it('returns an empty map (detection-only; values are not captured during introspection)', () => {
-    const annotations = {
-      pg: {
-        nativeEnumTypeNames: ['user_role'],
-      },
-    };
-    expect(extractEnumDefinitions(annotations)).toEqual(new Map());
   });
 });

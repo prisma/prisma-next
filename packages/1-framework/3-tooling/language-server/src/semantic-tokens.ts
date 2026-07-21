@@ -86,7 +86,7 @@ export const semanticTokensLegend: SemanticTokensLegend = {
 export interface SemanticTokenSource {
   readonly document: DocumentAst;
   readonly sourceFile: SourceFile;
-  readonly symbolTable: SymbolTable | undefined;
+  readonly symbolTable: SymbolTable;
   readonly scalarTypes: readonly string[];
 }
 
@@ -528,7 +528,7 @@ function classifyTypeReference(
   const table = source.symbolTable;
   const namespaceName = path.length > 1 ? path[path.length - 2] : namespace;
   const namespaceScope =
-    namespaceName !== undefined ? table?.topLevel.namespaces[namespaceName] : undefined;
+    namespaceName !== undefined ? table.topLevel.namespaces[namespaceName] : undefined;
 
   if (namespaceScope !== undefined) {
     if (Object.hasOwn(namespaceScope.models, name)) {
@@ -542,22 +542,20 @@ function classifyTypeReference(
     }
   }
 
-  if (table !== undefined) {
-    if (Object.hasOwn(table.topLevel.models, name)) {
-      return { tokenType: 'class' };
-    }
-    if (Object.hasOwn(table.topLevel.compositeTypes, name)) {
-      return { tokenType: 'struct' };
-    }
-    if (Object.hasOwn(table.topLevel.scalars, name)) {
-      return { tokenType: 'type', modifierBitset: semanticTokenModifierBits.defaultLibrary };
-    }
-    if (
-      Object.hasOwn(table.topLevel.typeAliases, name) ||
-      Object.hasOwn(table.topLevel.blocks, name)
-    ) {
-      return { tokenType: 'type' };
-    }
+  if (Object.hasOwn(table.topLevel.models, name)) {
+    return { tokenType: 'class' };
+  }
+  if (Object.hasOwn(table.topLevel.compositeTypes, name)) {
+    return { tokenType: 'struct' };
+  }
+  if (Object.hasOwn(table.topLevel.scalars, name)) {
+    return { tokenType: 'type', modifierBitset: semanticTokenModifierBits.defaultLibrary };
+  }
+  if (
+    Object.hasOwn(table.topLevel.typeAliases, name) ||
+    Object.hasOwn(table.topLevel.blocks, name)
+  ) {
+    return { tokenType: 'type' };
   }
 
   if (source.scalarTypes.includes(name)) {
@@ -567,8 +565,8 @@ function classifyTypeReference(
   return { tokenType: 'type' };
 }
 
-function isKnownNamespace(name: string, table: SymbolTable | undefined): boolean {
-  return table !== undefined && Object.hasOwn(table.topLevel.namespaces, name);
+function isKnownNamespace(name: string, table: SymbolTable): boolean {
+  return Object.hasOwn(table.topLevel.namespaces, name);
 }
 
 function identifierSegments(name: QualifiedNameAst): readonly IdentifierSegment[] {

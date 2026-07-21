@@ -9,7 +9,7 @@ import type {
 import { blindCast } from '@prisma-next/utils/casts';
 import { describe, expect, it } from 'vitest';
 import { reloadMutationRowsByIdentities } from '../src/collection-dispatch';
-import { createMockRuntime, type MockRuntime } from './helpers';
+import { buildTestContextFromContract, createMockRuntime, type MockRuntime } from './helpers';
 
 function storageTable(columnCodecs: Record<string, string>) {
   const cols: Record<string, { codecId: string; nativeType: string; nullable: boolean }> = {};
@@ -64,6 +64,7 @@ const twoNamespaceContract = blindCast<Contract<SqlStorage>, 'hand-built multi-n
     },
   },
 });
+const twoNamespaceContext = buildTestContextFromContract(twoNamespaceContract);
 
 async function readBackIdentityCodec(
   runtime: MockRuntime,
@@ -72,7 +73,7 @@ async function readBackIdentityCodec(
 ): Promise<{ codecId: string } | undefined> {
   runtime.setNextResults([[]]);
   await reloadMutationRowsByIdentities<Record<string, unknown>>({
-    contract: twoNamespaceContract,
+    context: twoNamespaceContext,
     runtime,
     tableName: 'users',
     modelName: 'User',

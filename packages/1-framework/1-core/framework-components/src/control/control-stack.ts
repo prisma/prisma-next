@@ -1,4 +1,4 @@
-import type { JsonValue } from '@prisma-next/contract/types';
+import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { CapabilityMatrix } from '../shared/capabilities';
 import { mergeCapabilityMatrices } from '../shared/capabilities';
@@ -9,15 +9,12 @@ import type {
   AuthoringContributions,
   AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
+  AuthoringModelAttributeDescriptorNamespace,
   AuthoringPslBlockDescriptorNamespace,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
-  isAuthoringEntityTypeDescriptor,
-  isAuthoringFieldPresetDescriptor,
-  isAuthoringPslBlockDescriptor,
-  isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
@@ -45,6 +42,7 @@ export interface AssembledAuthoringContributions {
   readonly type: AuthoringTypeNamespace;
   readonly entityTypes: AuthoringEntityTypeNamespace;
   readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
+  readonly modelAttributes: AuthoringModelAttributeDescriptorNamespace;
 }
 
 export interface ControlStack<
@@ -56,6 +54,8 @@ export interface ControlStack<
   readonly adapter?: ControlAdapterDescriptor<TFamilyId, TTargetId> | undefined;
   readonly driver?: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
   readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+
+  readonly extensionContracts: ReadonlyMap<string, Contract>;
 
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly queryOperationTypeImports: ReadonlyArray<TypesImportSpec>;
@@ -166,32 +166,21 @@ export function assembleAuthoringContributions(
   const type = {} as Record<string, unknown>;
   const entityTypes = {} as Record<string, unknown>;
   const pslBlockDescriptors: Record<string, unknown> = {};
+  const modelAttributes: Record<string, unknown> = {};
 
   for (const descriptor of descriptors) {
     if (descriptor.authoring?.field) {
-      mergeAuthoringNamespaces(
-        field,
-        descriptor.authoring.field,
-        [],
-        isAuthoringFieldPresetDescriptor,
-        'field',
-      );
+      mergeAuthoringNamespaces(field, descriptor.authoring.field, [], 'fieldPreset', 'field');
     }
     if (descriptor.authoring?.type) {
-      mergeAuthoringNamespaces(
-        type,
-        descriptor.authoring.type,
-        [],
-        isAuthoringTypeConstructorDescriptor,
-        'type',
-      );
+      mergeAuthoringNamespaces(type, descriptor.authoring.type, [], 'typeConstructor', 'type');
     }
     if (descriptor.authoring?.entityTypes) {
       mergeAuthoringNamespaces(
         entityTypes,
         descriptor.authoring.entityTypes,
         [],
-        isAuthoringEntityTypeDescriptor,
+        'entity',
         'entity',
       );
     }
@@ -200,8 +189,17 @@ export function assembleAuthoringContributions(
         pslBlockDescriptors,
         descriptor.authoring.pslBlockDescriptors,
         [],
-        isAuthoringPslBlockDescriptor,
         'pslBlock',
+        'pslBlock',
+      );
+    }
+    if (descriptor.authoring?.modelAttributes) {
+      mergeAuthoringNamespaces(
+        modelAttributes,
+        descriptor.authoring.modelAttributes,
+        [],
+        'modelAttribute',
+        'modelAttribute',
       );
     }
   }
@@ -213,11 +211,16 @@ export function assembleAuthoringContributions(
     AuthoringPslBlockDescriptorNamespace,
     'merge target accumulator narrows to typed namespace post-merge'
   >(pslBlockDescriptors);
+  const modelAttributeNamespace = blindCast<
+    AuthoringModelAttributeDescriptorNamespace,
+    'merge target accumulator narrows to typed namespace post-merge'
+  >(modelAttributes);
   assertNoCrossRegistryCollisions(
     typeNamespace,
     fieldNamespace,
     entityTypeNamespace,
     pslBlockDescriptorNamespace,
+    modelAttributeNamespace,
   );
 
   return {
@@ -225,6 +228,7 @@ export function assembleAuthoringContributions(
     type: typeNamespace,
     entityTypes: entityTypeNamespace,
     pslBlockDescriptors: pslBlockDescriptorNamespace,
+    modelAttributes: modelAttributeNamespace,
   };
 }
 
@@ -309,6 +313,10 @@ export function extractCodecLookup(
   const descriptorsById = new Map<string, AnyCodecDescriptor>();
   const targetTypesById = new Map<string, readonly string[]>();
   const metaById = new Map<string, CodecMeta>();
+  const metaRenderersById = new Map<
+    string,
+    (params: Record<string, unknown> | JsonValue) => CodecMeta | undefined
+  >();
   const renderersById = new Map<string, (params: Record<string, unknown>) => string | undefined>();
   const inputRenderersById = new Map<
     string,
@@ -338,6 +346,9 @@ export function extractCodecLookup(
       }
       if (codecDescriptor.meta !== undefined) {
         metaById.set(codecDescriptor.codecId, codecDescriptor.meta);
+      }
+      if (typeof codecDescriptor.metaFor === 'function') {
+        metaRenderersById.set(codecDescriptor.codecId, codecDescriptor.metaFor);
       }
       if (typeof codecDescriptor.renderOutputType === 'function') {
         renderersById.set(codecDescriptor.codecId, codecDescriptor.renderOutputType);
@@ -384,10 +395,17 @@ export function extractCodecLookup(
     },
     forColumn: () => undefined,
     targetTypesFor: (id) => targetTypesById.get(id),
-    metaFor: (id) => metaById.get(id),
+    metaFor: (id, typeParams) => {
+      if (typeParams !== undefined) {
+        const paramsAware = metaRenderersById.get(id)?.(typeParams);
+        if (paramsAware !== undefined) return paramsAware;
+      }
+      return metaById.get(id);
+    },
     renderOutputTypeFor: (id, params) => renderersById.get(id)?.(params),
     renderInputTypeFor: (id, params) => inputRenderersById.get(id)?.(params),
     renderValueLiteralFor: (id, value, side) => valueLiteralRenderersById.get(id)?.(value, side),
+    descriptorFor: (id) => descriptorsById.get(id),
   };
 }
 
@@ -413,6 +431,19 @@ interface DependencyDeclaringDescriptor {
       readonly extensionPacks?: Readonly<Record<string, unknown>>;
     };
   };
+}
+
+function assembleExtensionContracts(
+  extensions: ReadonlyArray<
+    Pick<ControlExtensionDescriptor<string, string>, 'id' | 'contractSpace'>
+  >,
+): ReadonlyMap<string, Contract> {
+  const result = new Map<string, Contract>();
+  for (const ext of extensions) {
+    if (ext.contractSpace === undefined) continue;
+    result.set(ext.id, ext.contractSpace.contractJson);
+  }
+  return result;
 }
 
 function readDeclaredDependencyIds(descriptor: DependencyDeclaringDescriptor): readonly string[] {
@@ -517,6 +548,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     adapter,
     driver,
     extensionPacks: orderedExtensionPacks,
+    extensionContracts: assembleExtensionContracts(orderedExtensionPacks),
 
     codecTypeImports: extractCodecTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),

@@ -39,18 +39,6 @@ describe('createPerSpaceVerifier', () => {
       target: { expected: 'postgres' },
       schema: {
         issues: [],
-        root: {
-          status: 'pass',
-          kind: 'root',
-          name: 'app',
-          contractPath: '',
-          code: 'OK',
-          message: '',
-          expected: undefined,
-          actual: undefined,
-          children: [],
-        },
-        counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
       },
       timings: { total: 0 },
     });

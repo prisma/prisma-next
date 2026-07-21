@@ -1,7 +1,7 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { escapeLiteral, quoteIdentifier } from '../sql-utils';
+import { escapeLiteral, quoteIdentifier, quoteQualifiedName } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
@@ -65,13 +65,23 @@ export function buildColumnTypeSql(
     }
   }
 
+  // A column whose codec supplied a `typeParams.typeName` references a named
+  // database type (e.g. a native enum), not a parameterized builtin: render it
+  // as its quoted, schema-qualified type-name identifier. DDL-render only — the
+  // verify comparison value (`resolvedNativeType`) stays the bare name the
+  // family expander produces, matching introspection.
+  if (typeof resolved.typeParams?.['typeName'] === 'string') {
+    const quoted = quoteQualifiedName(resolved.nativeType);
+    return column.many ? `${quoted}[]` : quoted;
+  }
+
   const expanded = expandParameterizedTypeSql(resolved, codecHooks);
   if (expanded !== null) {
     return column.many ? `${expanded}[]` : expanded;
   }
 
   if (column.typeRef) {
-    const base = quoteIdentifier(resolved.nativeType);
+    const base = quoteQualifiedName(resolved.nativeType);
     return column.many ? `${base}[]` : base;
   }
 
@@ -118,7 +128,7 @@ function expandParameterizedTypeSql(
 /** Autoincrement columns use SERIAL types, so this returns empty for them. */
 export function buildColumnDefaultSql(
   columnDefault: PostgresColumnDefault | undefined,
-  column?: StorageColumn,
+  column?: Pick<StorageColumn, 'many' | 'nativeType'>,
 ): string {
   if (!columnDefault) {
     return '';
@@ -139,7 +149,10 @@ export function buildColumnDefaultSql(
   }
 }
 
-export function renderDefaultLiteral(value: unknown, column?: StorageColumn): string {
+export function renderDefaultLiteral(
+  value: unknown,
+  column?: Pick<StorageColumn, 'many' | 'nativeType'>,
+): string {
   const isJsonColumn = column?.nativeType === 'json' || column?.nativeType === 'jsonb';
 
   if (column?.many && Array.isArray(value)) {

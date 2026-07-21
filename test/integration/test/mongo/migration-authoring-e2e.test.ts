@@ -22,7 +22,7 @@ import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { synthMigrationEdges } from './synth-migration-edges';
+import { buildFabricatedMigrationEdges } from './fabricated-migration-edges';
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] as const,
@@ -88,7 +88,7 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
       };
       const result = await runner.execute({
         plan,
-        migrationEdges: synthMigrationEdges(plan),
+        migrationEdges: buildFabricatedMigrationEdges(plan),
         // Synthetic-contract opt-out (paired with `strictVerification: false`):
         // these tests exercise the runner against hand-rolled migration ops,
         // not a real authored contract. Supply the minimum well-formed shape
@@ -350,7 +350,7 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
         };
         const result2 = await runner.execute({
           plan: planV2,
-          migrationEdges: synthMigrationEdges(planV2),
+          migrationEdges: buildFabricatedMigrationEdges(planV2),
           // Synthetic-contract opt-out: see comment at the top-level `runOps` call.
           destinationContract: {
             storage: {
@@ -403,7 +403,7 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
         };
         const result3 = await runner.execute({
           plan: planV3,
-          migrationEdges: synthMigrationEdges(planV3),
+          migrationEdges: buildFabricatedMigrationEdges(planV3),
           // Synthetic-contract opt-out: see comment at the top-level `runOps` call.
           destinationContract: {
             storage: {

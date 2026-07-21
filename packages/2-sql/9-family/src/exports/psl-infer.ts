@@ -18,6 +18,7 @@ export {
   deriveBackRelationFieldName,
   deriveRelationFieldName,
   pluralize,
+  toEnumMemberName,
   toEnumName,
   toFieldName,
   toModelName,
@@ -33,4 +34,7 @@ export type {
 } from '../core/psl-contract-infer/printer-config';
 export { parseRawDefault } from '../core/psl-contract-infer/raw-default-parser';
 export type { InferredRelations } from '../core/psl-contract-infer/relation-inference';
-export { inferRelations } from '../core/psl-contract-infer/relation-inference';
+export {
+  buildChildRelationField,
+  inferRelations,
+} from '../core/psl-contract-infer/relation-inference';

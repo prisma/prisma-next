@@ -1,6 +1,6 @@
 import type { DiffableNode } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { assertNode, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { PostgresNamespaceSchemaNode } from './postgres-namespace-schema-node';
 import type { PostgresRoleSchemaNode } from './postgres-role-schema-node';
 import { PostgresSchemaNodeKind } from './schema-node-kinds';
@@ -17,12 +17,14 @@ export interface PostgresDatabaseSchemaNodeInput {
  *
  * `id` is the fixed sentinel `'database'` — the root has no siblings and
  * the value is never emitted into migration paths. `isEqualTo` is identity
- * (roots always share the `'database'` id). `children()` returns namespace
- * nodes only; roles are held on the root but not yielded (role diffing is a
- * later slice).
+ * (roots always share the `'database'` id). `children()` yields the namespace
+ * nodes followed by the role nodes — both are root-level diff subjects. The
+ * differ pairs siblings by `(nodeKind, id)`, so a role and a namespace may
+ * share a name without colliding.
  */
 export class PostgresDatabaseSchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.database;
+
   readonly namespaces: Readonly<Record<string, PostgresNamespaceSchemaNode>>;
   readonly roles: readonly PostgresRoleSchemaNode[];
   readonly existingSchemas: readonly string[];
@@ -46,7 +48,7 @@ export class PostgresDatabaseSchemaNode extends SqlSchemaIRNode implements Diffa
   }
 
   children(): readonly DiffableNode[] {
-    return Object.values(this.namespaces);
+    return [...Object.values(this.namespaces), ...this.roles];
   }
 
   static is(node: SqlSchemaIRNode): node is PostgresDatabaseSchemaNode {
@@ -54,10 +56,6 @@ export class PostgresDatabaseSchemaNode extends SqlSchemaIRNode implements Diffa
   }
 
   static assert(node: SqlSchemaIRNode): asserts node is PostgresDatabaseSchemaNode {
-    if (!PostgresDatabaseSchemaNode.is(node)) {
-      throw new Error(
-        `Expected a PostgresDatabaseSchemaNode but got nodeKind=${node.nodeKind ?? 'undefined'}`,
-      );
-    }
+    assertNode(node, 'PostgresDatabaseSchemaNode', PostgresDatabaseSchemaNode.is);
   }
 }

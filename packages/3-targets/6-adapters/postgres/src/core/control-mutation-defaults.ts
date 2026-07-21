@@ -5,16 +5,18 @@ import type {
   DefaultFunctionLoweringContext,
   LoweredDefaultResult,
   MutationDefaultGeneratorDescriptor,
-  ParsedDefaultFunctionCall,
+  TypedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
 import {
   builtinGeneratorRegistryMetadata,
   resolveBuiltinGeneratedColumnDescriptor,
 } from '@prisma-next/ids';
+import type { FuncCallSig } from '@prisma-next/psl-parser';
+import { int, num, oneOf, optional, str } from '@prisma-next/psl-parser';
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;
-  readonly span: ParsedDefaultFunctionCall['span'];
+  readonly span: TypedDefaultFunctionCall['span'];
   readonly message: string;
 }): LoweredDefaultResult {
   return {
@@ -45,218 +47,62 @@ function executionGenerator(
   };
 }
 
-function expectNoArgs(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-  readonly usage: string;
-}): LoweredDefaultResult | undefined {
-  if (input.call.args.length === 0) {
-    return undefined;
-  }
-  return invalidArgumentDiagnostic({
-    context: input.context,
-    span: input.call.span,
-    message: `Default function "${input.call.name}" does not accept arguments. Use ${input.usage}.`,
-  });
-}
-
-function parseIntegerArgument(raw: string): number | undefined {
-  const trimmed = raw.trim();
-  if (!/^-?\d+$/.test(trimmed)) {
-    return undefined;
-  }
-  const value = Number(trimmed);
-  if (!Number.isInteger(value)) {
-    return undefined;
-  }
-  return value;
-}
-
-function parseStringLiteral(raw: string): string | undefined {
-  const match = raw.trim().match(/^(['"])(.*)\1$/s);
-  if (!match) {
-    return undefined;
-  }
-  return match[2] ?? '';
-}
-
-function lowerAutoincrement(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  const maybeNoArgs = expectNoArgs({
-    call: input.call,
-    context: input.context,
-    usage: '`autoincrement()`',
-  });
-  if (maybeNoArgs) {
-    return maybeNoArgs;
-  }
+function lowerAutoincrement(): LoweredDefaultResult {
   return {
     ok: true,
     value: {
       kind: 'storage',
-      defaultValue: {
-        kind: 'function',
-        expression: 'autoincrement()',
-      },
+      defaultValue: { kind: 'function', expression: 'autoincrement()' },
     },
   };
 }
 
-function lowerNow(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  const maybeNoArgs = expectNoArgs({
-    call: input.call,
-    context: input.context,
-    usage: '`now()`',
-  });
-  if (maybeNoArgs) {
-    return maybeNoArgs;
-  }
+function lowerNow(): LoweredDefaultResult {
   return {
     ok: true,
     value: {
       kind: 'storage',
-      defaultValue: {
-        kind: 'function',
-        expression: 'now()',
-      },
+      defaultValue: { kind: 'function', expression: 'now()' },
     },
   };
 }
 
-function lowerUuid(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  if (input.call.args.length === 0) {
-    return executionGenerator('uuidv4');
-  }
-  if (input.call.args.length !== 1) {
-    return invalidArgumentDiagnostic({
-      context: input.context,
-      span: input.call.span,
-      message:
-        'Default function "uuid" accepts at most one version argument: `uuid()`, `uuid(4)`, or `uuid(7)`.',
-    });
-  }
-  const version = parseIntegerArgument(input.call.args[0]?.raw ?? '');
-  if (version === 4) {
-    return executionGenerator('uuidv4');
-  }
-  if (version === 7) {
-    return executionGenerator('uuidv7');
-  }
-  return invalidArgumentDiagnostic({
-    context: input.context,
-    span: input.call.args[0]?.span ?? input.call.span,
-    message:
-      'Default function "uuid" supports only `uuid()`, `uuid(4)`, or `uuid(7)` in SQL PSL provider v1.',
-  });
-}
-
-function lowerCuid(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  if (input.call.args.length === 0) {
-    return {
-      ok: false,
-      diagnostic: {
-        code: 'PSL_UNKNOWN_DEFAULT_FUNCTION',
-        message:
-          'Default function "cuid()" is not supported in SQL PSL provider v1. Use `cuid(2)` instead.',
-        sourceId: input.context.sourceId,
-        span: input.call.span,
-      },
-    };
-  }
-  if (input.call.args.length !== 1) {
-    return invalidArgumentDiagnostic({
-      context: input.context,
-      span: input.call.span,
-      message: 'Default function "cuid" accepts exactly one version argument: `cuid(2)`.',
-    });
-  }
-  const version = parseIntegerArgument(input.call.args[0]?.raw ?? '');
-  if (version === 2) {
-    return executionGenerator('cuid2');
-  }
-  return invalidArgumentDiagnostic({
-    context: input.context,
-    span: input.call.args[0]?.span ?? input.call.span,
-    message: 'Default function "cuid" supports only `cuid(2)` in SQL PSL provider v1.',
-  });
-}
-
-function lowerUlid(input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}): LoweredDefaultResult {
-  const maybeNoArgs = expectNoArgs({
-    call: input.call,
-    context: input.context,
-    usage: '`ulid()`',
-  });
-  if (maybeNoArgs) {
-    return maybeNoArgs;
-  }
+function lowerUlid(): LoweredDefaultResult {
   return executionGenerator('ulid');
 }
 
-function lowerNanoid(input: {
-  readonly call: ParsedDefaultFunctionCall;
+function lowerUuid(input: {
+  readonly call: TypedDefaultFunctionCall;
   readonly context: DefaultFunctionLoweringContext;
 }): LoweredDefaultResult {
-  if (input.call.args.length === 0) {
-    return executionGenerator('nanoid');
-  }
-  if (input.call.args.length !== 1) {
-    return invalidArgumentDiagnostic({
-      context: input.context,
-      span: input.call.span,
-      message:
-        'Default function "nanoid" accepts at most one size argument: `nanoid()` or `nanoid(<2-255>)`.',
-    });
-  }
-  const size = parseIntegerArgument(input.call.args[0]?.raw ?? '');
-  if (size !== undefined && size >= 2 && size <= 255) {
-    return executionGenerator('nanoid', { size });
-  }
-  return invalidArgumentDiagnostic({
-    context: input.context,
-    span: input.call.args[0]?.span ?? input.call.span,
-    message: 'Default function "nanoid" size argument must be an integer between 2 and 255.',
-  });
+  return input.call.args['version'] === 7
+    ? executionGenerator('uuidv7')
+    : executionGenerator('uuidv4');
+}
+
+function lowerCuid(): LoweredDefaultResult {
+  return executionGenerator('cuid2');
+}
+
+function lowerNanoid(input: {
+  readonly call: TypedDefaultFunctionCall;
+  readonly context: DefaultFunctionLoweringContext;
+}): LoweredDefaultResult {
+  const size = input.call.args['size'];
+  return typeof size === 'number'
+    ? executionGenerator('nanoid', { size })
+    : executionGenerator('nanoid');
 }
 
 function lowerDbgenerated(input: {
-  readonly call: ParsedDefaultFunctionCall;
+  readonly call: TypedDefaultFunctionCall;
   readonly context: DefaultFunctionLoweringContext;
 }): LoweredDefaultResult {
-  if (input.call.args.length !== 1) {
+  const expression = input.call.args['expression'];
+  if (typeof expression !== 'string' || expression.trim().length === 0) {
     return invalidArgumentDiagnostic({
       context: input.context,
       span: input.call.span,
-      message:
-        'Default function "dbgenerated" requires exactly one string argument: `dbgenerated("...")`.',
-    });
-  }
-  const rawExpression = parseStringLiteral(input.call.args[0]?.raw ?? '');
-  if (rawExpression === undefined) {
-    return invalidArgumentDiagnostic({
-      context: input.context,
-      span: input.call.args[0]?.span ?? input.call.span,
-      message: 'Default function "dbgenerated" argument must be a string literal.',
-    });
-  }
-  if (rawExpression.trim().length === 0) {
-    return invalidArgumentDiagnostic({
-      context: input.context,
-      span: input.call.args[0]?.span ?? input.call.span,
       message: 'Default function "dbgenerated" argument cannot be empty.',
     });
   }
@@ -264,22 +110,47 @@ function lowerDbgenerated(input: {
     ok: true,
     value: {
       kind: 'storage',
-      defaultValue: {
-        kind: 'function',
-        expression: rawExpression,
-      },
+      defaultValue: { kind: 'function', expression },
     },
   };
 }
 
+const nowSig: FuncCallSig = {};
+const autoincrementSig: FuncCallSig = {};
+const ulidSig: FuncCallSig = {};
+const uuidSig: FuncCallSig = {
+  positional: [{ key: 'version', type: optional(oneOf(num(4), num(7))) }],
+};
+const cuidSig: FuncCallSig = { positional: [{ key: 'version', type: num(2) }] };
+const nanoidSig: FuncCallSig = {
+  positional: [{ key: 'size', type: optional(int({ min: 2, max: 255 })) }],
+};
+const dbgeneratedSig: FuncCallSig = { positional: [{ key: 'expression', type: str() }] };
+
 const postgresDefaultFunctionRegistryEntries = [
-  ['autoincrement', { lower: lowerAutoincrement, usageSignatures: ['autoincrement()'] }],
-  ['now', { lower: lowerNow, usageSignatures: ['now()'] }],
-  ['uuid', { lower: lowerUuid, usageSignatures: ['uuid()', 'uuid(4)', 'uuid(7)'] }],
-  ['cuid', { lower: lowerCuid, usageSignatures: ['cuid(2)'] }],
-  ['ulid', { lower: lowerUlid, usageSignatures: ['ulid()'] }],
-  ['nanoid', { lower: lowerNanoid, usageSignatures: ['nanoid()', 'nanoid(<2-255>)'] }],
-  ['dbgenerated', { lower: lowerDbgenerated, usageSignatures: ['dbgenerated("...")'] }],
+  [
+    'autoincrement',
+    {
+      signature: autoincrementSig,
+      lower: lowerAutoincrement,
+      usageSignatures: ['autoincrement()'],
+    },
+  ],
+  ['now', { signature: nowSig, lower: lowerNow, usageSignatures: ['now()'] }],
+  [
+    'uuid',
+    { signature: uuidSig, lower: lowerUuid, usageSignatures: ['uuid()', 'uuid(4)', 'uuid(7)'] },
+  ],
+  ['cuid', { signature: cuidSig, lower: lowerCuid, usageSignatures: ['cuid(2)'] }],
+  ['ulid', { signature: ulidSig, lower: lowerUlid, usageSignatures: ['ulid()'] }],
+  [
+    'nanoid',
+    { signature: nanoidSig, lower: lowerNanoid, usageSignatures: ['nanoid()', 'nanoid(<2-255>)'] },
+  ],
+  [
+    'dbgenerated',
+    { signature: dbgeneratedSig, lower: lowerDbgenerated, usageSignatures: ['dbgenerated("...")'] },
+  ],
 ] satisfies ReadonlyArray<readonly [string, ControlMutationDefaultEntry]>;
 
 const postgresScalarTypeDescriptors = new Map<string, string>([

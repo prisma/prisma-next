@@ -11,9 +11,18 @@
 
 export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export {
+  RelationalSchemaNodeKind,
+  relationalNodeEntityKind,
+  relationalNodeGranularity,
+} from './ir/schema-node-kinds';
+export {
   SqlCheckConstraintIR,
   type SqlCheckConstraintIRInput,
 } from './ir/sql-check-constraint-ir';
+export {
+  SqlColumnDefaultIR,
+  type SqlColumnDefaultIRInput,
+} from './ir/sql-column-default-ir';
 export {
   type SqlAnnotations,
   SqlColumnIR,
@@ -26,7 +35,7 @@ export {
 } from './ir/sql-foreign-key-ir';
 export { SqlIndexIR, type SqlIndexIRInput } from './ir/sql-index-ir';
 export { SqlSchemaIR, type SqlSchemaIRInput } from './ir/sql-schema-ir';
-export { SqlSchemaIRNode } from './ir/sql-schema-ir-node';
+export { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './ir/sql-schema-ir-node';
 export { SqlTableIR, type SqlTableIRInput } from './ir/sql-table-ir';
 export { SqlUniqueIR, type SqlUniqueIRInput } from './ir/sql-unique-ir';
 

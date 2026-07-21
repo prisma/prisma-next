@@ -19,12 +19,14 @@ import {
   CodecDescriptorImpl,
   CodecImpl,
   type CodecInstanceContext,
+  type CodecMeta,
   type ColumnHelperFor,
   type ColumnHelperForStrict,
   column,
   renderTsLiteral,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   SqlCharCodec,
   SqlFloatCodec,
@@ -41,6 +43,12 @@ import { blindCast } from '@prisma-next/utils/casts';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import {
+  pgByteaDecodeJson,
+  pgByteaEncodeJson,
+  pgDateDecode,
+  pgDateDecodeJson,
+  pgDateEncode,
+  pgDateEncodeJson,
   pgIntervalDecode,
   pgJsonbDecode,
   pgJsonbEncode,
@@ -60,9 +68,12 @@ import {
   PG_BOOL_CODEC_ID,
   PG_BYTEA_CODEC_ID,
   PG_CHAR_CODEC_ID,
+  PG_DATE_CODEC_ID,
+  PG_ENUM_CODEC_ID,
   PG_FLOAT_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
+  PG_INET_CODEC_ID,
   PG_INT_CODEC_ID,
   PG_INT2_CODEC_ID,
   PG_INT4_CODEC_ID,
@@ -81,17 +92,19 @@ import {
   PG_VARBIT_CODEC_ID,
   PG_VARCHAR_CODEC_ID,
 } from './codec-ids';
+import { DEFAULT_NAMESPACE_ID } from './namespace-ids';
+import { PostgresNativeEnum } from './postgres-native-enum';
 
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
-type NumericParams = { readonly precision: number; readonly scale?: number };
+type NumericParams = { readonly precision?: number; readonly scale?: number };
 
 const lengthParamsSchema = arktype({
   'length?': 'number.integer > 0',
 }) satisfies StandardSchemaV1<LengthParams>;
 
 const numericParamsSchema = arktype({
-  precision: 'number.integer > 0 & number.integer <= 1000',
+  'precision?': 'number.integer > 0 & number.integer <= 1000',
   'scale?': 'number.integer >= 0',
 }) satisfies StandardSchemaV1<NumericParams>;
 
@@ -107,6 +120,7 @@ const PG_INT8_META = { db: { sql: { postgres: { nativeType: 'bigint' } } } } as 
 const PG_FLOAT4_META = { db: { sql: { postgres: { nativeType: 'real' } } } } as const;
 const PG_FLOAT8_META = { db: { sql: { postgres: { nativeType: 'double precision' } } } } as const;
 const PG_NUMERIC_META = { db: { sql: { postgres: { nativeType: 'numeric' } } } } as const;
+const PG_DATE_META = { db: { sql: { postgres: { nativeType: 'date' } } } } as const;
 const PG_TIMESTAMP_META = {
   db: { sql: { postgres: { nativeType: 'timestamp without time zone' } } },
 } as const;
@@ -164,6 +178,145 @@ export const pgTextColumn = () =>
 
 pgTextColumn satisfies ColumnHelperFor<PgTextDescriptor>;
 pgTextColumn satisfies ColumnHelperForStrict<PgTextDescriptor>;
+
+/**
+ * Codec for a `pg.enum(Ref)` column bound to a native Postgres enum type.
+ * Text passthrough, identical to `pg/text@1` — encode/decode do not carry the
+ * enum's member values; membership is enforced by the native type itself, not
+ * by this codec. `renderValueLiteral` renders a member value as its TS
+ * literal, which is what drives the column's typed value-union (via
+ * `renderValueSetType` reading the column's `valueSet` ref) — the codec
+ * itself carries no params of its own; typing comes entirely from the
+ * column's value-set, not from `pg/enum@1`.
+ *
+ * A distinct codec id (rather than reusing `pg/text@1` on a plain text
+ * column) keeps native-enum columns independently identifiable — from a
+ * column's `codecId` alone, without also inspecting `nativeType` — which
+ * the managed (DDL) phase needs to target `CREATE TYPE`/`ALTER TYPE`
+ * operations at exactly the columns that use one.
+ */
+export class PgEnumCodec extends CodecImpl<
+  typeof PG_ENUM_CODEC_ID,
+  readonly ['equality', 'order', 'textual'],
+  string,
+  string
+> {
+  async encode(value: string, _ctx: CodecCallContext): Promise<string> {
+    return value;
+  }
+  async decode(wire: string, _ctx: CodecCallContext): Promise<string> {
+    return wire;
+  }
+  encodeJson(value: string): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): string {
+    return blindCast<
+      string,
+      'text codec: a native-enum member value is stored as its wire string form'
+    >(json);
+  }
+}
+
+type PgEnumParams = { readonly typeName: string };
+
+const pgEnumParamsSchema = arktype({
+  typeName: 'string',
+}) satisfies StandardSchemaV1<PgEnumParams>;
+
+function isJsonObject(
+  value: JsonValue | undefined,
+): value is { readonly [key: string]: JsonValue } {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export class PgEnumDescriptor extends CodecDescriptorImpl<PgEnumParams> {
+  override readonly codecId = PG_ENUM_CODEC_ID;
+  override readonly traits = ['equality', 'order', 'textual'] as const;
+  override readonly targetTypes = ['text'] as const;
+  override readonly meta = PG_TEXT_META;
+  override readonly paramsSchema = pgEnumParamsSchema satisfies StandardSchemaV1<PgEnumParams>;
+  override renderValueLiteral(value: JsonValue): string | undefined {
+    return renderTsLiteral(value);
+  }
+  override metaFor(typeParams: JsonValue | undefined): CodecMeta | undefined {
+    if (!isJsonObject(typeParams)) return this.meta;
+    const typeName = typeParams['typeName'];
+    return typeof typeName === 'string'
+      ? { db: { sql: { postgres: { nativeType: typeName } } } }
+      : this.meta;
+  }
+  override factory(_params: PgEnumParams): (ctx: CodecInstanceContext) => PgEnumCodec {
+    return () => new PgEnumCodec(this);
+  }
+
+  /**
+   * Authoring-time hook a `pg.enum(<ref>)` type constructor calls once it has
+   * resolved its ref argument to the referenced `native_enum` entity:
+   * produces this codec's per-column `typeParams` and native type from the
+   * entity's bare type name. Schema-qualification (`auth.aal_level` for a
+   * named non-default schema) is not this hook's concern — the field's
+   * namespace isn't known at this call site for every authoring path (the TS
+   * builder resolves a column before it knows its model's namespace), so it is
+   * applied later, at contract construction, by {@link qualifyNativeType} via
+   * the target's `authoring.qualifyColumnType` hook. `nativeType` mirrors
+   * `typeParams.typeName` — the same value {@link metaFor} derives at render
+   * time — so the column's declared native type and the render-time cast
+   * agree. Returns `undefined` if `entity` is not a `PostgresNativeEnum` (a
+   * contributor bug, not a user-schema error — the caller decides how to
+   * report it).
+   */
+  columnFromEntity(
+    entity: object,
+  ): { readonly typeParams: PgEnumParams; readonly nativeType: string } | undefined {
+    if (!PostgresNativeEnum.is(entity)) return undefined;
+    return { typeParams: { typeName: entity.typeName }, nativeType: entity.typeName };
+  }
+
+  /**
+   * Schema-qualifies this native enum type's name for the namespace the
+   * consuming column lives in: `${namespaceId}.${typeName}` for a named
+   * non-default schema, bare for the target's default schema (`public`) or
+   * the late-bound unbound sentinel (whose schema `search_path` resolves at
+   * runtime). Postgres's `format_type()` reports the bare name for a
+   * public-schema type, so a public column's declared native type must stay
+   * bare to match. Owned here because the codec owns its native type.
+   */
+  qualifyNativeType(typeName: string, namespaceId: string): string {
+    return namespaceId === DEFAULT_NAMESPACE_ID || namespaceId === UNBOUND_NAMESPACE_ID
+      ? typeName
+      : `${namespaceId}.${typeName}`;
+  }
+}
+
+export const pgEnumDescriptor = new PgEnumDescriptor();
+
+/**
+ * Contract-construction-time column-type qualifier the Postgres target
+ * contributes through `authoring.qualifyColumnType`.
+ * `buildSqlContractFromDefinition` calls this for every column as it is
+ * constructed, passing the column's bare type info and its owning
+ * `namespaceId`; a native-enum column (`pg/enum@1`) gets its type name
+ * schema-qualified for that namespace (via
+ * {@link PgEnumDescriptor.qualifyNativeType}), keeping `nativeType` and
+ * `typeParams.typeName` in sync. Every other codec passes through unchanged.
+ * Both the PSL `pg.enum(Ref)` path and the TS `pg.enum(handle)` path route
+ * through here — the dispatch keys off the codec id, not authoring surface.
+ */
+export function postgresQualifyColumnType(
+  input: {
+    readonly codecId: string;
+    readonly nativeType: string;
+    readonly typeParams?: Record<string, unknown>;
+  },
+  namespaceId: string,
+): { readonly nativeType: string; readonly typeParams?: Record<string, unknown> } {
+  if (input.codecId !== PG_ENUM_CODEC_ID) return input;
+  const bareTypeName = input.typeParams?.['typeName'];
+  if (typeof bareTypeName !== 'string') return input;
+  const qualified = pgEnumDescriptor.qualifyNativeType(bareTypeName, namespaceId);
+  return { nativeType: qualified, typeParams: { ...input.typeParams, typeName: qualified } };
+}
 
 /**
  * Postgres `text[]` codec. Encode is an identity pass-through: the pg wire
@@ -471,10 +624,17 @@ export class PgNumericCodec extends CodecImpl<
     return pgNumericDecode(wire);
   }
   encodeJson(value: string): JsonValue {
-    return value;
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      throw new TypeError('pg/numeric@1 database JSON value must be a finite number');
+    }
+    return number;
   }
   decodeJson(json: JsonValue): string {
-    return json as string;
+    if (typeof json !== 'number') {
+      throw new TypeError('pg/numeric@1 database JSON value must be a number');
+    }
+    return pgNumericDecode(json);
   }
 }
 
@@ -494,11 +654,56 @@ export class PgNumericDescriptor extends CodecDescriptorImpl<NumericParams> {
 
 export const pgNumericDescriptor = new PgNumericDescriptor();
 
-export const pgNumericColumn = (params: NumericParams) =>
+export const pgNumericColumn = (params: NumericParams = {}) =>
   column(pgNumericDescriptor.factory(params), pgNumericDescriptor.codecId, params, 'numeric');
 
 pgNumericColumn satisfies ColumnHelperFor<PgNumericDescriptor>;
 pgNumericColumn satisfies ColumnHelperForStrict<PgNumericDescriptor>;
+
+/**
+ * A Postgres `date` has no time-of-day or timezone component. This codec
+ * canonicalizes its JS-level value as a `Date` at UTC midnight, so its
+ * round-trip is independent of the process's local timezone — see
+ * `pgDateEncode`/`pgDateDecode` in `codec-helpers.ts`.
+ */
+export class PgDateCodec extends CodecImpl<
+  typeof PG_DATE_CODEC_ID,
+  readonly ['equality', 'order'],
+  Date | string,
+  Date
+> {
+  async encode(value: Date, _ctx: CodecCallContext): Promise<string> {
+    return pgDateEncode(value);
+  }
+  async decode(wire: Date, _ctx: CodecCallContext): Promise<Date> {
+    return pgDateDecode(wire);
+  }
+  encodeJson(value: Date): JsonValue {
+    return pgDateEncodeJson(value);
+  }
+  decodeJson(json: JsonValue): Date {
+    return pgDateDecodeJson(json);
+  }
+}
+
+export class PgDateDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_DATE_CODEC_ID;
+  override readonly traits = ['equality', 'order'] as const;
+  override readonly targetTypes = ['date'] as const;
+  override readonly meta = PG_DATE_META;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => PgDateCodec {
+    return () => new PgDateCodec(this);
+  }
+}
+
+export const pgDateDescriptor = new PgDateDescriptor();
+
+export const pgDateColumn = () =>
+  column(pgDateDescriptor.factory(), pgDateDescriptor.codecId, undefined, 'date');
+
+pgDateColumn satisfies ColumnHelperFor<PgDateDescriptor>;
+pgDateColumn satisfies ColumnHelperForStrict<PgDateDescriptor>;
 
 export class PgTimestampCodec extends CodecImpl<
   typeof PG_TIMESTAMP_CODEC_ID,
@@ -777,17 +982,10 @@ export class PgByteaCodec extends CodecImpl<
       : new Uint8Array(wire.buffer, wire.byteOffset, wire.byteLength);
   }
   encodeJson(value: Uint8Array): JsonValue {
-    return Buffer.from(value).toString('base64');
+    return pgByteaEncodeJson(value);
   }
   decodeJson(json: JsonValue): Uint8Array {
-    if (typeof json !== 'string') {
-      throw new Error(`Expected base64 string for pg/bytea@1, got ${typeof json}`);
-    }
-    const decoded = Buffer.from(json, 'base64');
-    if (decoded.toString('base64') !== json) {
-      throw new Error(`Invalid base64 string for pg/bytea@1 (length: ${json.length})`);
-    }
-    return new Uint8Array(decoded);
+    return pgByteaDecodeJson(json);
   }
 }
 
@@ -850,6 +1048,47 @@ export const pgUuidColumn = () =>
 
 pgUuidColumn satisfies ColumnHelperFor<PgUuidDescriptor>;
 pgUuidColumn satisfies ColumnHelperForStrict<PgUuidDescriptor>;
+
+const PG_INET_META = { db: { sql: { postgres: { nativeType: 'inet' } } } } as const;
+
+export class PgInetCodec extends CodecImpl<
+  typeof PG_INET_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string
+> {
+  async encode(value: string, _ctx: CodecCallContext): Promise<string> {
+    return value;
+  }
+  async decode(wire: string, _ctx: CodecCallContext): Promise<string> {
+    return wire;
+  }
+  encodeJson(value: string): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): string {
+    return blindCast<string, 'inet columns serialize to JSON as their wire string form'>(json);
+  }
+}
+
+export class PgInetDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_INET_CODEC_ID;
+  override readonly traits = ['equality', 'order'] as const;
+  override readonly targetTypes = ['inet'] as const;
+  override readonly meta = PG_INET_META;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => PgInetCodec {
+    return () => new PgInetCodec(this);
+  }
+}
+
+export const pgInetDescriptor = new PgInetDescriptor();
+
+export const pgInetColumn = () =>
+  column(pgInetDescriptor.factory(), pgInetDescriptor.codecId, undefined, 'inet');
+
+pgInetColumn satisfies ColumnHelperFor<PgInetDescriptor>;
+pgInetColumn satisfies ColumnHelperForStrict<PgInetDescriptor>;
 
 export class PgIntervalCodec extends CodecImpl<
   typeof PG_INTERVAL_CODEC_ID,
@@ -1086,6 +1325,7 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   sqlTextDescriptor,
   sqlTimestampDescriptor,
   pgTextDescriptor,
+  pgEnumDescriptor,
   pgCharDescriptor,
   pgVarcharDescriptor,
   pgIntDescriptor,
@@ -1096,6 +1336,8 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgNumericDescriptor,
+  // PSL `@db.Date` binding is deferred to remove-db-attributes' `Date` type; pin it via codecId, not a second targetTypes activation here.
+  pgDateDescriptor,
   pgTimestampDescriptor,
   pgTimestamptzDescriptor,
   pgTimeDescriptor,
@@ -1105,6 +1347,7 @@ export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   pgVarbitDescriptor,
   pgByteaDescriptor,
   pgUuidDescriptor,
+  pgInetDescriptor,
   pgIntervalDescriptor,
   pgJsonDescriptor,
   pgJsonbDescriptor,

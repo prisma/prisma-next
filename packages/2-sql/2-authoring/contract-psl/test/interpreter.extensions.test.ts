@@ -600,4 +600,264 @@ namespace public {
       },
     });
   });
+
+  describe('top-level extension blocks', () => {
+    const topThingPslBlockDescriptors = {
+      top_thing: {
+        kind: 'pslBlock' as const,
+        keyword: 'top_thing',
+        discriminator: 'top-thing',
+        name: { required: true },
+        parameters: {},
+      },
+    };
+    const topThingAuthoringContributions = {
+      entityTypes: {
+        topThing: {
+          kind: 'entity' as const,
+          discriminator: 'top-thing',
+          output: {
+            factory: (raw: unknown) => raw,
+          },
+        },
+      },
+      pslBlockDescriptors: topThingPslBlockDescriptors,
+    };
+
+    it('lowers a top-level block into the default namespace bucket, like top-level models', () => {
+      const capturedEntries: Record<string, Record<string, Record<string, unknown>>> = {};
+      const createNamespace = (input: SqlNamespaceInput): SqlNamespaceBase => {
+        capturedEntries[input.id] = {
+          ...(capturedEntries[input.id] ?? {}),
+          ...input.entries,
+        };
+        return createTestSqlNamespace(input);
+      };
+
+      const symbolTableInput = symbolTableInputFromParseArgs({
+        schema: `
+top_thing my_entry {
+}
+
+model Foo {
+  id Int @id
+}
+`,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: topThingPslBlockDescriptors,
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        ...symbolTableInput,
+        target: postgresTarget,
+        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+        composedExtensionContracts: new Map(),
+        authoringContributions: topThingAuthoringContributions,
+        createNamespace,
+        capabilities: { sql: { scalarList: true } },
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(capturedEntries['public']).toMatchObject({
+        'top-thing': {
+          my_entry: expect.objectContaining({ kind: 'top-thing', name: 'my_entry' }),
+        },
+      });
+    });
+
+    it('accepts a blocks-only `namespace unbound { … }` alongside named namespaces and lowers its blocks into the unbound bucket', () => {
+      const capturedEntries: Record<string, Record<string, Record<string, unknown>>> = {};
+      const createNamespace = (input: SqlNamespaceInput): SqlNamespaceBase => {
+        capturedEntries[input.id] = {
+          ...(capturedEntries[input.id] ?? {}),
+          ...input.entries,
+        };
+        return createTestSqlNamespace(input);
+      };
+
+      const symbolTableInput = symbolTableInputFromParseArgs({
+        schema: `
+namespace unbound {
+  top_thing my_entry {
+  }
+}
+
+namespace auth {
+  model Foo {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: topThingPslBlockDescriptors,
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        ...symbolTableInput,
+        target: postgresTarget,
+        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+        composedExtensionContracts: new Map(),
+        authoringContributions: topThingAuthoringContributions,
+        createNamespace,
+        capabilities: { sql: { scalarList: true } },
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(capturedEntries['__unbound__']).toMatchObject({
+        'top-thing': {
+          my_entry: expect.objectContaining({ kind: 'top-thing', name: 'my_entry' }),
+        },
+      });
+      expect(result.value.storage.namespaces['__unbound__']).toBeDefined();
+    });
+
+    it('the raw sentinel spelling `namespace __unbound__ { … }` lowers blocks into the unbound bucket like the `unbound` spelling', () => {
+      const capturedEntries: Record<string, Record<string, Record<string, unknown>>> = {};
+      const createNamespace = (input: SqlNamespaceInput): SqlNamespaceBase => {
+        capturedEntries[input.id] = {
+          ...(capturedEntries[input.id] ?? {}),
+          ...input.entries,
+        };
+        return createTestSqlNamespace(input);
+      };
+
+      const symbolTableInput = symbolTableInputFromParseArgs({
+        schema: `
+namespace __unbound__ {
+  top_thing my_entry {
+  }
+}
+
+namespace auth {
+  model Foo {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: topThingPslBlockDescriptors,
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        ...symbolTableInput,
+        target: postgresTarget,
+        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+        composedExtensionContracts: new Map(),
+        authoringContributions: topThingAuthoringContributions,
+        createNamespace,
+        capabilities: { sql: { scalarList: true } },
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(capturedEntries['__unbound__']).toMatchObject({
+        'top-thing': {
+          my_entry: expect.objectContaining({ kind: 'top-thing', name: 'my_entry' }),
+        },
+      });
+    });
+  });
+
+  describe('extension entity merge collisions across reopened namespace spellings', () => {
+    const thingPslBlockDescriptors = {
+      thing: {
+        kind: 'pslBlock' as const,
+        keyword: 'thing',
+        discriminator: 'thing',
+        name: { required: true },
+        parameters: {},
+      },
+    };
+    const thingAuthoringContributions = {
+      entityTypes: {
+        thing: {
+          kind: 'entity' as const,
+          discriminator: 'thing',
+          output: { factory: (raw: unknown) => raw },
+        },
+      },
+      pslBlockDescriptors: thingPslBlockDescriptors,
+    };
+
+    it('rejects two reopened unbound spellings declaring the same named entity under the same entries kind', () => {
+      const document = symbolTableInputFromParseArgs({
+        schema: `namespace unbound {
+  thing shared {
+  }
+}
+
+namespace __unbound__ {
+  thing shared {
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: thingPslBlockDescriptors,
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        ...baseInput,
+        ...document,
+        authoringContributions: thingAuthoringContributions,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_DUPLICATE_EXTENSION_ENTITY',
+            message: expect.stringContaining('shared'),
+          }),
+        ]),
+      );
+    });
+
+    it('allows disjoint entity names across the two unbound spellings and unions them into the unbound bucket', () => {
+      const capturedEntries: Record<string, Record<string, Record<string, unknown>>> = {};
+      const createNamespace = (input: SqlNamespaceInput): SqlNamespaceBase => {
+        capturedEntries[input.id] = {
+          ...(capturedEntries[input.id] ?? {}),
+          ...input.entries,
+        };
+        return createTestSqlNamespace(input);
+      };
+
+      const document = symbolTableInputFromParseArgs({
+        schema: `namespace unbound {
+  thing entry_a {
+  }
+}
+
+namespace __unbound__ {
+  thing entry_b {
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: thingPslBlockDescriptors,
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        ...baseInput,
+        ...document,
+        authoringContributions: thingAuthoringContributions,
+        createNamespace,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(capturedEntries['__unbound__']).toMatchObject({
+        thing: {
+          entry_a: expect.objectContaining({ name: 'entry_a' }),
+          entry_b: expect.objectContaining({ name: 'entry_b' }),
+        },
+      });
+    });
+  });
 });

@@ -1,4 +1,3 @@
-import type { EnumValues } from '@prisma-next/contract/enum-accessor';
 import type { OrderLineItemInput, StatusEntryInput } from '../contract';
 import type { Db } from '../db';
 
@@ -20,7 +19,7 @@ export function createOrder(
     userId: string;
     items: ReadonlyArray<OrderLineItemInput>;
     shippingAddress: string;
-    type: EnumValues<Db['enums']['OrderType']>;
+    type: Db['enums']['OrderType']['Value'];
     statusHistory: ReadonlyArray<StatusEntryInput>;
   },
 ) {

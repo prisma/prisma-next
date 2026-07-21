@@ -22,7 +22,7 @@ import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { synthMigrationEdges } from './synth-migration-edges';
+import { buildFabricatedMigrationEdges } from './fabricated-migration-edges';
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -131,7 +131,7 @@ async function planAndApply(
     };
     const runResult = await runner.execute({
       plan,
-      migrationEdges: synthMigrationEdges(plan),
+      migrationEdges: buildFabricatedMigrationEdges(plan),
       destinationContract: destination,
       policy: ALL_POLICY,
       frameworkComponents: [],

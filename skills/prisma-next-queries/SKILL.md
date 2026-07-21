@@ -36,6 +36,7 @@ Once the contract is emitted and the DB is up to date, this skill covers everyth
 
 - User wants to add / change a model → `prisma-next-contract`.
 - User wants to wire `db.ts` or add middleware → `prisma-next-runtime`.
+- User is querying through a Supabase role-bound db (`asUser` / `asAnon` / `asServiceRole`, RLS, `auth.*` admin reads) → `prisma-next-supabase` for the role-binding surface; everything in this skill then applies to the returned `RoleBoundDb`.
 - User wants to debug a query failure (structured error envelope) → `prisma-next-debug`.
 
 ## Pick your target
@@ -46,6 +47,7 @@ Prisma Next ships **two query lanes per target** on the same `db` value from `sr
 |---|---|
 | `@prisma-next/postgres/runtime` | [`postgres.md`](./postgres.md) — `db.orm.<ns>.<Model>` + `db.sql.<ns>.<table>` |
 | `@prisma-next/mongo/runtime` | [`mongo.md`](./mongo.md) — `db.orm.<root>` + `db.query.from(...)` |
+| `@prisma-next/extension-supabase/runtime` | [`postgres.md`](./postgres.md) — a Supabase `RoleBoundDb` is a Postgres surface (`db.orm.<Model>` + `db.sql.<table>`); bind a role first via `prisma-next-supabase` |
 
 Both targets share the contract and connection on one `db` value. Reach for the ORM first; drop to the lower-level lane when the ORM can't express the shape. Lane choice is local — one query function picks one lane, not the whole app.
 
@@ -74,9 +76,15 @@ const users = await db.orm.public.User.select('id', 'email').all();
 You do **not** need a `collect()` / `toArray()` helper — `await` is enough. Internally `await` invokes the result's `then(...)`, which buffers the rows into an array. Two equivalent alternatives exist for the cases where they read better:
 
 ```typescript
-// Explicit buffering — same outcome as `await ... .all()`, useful when you
-// want a named Promise<Row[]> to thread through downstream code.
-const rows: Promise<Row[]> = db.orm.public.User.select('id', 'email').all().toArray();
+// `.toArray()` returns a genuine `Promise<Row[]>`. Reach for it only when
+// something needs a real `Promise` and not merely a thenable: a slot typed
+// `Promise<Row[]>` (an `AsyncIterableResult` has only `then`, not `catch` /
+// `finally`, so it does not satisfy that annotation), or a runtime
+// `instanceof Promise` check. Note that `await` and the `Promise.all` /
+// `Promise.race` combinators all accept the thenable directly — those are
+// NOT reasons to call `.toArray()`. Whenever you are just going to await it
+// here, use `await ...all()` and skip `.toArray()`.
+const rows: Promise<User[]> = db.orm.public.User.select('id', 'email').all().toArray();
 
 // Streaming — process rows one at a time without buffering the whole result.
 // Use for genuinely large result sets (anything that wouldn't fit comfortably

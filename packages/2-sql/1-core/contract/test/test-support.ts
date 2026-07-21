@@ -60,6 +60,6 @@ export class TestSqlNamespace extends SqlNamespaceBase {
   }
 }
 
-export function createTestSqlNamespace(input: SqlNamespaceInput): SqlNamespaceBase {
+export function createTestSqlNamespace(input: SqlNamespaceInput): TestSqlNamespace {
   return new TestSqlNamespace(input);
 }

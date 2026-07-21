@@ -1,6 +1,6 @@
-import type { DiffableNode } from '@prisma-next/framework-components/control';
+import type { DiffableNode, SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { RlsPolicyOperation } from '../postgres-rls-policy';
 import { PostgresSchemaNodeKind } from './schema-node-kinds';
@@ -23,6 +23,13 @@ export interface PostgresPolicySchemaNodeInput {
   readonly withCheck?: string;
   /** `true` = `AS PERMISSIVE`, `false` = `AS RESTRICTIVE`. */
   readonly permissive: boolean;
+  /**
+   * This policy's table node, plus one entry per role it grants to — each
+   * as the root-anchored chain the differ pairs siblings with. Stamped by
+   * the derivation, which holds the parent (database/namespace) context.
+   * Never compared by `isEqualTo`.
+   */
+  readonly dependsOn?: readonly SchemaNodeRef[];
 }
 
 /**
@@ -38,6 +45,7 @@ export interface PostgresPolicySchemaNodeInput {
  */
 export class PostgresPolicySchemaNode extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = PostgresSchemaNodeKind.policy;
+
   readonly name: string;
   readonly prefix: string;
   readonly tableName: string;
@@ -47,6 +55,8 @@ export class PostgresPolicySchemaNode extends SqlSchemaIRNode implements Diffabl
   declare readonly using?: string;
   declare readonly withCheck?: string;
   readonly permissive: boolean;
+  /** See {@link PostgresPolicySchemaNodeInput.dependsOn}. Non-enumerable so it stays out of JSON and structural equality, matching `SqlColumnIR.codecRef`. */
+  declare readonly dependsOn?: readonly SchemaNodeRef[];
 
   constructor(input: PostgresPolicySchemaNodeInput) {
     super();
@@ -59,6 +69,7 @@ export class PostgresPolicySchemaNode extends SqlSchemaIRNode implements Diffabl
     if (input.using !== undefined) this.using = input.using;
     if (input.withCheck !== undefined) this.withCheck = input.withCheck;
     this.permissive = input.permissive;
+    defineNonEnumerable(this, 'dependsOn', input.dependsOn);
     freezeNode(this);
   }
 
@@ -84,10 +95,6 @@ export class PostgresPolicySchemaNode extends SqlSchemaIRNode implements Diffabl
   }
 
   static assert(node: SqlSchemaIRNode | undefined): asserts node is PostgresPolicySchemaNode {
-    if (node === undefined || !PostgresPolicySchemaNode.is(node)) {
-      throw new Error(
-        `Expected a PostgresPolicySchemaNode but got nodeKind=${node?.nodeKind ?? 'undefined'}`,
-      );
-    }
+    assertNode(node, 'PostgresPolicySchemaNode', PostgresPolicySchemaNode.is);
   }
 }

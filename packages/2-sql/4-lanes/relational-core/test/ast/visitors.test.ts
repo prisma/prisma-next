@@ -106,7 +106,7 @@ describe('ast/visitors', () => {
       EqColJoinOn.of(col('member', 'id'), col('posts', 'userId')),
     );
     expect(
-      ((rewritten.projection[1]?.expr as SubqueryExpr).query.where as BinaryExpr).right,
+      ((rewritten.projection[1]!.expr as SubqueryExpr).query.where as BinaryExpr).right,
     ).toEqual(lit('TRUE'));
   });
 

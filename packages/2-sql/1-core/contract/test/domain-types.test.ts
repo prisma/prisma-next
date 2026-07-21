@@ -25,9 +25,12 @@ describe('domain type compatibility', () => {
       const fields: FieldsFromModel = {
         id: { nullable: false, type: { kind: 'scalar', codecId: 'pg/int4@1' } },
       };
-      expect(fields.id.nullable).toBe(false);
-      expect(fields.id.type.kind).toBe('scalar');
-      expect(fields.id.type.codecId).toBe('pg/int4@1');
+      const idField = fields['id']!;
+      expect(idField.nullable).toBe(false);
+      expect(idField.type.kind).toBe('scalar');
+      if (idField.type.kind === 'scalar') {
+        expect(idField.type.codecId).toBe('pg/int4@1');
+      }
     });
   });
 
@@ -35,7 +38,7 @@ describe('domain type compatibility', () => {
     it('roots field exists on Contract<SqlStorage>', () => {
       type Roots = Contract<SqlStorage>['roots'];
       const roots: Roots = { users: crossRef('User') };
-      expect(roots.users.model).toBe('User');
+      expect(roots['users']!.model).toBe('User');
     });
   });
 

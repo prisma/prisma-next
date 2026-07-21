@@ -1,5 +1,5 @@
 import { generateContractDts } from '@prisma-next/emitter';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { type CodecLookup, renderTsLiteral } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
@@ -866,6 +866,140 @@ describe('StorageColumnTypes', () => {
     // Field type and column type must be byte-identical.
     const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
     expect(storageColumnMatch![0]).toContain("readonly level: 'low' | 'high' | 'urgent'");
+  });
+
+  describe('a native-enum column (pg/enum@1, value-set-typed, no domain enum)', () => {
+    // Mirrors a native Postgres enum column: codecId 'pg/enum@1', a storage
+    // valueSet ref, NO domain field valueSet (a native enum never creates a
+    // domain enum — authoring-design.md §0/§2.5). Typing must flow through
+    // the exact same value-set → codec path a check-enum column uses
+    // (querying-design.md §2.1) — no new typing code.
+    function nativeEnumColumnContract() {
+      return createContract({
+        domain: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              models: {
+                AuthSession: {
+                  storage: {
+                    namespaceId: UNBOUND_NAMESPACE_ID,
+                    table: 'authSession',
+                    fields: { aal: { column: 'aal' } },
+                  },
+                  fields: {
+                    aal: { nullable: false, type: { kind: 'scalar', codecId: 'pg/enum@1' } },
+                  },
+                  relations: {},
+                },
+              },
+            },
+          },
+        },
+        storage: {
+          namespaces: {
+            [UNBOUND_NAMESPACE_ID]: {
+              id: UNBOUND_NAMESPACE_ID,
+              entries: {
+                table: {
+                  authSession: {
+                    columns: {
+                      aal: {
+                        nativeType: 'aal_level',
+                        codecId: 'pg/enum@1',
+                        nullable: false,
+                        valueSet: {
+                          plane: 'storage',
+                          entityKind: 'valueSet',
+                          namespaceId: UNBOUND_NAMESPACE_ID,
+                          entityName: 'AalLevel',
+                        },
+                      },
+                    },
+                    uniques: [],
+                    indexes: [],
+                    foreignKeys: [],
+                  },
+                },
+                valueSet: {
+                  AalLevel: { kind: 'valueSet', values: ['aal1', 'aal2', 'aal3'] },
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    function pgEnumCodecLookup(): CodecLookup {
+      return {
+        get: () => undefined,
+        targetTypesFor: () => undefined,
+        metaFor: () => undefined,
+        renderOutputTypeFor: () => undefined,
+        renderValueLiteralFor: (id, value) =>
+          id === 'pg/enum@1' ? renderTsLiteral(value) : undefined,
+      };
+    }
+
+    it('types the column as the member-value literal union (StorageColumnTypes)', () => {
+      const dts = generateContractDts(
+        nativeEnumColumnContract(),
+        sqlEmission,
+        [],
+        testHashes,
+        undefined,
+        pgEnumCodecLookup(),
+      );
+
+      const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+      expect(storageColumnMatch).not.toBeNull();
+      expect(storageColumnMatch![0]).toContain("readonly aal: 'aal1' | 'aal2' | 'aal3'");
+      expect(storageColumnMatch![0]).not.toContain("CodecTypes['pg/enum@1']");
+    });
+
+    it('types the column input side as the same literal union (StorageColumnInputTypes)', () => {
+      const dts = generateContractDts(
+        nativeEnumColumnContract(),
+        sqlEmission,
+        [],
+        testHashes,
+        undefined,
+        pgEnumCodecLookup(),
+      );
+
+      const inputMatch = dts.match(/export type StorageColumnInputTypes = ({.+?});/s);
+      expect(inputMatch).not.toBeNull();
+      expect(inputMatch![0]).toContain("readonly aal: 'aal1' | 'aal2' | 'aal3'");
+    });
+
+    it('falls back to the codec output type when no codec lookup is supplied (no renderValueLiteral)', () => {
+      const dts = generateContractDts(nativeEnumColumnContract(), sqlEmission, [], testHashes);
+
+      const storageColumnMatch = dts.match(/export type StorageColumnTypes = ({.+?});/s);
+      expect(storageColumnMatch).not.toBeNull();
+      expect(storageColumnMatch![0]).toContain(`readonly aal: CodecTypes['pg/enum@1']['output']`);
+    });
+
+    it("also types FieldOutputTypes as the literal union, via the storage column's valueSet (no domain field valueSet involved)", () => {
+      // The SQL family's `resolveFieldValueSet` SPI hook (emitter/src/index.ts)
+      // resolves a field's value-set from its STORAGE COLUMN's `valueSet` ref —
+      // not from a domain-field `valueSet`. `nativeEnumColumnContract()`'s
+      // domain field carries no `valueSet` (no domain enum for a native
+      // enum), yet FieldOutputTypes must still resolve the union — proving
+      // ORM-side typing does not depend on a domain enum existing.
+      const dts = generateContractDts(
+        nativeEnumColumnContract(),
+        sqlEmission,
+        [],
+        testHashes,
+        undefined,
+        pgEnumCodecLookup(),
+      );
+
+      const fieldOutputMatch = dts.match(/export type FieldOutputTypes = ({[\s\S]*?});/);
+      expect(fieldOutputMatch).not.toBeNull();
+      expect(fieldOutputMatch![0]).toContain("readonly aal: 'aal1' | 'aal2' | 'aal3'");
+    });
   });
 
   it('wraps StorageColumnTypes/StorageColumnInputTypes in ReadonlyArray for a native many[] column', () => {

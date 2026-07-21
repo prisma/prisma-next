@@ -56,7 +56,7 @@ function makeSchema(existingSchemas?: readonly string[]): SqlSchemaIRNode {
 }
 
 describe('verifyPostgresNamespacePresence', () => {
-  it('emits missing_schema for a declared namespace whose schema is absent from introspection', () => {
+  it('emits a postgres-namespace not-found issue for a declared namespace whose schema is absent from introspection', () => {
     const contract = makeContract(['auth']);
     const schema = makeSchema(['public']);
 
@@ -64,10 +64,9 @@ describe('verifyPostgresNamespacePresence', () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({
-      kind: 'missing_schema',
-      namespaceId: 'auth',
+      path: ['database', 'auth'],
+      expected: { nodeKind: 'postgres-namespace', schemaName: 'auth' },
     });
-    expect(issues[0]?.message).toContain('auth');
   });
 
   it('does not emit missing_schema when the introspected list already contains the namespace', () => {
@@ -104,19 +103,16 @@ describe('verifyPostgresNamespacePresence', () => {
     const issues = verifyPostgresNamespacePresence({ contract, schema });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ kind: 'missing_schema', namespaceId: 'auth' });
+    expect(issues[0]).toMatchObject({ path: ['database', 'auth'] });
   });
 
-  it('emits a missing_schema for every declared-but-absent namespace in coordinate-sorted order', () => {
+  it('emits a not-found issue for every declared-but-absent namespace in coordinate-sorted order', () => {
     const contract = makeContract(['analytics', 'auth', 'public']);
     const schema = makeSchema(['public']);
 
     const issues = verifyPostgresNamespacePresence({ contract, schema });
 
     expect(issues).toHaveLength(2);
-    expect(issues.map((i) => ('namespaceId' in i ? i.namespaceId : undefined))).toEqual([
-      'analytics',
-      'auth',
-    ]);
+    expect(issues.map((i) => i.path[1])).toEqual(['analytics', 'auth']);
   });
 });

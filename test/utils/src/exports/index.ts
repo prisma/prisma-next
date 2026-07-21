@@ -65,11 +65,21 @@ export async function withClient<T>(
   fn: (client: Client) => Promise<T>,
 ): Promise<T> {
   const client = new Client({ connectionString });
+  // A PGlite (WASM) dev server can abort mid-operation on the slower CI runners
+  // (the same crash the suites' `retry` config re-runs). When it does, this
+  // client's connection drops and `pg` emits an asynchronous 'error' event.
+  // With no listener that becomes an *unhandled* error, which fails the whole
+  // run even though the awaited query already rejected and the test is retried
+  // on a fresh database. Absorb the connection-level event — query/connect
+  // failures still reject their own promises, so nothing real is masked.
+  client.on('error', () => {});
   await client.connect();
   try {
     return await fn(client);
   } finally {
-    await client.end();
+    // On a dropped connection `end()` itself can reject; the caller already has
+    // the real failure from `fn`, so don't let cleanup mask or replace it.
+    await client.end().catch(() => {});
   }
 }
 

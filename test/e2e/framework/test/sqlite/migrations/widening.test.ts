@@ -70,7 +70,7 @@ describe('SQLite Migration E2E - Widening operations (recreate-table)', () => {
   // the contract side. As long as both sides converge on `now()`, the
   // additive apply must verify clean and the column's stored default
   // must be one of the SQLite-native spellings (the runner's
-  // post-execute `verifySqlSchema` already proves the canonical
+  // post-execute schema verify already proves the canonical
   // equivalence; this assertion just pins the storage form).
   it('round-trips a `now()` default through apply + introspect without drift', async () => {
     await applyMigration(

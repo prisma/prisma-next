@@ -3,7 +3,12 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
-import { MAX_DESCRIPTION_LENGTH, runCheck, validateSkillMd } from './validate-skills.mjs';
+import {
+  MAX_DESCRIPTION_LENGTH,
+  runCheck,
+  SKILL_ROOTS,
+  validateSkillMd,
+} from './validate-skills.mjs';
 
 const validSkill = `---
 name: example-skill
@@ -51,6 +56,21 @@ description: ${longDescription}
   it('fails when frontmatter is missing', () => {
     deepStrictEqual(validateSkillMd('# No frontmatter\n'), ['missing frontmatter block']);
   });
+
+  it('fails when an unquoted description contains a bare "key: value" sequence', () => {
+    // Mirrors the PR #987 regression: an unquoted plain scalar describing
+    // `extensionPacks: [supabasePack]` reads as a nested YAML mapping, not text.
+    const broken = `---
+name: prisma-next-supabase
+description: Use Prisma Next with Supabase — wire extensionPacks: [supabasePack] into your db.
+---
+
+# Supabase
+`;
+    const errors = validateSkillMd(broken);
+    strictEqual(errors.length, 1);
+    strictEqual(errors[0].startsWith('frontmatter parse error:'), true);
+  });
 });
 
 describe('runCheck', () => {
@@ -82,5 +102,51 @@ description: broken yaml: this colon breaks parsing
     strictEqual(offences.length, 1);
     strictEqual(offences[0].file, 'skills-contrib/bad-skill/SKILL.md');
     strictEqual(offences[0].errors[0].startsWith('frontmatter parse error:'), true);
+  });
+
+  it('scans the user-facing skills/ root, not just skills-contrib', () => {
+    const root = mkdtempSync(join(tmpdir(), 'validate-skills-userfacing-'));
+    const skillDir = join(root, 'skills', 'prisma-next-example');
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, 'SKILL.md'),
+      `---
+name: prisma-next-example
+description: Wire this skill with adapterPacks: [examplePack] for the example target.
+---
+
+# Example
+`,
+    );
+
+    const offences = runCheck({ root });
+    strictEqual(offences.length, 1);
+    strictEqual(offences[0].file, 'skills/prisma-next-example/SKILL.md');
+    strictEqual(offences[0].errors[0].startsWith('frontmatter parse error:'), true);
+  });
+
+  it('scans skills/upgrade and skills/extension-author, the other roots prisma-next init installs', () => {
+    const root = mkdtempSync(join(tmpdir(), 'validate-skills-nested-'));
+    for (const subpath of ['skills/upgrade', 'skills/extension-author']) {
+      const skillDir = join(root, subpath, 'nested-skill');
+      mkdirSync(skillDir, { recursive: true });
+      writeFileSync(
+        join(skillDir, 'SKILL.md'),
+        validSkill.replace('example-skill', 'nested-skill'),
+      );
+    }
+
+    deepStrictEqual(runCheck({ root }), []);
+  });
+});
+
+describe('SKILL_ROOTS', () => {
+  it('covers skills-contrib plus every subpath prisma-next init installs from', () => {
+    deepStrictEqual(SKILL_ROOTS, [
+      'skills-contrib',
+      'skills',
+      'skills/upgrade',
+      'skills/extension-author',
+    ]);
   });
 });

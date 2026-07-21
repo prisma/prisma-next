@@ -13,9 +13,6 @@ import type {
 } from '@prisma-next/framework-components/authoring';
 import {
   assertNoCrossRegistryCollisions,
-  isAuthoringEntityTypeDescriptor,
-  isAuthoringFieldPresetDescriptor,
-  isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
 } from '@prisma-next/framework-components/authoring';
 import type {
@@ -183,7 +180,7 @@ function composeTypeNamespace(components: readonly AuthoringComponent[]): Author
   for (const component of components) {
     const ns = extractTypeNamespace(component);
     if (Object.keys(ns).length > 0) {
-      mergeAuthoringNamespaces(merged, ns, [], isAuthoringTypeConstructorDescriptor, 'type');
+      mergeAuthoringNamespaces(merged, ns, [], 'typeConstructor', 'type');
     }
   }
   return merged as AuthoringTypeNamespace;
@@ -194,7 +191,7 @@ function composeFieldNamespace(components: readonly AuthoringComponent[]): Autho
   for (const component of components) {
     const ns = extractFieldNamespace(component);
     if (Object.keys(ns).length > 0) {
-      mergeAuthoringNamespaces(merged, ns, [], isAuthoringFieldPresetDescriptor, 'field');
+      mergeAuthoringNamespaces(merged, ns, [], 'fieldPreset', 'field');
     }
   }
   return merged as AuthoringFieldNamespace;
@@ -207,7 +204,7 @@ function composeEntityNamespace(
   for (const component of components) {
     const ns = extractEntitiesNamespace(component);
     if (Object.keys(ns).length > 0) {
-      mergeAuthoringNamespaces(merged, ns, [], isAuthoringEntityTypeDescriptor, 'entity');
+      mergeAuthoringNamespaces(merged, ns, [], 'entity', 'entity');
     }
   }
   return merged as AuthoringEntityTypeNamespace;

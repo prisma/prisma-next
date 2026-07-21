@@ -2,6 +2,7 @@ import type { AnyCodecDescriptor } from '@prisma-next/framework-components/codec
 import { describe, expect, it } from 'vitest';
 import {
   pgBoolDescriptor,
+  pgEnumDescriptor,
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgInt2Descriptor,
@@ -86,6 +87,22 @@ describe('codec renderValueLiteral', () => {
 
     it('renders false literal', () => {
       expect(renderer?.(false, 'output')).toBe('false');
+    });
+  });
+
+  describe('pg/enum@1', () => {
+    const renderer = valueRendererFor(pgEnumDescriptor);
+
+    it('renders a quoted string literal for output', () => {
+      expect(renderer?.('aal1', 'output')).toBe("'aal1'");
+    });
+
+    it('renders a quoted string literal for input', () => {
+      expect(renderer?.('aal2', 'input')).toBe("'aal2'");
+    });
+
+    it('escapes single quotes in member values', () => {
+      expect(renderer?.("it's", 'output')).toBe("'it\\'s'");
     });
   });
 

@@ -15,11 +15,19 @@ import {
 } from '@prisma-next/sql-contract/types';
 
 import { type CfExpr, cfExpr } from '@prisma-next/sql-relational-core/contract-free';
+import { invariant } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresTableSource } from './ast/table-source';
 import { PG_TEXT_CODEC_ID } from './codec-ids';
-import { policyEntityKind, roleEntityKind } from './entity-kinds';
+import {
+  nativeEnumEntityKind,
+  policyEntityKind,
+  rlsEnablementEntityKind,
+  roleEntityKind,
+} from './entity-kinds';
+import { PostgresNativeEnum } from './postgres-native-enum';
+import type { PostgresRlsEnablement } from './postgres-rls-enablement';
 import type { PostgresRlsPolicy } from './postgres-rls-policy';
 import type { PostgresRole } from './postgres-role';
 import { escapeLiteral } from './sql-utils';
@@ -29,6 +37,8 @@ export type PostgresContract = Contract<SqlStorage> & { readonly target: 'postgr
 export type PostgresNamespaceEntries = SqlNamespaceEntries & {
   readonly policy?: Readonly<Record<string, PostgresRlsPolicy>>;
   readonly role?: Readonly<Record<string, PostgresRole>>;
+  readonly rls?: Readonly<Record<string, PostgresRlsEnablement>>;
+  readonly native_enum?: Readonly<Record<string, PostgresNativeEnum>>;
 };
 
 export interface PostgresSchemaInput {
@@ -70,9 +80,34 @@ export class PostgresSchema extends SqlNamespaceBase {
 
     const dispatched = hydrateNamespaceEntities(
       input.entries,
-      composeSqlEntityKinds([policyEntityKind, roleEntityKind]),
+      composeSqlEntityKinds([
+        policyEntityKind,
+        roleEntityKind,
+        rlsEnablementEntityKind,
+        nativeEnumEntityKind,
+      ]),
       'carry',
     );
+
+    // A native enum keys under its PHYSICAL type name in storage `entries`
+    // (ADR 221 coordinate `entityName`). The family/authoring layer keys every
+    // block by its author handle, so re-key the `native_enum` slot by each
+    // entity's `typeName` here — target-local Postgres code that already knows
+    // this entity kind. This runs at both authoring and hydration; a serialized
+    // contract's key already equals the `typeName`, so the re-key is idempotent.
+    const nativeEnumSlot = dispatched['native_enum'];
+    if (nativeEnumSlot !== undefined) {
+      const rekeyed: Record<string, unknown> = {};
+      for (const [handle, entity] of Object.entries(nativeEnumSlot)) {
+        const physicalName = PostgresNativeEnum.is(entity) ? entity.typeName : handle;
+        invariant(
+          !Object.hasOwn(rekeyed, physicalName),
+          `PostgresSchema "${input.id}": two native_enum entities resolve to the same physical type name "${physicalName}". Give them distinct @@map type names.`,
+        );
+        rekeyed[physicalName] = entity;
+      }
+      dispatched['native_enum'] = Object.freeze(rekeyed);
+    }
 
     // Drop an empty valueSet so presence signals non-emptiness.
     const valueSetRaw = dispatched['valueSet'];
@@ -81,11 +116,15 @@ export class PostgresSchema extends SqlNamespaceBase {
         ? { ...dispatched, valueSet: undefined }
         : dispatched;
 
+    const entriesInput: Record<string, Readonly<Record<string, unknown>> | undefined> = {
+      ...withPresence,
+    };
+
     this.entries = Object.freeze(
       blindCast<
         PostgresNamespaceEntries,
-        'composeSqlEntityKinds([policyEntityKind, roleEntityKind]) supplies table→StorageTable, valueSet→StorageValueSet, policy→PostgresRlsPolicy, role→PostgresRole descriptors'
-      >(withPresence),
+        'composeSqlEntityKinds([policyEntityKind, roleEntityKind, rlsEnablementEntityKind, nativeEnumEntityKind]) supplies table→StorageTable, valueSet→StorageValueSet, policy→PostgresRlsPolicy, role→PostgresRole, rls→PostgresRlsEnablement, native_enum→PostgresNativeEnum descriptors'
+      >(entriesInput),
     );
     Object.defineProperty(this, 'kind', {
       value: 'schema',
@@ -110,6 +149,10 @@ export class PostgresSchema extends SqlNamespaceBase {
 
   get role(): Readonly<Record<string, PostgresRole>> {
     return this.entries.role ?? Object.freeze({});
+  }
+
+  get rls(): Readonly<Record<string, PostgresRlsEnablement>> {
+    return this.entries.rls ?? Object.freeze({});
   }
 
   /**
@@ -269,7 +312,10 @@ export function isPostgresSchema(ns: unknown): ns is PostgresSchema {
  * The factory has no per-call state — every named id deterministically
  * maps to a distinct schema instance — so callers can pass it through
  * by reference and trust the resulting `SqlStorage.namespaces` map to
- * be value-stable for a given input set.
+ * be value-stable for a given input set. Native-enum column type names are
+ * schema-qualified earlier, at column construction, via the target's
+ * `authoring.qualifyColumnType` hook (`postgresQualifyColumnType`), so this
+ * factory just materialises the namespace from already-qualified entries.
  */
 export function postgresCreateNamespace(input: SqlNamespaceInput): PostgresSchema {
   const schemaInput: PostgresSchemaInput = {

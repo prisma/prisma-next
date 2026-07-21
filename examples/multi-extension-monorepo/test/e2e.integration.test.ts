@@ -220,7 +220,7 @@ describe.sequential('multi-extension-monorepo end-to-end (PGlite)', {
       await rm(project.projectRoot, { recursive: true, force: true });
       project = undefined;
     }
-  });
+  }, timeouts.spinUpPpgDev);
 
   it('pinned per-space artefacts land for both extension spaces', async () => {
     project = await setupTestProject();

@@ -1,0 +1,231 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "roots": {
+    "account": {
+      "model": "Account",
+      "namespace": "public"
+    },
+    "session": {
+      "model": "Session",
+      "namespace": "auth"
+    }
+  },
+  "domain": {
+    "namespaces": {
+      "auth": {
+        "models": {
+          "Session": {
+            "fields": {
+              "aal": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/enum@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "typeName": "auth.aal_level"
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "aal": {
+                  "column": "aal"
+                },
+                "id": {
+                  "column": "id"
+                }
+              },
+              "namespaceId": "auth",
+              "table": "session"
+            }
+          }
+        }
+      },
+      "public": {
+        "models": {
+          "Account": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "role": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/enum@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "typeName": "Role"
+                  }
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "role": {
+                  "column": "role"
+                }
+              },
+              "namespaceId": "public",
+              "table": "account"
+            }
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "namespaces": {
+      "auth": {
+        "entries": {
+          "native_enum": {
+            "aal_level": {
+              "kind": "postgres-enum",
+              "members": ["aal1", "aal2", "aal3"],
+              "typeName": "aal_level"
+            }
+          },
+          "table": {
+            "session": {
+              "columns": {
+                "aal": {
+                  "codecId": "pg/enum@1",
+                  "nativeType": "auth.aal_level",
+                  "nullable": true,
+                  "typeParams": {
+                    "typeName": "auth.aal_level"
+                  },
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "AalLevel",
+                    "namespaceId": "auth",
+                    "plane": "storage"
+                  }
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": ["id"]
+              },
+              "uniques": []
+            }
+          },
+          "valueSet": {
+            "AalLevel": {
+              "kind": "valueSet",
+              "values": ["aal1", "aal2", "aal3"]
+            }
+          }
+        },
+        "id": "auth"
+      },
+      "public": {
+        "entries": {
+          "native_enum": {
+            "Role": {
+              "kind": "postgres-enum",
+              "members": ["user", "admin"],
+              "typeName": "Role"
+            }
+          },
+          "table": {
+            "account": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "role": {
+                  "codecId": "pg/enum@1",
+                  "nativeType": "Role",
+                  "nullable": false,
+                  "typeParams": {
+                    "typeName": "Role"
+                  },
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Role",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": ["id"]
+              },
+              "uniques": []
+            }
+          },
+          "valueSet": {
+            "Role": {
+              "kind": "valueSet",
+              "values": ["user", "admin"]
+            }
+          }
+        },
+        "id": "public"
+      }
+    },
+    "storageHash": "sha256:765bacb7dc22ed5dbaa11a6a91f0a6184d22863d5112096f6a42c3841e1b0334"
+  },
+  "capabilities": {
+    "postgres": {
+      "distinctOn": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "lateral": true,
+      "returning": true,
+      "scalarList": true
+    }
+  },
+  "extensionPacks": {},
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}

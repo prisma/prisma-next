@@ -36,6 +36,7 @@ function enumBlock(input: {
 }): PslExtensionBlock {
   return {
     kind: 'enum',
+    keyword: 'enum',
     name: input.name,
     parameters: input.parameters,
     blockAttributes: input.typeCodecId !== undefined ? [typeAttr(input.typeCodecId)] : [],

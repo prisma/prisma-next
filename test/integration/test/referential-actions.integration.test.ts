@@ -272,8 +272,10 @@ describe('referential actions integration', () => {
               frameworkComponents,
             });
 
-            expect(result.ok).toBe(true);
-            expect(result.schema.counts.fail).toBe(0);
+            expect(result).toMatchObject({
+              ok: true,
+              schema: { issues: [] },
+            });
           } finally {
             await driver.close();
           }
@@ -369,12 +371,11 @@ describe('referential actions integration', () => {
             });
 
             expect(result.ok).toBe(false);
-            expect(result.schema.counts.fail).toBeGreaterThan(0);
-            expect(
-              result.schema.issues.some(
-                (i) => i.kind === 'foreign_key_mismatch' && i.table === 'post',
-              ),
-            ).toBe(true);
+            expect(result.schema.issues).toContainEqual(
+              expect.objectContaining({
+                path: ['database', 'public', 'post', 'foreign-key:userId->public.user(id)'],
+              }),
+            );
           } finally {
             await driver.close();
           }
@@ -443,12 +444,11 @@ describe('referential actions integration', () => {
             });
 
             expect(result.ok).toBe(false);
-            expect(result.schema.counts.fail).toBeGreaterThan(0);
-            expect(
-              result.schema.issues.some(
-                (i) => i.kind === 'foreign_key_mismatch' && i.table === 'post',
-              ),
-            ).toBe(true);
+            expect(result.schema.issues).toContainEqual(
+              expect.objectContaining({
+                path: ['database', 'public', 'post', 'foreign-key:userId->public.user(id)'],
+              }),
+            );
           } finally {
             await driver.close();
           }
@@ -538,8 +538,10 @@ describe('referential actions integration', () => {
               frameworkComponents,
             });
 
-            expect(result.ok).toBe(true);
-            expect(result.schema.counts.fail).toBe(0);
+            expect(result).toMatchObject({
+              ok: true,
+              schema: { issues: [] },
+            });
           } finally {
             await driver.close();
           }

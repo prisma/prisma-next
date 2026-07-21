@@ -546,8 +546,6 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
         target: fk.target,
         onDelete: fk.onDelete ?? null,
         onUpdate: fk.onUpdate ?? null,
-        constraint: fk.constraint,
-        index: fk.index,
       });
       if (seenForeignKeyDefinitions.has(signature)) {
         errors.push(

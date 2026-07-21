@@ -156,11 +156,11 @@ describe('postgis codecs', () => {
   });
 
   describe('encodeJson / decodeJson', () => {
-    it('round-trips a Geometry through JSON form', () => {
+    it('round-trips the Postgres JSON HEXEWKB representation', () => {
       const c = asAsyncCodec();
       const value: Geometry = { type: 'Point', coordinates: [1, 2], srid: 4326 };
       const encoded = c.encodeJson(value);
-      expect(encoded).toEqual(value);
+      expect(encoded).toBe('0101000020E6100000000000000000F03F0000000000000040');
       expect(c.decodeJson(encoded)).toEqual(value);
     });
 
@@ -171,11 +171,9 @@ describe('postgis codecs', () => {
       );
     });
 
-    it('decodeJson rejects unsupported geometry type', () => {
+    it('decodeJson rejects malformed HEXEWKB', () => {
       const c = asAsyncCodec();
-      expect(() =>
-        c.decodeJson({ type: 'Sphere', coordinates: [0, 0] } as unknown as JsonValue),
-      ).toThrow(/unsupported type/);
+      expect(() => c.decodeJson('zz')).toThrow(/invalid hex byte/);
     });
   });
 

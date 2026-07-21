@@ -55,6 +55,16 @@ export interface MigrationPackage {
   readonly dirName: string;
   readonly metadata: MigrationMetadata;
   readonly ops: readonly MigrationPlanOperation[];
+  /**
+   * Contract IR JSON of this migration's destination state, populated by
+   * the on-disk readers from the sibling `end-contract.json` file when
+   * present (raw parsed JSON). Absent for packages loaded without the
+   * snapshot file — the runner never requires it (see ADR 199: identity
+   * is anchored on the storage-hash bookends). The edge's *start* state
+   * is deliberately not carried: it is by construction the end state of
+   * the predecessor edge, so consumers derive it from the previous row.
+   */
+  readonly endContractJson?: unknown;
 }
 
 /**

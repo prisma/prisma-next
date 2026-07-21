@@ -104,14 +104,15 @@ export type SqlNamespaceEntries = Readonly<Record<string, Readonly<Record<string
  * types satisfy this structurally (no prototype methods). The runtime
  * abstract class `SqlNamespaceBase` extends this.
  *
- * `qualifyTable` is optional so JSON-shaped contract types (which carry no
- * methods) are accepted where `SqlNamespace` is required. Hydrated
- * `SqlNamespaceBase` instances always have it.
+ * `qualifyTable` and `isUnbound` are optional so JSON-shaped contract types
+ * (which carry no methods) are accepted where `SqlNamespace` is required.
+ * Hydrated `SqlNamespaceBase` instances always have both.
  */
 export interface SqlNamespace {
   readonly kind: string;
   readonly id: string;
   readonly entries: SqlNamespaceEntries;
+  readonly isUnbound?: boolean;
   qualifyTable?(tableName: string): string;
 }
 

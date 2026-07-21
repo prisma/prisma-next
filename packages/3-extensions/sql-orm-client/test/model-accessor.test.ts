@@ -580,6 +580,73 @@ describe('createModelAccessor', () => {
     });
   });
 
+  describe('variant-aware relation resolution', () => {
+    const polyContext = { ...context, contract: buildMixedPolyContract() };
+
+    interface RelationOps {
+      some(predicate?: unknown): unknown;
+    }
+    type RelationBag = Record<string, RelationOps | undefined>;
+
+    it('correlates an MTI variant relation predicate against the variant table', () => {
+      const feature = createModelAccessor(
+        polyContext,
+        'public',
+        'Task',
+        'Feature',
+      ) as unknown as RelationBag;
+
+      const expr = feature['assignee']!.some() as ExistsExpr;
+
+      expect(expr.notExists).toBe(false);
+      expect(expr.subquery.from).toEqual(TableSource.named('assignees', undefined, 'public'));
+      expect(expr.subquery.projection).toEqual([
+        ProjectionItem.of('_exists', ColumnRef.of('assignees', 'id')),
+      ]);
+      expect(expr.subquery.where).toEqual(
+        BinaryExpr.eq(ColumnRef.of('assignees', 'id'), ColumnRef.of('features', 'assignee_id')),
+      );
+    });
+
+    it('correlates an STI variant relation predicate against the base table', () => {
+      const bug = createModelAccessor(
+        polyContext,
+        'public',
+        'Task',
+        'Bug',
+      ) as unknown as RelationBag;
+
+      const expr = bug['assignee']!.some() as ExistsExpr;
+
+      expect(expr.notExists).toBe(false);
+      expect(expr.subquery.from).toEqual(TableSource.named('assignees', undefined, 'public'));
+      expect(expr.subquery.where).toEqual(
+        BinaryExpr.eq(ColumnRef.of('assignees', 'id'), ColumnRef.of('tasks', 'assignee_id')),
+      );
+    });
+
+    it('does not expose the variant-declared relation without narrowing', () => {
+      const task = createModelAccessor(polyContext, 'public', 'Task') as unknown as RelationBag;
+      expect(task['assignee']).toBeUndefined();
+    });
+
+    it('keeps a base relation resolving against the base table when a variant is selected', () => {
+      const feature = createModelAccessor(
+        polyContext,
+        'public',
+        'Task',
+        'Feature',
+      ) as unknown as RelationBag;
+
+      const expr = feature['subtasks']!.some() as ExistsExpr;
+
+      expect(expr.subquery.from).toEqual(TableSource.named('tasks', undefined, 'public'));
+      expect(expr.subquery.where).toEqual(
+        BinaryExpr.eq(ColumnRef.of('tasks', 'parent_id'), ColumnRef.of('tasks', 'id')),
+      );
+    });
+  });
+
   describe('M:N relation filters via junction', () => {
     it('some() emits EXISTS through junction (single-key)', () => {
       const accessor = createModelAccessor(context, 'public', 'User') as unknown as Record<

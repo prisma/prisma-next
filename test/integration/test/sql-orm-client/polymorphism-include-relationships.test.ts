@@ -42,6 +42,7 @@ async function createTasksTable(runtime: PgIntegrationRuntime): Promise<void> {
       title text not null,
       type text not null,
       severity text,
+      bug_assignee_person_id integer,
       project_id integer,
       reporter_id integer
     )
@@ -49,7 +50,8 @@ async function createTasksTable(runtime: PgIntegrationRuntime): Promise<void> {
   await runtime.query(`
     create table features (
       id integer primary key references tasks(id),
-      priority integer not null
+      priority integer not null,
+      feature_assignee_person_id integer
     )
   `);
   await runtime.query(`
@@ -127,6 +129,7 @@ describe('integration/polymorphism-include-relationships', () => {
             type: 'bug',
             projectId: null,
             reporterId: null,
+            assigneeId: null,
             severity: 'critical',
             comments: [
               { id: 10, body: 'repro attached', taskId: 1 },
@@ -139,6 +142,7 @@ describe('integration/polymorphism-include-relationships', () => {
             type: 'feature',
             projectId: null,
             reporterId: null,
+            assigneeId: null,
             priority: 5,
             comments: [{ id: 11, body: 'ship it', taskId: 2 }],
           },
@@ -270,6 +274,7 @@ describe('integration/polymorphism-include-relationships', () => {
                 type: 'bug',
                 projectId: 1,
                 reporterId: null,
+                assigneeId: null,
                 severity: 'critical',
               },
               {
@@ -278,6 +283,7 @@ describe('integration/polymorphism-include-relationships', () => {
                 type: 'feature',
                 projectId: 1,
                 reporterId: null,
+                assigneeId: null,
                 priority: 3,
               },
               {
@@ -362,6 +368,7 @@ describe('integration/polymorphism-include-relationships', () => {
                 type: 'bug',
                 projectId: 1,
                 reporterId: 50,
+                assigneeId: null,
                 severity: 'critical',
                 reporter: { id: 50, name: 'Ada' },
               },
@@ -371,6 +378,7 @@ describe('integration/polymorphism-include-relationships', () => {
                 type: 'feature',
                 projectId: 1,
                 reporterId: 51,
+                assigneeId: null,
                 priority: 7,
                 reporter: { id: 51, name: 'Bob' },
               },
@@ -489,6 +497,7 @@ describe('integration/polymorphism-include-relationships', () => {
                 type: 'bug',
                 projectId: 1,
                 reporterId: null,
+                assigneeId: null,
                 severity: 'critical',
               },
               {
@@ -497,6 +506,7 @@ describe('integration/polymorphism-include-relationships', () => {
                 type: 'feature',
                 projectId: 1,
                 reporterId: null,
+                assigneeId: null,
                 priority: 9,
               },
             ],

@@ -8,7 +8,11 @@ import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RuntimeQueryable } from '@prisma-next/sql-orm-client';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import {
+  createExecutionContext,
+  createSqlExecutionStack,
+  type SqlRuntimeExtensionDescriptor,
+} from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { Client } from 'pg';
 import { getTestContract } from './helpers';
@@ -78,6 +82,7 @@ export async function createPgIntegrationRuntime(
   // must build the runtime against that same contract. Defaults to the base
   // sql-orm-client fixture.
   contractOverride?: Contract<SqlStorage>,
+  additionalExtensionPacks: readonly SqlRuntimeExtensionDescriptor<'postgres'>[] = [],
 ): Promise<PgIntegrationRuntime> {
   // Use a single client, not a pool: the `@prisma/dev` server is PGlite-backed
   // and allows only one concurrent connection. The mutation path opens a
@@ -102,7 +107,7 @@ export async function createPgIntegrationRuntime(
         target: postgresTarget,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [pgvectorRuntime],
+        extensionPacks: [pgvectorRuntime, ...additionalExtensionPacks],
       });
 
       const context = createExecutionContext<Contract<SqlStorage>>({ contract, stack });

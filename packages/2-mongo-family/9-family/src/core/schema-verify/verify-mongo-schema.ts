@@ -21,7 +21,7 @@ export interface VerifyMongoSchemaOptions {
   /**
    * Active framework components participating in this composition. Mongo
    * verification does not currently consult them, but the parameter exists
-   * for parity with `verifySqlSchema` so callers can pass the same envelope.
+   * for parity with the SQL family verify so callers can pass the same envelope.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', string>>;
 }
@@ -38,26 +38,31 @@ export function verifyMongoSchema(options: VerifyMongoSchemaOptions): VerifyData
     expectedIR,
   );
   const collectionControlPolicy = resolveMongoCollectionControlPolicy(contract);
-  const { root, issues, counts } = diffMongoSchemas(
+  const { failures, warnings } = diffMongoSchemas(
     canonicalLive,
     canonicalExpected,
     strict,
     collectionControlPolicy,
   );
 
-  const ok = counts.fail === 0;
+  const ok = failures.length === 0;
   const profileHash = typeof contract.profileHash === 'string' ? contract.profileHash : '';
 
   return {
     ok,
     ...ifDefined('code', ok ? undefined : VERIFY_CODE_SCHEMA_FAILURE),
-    summary: ok ? 'Schema matches contract' : `Schema verification found ${counts.fail} issue(s)`,
+    summary: ok
+      ? 'Schema matches contract'
+      : `Schema verification found ${failures.length} issue(s)`,
     contract: {
       storageHash: contract.storage.storageHash,
       ...(profileHash ? { profileHash } : {}),
     },
     target: { expected: contract.target },
-    schema: { issues, schemaDiffIssues: [], root, counts },
+    schema: {
+      issues: failures,
+      warnings: { issues: warnings },
+    },
     meta: {
       strict,
       ...ifDefined('contractPath', context?.contractPath),
