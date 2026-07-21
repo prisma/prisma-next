@@ -883,20 +883,13 @@ function buildScalarField(
     // `identity` field on the column IR — this pairing is the marker.
     attributes.push(parseDefaultAttributeString('@default(autoincrement())'));
   } else if (column.many === true && column.resolvedDefault?.kind === 'literal') {
-    // Postgres reports a list column's default as raw SQL text (e.g.
-    // `'{}'::text[]`), which the family-generic raw-default parser doesn't
-    // recognize as an array literal and falls back to printing
-    // `dbgenerated(...)` — a shape the interpreter always rejects on a list
-    // column, because `dbgenerated` only ever lowers to a storage-level
-    // function default and lists accept only literal defaults. The postgres
-    // control adapter already resolved the same raw text to a structured
-    // literal at introspection time (`resolvedDefault`), so print PSL's own
-    // literal-list syntax from that instead of re-deriving it from the raw
-    // string. PSL literal-list elements are string/number/boolean only; if
-    // the resolved value holds anything else (e.g. a nested object, or a
-    // null element), it has no literal-list spelling, so the default is
-    // omitted rather than printed as `dbgenerated` — an omitted default
-    // becomes a live-only "extra" under verify, not a false mismatch.
+    // A list column's default must print from `resolvedDefault`: the raw SQL
+    // text (e.g. `'{}'::text[]`) only parses to `dbgenerated(...)`, which the
+    // interpreter rejects on a list column (lists accept literal defaults
+    // only). PSL literal-list elements are string/number/boolean only, so a
+    // resolved value holding anything else has no spelling — the default is
+    // then omitted, which verify reports as a live-only "extra", not a
+    // false mismatch.
     const formatted = Array.isArray(column.resolvedDefault.value)
       ? formatPslListLiteralValue(column.resolvedDefault.value)
       : undefined;
