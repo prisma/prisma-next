@@ -1,7 +1,10 @@
 import { domainModelsAtDefaultNamespace } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import { describe, expect, it } from 'vitest';
-import { resolvePolymorphismInfo } from '../src/collection-contract';
+import {
+  POLYMORPHIC_DISCRIMINATOR_ALIAS,
+  resolvePolymorphismInfo,
+} from '../src/collection-contract';
 import {
   acquireRuntimeScope,
   createRowEnvelope,
@@ -180,6 +183,20 @@ describe('mapPolymorphicRow()', () => {
 
     expect(result).toEqual({ id: 2, title: 'Dark mode', type: 'feature', priority: 1 });
     expect(result).not.toHaveProperty('severity');
+  });
+
+  it('uses a hidden discriminator without exposing it in the mapped row', () => {
+    const contract = buildMixedPolyContract();
+    const polyInfo = resolvePolymorphismInfo(contract, 'public', 'Task')!;
+
+    const row = {
+      id: 2,
+      [POLYMORPHIC_DISCRIMINATOR_ALIAS]: 'feature',
+      features__priority: 1,
+    };
+    const result = mapPolymorphicRow(contract, 'public', 'Task', polyInfo, row);
+
+    expect(result).toEqual({ id: 2, priority: 1 });
   });
 
   it('maps row with known variant using variantName override', () => {

@@ -9,7 +9,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
  */
 export function resolveIdentityValue(
   column: StorageColumn,
-  codecHooks: Map<string, CodecControlHooks>,
+  codecHooks: ReadonlyMap<string, CodecControlHooks>,
   storageTypes: Record<string, StorageTypeInstance> = {},
 ): string | null {
   const referencedType = column.typeRef ? storageTypes[column.typeRef] : undefined;

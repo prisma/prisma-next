@@ -13,6 +13,7 @@ import {
   makePslNamespaceEntries,
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import { printPslFromAst } from '../src/print-psl';
 
@@ -751,8 +752,8 @@ describe('printPslFromAst', () => {
                     kind: 'field',
                     name: field.name,
                     typeName: field.typeName,
-                    typeNamespaceId: field.typeNamespaceId,
-                    typeContractSpaceId: field.typeContractSpaceId,
+                    ...ifDefined('typeNamespaceId', field.typeNamespaceId),
+                    ...ifDefined('typeContractSpaceId', field.typeContractSpaceId),
                     optional: true,
                     list: false,
                     attributes: [],

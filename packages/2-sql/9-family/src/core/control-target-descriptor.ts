@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   ContractSerializer,
+  DiffSubjectGranularity,
   MigratableTargetDescriptor,
   SchemaVerifier,
 } from '@prisma-next/framework-components/control';
@@ -10,7 +11,7 @@ import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { SqlControlAdapter } from './control-adapter';
 import type { SqlControlFamilyInstance } from './control-instance';
-import type { SqlDiffDatabaseSchema, SqlVerifyDatabaseSchema } from './migrations/schema-differ';
+import type { SqlSchemaDiffFn } from './migrations/schema-differ';
 import type { SqlMigrationPlanner, SqlMigrationRunner } from './migrations/types';
 
 /**
@@ -62,22 +63,36 @@ export interface SqlControlTargetDescriptor<
     describedContracts?: readonly SqlDescribedContractSpace[],
   ) => PslDocumentAst;
   /**
-   * The single combined database-schema diff of two derived representations —
-   * the target's black-box comparison. Every SQL target provides it (Postgres
-   * returns relational + policy issues; SQLite returns relational only). It is
-   * schema logic on the target, not database I/O, so it lives here rather than
-   * on the control adapter. How it computes the two issue sets is private.
-   * See {@link SqlDiffDatabaseSchema} / {@link SqlVerifyDatabaseSchema}.
+   * The full-tree node diff the family verify verdict derives from —
+   * expected-tree derivation, pre-diff normalization, the generic differ,
+   * and ownership scoping, all target-side. The family applies strict
+   * gating + control-policy disposition over the returned issues; verify
+   * rejects when a surviving issue is a failure.
    */
-  readonly diffDatabaseSchema: SqlDiffDatabaseSchema;
+  readonly diffSchema: SqlSchemaDiffFn;
   /**
-   * The same combined comparison as {@link diffDatabaseSchema}, wrapped in the
-   * verify envelope (`ok`/`summary`/`code`/`target`/`timings`) plus the
-   * pass/warn/fail tree the CLI renders. Verify calls this instead of
-   * `diffDatabaseSchema` so the relational walk that produces the tree runs
-   * once per verify, not once for the diff and again for the tree.
+   * Classifies a diff-tree node's `nodeKind` into its framework-neutral
+   * {@link DiffSubjectGranularity} — the target owns the full node vocabulary
+   * that appears in its diff tree (its own kinds plus the relational kinds it
+   * delegates to), so it is the one place that can resolve this. The family
+   * verdict calls it inline per issue (never stamping the result); the
+   * framework aggregate's unclaimed-elements sweep reaches the same
+   * classifier via the family instance's `classifySubjectGranularity`
+   * capability.
    */
-  readonly verifyDatabaseSchema: SqlVerifyDatabaseSchema;
+  readonly classifySubjectGranularity: (nodeKind: string) => DiffSubjectGranularity;
+  /**
+   * Classifies a diff-tree node's `nodeKind` into its storage `entityKind` —
+   * the same vocabulary the contract storage's `entries` dictionary keys use
+   * (e.g. `'table'`). Sibling of `classifySubjectGranularity`, resolved the
+   * same way: the target owns the full node vocabulary, so it is the one
+   * place that can resolve this. `undefined` for a node kind with no
+   * storage entity of its own (a column, an index, …). The framework
+   * aggregate's unclaimed-elements sweep reaches this via the family
+   * instance's `classifyEntityKind` capability, so it never hardcodes a
+   * family entity kind.
+   */
+  readonly classifyEntityKind: (nodeKind: string) => string | undefined;
   createPlanner(adapter: SqlControlAdapter<TTargetId>): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

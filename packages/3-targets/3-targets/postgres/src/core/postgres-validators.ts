@@ -4,6 +4,7 @@ export const PostgresRoleSchema = type({
   kind: "'role'",
   name: 'string',
   namespaceId: 'string',
+  'control?': "'external'",
 });
 
 export const PostgresRlsPolicySchema = type({
@@ -17,6 +18,12 @@ export const PostgresRlsPolicySchema = type({
   'using?': 'string',
   'withCheck?': 'string',
   permissive: 'boolean',
+});
+
+export const PostgresRlsEnablementSchema = type({
+  kind: "'rls'",
+  tableName: 'string',
+  namespaceId: 'string',
 });
 
 export const PostgresNativeEnumSchema = type({

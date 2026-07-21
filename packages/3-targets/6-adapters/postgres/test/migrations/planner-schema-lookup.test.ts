@@ -1,7 +1,8 @@
 import { asNamespaceId } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { ForeignKey } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlTableIRInput } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import {
   buildSchemaLookupMap,
   hasForeignKey,
@@ -10,27 +11,25 @@ import {
 } from '@prisma-next/target-postgres/planner-schema-lookup';
 import { describe, expect, it } from 'vitest';
 
-function makeTable(
-  overrides: Partial<SqlSchemaIR['tables'][string]> = {},
-): SqlSchemaIR['tables'][string] {
-  return {
+function makeTable(overrides: Partial<SqlTableIRInput> = {}): SqlSchemaIR['tables'][string] {
+  return new SqlTableIR({
     name: 'test',
     columns: {},
     foreignKeys: [],
     uniques: [],
     indexes: [],
     ...overrides,
-  };
+  });
 }
 
 describe('buildSchemaLookupMap', () => {
   it('creates a lookup entry for each table', () => {
-    const schema: SqlSchemaIR = {
+    const schema = new SqlSchemaIR({
       tables: {
         user: makeTable({ name: 'user' }),
         post: makeTable({ name: 'post' }),
       },
-    };
+    });
     const map = buildSchemaLookupMap(schema);
     expect(map.size).toBe(2);
     expect(map.has('user')).toBe(true);
@@ -38,20 +37,20 @@ describe('buildSchemaLookupMap', () => {
   });
 
   it('populates uniqueKeys from uniques', () => {
-    const schema: SqlSchemaIR = {
+    const schema = new SqlSchemaIR({
       tables: {
         user: makeTable({
           uniques: [{ columns: ['email'] }, { columns: ['tenant', 'slug'] }],
         }),
       },
-    };
+    });
     const lookup = buildSchemaLookupMap(schema).get('user')!;
     expect(lookup.uniqueKeys.has('email')).toBe(true);
     expect(lookup.uniqueKeys.has('tenant,slug')).toBe(true);
   });
 
   it('populates indexKeys and uniqueIndexKeys from indexes', () => {
-    const schema: SqlSchemaIR = {
+    const schema = new SqlSchemaIR({
       tables: {
         user: makeTable({
           indexes: [
@@ -60,7 +59,7 @@ describe('buildSchemaLookupMap', () => {
           ],
         }),
       },
-    };
+    });
     const lookup = buildSchemaLookupMap(schema).get('user')!;
     expect(lookup.indexKeys.has('created_at')).toBe(true);
     expect(lookup.indexKeys.has('email')).toBe(true);
@@ -69,7 +68,7 @@ describe('buildSchemaLookupMap', () => {
   });
 
   it('populates fkKeys with a structurally-unambiguous encoding', () => {
-    const schema: SqlSchemaIR = {
+    const schema = new SqlSchemaIR({
       tables: {
         post: makeTable({
           foreignKeys: [
@@ -77,21 +76,21 @@ describe('buildSchemaLookupMap', () => {
           ],
         }),
       },
-    };
+    });
     const lookup = buildSchemaLookupMap(schema).get('post')!;
     expect(lookup.fkKeys.has(JSON.stringify([['author_id'], 'user', ['id']]))).toBe(true);
   });
 });
 
 describe('hasUniqueConstraint', () => {
-  const schema: SqlSchemaIR = {
+  const schema = new SqlSchemaIR({
     tables: {
       user: makeTable({
         uniques: [{ columns: ['email'] }],
         indexes: [{ columns: ['tenant', 'slug'], unique: true }],
       }),
     },
-  };
+  });
   const lookup = buildSchemaLookupMap(schema).get('user')!;
 
   it('matches a declared unique constraint', () => {
@@ -112,14 +111,14 @@ describe('hasUniqueConstraint', () => {
 });
 
 describe('hasIndex', () => {
-  const schema: SqlSchemaIR = {
+  const schema = new SqlSchemaIR({
     tables: {
       user: makeTable({
         uniques: [{ columns: ['email'] }],
         indexes: [{ columns: ['created_at'], unique: false }],
       }),
     },
-  };
+  });
   const lookup = buildSchemaLookupMap(schema).get('user')!;
 
   it('matches a declared index', () => {
@@ -136,7 +135,7 @@ describe('hasIndex', () => {
 });
 
 describe('hasForeignKey', () => {
-  const schema: SqlSchemaIR = {
+  const schema = new SqlSchemaIR({
     tables: {
       post: makeTable({
         foreignKeys: [
@@ -149,14 +148,12 @@ describe('hasForeignKey', () => {
         ],
       }),
     },
-  };
+  });
   const lookup = buildSchemaLookupMap(schema).get('post')!;
 
   const fk = (
     overrides: Partial<ForeignKey> & Pick<ForeignKey, 'source' | 'target'>,
   ): ForeignKey => ({
-    constraint: true,
-    index: true,
     ...overrides,
   });
 

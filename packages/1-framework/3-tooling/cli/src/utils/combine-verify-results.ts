@@ -12,11 +12,11 @@ export interface CombinedVerifyResult {
 
 /**
  * Collapse the aggregate verifier's per-space contract-satisfaction results
- * into a single {@link VerifyDatabaseSchemaResult} for the existing CLI
- * display surface, and carry the deduplicated unclaimed-elements list
- * alongside it. Concatenates issues across spaces; sums counts; uses the app
- * space's result as the structural envelope (storage hash, target). Extras are
- * already stripped from each per-space result, so nothing here duplicates an
+ * into a single {@link VerifyDatabaseSchemaResult} for the CLI display
+ * surface, and carry the deduplicated unclaimed-elements list alongside it.
+ * Concatenates the issue lists across spaces; uses the app space's result as
+ * the structural envelope (storage hash, target). Extras are already
+ * stripped from each per-space result, so nothing here duplicates an
  * unclaimed element per space.
  *
  * **Unclaimed disposition.** In strict mode a non-empty `unclaimed` list fails
@@ -50,21 +50,14 @@ export function combineVerifyResults(
   let okAll = true;
   let firstFailure: VerifyDatabaseSchemaResult | undefined;
   let issues: VerifyDatabaseSchemaResult['schema']['issues'] = [];
-  let schemaDiffIssues: VerifyDatabaseSchemaResult['schema']['schemaDiffIssues'] = [];
-  const counts = { pass: 0, warn: 0, fail: 0, totalNodes: 0 };
-  const childRoots: Array<VerifyDatabaseSchemaResult['schema']['root']> = [];
+  let warningIssues: VerifyDatabaseSchemaResult['schema']['issues'] = [];
   for (const [, result] of perSpace) {
     if (!result.ok) {
       okAll = false;
       if (firstFailure === undefined) firstFailure = result;
     }
     issues = [...issues, ...result.schema.issues];
-    schemaDiffIssues = [...schemaDiffIssues, ...result.schema.schemaDiffIssues];
-    counts.pass += result.schema.counts.pass;
-    counts.warn += result.schema.counts.warn;
-    counts.fail += result.schema.counts.fail;
-    counts.totalNodes += result.schema.counts.totalNodes;
-    childRoots.push(result.schema.root);
+    warningIssues = [...warningIssues, ...(result.schema.warnings?.issues ?? [])];
   }
 
   const unclaimedFails = strict && unclaimed.length > 0;
@@ -91,19 +84,7 @@ export function combineVerifyResults(
       target: appResult.target,
       schema: {
         issues,
-        schemaDiffIssues,
-        root: {
-          status: ok ? 'pass' : 'fail',
-          kind: 'aggregate',
-          name: 'aggregate',
-          contractPath: '',
-          code: 'AGGREGATE',
-          message: ok ? 'Aggregate schema matches' : 'Aggregate schema mismatch',
-          expected: undefined,
-          actual: undefined,
-          children: childRoots,
-        },
-        counts,
+        warnings: { issues: warningIssues },
       },
       meta: { strict },
       timings: { total: 0 },

@@ -1,10 +1,8 @@
 import type {
   Contract,
   ContractMarkerRecord,
-  ControlPolicy,
   LedgerEntryRecord,
 } from '@prisma-next/contract/types';
-import { effectiveControlPolicy } from '@prisma-next/contract/types';
 import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
@@ -13,6 +11,7 @@ import type {
   ControlFamilyInstance,
   ControlStack,
   CoreSchemaView,
+  DiffSubjectGranularity,
   MigrationPlanOperation,
   OperationPreview,
   OperationPreviewCapable,
@@ -25,7 +24,6 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   APP_SPACE_ID,
-  dispositionForCategory,
   SchemaTreeNode,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
@@ -52,8 +50,13 @@ import type {
   SqlControlTargetDescriptor,
   SqlDescribedContractSpace,
 } from './control-target-descriptor';
+import {
+  classifyDiffEntityKind,
+  classifyDiffSubjectGranularity,
+  verifySqlSchemaByDiff,
+} from './diff/schema-verify';
 import { SqlContractSerializer } from './ir/sql-contract-serializer';
-import type { DiffDatabaseSchemaInput } from './migrations/schema-differ';
+import type { SqlSchemaDiffFn } from './migrations/schema-differ';
 import type {
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
@@ -234,6 +237,26 @@ export interface SqlControlFamilyInstance
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): VerifyDatabaseSchemaResult;
 
+  /**
+   * Classifies a diff issue's subject granularity on demand, resolved from
+   * its node's `nodeKind` via the target's classifier. Satisfies the
+   * {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+   * capability that framework consumers spanning contract spaces (the
+   * migration aggregate's unclaimed-elements sweep) detect via
+   * `hasSchemaSubjectClassifier` and call instead of reading family/target
+   * node vocabulary. Nothing is stamped on the issue or the node.
+   */
+  classifySubjectGranularity(issue: SchemaDiffIssue): DiffSubjectGranularity | undefined;
+
+  /**
+   * Classifies a diff issue's subject storage `entityKind` on demand,
+   * resolved from its node's `nodeKind` via the target's classifier —
+   * sibling of `classifySubjectGranularity` above, part of the same
+   * {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+   * capability. Nothing is stamped on the issue or the node.
+   */
+  classifyEntityKind(issue: SchemaDiffIssue): string | undefined;
+
   sign(options: {
     readonly driver: SqlControlDriverInstance<string>;
     readonly contract: unknown;
@@ -297,6 +320,7 @@ export interface SqlControlFamilyInstance
       readonly migrationName: string;
       readonly migrationHash: string;
       readonly operations: readonly unknown[];
+      readonly destinationContractJson?: unknown;
     };
   }): Promise<void>;
 
@@ -542,6 +566,29 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     SqlControlTargetDescriptor<TTargetId, unknown>,
     'reading the optional target-descriptor inferPslContract hook'
   >(target).inferPslContract;
+  // The full-tree node diff the verify VERDICT derives from. Read lazily so
+  // construction-only stub descriptors (schema-view tests) keep working; the
+  // throw happens at verify time.
+  const diffSchema = blindCast<
+    { readonly diffSchema?: SqlSchemaDiffFn },
+    'reading the target-descriptor diffSchema hook'
+  >(target).diffSchema;
+  // The target's nodeKind → granularity classifier, resolved on demand by the
+  // verdict and by the instance's `classifySubjectGranularity` method below —
+  // never stamped onto an issue. Read lazily for the same
+  // construction-only-stub reason as `diffSchema`; the throw happens at call
+  // time.
+  const targetGranularityOf = blindCast<
+    { readonly classifySubjectGranularity?: (nodeKind: string) => DiffSubjectGranularity },
+    'reading the target-descriptor classifySubjectGranularity hook'
+  >(target).classifySubjectGranularity;
+  // The target's nodeKind → storage entityKind classifier — sibling of
+  // `targetGranularityOf` above, read the same lazy way for the same
+  // construction-only-stub reason.
+  const targetEntityKindOf = blindCast<
+    { readonly classifyEntityKind?: (nodeKind: string) => string | undefined },
+    'reading the target-descriptor classifyEntityKind hook'
+  >(target).classifyEntityKind;
   // `contract infer` needs each extension pack's already-assembled contract,
   // carried as-is (no merging — that is the contract-spaces machinery's
   // concern), paired with the `spaceId` its descriptor was registered under
@@ -554,24 +601,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         ? [{ spaceId: extension.id, contract: extension.contractSpace.contractJson }]
         : [],
   );
-  // The combined database-schema verify is a required target-descriptor
-  // operation: every SQL target provides it, wrapping the same comparison
-  // `diffDatabaseSchema` runs in the verify envelope plus the pass/warn/fail
-  // tree the CLI renders. Read it off the descriptor like the other
-  // target-owned hooks.
-  const verifyDatabaseSchema = blindCast<
-    {
-      readonly verifyDatabaseSchema?: (
-        input: DiffDatabaseSchemaInput,
-      ) => VerifyDatabaseSchemaResult;
-    },
-    'reading the required target-descriptor verifyDatabaseSchema hook'
-  >(target).verifyDatabaseSchema;
-  if (!verifyDatabaseSchema) {
-    throw new Error(
-      `SQL target "${target.targetId}" is missing the required verifyDatabaseSchema descriptor operation`,
-    );
-  }
   const deserializeWithTargetSerializer = (contractOrJson: unknown): Contract<SqlStorage> => {
     const serializer = targetSerializer ?? new SqlContractSerializer();
     const json =
@@ -729,42 +758,61 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
     }): VerifyDatabaseSchemaResult {
       const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
-      // Verify is a thin consumer of the target's black-box comparison: it
-      // introspects the actual schema (already in `options.schema`), calls the
-      // target's required `verifyDatabaseSchema`, and rejects when a surviving
-      // issue is a failure. It composes no diffing itself and is blind to how
-      // the comparison works.
-      const sqlResult = verifyDatabaseSchema({
+      if (!diffSchema) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required diffSchema descriptor operation`,
+        );
+      }
+      if (!targetGranularityOf) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required classifySubjectGranularity descriptor operation`,
+        );
+      }
+      // THE VERDICT: the target's full-tree node diff, graded by the
+      // family's post-diff filters (strict gating + control-policy
+      // disposition), plus the codec verifyType hook findings. The result
+      // is issue-based — `ok` holds exactly when both issue lists are empty.
+      return verifySqlSchemaByDiff({
         contract,
         schema: options.schema,
         strict: options.strict,
-        typeMetadataRegistry,
         frameworkComponents: options.frameworkComponents,
+        diffSchema,
+        granularityOf: targetGranularityOf,
       });
-      // Control-policy suppression of the structural (e.g. RLS policy) diff
-      // issues is a verify-side post-step — the combined diff returns them
-      // ownership-filtered, and a suppressed control policy drops them here.
-      const schemaDiffIssues = filterSchemaDiffIssues(
-        sqlResult.schema.schemaDiffIssues,
-        contract.defaultControlPolicy,
-      );
-      const relationalFails = sqlResult.schema.counts.fail;
-      if (schemaDiffIssues.length === 0) {
-        if (schemaDiffIssues === sqlResult.schema.schemaDiffIssues) return sqlResult;
-        return { ...sqlResult, schema: { ...sqlResult.schema, schemaDiffIssues } };
+    },
+
+    /**
+     * Classifies a diff issue's subject granularity on demand, by resolving
+     * its node's `nodeKind` through the target's classifier — the
+     * {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+     * capability. Framework consumers spanning contract spaces (the
+     * migration aggregate's unclaimed-elements sweep) detect and call this
+     * instead of reaching into the concrete schema-IR node, which they
+     * cannot read; nothing is stamped on the issue or the node.
+     */
+    classifySubjectGranularity(issue: SchemaDiffIssue): DiffSubjectGranularity | undefined {
+      if (!targetGranularityOf) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required classifySubjectGranularity descriptor operation`,
+        );
       }
-      const totalFails = relationalFails + schemaDiffIssues.length;
-      return {
-        ...sqlResult,
-        ok: false,
-        code: sqlResult.code ?? 'PN-RUN-3010',
-        summary: `Database schema does not satisfy contract (${totalFails} failure${totalFails === 1 ? '' : 's'})`,
-        schema: {
-          ...sqlResult.schema,
-          schemaDiffIssues,
-          counts: { ...sqlResult.schema.counts, fail: totalFails },
-        },
-      };
+      return classifyDiffSubjectGranularity(issue, targetGranularityOf);
+    },
+    /**
+     * Classifies a diff issue's subject storage `entityKind` on demand, by
+     * resolving its node's `nodeKind` through the target's classifier —
+     * the sibling of `classifySubjectGranularity` above, and part of the
+     * same {@link import('@prisma-next/framework-components/control').SchemaSubjectClassifierCapable}
+     * capability.
+     */
+    classifyEntityKind(issue: SchemaDiffIssue): string | undefined {
+      if (!targetEntityKindOf) {
+        throw new Error(
+          `SQL target "${target.targetId}" is missing the required classifyEntityKind descriptor operation`,
+        );
+      }
+      return classifyDiffEntityKind(issue, targetEntityKindOf);
     },
     async sign(options: {
       readonly driver: SqlControlDriverInstance<string>;
@@ -922,6 +970,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         readonly migrationName: string;
         readonly migrationHash: string;
         readonly operations: readonly unknown[];
+        readonly destinationContractJson?: unknown;
       };
     }): Promise<void> {
       return getControlAdapter().writeLedgerEntry(options.driver, options.space, options.entry);
@@ -1114,32 +1163,4 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       };
     },
   };
-}
-
-/**
- * Filters the structural schema-diff issues (from `diffDatabaseSchema`) through
- * the contract's `defaultControlPolicy`. Issues whose outcome maps to a suppressed
- * category under the effective policy are removed. This mirrors the control-policy
- * filtering applied by `verifySqlSchema` for table/column-level findings.
- *
- * Outcome → category mapping:
- * - `'extra'`    → `'extraAuxiliary'`    (an extra auxiliary entity, e.g. an RLS policy)
- * - `'missing'`  → `'declaredMissing'`
- * - `'mismatch'` → `'declaredIncompatible'`
- */
-export function filterSchemaDiffIssues(
-  issues: readonly SchemaDiffIssue[],
-  defaultControlPolicy: ControlPolicy | undefined,
-): readonly SchemaDiffIssue[] {
-  if (issues.length === 0) return issues;
-  const policy = effectiveControlPolicy(undefined, defaultControlPolicy);
-  return issues.filter((issue) => {
-    const category =
-      issue.outcome === 'extra'
-        ? ('extraAuxiliary' as const)
-        : issue.outcome === 'missing'
-          ? ('declaredMissing' as const)
-          : ('declaredIncompatible' as const);
-    return dispositionForCategory(policy, category) !== 'suppress';
-  });
 }

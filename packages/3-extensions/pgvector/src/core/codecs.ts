@@ -43,6 +43,22 @@ const vectorParamsSchema = arktype({
 
 const PG_VECTOR_META = { db: { sql: { postgres: { nativeType: 'vector' } } } } as const;
 
+function parseVector(value: string): number[] {
+  if (!value.startsWith('[') || !value.endsWith(']')) {
+    throw new Error(`Invalid vector format: expected "[...]", got "${value}"`);
+  }
+  const content = value.slice(1, -1).trim();
+  return content === ''
+    ? []
+    : content.split(',').map((entry) => {
+        const number = Number.parseFloat(entry.trim());
+        if (Number.isNaN(number)) {
+          throw new Error(`Invalid vector value: "${entry}" is not a number`);
+        }
+        return number;
+      });
+}
+
 export class PgVectorCodec extends CodecImpl<
   typeof VECTOR_CODEC_ID,
   readonly ['equality'],
@@ -60,8 +76,13 @@ export class PgVectorCodec extends CodecImpl<
     if (!Array.isArray(value)) {
       throw new Error('Vector value must be an array of numbers');
     }
-    if (!value.every((v) => typeof v === 'number')) {
-      throw new Error('Vector value must contain only numbers');
+    for (const element of value) {
+      if (typeof element !== 'number') {
+        throw new Error('Vector value must contain only numbers');
+      }
+      if (!Number.isFinite(element)) {
+        throw new Error('Vector value must contain only finite numbers');
+      }
     }
     if (value.length !== this.length) {
       throw new Error(`Vector length mismatch: expected ${this.length}, got ${value.length}`);
@@ -77,32 +98,23 @@ export class PgVectorCodec extends CodecImpl<
     if (typeof wire !== 'string') {
       throw new Error('Vector wire value must be a string');
     }
-    if (!wire.startsWith('[') || !wire.endsWith(']')) {
-      throw new Error(`Invalid vector format: expected "[...]", got "${wire}"`);
-    }
-    const content = wire.slice(1, -1).trim();
-    const parsed =
-      content === ''
-        ? []
-        : content.split(',').map((v) => {
-            const num = Number.parseFloat(v.trim());
-            if (Number.isNaN(num)) {
-              throw new Error(`Invalid vector value: "${v}" is not a number`);
-            }
-            return num;
-          });
-    this.assertVector(parsed);
-    return parsed;
-  }
-
-  encodeJson(value: number[]): JsonValue {
+    const value = parseVector(wire);
     this.assertVector(value);
     return value;
   }
 
+  encodeJson(value: number[]): JsonValue {
+    this.assertVector(value);
+    return `[${value.join(',')}]`;
+  }
+
   decodeJson(json: JsonValue): number[] {
-    this.assertVector(json);
-    return json;
+    if (typeof json !== 'string') {
+      throw new Error('Vector database JSON value must be a string');
+    }
+    const value = parseVector(json);
+    this.assertVector(value);
+    return value;
   }
 }
 

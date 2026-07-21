@@ -17,9 +17,11 @@ import {
   pgBoolDescriptor,
   pgByteaDescriptor,
   pgCharDescriptor,
+  pgDateDescriptor,
   pgFloat4Descriptor,
   pgFloat8Descriptor,
   pgFloatDescriptor,
+  pgInetDescriptor,
   pgInt2Descriptor,
   pgInt4Descriptor,
   pgInt8Descriptor,
@@ -59,6 +61,7 @@ const descriptorByScalar = {
   float4: pgFloat4Descriptor,
   float8: pgFloat8Descriptor,
   numeric: pgNumericDescriptor,
+  date: pgDateDescriptor,
   timestamp: pgTimestampDescriptor,
   timestamptz: pgTimestamptzDescriptor,
   time: pgTimeDescriptor,
@@ -71,6 +74,7 @@ const descriptorByScalar = {
   json: pgJsonDescriptor,
   jsonb: pgJsonbDescriptor,
   uuid: pgUuidDescriptor,
+  inet: pgInetDescriptor,
 } as const satisfies Record<string, AnyCodecDescriptor>;
 
 type ScalarName = keyof typeof descriptorByScalar;
@@ -91,10 +95,12 @@ describe('adapter-postgres codecs', () => {
       'char',
       'character',
       'character varying',
+      'date',
       'double precision',
       'float',
       'float4',
       'float8',
+      'inet',
       'int',
       'int2',
       'int4',
@@ -206,6 +212,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'sql-text', value: 'portable text' },
       { scalar: 'text', value: 'hello world' },
       { scalar: 'uuid', value: '550e8400-e29b-41d4-a716-446655440000' },
+      { scalar: 'inet', value: '192.168.1.1' },
     ] as const)('keeps $scalar values unchanged', async ({ scalar, value }) => {
       const codec = codecForScalar(scalar) as {
         encode: (input: string, ctx: SqlCodecCallContext) => Promise<string>;
@@ -282,6 +289,22 @@ describe('adapter-postgres codecs', () => {
 
     it('decodes number to string', async () => {
       expect(await numericCodec.decode(42, {})).toBe('42');
+    });
+  });
+
+  describe('date codec', () => {
+    const dateCodec = codecForScalar('date') as {
+      encode: (value: Date, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: Date, ctx: SqlCodecCallContext) => Promise<Date>;
+    };
+
+    it('encodes a Date as its UTC calendar date, not the pg driver Date auto-conversion', async () => {
+      expect(await dateCodec.encode(new Date(Date.UTC(2024, 0, 15)), {})).toBe('2024-01-15');
+    });
+
+    it('decodes the driver local-midnight Date to the equivalent UTC-midnight instant', async () => {
+      const decoded = await dateCodec.decode(new Date(2024, 0, 15), {});
+      expect(decoded.getTime()).toBe(Date.UTC(2024, 0, 15));
     });
   });
 
@@ -376,15 +399,27 @@ describe('adapter-postgres codecs', () => {
       expect(Array.from(decoded)).toEqual([0x01, 0x02, 0x03]);
     });
 
-    it('encodes Uint8Array to base64 in JSON form', () => {
-      const input = new Uint8Array([0x68, 0x65, 0x6c, 0x6c, 0x6f]);
-      expect(byteaCodec.encodeJson(input)).toBe('aGVsbG8=');
+    it('decodes Postgres JSON bytea hex text', () => {
+      expect(byteaCodec.decodeJson('\\x0102feff')).toEqual(
+        new Uint8Array([0x01, 0x02, 0xfe, 0xff]),
+      );
     });
 
-    it('decodes base64 string back to Uint8Array in JSON form', () => {
-      const decoded = byteaCodec.decodeJson('aGVsbG8=');
-      expect(decoded).toBeInstanceOf(Uint8Array);
-      expect(Array.from(decoded)).toEqual([0x68, 0x65, 0x6c, 0x6c, 0x6f]);
+    it('rejects malformed Postgres JSON bytea hex text', () => {
+      expect(() => byteaCodec.decodeJson('0102')).toThrow(
+        'Expected Postgres bytea hex text to start with "\\x"',
+      );
+      expect(() => byteaCodec.decodeJson('\\x123')).toThrow(
+        'Invalid Postgres bytea hex text length: 3',
+      );
+      expect(() => byteaCodec.decodeJson('\\x01zz')).toThrow(
+        'Invalid Postgres bytea hex pair "zz" at offset 2',
+      );
+    });
+
+    it('encodes Uint8Array to Postgres JSON bytea hex text', () => {
+      const input = new Uint8Array([0x68, 0x65, 0x6c, 0x6c, 0x6f]);
+      expect(byteaCodec.encodeJson(input)).toBe('\\x68656c6c6f');
     });
 
     it('round-trips through encodeJson / decodeJson', () => {
@@ -395,20 +430,8 @@ describe('adapter-postgres codecs', () => {
     });
 
     it('throws on non-string input to decodeJson', () => {
-      expect(() => byteaCodec.decodeJson(42)).toThrow('Expected base64 string for pg/bytea@1');
-    });
-
-    it('throws on invalid base64 characters in decodeJson', () => {
-      // The bytea codec must reject malformed base64 rather than silently skipping invalid characters and producing arbitrary bytes — see https://github.com/prisma/prisma-next/pull/428.
-      expect(() => byteaCodec.decodeJson('!!!not base64!!!')).toThrow(
-        /Invalid base64 string for pg\/bytea@1/,
-      );
-    });
-
-    it('throws on base64 with stray whitespace in decodeJson', () => {
-      // Whitespace decodes to valid bytes via Buffer.from, but the round-trip comparison rejects non-canonical input.
-      expect(() => byteaCodec.decodeJson('SGVs bG8=')).toThrow(
-        /Invalid base64 string for pg\/bytea@1/,
+      expect(() => byteaCodec.decodeJson(42)).toThrow(
+        'Expected Postgres bytea hex text to start with "\\x"',
       );
     });
   });
@@ -446,6 +469,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'float8', nativeType: 'double precision' },
       { scalar: 'bit varying', nativeType: 'bit varying' },
       { scalar: 'uuid', nativeType: 'uuid' },
+      { scalar: 'inet', nativeType: 'inet' },
     ];
 
     it.each(postgresNativeTypeCases)('sets postgres nativeType metadata for $scalar', ({
@@ -477,6 +501,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'bool' },
       { scalar: 'int4' },
       { scalar: 'uuid' },
+      { scalar: 'inet' },
     ];
 
     it.each(paramsSchemaPresenceCases)('descriptor for $scalar carries a paramsSchema', ({
@@ -488,17 +513,26 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('encodeJson / decodeJson', () => {
+    describe('pg/numeric@1', () => {
+      const codec = codecForScalar('numeric');
+
+      it('uses the Postgres JSON number representation', () => {
+        expect(codec.encodeJson('1234.5')).toBe(1234.5);
+        expect(codec.decodeJson(1234.5)).toBe('1234.5');
+      });
+    });
+
     describe('pg/timestamptz@1', () => {
       const codec = codecForScalar('timestamptz');
 
-      it('encodes Date to ISO string', () => {
+      it('encodes Date to the Postgres JSON timestamptz representation', () => {
         expect(codec.encodeJson(new Date('2024-01-15T00:00:00.000Z'))).toBe(
-          '2024-01-15T00:00:00.000Z',
+          '2024-01-15T00:00:00.000+00:00',
         );
       });
 
-      it('decodes ISO string to Date', () => {
-        const result = codec.decodeJson('2024-01-15T00:00:00.000Z') as Date;
+      it('decodes Postgres JSON timestamptz text to Date', () => {
+        const result = codec.decodeJson('2024-01-15T00:00:00.000+00:00') as Date;
         expect(result).toBeInstanceOf(Date);
         expect(result).toEqual(new Date('2024-01-15T00:00:00.000Z'));
       });
@@ -524,14 +558,14 @@ describe('adapter-postgres codecs', () => {
     describe('pg/timestamp@1', () => {
       const codec = codecForScalar('timestamp');
 
-      it('encodes Date to ISO string', () => {
+      it('encodes Date to the Postgres JSON timestamp representation', () => {
         expect(codec.encodeJson(new Date('2024-01-15T00:00:00.000Z'))).toBe(
-          '2024-01-15T00:00:00.000Z',
+          '2024-01-15T00:00:00.000',
         );
       });
 
-      it('decodes ISO string to Date', () => {
-        const result = codec.decodeJson('2024-01-15T00:00:00.000Z') as Date;
+      it('decodes Postgres JSON timestamp text to Date', () => {
+        const result = codec.decodeJson('2024-01-15T00:00:00.000') as Date;
         expect(result).toBeInstanceOf(Date);
         expect(result).toEqual(new Date('2024-01-15T00:00:00.000Z'));
       });
@@ -578,6 +612,20 @@ describe('adapter-postgres codecs', () => {
     it('resolves pgUuidDescriptor by codec id from the registry', () => {
       const resolved = postgresCodecRegistry.descriptorFor('pg/uuid@1');
       expect(resolved).toBe(pgUuidDescriptor);
+    });
+  });
+
+  describe('pg/inet@1 registry resolution', () => {
+    it('resolves pgInetDescriptor by codec id from the registry', () => {
+      const resolved = postgresCodecRegistry.descriptorFor('pg/inet@1');
+      expect(resolved).toBe(pgInetDescriptor);
+    });
+  });
+
+  describe('pg/date@1 registry resolution', () => {
+    it('resolves pgDateDescriptor by codec id from the registry', () => {
+      const resolved = postgresCodecRegistry.descriptorFor('pg/date@1');
+      expect(resolved).toBe(pgDateDescriptor);
     });
   });
 

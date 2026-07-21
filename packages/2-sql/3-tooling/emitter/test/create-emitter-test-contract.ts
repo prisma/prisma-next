@@ -2,20 +2,25 @@ import {
   type Contract,
   type ContractModelBase,
   type ContractValueObject,
+  profileHash,
   UNBOUND_DOMAIN_NAMESPACE_ID,
 } from '@prisma-next/contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { normalizeRootSqlStorage } from './sql-storage-fixture';
 
 export function createEmitterTestContract(
-  overrides: Partial<Contract> & {
-    models?: Record<string, ContractModelBase>;
-    valueObjects?: Record<string, ContractValueObject>;
+  overrides: Partial<Omit<Contract, 'storage'>> & {
+    models?: Record<string, ContractModelBase> | undefined;
+    valueObjects?: Record<string, ContractValueObject> | undefined;
+    storage?: Record<string, unknown> | undefined;
   } = {},
 ): Contract {
   const { models, domain, storage, valueObjects, ...rest } = overrides;
-  const merged = {
-    targetFamily: 'sql' as const,
+  const resolvedStorage = Object.hasOwn(overrides, 'storage')
+    ? normalizeRootSqlStorage(storage)
+    : normalizeRootSqlStorage({ tables: {} });
+  const contract: Contract = {
+    targetFamily: 'sql',
     target: 'test-db',
     roots: {},
     domain:
@@ -28,18 +33,10 @@ export function createEmitterTestContract(
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    profileHash: 'sha256:test' as const,
+    profileHash: profileHash('sha256:test'),
     ...rest,
+    storage: resolvedStorage as Contract['storage'],
   };
-  if (Object.hasOwn(overrides, 'storage')) {
-    merged.storage =
-      storage === undefined
-        ? (storage as Contract['storage'])
-        : (normalizeRootSqlStorage(storage) ?? storage);
-  } else {
-    merged.storage = normalizeRootSqlStorage({ tables: {} }) ?? { tables: {} };
-  }
-  const contract = merged as Contract;
   for (const [namespaceId, ns] of Object.entries(contract.domain.namespaces)) {
     for (const model of Object.values(ns.models ?? {})) {
       const storage = model.storage;

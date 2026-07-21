@@ -4,7 +4,6 @@ import type {
   ContractSpace,
   ControlAdapterDescriptor,
   ControlExtensionDescriptor,
-  DiffIssue,
   MigrationOperationPolicy,
   MigrationPlan,
   MigrationPlannerConflict,
@@ -17,7 +16,8 @@ import type {
   MigrationRunnerResult,
   OperationContext,
   OpFactoryCall,
-  SchemaIssue,
+  SchemaDiffIssue,
+  SchemaOwnership,
 } from '@prisma-next/framework-components/control';
 import type { AggregateMigrationEdgeRef } from '@prisma-next/migration-tools/aggregate';
 import type {
@@ -28,7 +28,7 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
-import type { SqlSchemaIR, SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
+import type { SqlSchemaIRNode } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlAdapter } from '../control-adapter';
 
@@ -99,20 +99,28 @@ export interface FieldEventContext {
 }
 
 export interface CodecControlHooks<TTargetDetails = unknown> {
+  /**
+   * `schema` is typed as the family-level `SqlSchemaIRNode` (not the concrete
+   * `SqlSchemaIR` class) because the actual value handed in is whatever
+   * per-namespace node the calling target's tree shape produces — a flat
+   * `SqlSchemaIR` for SQLite, a `PostgresNamespaceSchemaNode` for Postgres —
+   * read structurally for its `tables`/`nativeEnums` fields. Hooks that need
+   * the concrete Postgres shape narrow via `PostgresNamespaceSchemaNode.is(schema)`.
+   */
   planTypeOperations?: (options: {
     readonly typeName: string;
     readonly typeInstance: StorageTypeInstance;
     readonly contract: Contract<SqlStorage>;
-    readonly schema: SqlSchemaIR;
+    readonly schema: SqlSchemaIRNode;
     readonly schemaName?: string;
     readonly policy: MigrationOperationPolicy;
   }) => StorageTypePlanResult<TTargetDetails>;
   verifyType?: (options: {
     readonly typeName: string;
     readonly typeInstance: StorageTypeInstance;
-    readonly schema: SqlSchemaIR;
+    readonly schema: SqlSchemaIRNode;
     readonly schemaName?: string;
-  }) => readonly SchemaIssue[];
+  }) => readonly SchemaDiffIssue[];
   introspectTypes?: (options: {
     readonly driver: SqlControlDriverInstance<string>;
     readonly schemaName?: string;
@@ -274,12 +282,12 @@ export type SqlPlannerConflictKind =
   | 'controlPolicySuppressedCall';
 
 export interface SqlPlannerConflictLocation {
-  readonly namespace?: string;
-  readonly table?: string;
+  readonly namespaceId?: string;
+  readonly entityKind?: string;
+  readonly entityName?: string;
   readonly column?: string;
   readonly index?: string;
   readonly constraint?: string;
-  readonly type?: string;
 }
 
 export interface SqlPlannerConflict extends MigrationPlannerConflict {
@@ -346,15 +354,15 @@ export interface SqlMigrationPlannerPlanOptions {
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   /**
-   * Caller-supplied keep-predicate the planner applies to its schema diff
-   * (via `SchemaDiff.filter`) before building operations. The orchestration
-   * constructs it so the diff findings reaching op-building are exactly the
-   * contract space's own — e.g. dropping the `extra` findings for elements a
-   * sibling contract space declares, so the planner never emits DROP ops
-   * against another space's tables. The planner applies it blindly and holds
-   * no ownership logic. Absent for single-space plans.
+   * Ownership oracle over the whole contract-space composition (the passive
+   * aggregate). The planner asks it, per live extra node, whether any space
+   * declares that entity: a sibling-owned node is left untouched, an unowned
+   * node is a genuine extra it may drop under a destructive policy. The
+   * planner holds no list of other spaces' names — ownership lives in the
+   * aggregate; it only asks. Absent for a single-space plan handed no
+   * aggregate. See {@link SchemaOwnership}.
    */
-  readonly keepDiffIssue?: (issue: DiffIssue) => boolean;
+  readonly ownership?: SchemaOwnership;
 }
 
 export interface SqlMigrationPlanner<TTargetDetails> {

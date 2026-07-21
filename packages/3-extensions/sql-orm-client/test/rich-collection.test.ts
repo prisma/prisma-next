@@ -44,7 +44,7 @@ describe('SQL ORM collections with rich AST plans', () => {
 
     const plan = runtime.executions[0]?.plan;
     expect(plan?.ast).toBeInstanceOf(SelectAst);
-    expect((plan?.ast as SelectAst).limit).toBe(1);
+    expect((plan!.ast as SelectAst).limit).toBe(1);
   });
 
   it('executes grouped aggregates backed by aggregate expressions', async () => {

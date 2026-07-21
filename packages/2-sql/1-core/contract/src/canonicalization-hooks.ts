@@ -2,6 +2,7 @@ import type { PreserveEmptyPredicate, StorageSort } from '@prisma-next/contract/
 import {
   createPreserveEmptyPredicate,
   createStorageSort,
+  matchesPathPattern,
   type NamedArraySortTarget,
   type PathPattern,
 } from '@prisma-next/contract/hashing-utils';
@@ -10,15 +11,42 @@ const preserveEmptyPatterns = [
   ['storage', 'namespaces', '*', 'entries', 'table'],
   ['storage', 'namespaces', '*', 'entries', 'table', '*'],
   ['storage', 'namespaces', '*', 'entries', 'table', '*', ['uniques', 'indexes', 'foreignKeys']],
-  ['storage', 'namespaces', '*', 'entries', 'table', '*', 'foreignKeys', ['constraint', 'index']],
+  // A column default's literal payload is data, not shape — `{ kind:
+  // 'literal', value: false }` (or `value: []`) must survive the
+  // default-omission walk or the emitted contract fails its own
+  // validation on the next read (PN-CLI-4003 on `Boolean @default(false)`).
+  ['storage', 'namespaces', '*', 'entries', 'table', '*', 'columns', '*', 'default', 'value'],
 ] as const satisfies readonly PathPattern[];
+
+// A literal column default's value is user data, not omittable structure:
+// `@default(false)` (and empty objects/arrays at any depth inside the value)
+// must survive canonicalization, or the emitted contract fails the runtime's
+// structural validation with `default.value … (was missing)`.
+const columnDefaultValuePrefix = [
+  'storage',
+  'namespaces',
+  '*',
+  'entries',
+  'table',
+  '*',
+  'columns',
+  '*',
+  'default',
+  'value',
+] as const satisfies PathPattern;
+
+const isColumnDefaultValuePath = (path: readonly string[]): boolean =>
+  path.length >= columnDefaultValuePrefix.length &&
+  matchesPathPattern(path.slice(0, columnDefaultValuePrefix.length), columnDefaultValuePrefix);
 
 const sortTargets = [
   { path: ['namespaces', '*', 'entries', 'table', '*'], arrayKeys: ['indexes', 'uniques'] },
 ] as const satisfies readonly NamedArraySortTarget[];
 
-const shouldPreserveEmpty: PreserveEmptyPredicate =
-  createPreserveEmptyPredicate(preserveEmptyPatterns);
+const matchesPreserveEmptyPattern = createPreserveEmptyPredicate(preserveEmptyPatterns);
+
+const shouldPreserveEmpty: PreserveEmptyPredicate = (path) =>
+  isColumnDefaultValuePath(path) || matchesPreserveEmptyPattern(path);
 
 const sortStorage: StorageSort = createStorageSort(sortTargets);
 

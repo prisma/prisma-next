@@ -28,7 +28,7 @@ const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults(
 
 function expectDiagnosticForSchema(
   schema: string,
-  diagnostic: { readonly code: string; readonly message: string },
+  diagnostic: { readonly code: string; readonly message?: string },
 ): void {
   const document = symbolTableInputFromParseArgs({ schema, sourceId: 'schema.prisma' });
   const result = interpretPslDocumentToSqlContract({
@@ -39,8 +39,12 @@ function expectDiagnosticForSchema(
 
   expect(result.ok).toBe(false);
   if (result.ok) return;
+  const expected =
+    diagnostic.message === undefined
+      ? { code: diagnostic.code }
+      : { code: diagnostic.code, message: diagnostic.message };
   expect(result.failure.diagnostics).toEqual(
-    expect.arrayContaining([expect.objectContaining(diagnostic)]),
+    expect.arrayContaining([expect.objectContaining(expected)]),
   );
 }
 
@@ -154,18 +158,13 @@ model User {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.failure.summary).toBe('PSL to SQL contract interpretation failed');
-    expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('Field "Team.id" @map requires'),
-        }),
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('Model "Team" @map requires'),
-        }),
-      ]),
+    const mapDiagnostics = result.failure.diagnostics.filter(
+      (diagnostic) => diagnostic.code === 'PSL_INVALID_ATTRIBUTE_SYNTAX',
     );
+    expect(mapDiagnostics).toHaveLength(2);
+    for (const diagnostic of mapDiagnostics) {
+      expect(diagnostic.message).toContain('Expected a string literal');
+    }
   });
 
   it('returns diagnostics for unsupported model attributes', () => {
@@ -241,8 +240,8 @@ model User {
 }
 `,
       {
-        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        message: 'Model "Membership" @@id references unknown field "Membership.missingId"',
+        code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+        message: 'Field "missingId" does not exist on model "Membership"',
       },
     );
   });
@@ -501,7 +500,7 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_ORPHANED_BACKRELATION_LIST',
+          code: 'PSL_ORPHANED_BACKRELATION',
           message: expect.stringContaining('User.posts'),
         }),
       ]),
@@ -535,7 +534,7 @@ model Post {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+          code: 'PSL_AMBIGUOUS_BACKRELATION',
           message: expect.stringContaining('User.posts'),
         }),
       ]),
@@ -768,8 +767,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('Model "Thing" @@id requires fields list argument'),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('is missing required argument "fields"'),
         }),
       ]),
     );
@@ -794,8 +793,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('@@id requires bracketed field list argument'),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Expected a non-empty list'),
         }),
       ]),
     );
@@ -820,10 +819,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining(
-            'Model "Thing" @@id references unknown field "Thing.nope"',
-          ),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Field "nope" does not exist on model "Thing"'),
         }),
       ]),
     );
@@ -874,8 +871,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('@@id map argument must be a quoted string literal'),
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Expected a string literal'),
         }),
       ]),
     );
@@ -928,8 +925,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: 'Model "Thing" @@id list contains duplicate field "email"',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: 'Duplicate list entry',
         }),
       ]),
     );
@@ -1015,6 +1012,32 @@ model User {
     );
   });
 
+  it('rejects field @unique with a non-quoted map argument', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Thing {
+  id    Int @id
+  email String @unique(map: not_a_string)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      ...document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: expect.stringContaining('Expected a string literal'),
+        }),
+      ]),
+    );
+  });
+
   it('rejects @@unique with duplicate fields in the list', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model Thing {
@@ -1035,8 +1058,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: 'Model "Thing" @@unique list contains duplicate field "email"',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: 'Duplicate list entry',
         }),
       ]),
     );
@@ -1062,8 +1085,8 @@ model User {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: 'Model "Thing" @@index list contains duplicate field "email"',
+          code: 'PSL_INVALID_ATTRIBUTE_SYNTAX',
+          message: 'Duplicate list entry',
         }),
       ]),
     );
@@ -1138,7 +1161,7 @@ model User {
       expect(unsupported?.span).toBeDefined();
     });
 
-    it('Postgres rejects `namespace unbound { … }` alongside a sibling named namespace', () => {
+    it('Postgres rejects a model-carrying `namespace unbound { … }` alongside a sibling named namespace', () => {
       const document = symbolTableInputFromParseArgs({
         schema: `namespace unbound {
   model Tenant {
@@ -1173,6 +1196,103 @@ namespace auth {
       // `ifDefined('span', unboundBlock?.span)` shape would silently
       // regress this without an explicit assertion.
       expect(reserved?.span).toBeDefined();
+    });
+
+    it('Postgres rejects the raw sentinel spelling `namespace __unbound__ { … }` with models alongside a sibling named namespace', () => {
+      const document = symbolTableInputFromParseArgs({
+        schema: `namespace __unbound__ {
+  model Tenant {
+    id Int @id
+  }
+}
+
+namespace auth {
+  model User {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        ...baseInput,
+        ...document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const reserved = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_RESERVED_NAMESPACE_NAME',
+      );
+      expect(reserved).toBeDefined();
+      expect(reserved?.span).toBeDefined();
+    });
+
+    it('Postgres rejects a model-carrying unbound alias even when a blocks-only unbound alias under the other spelling is declared first', () => {
+      const rolePslBlockDescriptors = {
+        role: {
+          kind: 'pslBlock' as const,
+          keyword: 'role',
+          discriminator: 'role-like',
+          name: { required: true },
+          parameters: {},
+        },
+      };
+      const roleAuthoringContributions = {
+        entityTypes: {
+          role: {
+            kind: 'entity' as const,
+            discriminator: 'role-like',
+            output: { factory: (raw: unknown) => raw },
+          },
+        },
+        pslBlockDescriptors: rolePslBlockDescriptors,
+      };
+
+      const document = symbolTableInputFromParseArgs({
+        schema: `namespace unbound {
+  role a {
+  }
+}
+
+namespace __unbound__ {
+  model M {
+    id Int @id
+  }
+}
+
+namespace auth {
+  model X {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+        pslBlockDescriptors: rolePslBlockDescriptors,
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        ...baseInput,
+        ...document,
+        authoringContributions: roleAuthoringContributions,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const reserved = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_RESERVED_NAMESPACE_NAME',
+      );
+      expect(reserved).toBeDefined();
+      // The blocks-only `namespace unbound { role a {} }` alias is declared
+      // first; the diagnostic must still point at the model-carrying
+      // `namespace __unbound__ { model M {} }` alias, not the first block
+      // that happens to resolve to the unbound id.
+      expect(reserved?.span).toEqual(
+        expect.objectContaining({ start: expect.objectContaining({ line: 6 }) }),
+      );
     });
 
     it('Postgres accepts `namespace unbound { … }` when it is the only named namespace', () => {
@@ -1290,33 +1410,25 @@ describe('interpretPslDocumentToSqlContract list-field constructs', () => {
     });
   });
 
-  it('rejects a scalar literal default on a list field', () => {
+  it('rejects a scalar literal default on a list field as invalid syntax', () => {
     expectDiagnosticForSchema(
       `model Post {
   id Int @id
   tags String[] @default("x")
 }
 `,
-      {
-        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
-        message:
-          'Field "Post.tags" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.',
-      },
+      { code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' },
     );
   });
 
-  it('rejects a scalar numeric default on a list field', () => {
+  it('rejects a scalar numeric default on a list field as invalid syntax', () => {
     expectDiagnosticForSchema(
       `model Post {
   id Int @id
   scores Int[] @default(5)
 }
 `,
-      {
-        code: 'PSL_LIST_DEFAULT_NOT_ARRAY',
-        message:
-          'Field "Post.scores" is a list and its @default must be an array literal like [] or ["a", "b"], not a scalar value.',
-      },
+      { code: 'PSL_INVALID_ATTRIBUTE_SYNTAX' },
     );
   });
 

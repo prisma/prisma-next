@@ -32,11 +32,12 @@ function idColumnTable(name: string, foreignKeys: PostgresTableSchemaNode['forei
     uniques: [],
     indexes: [],
     policies: [],
+    rlsEnabled: false,
   });
 }
 
 function namespaceNode(schemaName: string, tables: Record<string, PostgresTableSchemaNode>) {
-  return new PostgresNamespaceSchemaNode({ schemaName, tables, nativeEnumTypeNames: [] });
+  return new PostgresNamespaceSchemaNode({ schemaName, tables });
 }
 
 function tree(namespaces: Record<string, PostgresNamespaceSchemaNode>) {
@@ -222,6 +223,36 @@ describe('inferPostgresPslContract — described-contract omission', () => {
     expect(flatPslModels(ast).map((m) => m.name)).toContain('Widgets');
   });
 
+  it('an rls marker entity in a described contract does not omit the same-named table', () => {
+    // The marker is keyed by table name (`entries.rls[tableName]`), so a
+    // described contract marking a table RLS-controlled must not suppress the
+    // introspected table itself — only a `table`-kind entry omits tables.
+    const database = tree({
+      public: namespaceNode('public', { profile: idColumnTable('profile') }),
+    });
+    const contractWithRlsMarker: SqlDescribedContractSpace = {
+      spaceId: 'pack',
+      contract: {
+        ...describedContract({}).contract,
+        storage: new SqlStorage({
+          storageHash: coreHash('sha256:contract'),
+          namespaces: {
+            public: new PostgresSchema({
+              id: 'public',
+              entries: {
+                rls: { profile: { kind: 'rls', tableName: 'profile', namespaceId: 'public' } },
+              },
+            }),
+          },
+        }),
+      },
+    };
+
+    const ast = inferPostgresPslContract(database, [contractWithRlsMarker]);
+
+    expect(flatPslModels(ast).map((m) => m.name)).toContain('Profile');
+  });
+
   it('resolves a cross-space FK into a described contract as the qualified relation, omitting the target table', () => {
     const database = tree({
       public: namespaceNode('public', {
@@ -244,6 +275,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -268,10 +300,16 @@ describe('inferPostgresPslContract — described-contract omission', () => {
     expect(relationField?.typeName).toBe('AuthUser');
     expect(relationField?.typeNamespaceId).toBe('auth');
     expect(relationField?.typeContractSpaceId).toBe('supabase');
+    // A resolved cross-space FK is not dangling — it must not carry the
+    // dangling-FK warning comment the "target neither in the tree nor owned"
+    // case gets.
+    expect(profileModel?.comment).toBeUndefined();
 
     const printed = printPsl(ast);
     expect(printed).toContain('supabase:auth.AuthUser');
-    expect(printed).toContain('@relation(fields: [userId], references: [id], onDelete: Cascade)');
+    expect(printed).toContain(
+      '@relation(fields: [userId], references: [id], onDelete: Cascade, index: false)',
+    );
   });
 
   it('resolves the cross-space FK even when a same-bare-named local table survives (pack-owned coordinate wins over the local shadow)', () => {
@@ -297,6 +335,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -350,6 +389,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -359,7 +399,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
     ).toThrow(/owns storage coordinate "auth\.users" but declares no domain model/);
   });
 
-  it('drops a genuinely dangling FK (target neither in the tree nor owned by any described contract), keeping the scalar column', () => {
+  it('drops a genuinely dangling FK (target neither in the tree nor owned by any described contract), keeping the scalar column and explaining the drop with a comment', () => {
     const database = tree({
       public: namespaceNode('public', {
         posts: new PostgresTableSchemaNode({
@@ -370,11 +410,17 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           },
           primaryKey: { columns: ['id'] },
           foreignKeys: [
-            { columns: ['ownerId'], referencedTable: 'owners', referencedColumns: ['id'] },
+            {
+              columns: ['ownerId'],
+              referencedTable: 'owners',
+              referencedSchema: 'secure',
+              referencedColumns: ['id'],
+            },
           ],
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -388,6 +434,12 @@ describe('inferPostgresPslContract — described-contract omission', () => {
     expect(postsModel?.fields.some((f) => f.name === 'ownerId')).toBe(true);
     expect(postsModel?.fields.some((f) => f.attributes.some((a) => a.name === 'relation'))).toBe(
       false,
+    );
+    expect(postsModel?.comment).toBe(
+      '// WARNING: Foreign key "ownerId" -> "secure.owners" exists in the database, but its ' +
+        'target schema is outside the introspected scope, so no relation field was generated. ' +
+        'If the target schema is described by an extension pack, add it to extensionPacks and ' +
+        're-run infer.',
     );
   });
 
@@ -409,6 +461,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
           uniques: [],
           indexes: [],
           policies: [],
+          rlsEnabled: false,
         }),
       }),
     });
@@ -423,6 +476,8 @@ describe('inferPostgresPslContract — described-contract omission', () => {
     expect(postsModel?.fields.some((f) => f.attributes.some((a) => a.name === 'relation'))).toBe(
       true,
     );
+    // A local FK that resolved to a real relation is not dangling — no warning comment.
+    expect(postsModel?.comment).toBeUndefined();
   });
 
   it('omits a described-contract-claimed table before the cross-schema duplicate-name check', () => {

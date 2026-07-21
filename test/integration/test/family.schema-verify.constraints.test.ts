@@ -34,7 +34,7 @@ describe('family instance schemaVerify - constraints', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with primary_key_mismatch issue',
+      'returns ok=false with a not-equal issue for the primary key',
       async () => {
         const contract = defineContract({
           models: {
@@ -49,17 +49,11 @@ describe('family instance schemaVerify - constraints', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result).toMatchObject({
-          ok: false,
-          schema: {
-            counts: { fail: expect.any(Number) },
-          },
-        });
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(result.schema.issues).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({ kind: 'primary_key_mismatch', table: 'user' }),
-          ]),
+        expect(result.ok).toBe(false);
+        expect(result.schema.issues).toContainEqual(
+          expect.objectContaining({
+            path: ['database', 'public', 'user', 'primary-key'],
+          }),
         );
       },
       timeouts.spinUpPpgDev,
@@ -80,7 +74,7 @@ describe('family instance schemaVerify - constraints', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with unique_constraint_mismatch issue',
+      'returns ok=false with a not-found issue for the missing unique constraint',
       async () => {
         const contract = defineContract({
           models: {
@@ -95,17 +89,11 @@ describe('family instance schemaVerify - constraints', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result).toMatchObject({
-          ok: false,
-          schema: {
-            counts: { fail: expect.any(Number) },
-          },
-        });
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(result.schema.issues).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({ kind: 'unique_constraint_mismatch', table: 'user' }),
-          ]),
+        expect(result.ok).toBe(false);
+        expect(result.schema.issues).toContainEqual(
+          expect.objectContaining({
+            path: ['database', 'public', 'user', 'unique:email'],
+          }),
         );
       },
       timeouts.spinUpPpgDev,
@@ -134,7 +122,7 @@ describe('family instance schemaVerify - constraints', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with foreign_key_mismatch issue',
+      'returns ok=false with a not-found issue for the missing foreign key',
       async () => {
         const User = model('User', {
           fields: {
@@ -165,17 +153,11 @@ describe('family instance schemaVerify - constraints', () => {
 
         const result = await runSchemaVerify(getConnectionString(), contract);
 
-        expect(result).toMatchObject({
-          ok: false,
-          schema: {
-            counts: { fail: expect.any(Number) },
-          },
-        });
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-        expect(result.schema.issues).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({ kind: 'foreign_key_mismatch', table: 'post' }),
-          ]),
+        expect(result.ok).toBe(false);
+        expect(result.schema.issues).toContainEqual(
+          expect.objectContaining({
+            path: ['database', 'public', 'post', 'foreign-key:userId->public.user(id)'],
+          }),
         );
       },
       timeouts.spinUpPpgDev,

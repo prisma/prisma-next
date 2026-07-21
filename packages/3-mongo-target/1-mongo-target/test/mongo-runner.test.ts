@@ -6,7 +6,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import {
   type AggregateMigrationEdgeRef,
-  buildSynthMigrationEdge,
+  buildFabricatedMigrationEdge,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
@@ -200,7 +200,7 @@ function makePlan(ops: readonly AnyMongoMigrationOperation[]): MigrationPlan {
 
 function synthEdges(plan: MigrationPlan): readonly AggregateMigrationEdgeRef[] {
   return [
-    buildSynthMigrationEdge({
+    buildFabricatedMigrationEdge({
       currentMarkerStorageHash: plan.origin?.storageHash,
       destinationStorageHash: plan.destination.storageHash,
       operationCount: plan.operations.length,
@@ -475,7 +475,7 @@ describe('MongoMigrationRunner schema verification', () => {
     expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
     expect(failure.why).toMatch(/destination contract/);
     expect(failure.meta?.['issues']).toEqual(
-      expect.arrayContaining([expect.objectContaining({ kind: 'extra_table', table: 'rogue' })]),
+      expect.arrayContaining([expect.objectContaining({ path: ['rogue'] })]),
     );
     expect(calls).toEqual({ initMarker: 0, updateMarker: 0, writeLedgerEntry: 0 });
   });
@@ -776,6 +776,6 @@ describe('MongoMigrationRunner - per-edge ledger', () => {
       migrationName: '',
       migrationHash: destHash,
     });
-    expect((ledgerEntries[0]?.operations as unknown[]).length).toBe(1);
+    expect((ledgerEntries[0]!.operations as unknown[]).length).toBe(1);
   });
 });

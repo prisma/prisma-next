@@ -1,11 +1,14 @@
 name: Detect inert diff
 description: >
   Classify the current diff as "inert" — touching only files that cannot
-  affect build/test/fixture results (docs, markdown, rules, skills, transient
-  project artefacts). Fail-safe: a diff is inert only if *every* changed file
-  matches the allow-list below; any unrecognized path yields inert=false. The
-  caller must check out the repository with fetch-depth: 0 first. Handles
-  pull_request and merge_group; on any other event inert is always false.
+  affect build/test/fixture results (docs, markdown, rules, contributor
+  skill sources under skills-contrib, transient project artefacts). The
+  user-facing skills/ tree is NOT inert — `prisma-next init` installs it
+  and an integration test covers it. Fail-safe: a diff is inert only if
+  *every* changed file matches the allow-list below; any unrecognized path
+  yields inert=false. The caller must check out the repository with
+  fetch-depth: 0 first. Handles pull_request and merge_group; on any other
+  event inert is always false.
 
 outputs:
   inert:
@@ -43,6 +46,7 @@ runs:
         while IFS= read -r f; do
           [ -z "$f" ] && continue
           case "$f" in
+            skills/*) inert=false; break ;;   # user-facing skills are installed + integration-tested
             *.md) ;;             # any markdown, anywhere
             docs/*) ;;           # documentation tree
             projects/*) ;;       # transient project artefacts (never imported)

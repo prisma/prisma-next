@@ -263,7 +263,7 @@ describe('control policy mongo CLI (e2e)', { timeout: timeouts.spinUpMongoMemory
       expect(verify.parsed['ok']).toBe(false);
     });
 
-    it('observed: leaves pre-seeded collection unchanged and verifier warns without failing on drift', async () => {
+    it('observed: leaves pre-seeded collection unchanged and verifier passes despite drift', async () => {
       const { testSetup, configPath } = await setupControlPolicyMongoFixture(
         db,
         createTempDir,
@@ -285,9 +285,18 @@ describe('control policy mongo CLI (e2e)', { timeout: timeouts.spinUpMongoMemory
       );
       expect(exitCode).toBe(0);
       expect(parsed['ok']).toBe(true);
-      const schema = parsed['schema'] as { counts: { warn: number; fail: number } };
-      expect(schema.counts.warn).toBeGreaterThan(0);
-      expect(schema.counts.fail).toBe(0);
+      // Under the `observed` control policy the dropped collection warns but
+      // does not fail: the failure lists stay empty (verify passes) AND the
+      // warning is surfaced in the warnings channel — watch-without-failing,
+      // not silent suppression.
+      const schema = parsed['schema'] as {
+        issues: readonly unknown[];
+        warnings: { issues: readonly { path: readonly string[] }[] };
+      };
+      expect(schema.issues).toEqual([]);
+      expect(schema.warnings.issues.some((w) => w.path.join('/').includes('legacy_jobs'))).toBe(
+        true,
+      );
     });
   });
 });

@@ -121,6 +121,10 @@ function buildAppPlan() {
             description: 'create user',
             sql: 'CREATE TABLE user (id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE)',
           },
+          {
+            description: 'create email index',
+            sql: 'CREATE INDEX user_email_idx ON user (email)',
+          },
         ],
         postcheck: [],
       },

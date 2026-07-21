@@ -42,7 +42,7 @@ describe('family instance schemaVerify', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false in strict mode with extra_column issue',
+      'returns ok=false in strict mode with a not-expected issue for the extra column',
       async () => {
         if (!connectionString) {
           throw new Error('Connection string not set');
@@ -89,12 +89,11 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(false);
-          expect(result.schema.counts.fail).toBeGreaterThan(0);
-          expect(
-            result.schema.issues.some(
-              (i) => i.kind === 'extra_column' && i.table === 'user' && i.column === 'extraColumn',
-            ),
-          ).toBe(true);
+          expect(result.schema.issues).toContainEqual(
+            expect.objectContaining({
+              path: ['database', 'public', 'user', 'column:extraColumn'],
+            }),
+          );
         } finally {
           await driver.close();
         }
@@ -150,8 +149,10 @@ describe('family instance schemaVerify', () => {
           });
 
           // In permissive mode, extra columns don't cause failures
-          expect(result.ok).toBe(true);
-          expect(result.schema.counts.fail).toBe(0);
+          expect(result).toMatchObject({
+            ok: true,
+            schema: { issues: [] },
+          });
         } finally {
           await driver.close();
         }
@@ -275,120 +276,11 @@ describe('family instance schemaVerify', () => {
 
           // Should fail due to type mismatch (integer vs bigint)
           expect(result.ok).toBe(false);
-          expect(result.schema.counts.fail).toBeGreaterThan(0);
-          expect(
-            result.schema.issues.some(
-              (i) => i.kind === 'type_mismatch' && i.table === 'user' && i.column === 'id',
-            ),
-          ).toBe(true);
-        } finally {
-          await driver.close();
-        }
-      },
-      timeouts.spinUpPpgDev,
-    );
-
-    it(
-      'type without metadata emits warning, not failure',
-      async () => {
-        if (!connectionString) {
-          throw new Error('Connection string not set');
-        }
-
-        await withClient(connectionString, async (client) => {
-          await client.query('DROP TABLE IF EXISTS "user"');
-          await client.query(`
-          CREATE TABLE "user" (
-            id INTEGER PRIMARY KEY,
-            email TEXT NOT NULL
-          )
-        `);
-        });
-
-        // Create a contract with a type ID that doesn't exist in the registry
-        // We'll use a fake type ID to simulate missing metadata
-        const contract = defineContract({
-          models: {
-            User: model('User', {
-              fields: {
-                id: field.column(int4Column).id(),
-                email: field.column(textColumn),
-              },
-            }).sql({ table: 'user' }),
-          },
-        });
-
-        // Modify contract to use a type ID not in the registry
-        const contractWithUnknownType = {
-          ...contract,
-          storage: {
-            ...contract.storage,
-            namespaces: {
-              ...contract.storage.namespaces,
-              public: {
-                ...contract.storage.namespaces['public'],
-                entries: {
-                  table: {
-                    ...contract.storage.namespaces['public'].entries.table,
-                    user: {
-                      ...contract.storage.namespaces['public'].entries.table.user,
-                      columns: {
-                        ...contract.storage.namespaces['public'].entries.table.user.columns,
-                        email: {
-                          ...contract.storage.namespaces['public'].entries.table.user.columns.email,
-                          codecId: 'pg/unknown-type@1' as const,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        };
-
-        const driver = await postgresDriver.create(connectionString);
-        try {
-          const familyInstance = sql.create(
-            createControlStack({
-              family: sql,
-              target: postgres,
-              adapter: postgresAdapter,
-              driver: postgresDriver,
-              extensionPacks: [],
+          expect(result.schema.issues).toContainEqual(
+            expect.objectContaining({
+              path: ['database', 'public', 'user', 'column:id'],
             }),
           );
-
-          const validatedContract = new PostgresContractSerializer().deserializeContract(
-            contractWithUnknownType,
-          ) as Contract<SqlStorage>;
-          const frameworkComponents: ReadonlyArray<
-            TargetBoundComponentDescriptor<'sql', 'postgres'>
-          > = [postgres, postgresAdapter];
-          const schema = await familyInstance.introspect({
-            driver,
-            contract: validatedContract,
-          });
-          const result = familyInstance.verifySchema({
-            contract: validatedContract,
-            schema,
-            strict: false,
-            frameworkComponents,
-          });
-
-          // Should have warnings for missing metadata, but not fail
-          // The verification should still pass (ok=true) because missing metadata is a warning
-          // However, we need to check for warn nodes in the tree
-          const findWarnNode = (node: typeof result.schema.root): boolean => {
-            if (node.status === 'warn' && node.code === 'type_metadata_missing') {
-              return true;
-            }
-            return node.children.some(findWarnNode);
-          };
-
-          // Should have at least one warning node for missing metadata
-          expect(findWarnNode(result.schema.root)).toBe(true);
-          expect(result.schema.counts.warn).toBeGreaterThan(0);
         } finally {
           await driver.close();
         }

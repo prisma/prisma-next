@@ -12,8 +12,13 @@ export type {
   AuthoringFieldNamespace,
   AuthoringFieldPresetDescriptor,
   AuthoringFieldPresetOutput,
+  AuthoringModelAttributeContext,
+  AuthoringModelAttributeDescriptor,
+  AuthoringModelAttributeDescriptorNamespace,
+  AuthoringModelAttributeLoweringOutput,
   AuthoringPslBlockDescriptor,
   AuthoringPslBlockDescriptorNamespace,
+  AuthoringSelectRef,
   AuthoringStorageTypeTemplate,
   AuthoringTemplateValue,
   AuthoringTypeConstructorDescriptor,
@@ -30,6 +35,7 @@ export {
   isAuthoringArgRef,
   isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
+  isAuthoringModelAttributeDescriptor,
   isAuthoringPslBlockDescriptor,
   isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
@@ -37,6 +43,7 @@ export {
   resolveEnumCodecId,
   validateAuthoringHelperArguments,
 } from '../shared/framework-authoring';
+export type { AuthoringOption } from '../shared/option-descriptor';
 export type {
   PslBlockParam,
   PslBlockParamList,

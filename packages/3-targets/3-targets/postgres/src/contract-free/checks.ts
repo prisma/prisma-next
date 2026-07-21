@@ -434,3 +434,83 @@ export function indexExistsAst(schema: string, indexName: string): IndexExistsCh
     indexAbsent: () => exprSelect().project('result', regclass.isNull()).build(),
   };
 }
+
+export interface NativeEnumTypeExistsCheckBuilder {
+  typePresent(): SelectAst;
+  typeAbsent(): SelectAst;
+}
+
+/**
+ * Typed native-enum type existence check over `pg_type` joined to
+ * `pg_namespace`, restricted to enum types (`typtype = 'e'`). Schema and
+ * type name are bound as text parameters; `schema` is a namespace
+ * coordinate (the `__unbound__` sentinel compares against
+ * `current_schema()`), matching {@link tableExistsAst} et al.
+ */
+export function nativeEnumTypeExistsAst(
+  schema: string,
+  typeName: string,
+): NativeEnumTypeExistsCheckBuilder {
+  const inner = () =>
+    exprSelect()
+      .from(cfTable('pg_type', 't'))
+      .join(
+        cfTable('pg_namespace', 'n'),
+        cfExpr.columnRef('n', 'oid').eqExpr(cfExpr.columnRef('t', 'typnamespace')),
+      )
+      .project('one', cfExpr.lit(1))
+      .where(
+        cfExpr.allOf([
+          cfExpr.columnRef('n', 'nspname').eqExpr(checkNamespace(schema).schemaFilterExpression()),
+          cfExpr.columnRef('t', 'typname').eqParam(typeName, PG_TEXT_CODEC_ID),
+          cfExpr.columnRef('t', 'typtype').eqParam('e', PG_TEXT_CODEC_ID),
+        ]),
+      );
+  return {
+    typePresent: () => exprSelect().project('result', cfExpr.exists(inner())).build(),
+    typeAbsent: () => exprSelect().project('result', cfExpr.notExists(inner())).build(),
+  };
+}
+
+export interface NativeEnumValueExistsCheckBuilder {
+  valuePresent(): SelectAst;
+  valueAbsent(): SelectAst;
+}
+
+/**
+ * Typed native-enum member-value existence check over `pg_enum` joined to
+ * `pg_type` and `pg_namespace`. Schema, type name, and the candidate member
+ * value are bound as text parameters — used by `addNativeEnumValue`'s
+ * precheck (value absent) and postcheck (value present).
+ */
+export function nativeEnumValueExistsAst(options: {
+  readonly schema: string;
+  readonly typeName: string;
+  readonly value: string;
+}): NativeEnumValueExistsCheckBuilder {
+  const inner = () =>
+    exprSelect()
+      .from(cfTable('pg_enum', 'e'))
+      .join(
+        cfTable('pg_type', 't'),
+        cfExpr.columnRef('t', 'oid').eqExpr(cfExpr.columnRef('e', 'enumtypid')),
+      )
+      .join(
+        cfTable('pg_namespace', 'n'),
+        cfExpr.columnRef('n', 'oid').eqExpr(cfExpr.columnRef('t', 'typnamespace')),
+      )
+      .project('one', cfExpr.lit(1))
+      .where(
+        cfExpr.allOf([
+          cfExpr
+            .columnRef('n', 'nspname')
+            .eqExpr(checkNamespace(options.schema).schemaFilterExpression()),
+          cfExpr.columnRef('t', 'typname').eqParam(options.typeName, PG_TEXT_CODEC_ID),
+          cfExpr.columnRef('e', 'enumlabel').eqParam(options.value, PG_TEXT_CODEC_ID),
+        ]),
+      );
+  return {
+    valuePresent: () => exprSelect().project('result', cfExpr.exists(inner())).build(),
+    valueAbsent: () => exprSelect().project('result', cfExpr.notExists(inner())).build(),
+  };
+}

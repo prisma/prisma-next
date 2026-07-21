@@ -4,7 +4,10 @@ import {
   diffMongoSchemas,
 } from '@prisma-next/family-mongo/control';
 import { MongoSchemaVerifierBase } from '@prisma-next/family-mongo/ir';
-import type { SchemaIssue, SchemaVerifyOptions } from '@prisma-next/framework-components/control';
+import type {
+  SchemaDiffIssue,
+  SchemaVerifyOptions,
+} from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import type { MongoTargetContract } from './mongo-target-contract';
@@ -39,18 +42,18 @@ export class MongoTargetSchemaVerifier extends MongoSchemaVerifierBase<
     readonly schema: MongoSchemaIR;
     readonly namespaceId: string;
     readonly namespace: Namespace;
-  }): readonly SchemaIssue[] {
+  }): readonly SchemaDiffIssue[] {
     const expectedIR = contractToMongoSchemaIR(options.contract);
     const { live, expected } = canonicalizeSchemasForVerification(options.schema, expectedIR);
     const collectionControlPolicy = (name: string) =>
       this.collectionControlPolicyForName(options.contract, name);
-    const { issues } = diffMongoSchemas(live, expected, false, collectionControlPolicy);
-    return issues;
+    const { failures, warnings } = diffMongoSchemas(live, expected, false, collectionControlPolicy);
+    return [...failures, ...warnings];
   }
 
   protected verifyTargetExtensions(
     _options: SchemaVerifyOptions<MongoTargetContract, MongoSchemaIR>,
-  ): readonly SchemaIssue[] {
+  ): readonly SchemaDiffIssue[] {
     return [];
   }
 }

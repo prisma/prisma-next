@@ -75,6 +75,105 @@ model Post {
     });
   });
 
+  it('accepts a bare model-typed optional field with no @relation as the 1:1 back side', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model User {
+  id Int @id
+  profile Profile?
+}
+
+model Profile {
+  id Int @id
+  userId Int @unique
+  user User @relation(fields: [userId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const models = modelsOf(result.value) as Record<
+      string,
+      { relations?: Record<string, unknown> }
+    >;
+    expect(models['User']?.relations).toMatchObject({
+      profile: {
+        to: crossRef('Profile', 'public'),
+        cardinality: '1:1',
+        on: {
+          localFields: ['id'],
+          targetFields: ['userId'],
+        },
+      },
+    });
+    expect(models['Profile']?.relations).toMatchObject({
+      user: {
+        to: crossRef('User', 'public'),
+        cardinality: 'N:1',
+        on: {
+          localFields: ['userId'],
+          targetFields: ['id'],
+        },
+      },
+    });
+  });
+
+  it('reports an orphaned 1:1 backrelation candidate when no FK points back at it', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model User {
+  id Int @id
+  profile Profile?
+}
+
+model Profile {
+  id Int @id
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_ORPHANED_BACKRELATION',
+          message: expect.stringContaining('User.profile'),
+        }),
+      ]),
+    );
+  });
+
+  it('still rejects a field whose type is neither a model, enum, composite, nor scalar', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model User {
+  id Int @id
+  nonsense Nonsense
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_FIELD_TYPE',
+          message: expect.stringContaining('User.nonsense'),
+        }),
+      ]),
+    );
+  });
+
   it('matches named backrelations using positional and named relation forms', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model User {
@@ -240,7 +339,7 @@ model Member {
     expect(result.failure.diagnostics).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
+          code: 'PSL_AMBIGUOUS_BACKRELATION',
           message: expect.stringContaining('Employee.reports'),
         }),
       ]),
@@ -282,6 +381,92 @@ model Member {
     const fks = memberTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);
     expect(fks[0]).toMatchObject({ name: 'team_member_team_ref_fkey' });
+  });
+
+  it('defaults a relation foreign key to a required backing index', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Team {
+  id Int @id
+  members Member[]
+}
+
+model Member {
+  id Int @id
+  teamId Int
+  team Team @relation(fields: [teamId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    const memberTable = unboundTables(storage)['member'];
+    const fks = memberTable?.foreignKeys ?? [];
+    expect(fks[0]).not.toHaveProperty('index');
+    expect(memberTable?.indexes).toEqual([{ columns: ['teamId'], name: 'member_teamId_idx' }]);
+  });
+
+  it('opts a relation foreign key out of its backing index via index: false', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Team {
+  id Int @id
+  members Member[]
+}
+
+model Member {
+  id Int @id
+  teamId Int
+  team Team @relation(fields: [teamId], references: [id], index: false)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = sqlStorageFromSuccessfulSqlInterpretation(result.value);
+    const memberTable = unboundTables(storage)['member'];
+    const fks = memberTable?.foreignKeys ?? [];
+    expect(fks[0]).not.toHaveProperty('index');
+    expect(memberTable?.indexes).toEqual([]);
+  });
+
+  it('rejects index on a backrelation list field', () => {
+    const document = symbolTableInputFromParseArgs({
+      schema: `model Team {
+  id Int @id
+  members Member[] @relation(index: false)
+}
+
+model Member {
+  id Int @id
+  teamId Int
+  team Team @relation(fields: [teamId], references: [id])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_RELATION_ATTRIBUTE',
+          message: expect.stringContaining('cannot declare onDelete/onUpdate/index'),
+        }),
+      ]),
+    );
   });
 
   it('returns diagnostics for unsupported referential action tokens', () => {

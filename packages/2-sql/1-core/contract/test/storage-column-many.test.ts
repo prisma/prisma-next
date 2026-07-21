@@ -1,12 +1,12 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { createContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { col } from '../src/factories';
+import { col, table } from '../src/factories';
 import { StorageColumn } from '../src/ir/storage-column';
 import type { SqlStorage } from '../src/types';
 import { validateStorage } from '../src/validators';
 
-function unboundTables(tables: Record<string, unknown>) {
+function unboundTables<T extends Record<string, unknown>>(tables: T) {
   return {
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
@@ -21,14 +21,9 @@ function unboundTables(tables: Record<string, unknown>) {
 describe('StorageColumn many', () => {
   describe('contract.json round-trip', () => {
     it('round-trips a many:true column through serialize → parse → deep-equal', () => {
-      const postTable = {
-        columns: {
-          tags: { nativeType: 'text', codecId: 'pg/text@1', nullable: false, many: true },
-        },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
-      };
+      const postTable = table({
+        tags: col('text', 'pg/text@1', false, { many: true }),
+      });
 
       const s = createContract<SqlStorage>({
         storage: unboundTables({ post: postTable }),
@@ -38,7 +33,7 @@ describe('StorageColumn many', () => {
       const parsed = JSON.parse(serialized) as unknown;
 
       validateStorage(parsed);
-      const tagsColumn = (parsed as SqlStorage).namespaces[UNBOUND_NAMESPACE_ID]?.entries.table[
+      const tagsColumn = (parsed as SqlStorage).namespaces[UNBOUND_NAMESPACE_ID]?.entries.table?.[
         'post'
       ]?.columns['tags'] as StorageColumn | undefined;
 
@@ -52,14 +47,9 @@ describe('StorageColumn many', () => {
     });
 
     it('scalar column (no many key) stays byte-identical — no many:false emitted', () => {
-      const postTable = {
-        columns: {
-          title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-        },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
-      };
+      const postTable = table({
+        title: col('text', 'pg/text@1'),
+      });
 
       const s = createContract<SqlStorage>({
         storage: unboundTables({ post: postTable }),
@@ -69,7 +59,7 @@ describe('StorageColumn many', () => {
       const parsed = JSON.parse(serialized) as unknown;
 
       validateStorage(parsed);
-      const titleColumn = (parsed as SqlStorage).namespaces[UNBOUND_NAMESPACE_ID]?.entries.table[
+      const titleColumn = (parsed as SqlStorage).namespaces[UNBOUND_NAMESPACE_ID]?.entries.table?.[
         'post'
       ]?.columns['title'] as StorageColumn | undefined;
 

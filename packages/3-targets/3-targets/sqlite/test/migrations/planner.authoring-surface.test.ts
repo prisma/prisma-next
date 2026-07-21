@@ -3,7 +3,7 @@ import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adap
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
@@ -64,7 +64,7 @@ function fromContractWithHash(hash: string): Contract<SqlStorage> {
   };
 }
 
-const emptySchema: SqlSchemaIR = { tables: {} };
+const emptySchema = new SqlSchemaIR({ tables: {} });
 
 describe('SqliteMigrationPlanner authoring surface', () => {
   describe('plan(...).plan', () => {

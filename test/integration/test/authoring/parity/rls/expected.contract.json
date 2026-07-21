@@ -1,0 +1,265 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "roots": {
+    "audit_log": {
+      "model": "AuditLog",
+      "namespace": "public"
+    },
+    "profile": {
+      "model": "Profile",
+      "namespace": "public"
+    }
+  },
+  "domain": {
+    "namespaces": {
+      "public": {
+        "models": {
+          "AuditLog": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "audit_log"
+            }
+          },
+          "Profile": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "public",
+              "table": "profile"
+            }
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "namespaces": {
+      "__unbound__": {
+        "entries": {
+          "role": {
+            "app_role": {
+              "control": "external",
+              "kind": "role",
+              "name": "app_role",
+              "namespaceId": "__unbound__"
+            }
+          },
+          "table": {}
+        },
+        "id": "__unbound__"
+      },
+      "public": {
+        "entries": {
+          "policy": {
+            "audit_read": {
+              "kind": "policy",
+              "name": "audit_read_aede9d92",
+              "namespaceId": "public",
+              "operation": "select",
+              "permissive": true,
+              "prefix": "audit_read",
+              "roles": ["authenticated"],
+              "tableName": "audit_log",
+              "using": "true"
+            },
+            "profile_admin_all": {
+              "kind": "policy",
+              "name": "profile_admin_all_8e1f0808",
+              "namespaceId": "public",
+              "operation": "all",
+              "permissive": true,
+              "prefix": "profile_admin_all",
+              "roles": ["anon", "authenticated"],
+              "tableName": "profile",
+              "using": "true",
+              "withCheck": "true"
+            },
+            "profile_owner_delete": {
+              "kind": "policy",
+              "name": "profile_owner_delete_1f76e28d",
+              "namespaceId": "public",
+              "operation": "delete",
+              "permissive": true,
+              "prefix": "profile_owner_delete",
+              "roles": ["authenticated"],
+              "tableName": "profile",
+              "using": "\"userId\"::uuid = auth.uid()"
+            },
+            "profile_owner_insert": {
+              "kind": "policy",
+              "name": "profile_owner_insert_1f1e2946",
+              "namespaceId": "public",
+              "operation": "insert",
+              "permissive": true,
+              "prefix": "profile_owner_insert",
+              "roles": ["authenticated"],
+              "tableName": "profile",
+              "withCheck": "\"userId\"::uuid = auth.uid()"
+            },
+            "profile_owner_read": {
+              "kind": "policy",
+              "name": "profile_owner_read_9f8e536e",
+              "namespaceId": "public",
+              "operation": "select",
+              "permissive": true,
+              "prefix": "profile_owner_read",
+              "roles": ["authenticated"],
+              "tableName": "profile",
+              "using": "\"userId\"::uuid = auth.uid()"
+            },
+            "profile_owner_write": {
+              "kind": "policy",
+              "name": "profile_owner_write_b674cdea",
+              "namespaceId": "public",
+              "operation": "update",
+              "permissive": true,
+              "prefix": "profile_owner_write",
+              "roles": ["authenticated"],
+              "tableName": "profile",
+              "using": "\"userId\"::uuid = auth.uid()",
+              "withCheck": "\"userId\"::uuid = auth.uid()"
+            },
+            "profile_public_read": {
+              "kind": "policy",
+              "name": "profile_public_read_16dd15e0",
+              "namespaceId": "public",
+              "operation": "select",
+              "permissive": true,
+              "prefix": "profile_public_read",
+              "roles": ["anon"],
+              "tableName": "profile",
+              "using": "true"
+            },
+            "profile_touch_write": {
+              "kind": "policy",
+              "name": "profile_touch_write_4b6e708b",
+              "namespaceId": "public",
+              "operation": "update",
+              "permissive": true,
+              "prefix": "profile_touch_write",
+              "roles": ["authenticated"],
+              "tableName": "profile",
+              "using": "\"userId\"::uuid = auth.uid()"
+            }
+          },
+          "rls": {
+            "audit_log": {
+              "kind": "rls",
+              "namespaceId": "public",
+              "tableName": "audit_log"
+            },
+            "profile": {
+              "kind": "rls",
+              "namespaceId": "public",
+              "tableName": "profile"
+            }
+          },
+          "table": {
+            "audit_log": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": ["id"]
+              },
+              "uniques": []
+            },
+            "profile": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": ["id"]
+              },
+              "uniques": []
+            }
+          }
+        },
+        "id": "public"
+      }
+    },
+    "storageHash": "sha256:baa5da17b0dde0c3c9063c4d3c11b1dbd4f73873fb2733b9bb73a2751070c13f"
+  },
+  "capabilities": {
+    "postgres": {
+      "distinctOn": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "lateral": true,
+      "returning": true,
+      "scalarList": true
+    }
+  },
+  "extensionPacks": {},
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}

@@ -57,7 +57,6 @@ const emptySchema = new PostgresDatabaseSchemaNode({
     public: new PostgresNamespaceSchemaNode({
       schemaName: 'public',
       tables: {},
-      nativeEnumTypeNames: [],
     }),
   },
   roles: [],
@@ -80,9 +79,9 @@ function liveSchemaWithUsers(
             uniques: [],
             foreignKeys: [],
             indexes: [],
+            rlsEnabled: false,
           }),
         },
-        nativeEnumTypeNames: [],
       }),
     },
     roles: [],
@@ -253,7 +252,7 @@ describe('PostgresMigrationPlanner.plan control-policy partitioning', async () =
           expect.objectContaining({
             kind: 'controlPolicySuppressedCall',
             summary: expect.stringContaining(
-              "has effective control 'external' but table declared 'managed'",
+              "has effective control 'external' but declared 'managed'",
             ),
           }),
         ]),

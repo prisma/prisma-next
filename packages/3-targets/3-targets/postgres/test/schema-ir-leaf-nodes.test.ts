@@ -91,15 +91,54 @@ describe('PostgresPolicySchemaNode', () => {
       expect(PostgresPolicySchemaNode.is(role)).toBe(false);
     });
   });
+
+  describe('dependsOn', () => {
+    const dependsOn = [
+      [
+        { nodeKind: 'postgres-database', id: 'database' },
+        { nodeKind: 'postgres-namespace', id: 'public' },
+        { nodeKind: 'postgres-table', id: 'profiles' },
+      ],
+      [
+        { nodeKind: 'postgres-database', id: 'database' },
+        { nodeKind: 'postgres-role', id: 'app_user' },
+      ],
+    ];
+
+    it('is readable when supplied', () => {
+      const node = new PostgresPolicySchemaNode({ ...basePolicyInput, dependsOn });
+      expect(node.dependsOn).toEqual(dependsOn);
+    });
+
+    it('is absent when not supplied', () => {
+      const node = new PostgresPolicySchemaNode(basePolicyInput);
+      expect(node.dependsOn).toBeUndefined();
+    });
+
+    it('is non-enumerable — excluded from JSON and structural equality', () => {
+      const node = new PostgresPolicySchemaNode({ ...basePolicyInput, dependsOn });
+      expect(Object.keys(node)).not.toContain('dependsOn');
+      expect(JSON.parse(JSON.stringify(node))).not.toHaveProperty('dependsOn');
+    });
+
+    it('is ignored by isEqualTo', () => {
+      const a = new PostgresPolicySchemaNode({ ...basePolicyInput, dependsOn });
+      const b = new PostgresPolicySchemaNode(basePolicyInput);
+      expect(a.isEqualTo(b)).toBe(true);
+    });
+  });
 });
 
 describe('PostgresRoleSchemaNode', () => {
-  it('id returns the role name', () => {
+  it('id returns the bare role name', () => {
     const node = new PostgresRoleSchemaNode({
       name: 'app_user',
       namespaceId: UNBOUND_NAMESPACE_ID,
     });
+    // The differ pairs siblings by (nodeKind, id), so a role never collides
+    // with a same-named schema even though both use the bare name as id.
     expect(node.id).toBe('app_user');
+    expect(node.name).toBe('app_user');
   });
 
   it('children() returns empty array (leaf)', () => {

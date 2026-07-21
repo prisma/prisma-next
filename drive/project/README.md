@@ -18,7 +18,12 @@ Project-scope calibration lives in [`drive/calibration/`](../calibration/):
 - **Working-branch naming.** Project working branch is named with the Linear Project ID: `<tml-id>-<descriptive-slug>` (lowercased; hyphens). Example: `tml-2549-agile-agent-orchestration`.
 - **Initial status update.** Links the project's spec.
 - **State conventions.** Don't manually transition issues to a completed state; the GitHub integration handles it on PR merge (auto-transitions to the team's terminal state). Manual transitions before merge are fine (e.g. moving to `In review` when the PR opens).
+- **Single-issue multi-slice auto-close.** When a whole project is tracked as one Linear issue, the GitHub integration auto-closes it on **every** slice-PR merge (each PR's title prefix matches the issue). The orchestrator must reopen after each merge — or prefer per-slice sub-issues under a parent issue, so auto-close fires per-slice. (Learned on lsp-interpreter-diagnostics: one issue, five reopens.)
 - **Promotion / demotion.** Handled by `drive-triage-work`; see [`drive/triage/README.md`](../triage/README.md) for the ceremony.
+
+## PR boundaries under mid-flight scope shifts
+
+A stacked PR is justified only when its base PR is independently valuable to merge as-is. When a mid-flight scope addition rewrites an unmerged slice's internals, fold the two into one PR — the transient scaffolding then nets out of the diff entirely instead of costing two reviews. (Learned on lsp-interpreter-diagnostics: a stacked PR folded into its base after the operator flagged the review-time waste.)
 
 ## Status-update cadence
 

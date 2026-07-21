@@ -1,3 +1,5 @@
+import pluralizeLib from 'pluralize';
+
 const PSL_RESERVED_WORDS = new Set(['model', 'enum', 'types', 'type', 'generator', 'datasource']);
 
 const IDENTIFIER_PART_PATTERN = /[A-Za-z0-9]+/g;
@@ -127,20 +129,23 @@ export function toEnumName(pgTypeName: string): NameResult {
   return { name };
 }
 
+const VALID_IDENTIFIER_PATTERN = /^[A-Za-z_]\w*$/;
+
+/**
+ * PSL member name for a native-enum value. The value itself always prints
+ * explicitly (`member = "value"`), so the returned name never needs a map:
+ * a value that already is a valid, non-reserved identifier is kept verbatim
+ * (case included); anything else is camelCased/escaped like a field name.
+ */
+export function toEnumMemberName(value: string): string {
+  if (VALID_IDENTIFIER_PATTERN.test(value) && !needsEscaping(value)) {
+    return value;
+  }
+  return escapeIfNeeded(snakeToCamelCase(value));
+}
+
 export function pluralize(word: string): string {
-  if (
-    word.endsWith('s') ||
-    word.endsWith('x') ||
-    word.endsWith('z') ||
-    word.endsWith('ch') ||
-    word.endsWith('sh')
-  ) {
-    return `${word}es`;
-  }
-  if (word.endsWith('y') && !/[aeiou]y$/i.test(word)) {
-    return `${word.slice(0, -1)}ies`;
-  }
-  return `${word}s`;
+  return pluralizeLib.plural(word);
 }
 
 export function deriveRelationFieldName(

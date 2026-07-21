@@ -23,18 +23,6 @@ export interface SourceDiagnostic {
   readonly data?: Readonly<Record<string, unknown>>;
 }
 
-interface DefaultFunctionArgument {
-  readonly raw: string;
-  readonly span: SourceSpan;
-}
-
-export interface ParsedDefaultFunctionCall {
-  readonly name: string;
-  readonly raw: string;
-  readonly args: readonly DefaultFunctionArgument[];
-  readonly span: SourceSpan;
-}
-
 export interface DefaultFunctionLoweringContext {
   readonly sourceId: string;
   readonly modelName: string;
@@ -49,18 +37,6 @@ export type LoweredDefaultValue =
 export type LoweredDefaultResult =
   | { readonly ok: true; readonly value: LoweredDefaultValue }
   | { readonly ok: false; readonly diagnostic: SourceDiagnostic };
-
-export type DefaultFunctionLoweringHandler = (input: {
-  readonly call: ParsedDefaultFunctionCall;
-  readonly context: DefaultFunctionLoweringContext;
-}) => LoweredDefaultResult;
-
-export interface DefaultFunctionRegistryEntry {
-  readonly lower: DefaultFunctionLoweringHandler;
-  readonly usageSignatures?: readonly string[];
-}
-
-export type DefaultFunctionRegistry = ReadonlyMap<string, DefaultFunctionRegistryEntry>;
 
 export interface MutationDefaultGeneratorDescriptor {
   readonly id: string;
@@ -93,9 +69,21 @@ export interface MutationDefaultGeneratorDescriptor {
   readonly buildPhases?: (args?: Record<string, unknown>) => ExecutionMutationDefaultPhases;
 }
 
+// A default-function call whose arguments the function's `funcCall` signature has already parsed
+// and validated, so the registry lowering reads them directly instead of re-parsing source text.
+export interface TypedDefaultFunctionCall {
+  readonly fn: string;
+  readonly span: SourceSpan;
+  readonly args: Readonly<Record<string, unknown>>;
+}
+
 export interface ControlMutationDefaultEntry {
+  // The function's argument signature. Typed `unknown` because its concrete type (`FuncCallSig`)
+  // lives in the authoring layer, which the core framework cannot import; the family that
+  // registers the entry narrows it back.
+  readonly signature?: unknown;
   readonly lower: (input: {
-    readonly call: ParsedDefaultFunctionCall;
+    readonly call: TypedDefaultFunctionCall;
     readonly context: DefaultFunctionLoweringContext;
   }) => LoweredDefaultResult;
   readonly usageSignatures?: readonly string[];

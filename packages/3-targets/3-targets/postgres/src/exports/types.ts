@@ -1,3 +1,8 @@
+export { PostgresNativeEnum, type PostgresNativeEnumInput } from '../core/postgres-native-enum';
+export {
+  PostgresRlsEnablement,
+  type PostgresRlsEnablementInput,
+} from '../core/postgres-rls-enablement';
 export {
   PostgresRlsPolicy,
   type PostgresRlsPolicyInput,
@@ -20,6 +25,10 @@ export {
   type PostgresNamespaceSchemaNodeInput,
 } from '../core/schema-ir/postgres-namespace-schema-node';
 export {
+  PostgresNativeEnumSchemaNode,
+  type PostgresNativeEnumSchemaNodeInput,
+} from '../core/schema-ir/postgres-native-enum-schema-node';
+export {
   PostgresPolicySchemaNode,
   type PostgresPolicySchemaNodeInput,
 } from '../core/schema-ir/postgres-policy-schema-node';
@@ -31,4 +40,5 @@ export {
   PostgresTableSchemaNode,
   type PostgresTableSchemaNodeInput,
 } from '../core/schema-ir/postgres-table-schema-node';
+export { PostgresSchemaNodeKind } from '../core/schema-ir/schema-node-kinds';
 export type { PostgresColumnDefault } from '../core/types';

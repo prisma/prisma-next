@@ -7,12 +7,12 @@ import type {
   MigrationRunner,
 } from '@prisma-next/framework-components/control';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
-import { sqliteTargetDescriptorMeta } from './descriptor-meta';
 import {
-  diffSqliteDatabaseSchema,
-  sqliteContractToSchema,
-  verifySqliteDatabaseSchema,
-} from './migrations/diff-database-schema';
+  relationalNodeEntityKind,
+  relationalNodeGranularity,
+} from '@prisma-next/sql-schema-ir/types';
+import { sqliteTargetDescriptorMeta } from './descriptor-meta';
+import { diffSqliteSchema, sqliteContractToSchema } from './migrations/diff-database-schema';
 import { createSqliteMigrationPlanner } from './migrations/planner';
 import type { SqlitePlanTargetDetails } from './migrations/planner-target-details';
 import { createSqliteMigrationRunner } from './migrations/runner';
@@ -28,24 +28,11 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
     ...sqliteTargetDescriptorMeta,
     contractSerializer: new SqliteContractSerializer(),
     schemaVerifier: new SqliteSchemaVerifier(),
-    diffDatabaseSchema(input) {
-      return diffSqliteDatabaseSchema({
-        contract: input.contract,
-        actualSchema: input.schema,
-        strict: input.strict,
-        typeMetadataRegistry: input.typeMetadataRegistry,
-        frameworkComponents: input.frameworkComponents,
-      });
+    diffSchema(input) {
+      return diffSqliteSchema(input);
     },
-    verifyDatabaseSchema(input) {
-      return verifySqliteDatabaseSchema({
-        contract: input.contract,
-        actualSchema: input.schema,
-        strict: input.strict,
-        typeMetadataRegistry: input.typeMetadataRegistry,
-        frameworkComponents: input.frameworkComponents,
-      });
-    },
+    classifySubjectGranularity: relationalNodeGranularity,
+    classifyEntityKind: relationalNodeEntityKind,
     migrations: {
       createPlanner(adapter: SqlControlAdapter<'sqlite'>): MigrationPlanner<'sql', 'sqlite'> {
         return createSqliteMigrationPlanner(adapter);

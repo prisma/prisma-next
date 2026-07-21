@@ -53,4 +53,16 @@ describe('resolveSchemaInputs', () => {
     const set = resolveSchemaInputs({});
     expect(set.includes(pathToFileURL('/abs/schema.psl').toString())).toBe(false);
   });
+
+  it('lists the configured input URIs in config order', () => {
+    const set = resolveSchemaInputs(configWith(['/abs/a.psl', '/abs/b.psl']));
+    expect([...set.uris()]).toEqual([
+      pathToFileURL('/abs/a.psl').toString(),
+      pathToFileURL('/abs/b.psl').toString(),
+    ]);
+  });
+
+  it('lists no URIs when there are no configured inputs', () => {
+    expect([...resolveSchemaInputs({}).uris()]).toEqual([]);
+  });
 });

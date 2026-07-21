@@ -16,7 +16,6 @@ export interface LintsOptions {
     readonly deleteWithoutWhere?: 'warn' | 'error';
     readonly updateWithoutWhere?: 'warn' | 'error';
     readonly readOnlyMutation?: 'warn' | 'error';
-    readonly unindexedPredicate?: 'warn' | 'error';
   };
   readonly fallbackWhenAstMissing?: 'raw' | 'skip';
 }
@@ -125,8 +124,6 @@ function getConfiguredSeverity(code: string, options?: LintsOptions): 'warn' | '
       return severities.updateWithoutWhere;
     case 'LINT.READ_ONLY_MUTATION':
       return severities.readOnlyMutation;
-    case 'LINT.UNINDEXED_PREDICATE':
-      return severities.unindexedPredicate;
     default:
       return undefined;
   }

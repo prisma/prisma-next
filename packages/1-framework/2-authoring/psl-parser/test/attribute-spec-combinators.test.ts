@@ -2,19 +2,27 @@ import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it } from 'vitest';
 import type { ArgType, InterpretCtx } from '../src/exports';
 import {
+  bool,
+  entityRef,
   fieldAttribute,
   fieldRef,
+  funcCall,
   identifier,
+  int,
   interpretAttribute,
   list,
+  modelAttribute,
   nodePslSpan,
+  num,
   oneOf,
+  optional,
+  record,
   str,
 } from '../src/exports';
 import { Cursor, parse, parseAttribute } from '../src/parse';
 import type { SourceFile } from '../src/source-file';
 import { buildSymbolTable } from '../src/symbol-table';
-import { FieldAttributeAst } from '../src/syntax/ast/attributes';
+import { FieldAttributeAst, ModelAttributeAst } from '../src/syntax/ast/attributes';
 import type { ExpressionAst } from '../src/syntax/ast/expressions';
 import { createSyntaxTree } from '../src/syntax/red';
 
@@ -26,7 +34,7 @@ function makeCtx(sourceFile: SourceFile): InterpretCtx {
     scalarTypes: ['String', 'Int'],
     pslBlockDescriptors: {},
   });
-  const selfModel = table.topLevel.models.M;
+  const selfModel = table.topLevel.models['M'];
   if (!selfModel) throw new Error('expected model M in the symbol table');
   return {
     level: 'field',
@@ -45,6 +53,13 @@ function argOf(exprSource: string): { expr: ExpressionAst; ctx: InterpretCtx } {
   const expr = first?.value();
   if (!expr) throw new Error('expected an argument expression');
   return { expr, ctx: makeCtx(cursor.sourceFile) };
+}
+
+function modelAttrOf(source: string): { node: ModelAttributeAst; ctx: InterpretCtx } {
+  const cursor = new Cursor(source);
+  const node = ModelAttributeAst.cast(createSyntaxTree(parseAttribute(cursor)));
+  if (!node) throw new Error('expected a model attribute');
+  return { node, ctx: { ...makeCtx(cursor.sourceFile), level: 'model' } };
 }
 
 describe('str', () => {
@@ -108,6 +123,224 @@ describe('identifier', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('int', () => {
+  it('parses an integer literal into its number value', () => {
+    const { expr, ctx } = argOf('42');
+
+    const result = int().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(42);
+  });
+
+  it('rejects a non-integer number with the threaded code', () => {
+    const { expr, ctx } = argOf('1.5');
+
+    const result = int().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a non-number token', () => {
+    const { expr, ctx } = argOf('"42"');
+
+    const result = int().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('accepts an integer within the declared bounds', () => {
+    const { expr, ctx } = argOf('16');
+
+    const result = int({ min: 2, max: 255 }).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(16);
+  });
+
+  it('rejects an integer below the minimum with a range message', () => {
+    const { expr, ctx } = argOf('1');
+
+    const result = int({ min: 2, max: 255 }).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.message).toBe('Expected an integer between 2 and 255');
+    }
+  });
+
+  it('rejects an integer above the maximum with a range message', () => {
+    const { expr, ctx } = argOf('300');
+
+    const result = int({ min: 2, max: 255 }).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.message).toBe('Expected an integer between 2 and 255');
+    }
+  });
+
+  it('still rejects a non-integer even within the bounds', () => {
+    const { expr, ctx } = argOf('1.5');
+
+    const result = int({ min: 0, max: 5 }).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure[0]?.message).toBe('Expected an integer literal');
+  });
+});
+
+describe('num', () => {
+  it('parses an integer literal into its number value', () => {
+    const { expr, ctx } = argOf('5');
+
+    const result = num().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(5);
+  });
+
+  it('parses a fractional literal into its number value', () => {
+    const { expr, ctx } = argOf('1.5');
+
+    const result = num().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(1.5);
+  });
+
+  it('rejects a string literal with the threaded code', () => {
+    const { expr, ctx } = argOf('"5"');
+
+    const result = num().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a boolean literal', () => {
+    const { expr, ctx } = argOf('true');
+
+    const result = num().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('rejects a bare identifier', () => {
+    const { expr, ctx } = argOf('Cascade');
+
+    const result = num().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('matches only the pinned number literal', () => {
+    const { expr, ctx } = argOf('4');
+
+    const result = num(4).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(4);
+  });
+
+  it('rejects a number literal other than the pinned value', () => {
+    const { expr, ctx } = argOf('7');
+
+    const result = num(4).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a string literal carrying the pinned digits', () => {
+    const { expr, ctx } = argOf('"4"');
+
+    const result = num(4).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('bool', () => {
+  it('parses true into its boolean value', () => {
+    const { expr, ctx } = argOf('true');
+
+    const result = bool().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(true);
+  });
+
+  it('parses false into its boolean value', () => {
+    const { expr, ctx } = argOf('false');
+
+    const result = bool().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(false);
+  });
+
+  it('rejects a non-boolean token with the threaded code', () => {
+    const { expr, ctx } = argOf('"true"');
+
+    const result = bool().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+});
+
+describe('modelAttribute', () => {
+  it('fixes the spec level to model', () => {
+    const spec = modelAttribute('demo', { positional: [{ key: 'k', type: int() }] });
+
+    expect(spec.level).toBe('model');
+    expect(spec.name).toBe('demo');
+  });
+
+  it('binds a model-attribute node through interpretAttribute', () => {
+    const { node, ctx } = modelAttrOf('@@demo(7)');
+    const spec = modelAttribute('demo', { positional: [{ key: 'k', type: int() }] });
+
+    const result = interpretAttribute(node, spec, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ k: 7 });
+  });
+
+  it('surfaces a leaf diagnostic when a model-attribute argument fails to parse', () => {
+    const { node, ctx } = modelAttrOf('@@demo("nope")');
+    const spec = modelAttribute('demo', { positional: [{ key: 'k', type: int() }] });
+
+    const result = interpretAttribute(node, spec, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
   });
 });
 
@@ -204,6 +437,47 @@ describe('fieldRef', () => {
   });
 });
 
+describe('entityRef', () => {
+  it('parses a bare identifier into its model name', () => {
+    const { expr, ctx } = argOf('Task');
+
+    const result = entityRef().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe('Task');
+  });
+
+  it('rejects a quoted string literal', () => {
+    const { expr, ctx } = argOf('"Task"');
+
+    const result = entityRef().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a number token', () => {
+    const { expr, ctx } = argOf('42');
+
+    const result = entityRef().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('rejects an array literal', () => {
+    const { expr, ctx } = argOf('[Task]');
+
+    const result = entityRef().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
 describe('list', () => {
   it('maps each element through the element combinator', () => {
     const { expr, ctx } = argOf('["a", "b"]');
@@ -254,6 +528,181 @@ describe('list', () => {
     const { expr, ctx } = argOf('"a"');
 
     const result = list(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('record', () => {
+  it('parses a single-key object into a record', () => {
+    const { expr, ctx } = argOf('{ where: "active = true" }');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ where: 'active = true' });
+  });
+
+  it('parses a multi-key object into a record', () => {
+    const { expr, ctx } = argOf('{ ops: "gin_trgm_ops", where: "deleted = false" }');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({ ops: 'gin_trgm_ops', where: 'deleted = false' });
+  });
+
+  it('parses an empty object into an empty record', () => {
+    const { expr, ctx } = argOf('{}');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toEqual({});
+  });
+
+  it('rejects a duplicate key', () => {
+    const { expr, ctx } = argOf('{ ops: "a", ops: "b" }');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a non-object argument', () => {
+    const { expr, ctx } = argOf('"nope"');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('propagates a leaf parse error when a value does not match', () => {
+    const { expr, ctx } = argOf('{ ops: 1 }');
+
+    const result = record(str()).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+  });
+});
+
+describe('funcCall', () => {
+  it('accepts a nullary call whose callee matches the pinned name', () => {
+    const { expr, ctx } = argOf('now()');
+
+    const result = funcCall('now', {}).parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toMatchObject({ fn: 'now', args: {} });
+  });
+
+  it('rejects a call whose callee differs from the pinned name', () => {
+    const { expr, ctx } = argOf('uuid()');
+
+    const result = funcCall('now', {}).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a bare identifier', () => {
+    const { expr, ctx } = argOf('now');
+
+    const result = funcCall('now', {}).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]?.code).toBe('PSL_INVALID_ATTRIBUTE_SYNTAX');
+    }
+  });
+
+  it('rejects a string literal', () => {
+    const { expr, ctx } = argOf('"now"');
+
+    const result = funcCall('now', {}).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('rejects an array literal', () => {
+    const { expr, ctx } = argOf('[1]');
+
+    const result = funcCall('now', {}).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('rejects a namespaced callee', () => {
+    const { expr, ctx } = argOf('foo.now()');
+
+    const result = funcCall('now', {}).parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+});
+
+describe('funcCall with a signature', () => {
+  const nanoid = () =>
+    funcCall('nanoid', {
+      positional: [{ key: 'size', type: optional(int({ min: 2, max: 255 })) }],
+    });
+
+  it('binds a positional argument through the signature into the typed record', () => {
+    const { expr, ctx } = argOf('nanoid(16)');
+
+    const result = nanoid().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toMatchObject({ fn: 'nanoid', args: { size: 16 } });
+  });
+
+  it('omits an absent optional argument, keeping the fn discriminant', () => {
+    const { expr, ctx } = argOf('nanoid()');
+
+    const result = nanoid().parse(expr, ctx);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toMatchObject({ fn: 'nanoid', args: {} });
+  });
+
+  it('rejects an out-of-range argument', () => {
+    const { expr, ctx } = argOf('nanoid(1)');
+
+    const result = nanoid().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure).toHaveLength(1);
+  });
+
+  it('rejects excess positional arguments', () => {
+    const { expr, ctx } = argOf('nanoid(16, 2)');
+
+    const result = nanoid().parse(expr, ctx);
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('still rejects a callee that differs from the pinned name', () => {
+    const { expr, ctx } = argOf('cuid(16)');
+
+    const result = nanoid().parse(expr, ctx);
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failure).toHaveLength(1);

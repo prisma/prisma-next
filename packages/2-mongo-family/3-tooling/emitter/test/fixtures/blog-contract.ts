@@ -1,4 +1,4 @@
-import { crossRef } from '@prisma-next/contract/types';
+import { coreHash, crossRef } from '@prisma-next/contract/types';
 import { createMongoContract } from './create-mongo-contract';
 
 export const blogContract = createMongoContract({
@@ -58,7 +58,7 @@ export const blogContract = createMongoContract({
     },
   },
   storage: {
-    storageHash: 'sha256:test',
+    storageHash: coreHash('sha256:test'),
     namespaces: {
       __unbound__: {
         id: '__unbound__',

@@ -11,30 +11,19 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { VerifyDatabaseSchemaResult } from '@prisma-next/framework-components/control';
-import { SchemaDiff } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  applyFkDefaults,
   type ReferentialAction,
   SqlStorage,
   StorageTable,
   type StorageTableInput,
 } from '@prisma-next/sql-contract/types';
-import type {
-  SqlReferentialAction,
-  SqlSchemaIR,
-  SqlTableIR,
-} from '@prisma-next/sql-schema-ir/types';
+import type { SqlReferentialAction } from '@prisma-next/sql-schema-ir/types';
+import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
 import type { CodecControlHooks, ExpandNativeTypeInput } from '../src/core/migrations/types';
-
-/**
- * Empty type metadata registry for tests that don't need codec warnings.
- */
-export const emptyTypeMetadataRegistry = new Map<string, { nativeType?: string }>();
 
 /**
  * Creates a minimal valid contract for testing.
@@ -75,7 +64,7 @@ export function createTestContract(
  * Creates a minimal valid SqlSchemaIR for testing.
  */
 export function createTestSchemaIR(tables: Record<string, SqlTableIR>): SqlSchemaIR {
-  return { tables };
+  return new SqlSchemaIR({ tables });
 }
 
 /**
@@ -100,8 +89,6 @@ export function createContractTable(
       name?: string;
       onDelete?: ReferentialAction;
       onUpdate?: ReferentialAction;
-      constraint?: boolean;
-      index?: boolean;
     }>;
     uniques?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
     indexes?: ReadonlyArray<{
@@ -130,7 +117,6 @@ export function createContractTable(
       ...fk,
       source: { ...fk.source, namespaceId: asNamespaceId(fk.source.namespaceId) },
       target: { ...fk.target, namespaceId: asNamespaceId(fk.target.namespaceId) },
-      ...applyFkDefaults(fk),
     })),
     uniques: options?.uniques ?? [],
     indexes: options?.indexes ?? [],
@@ -168,7 +154,7 @@ export function createSchemaTable(
     }>;
   },
 ): SqlTableIR {
-  const result: SqlTableIR = {
+  return new SqlTableIR({
     name,
     columns: Object.fromEntries(
       Object.entries(columns).map(([colName, col]) => [
@@ -184,11 +170,8 @@ export function createSchemaTable(
     foreignKeys: options?.foreignKeys ?? [],
     uniques: options?.uniques ?? [],
     indexes: options?.indexes ?? [],
-  };
-  if (options?.primaryKey) {
-    return { ...result, primaryKey: options.primaryKey };
-  }
-  return result;
+    ...ifDefined('primaryKey', options?.primaryKey),
+  });
 }
 
 /**
@@ -303,46 +286,4 @@ export function createMockPostgresComponent(): TargetBoundComponentDescriptor<'s
       },
     },
   } as TargetBoundComponentDescriptor<'sql', 'postgres'>;
-}
-
-/**
- * A no-op `diffDatabaseSchema` for target-descriptor stubs in tests that
- * construct a family instance but never call `verifySchema`. Every SQL target
- * descriptor must provide `diffDatabaseSchema`; this satisfies that requirement
- * for construction-only tests.
- */
-export function stubTargetDiffDatabaseSchema(): SchemaDiff {
-  return new SchemaDiff([], []);
-}
-
-/**
- * A no-op `verifyDatabaseSchema` for target-descriptor stubs in tests that
- * construct a family instance but never call `verifySchema`. Every SQL target
- * descriptor must provide `verifyDatabaseSchema`; this satisfies that
- * requirement for construction-only tests.
- */
-export function stubTargetVerifyDatabaseSchema(): VerifyDatabaseSchemaResult {
-  return {
-    ok: true,
-    summary: 'stub',
-    contract: { storageHash: 'stub' },
-    target: { expected: 'postgres' },
-    schema: {
-      issues: [],
-      schemaDiffIssues: [],
-      root: {
-        status: 'pass',
-        kind: 'database',
-        name: 'root',
-        contractPath: '',
-        code: '',
-        message: '',
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      },
-      counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
-    },
-    timings: { total: 0 },
-  };
 }

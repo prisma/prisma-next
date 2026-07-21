@@ -1,7 +1,60 @@
 import { describe, expect, it } from 'vitest';
-import { decodeEWKBHex, encodeEWKT } from '../src/core/ewkb';
+import { decodeEWKBHex, encodeEWKBHex, encodeEWKT } from '../src/core/ewkb';
+import type { Geometry } from '../src/core/geojson';
 
 describe('postgis EWKB / EWKT', () => {
+  it.each([
+    { type: 'Point', coordinates: [1, 2], srid: 4326 },
+    {
+      type: 'LineString',
+      coordinates: [
+        [0, 0],
+        [1, 1],
+      ],
+    },
+    {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [0, 0],
+          [1, 0],
+          [0, 0],
+        ],
+      ],
+    },
+    {
+      type: 'MultiPoint',
+      coordinates: [
+        [0, 0],
+        [1, 1],
+      ],
+      srid: 4326,
+    },
+    {
+      type: 'MultiLineString',
+      coordinates: [
+        [
+          [0, 0],
+          [1, 1],
+        ],
+      ],
+    },
+    {
+      type: 'MultiPolygon',
+      coordinates: [
+        [
+          [
+            [0, 0],
+            [1, 0],
+            [0, 0],
+          ],
+        ],
+      ],
+    },
+  ] satisfies Geometry[])('round-trips $type through HEXEWKB', (geometry) => {
+    expect(decodeEWKBHex(encodeEWKBHex(geometry))).toEqual(geometry);
+  });
+
   describe('encodeEWKT', () => {
     it('Point without SRID', () => {
       expect(encodeEWKT({ type: 'Point', coordinates: [1, 2] })).toBe('POINT(1 2)');

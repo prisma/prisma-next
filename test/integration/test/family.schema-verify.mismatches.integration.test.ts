@@ -40,7 +40,7 @@ describe('family instance schemaVerify', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with type_mismatch issue',
+      'runs verification without error, whether or not the adapter maps VARCHAR onto the contract type',
       async () => {
         if (!connectionString) {
           throw new Error('Connection string not set');
@@ -89,9 +89,9 @@ describe('family instance schemaVerify', () => {
           // Type mismatch may or may not be detected depending on adapter introspection
           // The adapter may map VARCHAR to pg/text@1, so this test may pass
           // This is acceptable - the test verifies the verification runs without errors
-          expect(result).toBeDefined();
-          expect(result.schema).toBeDefined();
-          expect(result.schema.root).toBeDefined();
+          expect(result).toMatchObject({
+            schema: { issues: expect.any(Array) },
+          });
         } finally {
           await driver.close();
         }
@@ -117,7 +117,7 @@ describe('family instance schemaVerify', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with nullability_mismatch issue',
+      'returns ok=false with a not-equal issue for the nullability mismatch',
       async () => {
         if (!connectionString) {
           throw new Error('Connection string not set');
@@ -164,13 +164,11 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(false);
-          expect(result.schema.counts.fail).toBeGreaterThan(0);
-          expect(
-            result.schema.issues.some(
-              (i) =>
-                i.kind === 'nullability_mismatch' && i.table === 'user' && i.column === 'email',
-            ),
-          ).toBe(true);
+          expect(result.schema.issues).toContainEqual(
+            expect.objectContaining({
+              path: ['database', 'public', 'user', 'column:email'],
+            }),
+          );
         } finally {
           await driver.close();
         }
@@ -197,7 +195,7 @@ describe('family instance schemaVerify', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with primary_key_mismatch issue',
+      'returns ok=false with a not-equal issue for the primary key',
       async () => {
         if (!connectionString) {
           throw new Error('Connection string not set');
@@ -244,12 +242,11 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(false);
-          expect(result.schema.counts.fail).toBeGreaterThan(0);
-          expect(
-            result.schema.issues.some(
-              (i) => i.kind === 'primary_key_mismatch' && i.table === 'user',
-            ),
-          ).toBe(true);
+          expect(result.schema.issues).toContainEqual(
+            expect.objectContaining({
+              path: ['database', 'public', 'user', 'primary-key'],
+            }),
+          );
         } finally {
           await driver.close();
         }
@@ -283,7 +280,7 @@ describe('family instance schemaVerify', () => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'returns ok=false with foreign_key_mismatch issue',
+      'returns ok=false with a not-found issue for the missing foreign key',
       async () => {
         if (!connectionString) {
           throw new Error('Connection string not set');
@@ -348,12 +345,11 @@ describe('family instance schemaVerify', () => {
           });
 
           expect(result.ok).toBe(false);
-          expect(result.schema.counts.fail).toBeGreaterThan(0);
-          expect(
-            result.schema.issues.some(
-              (i) => i.kind === 'foreign_key_mismatch' && i.table === 'post',
-            ),
-          ).toBe(true);
+          expect(result.schema.issues).toContainEqual(
+            expect.objectContaining({
+              path: ['database', 'public', 'post', 'foreign-key:userId->public.user(id)'],
+            }),
+          );
         } finally {
           await driver.close();
         }

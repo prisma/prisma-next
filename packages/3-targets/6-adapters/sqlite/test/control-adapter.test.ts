@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import type { CliStructuredError } from '@prisma-next/errors/control';
+import { PrimaryKey } from '@prisma-next/sql-schema-ir/types';
 import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { describe, expect, it } from 'vitest';
@@ -44,7 +45,7 @@ describe('SqliteControlAdapter.introspect', () => {
     expect(users.columns['id']!.nativeType).toBe('integer');
     expect(users.columns['name']!.nullable).toBe(false);
     expect(users.columns['bio']!.nullable).toBe(true);
-    expect(users.primaryKey).toEqual({ columns: ['id'] });
+    expect(users.primaryKey).toEqual(new PrimaryKey({ columns: ['id'] }));
     await driver.close();
   });
 
@@ -54,7 +55,24 @@ describe('SqliteControlAdapter.introspect', () => {
     const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
     const schema = await adapter.introspect(driver);
 
-    expect(schema.tables['kv']!.primaryKey).toEqual({ columns: ['ns', 'key'] });
+    expect(schema.tables['kv']!.primaryKey).toEqual(new PrimaryKey({ columns: ['ns', 'key'] }));
+    await driver.close();
+  });
+
+  it('stamps normalized resolvedNativeType and parsed resolvedDefault on columns', async () => {
+    const driver = createMemoryDriver();
+    driver.db.exec(
+      "CREATE TABLE docs (status TEXT NOT NULL DEFAULT 'draft', n INTEGER DEFAULT 5, note TEXT)",
+    );
+    const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
+    const schema = await adapter.introspect(driver);
+    const columns = schema.tables['docs']!.columns;
+
+    expect(columns['status']!.resolvedNativeType).toBe('text');
+    expect(columns['status']!.resolvedDefault).toEqual({ kind: 'literal', value: 'draft' });
+    expect(columns['n']!.resolvedNativeType).toBe('integer');
+    expect(columns['n']!.resolvedDefault).toEqual({ kind: 'literal', value: 5 });
+    expect(columns['note']!.resolvedDefault).toBeUndefined();
     await driver.close();
   });
 
@@ -73,6 +91,17 @@ describe('SqliteControlAdapter.introspect', () => {
     expect(fks[0]!.referencedTable).toBe('authors');
     expect(fks[0]!.referencedColumns).toEqual(['id']);
     expect(fks[0]!.onDelete).toBe('cascade');
+    expect(fks[0]!.dependsOn).toEqual([
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'authors' },
+      ],
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'posts' },
+        { nodeKind: 'sql-column', id: 'column:author_id' },
+      ],
+    ]);
     await driver.close();
   });
 

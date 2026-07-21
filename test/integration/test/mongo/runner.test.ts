@@ -21,7 +21,7 @@ import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { synthMigrationEdges } from './synth-migration-edges';
+import { buildFabricatedMigrationEdges } from './fabricated-migration-edges';
 
 const controlAdapter = new MongoControlAdapterImpl();
 
@@ -36,7 +36,7 @@ type PerSpaceOptions = MigrationRunnerPerSpaceOptions<'mongo', 'mongo'> & {
 };
 
 function withSynthEdges(entry: Omit<PerSpaceOptions, 'migrationEdges'>): PerSpaceOptions {
-  return { ...entry, migrationEdges: synthMigrationEdges(entry.plan) };
+  return { ...entry, migrationEdges: buildFabricatedMigrationEdges(entry.plan) };
 }
 
 function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {

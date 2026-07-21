@@ -10,23 +10,24 @@ import type {
   SymbolTable,
 } from '@prisma-next/psl-parser';
 import {
+  bool,
   fieldAttribute,
   fieldRef,
   identifier,
-  interpretAttribute,
   list,
   nodePslSpan,
   oneOf,
   optional,
   str,
 } from '@prisma-next/psl-parser';
-import type { FieldAttributeAst, SourceFile } from '@prisma-next/psl-parser/syntax';
+import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
 import { assertDefined, invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 import { checkUncomposedNamespace, reportUncomposedNamespace } from './psl-column-resolution';
+import { findFieldAttributeNode, interpretFieldAttribute } from './sql-attribute-specs';
 
 export const REFERENTIAL_ACTION_MAP: Record<string, ReferentialAction | undefined> = {
   NoAction: 'noAction',
@@ -61,6 +62,8 @@ export type ModelBackrelationCandidate = {
   readonly tableName: string;
   readonly field: FieldSymbol;
   readonly targetModelName: string;
+  /** Whether the PSL field itself is list-typed (`Target[]`) rather than singular (`Target?`). A singular candidate is the back side of a 1:1 relation and can never be many-to-many. */
+  readonly isList: boolean;
   readonly relationName?: string;
 };
 
@@ -121,25 +124,23 @@ const sqlRelation = fieldAttribute('relation', {
         identifier('SetDefault'),
       ),
     ),
+    /**
+     * Opts a foreign key out of its default backing index
+     * (`index: false`). Omitted (the default) keeps the FK's derived
+     * backing-index expectation; only `false` is meaningful — there is no
+     * `index: true` spelling since that is already the default.
+     */
+    index: optional(bool()),
   },
   refine: relationInvariants,
 });
 
 export type SqlRelationOutput = InferAttr<typeof sqlRelation>;
 
-function findRelationAttributeNode(field: FieldSymbol): FieldAttributeAst | undefined {
-  for (const attribute of field.node.attributes()) {
-    if (attribute.name()?.path().join('.') === 'relation') {
-      return attribute;
-    }
-  }
-  return undefined;
-}
-
 function relationAttributeSpan(ctx: InterpretCtx): PslSpan {
   const field = ctx.field;
   if (field !== undefined) {
-    const node = findRelationAttributeNode(field);
+    const node = findFieldAttributeNode(field, 'relation');
     if (node !== undefined) {
       return nodePslSpan(node.syntax, ctx.sourceFile);
     }
@@ -162,23 +163,6 @@ function resolveReferencedModel(symbols: SymbolTable, field: FieldSymbol): Model
   return undefined;
 }
 
-function buildRelationInterpretCtx(input: {
-  readonly selfModel: ModelSymbol;
-  readonly field: FieldSymbol;
-  readonly symbols: SymbolTable;
-  readonly sourceFile: SourceFile;
-  readonly sourceId: string;
-}): InterpretCtx {
-  return {
-    level: 'field',
-    sourceId: input.sourceId,
-    sourceFile: input.sourceFile,
-    selfModel: input.selfModel,
-    field: input.field,
-    resolveReferencedModel: () => resolveReferencedModel(input.symbols, input.field),
-  };
-}
-
 export function interpretRelationAttribute(input: {
   readonly selfModel: ModelSymbol;
   readonly field: FieldSymbol;
@@ -187,19 +171,18 @@ export function interpretRelationAttribute(input: {
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
 }): SqlRelationOutput | undefined {
-  const attributeNode = findRelationAttributeNode(input.field);
-  if (attributeNode === undefined) {
-    return undefined;
-  }
-  const ctx = buildRelationInterpretCtx(input);
-  const result = interpretAttribute(attributeNode, sqlRelation, ctx);
-  if (!result.ok) {
-    for (const failure of result.failure) {
-      input.diagnostics.push(failure);
-    }
-    return undefined;
-  }
-  return result.value;
+  const node = findFieldAttributeNode(input.field, 'relation');
+  if (node === undefined) return undefined;
+  return interpretFieldAttribute({
+    node,
+    spec: sqlRelation,
+    model: input.selfModel,
+    field: input.field,
+    sourceFile: input.sourceFile,
+    sourceId: input.sourceId,
+    diagnostics: input.diagnostics,
+    resolveReferencedModel: () => resolveReferencedModel(input.symbols, input.field),
+  });
 }
 
 export function indexFkRelations(input: {
@@ -455,11 +438,29 @@ function relationsForModel(
   return created;
 }
 
+/**
+ * A set of columns is unique when it exactly matches one of the model's unique
+ * column sets — its primary key or any single- or multi-column `@unique` /
+ * `@@unique` constraint. Set equality (not subset) is required: a singular
+ * back-relation means at most one child per parent, which a unique constraint
+ * covering exactly the FK columns guarantees.
+ */
+function fkColumnsAreUnique(
+  localColumns: readonly string[],
+  uniqueColumnSets: readonly (readonly string[])[],
+): boolean {
+  const local = new Set(localColumns);
+  return uniqueColumnSets.some(
+    (columns) => columns.length === local.size && columns.every((column) => local.has(column)),
+  );
+}
+
 export function applyBackrelationCandidates(input: {
   readonly backrelationCandidates: readonly ModelBackrelationCandidate[];
   readonly fkRelationsByPair: Map<string, readonly FkRelationMetadata[]>;
   readonly fkRelationsByDeclaringModel: ReadonlyMap<string, readonly FkRelationMetadata[]>;
   readonly modelIdColumns: ReadonlyMap<string, readonly string[]>;
+  readonly modelUniqueColumnSets: ReadonlyMap<string, readonly (readonly string[])[]>;
   readonly modelRelations: Map<string, ModelRelationMetadata[]>;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
@@ -472,35 +473,39 @@ export function applyBackrelationCandidates(input: {
       : [...pairMatches];
 
     if (matches.length === 0) {
-      const { pairs: junctionPairs, nearMisses } = findJunctionFkPairs({
-        candidate,
-        fkRelationsByDeclaringModel: input.fkRelationsByDeclaringModel,
-        modelIdColumns: input.modelIdColumns,
-      });
-      const junctionPair = junctionPairs[0];
-      if (junctionPairs.length === 1 && junctionPair) {
-        relationsForModel(input.modelRelations, candidate.modelName).push(
-          manyToManyRelationNode(candidate, junctionPair),
-        );
-        continue;
-      }
-      if (junctionPairs.length > 1) {
-        input.diagnostics.push({
-          code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
-          message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple junction FK pairs for a many-to-many relation. Add @relation(name: "...") (or @relation("...")) to the list field and the junction FK-side relation pointing back at "${candidate.modelName}" to disambiguate.`,
-          sourceId: input.sourceId,
-          span: candidate.field.span,
+      // A singular candidate is the back side of a 1:1 — many-to-many junction
+      // matching only makes sense for a list-typed backrelation.
+      if (candidate.isList) {
+        const { pairs: junctionPairs, nearMisses } = findJunctionFkPairs({
+          candidate,
+          fkRelationsByDeclaringModel: input.fkRelationsByDeclaringModel,
+          modelIdColumns: input.modelIdColumns,
         });
-        continue;
-      }
-      const nearMiss = nearMisses[0];
-      if (nearMiss) {
-        input.diagnostics.push(junctionNearMissDiagnostic(candidate, nearMiss, input.sourceId));
-        continue;
+        const junctionPair = junctionPairs[0];
+        if (junctionPairs.length === 1 && junctionPair) {
+          relationsForModel(input.modelRelations, candidate.modelName).push(
+            manyToManyRelationNode(candidate, junctionPair),
+          );
+          continue;
+        }
+        if (junctionPairs.length > 1) {
+          input.diagnostics.push({
+            code: 'PSL_AMBIGUOUS_BACKRELATION',
+            message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple junction FK pairs for a many-to-many relation. Add @relation(name: "...") (or @relation("...")) to the list field and the junction FK-side relation pointing back at "${candidate.modelName}" to disambiguate.`,
+            sourceId: input.sourceId,
+            span: candidate.field.span,
+          });
+          continue;
+        }
+        const nearMiss = nearMisses[0];
+        if (nearMiss) {
+          input.diagnostics.push(junctionNearMissDiagnostic(candidate, nearMiss, input.sourceId));
+          continue;
+        }
       }
       input.diagnostics.push({
-        code: 'PSL_ORPHANED_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation or use an explicit join model for many-to-many.`,
+        code: 'PSL_ORPHANED_BACKRELATION',
+        message: `Backrelation field "${candidate.modelName}.${candidate.field.name}" has no matching FK-side relation on model "${candidate.targetModelName}". Add @relation(fields: [...], references: [...]) on the FK-side relation${candidate.isList ? ' or use an explicit join model for many-to-many' : ''}.`,
         sourceId: input.sourceId,
         span: candidate.field.span,
       });
@@ -508,8 +513,8 @@ export function applyBackrelationCandidates(input: {
     }
     if (matches.length > 1) {
       input.diagnostics.push({
-        code: 'PSL_AMBIGUOUS_BACKRELATION_LIST',
-        message: `Backrelation list field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation(name: "...") (or @relation("...")) to both sides to disambiguate.`,
+        code: 'PSL_AMBIGUOUS_BACKRELATION',
+        message: `Backrelation field "${candidate.modelName}.${candidate.field.name}" matches multiple FK-side relations on model "${candidate.targetModelName}". Add @relation(name: "...") (or @relation("...")) to both sides to disambiguate.`,
         sourceId: input.sourceId,
         span: candidate.field.span,
       });
@@ -520,12 +525,25 @@ export function applyBackrelationCandidates(input: {
     const matched = matches[0];
     assertDefined(matched, 'Backrelation matching requires a defined relation match');
 
+    if (!candidate.isList) {
+      const uniqueColumnSets = input.modelUniqueColumnSets.get(matched.declaringModelName) ?? [];
+      if (!fkColumnsAreUnique(matched.localColumns, uniqueColumnSets)) {
+        input.diagnostics.push({
+          code: 'PSL_NON_UNIQUE_BACKRELATION',
+          message: `Backrelation field "${candidate.modelName}.${candidate.field.name}" is singular, but the matching FK on "${matched.declaringModelName}" (fields ${matched.localColumns.map((column) => `"${column}"`).join(', ')}) is not unique. A singular back-relation implies at most one related row; add @unique (or @@unique([...])) to the FK fields, or make "${candidate.field.name}" a list.`,
+          sourceId: input.sourceId,
+          span: candidate.field.span,
+        });
+        continue;
+      }
+    }
+
     relationsForModel(input.modelRelations, candidate.modelName).push({
       fieldName: candidate.field.name,
       toModel: matched.declaringModelName,
       toTable: matched.declaringTableName,
       ...ifDefined('toNamespaceId', matched.declaringNamespaceId),
-      cardinality: '1:N',
+      cardinality: candidate.isList ? '1:N' : '1:1',
       on: {
         parentTable: candidate.tableName,
         parentColumns: matched.referencedColumns,
@@ -536,7 +554,7 @@ export function applyBackrelationCandidates(input: {
   }
 }
 
-export function validateNavigationListFieldAttributes(input: {
+export function validateBackrelationFieldAttributes(input: {
   readonly modelName: string;
   readonly field: FieldSymbol;
   readonly sourceId: string;
