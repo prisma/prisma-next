@@ -9,8 +9,10 @@ import {
   rawSql,
   unique,
 } from '@prisma-next/target-postgres/migration';
-import type { Contract as End } from './end-contract';
-import endContract from './end-contract.json' with { type: 'json' };
+import type { Contract as End } from '../../snapshots/6c96d4165531a6e68599368aa8d4de3d90d1c7e592c7143cd167d69feee89dc0/contract';
+import endContract from '../../snapshots/6c96d4165531a6e68599368aa8d4de3d90d1c7e592c7143cd167d69feee89dc0/contract.json' with {
+  type: 'json',
+};
 
 export default class M extends Migration<never, End> {
   override readonly endContractJson = endContract;
