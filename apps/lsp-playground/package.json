@@ -35,7 +35,7 @@
     "vscode-languageclient": "~9.0.1",
     "vscode-languageserver-protocol": "~3.18.2",
     "vscode-ws-jsonrpc": "3.5.0",
-    "ws": "^8.21.0"
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:0.15.0",
