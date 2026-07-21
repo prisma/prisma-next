@@ -438,11 +438,29 @@ function relationsForModel(
   return created;
 }
 
+/**
+ * A set of columns is unique when it exactly matches one of the model's unique
+ * column sets — its primary key or any single- or multi-column `@unique` /
+ * `@@unique` constraint. Set equality (not subset) is required: a singular
+ * back-relation means at most one child per parent, which a unique constraint
+ * covering exactly the FK columns guarantees.
+ */
+function fkColumnsAreUnique(
+  localColumns: readonly string[],
+  uniqueColumnSets: readonly (readonly string[])[],
+): boolean {
+  const local = new Set(localColumns);
+  return uniqueColumnSets.some(
+    (columns) => columns.length === local.size && columns.every((column) => local.has(column)),
+  );
+}
+
 export function applyBackrelationCandidates(input: {
   readonly backrelationCandidates: readonly ModelBackrelationCandidate[];
   readonly fkRelationsByPair: Map<string, readonly FkRelationMetadata[]>;
   readonly fkRelationsByDeclaringModel: ReadonlyMap<string, readonly FkRelationMetadata[]>;
   readonly modelIdColumns: ReadonlyMap<string, readonly string[]>;
+  readonly modelUniqueColumnSets: ReadonlyMap<string, readonly (readonly string[])[]>;
   readonly modelRelations: Map<string, ModelRelationMetadata[]>;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
@@ -506,6 +524,19 @@ export function applyBackrelationCandidates(input: {
     invariant(matches.length === 1, 'Backrelation matching requires exactly one match');
     const matched = matches[0];
     assertDefined(matched, 'Backrelation matching requires a defined relation match');
+
+    if (!candidate.isList) {
+      const uniqueColumnSets = input.modelUniqueColumnSets.get(matched.declaringModelName) ?? [];
+      if (!fkColumnsAreUnique(matched.localColumns, uniqueColumnSets)) {
+        input.diagnostics.push({
+          code: 'PSL_NON_UNIQUE_BACKRELATION',
+          message: `Backrelation field "${candidate.modelName}.${candidate.field.name}" is singular, but the matching FK on "${matched.declaringModelName}" (fields ${matched.localColumns.map((column) => `"${column}"`).join(', ')}) is not unique. A singular back-relation implies at most one related row; add @unique (or @@unique([...])) to the FK fields, or make "${candidate.field.name}" a list.`,
+          sourceId: input.sourceId,
+          span: candidate.field.span,
+        });
+        continue;
+      }
+    }
 
     relationsForModel(input.modelRelations, candidate.modelName).push({
       fieldName: candidate.field.name,
