@@ -137,7 +137,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         frameworkComponents: options.frameworkComponents,
       });
       if (!schemaVerifyResult.ok) {
-        return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
+        return runnerFailure('MIGRATION.SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
           why: 'The resulting database schema does not satisfy the destination contract.',
           meta: {
             issues: schemaVerifyResult.schema.issues,
@@ -313,7 +313,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       return okVoid();
     }
     return runnerFailure(
-      'LEGACY_MARKER_SHAPE',
+      'MIGRATION.LEGACY_MARKER_SHAPE',
       'Legacy marker-table shape detected on prisma_contract.marker (no `space` column). ' +
         'Prisma Next is in pre-1.0; the previous transitional auto-migration to the per-space-row schema has been removed. ' +
         'Drop `prisma_contract.marker` and re-run `dbInit` to reinitialise from a clean baseline.',
@@ -335,7 +335,8 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     for (const step of steps) {
       const result = await driver.query(step.sql, step.params ?? []);
       if (!this.stepResultIsTrue(result.rows)) {
-        const code = phase === 'precheck' ? 'PRECHECK_FAILED' : 'POSTCHECK_FAILED';
+        const code =
+          phase === 'precheck' ? 'MIGRATION.PRECHECK_FAILED' : 'MIGRATION.POSTCHECK_FAILED';
         return runnerFailure(
           code,
           `Operation ${operation.id} failed during ${phase}: ${step.description}`,
@@ -363,7 +364,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       } catch (error: unknown) {
         if (SqlQueryError.is(error)) {
           return runnerFailure(
-            'EXECUTION_FAILED',
+            'MIGRATION.EXECUTION_FAILED',
             `Operation ${operation.id} failed during execution: ${step.description}`,
             {
               why: error.message,
@@ -487,7 +488,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     for (const operation of operations) {
       if (!allowedClasses.has(operation.operationClass)) {
         return runnerFailure(
-          'POLICY_VIOLATION',
+          'MIGRATION.POLICY_VIOLATION',
           `Operation ${operation.id} has class "${operation.operationClass}" which is not allowed by policy.`,
           {
             why: `Policy only allows: ${policy.allowedOperationClasses.join(', ')}.`,
@@ -517,7 +518,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
 
     if (!marker) {
       return runnerFailure(
-        'MARKER_ORIGIN_MISMATCH',
+        'MIGRATION.MARKER_ORIGIN_MISMATCH',
         `Missing contract marker: expected origin storage hash ${origin.storageHash}.`,
         {
           meta: {
@@ -528,7 +529,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     }
     if (marker.storageHash !== origin.storageHash) {
       return runnerFailure(
-        'MARKER_ORIGIN_MISMATCH',
+        'MIGRATION.MARKER_ORIGIN_MISMATCH',
         `Existing contract marker (${marker.storageHash}) does not match plan origin (${origin.storageHash}).`,
         {
           meta: {
@@ -540,7 +541,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     }
     if (origin.profileHash && marker.profileHash !== origin.profileHash) {
       return runnerFailure(
-        'MARKER_ORIGIN_MISMATCH',
+        'MIGRATION.MARKER_ORIGIN_MISMATCH',
         `Existing contract marker profile hash (${marker.profileHash}) does not match plan origin profile hash (${origin.profileHash}).`,
         {
           meta: {
@@ -559,7 +560,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   ): Result<void, SqlMigrationRunnerFailure> {
     if (destination.storageHash !== contract.storage.storageHash) {
       return runnerFailure(
-        'DESTINATION_CONTRACT_MISMATCH',
+        'MIGRATION.DESTINATION_CONTRACT_MISMATCH',
         `Plan destination storage hash (${destination.storageHash}) does not match provided contract storage hash (${contract.storage.storageHash}).`,
         {
           meta: {
@@ -575,7 +576,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       destination.profileHash !== contract.profileHash
     ) {
       return runnerFailure(
-        'DESTINATION_CONTRACT_MISMATCH',
+        'MIGRATION.DESTINATION_CONTRACT_MISMATCH',
         `Plan destination profile hash (${destination.profileHash}) does not match provided contract profile hash (${contract.profileHash}).`,
         {
           meta: {
@@ -614,7 +615,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     });
     if (!updated) {
       return runnerFailure(
-        'MARKER_CAS_FAILURE',
+        'MIGRATION.MARKER_CAS_FAILURE',
         'Marker was modified by another process during migration execution.',
         {
           meta: {

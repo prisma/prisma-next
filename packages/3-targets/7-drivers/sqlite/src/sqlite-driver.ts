@@ -22,7 +22,7 @@ interface DriverRuntimeError extends Error {
     | 'DRIVER.NOT_CONNECTED'
     | 'DRIVER.ALREADY_CONNECTED'
     | 'DRIVER.EXPLAIN_NOT_SUPPORTED';
-  readonly category: 'RUNTIME';
+  readonly category: 'DRIVER';
   readonly severity: 'error';
   readonly details?: Record<string, unknown>;
 }
@@ -39,7 +39,7 @@ function driverError(
   });
   return Object.assign(error, {
     code,
-    category: 'RUNTIME' as const,
+    category: 'DRIVER' as const,
     severity: 'error' as const,
     message,
     details,

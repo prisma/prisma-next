@@ -53,7 +53,6 @@
     "./ast": "./dist/exports/ast.mjs",
     "./codec-descriptor-registry": "./dist/exports/codec-descriptor-registry.mjs",
     "./contract-free": "./dist/exports/contract-free.mjs",
-    "./errors": "./dist/exports/errors.mjs",
     "./expression": "./dist/exports/expression.mjs",
     "./middleware": "./dist/exports/middleware.mjs",
     "./plan": "./dist/exports/plan.mjs",

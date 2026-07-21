@@ -190,7 +190,6 @@ This package follows the standard `exports/` directory pattern:
 - `src/exports/operations-registry.ts` - Re-exports operations registry
 - `src/exports/plan.ts` - Re-exports plan types and helpers
 - `src/exports/ast.ts` - Re-exports SQL AST types
-- `src/exports/errors.ts` - Re-exports error helpers (`planInvalid`, `planUnsupported`)
 - `src/index.ts` - Main entry point that re-exports from `exports/`
 
 This enables subpath imports like `@prisma-next/sql-relational-core/schema`, `@prisma-next/sql-relational-core/param`, `@prisma-next/sql-relational-core/plan`, etc.

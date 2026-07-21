@@ -125,7 +125,7 @@ function errorLegacyMarkerShape(options: {
     {
       why: options.why,
       fix: 'Legacy marker-table shape detected. Drop `prisma_contract.marker` (Postgres) or `_prisma_marker` (SQLite) and re-run `prisma-next db init` to recreate it with the current per-space schema.',
-      meta: { code: 'RUNNER_FAILED', runnerErrorCode: 'LEGACY_MARKER_SHAPE' },
+      meta: { runnerErrorCode: 'MIGRATION.LEGACY_MARKER_SHAPE' },
     },
   );
 }

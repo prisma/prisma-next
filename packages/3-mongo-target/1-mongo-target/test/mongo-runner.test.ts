@@ -326,7 +326,7 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     const result = await execute(harness, [op], { idempotencyChecks: false });
 
     expect(result.assertNotOk()).toMatchObject({
-      code: 'PRECHECK_FAILED',
+      code: 'MIGRATION.PRECHECK_FAILED',
       summary: `Operation ${op.id} failed during precheck`,
       meta: { operationId: op.id, name: op.name },
     });
@@ -351,7 +351,7 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     const result = await execute(harness, [op], { idempotencyChecks: false });
 
     expect(result.assertNotOk()).toMatchObject({
-      code: 'POSTCHECK_FAILED',
+      code: 'MIGRATION.POSTCHECK_FAILED',
       summary: `Operation ${op.id} failed during postcheck`,
       meta: { operationId: op.id, name: op.name },
     });
@@ -472,7 +472,7 @@ describe('MongoMigrationRunner schema verification', () => {
     });
 
     const failure = result.assertNotOk();
-    expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
+    expect(failure.code).toBe('MIGRATION.SCHEMA_VERIFY_FAILED');
     expect(failure.why).toMatch(/destination contract/);
     expect(failure.meta?.['issues']).toEqual(
       expect.arrayContaining([expect.objectContaining({ path: ['rogue'] })]),

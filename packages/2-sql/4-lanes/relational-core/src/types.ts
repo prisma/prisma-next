@@ -351,15 +351,6 @@ export interface RawFactory extends RawTemplateFactory {
   with(options: RawTemplateOptions): RawTemplateFactory;
 }
 
-export interface RuntimeError extends Error {
-  readonly code: string;
-  readonly category: 'PLAN';
-  readonly severity: 'error';
-  readonly details?: Record<string, unknown>;
-  readonly hints?: readonly string[];
-  readonly docs?: readonly string[];
-}
-
 export interface BuildParamsMap {
   readonly [name: string]: unknown;
 }

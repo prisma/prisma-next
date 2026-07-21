@@ -196,7 +196,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
 
     expect(tamperedResult.ok).toBe(false);
     if (!tamperedResult.ok) {
-      expect(tamperedResult.failure.code).toBe('SCHEMA_VERIFY_FAILED');
+      expect(tamperedResult.failure.code).toBe('MIGRATION.SCHEMA_VERIFY_FAILED');
       const issues = tamperedResult.failure.meta?.['issues'];
       expect(Array.isArray(issues)).toBe(true);
       expect((issues as readonly unknown[]).length).toBeGreaterThan(0);

@@ -289,7 +289,7 @@ describe('MongoMigrationRunner', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.failure.code).toBe('PRECHECK_FAILED');
+      expect(result.failure.code).toBe('MIGRATION.PRECHECK_FAILED');
     }
   });
 
@@ -354,7 +354,7 @@ describe('MongoMigrationRunner', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
+      expect(result.failure.code).toBe('MIGRATION.MARKER_ORIGIN_MISMATCH');
     }
   });
 
@@ -405,7 +405,7 @@ describe('MongoMigrationRunner', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
+      expect(result.failure.code).toBe('MIGRATION.MARKER_ORIGIN_MISMATCH');
     }
   });
 
@@ -443,7 +443,7 @@ describe('MongoMigrationRunner', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.failure.code).toBe('MARKER_CAS_FAILURE');
+      expect(result.failure.code).toBe('MIGRATION.MARKER_CAS_FAILURE');
     }
   });
 
@@ -466,7 +466,7 @@ describe('MongoMigrationRunner', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.failure.code).toBe('POLICY_VIOLATION');
+      expect(result.failure.code).toBe('MIGRATION.POLICY_VIOLATION');
     }
   });
 
@@ -716,7 +716,7 @@ describe('MongoMigrationRunner - data transforms', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.failure.code).toBe('POSTCHECK_FAILED');
+      expect(result.failure.code).toBe('MIGRATION.POSTCHECK_FAILED');
     }
   });
 
@@ -742,7 +742,7 @@ describe('MongoMigrationRunner - data transforms', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.failure.code).toBe('POLICY_VIOLATION');
+      expect(result.failure.code).toBe('MIGRATION.POLICY_VIOLATION');
     }
   });
 });

@@ -144,7 +144,7 @@ export class MongoMigrationRunner {
           );
           if (!precheckResult) {
             return runnerFailure(
-              'PRECHECK_FAILED',
+              'MIGRATION.PRECHECK_FAILED',
               `Operation ${operation.id} failed during precheck`,
               { meta: { operationId: operation.id } },
             );
@@ -163,7 +163,7 @@ export class MongoMigrationRunner {
           );
           if (!postcheckResult) {
             return runnerFailure(
-              'POSTCHECK_FAILED',
+              'MIGRATION.POSTCHECK_FAILED',
               `Operation ${operation.id} failed during postcheck`,
               { meta: { operationId: operation.id } },
             );
@@ -223,7 +223,7 @@ export class MongoMigrationRunner {
         ? options.scopeVerifyResult(rawVerifyResult)
         : rawVerifyResult;
       if (!verifyResult.ok) {
-        return runnerFailure('SCHEMA_VERIFY_FAILED', verifyResult.summary, {
+        return runnerFailure('MIGRATION.SCHEMA_VERIFY_FAILED', verifyResult.summary, {
           why: 'The resulting database schema does not satisfy the destination contract.',
           meta: { issues: verifyResult.schema.issues },
         });
@@ -237,7 +237,7 @@ export class MongoMigrationRunner {
         });
         if (!updated) {
           return runnerFailure(
-            'MARKER_CAS_FAILURE',
+            'MIGRATION.MARKER_CAS_FAILURE',
             'Marker was modified by another process during migration execution.',
             {
               meta: {
@@ -319,9 +319,13 @@ export class MongoMigrationRunner {
       if (!passed) {
         return {
           executed: false,
-          failure: runnerFailure('PRECHECK_FAILED', `Operation ${op.id} failed during precheck`, {
-            meta: { operationId: op.id, name: op.name },
-          }),
+          failure: runnerFailure(
+            'MIGRATION.PRECHECK_FAILED',
+            `Operation ${op.id} failed during precheck`,
+            {
+              meta: { operationId: op.id, name: op.name },
+            },
+          ),
         };
       }
     }
@@ -343,9 +347,13 @@ export class MongoMigrationRunner {
       if (!passed) {
         return {
           executed: false,
-          failure: runnerFailure('POSTCHECK_FAILED', `Operation ${op.id} failed during postcheck`, {
-            meta: { operationId: op.id, name: op.name },
-          }),
+          failure: runnerFailure(
+            'MIGRATION.POSTCHECK_FAILED',
+            `Operation ${op.id} failed during postcheck`,
+            {
+              meta: { operationId: op.id, name: op.name },
+            },
+          ),
         };
       }
     }
@@ -420,7 +428,7 @@ export class MongoMigrationRunner {
     for (const operation of operations) {
       if (!allowedClasses.has(operation.operationClass)) {
         return runnerFailure(
-          'POLICY_VIOLATION',
+          'MIGRATION.POLICY_VIOLATION',
           `Operation ${operation.id} has class "${operation.operationClass}" which is not allowed by policy.`,
           {
             why: `Policy only allows: ${[...allowedClasses].join(', ')}.`,
@@ -449,7 +457,7 @@ export class MongoMigrationRunner {
 
     if (!marker) {
       return runnerFailure(
-        'MARKER_ORIGIN_MISMATCH',
+        'MIGRATION.MARKER_ORIGIN_MISMATCH',
         `Missing contract marker: expected origin storage hash ${origin.storageHash}.`,
         { meta: { expectedOriginStorageHash: origin.storageHash } },
       );
@@ -457,7 +465,7 @@ export class MongoMigrationRunner {
 
     if (marker.storageHash !== origin.storageHash) {
       return runnerFailure(
-        'MARKER_ORIGIN_MISMATCH',
+        'MIGRATION.MARKER_ORIGIN_MISMATCH',
         `Existing contract marker (${marker.storageHash}) does not match plan origin (${origin.storageHash}).`,
         {
           meta: {
