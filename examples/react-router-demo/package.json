@@ -32,7 +32,7 @@
     "@react-router/node": "^7.18.1",
     "@react-router/serve": "^7.18.1",
     "dotenv": "^17.4.2",
-    "isbot": "^5.1.44",
+    "isbot": "^5.2.0",
     "pg": "catalog:",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

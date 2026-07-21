@@ -14,7 +14,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@clack/prompts": "^1.6.0",
+    "@clack/prompts": "^1.7.0",
     "@prisma-next/config": "workspace:0.15.0",
     "@prisma-next/config-loader": "workspace:0.15.0",
     "@prisma-next/contract": "workspace:0.15.0",
@@ -37,7 +37,7 @@
     "jsonc-parser": "^3.3.1",
     "package-manager-detector": "^1.7.0",
     "pathe": "^2.0.3",
-    "string-width": "^8.2.1",
+    "string-width": "^8.2.2",
     "strip-ansi": "^7.2.0",
     "wrap-ansi": "^10.0.0"
   },
