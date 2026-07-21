@@ -801,17 +801,3 @@ and per-row `onRow` hooks; `beforeExecute` has already run, `afterExecute`
 still fires; `decodeRow` still runs). No SPI or behavioural change.
 No user action required. Incidental substrate diff only.
 -->
-
-<!--
-ADR 175 Mongo custom collections (PR #936): `@prisma-next/mongo-orm` exports the
-extendable `Collection` class (previously the package-private implementation behind
-the `MongoCollection` interface), a `MONGO_ORM_COLLECTION_BRAND` brand (type-level plus a
-static runtime marker on the class), an `isMongoCollectionClass` structural guard, and an
-`AnyMongoCollectionClass` constructor type. `mongoOrm(...)` and the
-`@prisma-next/mongo` `mongo(...)` facade gain an optional `collections` registry
-(subclasses keyed by model name); `@prisma-next/mongo/runtime` re-exports
-`Collection`. All additive — the `MongoCollection` interface, `createMongoCollection`,
-and every existing option keep their shapes, and the new generics default so existing
-call sites compile unchanged. No extension-author action required. Incidental
-substrate diff only.
--->
