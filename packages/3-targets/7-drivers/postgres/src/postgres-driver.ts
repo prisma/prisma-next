@@ -116,6 +116,19 @@ class AsyncMutex {
   }
 }
 
+// Serializes BEGIN…COMMIT stream spans per physical client so two concurrent
+// streams on a shared client cannot interleave their transaction boundaries.
+const streamSpanLocks = new WeakMap<object, AsyncMutex>();
+
+function acquireStreamSpan(client: object): Promise<() => void> {
+  let mutex = streamSpanLocks.get(client);
+  if (mutex === undefined) {
+    mutex = new AsyncMutex();
+    streamSpanLocks.set(client, mutex);
+  }
+  return mutex.lock();
+}
+
 abstract class PostgresQueryable<C extends PoolClient | Client = PoolClient | Client>
   implements SqlQueryable
 {
@@ -188,15 +201,18 @@ abstract class PostgresQueryable<C extends PoolClient | Client = PoolClient | Cl
 
   // Errors propagate as raw pg errors so the caller can read SQLSTATE before
   // normalising (the prepared-statement retry layer needs the original code).
+  protected inExplicitTransaction(): boolean {
+    return false;
+  }
+
   private async *runQuery<Row>(request: SqlExecuteRequest, name?: string): AsyncIterable<Row> {
     const client = await this.acquireClient();
     try {
       if (!this.options.cursorDisabled) {
         try {
-          for await (const row of this.executeWithCursor(
+          for await (const row of this.streamWithPortalProtection(
             client,
-            request.sql,
-            request.params,
+            request,
             this.options.cursorBatchSize,
             name,
           )) {
@@ -250,6 +266,57 @@ abstract class PostgresQueryable<C extends PoolClient | Client = PoolClient | Cl
     }
   }
 
+  // A suspended cursor portal lives in the session's implicit transaction,
+  // which ends at the next Sync processed on that backend session. On a
+  // single-session multiplexer (a PGlite-backed `prisma dev` server, a
+  // transaction-mode pooler) traffic from other logical clients — or the
+  // server's own bookkeeping queries — can inject that Sync between two
+  // batch reads, destroying the portal mid-stream (`portal "C_N" does not
+  // exist`). An explicit transaction is the only portal lifetime the
+  // protocol guarantees, so wrap streamed execution in one unless the
+  // queryable is already inside a transaction.
+  private async *streamWithPortalProtection(
+    client: PoolClient | Client,
+    request: SqlExecuteRequest,
+    cursorBatchSize: number,
+    name?: string,
+  ): AsyncIterable<Record<string, unknown>> {
+    if (this.inExplicitTransaction()) {
+      yield* this.executeWithCursor(client, request.sql, request.params, cursorBatchSize, name);
+      return;
+    }
+
+    const releaseSpan = await acquireStreamSpan(client);
+    try {
+      await client.query('BEGIN');
+      let streamFailed = false;
+      let commitError: unknown;
+      try {
+        try {
+          yield* this.executeWithCursor(client, request.sql, request.params, cursorBatchSize, name);
+        } catch (error) {
+          streamFailed = true;
+          throw error;
+        }
+      } finally {
+        // COMMIT also terminates an aborted transaction (Postgres downgrades
+        // it to ROLLBACK), so one terminator covers success, error, and
+        // consumer abandonment. When the stream already failed, a failing
+        // COMMIT must not mask the original error.
+        try {
+          await client.query('COMMIT');
+        } catch (error) {
+          commitError = error;
+        }
+      }
+      if (!streamFailed && commitError !== undefined) {
+        throw commitError;
+      }
+    } finally {
+      releaseSpan();
+    }
+  }
+
   private async *executeWithCursor(
     client: PoolClient | Client,
     sql: string,
@@ -296,6 +363,7 @@ class PostgresConnectionImpl extends PostgresQueryable implements SqlConnection 
   #connection: PoolClient | Client;
   #onRelease: (() => void) | undefined;
   #onDestroy: ((reason: unknown) => Promise<void> | void) | undefined;
+  #transactionOpen = false;
 
   constructor(
     connection: PoolClient | Client,
@@ -317,9 +385,16 @@ class PostgresConnectionImpl extends PostgresQueryable implements SqlConnection 
     return Promise.resolve();
   }
 
+  protected override inExplicitTransaction(): boolean {
+    return this.#transactionOpen;
+  }
+
   async beginTransaction(): Promise<SqlTransaction> {
     await this.#connection.query('BEGIN').catch(rethrowNormalizedError);
-    return new PostgresTransactionImpl(this.#connection, this.options);
+    this.#transactionOpen = true;
+    return new PostgresTransactionImpl(this.#connection, this.options, () => {
+      this.#transactionOpen = false;
+    });
   }
 
   async release(): Promise<void> {
@@ -362,10 +437,12 @@ class PostgresConnectionImpl extends PostgresQueryable implements SqlConnection 
 
 class PostgresTransactionImpl extends PostgresQueryable implements SqlTransaction {
   #connection: PoolClient | Client;
+  #onSettled: (() => void) | undefined;
 
-  constructor(connection: PoolClient | Client, options: ConnectionOptions) {
+  constructor(connection: PoolClient | Client, options: ConnectionOptions, onSettled?: () => void) {
     super(options);
     this.#connection = connection;
+    this.#onSettled = onSettled;
   }
 
   override acquireClient(): Promise<PoolClient | Client> {
@@ -376,12 +453,24 @@ class PostgresTransactionImpl extends PostgresQueryable implements SqlTransactio
     return Promise.resolve();
   }
 
+  protected override inExplicitTransaction(): boolean {
+    return true;
+  }
+
+  #settle(): void {
+    const onSettled = this.#onSettled;
+    this.#onSettled = undefined;
+    onSettled?.();
+  }
+
   async commit(): Promise<void> {
     await this.#connection.query('COMMIT').catch(rethrowNormalizedError);
+    this.#settle();
   }
 
   async rollback(): Promise<void> {
     await this.#connection.query('ROLLBACK').catch(rethrowNormalizedError);
+    this.#settle();
   }
 }
 

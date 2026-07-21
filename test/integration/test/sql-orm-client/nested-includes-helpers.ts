@@ -4,11 +4,13 @@
 // matching the project convention visible across other files in
 // `test/integration/`). Each integration test spins up its own
 // prisma/dev PGlite instance via `withCollectionRuntime` (see
-// `./helpers`), and at higher per-file test counts the test
-// infrastructure exhibits worker-pool contention that surfaces as
-// spurious `portal "C_N" does not exist` errors. Splitting the corpus
-// across multiple files keeps each invocation under that threshold
-// while preserving the breadth of the coverage.
+// `./helpers`). The `portal "C_N" does not exist` errors that
+// historically motivated this split were a driver-level race — the
+// prisma/dev server's WAL-bridge queries could destroy a suspended
+// cursor portal on the shared PGlite session — fixed by wrapping
+// streamed execution in an explicit transaction (see
+// packages/3-targets/7-drivers/postgres/src/postgres-driver.ts).
+// The small-file split remains for readability.
 
 import type { Contract } from '@prisma-next/contract/types';
 import { Collection } from '@prisma-next/sql-orm-client';
