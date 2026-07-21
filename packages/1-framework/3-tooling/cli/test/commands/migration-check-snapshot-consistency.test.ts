@@ -19,7 +19,7 @@ import {
  * `pkg.metadata.to`. Nothing in the on-disk manifest schema validates that
  * `to` is a well-formed `sha256:<64hex>` value (`io.ts` only checks it is a
  * non-empty string), so a hand-edited or corrupted `migration.json` can
- * carry a malformed `to`. This must surface as a clean `PN-MIG-CHECK-006`
+ * carry a malformed `to`. This must surface as a clean `MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE`
  * failure, not an unhandled crash.
  */
 
@@ -87,14 +87,14 @@ async function checkFromDisk(migrationsDir: string): Promise<MigrationCheckResul
 }
 
 describe('migration check — snapshot consistency with a malformed to-hash', () => {
-  it('surfaces PN-MIG-CHECK-006 instead of crashing when metadata.to is not sha256:<64hex>', async () => {
+  it('surfaces MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE instead of crashing when metadata.to is not sha256:<64hex>', async () => {
     const { migrationsRoot } = await setupFixture();
     await writePackageWithTo(migrationsRoot, '20260101T0000_init', MALFORMED_HASH);
 
     const result = await checkFromDisk(migrationsRoot);
 
     expect(result.ok).toBe(false);
-    const failure = result.failures.find((f) => f.code === 'PN-MIG-CHECK-006');
+    const failure = result.failures.find((f) => f.code === 'MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE');
     expect(failure).toBeDefined();
     expect(failure?.why).toContain(MALFORMED_HASH);
   });
@@ -106,7 +106,9 @@ describe('migration check — snapshot consistency with a malformed to-hash', ()
     const result = await checkFromDisk(migrationsRoot);
 
     const snapshotFailures = result.failures.filter((f) =>
-      ['PN-MIG-CHECK-005', 'PN-MIG-CHECK-006'].includes(f.code),
+      ['MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH', 'MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE'].includes(
+        f.code,
+      ),
     );
     expect(snapshotFailures).toHaveLength(0);
   });

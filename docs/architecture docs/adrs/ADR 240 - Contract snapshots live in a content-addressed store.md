@@ -1,4 +1,4 @@
-# ADR 239 — Contract snapshots live in a content-addressed store
+# ADR 240 — Contract snapshots live in a content-addressed store
 
 Status: **Accepted**.
 
