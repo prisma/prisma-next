@@ -2,7 +2,8 @@
 name: prisma-next-queries
 description: >-
   Write Prisma Next queries for Postgres, SQLite, or Mongo — pick a lane
-  (Postgres `db.orm.<ns>.<Model>` + `db.sql.<ns>.<table>`; Mongo `db.orm.<root>`
+  (Postgres `db.orm.<ns>.<Model>` + `db.sql.<ns>.<table>`; SQLite flat
+  `db.orm.<Model>` + `db.sql.<table>`; Mongo `db.orm.<root>`
   + `db.query.from(...)` pipeline builder), filter / project / sort / paginate,
   eager-load with `.include(...)`, Postgres/SQLite `db.transaction(...)`,
   Postgres/SQLite ORM `.aggregate(...)`, Mongo aggregations via query builder,
@@ -47,7 +48,7 @@ Prisma Next ships **two query lanes per target** on the same `db` value from `sr
 |---|---|
 | `@prisma-next/postgres/runtime` | [`postgres.md`](./postgres.md) — `db.orm.<ns>.<Model>` + `db.sql.<ns>.<table>` |
 | `@prisma-next/mongo/runtime` | [`mongo.md`](./mongo.md) — `db.orm.<root>` + `db.query.from(...)` |
-| `@prisma-next/extension-supabase/runtime` | [`postgres.md`](./postgres.md) — a Supabase `RoleBoundDb` is a Postgres surface (`db.orm.<Model>` + `db.sql.<table>`); bind a role first via `prisma-next-supabase` |
+| `@prisma-next/extension-supabase/runtime` | [`postgres.md`](./postgres.md) — a Supabase `RoleBoundDb` is a Postgres surface (`db.orm.<ns>.<Model>` + `db.sql.<ns>.<table>`); bind a role first via `prisma-next-supabase` |
 
 Both targets share the contract and connection on one `db` value. Reach for the ORM first; drop to the lower-level lane when the ORM can't express the shape. Lane choice is local — one query function picks one lane, not the whole app.
 

@@ -13,6 +13,8 @@ Shared concepts (result consumption, script teardown, cross-target pitfalls, cap
 
 The namespace coordinate comes from your PSL: models declared at the top level of the schema live in the default `public` namespace, and models declared inside a `namespace <name> { ... }` block are addressed by that namespace (`db.orm.<ns>.<Model>`, `db.sql.<ns>.<table>`). The examples below use `public`; substitute your own namespace where a model is declared in one.
 
+> **SQLite readers:** this guide's query surface applies to you too, but SQLite has no namespaces — its facade pre-binds the single unbound namespace, so you use the **flat** form throughout: `db.orm.User`, `db.sql.user`. Drop the `public.` segment from every example below.
+
 Reach for the ORM first; drop to `db.sql` when the ORM can't express the shape. Lane choice is local — one query function picks one lane, not the whole app.
 
 **Lane decision table:**
@@ -22,8 +24,8 @@ Reach for the ORM first; drop to `db.sql` when the ORM can't express the shape. 
 | Standard CRUD with relations | **ORM (`db.orm.<ns>.<Model>`)** | Highest ergonomics; fully typed; model-shaped. |
 | Eager-load related records | **ORM `.include(...)`** | Composes with `.where` / `.select` / `.orderBy` / `.take` per branch. |
 | Aggregate (count, sum, avg) | **ORM `.aggregate(...)`** | Typed result; works with grouping (`.groupBy(...).aggregate(...)`). |
-| `INSERT ... RETURNING` / `UPDATE ... RETURNING` typed result | **ORM mutations** (returns updated rows) or **`db.sql.<t>.insert(...).returning(...)`** | ORM returns inserted/updated rows; SQL builder exposes `.returning(...)` explicitly. |
-| Computed projection (e.g. `ST_DistanceSphere(location, point) AS meters`) alongside model fields | **SQL builder (`db.sql.<t>`)** | The ORM projects model fields; arbitrary expression projection is the SQL builder's seam. |
+| `INSERT ... RETURNING` / `UPDATE ... RETURNING` typed result | **ORM mutations** (returns updated rows) or **`db.sql.<ns>.<t>.insert(...).returning(...)`** | ORM returns inserted/updated rows; SQL builder exposes `.returning(...)` explicitly. |
+| Computed projection (e.g. `ST_DistanceSphere(location, point) AS meters`) alongside model fields | **SQL builder (`db.sql.<ns>.<t>`)** | The ORM projects model fields; arbitrary expression projection is the SQL builder's seam. |
 | Complex `JOIN`, set operation, window function | **SQL builder** | The ORM doesn't express arbitrary joins. |
 | Postgres-specific feature (`LATERAL`, `FILTER`, custom aggregates) | **SQL builder**, falling back to extension operators when the extension provides them | DSL first; extensions can contribute operators (`postgis`, `pgvector`, `cipherstash`). |
 
@@ -253,8 +255,9 @@ The `.where(...)` callback receives `(fields, fns)` — `fields` is the field pr
 ### `INSERT` / `UPDATE` / `DELETE` with `RETURNING`
 
 ```typescript
-// Insert and return selected columns. Pass rows as an array — the
-// single-object form currently fails at result decoding (verified on 0.14.0).
+// Insert and return selected columns. `.insert(...)` takes an *array* of rows,
+// even for a single row — a bare object is a type error, and slips through to a
+// plan-build failure if you cast past it.
 const plan = db.sql.public.user
   .insert([{ email }])
   .returning('id', 'email')
@@ -346,7 +349,7 @@ Cross-namespace relations (e.g. `public.Profile` → `auth.User`) follow the sam
 3. **Coalescing `count()` with `?? 0` "just in case".** `count()` is `number`, not `number | null` — the runtime already substitutes `0` for the empty case. The `?? 0` belongs on `sum` / `avg` / `min` / `max`.
 4. **Reaching for `.between(a, b)` on a field proxy.** It doesn't exist. Either chain `.where((m) => m.field.gte(a)).where((m) => m.field.lte(b))` or use `and(m.field.gte(a), m.field.lte(b))` inside one `.where()` clause.
 5. **Importing `and` / `or` / `not` from a Postgres façade subpath.** The combinators currently live in `@prisma-next/sql-orm-client` — an internal package. See *What Prisma Next doesn't do yet* in [`SKILL.md`](./SKILL.md).
-6. **Trying to `db.sql.from(tables.user)`.** That surface does not exist. The builder is table-shaped: `db.sql.<tableName>.select(...)`. There is no `db.schema.tables` either.
+6. **Trying to `db.sql.from(tables.user)`.** That surface does not exist. The builder is table-shaped: `db.sql.<ns>.<tableName>.select(...)`. There is no `db.schema.tables` either.
 7. **Trying to `db.execute(plan)` directly.** Plans execute through the runtime: `db.runtime().execute(plan)`. Inside a transaction, use `tx.execute(plan)`.
 8. **Setting `capabilities: { lateral: true }` in `prisma-next.config.ts`.** `defineConfig` does not take `capabilities`. Capabilities are declared by the active adapter and become part of the emitted contract; the Postgres adapter advertises `lateral`, `jsonAgg`, and `returning` out of the box. Enable extension capabilities through `extensions: [...]` in the config (see `prisma-next-contract`).
 9. **Confabulating a `db.sql.raw(...)`, TypedSQL, or `.stream()` surface.** None of those exist today. See *What Prisma Next doesn't do yet* in [`SKILL.md`](./SKILL.md).
