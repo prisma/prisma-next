@@ -133,3 +133,7 @@ noUnsafeOptionalChaining (biome 2.5.2 → 2.5.3 dev-dependency bump). No SPI,
 contract shape, emitted artefact, or extension-authoring surface change.
 Incidental substrate diff only.
 -->
+
+<!--
+TML-2979 (MTI variant predicates in count writes): `changes: []`. The `packages/3-extensions/sql-orm-client` diff fixes internal query planning and adds regression coverage; it changes no public API, contract shape, emitted artefact, extension-authoring surface, adapter API, or downstream source translation. Incidental substrate diff only.
+-->
