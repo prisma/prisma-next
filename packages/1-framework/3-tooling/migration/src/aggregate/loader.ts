@@ -10,7 +10,6 @@ import { HEAD_REF_NAME, type RefLoadProblem, readRefsTolerant } from '../refs';
 import {
   APP_SPACE_ID,
   isValidSpaceId,
-  RESERVED_SPACE_SUBDIR_NAMES,
   spaceMigrationDirectory,
   spaceRefsDirectory,
 } from '../space-layout';
@@ -113,7 +112,6 @@ async function loadExtensionSpaces(
   const candidateDirs = await listContractSpaceDirectories(migrationsDir);
   const extensionIds = candidateDirs
     .filter((name) => name !== APP_SPACE_ID)
-    .filter((name) => !RESERVED_SPACE_SUBDIR_NAMES.has(name))
     .filter(isValidSpaceId)
     .sort();
 

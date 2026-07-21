@@ -1,4 +1,5 @@
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import {
   CONTRACT_SNAPSHOTS_DIRNAME,
   storageHashHex,
@@ -69,13 +70,29 @@ export async function writeContractSnapshot(
     return { written: false, dir };
   }
 
-  await mkdir(dir, { recursive: true });
+  const snapshotsDir = join(migrationsDir, CONTRACT_SNAPSHOTS_DIRNAME);
+  const tmpDir = join(
+    snapshotsDir,
+    `.tmp-${storageHashHex(storageHash)}-${Date.now()}-${randomBytes(4).toString('hex')}`,
+  );
+  await mkdir(tmpDir, { recursive: true });
+
   const jsonContent = `${canonicalizeJson(input.contractJson)}\n`;
   const dtsContent = input.contractDts.endsWith('\n')
     ? input.contractDts
     : `${input.contractDts}\n`;
-  await writeFile(join(dir, CONTRACT_JSON_FILE), jsonContent);
-  await writeFile(join(dir, CONTRACT_DTS_FILE), dtsContent);
+
+  try {
+    await writeFile(join(tmpDir, CONTRACT_JSON_FILE), jsonContent);
+    await writeFile(join(tmpDir, CONTRACT_DTS_FILE), dtsContent);
+    await rename(tmpDir, dir);
+  } catch (error) {
+    await rm(tmpDir, { recursive: true, force: true });
+    if (hasErrnoCode(error, 'EEXIST') || hasErrnoCode(error, 'ENOTEMPTY')) {
+      return { written: false, dir };
+    }
+    throw error;
+  }
 
   return { written: true, dir };
 }
@@ -104,11 +121,14 @@ export async function readContractSnapshotJson(
 }
 
 /**
- * Tolerant read: a missing store entry, unparseable `contract.json`, the
- * JSON literal `null`, or a `storageHash` that isn't a well-formed
- * `sha256:<64hex>` value all resolve to `undefined` rather than throwing —
- * parity with the catch-all tolerance of the pre-store `readEndContractJson`
- * (`io.ts`), which never validated the hash it was keyed by either.
+ * Tolerant read: a missing store entry (ENOENT), an unparseable
+ * `contract.json`, the JSON literal `null`, or a `storageHash` that isn't a
+ * well-formed `sha256:<64hex>` value all resolve to `undefined` rather than
+ * throwing — parity with the catch-all tolerance of the pre-store
+ * `readEndContractJson` (`io.ts`), which never validated the hash it was
+ * keyed by either. Any other fs error (e.g. `EACCES` on a present-but-
+ * unreadable file) propagates rather than silently loading a contract-less
+ * package.
  */
 export async function readContractSnapshotJsonTolerant(
   migrationsDir: string,
@@ -124,8 +144,11 @@ export async function readContractSnapshotJsonTolerant(
   let raw: string;
   try {
     raw = await readFile(jsonPath, 'utf-8');
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (hasErrnoCode(error, 'ENOENT')) {
+      return undefined;
+    }
+    throw error;
   }
 
   try {

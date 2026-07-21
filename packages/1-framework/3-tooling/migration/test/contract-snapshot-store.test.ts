@@ -219,6 +219,17 @@ describe('readContractSnapshotJsonTolerant', () => {
 
     expect(json).toBeUndefined();
   });
+
+  it('propagates a non-ENOENT fs error instead of swallowing it', async () => {
+    const dir = contractSnapshotDir(migrationsDir, STORAGE_HASH);
+    // A directory where contract.json is expected produces a real EISDIR on
+    // read — a genuine non-ENOENT errno, distinct from a missing entry.
+    await mkdir(join(dir, 'contract.json'), { recursive: true });
+
+    await expect(readContractSnapshotJsonTolerant(migrationsDir, STORAGE_HASH)).rejects.toThrow(
+      expect.objectContaining({ code: 'EISDIR' }),
+    );
+  });
 });
 
 describe('readContractSnapshotDts', () => {

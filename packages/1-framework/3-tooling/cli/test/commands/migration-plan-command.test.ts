@@ -6,7 +6,10 @@ import {
   createContractSpaceAggregate,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import {
+  errorContractSnapshotMissing,
+  MigrationToolsError,
+} from '@prisma-next/migration-tools/errors';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { timeouts } from '@prisma-next/test-utils';
@@ -182,11 +185,7 @@ function buildResolutionSpace(
         };
       } catch (error) {
         if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-          throw new MigrationToolsError('MIGRATION.FILE_MISSING', 'Missing end-contract.json', {
-            why: `Expected "end-contract.json" in "${matchingBundle.dirPath}" but the file does not exist.`,
-            fix: 'Re-emit the package.',
-            details: { file: 'end-contract.json', dir: matchingBundle.dirPath },
-          });
+          throw errorContractSnapshotMissing(hash, jsonPath);
         }
         throw error;
       }
@@ -1003,7 +1002,9 @@ describe('migration plan command', () => {
       const message = [...localConsoleOutput, ...consoleErrors].join('\n');
       expect(message).toContain('end-contract.json');
       expect(message).toContain('20260301T0900_prev');
-      expect(message).toContain('Re-emit the predecessor migration');
+      expect(message).toContain(
+        'Restore migrations/snapshots/ from version control, or re-run the command that produced this migration to regenerate its snapshot.',
+      );
     });
   });
 });

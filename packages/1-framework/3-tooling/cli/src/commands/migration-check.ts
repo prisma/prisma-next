@@ -23,7 +23,6 @@ import type { Refs } from '@prisma-next/migration-tools/refs';
 import {
   isValidSpaceId,
   listContractSpaceDirectories,
-  RESERVED_SPACE_SUBDIR_NAMES,
   spaceMigrationDirectory,
   spaceRefsDirectory,
 } from '@prisma-next/migration-tools/spaces';
@@ -110,6 +109,19 @@ async function checkSnapshotConsistency(
   pkg: OnDiskMigrationPackage,
   migrationsDir: string,
 ): Promise<CheckFailure | null> {
+  let snapshotDir: string;
+  try {
+    snapshotDir = contractSnapshotDir(migrationsDir, pkg.metadata.to);
+  } catch {
+    return {
+      space: spaceId,
+      code: 'PN-MIG-CHECK-006',
+      where: migrationPathRelative(pkg.dirPath),
+      why: `Migration "${pkg.dirName}" declares to="${pkg.metadata.to}", which is not a well-formed contract snapshot hash.`,
+      fix: 'Re-emit the migration package so migration.json declares a valid `sha256:<64hex>` to-hash.',
+    };
+  }
+
   let raw: unknown;
   try {
     raw = await readContractSnapshotJson(migrationsDir, pkg.metadata.to);
@@ -121,7 +133,7 @@ async function checkSnapshotConsistency(
       space: spaceId,
       code: 'PN-MIG-CHECK-006',
       where: migrationPathRelative(pkg.dirPath),
-      why: `Migration "${pkg.dirName}" has an unparseable contract snapshot at ${contractSnapshotDir(migrationsDir, pkg.metadata.to)}/contract.json.`,
+      why: `Migration "${pkg.dirName}" has an unparseable contract snapshot at ${snapshotDir}/contract.json.`,
       fix: 'Restore migrations/snapshots/ from version control, or re-run the command that produced this migration to regenerate its snapshot.',
     };
   }
@@ -171,9 +183,7 @@ export async function enumerateCheckSpaces(
   projectMigrationsDir: string,
 ): Promise<readonly CheckSpace[]> {
   const candidateDirs = await listContractSpaceDirectories(projectMigrationsDir);
-  const onDiskSpaceIds = new Set(
-    candidateDirs.filter((name) => !RESERVED_SPACE_SUBDIR_NAMES.has(name)).filter(isValidSpaceId),
-  );
+  const onDiskSpaceIds = new Set(candidateDirs.filter(isValidSpaceId));
   const spaces: CheckSpace[] = [];
   for (const space of aggregate.spaces()) {
     const spaceId = space.spaceId;
