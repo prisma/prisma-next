@@ -33,13 +33,13 @@ The capture workflow is documented in [`.claude/skills/record-gotchas/SKILL.md`]
 ```text
 $ pnpm prisma-next migrate --to prod --db $DB --config fixtures/diamond/prisma-next.config.ts
 ✖ Contract validation failed (PN-CLI-4003)
-  Why: Predecessor contract at .../fixtures/diamond/migrations/app/20260303T1000_merge_alice/end-contract.json failed to deserialize:
+  Why: Predecessor contract at .../fixtures/diamond/migrations/snapshots/93be6c.../contract.json failed to deserialize:
        Contract structural validation failed: storage.namespaces.__unbound__.entries must be an object (was missing);
        storage.namespaces.__unbound__.tables must be removed;
        execution.mutations.defaults[0].ref.namespace must be a string (was missing)
 ```
 
-**Cause.** The contract serialization format moved under the fixtures (e.g. the database→namespace→table diff-tree restructure, #894), and the fixtures' committed `start-contract.json`/`end-contract.json` snapshots were emitted with the older shape. Offline commands (`migration graph`, `list`, `show`, `check`) never deserialize predecessor contracts, so the drift is invisible until someone runs `migrate` or `migration status` against a database.
+**Cause.** The contract serialization format moved under the fixtures (e.g. the database→namespace→table diff-tree restructure, #894), and the fixtures' committed predecessor contract snapshot in `migrations/snapshots/<hex>/contract.json` was emitted with the older shape. Offline commands (`migration graph`, `list`, `show`, `check`) never deserialize predecessor contracts, so the drift is invisible until someone runs `migrate` or `migration status` against a database.
 
 **Workaround.** Treat the fixtures as offline-only (graph rendering) for now. For a live apply walkthrough, create a fresh fixture with the current CLI (`contract emit` + `migration plan`) instead of reusing the committed ones.
 
@@ -49,7 +49,7 @@ $ pnpm prisma-next migrate --to prod --db $DB --config fixtures/diamond/prisma-n
 3. `pnpm prisma-next migrate --to prod --db <url> --config fixtures/diamond/prisma-next.config.ts` → PN-CLI-4003 as above.
 
 **References.**
-- Fixture snapshots: [`examples/prisma-next-demo/fixtures/diamond/migrations/app/20260303T1000_merge_alice/end-contract.json`](examples/prisma-next-demo/fixtures/diamond/migrations/app/20260303T1000_merge_alice/end-contract.json)
+- Fixture snapshot: [`examples/prisma-next-demo/fixtures/diamond/migrations/snapshots/93be6c200743261baf55f0586b1380a1c0ade3c48730c09a8fec71ba419c2464/contract.json`](examples/prisma-next-demo/fixtures/diamond/migrations/snapshots/93be6c200743261baf55f0586b1380a1c0ade3c48730c09a8fec71ba419c2464/contract.json)
 - Restructure that moved the format: #894
 
 ---

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { writeContractSnapshot } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
@@ -69,17 +70,16 @@ function contractIRForHash(storageHash: string): ContractIR {
   };
 }
 
-async function writeEndContract(packageDir: string, storageHash: string): Promise<void> {
+async function writeEndContract(migrationsRootDir: string, storageHash: string): Promise<void> {
   const ir = contractIRForHash(storageHash);
-  await writeFile(
-    join(packageDir, 'end-contract.json'),
-    `${JSON.stringify(ir.contract, null, 2)}\n`,
-    'utf-8',
-  );
-  await writeFile(join(packageDir, 'end-contract.d.ts'), ir.contractDts, 'utf-8');
+  await writeContractSnapshot(migrationsRootDir, storageHash, {
+    contractJson: ir.contract,
+    contractDts: ir.contractDts,
+  });
 }
 
 async function writeAttestedMigration(
+  migrationsRootDir: string,
   appMigrationsDir: string,
   opts: {
     from: string | null;
@@ -87,7 +87,7 @@ async function writeAttestedMigration(
     ops: MigrationPlanOperation[];
     timestamp: Date;
     slug: string;
-    withEndContract?: boolean;
+    withSnapshot?: boolean;
   },
 ): Promise<{ dirName: string; packageDir: string }> {
   const dirName = formatMigrationDirName(opts.timestamp, opts.slug);
@@ -101,8 +101,8 @@ async function writeAttestedMigration(
   const migrationHash = computeMigrationHash(baseMetadata, opts.ops);
   const metadata: MigrationMetadata = { ...baseMetadata, migrationHash };
   await writeMigrationPackage(packageDir, metadata, opts.ops);
-  if (opts.withEndContract !== false) {
-    await writeEndContract(packageDir, opts.to);
+  if (opts.withSnapshot !== false) {
+    await writeEndContract(migrationsRootDir, opts.to);
   }
   return { dirName, packageDir };
 }
@@ -122,6 +122,7 @@ function snapshotDtsPath(refsDir: string, name: string): string {
 describe('ref commands snapshot integration', { timeout: timeouts.databaseOperation }, () => {
   let tempDir: string;
   let configPath: string;
+  let migrationsRootDir: string;
   let appMigrationsDir: string;
   let refsDir: string;
 
@@ -134,7 +135,8 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
     mocks.writeRefPaired.mockImplementation(realWriteRefPaired);
 
     tempDir = join(tmpdir(), `ref-cmd-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    appMigrationsDir = join(tempDir, 'migrations', 'app');
+    migrationsRootDir = join(tempDir, 'migrations');
+    appMigrationsDir = join(migrationsRootDir, 'app');
     refsDir = join(appMigrationsDir, 'refs');
     await mkdir(refsDir, { recursive: true });
     configPath = join(tempDir, 'prisma-next.config.ts');
@@ -177,21 +179,21 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
     firstDirName: string;
     secondDirName: string;
   }> {
-    const first = await writeAttestedMigration(appMigrationsDir, {
+    const first = await writeAttestedMigration(migrationsRootDir, appMigrationsDir, {
       from: null,
       to: HASH_A,
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'add_user',
     });
-    const second = await writeAttestedMigration(appMigrationsDir, {
+    const second = await writeAttestedMigration(migrationsRootDir, appMigrationsDir, {
       from: HASH_A,
       to: HASH_B,
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'add_post',
     });
-    await writeAttestedMigration(appMigrationsDir, {
+    await writeAttestedMigration(migrationsRootDir, appMigrationsDir, {
       from: HASH_B,
       to: HASH_C,
       ops: [createTableOp('comment')],
@@ -361,14 +363,14 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
     }
   });
 
-  it('refuses when the matching bundle end-contract.json is missing', async () => {
-    await writeAttestedMigration(appMigrationsDir, {
+  it('refuses when the matching bundle has no contract snapshot in the store', async () => {
+    await writeAttestedMigration(migrationsRootDir, appMigrationsDir, {
       from: null,
       to: HASH_A,
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'add_user',
-      withEndContract: false,
+      withSnapshot: false,
     });
     const prev = process.cwd();
     process.chdir(tempDir);

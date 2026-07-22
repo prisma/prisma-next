@@ -9,18 +9,17 @@
 1. `emit` on the fixture-bearing packages (`examples/*`, `apps/*`, `sql-builder`, `sql-orm-client`, `e2e-tests`, `integration-tests`) — runs the **contract emitter** and rewrites each `contract.json` + `contract.d.ts`.
 2. `build:contract-space` on `packages/3-extensions/*` — the extensions' emitted `contract.json`.
 3. `migrations:regen` (`scripts/regen-extension-migrations.mjs`) — extension migration artifacts.
-4. `migrations:regen:examples` (`scripts/regen-example-migrations.mjs`) — for each example migration: re-emits its `contract.json` / `{start,end}-contract.*` snapshots, then re-runs `tsx migration.ts` to rewrite `ops.json` + `migration.json`.
+4. `migrations:regen:examples` (`scripts/regen-example-migrations.mjs`) — for each example migration: re-emits its bookend contracts into the content-addressed store at `migrations/snapshots/<hex>/contract.*`, then re-runs `tsx migration.ts` to rewrite `ops.json` + `migration.json`.
 
 `fixtures:check` runs `fixtures:emit` and then:
 
 ```bash
-git diff --exit-code -- ':(glob)**/contract.*' ':(glob)**/expected.contract.json' \
-                        ':(glob)**/start-contract.*' ':(glob)**/end-contract.*'
+git diff --exit-code -- ':(glob)**/contract.*' ':(glob)**/expected.contract.json'
 ```
 
 ## What it gates
 
-**Contract emission, byte-for-byte.** The diff glob covers exactly `contract.json` / `contract.d.ts`, `expected.contract.json`, and migration `start-contract.*` / `end-contract.*`. A green `fixtures:check` means: the contract emitter, the canonicalizer, and the type printer still turn each fixture's schema into the identical committed contract. That is a real and useful invariant — most emitter/serializer/canonicalizer changes are caught here.
+**Contract emission, byte-for-byte.** The diff glob covers exactly `contract.json` / `contract.d.ts` and `expected.contract.json` — which also matches every store entry under `migrations/snapshots/<hex>/contract.*`. A green `fixtures:check` means: the contract emitter, the canonicalizer, and the type printer still turn each fixture's schema into the identical committed contract. That is a real and useful invariant — most emitter/serializer/canonicalizer changes are caught here.
 
 ## What it does NOT gate
 

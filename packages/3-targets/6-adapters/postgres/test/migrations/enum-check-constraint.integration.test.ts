@@ -153,6 +153,7 @@ describe.sequential('enum check-constraint — end-to-end PGlite', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (result.kind !== 'success') {
       throw new Error(`Planner failed: ${JSON.stringify(result, null, 2)}`);
@@ -198,6 +199,7 @@ describe.sequential('enum check-constraint — end-to-end PGlite', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (result.kind !== 'success') throw new Error('Planner failed');
     const executeResult = await runner.execute({
@@ -241,6 +243,7 @@ describe.sequential('enum check-constraint — end-to-end PGlite', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (result.kind !== 'success') throw new Error('Planner failed');
     await runner.execute({
@@ -287,6 +290,7 @@ describe.sequential('enum check-constraint — end-to-end PGlite', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (v1Result.kind !== 'success') throw new Error('v1 planner failed');
     const v1ExecResult = await runner.execute({
@@ -323,6 +327,7 @@ describe.sequential('enum check-constraint — end-to-end PGlite', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (v2PlanResult.kind !== 'success') {
       throw new Error(`v2 planner failed: ${JSON.stringify(v2PlanResult, null, 2)}`);

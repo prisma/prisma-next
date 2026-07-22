@@ -7,19 +7,23 @@ import type { ImportRequirement } from './ts-expression';
  *
  * The emitter invariants:
  *
- * - **One line per module specifier.** Named imports are aggregated and
- *   emitted sorted; a single default symbol is combined onto the same line
- *   when attributes agree (`import def, { a, b } from "m";`). Aliased symbols
- *   render `symbol as alias`. When every symbol for a module is `typeOnly`,
- *   the statement collapses to `import type { … }`; a module mixing value
- *   and type symbols prefixes the type-only ones (`import { type T, v }`).
- *   Exception: a fully type-only statement that has both a default and one or
- *   more named bindings splits to two lines (`import type D from "m";` then
- *   `import type { N } from "m";`) because TypeScript rejects
- *   `import type D, { N } from "m"` (TS1363).
- * - **At most one default symbol per module.** Two conflicting default
- *   symbols on the same specifier throw — the user's renderer can't
- *   guess which one they meant.
+ * - **Usually one line per module specifier.** Named imports are aggregated
+ *   and emitted sorted; a single default symbol is combined onto the same
+ *   line when attributes agree (`import def, { a, b } from "m";`). Aliased
+ *   symbols render `symbol as alias`. When every symbol for a module is
+ *   `typeOnly`, the statement collapses to `import type { … }`; a module
+ *   mixing value and type symbols prefixes the type-only ones
+ *   (`import { type T, v }`). Exceptions that split into multiple lines: a
+ *   fully type-only statement with both a default and one or more named
+ *   bindings (`import type D from "m";` then `import type { N } from "m";`,
+ *   because TypeScript rejects `import type D, { N } from "m"` — TS1363),
+ *   and multiple distinct default symbols (see below).
+ * - **Multiple distinct default symbols per module are allowed.** JS permits
+ *   re-importing the same specifier under different default-binding names
+ *   (`import a from 'm'; import b from 'm';`), so each distinct default
+ *   symbol renders its own `import` line, sorted alphabetically; a repeated
+ *   requirement for the same symbol still collapses into one binding,
+ *   merging `typeOnly` by AND.
  * - **Attribute unanimity per module.** All requirements for the same
  *   module specifier must carry the same (or no) `attributes` map.
  *   Divergent attribute maps throw — they can't collapse to one line
@@ -36,8 +40,9 @@ import type { ImportRequirement } from './ts-expression';
  *   alias) treated as alias `""` so it sorts before any aliased form of the
  *   same symbol.
  *
- * Returns a string containing one import line per module, joined by `\n`
- * (no trailing newline). An empty requirement list returns `""`.
+ * Returns a string containing one or more import lines per module (see the
+ * splitting exceptions above), joined by `\n` (no trailing newline). An
+ * empty requirement list returns `""`.
  */
 export function renderImports(requirements: readonly ImportRequirement[]): string {
   const byModule = aggregateByModule(requirements);
@@ -55,8 +60,7 @@ interface NamedBinding {
 
 interface ModuleImportGroup {
   readonly named: Map<string, NamedBinding>;
-  defaultSymbol: string | null;
-  defaultTypeOnly: boolean;
+  readonly defaults: Map<string, boolean>;
   attributes: Readonly<Record<string, string>> | null;
   attributesSet: boolean;
 }
@@ -70,8 +74,7 @@ function aggregateByModule(
     if (!group) {
       group = {
         named: new Map(),
-        defaultSymbol: null,
-        defaultTypeOnly: true,
+        defaults: new Map(),
         attributes: null,
         attributesSet: false,
       };
@@ -86,14 +89,11 @@ function mergeRequirementIntoGroup(req: ImportRequirement, group: ModuleImportGr
   const kind = req.kind ?? 'named';
   const typeOnly = req.typeOnly === true;
   if (kind === 'default') {
-    if (group.defaultSymbol !== null && group.defaultSymbol !== req.symbol) {
-      throw new Error(
-        `Conflicting default imports for module "${req.moduleSpecifier}": ` +
-          `"${group.defaultSymbol}" and "${req.symbol}". Only one default symbol is allowed per module.`,
-      );
-    }
-    group.defaultSymbol = req.symbol;
-    group.defaultTypeOnly = group.defaultTypeOnly && typeOnly;
+    const existingTypeOnly = group.defaults.get(req.symbol);
+    group.defaults.set(
+      req.symbol,
+      existingTypeOnly === undefined ? typeOnly : existingTypeOnly && typeOnly,
+    );
   } else {
     const alias = req.alias && req.alias !== req.symbol ? req.alias : null;
     const key = namedBindingKey(req.symbol, alias);
@@ -148,41 +148,75 @@ function stringifyAttributes(attrs: Readonly<Record<string, string>> | null): st
 }
 
 function renderModuleImport(moduleSpecifier: string, group: ModuleImportGroup): string {
-  const typeOnlyStatement = isStatementTypeOnly(group);
   const attrs = buildAttributesClause(group.attributes);
-  const hasDefault = group.defaultSymbol !== null;
+  const defaultEntries = [...group.defaults.entries()].sort(([a], [b]) => a.localeCompare(b));
   const hasNamed = group.named.size > 0;
+
+  // More than one distinct default symbol can't share a single import
+  // clause (`import a, b from 'm'` isn't valid syntax), so each gets its
+  // own line; named bindings (if any) follow on their own line.
+  if (defaultEntries.length > 1) {
+    const defaultLines = defaultEntries.map(
+      ([symbol, typeOnly]) =>
+        `import ${typeOnly ? 'type ' : ''}${symbol} from '${moduleSpecifier}'${attrs};`,
+    );
+    if (!hasNamed) return defaultLines.join('\n');
+    return [...defaultLines, renderNamedOnlyStatement(moduleSpecifier, group, attrs)].join('\n');
+  }
+
+  const defaultEntry = defaultEntries[0];
+  const hasDefault = defaultEntry !== undefined;
+  const [defaultSymbol, defaultTypeOnly] = defaultEntry ?? [null, true];
+  const typeOnlyStatement = isStatementTypeOnly(hasDefault, defaultTypeOnly, group);
   if (typeOnlyStatement && hasDefault && hasNamed) {
-    const defaultLine = `import type ${group.defaultSymbol} from '${moduleSpecifier}'${attrs};`;
+    const defaultLine = `import type ${defaultSymbol} from '${moduleSpecifier}'${attrs};`;
     const namedClause = renderNamedBindingsList(group, true);
     const namedLine = `import type { ${namedClause} } from '${moduleSpecifier}'${attrs};`;
     return `${defaultLine}\n${namedLine}`;
   }
   const keyword = typeOnlyStatement ? 'import type' : 'import';
-  const clause = buildImportClause(group, typeOnlyStatement);
+  const clause = buildImportClause(defaultSymbol, group, typeOnlyStatement);
   return `${keyword} ${clause} from '${moduleSpecifier}'${attrs};`;
 }
 
-function isStatementTypeOnly(group: ModuleImportGroup): boolean {
-  const hasDefault = group.defaultSymbol !== null;
+function renderNamedOnlyStatement(
+  moduleSpecifier: string,
+  group: ModuleImportGroup,
+  attrs: string,
+): string {
+  const typeOnlyStatement = [...group.named.values()].every((binding) => binding.typeOnly);
+  const keyword = typeOnlyStatement ? 'import type' : 'import';
+  const namedClause = renderNamedBindingsList(group, typeOnlyStatement);
+  return `${keyword} { ${namedClause} } from '${moduleSpecifier}'${attrs};`;
+}
+
+function isStatementTypeOnly(
+  hasDefault: boolean,
+  defaultTypeOnly: boolean,
+  group: ModuleImportGroup,
+): boolean {
   const hasNamed = group.named.size > 0;
   if (!hasDefault && !hasNamed) return false;
-  if (hasDefault && !group.defaultTypeOnly) return false;
+  if (hasDefault && !defaultTypeOnly) return false;
   for (const binding of group.named.values()) {
     if (!binding.typeOnly) return false;
   }
   return true;
 }
 
-function buildImportClause(group: ModuleImportGroup, statementTypeOnly: boolean): string {
+function buildImportClause(
+  defaultSymbol: string | null,
+  group: ModuleImportGroup,
+  statementTypeOnly: boolean,
+): string {
   const hasNamed = group.named.size > 0;
-  const hasDefault = group.defaultSymbol !== null;
+  const hasDefault = defaultSymbol !== null;
   const namedClause = hasNamed ? renderNamedBindingsList(group, statementTypeOnly) : '';
   if (hasDefault && hasNamed) {
-    return `${group.defaultSymbol}, { ${namedClause} }`;
+    return `${defaultSymbol}, { ${namedClause} }`;
   }
   if (hasDefault) {
-    return group.defaultSymbol as string;
+    return defaultSymbol;
   }
   return `{ ${namedClause} }`;
 }

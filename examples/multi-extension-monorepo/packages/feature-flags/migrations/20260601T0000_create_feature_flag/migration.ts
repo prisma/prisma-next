@@ -14,8 +14,10 @@ import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control'
 import { Migration, MigrationCLI, rawSql } from '@prisma-next/target-postgres/migration';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { FEATURE_FLAG_TABLE, FEATURE_FLAGS_BASELINE_INVARIANT_ID } from '../../src/constants';
-import type { Contract as End } from './end-contract';
-import endContract from './end-contract.json' with { type: 'json' };
+import type { Contract as End } from '../snapshots/6759a7591f2bdf9b5c20fcbf2b02dbf56956c7762cef663c5e8e2b6779057cf4/contract';
+import endContract from '../snapshots/6759a7591f2bdf9b5c20fcbf2b02dbf56956c7762cef663c5e8e2b6779057cf4/contract.json' with {
+  type: 'json',
+};
 
 export default class M extends Migration<never, End> {
   override readonly endContractJson = endContract;

@@ -1,4 +1,7 @@
-import { readFile } from 'node:fs/promises';
+import {
+  contractSnapshotDir,
+  readContractSnapshotJson,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -135,16 +138,20 @@ async function executeDbUpdateCommand(
           errorUnexpected(
             `No migration bundle found for --to "${options.to}" (resolved hash: ${targetHash})`,
             {
-              why: `The ref resolved successfully but no on-disk migration package has an end-contract hash matching ${targetHash}.`,
+              why: `The ref resolved successfully but no on-disk migration package has a destination (\`to\`) hash matching ${targetHash}.`,
               fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
             },
           ),
         );
       }
-      const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
-      const raw = await readFile(endContractPath, 'utf-8');
-      contractJson = JSON.parse(raw) as Record<string, unknown>;
-      contractJsonPathForSnapshot = endContractPath;
+      contractJson = (await readContractSnapshotJson(migrationsDir, targetHash)) as Record<
+        string,
+        unknown
+      >;
+      contractJsonPathForSnapshot = join(
+        contractSnapshotDir(migrationsDir, targetHash),
+        'contract.json',
+      );
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));

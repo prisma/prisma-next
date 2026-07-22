@@ -73,8 +73,7 @@ jobs:
     name: Lint
     # Depends on build only for cache coherence: build is the single writer of
     # the shared Turbo/pnpm caches, so every other job restores an exact-key
-    # hit and skips saving. Without this, lint (which does no build) could win
-    # the cache-save race and persist a build-less cache.
+    # hit and skips saving. The build step below just restores that cache.
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -89,6 +88,8 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build packages (restored from Turbo cache)
+        run: pnpm build
       - name: Lint dependencies
         run: pnpm lint:deps
       - name: Lint code shape

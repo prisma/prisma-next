@@ -21,7 +21,7 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import supabasePack from '@prisma-next/extension-supabase/pack';
 import { InvalidJwtError, supabase } from '@prisma-next/extension-supabase/runtime';
 import sql from '@prisma-next/family-sql/control';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlMiddleware } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
 import { timeouts, withClient } from '@prisma-next/test-utils';
@@ -68,7 +68,7 @@ async function runDbInit(connectionString: string, migrationsDir: string): Promi
   const space = supabasePack.contractSpace;
   if (!space) throw new Error('supabasePack must declare a contractSpace');
 
-  await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+  await emitContractSpaceArtifacts(migrationsDir, 'supabase', {
     contract: space.contractJson,
     contractDts: '// supabase extension contract space\n',
     headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },

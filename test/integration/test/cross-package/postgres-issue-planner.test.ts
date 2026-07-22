@@ -615,8 +615,9 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
 
       const ts = renderCallsToTypeScript(result.value.calls, {
-        from: 'sha256:aaa',
-        to: 'sha256:bbb',
+        from: `sha256:${'a'.repeat(64)}`,
+        to: `sha256:${'b'.repeat(64)}`,
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(ts).toContain('export default class M extends Migration');
@@ -675,6 +676,7 @@ describe('planIssues', () => {
         fromContract: null,
         frameworkComponents: [],
         spaceId: 'app',
+        snapshotsImportPath: '../../snapshots',
       });
       if (result.kind !== 'success') throw new Error('expected planner success');
       return await Promise.all(result.plan.operations);

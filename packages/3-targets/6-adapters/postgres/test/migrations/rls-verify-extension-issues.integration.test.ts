@@ -129,6 +129,7 @@ describe.sequential('RLS verify extension issues', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success')
       throw new Error(

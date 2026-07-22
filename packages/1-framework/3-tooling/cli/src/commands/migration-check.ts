@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { loadConfig } from '@prisma-next/config-loader';
 import { createControlStack } from '@prisma-next/framework-components/control';
@@ -7,6 +7,11 @@ import type {
   IntegrityViolation,
 } from '@prisma-next/migration-tools/aggregate';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
+import {
+  contractSnapshotDir,
+  readContractSnapshotJson,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { verifyMigrationHash } from '@prisma-next/migration-tools/hash';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
@@ -18,7 +23,6 @@ import type { Refs } from '@prisma-next/migration-tools/refs';
 import {
   isValidSpaceId,
   listContractSpaceDirectories,
-  RESERVED_SPACE_SUBDIR_NAMES,
   spaceMigrationDirectory,
   spaceRefsDirectory,
 } from '@prisma-next/migration-tools/spaces';
@@ -92,32 +96,57 @@ function checkFileExists(
   return null;
 }
 
-function checkSnapshotConsistency(
+/**
+ * Snapshot-store consistency check for one migration package (D6.5):
+ * absent store entry is not an issue (runner independence, ADR 199 — a
+ * package dir with only `migration.json` + `ops.json` is legitimate); a
+ * present entry whose inner `storage.storageHash` disagrees with
+ * `pkg.metadata.to` is `MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH`; an unparseable store
+ * entry (or a malformed `to`) is `MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE`.
+ */
+async function checkSnapshotConsistency(
   spaceId: string,
   pkg: OnDiskMigrationPackage,
-): CheckFailure | null {
-  const endContractPath = join(pkg.dirPath, 'end-contract.json');
-  if (!existsSync(endContractPath)) return null;
+  migrationsDir: string,
+): Promise<CheckFailure | null> {
+  let snapshotDir: string;
   try {
-    const raw = JSON.parse(readFileSync(endContractPath, 'utf-8')) as Record<string, unknown>;
-    const storage = raw['storage'] as Record<string, unknown> | undefined;
-    const snapshotHash = storage?.['storageHash'];
-    if (typeof snapshotHash === 'string' && snapshotHash !== pkg.metadata.to) {
-      return {
-        space: spaceId,
-        code: 'MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH',
-        where: migrationPathRelative(pkg.dirPath),
-        why: `Migration "${pkg.dirName}" declares to=${pkg.metadata.to} but end-contract.json has storageHash=${snapshotHash}`,
-        fix: 'Re-emit the migration package so migration.json and end-contract.json agree.',
-      };
-    }
+    snapshotDir = contractSnapshotDir(migrationsDir, pkg.metadata.to);
   } catch {
     return {
       space: spaceId,
       code: 'MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE',
       where: migrationPathRelative(pkg.dirPath),
-      why: `Migration "${pkg.dirName}" has an unparseable end-contract.json.`,
-      fix: 'Re-emit the migration package to repair the snapshot file.',
+      why: `Migration "${pkg.dirName}" declares to="${pkg.metadata.to}", which is not a well-formed contract snapshot hash.`,
+      fix: 'Re-emit the migration package so migration.json declares a valid `sha256:<64hex>` to-hash.',
+    };
+  }
+
+  let raw: unknown;
+  try {
+    raw = await readContractSnapshotJson(migrationsDir, pkg.metadata.to);
+  } catch (error) {
+    if (MigrationToolsError.is(error) && error.code === 'MIGRATION.CONTRACT_SNAPSHOT_MISSING') {
+      return null;
+    }
+    return {
+      space: spaceId,
+      code: 'MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE',
+      where: migrationPathRelative(pkg.dirPath),
+      why: `Migration "${pkg.dirName}" has an unparseable contract snapshot at ${snapshotDir}/contract.json.`,
+      fix: 'Restore migrations/snapshots/ from version control, or re-run the command that produced this migration to regenerate its snapshot.',
+    };
+  }
+  const record = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const storage = record['storage'] as Record<string, unknown> | undefined;
+  const snapshotHash = storage?.['storageHash'];
+  if (typeof snapshotHash === 'string' && snapshotHash !== pkg.metadata.to) {
+    return {
+      space: spaceId,
+      code: 'MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH',
+      where: migrationPathRelative(pkg.dirPath),
+      why: `Migration "${pkg.dirName}" declares to=${pkg.metadata.to} but its contract snapshot has storageHash=${snapshotHash}`,
+      fix: 'Re-emit the migration package so migration.json and its contract snapshot agree.',
     };
   }
   return null;
@@ -137,6 +166,8 @@ export interface CheckSpace {
   readonly graph: MigrationGraph;
   readonly migrationsDir: string;
   readonly refsDir: string;
+  /** Migrations root the contract-snapshot store lives under — shared by every space. */
+  readonly projectMigrationsDir: string;
 }
 
 /**
@@ -152,9 +183,7 @@ export async function enumerateCheckSpaces(
   projectMigrationsDir: string,
 ): Promise<readonly CheckSpace[]> {
   const candidateDirs = await listContractSpaceDirectories(projectMigrationsDir);
-  const onDiskSpaceIds = new Set(
-    candidateDirs.filter((name) => !RESERVED_SPACE_SUBDIR_NAMES.has(name)).filter(isValidSpaceId),
-  );
+  const onDiskSpaceIds = new Set(candidateDirs.filter(isValidSpaceId));
   const spaces: CheckSpace[] = [];
   for (const space of aggregate.spaces()) {
     const spaceId = space.spaceId;
@@ -168,6 +197,7 @@ export async function enumerateCheckSpaces(
       graph: space.graph(),
       migrationsDir,
       refsDir: spaceRefsDirectory(migrationsDir),
+      projectMigrationsDir,
     });
   }
   return spaces;
@@ -238,12 +268,15 @@ function checkDanglingRefs(space: CheckSpace): readonly CheckFailure[] {
   return failures;
 }
 
-function checkSpace(space: CheckSpace): readonly CheckFailure[] {
+async function checkSpace(space: CheckSpace): Promise<readonly CheckFailure[]> {
+  const snapshotFailures = await Promise.all(
+    space.packages.map((pkg) =>
+      checkSnapshotConsistency(space.spaceId, pkg, space.projectMigrationsDir),
+    ),
+  );
   return [
     ...checkManifestFilesPresent(space),
-    ...space.packages
-      .map((pkg) => checkSnapshotConsistency(space.spaceId, pkg))
-      .filter((f): f is CheckFailure => f !== null),
+    ...snapshotFailures.filter((f): f is CheckFailure => f !== null),
     ...checkReachability(space),
     ...checkDanglingRefs(space),
   ];
@@ -272,9 +305,9 @@ export interface RunMigrationCheckInputs {
  * Aggregate-integrity violations (which already span every space) are folded
  * in by the caller, not here.
  */
-export function runMigrationCheck(
+export async function runMigrationCheck(
   inputs: RunMigrationCheckInputs,
-): Result<MigrationCheckResult, CliStructuredError> {
+): Promise<Result<MigrationCheckResult, CliStructuredError>> {
   const { spaces, spaceFilter } = inputs;
 
   if (spaceFilter !== undefined && !isValidSpaceId(spaceFilter)) {
@@ -287,7 +320,7 @@ export function runMigrationCheck(
   const scopedSpaces =
     spaceFilter !== undefined ? spaces.filter((s) => s.spaceId === spaceFilter) : spaces;
 
-  const failures = scopedSpaces.flatMap(checkSpace);
+  const failures = (await Promise.all(scopedSpaces.map(checkSpace))).flat();
   if (failures.length === 0) {
     return ok({ ok: true, failures: [], summary: 'All checks passed' });
   }
@@ -365,7 +398,7 @@ async function executeMigrationCheckCommand(
     });
   }
 
-  const checkResult = runMigrationCheck({
+  const checkResult = await runMigrationCheck({
     spaces,
     ...(options.space !== undefined ? { spaceFilter: options.space } : {}),
   });
@@ -558,7 +591,11 @@ async function checkSingleTarget(
     });
   }
 
-  const snapshotFailure = checkSnapshotConsistency(matchedSpace.spaceId, matchedPkg);
+  const snapshotFailure = await checkSnapshotConsistency(
+    matchedSpace.spaceId,
+    matchedPkg,
+    matchedSpace.projectMigrationsDir,
+  );
   if (snapshotFailure) failures.push(snapshotFailure);
 
   const resolvedSpaceId = matchedSpace.spaceId !== 'app' ? matchedSpace.spaceId : undefined;

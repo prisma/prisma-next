@@ -421,7 +421,7 @@ export function errorBundleNotFoundForGraphNode(
     ? `No migration bundle found for reference "${explicitLabel}" (resolved hash: ${hash})`
     : `No migration bundle found for graph node ${hash}`;
   return new MigrationToolsError('MIGRATION.BUNDLE_NOT_FOUND_FOR_GRAPH_NODE', summary, {
-    why: `The hash ${hash} is a graph node but no on-disk migration package has an end-contract hash matching it.`,
+    why: `The hash ${hash} is a graph node but no on-disk migration package has a destination (\`to\`) hash matching it.`,
     fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
     details: { hash, ...(explicitLabel ? { explicitLabel } : {}) },
   });
@@ -452,6 +452,37 @@ export function errorHashNotInGraph(hash: string, graph: MigrationGraph): Migrat
       why: `The migration graph contains nodes ${reachableList}; "${hash}" isn't one of them.`,
       fix: `Pass a hash that's the from-or-to of an on-disk migration bundle, use --from with a graph-node hash, or run "prisma-next migration plan" to introduce it.`,
       details: { hash, reachableHashes },
+    },
+  );
+}
+
+export function errorContractSnapshotMissing(
+  storageHash: string,
+  expectedPath: string,
+): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.CONTRACT_SNAPSHOT_MISSING',
+    'Contract snapshot is missing',
+    {
+      why: `Expected a contract snapshot for ${storageHash} at "${expectedPath}" but the file does not exist.`,
+      fix: "Re-emit the contract snapshot by re-running the command that authored the migration referencing this hash (`prisma-next migration plan` for app-space migrations; the extension's contract-space build for extension spaces), or restore migrations/snapshots/ from version control.",
+      details: { storageHash, expectedPath },
+    },
+  );
+}
+
+export function errorContractSnapshotHashMismatch(
+  storageHash: string,
+  actualHash: string,
+  dir: string,
+): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.CONTRACT_SNAPSHOT_HASH_MISMATCH',
+    'Contract snapshot hash mismatch',
+    {
+      why: `The contract JSON's inner storage.storageHash ("${actualHash}") does not match the requested storage hash ("${storageHash}") for snapshot directory "${dir}".`,
+      fix: 'Pass a contractJson whose storage.storageHash equals the storageHash argument passed to writeContractSnapshot — the two must agree by construction.',
+      details: { storageHash, actualHash, dir },
     },
   );
 }

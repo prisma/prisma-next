@@ -73,7 +73,7 @@ ParadeDB BM25 indexes require a `key_field` — a unique column that identifies 
 
 ## Authoring (maintainers)
 
-After changing the contract source, run `pnpm migrations:regen` from the repo root to keep migration metadata, `refs/head.json`, and `end-contract.*` consistent with the freshly-built `src/contract.json`; it is also wired into `pnpm fixtures:emit` automatically.
+After changing the contract source, run `pnpm migrations:regen` from the repo root to keep migration metadata, `refs/head.json`, and the `migrations/snapshots/<hex>/contract.*` store entries consistent with the freshly-built `src/contract.json`; it is also wired into `pnpm fixtures:emit` automatically.
 
 See [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md) ("Contract-space package layout") for the layout and rationale.
 

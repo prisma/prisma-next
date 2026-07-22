@@ -6,6 +6,7 @@ import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-em
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
 import { createRefCommand } from '@prisma-next/cli/commands/ref';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { contractSnapshotDir } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -178,17 +179,14 @@ withTempDir(({ createTempDir }) => {
       'ref set writes paired snapshots, ref list ignores them, ref delete removes all files',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
-          const { testDir, configPath, migrationDir, toHash } = await seedPlannedMigration(
+          const { testDir, configPath, toHash } = await seedPlannedMigration(
             createTempDir,
             connectionString,
           );
           const refsDir = appRefsDir(testDir);
           const bundleEndContract = join(
-            testDir,
-            'migrations',
-            'app',
-            migrationDir,
-            'end-contract.json',
+            contractSnapshotDir(join(testDir, 'migrations'), toHash),
+            'contract.json',
           );
 
           const setResult = await runRef(testDir, [

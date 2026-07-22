@@ -38,6 +38,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('expected planner success');
@@ -101,6 +102,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (initialPlan.kind !== 'success') throw new Error('expected initial planner success');
     const firstResult = await runner.execute({

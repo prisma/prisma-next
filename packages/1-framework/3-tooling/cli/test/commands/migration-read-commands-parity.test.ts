@@ -7,6 +7,7 @@ import type { MigrationPlanOperation } from '@prisma-next/framework-components/c
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { writeContractSnapshot } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
@@ -268,15 +269,16 @@ async function buildMultiSpaceFixture(): Promise<{
   });
   await writeRefFor(migrationsDir, { spaceId: 'app', name: 'db', hash: HASH_804e018 });
   await writeRefFor(migrationsDir, { spaceId: 'postgis', name: 'db', hash: HASH_POSTGIS });
-  await writeFile(
-    join(migrationsDir, 'postgis', 'contract.json'),
-    JSON.stringify({
+  await writeRefFor(migrationsDir, { spaceId: 'postgis', name: 'head', hash: HASH_POSTGIS });
+  await writeContractSnapshot(migrationsDir, HASH_POSTGIS, {
+    contractJson: {
       storage: { storageHash: HASH_POSTGIS, namespaces: {} },
       schemaVersion: '1.0.0',
       target: 'postgres',
       targetFamily: 'sql',
-    }),
-  );
+    },
+    contractDts: 'export type Contract = unknown;\n',
+  });
 
   const aggregate = await loadContractSpaceAggregate({
     migrationsDir,
@@ -827,7 +829,7 @@ describe('migration check multi-space parity (D6 lock)', () => {
     expect(spaceIds).toContain('app');
     expect(spaceIds).toContain('postgis');
 
-    const result = runMigrationCheck({ spaces });
+    const result = await runMigrationCheck({ spaces });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.ok).toBe(true);
@@ -838,7 +840,7 @@ describe('migration check multi-space parity (D6 lock)', () => {
     const { aggregate, migrationsDir } = await buildMultiSpaceFixture();
     const spaces = await enumerateCheckSpaces(aggregate, migrationsDir);
 
-    const result = runMigrationCheck({ spaces, spaceFilter: 'app' });
+    const result = await runMigrationCheck({ spaces, spaceFilter: 'app' });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.ok).toBe(true);
@@ -850,7 +852,7 @@ describe('migration check multi-space parity (D6 lock)', () => {
     const { aggregate, migrationsDir } = await buildMultiSpaceFixture();
     const spaces = await enumerateCheckSpaces(aggregate, migrationsDir);
 
-    const result = runMigrationCheck({ spaces, spaceFilter: 'nonexistent' });
+    const result = await runMigrationCheck({ spaces, spaceFilter: 'nonexistent' });
     expect(result.ok).toBe(false);
     if (result.ok) return;
     const envelope = result.failure.toEnvelope();

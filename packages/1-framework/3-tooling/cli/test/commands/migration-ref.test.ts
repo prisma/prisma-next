@@ -112,7 +112,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     expect(stagingEntry.hash).toBe(HASH_C);
     expect(productionEntry.hash).toBe(HASH_B);
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const attested = packages;
     const graph = reconstructGraph(attested);
 
@@ -164,7 +164,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
 
     const entry = await readRef(refsDir, 'production');
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const attested = packages;
     const graph = reconstructGraph(attested);
 
@@ -227,7 +227,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
       slug: 'add_post',
     });
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const attested = packages;
     const graph = reconstructGraph(attested);
 
@@ -278,7 +278,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     await writeRef(refsDir, 'production', ENTRY_A);
 
     const refs = await readRefs(refsDir);
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const attested = packages;
     const graph = reconstructGraph(attested);
 

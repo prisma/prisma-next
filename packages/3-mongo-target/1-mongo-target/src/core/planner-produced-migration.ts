@@ -30,6 +30,7 @@ export class PlannerProducedMongoMigration
   constructor(
     private readonly calls: readonly OpFactoryCall[],
     private readonly meta: MigrationMeta,
+    private readonly snapshotsImportPath: string,
   ) {
     super();
   }
@@ -46,6 +47,7 @@ export class PlannerProducedMongoMigration
     return renderCallsToTypeScript(this.calls, {
       from: this.meta.from,
       to: this.meta.to,
+      snapshotsImportPath: this.snapshotsImportPath,
     });
   }
 }

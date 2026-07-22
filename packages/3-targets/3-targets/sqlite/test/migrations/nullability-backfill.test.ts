@@ -39,7 +39,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
+      storageHash: coreHash(`sha256:${'c'.repeat(64)}`),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -108,6 +108,7 @@ describe('nullability-tightening backfill', async () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -127,6 +128,7 @@ describe('nullability-tightening backfill', async () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -193,6 +195,7 @@ describe('nullability-tightening backfill', async () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');

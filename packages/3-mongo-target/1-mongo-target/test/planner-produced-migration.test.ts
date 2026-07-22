@@ -3,36 +3,41 @@ import { describe, expect, it } from 'vitest';
 import { CreateIndexCall, DropIndexCall } from '../src/core/op-factory-call';
 import { PlannerProducedMongoMigration } from '../src/core/planner-produced-migration';
 
+const SNAPSHOTS_IMPORT_PATH = '../../snapshots';
 const META = {
-  from: 'sha256:00',
-  to: 'sha256:01',
+  from: `sha256:${'a'.repeat(64)}`,
+  to: `sha256:${'b'.repeat(64)}`,
 } as const;
 
 describe('PlannerProducedMongoMigration', () => {
   it("identifies as the 'mongo' target", () => {
-    const migration = new PlannerProducedMongoMigration([], META);
+    const migration = new PlannerProducedMongoMigration([], META, SNAPSHOTS_IMPORT_PATH);
 
     expect(migration.targetId).toBe('mongo');
   });
 
   it('exposes describe() metadata as supplied', () => {
-    const migration = new PlannerProducedMongoMigration([], META);
+    const migration = new PlannerProducedMongoMigration([], META, SNAPSHOTS_IMPORT_PATH);
 
     expect(migration.describe()).toEqual(META);
   });
 
   it('derives origin/destination from describe() (round-trips through MigrationPlan surface)', () => {
-    const migration = new PlannerProducedMongoMigration([], META);
+    const migration = new PlannerProducedMongoMigration([], META, SNAPSHOTS_IMPORT_PATH);
 
-    expect(migration.origin).toEqual({ storageHash: 'sha256:00' });
-    expect(migration.destination).toEqual({ storageHash: 'sha256:01' });
+    expect(migration.origin).toEqual({ storageHash: META.from });
+    expect(migration.destination).toEqual({ storageHash: META.to });
   });
 
   it("treats a null 'from' as a null origin so runners do not match against an empty hash", () => {
-    const migration = new PlannerProducedMongoMigration([], { from: null, to: 'sha256:01' });
+    const migration = new PlannerProducedMongoMigration(
+      [],
+      { from: null, to: META.to },
+      SNAPSHOTS_IMPORT_PATH,
+    );
 
     expect(migration.origin).toBeNull();
-    expect(migration.destination).toEqual({ storageHash: 'sha256:01' });
+    expect(migration.destination).toEqual({ storageHash: META.to });
   });
 
   it('renders the supplied OpFactoryCall list to runnable mongo operations via the operations getter', () => {
@@ -40,7 +45,7 @@ describe('PlannerProducedMongoMigration', () => {
       new CreateIndexCall('users', [{ field: 'email', direction: 1 }], { unique: true }),
       new DropIndexCall('users', [{ field: 'legacy', direction: 1 }]),
     ];
-    const migration = new PlannerProducedMongoMigration(calls, META);
+    const migration = new PlannerProducedMongoMigration(calls, META, SNAPSHOTS_IMPORT_PATH);
 
     const ops = migration.operations;
 
@@ -50,14 +55,14 @@ describe('PlannerProducedMongoMigration', () => {
   });
 
   it('returns an empty operations list when constructed with no calls', () => {
-    const migration = new PlannerProducedMongoMigration([], META);
+    const migration = new PlannerProducedMongoMigration([], META, SNAPSHOTS_IMPORT_PATH);
 
     expect(migration.operations).toEqual([]);
   });
 
   it('renders authoring TypeScript that wires up MigrationCLI.run and derives describe() from contract JSON', () => {
     const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
-    const migration = new PlannerProducedMongoMigration(calls, META);
+    const migration = new PlannerProducedMongoMigration(calls, META, SNAPSHOTS_IMPORT_PATH);
 
     const source = migration.renderTypeScript();
 
@@ -77,7 +82,7 @@ describe('PlannerProducedMongoMigration', () => {
   });
 
   it('renders an empty-class stub when constructed with no calls', () => {
-    const migration = new PlannerProducedMongoMigration([], META);
+    const migration = new PlannerProducedMongoMigration([], META, SNAPSHOTS_IMPORT_PATH);
 
     const source = migration.renderTypeScript();
 
@@ -89,7 +94,7 @@ describe('PlannerProducedMongoMigration', () => {
 
   it('renderTypeScript emits no describe() block (so no labels leak through it)', () => {
     const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
-    const migration = new PlannerProducedMongoMigration(calls, META);
+    const migration = new PlannerProducedMongoMigration(calls, META, SNAPSHOTS_IMPORT_PATH);
 
     const source = migration.renderTypeScript();
 

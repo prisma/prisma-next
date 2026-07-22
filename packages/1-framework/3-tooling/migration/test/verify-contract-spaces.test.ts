@@ -98,6 +98,13 @@ describe('listContractSpaceDirectories', () => {
 
     expect(await listContractSpaceDirectories(projectMigrationsDir)).toEqual(['cipherstash']);
   });
+
+  it('skips the reserved snapshots/ contract snapshot store directory', async () => {
+    await makeContractSpaceDir('snapshots');
+    await makeContractSpaceDir('cipherstash');
+
+    expect(await listContractSpaceDirectories(projectMigrationsDir)).toEqual(['cipherstash']);
+  });
 });
 
 describe('verifyContractSpaces', () => {

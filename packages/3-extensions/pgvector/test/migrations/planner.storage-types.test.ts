@@ -125,6 +125,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expectNarrowedType(result.kind === 'success');
@@ -199,6 +200,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result).toMatchObject({
@@ -301,6 +303,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expectNarrowedType(result.kind === 'success');
@@ -371,6 +374,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       fromContract: null,
       frameworkComponents: [pgvectorDescriptor],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expectNarrowedType(result.kind === 'success');
@@ -442,6 +446,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         fromContract: null,
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       }),
     ).toThrow(
       'Column declares typeParams for nativeType "vector" but no expandNativeType hook is registered for codecId "pg/vector@1".',

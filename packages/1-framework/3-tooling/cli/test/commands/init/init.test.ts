@@ -688,7 +688,7 @@ describe('runInit hygiene + tsconfig (FR2 / FR3)', { timeout: timeouts.databaseO
     expect(gitignore).toContain('.env');
   });
 
-  it('writes .gitattributes with linguist-generated lines for emitted artefacts (FR3.4)', async () => {
+  it('writes .gitattributes with linguist-generated lines for emitted artifacts (FR3.4)', async () => {
     await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', install: false },
       flags: noninteractiveFlags(),
@@ -959,14 +959,14 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
     rmSync(tmpDir, { recursive: true, force: true });
   }, timeouts.databaseOperation);
 
-  it('deletes previously-emitted contract artefacts on re-init (FR9.1)', async () => {
+  it('deletes previously-emitted contract artifacts on re-init (FR9.1)', async () => {
     await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', install: false },
       flags: noninteractiveFlags(),
     });
     writeFileSync(join(tmpDir, 'src/prisma', 'contract.json'), '{"stale":true}');
     writeFileSync(join(tmpDir, 'src/prisma', 'contract.d.ts'), 'export type Contract = never;');
-    writeFileSync(join(tmpDir, 'src/prisma', 'end-contract.json'), '{"stale":true}');
+    writeFileSync(join(tmpDir, 'src/prisma', 'ops.json'), '{"stale":true}');
 
     await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', force: true, install: false },
@@ -975,7 +975,7 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
 
     expect(existsSync(join(tmpDir, 'src/prisma/contract.json'))).toBe(false);
     expect(existsSync(join(tmpDir, 'src/prisma/contract.d.ts'))).toBe(false);
-    expect(existsSync(join(tmpDir, 'src/prisma/end-contract.json'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'src/prisma/ops.json'))).toBe(false);
   });
 
   it('does not delete unrelated files in the schema dir (FR9.1 boundary)', async () => {
@@ -1121,7 +1121,7 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
     expect(pkg.dependencies['someUnrelated']).toBe('^2.0.0');
   });
 
-  it('after target switch, project contains no Postgres-target artefacts (FR9 acceptance)', async () => {
+  it('after target switch, project contains no Postgres-target artifacts (FR9 acceptance)', async () => {
     await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', install: false },
       flags: noninteractiveFlags(),
@@ -1677,7 +1677,7 @@ describe('isRecognisedPnpmResolutionError (FR7.2)', () => {
   it('matches a literal "workspace:* is not a valid version" message', () => {
     expect(
       isRecognisedPnpmResolutionError(
-        'workspace:* is not a valid version specifier in registry artefacts',
+        'workspace:* is not a valid version specifier in registry artifacts',
       ),
     ).toBe(true);
   });

@@ -45,7 +45,7 @@ import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import { issueOutcome } from '@prisma-next/framework-components/control';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
@@ -88,7 +88,7 @@ describe('reference fixture round-trip verify', () => {
     if (!supabaseSpace) {
       throw new Error('supabasePack must declare a contractSpace');
     }
-    await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+    await emitContractSpaceArtifacts(migrationsDir, 'supabase', {
       contract: supabaseSpace.contractJson,
       contractDts: '// supabase extension contract space\n',
       headRef: {
@@ -96,7 +96,7 @@ describe('reference fixture round-trip verify', () => {
         invariants: [...supabaseSpace.headRef.invariants],
       },
     });
-    await emitContractSpaceArtefacts(migrationsDir, 'app', {
+    await emitContractSpaceArtifacts(migrationsDir, 'app', {
       contract: appContractJson,
       contractDts: '// synthetic app contract\n',
       headRef: { hash: appStorageHash, invariants: [] },

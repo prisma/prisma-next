@@ -124,6 +124,7 @@ describe.sequential('roles enter verify — existence-only, asymmetric', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') throw new Error(`Planner failed: ${planResult.kind}`);
     const executeResult = await runner.execute({

@@ -69,7 +69,7 @@ export interface ComputeExtensionSpaceApplyPathInputs {
  * forward to the on-disk head ref hash, covering every required
  * invariant.
  *
- * Reads only on-disk artefacts (`migrations/<spaceId>/refs/head.json`
+ * Reads only on-disk artifacts (`migrations/<spaceId>/refs/head.json`
  * and the per-space migration packages). **Does not import any
  * extension descriptor module** — `db init` / `db update` must remain
  * runnable without the descriptor source on disk.
@@ -97,7 +97,7 @@ export async function computeExtensionSpaceApplyPath(
   }
 
   const spaceDir = spaceMigrationDirectory(projectMigrationsDir, spaceId);
-  const { packages } = await readMigrationsDir(spaceDir);
+  const { packages } = await readMigrationsDir(spaceDir, { migrationsDir: projectMigrationsDir });
   const graph = reconstructGraph(packages);
 
   // Live-marker layer encodes "no prior state" as EMPTY_CONTRACT_HASH;

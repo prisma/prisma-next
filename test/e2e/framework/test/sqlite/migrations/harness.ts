@@ -150,6 +150,7 @@ export async function applyMigration(
         fromContract: null,
         frameworkComponents: fw,
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
       if (r.kind !== 'success') throw new Error('Origin planner failed');
       const run = await runner.execute({
@@ -179,6 +180,7 @@ export async function applyMigration(
       fromContract: options.origin ?? null,
       frameworkComponents: fw,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') {
       throw new Error(

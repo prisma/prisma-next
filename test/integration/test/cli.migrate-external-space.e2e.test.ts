@@ -5,6 +5,15 @@
  * space's marker to its head declaratively (mirroring the db-init
  * aggregate planner) instead of demanding an authored graph.
  *
+ * The first journey also locks AC8 of TML-3059 (contract-snapshot-store
+ * dedup): the seed phase (run as part of `migration plan`) populates
+ * `migrations/snapshots/<hex>/contract.json` for the external space's
+ * head hash instead of a per-space `migrations/<space-id>/contract.json`
+ * sibling, and the subsequent `migrate` — which must resolve the head
+ * contract to verify/advance the marker — only succeeds by reading it
+ * back through that same store entry (the aggregate loader has no other
+ * source for an extension space's contract under the new layout).
+ *
  * Also locks the remediation contract for the case that legitimately
  * remains unreachable (an APP space that was never planned): the error's
  * `fix` must prescribe commands that run verbatim — the test executes
@@ -12,13 +21,14 @@
  */
 
 import { execFile } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import type { MigrateResult } from '@prisma-next/cli/commands/migrate';
 import { createMigrateCommand } from '@prisma-next/cli/commands/migrate';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
+import { storageHashHex } from '@prisma-next/framework-components/control';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -134,7 +144,7 @@ withTempDir(({ createTempDir }) => {
           );
 
           await emitContract(testDir, configPath);
-          // Seeds the external space's pinned artefacts (head ref, no
+          // Seeds the external space's pinned artifacts (head ref, no
           // bundles) and authors the app baseline bundle.
           await runMigrationPlan(testDir, [
             '--config',
@@ -144,6 +154,28 @@ withTempDir(({ createTempDir }) => {
             '--no-color',
           ]);
 
+          // AC8: the seed phase populates the content-addressed store for
+          // the external space's head, not a per-space sibling copy.
+          const storeContractPath = join(
+            testDir,
+            'migrations',
+            'snapshots',
+            storageHashHex(TEST_EXTERNAL_HEAD_HASH),
+            'contract.json',
+          );
+          expect(existsSync(storeContractPath)).toBe(true);
+          const storedContract = JSON.parse(readFileSync(storeContractPath, 'utf-8')) as {
+            storage: { storageHash: string };
+          };
+          expect(storedContract.storage.storageHash).toBe(TEST_EXTERNAL_HEAD_HASH);
+          expect(
+            existsSync(join(testDir, 'migrations', TEST_EXTERNAL_SPACE_ID, 'contract.json')),
+          ).toBe(false);
+
+          // The aggregate loader must resolve the external space's head
+          // contract through that same store entry: `migrate` verifies
+          // and advances the marker against it below, with no other
+          // contract source available under the new layout.
           consoleOutput.length = 0;
           await runMigrate(testDir, ['--config', configPath, '--json', '--no-color']);
 

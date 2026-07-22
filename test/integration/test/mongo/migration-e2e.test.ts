@@ -155,6 +155,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         policy: ALL_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(result.kind).toBe('success');
@@ -176,6 +177,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         policy: ALL_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       if (result.kind !== 'success') throw new Error('Plan failed unexpectedly');
 
@@ -227,6 +229,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         policy: ALL_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       if (result.kind !== 'success') throw new Error('Plan failed');
 
@@ -272,6 +275,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         policy: ALL_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        snapshotsImportPath: '../../snapshots',
       });
       if (result.kind !== 'success') throw new Error('Plan failed');
 
@@ -333,6 +337,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
           policy: ALL_POLICY,
           fromContract: null,
           frameworkComponents: [],
+          snapshotsImportPath: '../../snapshots',
         });
         if (createResult.kind !== 'success') throw new Error('Create plan failed');
 
@@ -363,6 +368,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
           policy: ALL_POLICY,
           fromContract: indexedContract,
           frameworkComponents: [],
+          snapshotsImportPath: '../../snapshots',
         });
         if (dropResult.kind !== 'success') throw new Error('Drop plan failed');
 
@@ -435,6 +441,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
           policy: ALL_POLICY,
           fromContract: null,
           frameworkComponents: [],
+          snapshotsImportPath: '../../snapshots',
         });
         if (result.kind !== 'success') throw new Error('Plan failed');
 
@@ -501,6 +508,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
           policy: ALL_POLICY,
           fromContract: null,
           frameworkComponents: [],
+          snapshotsImportPath: '../../snapshots',
         });
         if (result.kind !== 'success') throw new Error('Plan failed');
 

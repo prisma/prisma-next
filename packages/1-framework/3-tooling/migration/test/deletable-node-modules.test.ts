@@ -9,17 +9,17 @@
  * descriptor) does not affect verify / apply outcomes.
  *
  * Scoped to the framework helpers
- * (`emitContractSpaceArtefacts` + `listContractSpaceDirectories` +
+ * (`emitContractSpaceArtifacts` + `listContractSpaceDirectories` +
  * `verifyContractSpaces` + `concatenateSpaceApplyInputs`). The test
  * intentionally **does not import** the synthetic
  * `test-contract-space` fixture (today hosted under
  * `test/integration/test/contract-space-fixture/`) — that is the
  * point. The test invents a `'test-contract-space'` space id inline
- * and runs the helpers against on-disk artefacts on disk plus a fake set of
+ * and runs the helpers against on-disk artifacts on disk plus a fake set of
  * marker rows.
  *
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
- *   — "Pinned per-space artefacts" / verifier reads only the user repo.
+ *   — "Pinned per-space artifacts" / verifier reads only the user repo.
  */
 
 import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
@@ -33,9 +33,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadContractSpaceAggregate } from '../src/aggregate/loader';
 import { verifyMigration } from '../src/aggregate/verifier';
 import { concatenateSpaceApplyInputs } from '../src/concatenate-space-apply-inputs';
+import { contractSnapshotDir } from '../src/contract-snapshot-store';
 import {
   type ContractSpaceHeadRecord,
-  emitContractSpaceArtefacts,
+  emitContractSpaceArtifacts,
   listContractSpaceDirectories,
   type SpaceApplyInput,
   type SpaceMarkerRecord,
@@ -48,7 +49,7 @@ const TEST_HEAD_HASH = 'sha256:0000000000000000000000000000000000000000000000000
 const TEST_INVARIANT = 'test-contract-space:create-test_box-v1';
 
 const testContract = {
-  storageHash: TEST_HEAD_HASH,
+  storage: { storageHash: TEST_HEAD_HASH },
   tables: { test_box: { columns: { x: 'int', y: 'int' } } },
 };
 const testContractDts =
@@ -74,7 +75,7 @@ async function setupProjectWithTestSpace(): Promise<ProjectFixture> {
     recursive: true,
   });
 
-  await emitContractSpaceArtefacts(projectMigrationsDir, TEST_SPACE_ID, {
+  await emitContractSpaceArtifacts(projectMigrationsDir, TEST_SPACE_ID, {
     contract: testContract,
     contractDts: testContractDts,
     headRef: { hash: TEST_HEAD_HASH, invariants: [TEST_INVARIANT] },
@@ -102,9 +103,9 @@ describe('per-space verifier + runner against a project with deleted node_module
     expect(dirs).toEqual([TEST_SPACE_ID]);
   });
 
-  it('verifyContractSpaces returns ok when on-disk artefacts + marker rows match — no descriptor needed', async () => {
+  it('verifyContractSpaces returns ok when on-disk artifacts + marker rows match — no descriptor needed', async () => {
     const spaceContractRaw = await readFile(
-      join(fixture.projectMigrationsDir, TEST_SPACE_ID, 'contract.json'),
+      join(contractSnapshotDir(fixture.projectMigrationsDir, TEST_HEAD_HASH), 'contract.json'),
       'utf-8',
     );
     expect(spaceContractRaw.trimEnd()).toBe(canonicalizeJson(testContract));
@@ -199,9 +200,9 @@ describe('per-space verifier + runner against a project with deleted node_module
  * property is locked at the API surface.
  */
 describe('aggregate pipeline (loader → planner → verifier) against deleted node_modules', () => {
-  const HEAD_HASH = 'sha256:abc123';
   let projectRoot: string;
   let migrationsDir: string;
+  let headHash: string;
 
   beforeEach(async () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'no-descriptor-pipeline-'));
@@ -215,7 +216,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       },
     );
 
-    // Pin the contract-space artefacts the loader reads. The contract
+    // Pin the contract-space artifacts the loader reads. The contract
     // value here is the same shape the validator will return.
     const spaceContract = createSqlContract({
       target: 'postgres',
@@ -230,17 +231,18 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
         },
       },
     });
-    await emitContractSpaceArtefacts(migrationsDir, TEST_SPACE_ID, {
+    headHash = spaceContract.storage.storageHash;
+    await emitContractSpaceArtifacts(migrationsDir, TEST_SPACE_ID, {
       contract: spaceContract as unknown as Record<string, unknown>,
       contractDts: '// rendered .d.ts\nexport interface Contract {}\n',
-      headRef: { hash: HEAD_HASH, invariants: [] },
+      headRef: { hash: headHash, invariants: [] },
     });
 
-    // Baseline migration package — single edge from null → HEAD_HASH —
+    // Baseline migration package — single edge from null → headHash —
     // so reconstructGraph finds a path from EMPTY_CONTRACT_HASH.
     await writeTestPackage(join(migrationsDir, TEST_SPACE_ID, '20260225_baseline'), {
       from: null,
-      to: HEAD_HASH,
+      to: headHash,
     });
 
     await rm(join(projectRoot, 'node_modules'), { recursive: true, force: true });

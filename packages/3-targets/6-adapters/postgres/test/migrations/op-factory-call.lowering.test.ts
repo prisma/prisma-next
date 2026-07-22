@@ -51,7 +51,11 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
-const META = { from: 'sha256:from', to: 'sha256:to' } as const;
+const SNAPSHOTS_IMPORT_PATH = '../../snapshots';
+const META = {
+  from: `sha256:${'a'.repeat(64)}`,
+  to: `sha256:${'b'.repeat(64)}`,
+} as const;
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 describe('renderOps', () => {
@@ -233,11 +237,12 @@ describe('TypeScriptRenderablePostgresMigration', () => {
       calls,
       META,
       APP_SPACE_ID,
+      SNAPSHOTS_IMPORT_PATH,
       testAdapter,
     );
 
     expect(migration.targetId).toBe('postgres');
-    expect(migration.destination).toEqual({ storageHash: 'sha256:to' });
+    expect(migration.destination).toEqual({ storageHash: META.to });
     expect(migration.describe()).toEqual(META);
 
     const operations = await Promise.all(migration.operations);
@@ -247,7 +252,12 @@ describe('TypeScriptRenderablePostgresMigration', () => {
 
   it('renders TypeScript source mirroring renderCallsToTypeScript output', () => {
     const calls = [new DropTableCall('public', 'stale')];
-    const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
+    const migration = new TypeScriptRenderablePostgresMigration(
+      calls,
+      META,
+      APP_SPACE_ID,
+      SNAPSHOTS_IMPORT_PATH,
+    );
 
     const source = migration.renderTypeScript();
     expect(source).toContain(

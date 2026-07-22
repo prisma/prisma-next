@@ -390,6 +390,7 @@ describe('planner ownership + policy for enum extras', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ...(ownership !== undefined ? { ownership } : {}),
     });
   }
@@ -544,6 +545,7 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ownership: twoSpaceOwnership(app.storage, packStorageDeclaringRenamedEnum()),
     });
 
@@ -566,6 +568,7 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ownership: twoSpaceOwnership(app.storage, packStorageDeclaringRenamedEnum()),
     });
 

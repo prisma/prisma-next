@@ -721,16 +721,10 @@ describe('DataTransformCall', () => {
     expect(ts).toContain('run: () => placeholder("backfill-status:run")');
   });
 
-  it('importRequirements() references placeholder and the generated end-contract JSON', () => {
+  it('importRequirements() references only the placeholder facade import (endContract comes from the scaffold)', () => {
     const call = new DataTransformCall('Backfill status', 'check', 'run');
     expect(call.importRequirements()).toEqual([
       { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'placeholder' },
-      {
-        moduleSpecifier: './end-contract.json',
-        symbol: 'endContract',
-        kind: 'default',
-        attributes: { type: 'json' },
-      },
     ]);
   });
 });

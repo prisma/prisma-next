@@ -1,4 +1,7 @@
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import {
+  APP_SPACE_ID,
+  CONTRACT_SNAPSHOTS_DIRNAME,
+} from '@prisma-next/framework-components/control';
 import { join } from 'pathe';
 import { errorInvalidSpaceId } from './errors';
 
@@ -58,14 +61,16 @@ export function spaceMigrationDirectory(projectMigrationsDir: string, spaceId: s
 export const SPACE_REFS_DIRNAME = 'refs';
 
 /**
- * Names reserved as per-space subdirectories of `migrations/<space>/`.
- * Used by the enumerator to filter contract-space candidates so a
- * reserved name (e.g. a top-level `migrations/refs/` left in the wrong
- * place) is never enumerated as a phantom contract space. Currently
- * holds `SPACE_REFS_DIRNAME`; extend if future per-space layouts add
- * more reserved subdirectories.
+ * Names reserved under `migrations/` that must never be enumerated as a
+ * phantom contract space: `SPACE_REFS_DIRNAME` (e.g. a top-level
+ * `migrations/refs/` left in the wrong place) and
+ * `CONTRACT_SNAPSHOTS_DIRNAME` (the migrations-root-wide contract
+ * snapshot store, `migrations/snapshots/`).
  */
-export const RESERVED_SPACE_SUBDIR_NAMES: ReadonlySet<string> = new Set([SPACE_REFS_DIRNAME]);
+export const RESERVED_SPACE_SUBDIR_NAMES: ReadonlySet<string> = new Set([
+  SPACE_REFS_DIRNAME,
+  CONTRACT_SNAPSHOTS_DIRNAME,
+]);
 
 /**
  * Resolve the per-space refs directory for `spaceMigrationsDir`

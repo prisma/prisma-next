@@ -1,6 +1,5 @@
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { notOk, type Result } from '@prisma-next/utils/result';
-import { join } from 'pathe';
 import {
   CliStructuredError,
   errorContractValidationFailed,
@@ -66,22 +65,19 @@ export function mapContractAtError(
             fix: error.fix,
           }),
         );
-      case 'MIGRATION.FILE_MISSING': {
-        const file =
-          typeof error.details?.['file'] === 'string' ? error.details['file'] : 'end-contract.json';
-        const dir = typeof error.details?.['dir'] === 'string' ? error.details['dir'] : '';
-        const jsonPath = dir ? join(dir, 'end-contract.json') : file;
+      case 'MIGRATION.CONTRACT_SNAPSHOT_MISSING': {
+        const expectedPath =
+          typeof error.details?.['expectedPath'] === 'string'
+            ? error.details['expectedPath']
+            : 'migrations/snapshots/';
         const role = options?.artifactRole ?? 'from';
         return notOk(
-          errorFileNotFound(jsonPath, {
+          errorFileNotFound(expectedPath, {
             why:
               role === 'to'
-                ? `Target migration is missing its destination contract snapshot at ${jsonPath}`
-                : `Predecessor migration is missing its destination contract snapshot at ${jsonPath}`,
-            fix:
-              role === 'to'
-                ? 'Re-emit the target migration so its sibling `end-contract.json` / `end-contract.d.ts` are restored, then re-run this command.'
-                : 'Re-emit the predecessor migration (`prisma-next migration plan` from its source) so its sibling `end-contract.json` is restored, then re-run this command.',
+                ? `Target migration is missing its contract snapshot at ${expectedPath}`
+                : `Predecessor migration is missing its contract snapshot at ${expectedPath}`,
+            fix: 'Restore migrations/snapshots/ from version control, or re-run the command that produced this migration to regenerate its snapshot.',
           }),
         );
       }

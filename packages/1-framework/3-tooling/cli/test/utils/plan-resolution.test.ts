@@ -60,14 +60,13 @@ function sampleContractIR(storageHash: string): ContractIR {
 
 function contractAtResult(
   storageHash: string,
-  opts?: { readonly provenance?: 'snapshot' | 'graph-node'; readonly sourceDir?: string },
+  opts?: { readonly provenance?: 'snapshot' | 'graph-node' },
 ): {
   hash: string;
   contract: Contract;
   contractJson: unknown;
   contractDts: string;
   provenance: 'snapshot' | 'graph-node';
-  sourceDir?: string;
 } {
   const ir = sampleContractIR(storageHash);
   const provenance = opts?.provenance ?? 'snapshot';
@@ -77,7 +76,6 @@ function contractAtResult(
     contractJson: ir.contract,
     contractDts: ir.contractDts,
     provenance,
-    ...(provenance === 'graph-node' ? { sourceDir: opts?.sourceDir ?? '/migrations/app/m1' } : {}),
   };
 }
 
@@ -95,6 +93,7 @@ function makeSpace(
         ? { hash: packages[packages.length - 1]!.metadata.to, invariants: [] }
         : null,
     refsDir: '/project/migrations/refs',
+    migrationsDir: '/project/migrations',
     resolveContract: () => ({ storage: { storageHash: HASH_B } }) as Contract,
     deserializeContract: (json) => json as Contract,
   });
@@ -258,9 +257,7 @@ describe('resolveFromForPlan', () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
     const contractAt = vi
       .fn()
-      .mockResolvedValue(
-        contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
-      );
+      .mockResolvedValue(contractAtResult(HASH_A, { provenance: 'graph-node' }));
     const space = makeSpace(bundles, {}, contractAt);
     const result = await resolveFromForPlan(baseInput({ space, optionsFrom: HASH_A }));
 
@@ -269,7 +266,6 @@ describe('resolveFromForPlan', () => {
       expect(result.value).toMatchObject({
         kind: 'graph-node',
         fromHash: HASH_A,
-        sourceDir: '/migrations/app/m1',
       });
     }
     expect(contractAt).toHaveBeenCalledWith(HASH_A, undefined);
@@ -305,11 +301,7 @@ describe('resolveFromForPlan', () => {
     const space = makeSpace(
       bundles,
       { db: { hash: HASH_A, invariants: [] } },
-      vi
-        .fn()
-        .mockResolvedValue(
-          contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
-        ),
+      vi.fn().mockResolvedValue(contractAtResult(HASH_A, { provenance: 'graph-node' })),
     );
     const result = await resolveFromForPlan(baseInput({ space }));
 
@@ -318,7 +310,6 @@ describe('resolveFromForPlan', () => {
       expect(result.value).toMatchObject({
         kind: 'graph-node',
         fromHash: HASH_A,
-        sourceDir: '/migrations/app/m1',
       });
     }
   });
@@ -328,11 +319,7 @@ describe('resolveFromForPlan', () => {
     const space = makeSpace(
       bundles,
       { staging: { hash: HASH_A, invariants: [] } },
-      vi
-        .fn()
-        .mockResolvedValue(
-          contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
-        ),
+      vi.fn().mockResolvedValue(contractAtResult(HASH_A, { provenance: 'graph-node' })),
     );
     const result = await resolveFromForPlan(baseInput({ space, optionsFrom: 'staging' }));
 
@@ -341,7 +328,6 @@ describe('resolveFromForPlan', () => {
       expect(result.value).toMatchObject({
         kind: 'graph-node',
         fromHash: HASH_A,
-        sourceDir: '/migrations/app/m1',
       });
     }
     expect(space.contractAt).toHaveBeenCalledWith(HASH_A, { refName: 'staging' });
@@ -462,13 +448,11 @@ describe('resolveToForPlan', () => {
     }
   });
 
-  it('resolves a full hash that is a graph node via the bundle end-contract artifacts', async () => {
+  it('resolves a full hash that is a graph node via the bundle destination contract artifacts', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
     const contractAt = vi
       .fn()
-      .mockResolvedValue(
-        contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
-      );
+      .mockResolvedValue(contractAtResult(HASH_A, { provenance: 'graph-node' }));
     const space = makeSpace(bundles, {}, contractAt);
     const result = await resolveToForPlan(HASH_A, baseToInput({ space }));
 
@@ -484,9 +468,7 @@ describe('resolveToForPlan', () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
     const contractAt = vi
       .fn()
-      .mockResolvedValue(
-        contractAtResult(HASH_A, { provenance: 'graph-node', sourceDir: '/migrations/app/m1' }),
-      );
+      .mockResolvedValue(contractAtResult(HASH_A, { provenance: 'graph-node' }));
     const space = makeSpace(bundles, {}, contractAt);
     const result = await resolveToForPlan('m2^', baseToInput({ space }));
 

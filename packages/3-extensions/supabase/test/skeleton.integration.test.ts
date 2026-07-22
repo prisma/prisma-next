@@ -21,7 +21,7 @@
  * How the supabase extension space participates:
  *   The supabase pack declares `contractSpace` (contract + headRef, no migrations).
  *   The test materialises `migrations/supabase/` on disk (via
- *   `emitContractSpaceArtefacts`) so `db init` discovers the extension space and
+ *   `emitContractSpaceArtifacts`) so `db init` discovers the extension space and
  *   processes its `auth.*` / `storage.*` tables through the aggregate planner.
  *   Because the pack ships zero migration packages, the loader synthesizes the head
  *   ref from the contract hash and the planner falls through to synth strategy (zero
@@ -45,7 +45,7 @@ import { createControlClient } from '@prisma-next/cli/control-api';
 import { coreHash, UNBOUND_DOMAIN_NAMESPACE_ID } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
@@ -121,7 +121,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       // `db init` discovers extension spaces by scanning `migrations/<space>/`.
       // The supabase pack is migration-less: it declares only external schema
       // (auth.* / storage.* are Supabase-managed tables) and ships zero DDL
-      // migrations. We write the space artefacts (contract.json + refs/head.json)
+      // migrations. We write the space artifacts (contract.json + refs/head.json)
       // so the aggregate loader picks the space up via the uniform read path —
       // head.json carries the pack's declared `{ hash, invariants }` on disk.
       // With no migration packages, the planner falls through to the synth
@@ -131,7 +131,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       if (!space) {
         throw new Error('supabasePack must declare a contractSpace');
       }
-      await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+      await emitContractSpaceArtifacts(migrationsDir, 'supabase', {
         contract: space.contractJson,
         contractDts: '// supabase extension contract space\n',
         headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
@@ -289,7 +289,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
       if (!space) {
         throw new Error('supabasePack must declare a contractSpace');
       }
-      await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+      await emitContractSpaceArtifacts(migrationsDir, 'supabase', {
         contract: space.contractJson,
         contractDts: '// supabase extension contract space\n',
         headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
@@ -411,7 +411,7 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
 
     const space = supabasePack.contractSpace;
     if (!space) throw new Error('supabasePack must declare a contractSpace');
-    await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+    await emitContractSpaceArtifacts(migrationsDir, 'supabase', {
       contract: space.contractJson,
       contractDts: '// supabase extension contract space\n',
       headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },

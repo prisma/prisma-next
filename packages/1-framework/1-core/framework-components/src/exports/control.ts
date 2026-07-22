@@ -1,5 +1,11 @@
 export type { ImportRequirement } from '@prisma-next/ts-render';
 export type { ContractSerializer } from '../control/contract-serializer';
+export {
+  CONTRACT_SNAPSHOTS_DIRNAME,
+  contractSnapshotJsonSpecifier,
+  contractSnapshotTypesSpecifier,
+  storageHashHex,
+} from '../control/contract-snapshot-layout';
 export type {
   DiffSubjectGranularity,
   MigratableTargetDescriptor,

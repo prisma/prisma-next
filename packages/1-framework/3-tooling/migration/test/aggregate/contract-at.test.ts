@@ -4,6 +4,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createAggregateContractSpace } from '../../src/aggregate/aggregate';
+import { contractSnapshotDir, writeContractSnapshot } from '../../src/contract-snapshot-store';
 import { writeRefSnapshot } from '../../src/refs/snapshot';
 import { createAttestedPackage, createTestContract, writeTestPackage } from '../fixtures';
 
@@ -44,15 +45,14 @@ function sampleContractJson(storageHash: string): unknown {
 }
 
 async function writeEndContract(
-  packageDir: string,
+  migrationsDir: string,
   storageHash: string,
   dtsLabel: string,
 ): Promise<void> {
-  await writeFile(
-    join(packageDir, 'end-contract.json'),
-    `${JSON.stringify(sampleContractJson(storageHash), null, 2)}\n`,
-  );
-  await writeFile(join(packageDir, 'end-contract.d.ts'), sampleContractDts(dtsLabel));
+  await writeContractSnapshot(migrationsDir, storageHash, {
+    contractJson: sampleContractJson(storageHash),
+    contractDts: sampleContractDts(dtsLabel),
+  });
 }
 
 describe('AggregateContractSpace.contractAt', () => {
@@ -68,7 +68,7 @@ describe('AggregateContractSpace.contractAt', () => {
     await mkdir(refsDir, { recursive: true });
     packageDir = join(workDir, '20260101T0000_init');
     await writeTestPackage(packageDir, { from: null, to: HASH_B });
-    await writeEndContract(packageDir, HASH_B, 'bundle');
+    await writeEndContract(workDir, HASH_B, 'bundle');
   });
 
   afterEach(async () => {
@@ -85,6 +85,7 @@ describe('AggregateContractSpace.contractAt', () => {
       refs: {},
       headRef: { hash: HASH_B, invariants: [] },
       refsDir,
+      migrationsDir: workDir,
       resolveContract: () => createTestContract(),
       deserializeContract: deserialize,
     });
@@ -110,7 +111,7 @@ describe('AggregateContractSpace.contractAt', () => {
     );
   });
 
-  it('reads end-contract from the matching graph-node package without refName', async () => {
+  it('reads the destination contract from the matching graph-node package without refName', async () => {
     const space = spaceWithPackages([
       createAttestedPackage('20260101T0000_init', { from: null, to: HASH_B }),
     ]);
@@ -120,7 +121,6 @@ describe('AggregateContractSpace.contractAt', () => {
     expect(result.hash).toBe(HASH_B);
     expect(result.provenance).toBe('graph-node');
     if (result.provenance !== 'graph-node') throw new Error('expected graph-node provenance');
-    expect(result.sourceDir).toBe(packageDir);
     expect(result.contractDts).toBe(sampleContractDts('bundle'));
     expect((result.contractJson as { storage: { storageHash: string } }).storage.storageHash).toBe(
       HASH_B,
@@ -136,7 +136,6 @@ describe('AggregateContractSpace.contractAt', () => {
 
     expect(result.provenance).toBe('graph-node');
     if (result.provenance !== 'graph-node') throw new Error('expected graph-node provenance');
-    expect(result.sourceDir).toBe(packageDir);
     expect(result.contractDts).toBe(sampleContractDts('bundle'));
   });
 
@@ -150,21 +149,21 @@ describe('AggregateContractSpace.contractAt', () => {
     });
   });
 
-  it('throws when the matching bundle is missing end-contract.json', async () => {
-    await rm(join(packageDir, 'end-contract.json'));
+  it('throws when the matching bundle is missing a store entry', async () => {
+    await rm(contractSnapshotDir(workDir, HASH_B), { recursive: true, force: true });
 
     const space = spaceWithPackages([
       createAttestedPackage('20260101T0000_init', { from: null, to: HASH_B }),
     ]);
 
     await expect(space.contractAt(HASH_B)).rejects.toMatchObject({
-      code: 'MIGRATION.FILE_MISSING',
-      details: { file: 'end-contract.json', dir: packageDir },
+      code: 'MIGRATION.CONTRACT_SNAPSHOT_MISSING',
+      details: { storageHash: HASH_B },
     });
   });
 
-  it('throws when end-contract.json is invalid JSON', async () => {
-    await writeFile(join(packageDir, 'end-contract.json'), '{not json');
+  it('throws when the store entry contract.json is invalid JSON', async () => {
+    await writeFile(join(contractSnapshotDir(workDir, HASH_B), 'contract.json'), '{not json');
 
     const space = spaceWithPackages([
       createAttestedPackage('20260101T0000_init', { from: null, to: HASH_B }),
@@ -175,7 +174,7 @@ describe('AggregateContractSpace.contractAt', () => {
     });
   });
 
-  it('throws when deserializeContract rejects the parsed end-contract', async () => {
+  it('throws when deserializeContract rejects the parsed destination contract', async () => {
     const space = spaceWithPackages(
       [createAttestedPackage('20260101T0000_init', { from: null, to: HASH_B })],
       () => {

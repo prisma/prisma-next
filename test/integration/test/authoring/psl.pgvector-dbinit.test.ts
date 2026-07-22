@@ -6,7 +6,7 @@ import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import { sqlContractCanonicalizationHooks } from '@prisma-next/sql-contract/canonicalization-hooks';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
@@ -20,7 +20,7 @@ import { emit } from '../../utils/emit';
 import { createIntegrationTestDir } from '../utils/cli-test-helpers';
 
 /**
- * Materialise pgvector's pinned contract-space artefacts under
+ * Materialise pgvector's pinned contract-space artifacts under
  * `<projectRoot>/migrations/pgvector/...` so the per-space db init
  * flow (sub-spec § 6) can read its head ref + baseline migration.
  *
@@ -28,7 +28,7 @@ import { createIntegrationTestDir } from '../utils/cli-test-helpers';
  * a contract space because the apply path reads the user repo, not the
  * descriptor.
  */
-async function materialisePgvectorPinnedArtefacts(projectRoot: string): Promise<string> {
+async function materialisePgvectorPinnedArtifacts(projectRoot: string): Promise<string> {
   const migrationsDir = join(projectRoot, 'migrations');
   mkdirSync(migrationsDir, { recursive: true });
   const space = pgvector.contractSpace;
@@ -39,7 +39,7 @@ async function materialisePgvectorPinnedArtefacts(projectRoot: string): Promise<
   if (!baseline) {
     throw new Error('pgvector contract-space must ship at least one baseline migration');
   }
-  await emitContractSpaceArtefacts(migrationsDir, 'pgvector', {
+  await emitContractSpaceArtifacts(migrationsDir, 'pgvector', {
     contract: space.contractJson,
     contractDts: '// rendered .d.ts for pgvector contract space\nexport interface Contract {}\n',
     headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
@@ -142,7 +142,7 @@ model Document {
 }
 `);
 
-        const migrationsDir = await materialisePgvectorPinnedArtefacts(testDir);
+        const migrationsDir = await materialisePgvectorPinnedArtifacts(testDir);
 
         await withDevDatabase(async ({ connectionString }) => {
           await withPgvectorControlClient(connectionString, async (client) => {
@@ -193,7 +193,7 @@ model Document {
 }
 `);
 
-        const migrationsDir = await materialisePgvectorPinnedArtefacts(testDir);
+        const migrationsDir = await materialisePgvectorPinnedArtifacts(testDir);
 
         await withDevDatabase(async ({ connectionString }) => {
           await withPgvectorControlClient(connectionString, async (client) => {

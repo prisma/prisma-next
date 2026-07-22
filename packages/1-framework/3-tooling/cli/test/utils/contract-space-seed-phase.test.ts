@@ -1,8 +1,9 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { contractSnapshotDir } from '@prisma-next/migration-tools/contract-snapshot-store';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import {
-  emitContractSpaceArtefacts,
+  emitContractSpaceArtifacts,
   readContractSpaceHeadRef,
   spaceMigrationDirectory,
 } from '@prisma-next/migration-tools/spaces';
@@ -15,6 +16,10 @@ import {
 
 const HASH_A = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const HASH_B = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+function makeContract(storageHash: string, extra: Record<string, unknown> = {}): unknown {
+  return { storage: { storageHash }, ...extra };
+}
 
 function makeMetadata(args: {
   readonly from: string | null;
@@ -51,14 +56,14 @@ describe('runContractSpaceSeedPhase', () => {
     await rm(migrationsDir, { recursive: true, force: true });
   });
 
-  it('emits on-disk artefacts on first emit and reports action=updated', async () => {
+  it('emits on-disk artifacts on first emit and reports action=updated', async () => {
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
       extensionPacks: [
         {
           id: 'cipherstash',
           contractSpace: {
-            contractJson: { v: 1 },
+            contractJson: makeContract(HASH_A, { v: 1 }),
             headRef: { hash: HASH_A, invariants: [] },
             migrations: [],
           },
@@ -79,8 +84,8 @@ describe('runContractSpaceSeedPhase', () => {
   });
 
   it('reports action=unchanged on idempotent re-pin', async () => {
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-      contract: { v: 1 },
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
+      contract: makeContract(HASH_A, { v: 1 }),
       contractDts: '\n',
       headRef: { hash: HASH_A, invariants: [] },
     });
@@ -91,7 +96,7 @@ describe('runContractSpaceSeedPhase', () => {
         {
           id: 'cipherstash',
           contractSpace: {
-            contractJson: { v: 1 },
+            contractJson: makeContract(HASH_A, { v: 1 }),
             headRef: { hash: HASH_A, invariants: [] },
             migrations: [],
           },
@@ -107,13 +112,13 @@ describe('runContractSpaceSeedPhase', () => {
     expect(record.newMigrationDirs).toEqual([]);
   });
 
-  it('always re-emits artefacts even when descriptor hash matches on-disk head', async () => {
-    // Pre-write artefacts with stale `.d.ts` placeholder that our seed
-    // helper will overwrite. The framework owns these files; re-emit is
-    // the contract.
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-      contract: { v: 1 },
-      contractDts: '// stale placeholder\n',
+  it('leaves the store snapshot untouched (write-if-absent) when descriptor hash matches on-disk head', async () => {
+    // Pre-write the store entry at HASH_A. The seed phase re-emits
+    // `refs/head.json` unconditionally, but the store's write-if-absent
+    // semantics mean an already-populated hash directory is left as-is.
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
+      contract: makeContract(HASH_A, { v: 1 }),
+      contractDts: '// first write\n',
       headRef: { hash: HASH_A, invariants: [] },
     });
 
@@ -123,7 +128,7 @@ describe('runContractSpaceSeedPhase', () => {
         {
           id: 'cipherstash',
           contractSpace: {
-            contractJson: { v: 1 },
+            contractJson: makeContract(HASH_A, { v: 1 }),
             headRef: { hash: HASH_A, invariants: [] },
             migrations: [],
           },
@@ -131,17 +136,16 @@ describe('runContractSpaceSeedPhase', () => {
       ],
     });
 
-    const dts = await readFile(join(migrationsDir, 'cipherstash', 'contract.d.ts'), 'utf-8');
-    // Placeholder dts is a self-contained `export {};` module — no
-    // TypeScript suppressions (repo bans `@ts-nocheck`).
-    expect(dts).not.toContain('@ts-nocheck');
-    expect(dts).toContain('export {};');
-    expect(dts).not.toContain('stale placeholder');
+    const dts = await readFile(
+      join(contractSnapshotDir(migrationsDir, HASH_A), 'contract.d.ts'),
+      'utf-8',
+    );
+    expect(dts).toBe('// first write\n');
   });
 
   it('reports action=updated when descriptor hash differs from on-disk head', async () => {
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-      contract: { v: 1 },
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
+      contract: makeContract(HASH_A, { v: 1 }),
       contractDts: '\n',
       headRef: { hash: HASH_A, invariants: [] },
     });
@@ -152,7 +156,7 @@ describe('runContractSpaceSeedPhase', () => {
         {
           id: 'cipherstash',
           contractSpace: {
-            contractJson: { v: 2 },
+            contractJson: makeContract(HASH_B, { v: 2 }),
             headRef: { hash: HASH_B, invariants: [] },
             migrations: [],
           },
@@ -177,7 +181,7 @@ describe('runContractSpaceSeedPhase', () => {
         {
           id: 'cipherstash',
           contractSpace: {
-            contractJson: { v: 1 },
+            contractJson: makeContract(HASH_A, { v: 1 }),
             headRef: { hash: HASH_A, invariants: [] },
             migrations: [makePkg('20260101T0000_init', { from: null, to: HASH_A })],
           },
@@ -213,7 +217,7 @@ describe('runContractSpaceSeedPhase', () => {
         {
           id: 'cipherstash',
           contractSpace: {
-            contractJson: { v: 1 },
+            contractJson: makeContract(HASH_B, { v: 1 }),
             headRef: { hash: HASH_B, invariants: [] },
             migrations: [
               makePkg('20260101T0000_init', { from: null, to: HASH_A }),
@@ -231,10 +235,10 @@ describe('runContractSpaceSeedPhase', () => {
     expect(manifest).toBe('{}');
   });
 
-  it('reports action=updated when artefacts unchanged but new migration packages were materialised', async () => {
-    // Pre-emit artefacts at HASH_A so on-disk head matches descriptor.
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-      contract: { v: 1 },
+  it('reports action=updated when artifacts unchanged but new migration packages were materialised', async () => {
+    // Pre-emit artifacts at HASH_A so on-disk head matches descriptor.
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
+      contract: makeContract(HASH_A, { v: 1 }),
       contractDts: '\n',
       headRef: { hash: HASH_A, invariants: [] },
     });
@@ -245,7 +249,7 @@ describe('runContractSpaceSeedPhase', () => {
         {
           id: 'cipherstash',
           contractSpace: {
-            contractJson: { v: 1 },
+            contractJson: makeContract(HASH_A, { v: 1 }),
             headRef: { hash: HASH_A, invariants: [] },
             migrations: [makePkg('20260101T0000_init', { from: null, to: HASH_A })],
           },
@@ -275,7 +279,7 @@ describe('runContractSpaceSeedPhase', () => {
         {
           id: 'zeta',
           contractSpace: {
-            contractJson: { v: 1 },
+            contractJson: makeContract(HASH_A, { v: 1 }),
             headRef: { hash: HASH_A, invariants: [] },
             migrations: [],
           },
@@ -283,7 +287,7 @@ describe('runContractSpaceSeedPhase', () => {
         {
           id: 'alpha',
           contractSpace: {
-            contractJson: { v: 1 },
+            contractJson: makeContract(HASH_B, { v: 1 }),
             headRef: { hash: HASH_B, invariants: [] },
             migrations: [],
           },

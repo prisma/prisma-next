@@ -64,6 +64,10 @@
       "types": "./dist/exports/io.d.mts",
       "import": "./dist/exports/io.mjs"
     },
+    "./contract-snapshot-store": {
+      "types": "./dist/exports/contract-snapshot-store.d.mts",
+      "import": "./dist/exports/contract-snapshot-store.mjs"
+    },
     "./hash": {
       "types": "./dist/exports/hash.d.mts",
       "import": "./dist/exports/hash.mjs"

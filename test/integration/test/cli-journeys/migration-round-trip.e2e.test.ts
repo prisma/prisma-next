@@ -27,6 +27,7 @@
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { storageHashHex } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
@@ -115,13 +116,14 @@ withTempDir(({ createTempDir }) => {
           readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
         );
 
+        const endContractSpecifier = `../../snapshots/${storageHashHex(manifestInitial.to)}/contract.json`;
         const migrationTs = `
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import { Migration, MigrationCLI, col } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import endContractJson from './end-contract.json' with { type: 'json' };
+import endContractJson from '${endContractSpecifier}' with { type: 'json' };
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 
 const endContract = new PostgresContractSerializer().deserializeContract(endContractJson);

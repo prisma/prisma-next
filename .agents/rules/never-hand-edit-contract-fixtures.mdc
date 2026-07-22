@@ -4,7 +4,7 @@ alwaysApply: true
 ---
 # Never hand-edit emitted contract fixtures
 
-**CRITICAL**: Never hand-edit `contract.json`, `contract.d.ts`, `expected.contract.json`, or any other file emitted by the contract pipeline (including migration `start-contract.json` / `end-contract.json` snapshots). These files are generated; their canonical form is whatever the emitter produces, byte-for-byte.
+**CRITICAL**: Never hand-edit `contract.json`, `contract.d.ts`, `expected.contract.json`, or any other file emitted by the contract pipeline (including migration snapshot store entries at `migrations/snapshots/<hex>/contract.{json,d.ts}`). These files are generated; their canonical form is whatever the emitter produces, byte-for-byte.
 
 To bring fixtures back in sync:
 
@@ -13,13 +13,13 @@ pnpm fixtures:emit   # regenerate everything
 pnpm fixtures:check  # re-emit + git diff --exit-code; fails if stale
 ```
 
-`fixtures:emit` knows which packages contribute fixtures: examples, apps, `sql-builder`, `sql-orm-client`, extension `build:contract-space`, extension migration regen (`migrations:regen` / `scripts/regen-extension-migrations.mjs`), and example-app migration regen (`migrations:regen:examples` / `scripts/regen-example-migrations.mjs`). The example-app migration regen covers `{start,end}-contract.*` snapshots in `examples/*/migrations/**`. Don't second-guess it by emitting only one package.
+`fixtures:emit` knows which packages contribute fixtures: examples, apps, `sql-builder`, `sql-orm-client`, extension `build:contract-space`, extension migration regen (`migrations:regen` / `scripts/regen-extension-migrations.mjs`), and example-app migration regen (`migrations:regen:examples` / `scripts/regen-example-migrations.mjs`). The example-app migration regen covers the `migrations/snapshots/<hex>/contract.*` store entries under `examples/*/migrations/**`. Don't second-guess it by emitting only one package.
 
-**`fixtures:check` gates contract *emission*, not planner *operations*.** Its diff glob is contract files only (`contract.*`, `expected.contract.json`, `{start,end}-contract.*`) — `ops.json` is excluded, and example `migration.ts` ops are static (regen re-serializes them, never calls `plan()`). So a green `fixtures:check` does **not** prove `MigrationPlanner.plan()` still emits the same ops. Prove planner-op parity with the planner suites, the `migration plan` e2e tests, and a golden diff of real `plan()` output vs the committed example ops. Full mechanism: [`docs/onboarding/fixtures-emit-and-check.md`](../../docs/onboarding/fixtures-emit-and-check.md).
+**`fixtures:check` gates contract *emission*, not planner *operations*.** Its diff glob is contract files only (`contract.*`, `expected.contract.json` — which also matches every `migrations/snapshots/<hex>/contract.*` store entry) — `ops.json` is excluded, and example `migration.ts` ops are static (regen re-serializes them, never calls `plan()`). So a green `fixtures:check` does **not** prove `MigrationPlanner.plan()` still emits the same ops. Prove planner-op parity with the planner suites, the `migration plan` e2e tests, and a golden diff of real `plan()` output vs the committed example ops. Full mechanism: [`docs/onboarding/fixtures-emit-and-check.md`](../../docs/onboarding/fixtures-emit-and-check.md).
 
 ## What's forbidden
 
-For any `contract.json`, `contract.d.ts`, `expected.contract.json`, or migration `{start,end}-contract.{json,d.ts}`:
+For any `contract.json`, `contract.d.ts`, `expected.contract.json`, or a migration snapshot store entry (`migrations/snapshots/<hex>/contract.{json,d.ts}`):
 
 - Writing via `Write`, `StrReplace`, `sed`, `awk`, or manual JSON-stringify-then-write.
 - "Reformatting" the JSON — the canonicalizer owns whitespace and key order.
@@ -31,11 +31,11 @@ If `pnpm fixtures:emit` fails or doesn't cover the file, **fix the emit chain** 
 
 ```bash
 pnpm fixtures:emit
-git status -- ':(glob)**/contract.*' ':(glob)**/expected.contract.json' ':(glob)**/start-contract.*' ':(glob)**/end-contract.*'
+git status -- ':(glob)**/contract.*' ':(glob)**/expected.contract.json'
 git add <the specific fixture files>
 git commit -s -m 'chore(fixtures): re-emit after <reason>'
 ```
 
 ## Escape hatch (rare)
 
-Hand-crafted JSON in a `*.test.ts` file is acceptable only when the test's point is to pin a specific byte sequence the emitter would never produce. Never applies to `contract.json` / `contract.d.ts` / `expected.contract.json` / migration `{start,end}-contract.json` — those are always emitter-owned.
+Hand-crafted JSON in a `*.test.ts` file is acceptable only when the test's point is to pin a specific byte sequence the emitter would never produce. Never applies to `contract.json` / `contract.d.ts` / `expected.contract.json` / a migration snapshot store entry (`migrations/snapshots/<hex>/contract.json`) — those are always emitter-owned.

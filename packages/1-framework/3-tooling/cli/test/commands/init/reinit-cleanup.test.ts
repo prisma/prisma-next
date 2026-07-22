@@ -2,9 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { findStaleArtefacts, removeDependency } from '../../../src/commands/init/reinit-cleanup';
+import { findStaleArtifacts, removeDependency } from '../../../src/commands/init/reinit-cleanup';
 
-describe('findStaleArtefacts (FR9.1)', () => {
+describe('findStaleArtifacts (FR9.1)', () => {
   let tmpDir: string;
 
   beforeEach(() => {
@@ -16,31 +16,31 @@ describe('findStaleArtefacts (FR9.1)', () => {
   });
 
   it('returns the empty list when the schema dir does not exist', () => {
-    expect(findStaleArtefacts(tmpDir, 'prisma')).toEqual([]);
+    expect(findStaleArtifacts(tmpDir, 'prisma')).toEqual([]);
   });
 
-  it('returns the empty list when no artefact files are present', () => {
+  it('returns the empty list when no artifact files are present', () => {
     mkdirSync(join(tmpDir, 'prisma'));
     writeFileSync(join(tmpDir, 'prisma', 'contract.prisma'), 'model User {}');
-    expect(findStaleArtefacts(tmpDir, 'prisma')).toEqual([]);
+    expect(findStaleArtifacts(tmpDir, 'prisma')).toEqual([]);
   });
 
-  it('returns each known artefact filename present in the schema dir', () => {
+  it('returns each known artifact filename present in the schema dir', () => {
     mkdirSync(join(tmpDir, 'prisma'));
     writeFileSync(join(tmpDir, 'prisma', 'contract.json'), '{}');
     writeFileSync(join(tmpDir, 'prisma', 'contract.d.ts'), 'export {}');
-    writeFileSync(join(tmpDir, 'prisma', 'end-contract.json'), '{}');
-    expect(findStaleArtefacts(tmpDir, 'prisma')).toEqual([
+    writeFileSync(join(tmpDir, 'prisma', 'ops.json'), '{}');
+    expect(findStaleArtifacts(tmpDir, 'prisma')).toEqual([
       'prisma/contract.json',
       'prisma/contract.d.ts',
-      'prisma/end-contract.json',
+      'prisma/ops.json',
     ]);
   });
 
   it('honours a non-default schema dir', () => {
     mkdirSync(join(tmpDir, 'db', 'nested'), { recursive: true });
     writeFileSync(join(tmpDir, 'db', 'nested', 'contract.json'), '{}');
-    expect(findStaleArtefacts(tmpDir, 'db/nested')).toEqual(['db/nested/contract.json']);
+    expect(findStaleArtifacts(tmpDir, 'db/nested')).toEqual(['db/nested/contract.json']);
   });
 
   it('does not flag unrelated files that just happen to live in the schema dir', () => {
@@ -48,7 +48,7 @@ describe('findStaleArtefacts (FR9.1)', () => {
     writeFileSync(join(tmpDir, 'prisma', 'contract.prisma'), 'model User {}');
     writeFileSync(join(tmpDir, 'prisma', 'README.md'), '# notes');
     writeFileSync(join(tmpDir, 'prisma', 'seed.ts'), 'export {}');
-    expect(findStaleArtefacts(tmpDir, 'prisma')).toEqual([]);
+    expect(findStaleArtifacts(tmpDir, 'prisma')).toEqual([]);
   });
 });
 

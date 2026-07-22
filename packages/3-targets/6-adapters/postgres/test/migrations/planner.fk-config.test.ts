@@ -121,6 +121,7 @@ describe('PostgresMigrationPlanner - materialized FK/index combinations', () => 
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -140,6 +141,7 @@ describe('PostgresMigrationPlanner - materialized FK/index combinations', () => 
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -159,6 +161,7 @@ describe('PostgresMigrationPlanner - materialized FK/index combinations', () => 
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -178,6 +181,7 @@ describe('PostgresMigrationPlanner - materialized FK/index combinations', () => 
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -208,6 +212,7 @@ describe('PostgresMigrationPlanner - materialized FK/index combinations', () => 
       fromContract,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');

@@ -17,11 +17,13 @@ applications) uses the **same** on-disk shape:
 ├── prisma-next.config.ts            ← project config (at package root)
 ├── migrations/
 │   ├── refs/head.json               ← hand-pinned head ref
+│   ├── snapshots/                   ← content-addressed contract store, keyed by storage hash
+│   │   └── <hex>/
+│   │       ├── contract.json
+│   │       └── contract.d.ts
 │   └── <timestamp>_<name>/          ← one dir per migration
 │       ├── migration.json
 │       ├── ops.json
-│       ├── end-contract.json
-│       ├── end-contract.d.ts
 │       └── migration.ts
 └── src/
     ├── contract.prisma              ← PSL source when the space has app-visible schema (preferred; exceptions below)

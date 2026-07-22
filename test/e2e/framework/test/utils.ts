@@ -14,7 +14,7 @@ import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import sql from '@prisma-next/family-sql/control';
 import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -104,12 +104,12 @@ export async function emitAndVerifyContract(
 }
 
 /**
- * Materialise pgvector's pinned contract-space artefacts under
+ * Materialise pgvector's pinned contract-space artifacts under
  * `<migrationsDir>/pgvector/...`. The e2e contracts declare pgvector
  * in their extension packs, so the per-space `db init` flow requires
  * its head ref + baseline migration to be present on disk.
  */
-async function materialisePgvectorPinnedArtefacts(migrationsDir: string): Promise<void> {
+async function materialisePgvectorPinnedArtifacts(migrationsDir: string): Promise<void> {
   const space = pgvector.contractSpace;
   if (!space) {
     throw new Error('pgvector descriptor must declare a contractSpace');
@@ -118,7 +118,7 @@ async function materialisePgvectorPinnedArtefacts(migrationsDir: string): Promis
   if (!baseline) {
     throw new Error('pgvector contract-space must ship at least one baseline migration');
   }
-  await emitContractSpaceArtefacts(migrationsDir, 'pgvector', {
+  await emitContractSpaceArtifacts(migrationsDir, 'pgvector', {
     contract: space.contractJson,
     contractDts: '// rendered .d.ts for pgvector contract space\nexport interface Contract {}\n',
     headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
@@ -131,7 +131,7 @@ export async function withE2eMigrationsDir<T>(
 ): Promise<T> {
   const migrationsDir = await mkdtemp(join(tmpdir(), 'prisma-next-e2e-migrations-'));
   try {
-    await materialisePgvectorPinnedArtefacts(migrationsDir);
+    await materialisePgvectorPinnedArtifacts(migrationsDir);
     return await callback(migrationsDir);
   } finally {
     await rm(migrationsDir, { recursive: true, force: true });

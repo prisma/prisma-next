@@ -114,6 +114,10 @@ function swapToAdditive(ctx: JourneyCtx): void {
   copyFileSync(join(FIXTURES_DIR, 'contract-additive.ts'), join(ctx.testDir, 'contract.ts'));
 }
 
+function swapToBranchB(ctx: JourneyCtx): void {
+  copyFileSync(join(FIXTURES_DIR, 'contract-branch-b.ts'), join(ctx.testDir, 'contract.ts'));
+}
+
 async function emitContract(ctx: JourneyCtx): Promise<RunResult> {
   return runCli(createContractEmitCommand(), ctx.testDir, ['--config', ctx.configPath]);
 }
@@ -602,32 +606,22 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     ).toBe(0);
 
     // Mongo-Q.03: branch B — index-only migration, no invariantId, planned --from C1.
-    // We use `migration new --from <hash>` to fork off C1. Replace the contract
-    // file with a different additive shape so the destination hash differs.
-    // Easiest: keep the same additive contract but write a different migration
-    // body that produces a distinct destination hash via a different index spec.
+    // The destination contract snapshot store is content-addressed (keyed by
+    // the contract's real storage hash), so branch B needs a genuinely
+    // distinct contract to land at a distinct destination — swap to a third
+    // fixture (a different additive index) and emit it before scaffolding,
+    // then hand-author an index-only migration.ts against the real hash.
+    swapToBranchB(ctx);
+    expect((await emitContract(ctx)).exitCode, 'Mongo-Q.03: emit CB').toBe(0);
     expect(
       (await migrationNew(ctx, ['--name', 'branch-b-no-invariant', '--from', c1Hash])).exitCode,
       'Mongo-Q.03: new branch B',
     ).toBe(0);
     const branchBDir = findMigrationDirBySlug(ctx, 'branch_b_no_invariant');
-    const branchBManifestPath = join(branchBDir, 'migration.json');
-    const branchBManifest = JSON.parse(readFileSync(branchBManifestPath, 'utf-8')) as {
-      from: string;
-      to: string;
-      toContract?: unknown;
-      fromContract?: unknown;
-    };
-    // Synthesize a CB hash so branch B lands at a destination distinct from
-    // branch A. The contract files share the same hash, so we cannot get a
-    // real second hash without a second contract fixture; clearing the
-    // toContract bookend lets emit accept the synthetic destination.
-    const cbHash = `sha256:${'b'.repeat(64)}`;
-    writeFileSync(
-      branchBManifestPath,
-      `${JSON.stringify({ ...branchBManifest, toContract: null }, null, 2)}\n`,
-      'utf-8',
-    );
+    const branchBManifest = JSON.parse(
+      readFileSync(join(branchBDir, 'migration.json'), 'utf-8'),
+    ) as { from: string; to: string };
+    const cbHash = branchBManifest.to;
     writeFileSync(
       join(branchBDir, 'migration.ts'),
       renderIndexOnlyMigrationTs(branchBManifest.from, cbHash),

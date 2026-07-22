@@ -99,6 +99,7 @@ describe.sequential('pg/uuid@1 — end-to-end PGlite coverage', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     if (planResult.kind !== 'success') {

@@ -29,6 +29,7 @@ function makeSpaceState(spaceId: string, contract: Contract, isApp = false): Int
     refs: {},
     headRef: isApp ? { hash: contract.storage.storageHash, invariants: [] } : null,
     refsDir: '/tmp/refs',
+    migrationsDir: '/tmp/migrations',
     resolveContract: () => contract,
     deserializeContract: (raw) => raw as Contract,
   });
@@ -54,6 +55,7 @@ describe('computeIntegrityViolations', () => {
       refs: {},
       headRef: { hash: 'sha256:t2', invariants: [] },
       refsDir: '/tmp/refs',
+      migrationsDir: '/tmp/migrations',
       resolveContract: () => {
         throw new Error('unused in this test');
       },
@@ -142,6 +144,7 @@ describe('computeIntegrityViolations', () => {
       refs: {},
       headRef: { hash: 'sha256:head', invariants: [] },
       refsDir: '/tmp/refs',
+      migrationsDir: '/tmp/migrations',
       resolveContract: () => {
         throw new Error('unused');
       },

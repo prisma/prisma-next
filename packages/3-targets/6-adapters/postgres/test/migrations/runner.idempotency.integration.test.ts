@@ -261,6 +261,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         fromContract: null,
         frameworkComponents,
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
       if (initialPlan.kind !== 'success') {
         throw new Error('expected initial planner success');
@@ -349,6 +350,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         fromContract: null,
         frameworkComponents,
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
       if (initialPlan.kind !== 'success') {
         throw new Error('expected initial planner success');

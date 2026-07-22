@@ -214,6 +214,7 @@ function planFor(contract: MongoContract, fromContract: MongoContract | null) {
     policy: ALL_POLICY,
     fromContract,
     frameworkComponents: [],
+    snapshotsImportPath: '../../snapshots',
   });
   if (result.kind !== 'success') {
     throw new Error(`Plan failed: ${JSON.stringify(result.conflicts ?? [])}`);

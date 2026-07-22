@@ -10,10 +10,14 @@ import {
   RawUpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import { dataTransform, setValidation } from '@prisma-next/target-mongo/migration';
-import type { Contract as End } from './end-contract';
-import endContract from './end-contract.json' with { type: 'json' };
-import type { Contract as Start } from './start-contract';
-import startContract from './start-contract.json' with { type: 'json' };
+import type { Contract as End } from '../../snapshots/71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c/contract';
+import endContract from '../../snapshots/71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c/contract.json' with {
+  type: 'json',
+};
+import type { Contract as Start } from '../../snapshots/059f3f35403c5a7a90851c23f1028e16d5250630f8a82fba33053e9a50534589/contract';
+import startContract from '../../snapshots/059f3f35403c5a7a90851c23f1028e16d5250630f8a82fba33053e9a50534589/contract.json' with {
+  type: 'json',
+};
 
 function existingProductsWithoutStatus(storageHash: string): MongoQueryPlan {
   return {

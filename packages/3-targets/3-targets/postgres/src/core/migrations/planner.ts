@@ -141,6 +141,12 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
      * {@link SqlMigrationPlannerPlanOptions.ownership}.
      */
     readonly ownership?: SchemaOwnership;
+    /**
+     * POSIX-relative path from the migration package dir to
+     * `migrations/snapshots` — see
+     * {@link SqlMigrationPlannerPlanOptions.snapshotsImportPath}.
+     */
+    readonly snapshotsImportPath: string;
   }): PostgresPlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
@@ -156,6 +162,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         to: context.toHash,
       },
       spaceId,
+      context.snapshotsImportPath,
       this.#lowerer,
     );
   }
@@ -323,6 +330,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           to: options.contract.storage.storageHash,
         },
         options.spaceId,
+        options.snapshotsImportPath,
         this.#lowerer,
       ),
       ...(warnings.length > 0 ? { warnings: Object.freeze(warnings) } : {}),

@@ -39,8 +39,8 @@ Once the contract changes, you choose how the change reaches the database. This 
 - **Migration package files** (inside each `migrations/app/<dir>/`):
   - `migration.json` — manifest (metadata + `migrationHash`).
   - `ops.json` — canonical operation list. Content-addressed; `migrationHash` is computed over this.
-  - `end-contract.json` and `end-contract.d.ts` — the contract this migration ends at, imported by `migration.ts` for type-safe data transforms.
   - `migration.ts` — TypeScript authoring source, **framework-rendered** by `migration plan` (or `migration new`). You edit specific holes in it (see *Fill a placeholder* below) and re-emit `ops.json` / `migration.json` by running it.
+- **Contract snapshots.** `migration.ts` imports its bookend contracts from the shared, content-addressed store at `migrations/snapshots/<hex>/contract.json` + `contract.d.ts` (`<hex>` is the contract's storage hash, `sha256:` prefix stripped) — not from files inside the migration package.
 - **Self-emit.** Running `node migrations/app/<dir>/migration.ts` regenerates `ops.json` and `migration.json` from the (possibly edited) TS source. This is the only supported way to update an existing migration package after edits.
 - **`migration.ts` shape.** Framework-rendered. A class extending `Migration` (from `@prisma-next/family-mongo/migration` on Mongo, or re-exported via `@prisma-next/postgres/migration` on Postgres — see the framing block below), with an `operations` getter that returns an array of factory-call values. The file ends with `MigrationCLI.run(import.meta.url, M)` so executing it self-emits.
 - **`placeholder(slot)`.** A sentinel the planner emits into the rendered `migration.ts` (from `@prisma-next/errors/migration` on Mongo, or the `@prisma-next/postgres/migration` import on Postgres) wherever a data transform is needed. Calling `placeholder(...)` at emit time throws `PN-MIG-2001` *Unfilled migration placeholder*. The user replaces the `() => placeholder(...)` arrow with a real query-plan closure (Postgres) or fills `dataTransform({ check, run })` sources (Mongo — see *Fill a placeholder*), then self-emits.
@@ -227,7 +227,7 @@ The scaffold the planner emits looks like:
 
 ```typescript
 // migrations/app/20260515T1200_add_user_name/migration.ts
-import endContract from './end-contract.json' with { type: 'json' };
+import endContract from '../../snapshots/93f07d1b…c9e1e5a2/contract.json' with { type: 'json' };
 import { Migration, MigrationCLI, addColumn, placeholder } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
@@ -255,7 +255,7 @@ Replace both `placeholder(...)` calls with query-plan closures built from `endCo
 Build the query builder against `endContract` so the storage hashes line up — using a different contract reference raises `PN-MIG-2005`. The filled-in shape (the rendered scaffold above with `placeholder(...)` calls replaced; if you need an extra factory like `setNotNull`, add it to the *existing* `@prisma-next/postgres/migration` import line rather than authoring a second import). See `prisma-next-queries` for the surrounding `db` setup:
 
 ```typescript
-import endContract from './end-contract.json' with { type: 'json' };
+import endContract from '../../snapshots/93f07d1b…c9e1e5a2/contract.json' with { type: 'json' };
 import { Migration, MigrationCLI, addColumn, setNotNull } from '@prisma-next/postgres/migration';
 import { db } from './db'; // sql({ context: createExecutionContext({ contract: endContract, ... }) })
 
@@ -455,7 +455,7 @@ node migrations/app/<dir>/migration.ts
 pnpm prisma-next migrate --db $DATABASE_URL
 ```
 
-If self-emit itself fails (e.g. the contract has moved on and the operations no longer make sense against `end-contract.json`), the package is stale. Either restore it from version control or delete it and re-plan with `migration plan`.
+If self-emit itself fails (e.g. the contract has moved on and the operations no longer make sense against the migration's end contract), the package is stale. Either restore it from version control or delete it and re-plan with `migration plan`.
 
 ## Workflow — Resolve a destructive-operation prompt (`db update` only)
 

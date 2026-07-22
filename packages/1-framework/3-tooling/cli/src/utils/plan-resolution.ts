@@ -27,7 +27,7 @@ export function looksLikeFullHash(input: string): boolean {
 
 export type FromResolution =
   | { kind: 'greenfield'; fromHash: null; fromContract: null }
-  | { kind: 'graph-node'; fromHash: string; fromContract: Contract; sourceDir: string }
+  | { kind: 'graph-node'; fromHash: string; fromContract: Contract }
   | {
       kind: 'snapshot';
       fromHash: string;
@@ -93,7 +93,6 @@ type RefContractResolution =
       contract: Contract;
       contractJson: unknown;
       contractDts: string;
-      sourceDir: string;
     };
 
 async function resolveContractRef(
@@ -123,7 +122,6 @@ async function resolveContractRef(
       contract: at.contract,
       contractJson: at.contractJson,
       contractDts: at.contractDts,
-      sourceDir: at.sourceDir,
     });
   } catch (error) {
     return mapContractAtError(
@@ -152,7 +150,6 @@ async function resolveFromPolicy(
       kind: 'graph-node',
       fromHash: resolution.value.hash,
       fromContract: resolution.value.contract,
-      sourceDir: resolution.value.sourceDir,
     });
   }
 

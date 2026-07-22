@@ -105,6 +105,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
       fromContract: null,
       frameworkComponents: makeFrameworkComponents(hooks),
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -165,6 +166,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
       fromContract,
       frameworkComponents: makeFrameworkComponents(hooks),
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -188,6 +190,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -231,6 +234,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
       fromContract: null,
       frameworkComponents: fc,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     const b = planner.plan({
       contract: c,
@@ -239,6 +243,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
       fromContract: null,
       frameworkComponents: fc,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(a.kind).toBe('success');

@@ -204,6 +204,7 @@ async function applyContract(
     fromContract: null,
     frameworkComponents,
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
   if (planResult.kind !== 'success')
     throw new Error(`Planner failed: ${JSON.stringify(planResult)}`);
@@ -305,6 +306,7 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
         fromContract: null,
         frameworkComponents,
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(planResult.kind).toBe('success');
@@ -477,6 +479,7 @@ describe.sequential('RLS policy_insert WITH CHECK — enforcement + edit replace
         fromContract: null,
         frameworkComponents,
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(planResult.kind).toBe('success');

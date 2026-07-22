@@ -92,6 +92,12 @@ export class SqliteMigrationPlanner
      * {@link SqlMigrationPlannerPlanOptions.ownership}.
      */
     readonly ownership?: SchemaOwnership;
+    /**
+     * POSIX-relative path from the migration package dir to
+     * `migrations/snapshots` — see
+     * {@link SqlMigrationPlannerPlanOptions.snapshotsImportPath}.
+     */
+    readonly snapshotsImportPath: string;
   }): SqlitePlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
@@ -107,6 +113,7 @@ export class SqliteMigrationPlanner
         to: context.toHash,
       },
       spaceId,
+      context.snapshotsImportPath,
       undefined,
       this.#lowerer,
     );
@@ -164,6 +171,7 @@ export class SqliteMigrationPlanner
           to: options.contract.storage.storageHash,
         },
         options.spaceId,
+        options.snapshotsImportPath,
         destination,
         this.#lowerer,
       ),

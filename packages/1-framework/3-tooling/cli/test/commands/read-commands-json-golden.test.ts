@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import * as configLoader from '@prisma-next/config-loader';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { writeContractSnapshot } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
@@ -140,7 +141,7 @@ async function writeLinearMigrations(
   return { dirInit, dirNext };
 }
 
-async function writeEndContract(packageDir: string, storageHash: string): Promise<void> {
+async function writeEndContract(migrationsRootDir: string, storageHash: string): Promise<void> {
   const contract = {
     schemaVersion: '1',
     targetFamily: TARGET_FAMILY,
@@ -150,8 +151,10 @@ async function writeEndContract(packageDir: string, storageHash: string): Promis
     domain: applicationDomainOf({ models: {} }),
     roots: {},
   };
-  await writeFile(join(packageDir, 'end-contract.json'), `${JSON.stringify(contract, null, 2)}\n`);
-  await writeFile(join(packageDir, 'end-contract.d.ts'), 'export type Contract = unknown;\n');
+  await writeContractSnapshot(migrationsRootDir, storageHash, {
+    contractJson: contract,
+    contractDts: 'export type Contract = unknown;\n',
+  });
 }
 
 function migrationGraphJson(result: {
@@ -330,8 +333,7 @@ describe('read commands --json golden', () => {
     createdDirs.push(cwd);
     const contractPath = await writeContract(cwd, HASH_B);
     const { dirNext } = await writeLinearMigrations(join(cwd, 'migrations'));
-    const packageDir = join(cwd, 'migrations', 'app', dirNext);
-    await writeEndContract(packageDir, HASH_B);
+    await writeEndContract(join(cwd, 'migrations'), HASH_B);
     stubLoadConfig(contractPath);
 
     const prev = process.cwd();
@@ -356,8 +358,7 @@ describe('read commands --json golden', () => {
     createdDirs.push(cwd);
     const contractPath = await writeContract(cwd, HASH_B);
     const { dirNext } = await writeLinearMigrations(join(cwd, 'migrations'));
-    const packageDir = join(cwd, 'migrations', 'app', dirNext);
-    await writeEndContract(packageDir, HASH_B);
+    await writeEndContract(join(cwd, 'migrations'), HASH_B);
     stubLoadConfig(contractPath);
 
     const { consoleOutput, cleanup } = setupCommandMocks({ isTTY: false });

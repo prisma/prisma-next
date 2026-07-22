@@ -98,6 +98,7 @@ async function planAgainst(contract: Contract<SqlStorage>, schema: PostgresDatab
     fromContract: null,
     frameworkComponents: [],
     spaceId: 'app',
+    snapshotsImportPath: '../../snapshots',
   });
   expect(result.kind).toBe('success');
   if (result.kind !== 'success') throw new Error('expected planner success');
@@ -289,6 +290,7 @@ describe('PostgresMigrationPlanner.plan tolerated vs managed add-column', async 
       fromContract: null,
       frameworkComponents: [],
       spaceId: 'app',
+      snapshotsImportPath: '../../snapshots',
     });
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('expected planner success');

@@ -250,6 +250,7 @@ describe('Postgres planner ownership consultation', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -271,6 +272,7 @@ describe('Postgres planner ownership consultation', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ownership: ownsOnly(inPublic('app_user'), inPublic('cipher_state')),
     });
 
@@ -291,6 +293,7 @@ describe('Postgres planner ownership consultation', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -337,6 +340,7 @@ describe('Postgres planner ownership consultation', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ownership: ownsOnly(inPublic('app_user')),
     });
 
@@ -362,6 +366,7 @@ describe('Postgres planner ownership consultation', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ownership: ownsOnly(inPublic('app_user'), inPublic('orphan_table')),
     });
 
@@ -385,6 +390,7 @@ describe('Postgres planner ownership consultation', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ownership: ownsOnly(
         inPublic('app_user'),
         inPublic('cipher_state'),

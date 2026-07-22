@@ -57,6 +57,7 @@ async function migrateContract(
       fromContract: null,
       frameworkComponents: postgresFrameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') {
       throw new Error(`planner failed: ${JSON.stringify(planResult)}`);

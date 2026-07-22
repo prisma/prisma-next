@@ -504,6 +504,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') throw new Error('expected planner success');
 

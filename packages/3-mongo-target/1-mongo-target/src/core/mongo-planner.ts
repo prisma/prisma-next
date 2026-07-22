@@ -293,16 +293,26 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
      */
     readonly fromContract: Contract | null;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
+    /**
+     * POSIX-relative path from the migration package dir to
+     * `migrations/snapshots`, e.g. `'../../snapshots'`. Threaded straight
+     * into the produced plan's `renderTypeScript()` metadata.
+     */
+    readonly snapshotsImportPath: string;
   }): MigrationPlannerResult {
     const contract = options.contract as MongoContract;
     const result = this.planCalls(options);
     if (result.kind === 'failure') return result;
     return {
       kind: 'success',
-      plan: new PlannerProducedMongoMigration(result.calls, {
-        from: options.fromContract?.storage.storageHash ?? null,
-        to: contract.storage.storageHash,
-      }),
+      plan: new PlannerProducedMongoMigration(
+        result.calls,
+        {
+          from: options.fromContract?.storage.storageHash ?? null,
+          to: contract.storage.storageHash,
+        },
+        options.snapshotsImportPath,
+      ),
     };
   }
 
@@ -316,10 +326,14 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
    * not import from the generated contract `.d.ts`.
    */
   emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
-    return new PlannerProducedMongoMigration([], {
-      from: context.fromHash,
-      to: context.toHash,
-    });
+    return new PlannerProducedMongoMigration(
+      [],
+      {
+        from: context.fromHash,
+        to: context.toHash,
+      },
+      context.snapshotsImportPath,
+    );
   }
 }
 
