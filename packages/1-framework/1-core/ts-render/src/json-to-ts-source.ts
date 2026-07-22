@@ -29,7 +29,7 @@ export type JsonObject = { readonly [key: string]: JsonValue | undefined };
 export function jsonToTsSource(value: unknown): string {
   if (value === undefined) return 'undefined';
   if (value === null) return 'null';
-  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'string') return stringifyLiteral(value);
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (Array.isArray(value)) {
     if (value.length === 0) return '[]';
@@ -50,6 +50,14 @@ export function jsonToTsSource(value: unknown): string {
 }
 
 function renderKey(key: string): string {
-  if (key === '__proto__') return JSON.stringify(key);
-  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : JSON.stringify(key);
+  if (key === '__proto__') return stringifyLiteral(key);
+  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : stringifyLiteral(key);
+}
+
+// JSON.stringify leaves U+2028/U+2029 unescaped; embedded raw in JS/TS source
+// those characters can terminate the string literal, so escape them explicitly.
+function stringifyLiteral(value: string): string {
+  return JSON.stringify(value)
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 }

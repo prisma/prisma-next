@@ -47,6 +47,18 @@ describe('jsonToTsSource', () => {
       expect(jsonToTsSource({ a: undefined })).toBe('{}');
       expect(jsonToTsSource({ a: 1, b: undefined })).toBe('{ a: 1 }');
     });
+
+    it('escapes U+2028 line separator in strings so it cannot terminate the string literal', () => {
+      expect(jsonToTsSource('a b')).toBe('"a\\u2028b"');
+    });
+
+    it('escapes U+2029 paragraph separator in strings so it cannot terminate the string literal', () => {
+      expect(jsonToTsSource('a b')).toBe('"a\\u2029b"');
+    });
+
+    it('escapes U+2028 in an object key that needs quoting', () => {
+      expect(jsonToTsSource({ ['weird key']: 1 })).toBe('{ "weird\\u2028key": 1 }');
+    });
   });
 
   describe('non-JSON inputs bounds', () => {
