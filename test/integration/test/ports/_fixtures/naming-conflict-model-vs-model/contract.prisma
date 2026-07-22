@@ -1,0 +1,33 @@
+// Faithful translation of prisma/prisma functional suite `naming-conflict/model-vs-model`
+// (packages/client/tests/functional/naming-conflict/model-vs-model, postgres matrix entry).
+//
+// Upstream tests 12 conflicting model names against Prisma's generated type names
+// (ModelUpdate, ModelDefault, ModelSelect, ModelInclude, ModelResult, ModelDelete,
+//  ModelUpsert, ModelAggregate, ModelCount, ModelPayload, ModelFieldRefs, ModelGroupBy).
+// prisma-next model names are plain identifiers with no internal naming conflicts,
+// so one representative variant (ModelUpdate) covers the ported assertion.
+//
+// Upstream schema:
+//   model Model {
+//     id      String @id @default(cuid())
+//     otherId String @unique
+//     other   ModelUpdate @relation(fields: [otherId], references: [id])
+//   }
+//
+//   model ModelUpdate {
+//     id    String @id @default(cuid())
+//     name  String
+//     model Model?
+//   }
+
+model Model {
+  id      String      @id @default(cuid(2))
+  otherId String      @unique
+  other   ModelUpdate @relation(fields: [otherId], references: [id])
+}
+
+model ModelUpdate {
+  id    String  @id @default(cuid(2))
+  name  String
+  model Model?
+}

@@ -37,11 +37,11 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `should fail as createManyAndReturn is not supported on tested providers` — `prisma.user` lacks `createManyAndReturn` (@ts-expect-error + expectTypeOf not.toHaveProperty) [providers: sqlserver,mongodb,mysql]
 
 ### packages/client/tests/functional/methods/findFirstOrThrow/tests.ts
-- [ ] `finds existing record` — `findFirstOrThrow` returns seeded user by email, type not nullable [providers: all]
-- [ ] `throws if record was not found` — rejects with PrismaClientKnownRequestError code P2025 [providers: all]
-- [ ] `works with transactions` — batch `$transaction` with failing findFirstOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all]
-- [ ] `works with interactive transactions` — interactive `$transaction` with failing findFirstOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all]
-- [ ] `reports correct method name in case of validation error` — invalid where field rejects with message containing `prisma.user.findFirstOrThrow()` invocation [providers: all]
+- [x] `finds existing record` — `findFirstOrThrow` returns seeded user by email, type not nullable [providers: all] → ports/prisma/functional/methods-findFirstOrThrow.test.ts
+- [x] `throws if record was not found` — rejects with PrismaClientKnownRequestError code P2025 [providers: all] → ports/prisma/functional/methods-findFirstOrThrow.test.ts
+- [x] `works with transactions` — batch `$transaction` with failing findFirstOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all] → non-ported
+- [x] `works with interactive transactions` — interactive `$transaction` with failing findFirstOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all] → non-ported
+- [x] `reports correct method name in case of validation error` — invalid where field rejects with message containing `prisma.user.findFirstOrThrow()` invocation [providers: all] → non-ported
 
 ### packages/client/tests/functional/methods/findUniqueOrThrow/tests.ts
 - [x] `finds existing record` — `findUniqueOrThrow` returns seeded user by email, type not nullable [providers: all] → ports/prisma/functional/methods-findUniqueOrThrow.test.ts
@@ -117,7 +117,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `allows to use ${typeName} name for a model name (relation)` — findFirstOrThrow relationHolder including the model relation, asserts included model row and non-any type [providers: all] (typeName axis: all builtInNames)
 
 ### packages/client/tests/functional/naming-conflict/model-vs-model/tests.ts
-- [ ] `allows to use models of conflicting names` — creates model with nested `other`, findFirstOrThrow with include asserts other row {id,name} and non-any type [providers: all] (conflictingModel axis: ModelUpdate…ModelGroupBy)
+- [x] `allows to use models of conflicting names` — creates model with nested `other`, findFirstOrThrow with include asserts other row {id,name} and non-any type [providers: all] (conflictingModel axis: ModelUpdate…ModelGroupBy) → ports/prisma/functional/naming-conflict-model-vs-model.test.ts
 
 ### packages/client/tests/functional/omit/test.ts
 - [ ] `non-existing true field in omit throw validation error` — findFirstOrThrow with unknown omit field `true` rejects with inline-snapshot validation error [providers: all]

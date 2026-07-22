@@ -11,19 +11,19 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/0-legacy-ports/aggregations/tests.ts
 
-- [ ] `min` — aggregate _min of age [providers: all]
-- [ ] `max` — aggregate _max of age [providers: all]
-- [ ] `sum` — aggregate _sum of age [providers: all]
-- [ ] `count inline boolean` — aggregate _count with boolean true [providers: all]
-- [ ] `count with _all` — aggregate _count with _all: true [providers: all]
-- [ ] `avg` — aggregate _avg of age [providers: all]
-- [ ] `multiple aggregations` — aggregate combining _min/_max/_sum/_count/_avg [providers: all]
-- [ ] `multiple aggregations with where` — combined aggregations with a where filter [providers: all]
-- [ ] `invalid min` — aggregate _min on non-existent field rejects with error snapshot [providers: all]
-- [ ] `invalid max` — aggregate _max on non-existent field rejects with error snapshot [providers: all]
-- [ ] `invalid sum` — aggregate _sum on non-numeric field rejects with error snapshot [providers: all]
-- [ ] `invalid count` — aggregate _count on non-existent field rejects with error snapshot [providers: all]
-- [ ] `invalid avg` — aggregate _avg on non-numeric field rejects with error snapshot [providers: all]
+- [x] `min` — aggregate _min of age [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `max` — aggregate _max of age [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `sum` — aggregate _sum of age [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `count inline boolean` — aggregate _count with boolean true [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `count with _all` — aggregate _count with _all: true [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `avg` — aggregate _avg of age [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `multiple aggregations` — aggregate combining _min/_max/_sum/_count/_avg [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `multiple aggregations with where` — combined aggregations with a where filter [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `invalid min` — aggregate _min on non-existent field rejects with error snapshot [providers: all] → non-ported
+- [x] `invalid max` — aggregate _max on non-existent field rejects with error snapshot [providers: all] → non-ported
+- [x] `invalid sum` — aggregate _sum on non-numeric field rejects with error snapshot [providers: all] → non-ported
+- [x] `invalid count` — aggregate _count on non-existent field rejects with error snapshot [providers: all] → non-ported
+- [x] `invalid avg` — aggregate _avg on non-numeric field rejects with error snapshot [providers: all] → non-ported
 
 ### packages/client/tests/functional/0-legacy-ports/atomic-increment-decrement/tests.ts
 
@@ -52,12 +52,12 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/0-legacy-ports/json/tests.ts
 
-- [ ] `create required json` — create resource with nested required JSON value [providers: exclude:sqlserver]
-- [ ] `select required json` — findMany selecting requiredJson field [providers: exclude:sqlserver]
-- [ ] `select required json with where path` — filter by JSON path equals (mysql/sqlite string path, postgres/cockroach array path) (testIf: mysql/postgresql/cockroachdb/sqlite only) [providers: exclude:sqlserver]
-- [ ] `select required json with where equals` — filter JSON by whole-value equals [providers: exclude:sqlserver]
-- [ ] `select required json with where not equals` — filter JSON by not-equals returns none [providers: exclude:sqlserver]
-- [ ] `update required json with where equals` — update requiredJson to empty object [providers: exclude:sqlserver]
+- [x] `create required json` — create resource with nested required JSON value [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json.test.ts
+- [x] `select required json` — findMany selecting requiredJson field [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json.test.ts
+- [x] `select required json with where path` — filter by JSON path equals (mysql/sqlite string path, postgres/cockroach array path) (testIf: mysql/postgresql/cockroachdb/sqlite only) [providers: exclude:sqlserver] → non-ported
+- [x] `select required json with where equals` — filter JSON by whole-value equals [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json.test.ts
+- [x] `select required json with where not equals` — filter JSON by not-equals returns none [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json.test.ts
+- [x] `update required json with where equals` — update requiredJson to empty object [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json.test.ts
 
 ### packages/client/tests/functional/0-legacy-ports/malformed-id/tests.ts
 
@@ -67,12 +67,12 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/0-legacy-ports/optional-relation-filters/tests.ts
 
-- [ ] `filter existing optional relation with \`isNot: null\`` — findMany where relation isNot null (testIf: non-mongodb) [providers: all]
-- [ ] `filter empty optional relation with ` — findMany where relation is null (testIf: non-mongodb) [providers: all]
-- [ ] `filter empty optional relation with \`null\`` — findMany where relation equals null (testIf: non-mongodb) [providers: all]
-- [ ] `filter empty optional relation` — findMany where relation null returns single user (testIf: non-mongodb) [providers: all]
-- [ ] `filter existing optional relation with empty field` — findMany where relation field is null (testIf: non-mongodb) [providers: all]
-- [ ] `filter existing optional relation with existing field` — findMany where relation field not null (testIf: non-mongodb) [providers: all]
+- [x] `filter existing optional relation with \`isNot: null\`` — findMany where relation isNot null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
+- [x] `filter empty optional relation with ` — findMany where relation is null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
+- [x] `filter empty optional relation with \`null\`` — findMany where relation equals null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
+- [x] `filter empty optional relation` — findMany where relation null returns single user (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
+- [x] `filter existing optional relation with empty field` — findMany where relation field is null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
+- [x] `filter existing optional relation with existing field` — findMany where relation field not null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
 
 ### packages/client/tests/functional/0-legacy-ports/query-raw/tests.ts
 
@@ -396,7 +396,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/create-default-date/test.ts
 
-- [ ] `correctly creates a field with default date` — creating a record with no args populates a default date field as a Date [providers: sqlite,postgres,mysql,sqlserver]
+- [x] `correctly creates a field with default date` — creating a record with no args populates a default date field as a Date [providers: sqlite,postgres,mysql,sqlserver] → ports/prisma/functional/create-default-date.test.ts
 
 ### packages/client/tests/functional/dataproxy-engine/version/tests.ts
 
@@ -410,14 +410,14 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/decimal/precision/tests.ts
 
-- [ ] `decimals should not lose precision when written to db` — property test (fast-check) that decimals round-trip through the db without precision loss [providers: postgres,mysql,cockroachdb,sqlserver]
+- [x] `decimals should not lose precision when written to db` — property test (fast-check) that decimals round-trip through the db without precision loss [providers: postgres,mysql,cockroachdb,sqlserver] → ports/prisma/functional/decimal-precision.test.ts
 
 ### packages/client/tests/functional/decimal/scalar/tests.ts
 
-- [ ] `possible inputs > decimal as Decimal.js instance` — findFirst matching a Decimal.js instance returns the stored decimal [providers: exclude:mongodb]
-- [ ] `possible inputs > decimal as string` — findFirst matching a string value returns the stored decimal [providers: exclude:mongodb]
-- [ ] `possible inputs > decimal as number` — findFirst with numeric gt/lt filter returns the stored decimal [providers: exclude:mongodb]
-- [ ] `possible inputs > decimal as decimal.js-like object` — findFirst matching a decimal.js-like object returns the stored decimal [providers: exclude:mongodb]
+- [x] `possible inputs > decimal as Decimal.js instance` — findFirst matching a Decimal.js instance returns the stored decimal [providers: exclude:mongodb] → non-ported
+- [x] `possible inputs > decimal as string` — findFirst matching a string value returns the stored decimal [providers: exclude:mongodb] → ports/prisma/functional/decimal-scalar.test.ts
+- [x] `possible inputs > decimal as number` — findFirst with numeric gt/lt filter returns the stored decimal [providers: exclude:mongodb] → ports/prisma/functional/decimal-scalar.test.ts
+- [x] `possible inputs > decimal as decimal.js-like object` — findFirst matching a decimal.js-like object returns the stored decimal [providers: exclude:mongodb] → non-ported
 
 ### packages/client/tests/functional/default-selection/tests.ts
 

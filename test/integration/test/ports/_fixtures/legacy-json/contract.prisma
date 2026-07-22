@@ -1,0 +1,16 @@
+// Faithful translation of prisma/prisma functional suite `0-legacy-ports/json`
+// (packages/client/tests/functional/0-legacy-ports/json, postgres matrix entry):
+//
+//   model Resource {
+//     id           String @id
+//     requiredJson Json
+//     optionalJson Json?
+//   }
+//
+// Upstream idForProvider(postgresql) is String @id. The id column is provided
+// explicitly in seed data (no auto-generation).
+model Resource {
+  id           String @id
+  requiredJson Json
+  optionalJson Json?
+}
