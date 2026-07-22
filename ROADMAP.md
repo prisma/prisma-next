@@ -2,7 +2,7 @@
 
 Prisma Next — the contract-first rewrite of Prisma — ships as **Prisma 8**. On **July 31** we publish **`prisma@8.0.0-rc.1`** from the `prisma/prisma` repository: the same repository and the same npm package Prisma users already know. The release candidate is published under a pre-release tag, so `npm install prisma` keeps installing Prisma 7 until 8.0.0 final ships. Prisma 8 carries **PostgreSQL to general availability** — and that is all: **MongoDB ships in early access**, and **SQLite is a proof of concept** at this stage. A release candidate freezes the public API; it does not promise Prisma 7 feature parity. Its promise is different: **everything it ships works and is proven by a test**, everything experimental is labeled, and everything absent is named rather than silently missing.
 
-**Updated July 21 · Health: on track · Ships July 31 · Tasks: 1 done / 12 in flight / 21 not started · [Scoreboard](https://github.com/prisma/prisma-next/pull/1000): ~450 proven / ~500 unproven / ~250 not in 8.0**
+**Updated July 21 · Health: on track · Ships July 31 · Tasks: 1 done / 12 in flight / 21 not started · [Scoreboard](https://github.com/prisma/prisma-next/pull/1000): ~450 proven / ~500 unproven / ~30 experimental / ~250 not in 8.0**
 
 ## What needs to happen to release v8-RC1
 
@@ -70,7 +70,7 @@ On July 24 we decide from this list and the discovery rate, not from hope: if it
 
 ## 2. The schema language must reach its final form
 
-Users write their data model in Prisma Schema Language (PSL) files. Whatever syntax the RC accepts is the syntax v8 supports forever — so every planned change to the language must land before July 31 or be abandoned. Four are planned, and they're coordinated so users' generated files change once, not four times.
+Users write their data model in Prisma Schema Language (PSL) files. Whatever syntax the RC accepts is the syntax v8 supports forever — so every planned change to the language must land before July 31 or be abandoned. Four language changes are planned — mixins, native column types, directional relations, and tagged SQL fences — plus two items that follow from them: removing `@dbgenerated()` builds on the tagged fences, and the example schemas get regenerated once at the end. All of it is coordinated so users' generated files change once, not once per change.
 
 <details><summary>⏳ <b>Mixins: reusable, named sets of fields</b></summary>
 
@@ -93,7 +93,7 @@ Prisma 7 expressed relations with paired fields on both models and disambiguated
 
 <details><summary>⬜ <b>SQL embedded in schemas gets proper fences instead of escaped strings</b></summary>
 
-Schemas sometimes need to carry a piece of literal SQL: a view definition, a partial-index condition, a row-level-security policy expression, a database-computed default. Today those travel as ordinary quoted strings, with all the escaping pain that implies. The accepted design ([ADR 129](../../docs/architecture%20docs/adrs/ADR%20129%20-%20Template-Tagged%20Literals%20for%20Extensions.md)) is a tagged backtick fence — `` pg.sql`SELECT 1` `` — with no string interpolation, cleanly handed to the extension that owns it. It is not implemented yet; if it doesn't land, the quoted-string form freezes as the API.
+Schemas sometimes need to carry a piece of literal SQL: a view definition, a partial-index condition, a row-level-security policy expression, a database-computed default. Today those travel as ordinary quoted strings, with all the escaping pain that implies. The accepted design ([ADR 129](docs/architecture%20docs/adrs/ADR%20129%20-%20Template-Tagged%20Literals%20for%20Extensions.md)) is a tagged backtick fence — `` pg.sql`SELECT 1` `` — with no string interpolation, cleanly handed to the extension that owns it. It is not implemented yet; if it doesn't land, the quoted-string form freezes as the API.
 </details>
 
 <details><summary>⬜ <b>`@dbgenerated()` is removed; database-computed defaults become tagged fences</b></summary>
@@ -252,7 +252,7 @@ Users migrating incrementally will have Prisma 7's VS Code extension installed *
 
 <details><summary>⬜ <b>Claims we haven't verified get verified or softened</b></summary>
 
-Support statements that end up in the announcement get checked first: Windows, Bun, and Deno support levels; the telemetry consent prompt's wording; and whether the telemetry backend survives announcement-scale traffic.
+Support statements that end up in the announcement get checked first: Windows, Bun, and Deno support levels; the telemetry first-run notice's wording; and whether the telemetry backend survives announcement-scale traffic.
 </details>
 
 ---
