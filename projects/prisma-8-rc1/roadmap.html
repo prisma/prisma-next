@@ -119,6 +119,11 @@
   .musts .what a { color: var(--ink); font-weight: 650; text-decoration: none; }
   .musts .what a:hover { color: var(--accent-ink); text-decoration: underline; }
   .musts .what .note { display: block; font-size: 14px; color: var(--ink-soft); margin-top: 1px; }
+  .musts .mini { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .musts .minibar { flex: 1 1 auto; max-width: 340px; height: 6px; border-radius: 3px; overflow: hidden; display: flex; background: var(--open-bg); }
+  .musts .minibar .d { background: var(--good); }
+  .musts .minibar .f { background: var(--accent); }
+  .musts .minicount { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
 
   .pill {
     flex: none; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
@@ -228,42 +233,42 @@
       <li>
         <span class="n">1</span>
         <span class="what"><a href="#req1">Queries must return correct values</a>
-          <span class="note">The main remaining defect: values read through relation-loading corrupt or fail.</span></span>
+          <span class="note">The main remaining defect: values read through relation-loading corrupt or fail.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="5 tasks: 4 in flight · 1 not started"><span class="f" style="width: 80.0%"></span></span><span class="minicount">4 in flight · 1 not started</span></span></span>
         <span class="owner">Alexey</span>
         <span class="pill flight">In progress</span>
       </li>
       <li>
         <span class="n">2</span>
         <span class="what"><a href="#req2">The schema language must reach its final form</a>
-          <span class="note">Whatever syntax the RC ships is permanent for the life of v8; three language projects are running.</span></span>
+          <span class="note">Whatever syntax the RC ships is permanent for the life of v8; three language projects are running.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="6 tasks: 3 in flight · 3 not started"><span class="f" style="width: 50.0%"></span></span><span class="minicount">3 in flight · 3 not started</span></span></span>
         <span class="owner">Serhii</span>
         <span class="pill flight">In flight</span>
       </li>
       <li>
         <span class="n">3</span>
         <span class="what"><a href="#req3">Every name and format users depend on must be final</a>
-          <span class="note">Error codes are consolidating now; config keys, hashes, and generated-file layouts still to do.</span></span>
+          <span class="note">Error codes are consolidating now; config keys, hashes, and generated-file layouts still to do.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="5 tasks: 1 in flight · 4 not started"><span class="f" style="width: 20.0%"></span></span><span class="minicount">1 in flight · 4 not started</span></span></span>
         <span class="owner">Will</span>
         <span class="pill flight">In progress</span>
       </li>
       <li>
         <span class="n">4</span>
         <span class="what"><a href="#req4">The release's claims must be proven</a>
-          <span class="note">"It works" and "you can migrate incrementally" each need a runnable receipt.</span></span>
+          <span class="note">"It works" and "you can migrate incrementally" each need a runnable receipt.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="6 tasks: 1 done · 2 in flight · 3 not started"><span class="d" style="width: 16.7%"></span><span class="f" style="width: 33.3%"></span></span><span class="minicount">1 done · 2 in flight · 3 not started</span></span></span>
         <span class="owner">Everyone</span>
         <span class="pill flight">Scoreboard drafted</span>
       </li>
       <li>
         <span class="n">5</span>
         <span class="what"><a href="#req5">The code must move into prisma/prisma</a>
-          <span class="note">Repository merge, publishing pipeline, and years of open v7 issues.</span></span>
+          <span class="note">Repository merge, publishing pipeline, and years of open v7 issues.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="5 tasks: 1 in flight · 4 not started"><span class="f" style="width: 20.0%"></span></span><span class="minicount">1 in flight · 4 not started</span></span></span>
         <span class="owner">Alexey</span>
         <span class="pill open">Starting</span>
       </li>
       <li>
         <span class="n">6</span>
         <span class="what"><a href="#req6">The rough edges users hit on day one must be gone</a>
-          <span class="note">Small fixes that would be embarrassing under announcement-day attention.</span></span>
+          <span class="note">Small fixes that would be embarrassing under announcement-day attention.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="7 tasks: 1 in flight · 6 not started"><span class="f" style="width: 14.3%"></span></span><span class="minicount">1 in flight · 6 not started</span></span></span>
         <span class="owner">Everyone</span>
         <span class="pill open">Open</span>
       </li>
