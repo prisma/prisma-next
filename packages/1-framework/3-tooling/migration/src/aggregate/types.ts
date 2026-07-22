@@ -15,7 +15,7 @@ export interface ContractAtOptions {
 
 export type ContractAtResult =
   | {
-      readonly provenance: 'snapshot';
+      readonly provenance: 'ref';
       readonly hash: string;
       readonly contractJson: unknown;
       readonly contractDts: string;
@@ -61,8 +61,9 @@ export type ContractAtResult =
  *   `checkIntegrity` under `checkContracts`); callers gate before
  *   querying it.
  * - `contractAt(hash, opts?)`: materializes the contract at an arbitrary
- *   graph node — when `opts.refName` is set, prefer the ref's paired
- *   snapshot; else find the package whose `metadata.to === hash` and read
+ *   graph node — when `opts.refName` is set, resolve the ref's pointer
+ *   and read the contract snapshot store entry keyed by the pointer's
+ *   hash; else find the package whose `metadata.to === hash` and read
  *   the contract snapshot store entry keyed by that hash. Lazy per
  *   `(hash, refName?)` memoisation; throws typed {@link MigrationToolsError}
  *   values compatible with CLI mappers.

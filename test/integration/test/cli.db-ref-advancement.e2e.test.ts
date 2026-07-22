@@ -1,5 +1,6 @@
-import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { contractSnapshotDir } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -21,28 +22,27 @@ function refPointerPath(refsDir: string, name: string): string {
   return join(refsDir, `${name}.json`);
 }
 
-function snapshotJsonPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.json`);
+function migrationsDirFromRefsDir(refsDir: string): string {
+  return dirname(dirname(refsDir));
 }
 
-function snapshotDtsPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.d.ts`);
+function refPointerHash(refsDir: string, name: string): string | undefined {
+  const pointerPath = refPointerPath(refsDir, name);
+  if (!existsSync(pointerPath)) return undefined;
+  return (JSON.parse(readFileSync(pointerPath, 'utf-8')) as { hash: string }).hash;
 }
 
+// A ref now consists of just its pointer file; the contract bytes resolve
+// through the content-addressed store keyed by the pointer's hash.
 function refFilesExist(refsDir: string, name: string): boolean {
-  return (
-    existsSync(refPointerPath(refsDir, name)) &&
-    existsSync(snapshotJsonPath(refsDir, name)) &&
-    existsSync(snapshotDtsPath(refsDir, name))
-  );
+  const hash = refPointerHash(refsDir, name);
+  if (hash === undefined) return false;
+  const storeDir = contractSnapshotDir(migrationsDirFromRefsDir(refsDir), hash);
+  return existsSync(join(storeDir, 'contract.json')) && existsSync(join(storeDir, 'contract.d.ts'));
 }
 
 function refFilesAbsent(refsDir: string, name: string): boolean {
-  return (
-    !existsSync(refPointerPath(refsDir, name)) &&
-    !existsSync(snapshotJsonPath(refsDir, name)) &&
-    !existsSync(snapshotDtsPath(refsDir, name))
-  );
+  return !existsSync(refPointerPath(refsDir, name));
 }
 
 function noRefFilesUnder(refsDir: string): boolean {
@@ -50,10 +50,7 @@ function noRefFilesUnder(refsDir: string): boolean {
     return true;
   }
   const entries = readdirSync(refsDir, { recursive: true });
-  return !entries.some((entry) => {
-    const fileName = String(entry);
-    return fileName.endsWith('.json') && !fileName.includes('.contract.');
-  });
+  return !entries.some((entry) => String(entry).endsWith('.json'));
 }
 
 withTempDir(({ createTempDir }) => {

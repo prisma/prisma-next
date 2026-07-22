@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import type { MigrateResult } from '@prisma-next/cli/commands/migrate';
@@ -99,28 +99,33 @@ function refPointerPath(refsDir: string, name: string): string {
   return join(refsDir, `${name}.json`);
 }
 
-function snapshotJsonPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.json`);
+function migrationsDirFromRefsDir(refsDir: string): string {
+  return dirname(dirname(refsDir));
 }
 
-function snapshotDtsPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.d.ts`);
+function refPointerHash(refsDir: string, name: string): string | undefined {
+  const pointerPath = refPointerPath(refsDir, name);
+  if (!existsSync(pointerPath)) return undefined;
+  return (JSON.parse(readFileSync(pointerPath, 'utf-8')) as { hash: string }).hash;
 }
 
+function storeContractJsonPath(refsDir: string, name: string): string {
+  const hash = refPointerHash(refsDir, name);
+  if (hash === undefined) throw new Error(`ref "${name}" has no pointer`);
+  return join(contractSnapshotDir(migrationsDirFromRefsDir(refsDir), hash), 'contract.json');
+}
+
+// A ref now consists of just its pointer file; the contract bytes resolve
+// through the content-addressed store keyed by the pointer's hash.
 function refFilesExist(refsDir: string, name: string): boolean {
-  return (
-    existsSync(refPointerPath(refsDir, name)) &&
-    existsSync(snapshotJsonPath(refsDir, name)) &&
-    existsSync(snapshotDtsPath(refsDir, name))
-  );
+  const hash = refPointerHash(refsDir, name);
+  if (hash === undefined) return false;
+  const storeDir = contractSnapshotDir(migrationsDirFromRefsDir(refsDir), hash);
+  return existsSync(join(storeDir, 'contract.json')) && existsSync(join(storeDir, 'contract.d.ts'));
 }
 
 function refFilesAbsent(refsDir: string, name: string): boolean {
-  return (
-    !existsSync(refPointerPath(refsDir, name)) &&
-    !existsSync(snapshotJsonPath(refsDir, name)) &&
-    !existsSync(snapshotDtsPath(refsDir, name))
-  );
+  return !existsSync(refPointerPath(refsDir, name));
 }
 
 function noRefFilesUnder(refsDir: string): boolean {
@@ -262,9 +267,9 @@ withTempDir(({ createTempDir }) => {
           ]);
 
           expect(refFilesExist(refsDir, 'staging')).toBe(true);
-          expect(JSON.parse(readFileSync(snapshotJsonPath(refsDir, 'staging'), 'utf-8'))).toEqual(
-            JSON.parse(readFileSync(bundleEndContract, 'utf-8')),
-          );
+          expect(
+            JSON.parse(readFileSync(storeContractJsonPath(refsDir, 'staging'), 'utf-8')),
+          ).toEqual(JSON.parse(readFileSync(bundleEndContract, 'utf-8')));
         });
       },
       timeouts.spinUpPpgDev,
@@ -394,7 +399,10 @@ withTempDir(({ createTempDir }) => {
             '--no-color',
           ]);
           const firstPointer = readFileSync(refPointerPath(refsDir, 'staging'), 'utf-8');
-          const firstSnapshot = readFileSync(snapshotJsonPath(refsDir, 'staging'), 'utf-8');
+          const firstStoreContract = readFileSync(
+            storeContractJsonPath(refsDir, 'staging'),
+            'utf-8',
+          );
 
           await runMigrate(testDir, [
             '--config',
@@ -405,7 +413,9 @@ withTempDir(({ createTempDir }) => {
           ]);
 
           expect(readFileSync(refPointerPath(refsDir, 'staging'), 'utf-8')).toBe(firstPointer);
-          expect(readFileSync(snapshotJsonPath(refsDir, 'staging'), 'utf-8')).toBe(firstSnapshot);
+          expect(readFileSync(storeContractJsonPath(refsDir, 'staging'), 'utf-8')).toBe(
+            firstStoreContract,
+          );
         });
       },
       timeouts.spinUpPpgDev,

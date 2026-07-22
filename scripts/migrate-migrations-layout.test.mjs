@@ -133,6 +133,18 @@ async function buildFixture(root) {
   return { hashA, hashB, hashC, pkg1Dir, pkg2Dir, extPkgDir, extDir };
 }
 
+async function writeRefPair(refsDir, name, hash) {
+  await writeFile(
+    join(refsDir, `${name}.json`),
+    `${JSON.stringify({ hash, invariants: [] }, null, 2)}\n`,
+  );
+  await writeFile(
+    join(refsDir, `${name}.contract.json`),
+    `${JSON.stringify(fakeContractJson(hash))}\n`,
+  );
+  await writeFile(join(refsDir, `${name}.contract.d.ts`), CONTRACT_DTS);
+}
+
 async function withTempDir(fn) {
   const dir = await mkdtemp(join(tmpdir(), 'migrate-migrations-layout-test-'));
   try {
@@ -341,6 +353,114 @@ describe('migrateMigrationsRoots — abort on inner hash mismatch', () => {
   });
 });
 
+describe('migrateMigrationsRoots — ref-paired snapshot folding', () => {
+  it('folds ref-paired snapshots into the store, deletes the pair, leaves the pointer untouched', async () => {
+    await withTempDir(async (root) => {
+      const { hashA, extDir } = await buildFixture(root);
+      const hashD = fakeHash('contract-d');
+      const refsDir = join(extDir, 'refs');
+      // 'db' names hashA — already written to the store by pkg1's `to`
+      // side, so folding it is a write-if-absent hit. 'staging' names a
+      // hash no package uses, so folding it is the only writer.
+      await writeRefPair(refsDir, 'db', hashA);
+      await writeRefPair(refsDir, 'staging', hashD);
+
+      const dbPointerBefore = await readFile(join(refsDir, 'db.json'), 'utf8');
+      const stagingPointerBefore = await readFile(join(refsDir, 'staging.json'), 'utf8');
+
+      const [summary] = await migrateMigrationsRoots([root]);
+
+      assert.equal(summary.refsProcessed, 2);
+
+      // Pointers are untouched — folding never writes them.
+      assert.equal(await readFile(join(refsDir, 'db.json'), 'utf8'), dbPointerBefore);
+      assert.equal(await readFile(join(refsDir, 'staging.json'), 'utf8'), stagingPointerBefore);
+
+      // The paired snapshot files are gone.
+      for (const name of [
+        'db.contract.json',
+        'db.contract.d.ts',
+        'staging.contract.json',
+        'staging.contract.d.ts',
+      ]) {
+        await assert.rejects(readFile(join(refsDir, name)), { code: 'ENOENT' });
+      }
+
+      // hashD's store entry exists only because the ref fold wrote it.
+      const storeDir = join(root, 'snapshots', storageHashHexOf(hashD));
+      assert.deepEqual(
+        JSON.parse(await readFile(join(storeDir, 'contract.json'), 'utf8')),
+        fakeContractJson(hashD),
+      );
+      assert.equal(await readFile(join(storeDir, 'contract.d.ts'), 'utf8'), CONTRACT_DTS);
+
+      // Second run: no ref pairs remain, so nothing to fold.
+      const [summary2] = await migrateMigrationsRoots([root]);
+      assert.equal(summary2.refsProcessed, 0);
+      assert.equal(summary2.storeEntriesWritten, 0);
+      assert.equal(summary2.filesDeleted, 0);
+    });
+  });
+
+  it('aborts when a ref-paired contract.json has no sibling pointer', async () => {
+    await withTempDir(async (root) => {
+      const { extDir } = await buildFixture(root);
+      const refsDir = join(extDir, 'refs');
+      const hash = fakeHash('orphan');
+      await writeFile(
+        join(refsDir, 'orphan.contract.json'),
+        `${JSON.stringify(fakeContractJson(hash))}\n`,
+      );
+      await writeFile(join(refsDir, 'orphan.contract.d.ts'), CONTRACT_DTS);
+
+      await assert.rejects(migrateMigrationsRoots([root]), MigrationLayoutAbortError);
+
+      await assert.rejects(readdir(join(root, 'snapshots')), { code: 'ENOENT' });
+      await assert.doesNotReject(readFile(join(refsDir, 'orphan.contract.json')));
+      await assert.doesNotReject(readFile(join(refsDir, 'orphan.contract.d.ts')));
+    });
+  });
+
+  it('aborts when the ref-paired contract hash disagrees with the pointer', async () => {
+    await withTempDir(async (root) => {
+      const { hashA, extDir } = await buildFixture(root);
+      const refsDir = join(extDir, 'refs');
+      await writeRefPair(refsDir, 'db', hashA);
+      await writeFile(
+        join(refsDir, 'db.contract.json'),
+        `${JSON.stringify(fakeContractJson(fakeHash('wrong-hash')))}\n`,
+      );
+
+      await assert.rejects(migrateMigrationsRoots([root]), MigrationLayoutAbortError);
+
+      await assert.rejects(readdir(join(root, 'snapshots')), { code: 'ENOENT' });
+      await assert.doesNotReject(readFile(join(refsDir, 'db.json')));
+      await assert.doesNotReject(readFile(join(refsDir, 'db.contract.json')));
+    });
+  });
+
+  it('aborts when the ref-paired contract.d.ts is missing', async () => {
+    await withTempDir(async (root) => {
+      const { extDir } = await buildFixture(root);
+      const refsDir = join(extDir, 'refs');
+      const hash = fakeHash('nodts');
+      await writeFile(
+        join(refsDir, 'nodts.json'),
+        `${JSON.stringify({ hash, invariants: [] }, null, 2)}\n`,
+      );
+      await writeFile(
+        join(refsDir, 'nodts.contract.json'),
+        `${JSON.stringify(fakeContractJson(hash))}\n`,
+      );
+
+      await assert.rejects(migrateMigrationsRoots([root]), MigrationLayoutAbortError);
+
+      await assert.rejects(readdir(join(root, 'snapshots')), { code: 'ENOENT' });
+      await assert.doesNotReject(readFile(join(refsDir, 'nodts.contract.json')));
+    });
+  });
+});
+
 describe('discoverMigrationsRoots', () => {
   it('finds a deep consumer-project root via app/*/migration.json, not its space subdir', async () => {
     await withTempDir(async (start) => {
@@ -387,6 +507,7 @@ describe('formatSummary', () => {
         root: '/repo/examples/demo/migrations',
         packagesProcessed: 2,
         spacesProcessed: 1,
+        refsProcessed: 2,
         storeEntriesWritten: 3,
         storeEntriesAlreadyPresent: 1,
         filesDeleted: 8,
@@ -395,6 +516,7 @@ describe('formatSummary', () => {
     ]);
 
     assert.match(text, /processed 1 root\(s\)/);
+    assert.match(text, /refs: 2/);
     assert.match(text, /store writes: 3 \(1 already present\)/);
     assert.match(text, /TOTAL: 1 root\(s\), 3 store writes \(1 already present\), 8 files deleted/);
   });

@@ -1,7 +1,13 @@
 import { readFile } from 'node:fs/promises';
-import type { ContractIR } from '@prisma-next/migration-tools/refs';
-import { writeRefPaired } from '@prisma-next/migration-tools/refs';
+import { writeContractSnapshot } from '@prisma-next/migration-tools/contract-snapshot-store';
+import { errorInvalidRefName } from '@prisma-next/migration-tools/errors';
+import { validateRefName, writeRef } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
+
+export interface ContractIR {
+  readonly contract: unknown;
+  readonly contractDts: string;
+}
 
 export interface RefAdvancementFields {
   readonly advancedRef: { readonly name: string; readonly hash: string } | null;
@@ -32,11 +38,22 @@ export async function readContractIR(
 
 export async function executeRefAdvancement(
   refsDir: string,
+  migrationsDir: string,
   name: string,
   hash: string,
   contractIR: ContractIR,
 ): Promise<{ name: string; hash: string }> {
-  await writeRefPaired(refsDir, name, { hash, invariants: [] }, contractIR);
+  // Validate the ref name before writing anything: writeRef validates it too,
+  // but only after the store write below, which would otherwise leave a
+  // (harmless, but pointless) orphan store entry on an invalid name.
+  if (!validateRefName(name)) {
+    throw errorInvalidRefName(name);
+  }
+  await writeContractSnapshot(migrationsDir, hash, {
+    contractJson: contractIR.contract,
+    contractDts: contractIR.contractDts,
+  });
+  await writeRef(refsDir, name, { hash, invariants: [] });
   return { name, hash };
 }
 
@@ -44,6 +61,7 @@ export async function buildRefAdvancementFields(options: {
   readonly advanceRef?: string;
   readonly db?: string;
   readonly refsDir: string;
+  readonly migrationsDir: string;
   readonly contractIR: ContractIR;
   readonly mode: 'plan' | 'apply';
   readonly hash: string;
@@ -60,6 +78,7 @@ export async function buildRefAdvancementFields(options: {
   }
   const advancedRef = await executeRefAdvancement(
     options.refsDir,
+    options.migrationsDir,
     name,
     options.hash,
     options.contractIR,

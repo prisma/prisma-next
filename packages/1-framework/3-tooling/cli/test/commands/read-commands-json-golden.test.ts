@@ -25,7 +25,7 @@ import { createTerminalUI } from '../../src/utils/terminal-ui';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
 
 const mocks = vi.hoisted(() => ({
-  writeRefPaired: vi.fn(),
+  writeRef: vi.fn(),
   readMarker: vi.fn(),
   readLedger: vi.fn(),
   connect: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock('@prisma-next/config-loader', { spy: true });
 
 vi.mock('@prisma-next/migration-tools/refs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@prisma-next/migration-tools/refs')>();
-  return { ...actual, writeRefPaired: mocks.writeRefPaired };
+  return { ...actual, writeRef: mocks.writeRef };
 });
 
 vi.mock('../../src/control-api/client', () => ({
@@ -189,7 +189,7 @@ describe('read commands --json golden', () => {
     vi.clearAllMocks();
     mocks.connect.mockResolvedValue(undefined);
     mocks.close.mockResolvedValue(undefined);
-    mocks.writeRefPaired.mockResolvedValue(undefined);
+    mocks.writeRef.mockResolvedValue(undefined);
     mocks.schemaVerify.mockResolvedValue({ ok: true, summary: 'Schema matches contract' });
     mocks.sign.mockResolvedValue({
       ok: true,

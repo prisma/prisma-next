@@ -331,7 +331,7 @@ async function executeMigrationPlanCommand(
       fromHash = resolutionResult.value.fromHash;
       fromContract = resolutionResult.value.fromContract;
       break;
-    case 'snapshot':
+    case 'ref':
       fromHash = resolutionResult.value.fromHash;
       fromContract = resolutionResult.value.fromContract;
       snapshotStartContract = {

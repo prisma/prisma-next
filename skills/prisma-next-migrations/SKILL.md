@@ -99,20 +99,18 @@ pnpm prisma-next migrate --db $DATABASE_URL
 pnpm prisma-next db verify --db $DATABASE_URL
 ```
 
-The `db` ref is a named pointer at `migrations/app/refs/db.json` plus a **paired contract snapshot** (`db.contract.json`, `db.contract.d.ts`). It records which contract hash the project's dev database has been brought up to — the offline planner's stand-in for "where is my local DB?" without opening a connection at plan time.
+The `db` ref is a named pointer at `migrations/app/refs/db.json` — just `{ hash, invariants }`. It records which contract hash the project's dev database has been brought up to — the offline planner's stand-in for "where is my local DB?" without opening a connection at plan time. The contract it names resolves through the shared content-addressed store at `migrations/snapshots/<hex>/contract.json` by that hash, the same store every migration graph node resolves through.
 
-**What `db init` / `db update` write.** When run against the project's default `--db` URL (no explicit `--db` flag), both commands implicitly advance the `db` ref and refresh its paired snapshot from the post-command contract IR. Override the ref name with `--advance-ref <name>`. When you pass `--db <non-default-url>`, ref advancement is suppressed unless `--advance-ref` is explicit — reconciling a different database is not the same as checkpointing this project's dev state.
+**What `db init` / `db update` write.** When run against the project's default `--db` URL (no explicit `--db` flag), both commands implicitly advance the `db` ref: they write-if-absent the post-command contract IR into the snapshot store, then write the ref's pointer. Override the ref name with `--advance-ref <name>`. When you pass `--db <non-default-url>`, ref advancement is suppressed unless `--advance-ref` is explicit — reconciling a different database is not the same as checkpointing this project's dev state.
 
-The on-disk layout mirrors migration bundle snapshots:
+The on-disk layout is just the pointer:
 
 ```text
 migrations/app/refs/
-├── db.json                 # { "hash": "sha256:…", "invariants": [] }
-├── db.contract.json        # full contract IR at that hash
-└── db.contract.d.ts        # typed import handle
+└── db.json                 # { "hash": "sha256:…", "invariants": [] }
 ```
 
-**First `migration plan` after dev iteration.** `migration plan` defaults `--from` to the `db` ref. When the on-disk migration graph is still **empty** and the `db` ref points at a non-null hash with a paired snapshot (typical after one or more `db update` cycles), the planner emits **two** bundles instead of one:
+**First `migration plan` after dev iteration.** `migration plan` defaults `--from` to the `db` ref. When the on-disk migration graph is still **empty** and the `db` ref points at a non-null hash with a store entry (typical after one or more `db update` cycles), the planner emits **two** bundles instead of one:
 
 1. Baseline: `null → from-hash` (introduces `from-hash` as a graph node)
 2. Delta: `from-hash → current_contract`
@@ -132,19 +130,19 @@ pnpm prisma-next ref set db <graph-node-hash>
 pnpm prisma-next migration plan --name my_change
 ```
 
-If the paired snapshot is missing (`MIGRATION.SNAPSHOT_MISSING`), repopulate with `db update --advance-ref db` or delete the orphan pointer with `ref delete db`.
+If the `db` ref's pointer is itself missing and the hash isn't a graph node either (`MIGRATION.SNAPSHOT_MISSING`), create it with `ref set db <hash>` or advance it with `db update --advance-ref db`.
 
 **After plain `migrate`.** `migrate` does not implicitly advance the `db` ref (production-shaped commands stay explicit). The live marker advances while the ref may lag. Refresh with `db update` (no-op on DB when already current) or `migrate --advance-ref db` in the same invocation.
 
 **When to switch paths.** Use `db update` while the schema is in flux on a solo dev database. Switch to `migration plan` + `migrate` when the change needs a reviewable, replayable migration — typically before opening a PR or touching any shared environment. The `db` ref bridges the two: it captures dev iteration state on disk so the first formal plan knows where you left off.
 
-**Graph-node rule (plan time).** Any hash used as a `from` end — explicit `--from`, default `db` ref, or ref name — must already be a node in the on-disk migration graph once the graph is non-empty. The auto-baseline two-bundle emission is the one exception: it applies only on an **empty** graph with a non-null ref-resolved `from` and an available paired snapshot. If you deleted the snapshot files or the ref pointer without the graph, plan refuses with `MIGRATION.SNAPSHOT_MISSING` instead.
+**Graph-node rule (plan time).** Any hash used as a `from` end — explicit `--from`, default `db` ref, or ref name — must already be a node in the on-disk migration graph once the graph is non-empty. The auto-baseline two-bundle emission is the one exception: it applies only on an **empty** graph with a non-null ref-resolved `from` and an available store entry. If the ref's pointer is missing and the hash isn't a graph node either, plan refuses with `MIGRATION.SNAPSHOT_MISSING` instead.
 
 **Apply-time complement.** `migrate` reads the live marker before DDL. If the marker hash is not a graph node, the command refuses with `MIGRATION.MARKER_MISMATCH` — catching drift the offline planner cannot see. This is separate from `MIGRATION.MARKER_NOT_IN_HISTORY`, which fires later during the runner's graph walk when the marker is off the path being traversed. See `prisma-next-migration-review` for the full diagnostic catalog.
 
 `db` is a **default ref name**, not a reserved one. The framework overwrites it on the next dev cycle; you may `ref set db <hash>` explicitly and accept that a subsequent `db update` replaces it when run against the default URL.
 
-Canonical detail: [Migration System § Refs (paired contract snapshots)](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#paired-contract-snapshots), [§ `migration plan`](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#migration-plan), [§ Recovery affordances](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#recovery-affordances), and [ADR 218 — Refs with paired contract snapshots and universal graph-node invariant](../../docs/architecture%20docs/adrs/ADR%20218%20-%20Refs%20with%20paired%20contract%20snapshots%20and%20universal%20graph-node%20invariant.md) (TML-2629).
+Canonical detail: [Migration System § Contract resolution through the snapshot store](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#contract-resolution-through-the-snapshot-store), [§ `migration plan`](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#migration-plan), [§ Recovery affordances](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#recovery-affordances), [ADR 218 — Refs with paired contract snapshots and universal graph-node invariant](../../docs/architecture%20docs/adrs/ADR%20218%20-%20Refs%20with%20paired%20contract%20snapshots%20and%20universal%20graph-node%20invariant.md) (TML-2629, its paired-snapshot part superseded — see the ADR's Status note), and [ADR 240 — Contract snapshots live in a content-addressed store](../../docs/architecture%20docs/adrs/ADR%20240%20-%20Contract%20snapshots%20live%20in%20a%20content-addressed%20store.md).
 
 ## Workflow — `db update` (quick path)
 

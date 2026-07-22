@@ -29,7 +29,7 @@ export type FromResolution =
   | { kind: 'greenfield'; fromHash: null; fromContract: null }
   | { kind: 'graph-node'; fromHash: string; fromContract: Contract }
   | {
-      kind: 'snapshot';
+      kind: 'ref';
       fromHash: string;
       fromContract: Contract;
       contractDts: string;
@@ -81,7 +81,7 @@ export function assertFromIsGraphNode(
 
 type RefContractResolution =
   | {
-      kind: 'snapshot';
+      kind: 'ref';
       hash: string;
       contract: Contract;
       contractJson: unknown;
@@ -106,9 +106,9 @@ async function resolveContractRef(
   try {
     const at = await space.contractAt(hash, refName !== undefined ? { refName } : undefined);
 
-    if (at.provenance === 'snapshot') {
+    if (at.provenance === 'ref') {
       return ok({
-        kind: 'snapshot',
+        kind: 'ref',
         hash: at.hash,
         contract: at.contract,
         contractJson: at.contractJson,
@@ -175,7 +175,7 @@ async function resolveFromPolicy(
     throw error;
   }
   return ok({
-    kind: 'snapshot',
+    kind: 'ref',
     fromHash: hash,
     fromContract: contract,
     contractDts,

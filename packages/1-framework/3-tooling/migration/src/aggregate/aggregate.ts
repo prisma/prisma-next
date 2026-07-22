@@ -11,7 +11,7 @@ import {
   errorBundleNotFoundForGraphNode,
   errorContractDeserializationFailed,
   errorHashNotInGraph,
-  errorSnapshotMissing,
+  errorRefNotResolvable,
   MigrationToolsError,
 } from '../errors';
 import type { MigrationGraph } from '../graph';
@@ -19,8 +19,8 @@ import { isGraphNode } from '../graph-membership';
 import type { IntegrityQueryOptions, IntegrityViolation } from '../integrity-violation';
 import { reconstructGraph } from '../migration-graph';
 import type { OnDiskMigrationPackage } from '../package';
-import type { Refs } from '../refs';
-import { readRefSnapshot } from '../refs/snapshot';
+import type { RefEntry, Refs } from '../refs';
+import { readRef } from '../refs';
 import type { ContractSpaceHeadRecord } from '../verify-contract-spaces';
 import type {
   AggregateContractSpace,
@@ -49,7 +49,7 @@ function deserializeContractAtPath(
   }
 }
 
-async function readGraphNodeEndContract(
+async function readContractSnapshotEntry(
   migrationsDir: string,
   hash: string,
   deserializeContract: (raw: unknown) => Contract,
@@ -74,15 +74,29 @@ async function resolveContractAt(args: {
   const refName = opts?.refName;
 
   if (refName !== undefined) {
-    const snapshot = await readRefSnapshot(refsDir, refName);
-    if (snapshot) {
-      const jsonPath = join(refsDir, `${refName}.contract.json`);
+    let refEntry: RefEntry | undefined;
+    try {
+      refEntry = await readRef(refsDir, refName);
+    } catch (error) {
+      if (MigrationToolsError.is(error) && error.code === 'MIGRATION.UNKNOWN_REF') {
+        refEntry = undefined;
+      } else {
+        throw error;
+      }
+    }
+
+    if (refEntry) {
+      const { contractJson, contractDts, contract } = await readContractSnapshotEntry(
+        migrationsDir,
+        refEntry.hash,
+        deserializeContract,
+      );
       return {
-        hash,
-        contractJson: snapshot.contract,
-        contractDts: snapshot.contractDts,
-        contract: deserializeContractAtPath(jsonPath, snapshot.contract, deserializeContract),
-        provenance: 'snapshot',
+        hash: refEntry.hash,
+        contractJson,
+        contractDts,
+        contract,
+        provenance: 'ref',
       };
     }
 
@@ -96,7 +110,7 @@ async function resolveContractAt(args: {
       });
     }
 
-    throw errorSnapshotMissing(refName);
+    throw errorRefNotResolvable(refName);
   }
 
   if (isGraphNode(hash, graph)) {
@@ -119,7 +133,7 @@ async function resolveGraphNodeContractAt(args: {
     throw errorBundleNotFoundForGraphNode(hash, explicitLabel);
   }
 
-  const { contractJson, contractDts, contract } = await readGraphNodeEndContract(
+  const { contractJson, contractDts, contract } = await readContractSnapshotEntry(
     migrationsDir,
     hash,
     deserializeContract,
@@ -160,9 +174,10 @@ export function requireHeadRef(space: AggregateContractSpace): ContractSpaceHead
  * undeserializable on-disk contract) re-throws on each call rather than
  * caching a value — `checkIntegrity` surfaces that as `contractUnreadable`.
  * `contractAt()` materializes the contract at an arbitrary graph node with
- * the same resolution order as plan-time ref resolution: ref snapshot first
- * (when `opts.refName` is set), else the contract snapshot store entry
- * keyed by the matching package's `to` hash.
+ * the same resolution order as plan-time ref resolution: the ref's pointer
+ * plus the store entry keyed by the pointer's hash first (when
+ * `opts.refName` is set), else the contract snapshot store entry keyed by
+ * the matching package's `to` hash.
  */
 export function createAggregateContractSpace(args: {
   readonly spaceId: string;

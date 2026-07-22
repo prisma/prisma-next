@@ -176,6 +176,7 @@ async function executeDbInitCommand(
           ...ifDefined('advanceRef', options.advanceRef),
           ...ifDefined('db', options.db),
           refsDir,
+          migrationsDir,
           contractIR,
           mode: result.value.mode,
           hash: advancementHash,

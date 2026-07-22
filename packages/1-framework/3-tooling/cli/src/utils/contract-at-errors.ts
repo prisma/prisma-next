@@ -15,7 +15,7 @@ export function mapContractAtError(
 ): Result<never, CliStructuredError> {
   if (MigrationToolsError.is(error)) {
     switch (error.code) {
-      case 'MIGRATION.SNAPSHOT_MISSING': {
+      case 'MIGRATION.REF_NOT_RESOLVABLE': {
         const refName =
           typeof error.details?.['refName'] === 'string'
             ? error.details['refName']
@@ -26,18 +26,13 @@ export function mapContractAtError(
       }
       case 'MIGRATION.CONTRACT_DESERIALIZATION_FAILED': {
         const filePath =
-          typeof error.details?.['filePath'] === 'string'
-            ? error.details['filePath']
-            : 'ref-snapshot';
+          typeof error.details?.['filePath'] === 'string' ? error.details['filePath'] : 'unknown';
         const message =
           typeof error.details?.['message'] === 'string' ? error.details['message'] : error.message;
-        const isRefSnapshot = filePath.endsWith('.contract.json');
         return notOk(
           errorContractValidationFailed(
-            isRefSnapshot
-              ? `Ref snapshot contract failed to deserialize: ${message}`
-              : `Predecessor contract at ${filePath} failed to deserialize: ${message}`,
-            { where: { path: isRefSnapshot ? 'ref-snapshot' : filePath } },
+            `Predecessor contract at ${filePath} failed to deserialize: ${message}`,
+            { where: { path: filePath } },
           ),
         );
       }

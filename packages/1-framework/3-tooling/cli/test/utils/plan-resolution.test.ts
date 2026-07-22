@@ -8,7 +8,7 @@ import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
-import type { ContractIR, Refs } from '@prisma-next/migration-tools/refs';
+import type { Refs } from '@prisma-next/migration-tools/refs';
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -19,6 +19,7 @@ import {
   resolveFromForPlan,
   resolveToForPlan,
 } from '../../src/utils/plan-resolution';
+import type { ContractIR } from '../../src/utils/ref-advancement';
 
 const E = EMPTY_CONTRACT_HASH;
 const HASH_A = `sha256:${'a'.repeat(64)}`;
@@ -60,16 +61,16 @@ function sampleContractIR(storageHash: string): ContractIR {
 
 function contractAtResult(
   storageHash: string,
-  opts?: { readonly provenance?: 'snapshot' | 'graph-node' },
+  opts?: { readonly provenance?: 'ref' | 'graph-node' },
 ): {
   hash: string;
   contract: Contract;
   contractJson: unknown;
   contractDts: string;
-  provenance: 'snapshot' | 'graph-node';
+  provenance: 'ref' | 'graph-node';
 } {
   const ir = sampleContractIR(storageHash);
-  const provenance = opts?.provenance ?? 'snapshot';
+  const provenance = opts?.provenance ?? 'ref';
   return {
     hash: storageHash,
     contract: ir.contract as Contract,
@@ -134,7 +135,7 @@ describe('resolveFromForPlan', () => {
     }
   });
 
-  it('returns auto-baseline when graph is empty and db ref has a paired snapshot', async () => {
+  it('returns auto-baseline when graph is empty and the db ref resolves through the store', async () => {
     const space = makeSpace(
       [],
       { db: { hash: HASH_ORPHAN, invariants: [] } },
@@ -167,7 +168,7 @@ describe('resolveFromForPlan', () => {
     }
   });
 
-  it('returns snapshot for db ref at graph tip with paired snapshot', async () => {
+  it('returns ref-provenance for db ref at graph tip', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
     const space = makeSpace(
       bundles,
@@ -178,11 +179,11 @@ describe('resolveFromForPlan', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value).toMatchObject({ kind: 'snapshot', fromHash: HASH_B });
+      expect(result.value).toMatchObject({ kind: 'ref', fromHash: HASH_B });
     }
   });
 
-  it('returns snapshot for db ref at a non-tip graph node with paired snapshot', async () => {
+  it('returns ref-provenance for db ref at a non-tip graph node', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
     const space = makeSpace(
       bundles,
@@ -193,7 +194,7 @@ describe('resolveFromForPlan', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value).toMatchObject({ kind: 'snapshot', fromHash: HASH_A });
+      expect(result.value).toMatchObject({ kind: 'ref', fromHash: HASH_A });
     }
   });
 
@@ -271,20 +272,16 @@ describe('resolveFromForPlan', () => {
     expect(contractAt).toHaveBeenCalledWith(HASH_A, undefined);
   });
 
-  it('refuses snapshot-missing for legacy db ref without snapshot when hash is not a graph node', async () => {
+  it('refuses ref-not-resolvable for db ref whose pointer is absent and hash is not a graph node', async () => {
     const space = makeSpace(
       [],
       { db: { hash: HASH_ORPHAN, invariants: [] } },
       vi.fn().mockRejectedValue(
-        new MigrationToolsError(
-          'MIGRATION.SNAPSHOT_MISSING',
-          `Ref "db" has no paired contract snapshot`,
-          {
-            why: 'Ref "db" exists but its paired snapshot files are missing.',
-            fix: 'Run "prisma-next db update --advance-ref db" to repopulate the snapshot, or "prisma-next ref delete db" to clear the orphan pointer.',
-            details: { refName: 'db' },
-          },
-        ),
+        new MigrationToolsError('MIGRATION.REF_NOT_RESOLVABLE', `Ref "db" is not resolvable`, {
+          why: 'Ref "db" has no pointer file, and the hash being resolved is not a node in the migration graph either.',
+          fix: 'Create the ref with "prisma-next ref set db <hash>" (or advance it via "prisma-next db update --advance-ref db"), or pass a hash that is a node in the migration graph.',
+          details: { refName: 'db' },
+        }),
       ),
     );
     const result = await resolveFromForPlan(baseInput({ space }));
@@ -292,11 +289,11 @@ describe('resolveFromForPlan', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expectRefuse(result.failure, 'MIGRATION.SNAPSHOT_MISSING', 'db update --advance-ref db');
-      expect(result.failure.fix).toContain('ref delete db');
+      expect(result.failure.fix).toContain('ref set db');
     }
   });
 
-  it('falls back to graph-node bundle source for legacy db ref without snapshot when hash is in graph', async () => {
+  it('falls back to graph-node bundle source when the db ref pointer is absent but the hash is a graph node', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
     const space = makeSpace(
       bundles,
@@ -314,7 +311,7 @@ describe('resolveFromForPlan', () => {
     }
   });
 
-  it('returns graph-node for explicit ref when snapshot is missing but hash is a graph node', async () => {
+  it('returns graph-node for explicit ref when the pointer is absent but hash is a graph node', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1')];
     const space = makeSpace(
       bundles,
@@ -333,20 +330,16 @@ describe('resolveFromForPlan', () => {
     expect(space.contractAt).toHaveBeenCalledWith(HASH_A, { refName: 'staging' });
   });
 
-  it('refuses snapshot-missing for explicit ref name without snapshot when hash is not a graph node', async () => {
+  it('refuses ref-not-resolvable for an explicit ref whose pointer is absent and hash is not a graph node', async () => {
     const space = makeSpace(
       [],
       { staging: { hash: HASH_ORPHAN, invariants: [] } },
       vi.fn().mockRejectedValue(
-        new MigrationToolsError(
-          'MIGRATION.SNAPSHOT_MISSING',
-          `Ref "staging" has no paired contract snapshot`,
-          {
-            why: 'Ref "staging" exists but its paired snapshot files are missing.',
-            fix: 'Run "prisma-next db update --advance-ref staging" to repopulate the snapshot, or "prisma-next ref delete staging" to clear the orphan pointer.',
-            details: { refName: 'staging' },
-          },
-        ),
+        new MigrationToolsError('MIGRATION.REF_NOT_RESOLVABLE', `Ref "staging" is not resolvable`, {
+          why: 'Ref "staging" has no pointer file, and the hash being resolved is not a node in the migration graph either.',
+          fix: 'Create the ref with "prisma-next ref set staging <hash>" (or advance it via "prisma-next db update --advance-ref staging"), or pass a hash that is a node in the migration graph.',
+          details: { refName: 'staging' },
+        }),
       ),
     );
     const result = await resolveFromForPlan(baseInput({ space, optionsFrom: 'staging' }));
@@ -357,7 +350,7 @@ describe('resolveFromForPlan', () => {
     }
   });
 
-  it('surfaces contract validation failure for bad snapshot contract shape', async () => {
+  it('surfaces contract validation failure for a bad store contract shape', async () => {
     const space = makeSpace(
       [],
       { db: { hash: HASH_A, invariants: [] } },
@@ -366,10 +359,10 @@ describe('resolveFromForPlan', () => {
           'MIGRATION.CONTRACT_DESERIALIZATION_FAILED',
           'Contract failed to deserialize',
           {
-            why: 'Contract at "/project/migrations/refs/db.contract.json" failed to deserialize: unsupported legacy shape',
+            why: `Contract at "/project/migrations/snapshots/${'a'.repeat(64)}/contract.json" failed to deserialize: unsupported legacy shape`,
             fix: 'Re-emit.',
             details: {
-              filePath: '/project/migrations/refs/db.contract.json',
+              filePath: `/project/migrations/snapshots/${'a'.repeat(64)}/contract.json`,
               message: 'unsupported legacy shape',
             },
           },
@@ -384,14 +377,14 @@ describe('resolveFromForPlan', () => {
     }
   });
 
-  it('surfaces INVALID_REF_FILE when paired contract.d.ts is missing', async () => {
+  it('surfaces INVALID_REF_FILE when the ref pointer file is malformed', async () => {
     const space = makeSpace(
       [],
       { db: { hash: HASH_A, invariants: [] } },
       vi.fn().mockRejectedValue(
         new MigrationToolsError('MIGRATION.INVALID_REF_FILE', 'Invalid ref file', {
-          why: 'Missing paired contract.d.ts snapshot file',
-          fix: 'Re-run db update.',
+          why: 'Failed to parse as JSON',
+          fix: 'Fix the malformed ref pointer file.',
         }),
       ),
     );
@@ -431,7 +424,7 @@ describe('resolveToForPlan', () => {
     migrationCounter = 0;
   });
 
-  it('resolves a ref name with a paired snapshot to its materialized contract', async () => {
+  it('resolves a ref name to its materialized contract through the snapshot store', async () => {
     const bundles = [makePkg(E, HASH_A, 'm1'), makePkg(HASH_A, HASH_B, 'm2')];
     const space = makeSpace(
       bundles,

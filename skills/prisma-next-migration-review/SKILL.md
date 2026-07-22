@@ -85,7 +85,7 @@ These codes surface on `migration plan`, `ref set`, and `migrate` — not on `mi
 | Code | When | Meaning | Next move |
 |---|---|---|---|
 | `MIGRATION.HASH_NOT_IN_GRAPH` | `migration plan` (non-empty graph) or `ref set` | Resolved hash is not a node in the on-disk migration graph — typical when the default `db` ref points past the graph tip after dev-only `db update` cycles. | `migration plan --from <reachable-ref>` (e.g. `--from production`); or realign the ref with `ref set db <graph-node-hash>`. |
-| `MIGRATION.SNAPSHOT_MISSING` | `migration plan` | Ref pointer exists but paired snapshot files (`<name>.contract.json`) are absent. | `db update --advance-ref <name>` to repopulate, or `ref delete <name>` to clear the orphan pointer. |
+| `MIGRATION.SNAPSHOT_MISSING` | `migration plan` | A named ref has no pointer file (`<name>.json`), and the hash being resolved isn't a node in the migration graph either. | `ref set <name> <hash>` to create the ref, `db update --advance-ref <name>` to advance it, or pass a hash that is a graph node. |
 | `MIGRATION.MARKER_MISMATCH` | `migrate` (pre-DDL, before the runner) | Live DB marker hash is not a graph node — drift the offline planner cannot see. | `migration plan --from <graph-tip>` if the marker is canonical; `ref set db <marker-hash>` if the on-disk graph is canonical; investigate out-of-band applies. |
 | `MIGRATION.PATH_UNREACHABLE` | `migrate` (path resolution) | No migration path from the current marker to the resolved target in the on-disk graph. | Read the improved `fix` payload — it names `fromHash` / `targetHash` and suggests `migration plan --from <from> --to <target>`; run `migration list` to inspect the graph. |
 

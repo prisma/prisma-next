@@ -1,21 +1,23 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { writeContractSnapshot } from '@prisma-next/migration-tools/contract-snapshot-store';
+import {
+  contractSnapshotDir,
+  writeContractSnapshot,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import type { ContractIR } from '@prisma-next/migration-tools/refs';
 import { writeRef } from '@prisma-next/migration-tools/refs';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
-  writeRefPaired: vi.fn(),
+  writeRef: vi.fn(),
 }));
 
 vi.mock('@prisma-next/config-loader', () => ({
@@ -26,7 +28,7 @@ vi.mock('@prisma-next/migration-tools/refs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@prisma-next/migration-tools/refs')>();
   return {
     ...actual,
-    writeRefPaired: mocks.writeRefPaired,
+    writeRef: mocks.writeRef,
   };
 });
 
@@ -44,37 +46,33 @@ function createTableOp(table: string): MigrationPlanOperation {
   };
 }
 
-function contractIRForHash(storageHash: string): ContractIR {
+function contractJsonForHash(storageHash: string): unknown {
   return {
-    contract: {
-      schemaVersion: '1',
-      targetFamily: 'sql',
-      target: 'postgres',
-      profileHash: PROFILE_HASH,
-      storage: { storageHash },
-      models: {
-        User: {
-          fields: {
-            id: {
-              nullable: false,
-              type: { kind: 'scalar', codecId: 'sql/int4@1' },
-            },
+    schemaVersion: '1',
+    targetFamily: 'sql',
+    target: 'postgres',
+    profileHash: PROFILE_HASH,
+    storage: { storageHash },
+    models: {
+      User: {
+        fields: {
+          id: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'sql/int4@1' },
           },
-          relations: {},
-          storage: { namespaceId: '__unbound__', table: 'users', namespace: 'public' },
         },
+        relations: {},
+        storage: { namespaceId: '__unbound__', table: 'users', namespace: 'public' },
       },
-      roots: {},
     },
-    contractDts: 'export type Contract = unknown;\n',
+    roots: {},
   };
 }
 
 async function writeEndContract(migrationsRootDir: string, storageHash: string): Promise<void> {
-  const ir = contractIRForHash(storageHash);
   await writeContractSnapshot(migrationsRootDir, storageHash, {
-    contractJson: ir.contract,
-    contractDts: ir.contractDts,
+    contractJson: contractJsonForHash(storageHash),
+    contractDts: 'export type Contract = unknown;\n',
   });
 }
 
@@ -111,15 +109,11 @@ function refPointerPath(refsDir: string, name: string): string {
   return join(refsDir, `${name}.json`);
 }
 
-function snapshotJsonPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.json`);
+function storeContractJsonPath(migrationsRootDir: string, storageHash: string): string {
+  return join(contractSnapshotDir(migrationsRootDir, storageHash), 'contract.json');
 }
 
-function snapshotDtsPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.d.ts`);
-}
-
-describe('ref commands snapshot integration', { timeout: timeouts.databaseOperation }, () => {
+describe('ref commands', { timeout: timeouts.databaseOperation }, () => {
   let tempDir: string;
   let configPath: string;
   let migrationsRootDir: string;
@@ -128,11 +122,11 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
 
   beforeEach(async () => {
     mocks.loadConfig.mockReset();
-    mocks.writeRefPaired.mockReset();
-    const { writeRefPaired: realWriteRefPaired } = await vi.importActual<
+    mocks.writeRef.mockReset();
+    const { writeRef: realWriteRef } = await vi.importActual<
       typeof import('@prisma-next/migration-tools/refs')
     >('@prisma-next/migration-tools/refs');
-    mocks.writeRefPaired.mockImplementation(realWriteRefPaired);
+    mocks.writeRef.mockImplementation(realWriteRef);
 
     tempDir = join(tmpdir(), `ref-cmd-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     migrationsRootDir = join(tempDir, 'migrations');
@@ -209,7 +203,7 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
     };
   }
 
-  it('sets a ref to a graph-node hash with paired snapshot files', async () => {
+  it('sets a ref to a graph-node hash, writing only the pointer', async () => {
     const { hashB } = await seedLinearGraph();
     const prev = process.cwd();
     process.chdir(tempDir);
@@ -220,8 +214,7 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
       if (!result.ok) return;
       expect(result.value.hash).toBe(hashB);
       expect(existsSync(refPointerPath(refsDir, 'staging'))).toBe(true);
-      expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(true);
-      expect(existsSync(snapshotDtsPath(refsDir, 'staging'))).toBe(true);
+      expect(existsSync(storeContractJsonPath(migrationsRootDir, hashB))).toBe(true);
     } finally {
       process.chdir(prev);
     }
@@ -282,7 +275,7 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
     }
   });
 
-  it('resolves another ref name and writes the paired snapshot', async () => {
+  it('resolves another ref name and writes only the pointer', async () => {
     const { hashC } = await seedLinearGraph();
     await writeRef(refsDir, 'production', { hash: hashC, invariants: [] });
     const prev = process.cwd();
@@ -293,7 +286,7 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.hash).toBe(hashC);
-      expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(true);
+      expect(existsSync(refPointerPath(refsDir, 'staging'))).toBe(true);
     } finally {
       process.chdir(prev);
     }
@@ -344,7 +337,7 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
     }
   });
 
-  it('overwrites an existing ref atomically via writeRefPaired', async () => {
+  it('overwrites an existing ref pointer', async () => {
     const { hashA, hashB } = await seedLinearGraph();
     const prev = process.cwd();
     process.chdir(tempDir);
@@ -357,7 +350,6 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
       if (!second.ok) return;
       const pointer = JSON.parse(await readFile(refPointerPath(refsDir, 'staging'), 'utf-8'));
       expect(pointer.hash).toBe(hashB);
-      expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(true);
     } finally {
       process.chdir(prev);
     }
@@ -385,9 +377,9 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
     }
   });
 
-  it('cleans up when writeRefPaired fails mid-write', async () => {
+  it('does not write a pointer when the pointer write fails', async () => {
     const { hashA } = await seedLinearGraph();
-    mocks.writeRefPaired.mockRejectedValueOnce(new Error('simulated writeRefPaired failure'));
+    mocks.writeRef.mockRejectedValueOnce(new Error('simulated writeRef failure'));
     const prev = process.cwd();
     process.chdir(tempDir);
     try {
@@ -395,13 +387,12 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
       const result = await executeRefSetCommand('staging', hashA, { config: configPath });
       expect(result.ok).toBe(false);
       expect(existsSync(refPointerPath(refsDir, 'staging'))).toBe(false);
-      expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(false);
     } finally {
       process.chdir(prev);
     }
   });
 
-  it('deletes pointer and paired snapshot files', async () => {
+  it('deletes only the pointer, leaving the store entry', async () => {
     const { hashA } = await seedLinearGraph();
     const prev = process.cwd();
     process.chdir(tempDir);
@@ -413,8 +404,7 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
       const result = await executeRefDeleteCommand('staging', { config: configPath });
       expect(result.ok).toBe(true);
       expect(existsSync(refPointerPath(refsDir, 'staging'))).toBe(false);
-      expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(false);
-      expect(existsSync(snapshotDtsPath(refsDir, 'staging'))).toBe(false);
+      expect(existsSync(storeContractJsonPath(migrationsRootDir, hashA))).toBe(true);
     } finally {
       process.chdir(prev);
     }
@@ -436,44 +426,7 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
     }
   });
 
-  it('heals an orphan snapshot when the pointer is missing', async () => {
-    const { hashA } = await seedLinearGraph();
-    const prev = process.cwd();
-    process.chdir(tempDir);
-    try {
-      const { executeRefSetCommand, executeRefDeleteCommand } = await import(
-        '../../src/commands/ref'
-      );
-      await executeRefSetCommand('staging', hashA, { config: configPath });
-      await unlink(refPointerPath(refsDir, 'staging'));
-      const result = await executeRefDeleteCommand('staging', { config: configPath });
-      expect(result.ok).toBe(true);
-      expect(existsSync(snapshotJsonPath(refsDir, 'staging'))).toBe(false);
-    } finally {
-      process.chdir(prev);
-    }
-  });
-
-  it('deletes the pointer when the snapshot is missing', async () => {
-    const { hashA } = await seedLinearGraph();
-    const prev = process.cwd();
-    process.chdir(tempDir);
-    try {
-      const { executeRefSetCommand, executeRefDeleteCommand } = await import(
-        '../../src/commands/ref'
-      );
-      await executeRefSetCommand('staging', hashA, { config: configPath });
-      await unlink(snapshotJsonPath(refsDir, 'staging'));
-      await unlink(snapshotDtsPath(refsDir, 'staging'));
-      const result = await executeRefDeleteCommand('staging', { config: configPath });
-      expect(result.ok).toBe(true);
-      expect(existsSync(refPointerPath(refsDir, 'staging'))).toBe(false);
-    } finally {
-      process.chdir(prev);
-    }
-  });
-
-  it('refuses delete when neither pointer nor snapshot exists', async () => {
+  it('refuses delete for an unknown ref', async () => {
     const prev = process.cwd();
     process.chdir(tempDir);
     try {
@@ -499,7 +452,7 @@ describe('ref commands snapshot integration', { timeout: timeouts.databaseOperat
     }
   });
 
-  it('lists only pointer refs when paired snapshot files exist', async () => {
+  it('lists refs by pointer file', async () => {
     const { hashA, hashB } = await seedLinearGraph();
     const prev = process.cwd();
     process.chdir(tempDir);
