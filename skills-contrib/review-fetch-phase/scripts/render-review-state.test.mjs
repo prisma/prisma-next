@@ -46,3 +46,14 @@ test('escapes backslashes before pipes in table cells', () => {
     `expected escaped table row in:\n${markdown}`,
   );
 });
+
+test('renders sourcePath in the Source code span with literal backslashes and escaped pipes', () => {
+  const markdown = renderReviewStateMarkdown(buildPayload(), {
+    sourcePath: 'wip\\re|views\\review-state.json',
+  });
+
+  assert.ok(
+    markdown.includes('Source: `wip\\re\\|views\\review-state.json`'),
+    `expected code-span source in:\n${markdown}`,
+  );
+});

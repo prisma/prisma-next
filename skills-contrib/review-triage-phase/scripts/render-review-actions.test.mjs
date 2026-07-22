@@ -37,3 +37,21 @@ test('escapes backslashes before pipes in table cells', () => {
   assert.ok(markdown.includes('fix foo \\\\\\| bar'), `expected escaped summary in:\n${markdown}`);
   assert.ok(markdown.includes('trailing \\\\ |'), `expected escaped acceptance in:\n${markdown}`);
 });
+
+test('renders sourcePath and target-file code spans with literal backslashes and escaped pipes', () => {
+  const payload = buildPayload();
+  payload.actions[0].targetFiles = ['src\\win|dows\\a.ts'];
+
+  const markdown = renderReviewActionsMarkdown(payload, {
+    sourcePath: 'wip\\review-actions.json',
+  });
+
+  assert.ok(
+    markdown.includes('Source: `wip\\review-actions.json`'),
+    `expected code-span source in:\n${markdown}`,
+  );
+  assert.ok(
+    markdown.includes('`src\\win\\|dows\\a.ts`'),
+    `expected code-span target file in:\n${markdown}`,
+  );
+});

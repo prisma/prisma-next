@@ -81,6 +81,15 @@ function escapeTableCell(value) {
     .trim();
 }
 
+function formatCodeSpan(value) {
+  const text = String(value ?? '')
+    .replace(/\r?\n/g, ' ')
+    .replace(/\|/g, '\\|')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return `\`${text}\``;
+}
+
 function formatLines(startLine, endLine) {
   if (Number.isInteger(startLine) && Number.isInteger(endLine)) {
     return `${startLine}-${endLine}`;
@@ -112,13 +121,13 @@ function formatAuthorLogin(author) {
 export function renderReviewStateMarkdown(payload, { sourcePath }) {
   assertReviewStateV1(payload);
 
-  const source = sourcePath ? escapeTableCell(sourcePath) : 'review-state.json';
+  const source = formatCodeSpan(sourcePath || 'review-state.json');
   const lines = [];
 
   lines.push('# Review State');
   lines.push('');
   lines.push(`PR: ${escapeTableCell(payload.pr.url)}`);
-  lines.push(`Source: \`${source}\``);
+  lines.push(`Source: ${source}`);
   lines.push(`FetchedAt: ${escapeTableCell(payload.fetchedAt)}`);
   lines.push(`SourceBranch: ${escapeTableCell(payload.sourceBranch)}`);
   lines.push('');
