@@ -2,7 +2,7 @@
 
 This document defines shared error concepts for Prisma Next so we can be consistent across packages and planes (CLI, migration planning, query planning, runtime execution).
 
-See [ADR 239 — Errors are structural envelopes with dotted namespace codes](architecture%20docs/adrs/ADR%20239%20-%20Errors%20are%20structural%20envelopes%20with%20dotted%20namespace%20codes.md) for the concrete code format, namespace list, and the `StructuredError` mechanism that implements the taxonomy below.
+See [ADR 239 — Errors are structural envelopes with dotted namespace codes](architecture%20docs/adrs/ADR%20239%20-%20Errors%20are%20structural%20envelopes%20with%20dotted%20namespace%20codes.md) for the concrete code format, namespace list, and the `StructuredError` mechanism that implements the taxonomy below. The [error reference](reference/error-reference.md) lists every published code; CI keeps it complete (`pnpm check:error-reference`).
 
 ## Goals
 
