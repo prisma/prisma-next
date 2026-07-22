@@ -1,0 +1,376 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "roots": {
+    "model": {
+      "model": "Model",
+      "namespace": "public"
+    },
+    "other": {
+      "model": "Other",
+      "namespace": "public"
+    }
+  },
+  "domain": {
+    "namespaces": {
+      "public": {
+        "enum": {
+          "Enum": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "A",
+                "value": "A"
+              },
+              {
+                "name": "B",
+                "value": "B"
+              }
+            ]
+          }
+        },
+        "models": {
+          "Model": {
+            "fields": {
+              "enum": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "Enum",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "enumList": {
+                "many": true,
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 24
+                  }
+                }
+              },
+              "list": {
+                "many": true,
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "otherId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "value": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "relation": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "otherId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Other",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "enum": {
+                  "column": "enum"
+                },
+                "enumList": {
+                  "column": "enumList"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "list": {
+                  "column": "list"
+                },
+                "otherId": {
+                  "column": "otherId"
+                },
+                "value": {
+                  "column": "value"
+                }
+              },
+              "namespaceId": "public",
+              "table": "model"
+            }
+          },
+          "Other": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 24
+                  }
+                }
+              }
+            },
+            "relations": {
+              "model": {
+                "cardinality": "1:1",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "otherId"
+                  ]
+                },
+                "to": {
+                  "model": "Model",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "other"
+            }
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "namespaces": {
+      "public": {
+        "entries": {
+          "table": {
+            "model": {
+              "checks": [
+                {
+                  "column": "enum",
+                  "name": "model_enum_check",
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Enum",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                {
+                  "column": "enumList",
+                  "name": "model_enumList_check",
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Enum",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                }
+              ],
+              "columns": {
+                "enum": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Enum",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "enumList": {
+                  "codecId": "pg/text@1",
+                  "many": true,
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Enum",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 24
+                  }
+                },
+                "list": {
+                  "codecId": "pg/text@1",
+                  "many": true,
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "otherId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "value": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "otherId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "model"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "other"
+                  }
+                }
+              ],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "otherId"
+                  ]
+                }
+              ]
+            },
+            "other": {
+              "columns": {
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 24
+                  }
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
+          },
+          "valueSet": {
+            "Enum": {
+              "kind": "valueSet",
+              "values": [
+                "A",
+                "B"
+              ]
+            }
+          }
+        },
+        "id": "public",
+        "kind": "postgres-schema"
+      }
+    },
+    "storageHash": "sha256:abcfe9ab555c91bf413e1ae17033f48a2f1e5ae3e3a962b40af67ec0982df7fd"
+  },
+  "execution": {
+    "executionHash": "sha256:9e9cfe8da32d02ccdb629e725f10b3463e865e9773e31206d2d4dd2d73d24a5c",
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "cuid2",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "model"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "cuid2",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "other"
+          }
+        }
+      ]
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "distinctOn": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "lateral": true,
+      "returning": true,
+      "scalarList": true
+    }
+  },
+  "extensionPacks": {},
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}

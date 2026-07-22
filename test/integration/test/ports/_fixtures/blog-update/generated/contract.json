@@ -1,0 +1,666 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "roots": {
+    "post": {
+      "model": "Post",
+      "namespace": "public"
+    },
+    "profile": {
+      "model": "Profile",
+      "namespace": "public"
+    },
+    "user": {
+      "model": "User",
+      "namespace": "public"
+    }
+  },
+  "domain": {
+    "namespaces": {
+      "public": {
+        "models": {
+          "Post": {
+            "fields": {
+              "authorId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "content": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 24
+                  }
+                }
+              },
+              "lastPublishedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "lastReviewedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "optional": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "published": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "author": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "authorId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "authorId": {
+                  "column": "author"
+                },
+                "content": {
+                  "column": "content"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "lastPublishedAt": {
+                  "column": "lastPublishedAt"
+                },
+                "lastReviewedAt": {
+                  "column": "lastReviewedAt"
+                },
+                "optional": {
+                  "column": "optional"
+                },
+                "published": {
+                  "column": "published"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "public",
+              "table": "post"
+            }
+          },
+          "Profile": {
+            "fields": {
+              "bio": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "goesToBedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "goesToOfficeAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 24
+                  }
+                }
+              },
+              "notrequired": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "bio": {
+                  "column": "bio"
+                },
+                "goesToBedAt": {
+                  "column": "goesToBedAt"
+                },
+                "goesToOfficeAt": {
+                  "column": "goesToOfficeAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "notrequired": {
+                  "column": "notrequired"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "public",
+              "table": "profile"
+            }
+          },
+          "User": {
+            "fields": {
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 24
+                  }
+                }
+              },
+              "lastLoginAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "wakesUpAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "posts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "authorId"
+                  ]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "public"
+                }
+              },
+              "profile": {
+                "cardinality": "1:1",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "Profile",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "email": {
+                  "column": "email"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "lastLoginAt": {
+                  "column": "lastLoginAt"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "wakesUpAt": {
+                  "column": "wakesUpAt"
+                }
+              },
+              "namespaceId": "public",
+              "table": "user"
+            }
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "namespaces": {
+      "public": {
+        "entries": {
+          "table": {
+            "post": {
+              "columns": {
+                "author": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "content": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 24
+                  }
+                },
+                "lastPublishedAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "lastReviewedAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "optional": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "published": {
+                  "codecId": "pg/bool@1",
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "author"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "post"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "author"
+                  ],
+                  "name": "post_author_idx"
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "profile": {
+              "columns": {
+                "bio": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "goesToBedAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "goesToOfficeAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 24
+                  }
+                },
+                "notrequired": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "profile"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "userId"
+                  ]
+                }
+              ]
+            },
+            "user": {
+              "columns": {
+                "email": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 24
+                  }
+                },
+                "lastLoginAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "wakesUpAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "email"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "id": "public",
+        "kind": "postgres-schema"
+      }
+    },
+    "storageHash": "sha256:634fc31377d33b5ac2e5ad6d21dff04cd468931801e4930ddaeac51e945c6fee"
+  },
+  "execution": {
+    "executionHash": "sha256:9c96b8054fc6d11515bfe9120e7cf7beddd4cc95a87721f88231269e903a8d85",
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "cuid2",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "post"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updatedAt",
+            "namespace": "public",
+            "table": "post"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "cuid2",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "profile"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "cuid2",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "user"
+          }
+        }
+      ]
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "distinctOn": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "lateral": true,
+      "returning": true,
+      "scalarList": true
+    }
+  },
+  "extensionPacks": {},
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}

@@ -7,3 +7,11 @@ One entry per `test.fails` port: a faithful port that runs but does not pass aga
 Every entry here corresponds one-to-one with a `test.fails` marker in the corpus.
 
 <!-- entries appended per batch -->
+
+- `test/ports/prisma/functional/default-selection.test.ts` › `includes scalars` — default selection returns scalar fields (id/value/otherId) — the faithful schema includes an `Enum[]` enum-list column; the postgres emitter emits an invalid `CHECK (col IN (...))` for that array column, so the contract push fails (sqlState 22P02 "malformed array literal") before any ORM op runs. (The more-faithful native-enum-array authoring pushes but then fails at query time with `type "<enum>[]" does not exist`, code 42704 — either authoring hits a real gap.)
+- `test/ports/prisma/functional/default-selection.test.ts` › `does not include relations` — default selection excludes relation fields — same enum-list emitter gap.
+- `test/ports/prisma/functional/default-selection.test.ts` › `includes enums` — default selection includes the enum field — same enum-list emitter gap.
+- `test/ports/prisma/functional/default-selection.test.ts` › `includes lists` — default selection includes the `String[]` list field — same enum-list emitter gap (the `Enum[]` column in the same model blocks the push).
+- `test/ports/prisma/functional/default-selection.test.ts` › `includes enum lists` — default selection includes the `Enum[]` enum-list field — same enum-list emitter gap.
+- `test/ports/prisma/functional/enum-array.test.ts` › `can create data with an enum array` — create a record with an enum array field — text-backed enum-list column emits `CHECK (plans IN ('FREE','PAID','CUSTOM'))`, invalid for a postgres array column; push fails with sqlState 22P02 "malformed array literal". (Native-enum-array authoring pushes but fails at query time with code 42704 `type "plan[]" does not exist` — enum arrays are unsupported end-to-end today.)
+- `test/ports/prisma/functional/enum-array.test.ts` › `can retrieve data with an enum array` — create then read back the enum array — same enum-list emitter gap.

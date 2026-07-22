@@ -27,10 +27,10 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/0-legacy-ports/atomic-increment-decrement/tests.ts
 
-- [ ] `atomic increment` — update with increment on credit and age [providers: all]
-- [ ] `atomic decrement` — update with decrement on credit and age [providers: all]
-- [ ] `atomic increment with negative value` — increment by negative values decrements [providers: all]
-- [ ] `atomic decrement with negative` — decrement by negative values increments [providers: all]
+- [x] `atomic increment` — update with increment on credit and age [providers: all] → non-ported
+- [x] `atomic decrement` — update with decrement on credit and age [providers: all] → non-ported
+- [x] `atomic increment with negative value` — increment by negative values decrements [providers: all] → non-ported
+- [x] `atomic decrement with negative` — decrement by negative values increments [providers: all] → non-ported
 
 ### packages/client/tests/functional/0-legacy-ports/batch-find-unique/tests.ts
 
@@ -153,10 +153,10 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/blog-update/tests.ts
 
-- [ ] `should create a user and update that field on that user` — create then update user email [providers: all]
-- [ ] `should create a user and post and connect them together` — update user to connect an existing post [providers: all]
-- [ ] `should create a user and post and disconnect them` — update user to disconnect a created post [providers: all]
-- [ ] `should create a user with posts and a profile and update itself and nested connections setting fields to null` — nested update setting many fields/relations to null (skipTestIf: postgres+driverAdapter+relationJoins) [providers: all]
+- [x] `should create a user and update that field on that user` — create then update user email [providers: all] → ports/prisma/functional/blog-update.test.ts
+- [x] `should create a user and post and connect them together` — update user to connect an existing post [providers: all] → ports/prisma/functional/blog-update.test.ts
+- [x] `should create a user and post and disconnect them` — update user to disconnect a created post [providers: all] → ports/prisma/functional/blog-update.test.ts
+- [x] `should create a user with posts and a profile and update itself and nested connections setting fields to null` — nested update setting many fields/relations to null (skipTestIf: postgres+driverAdapter+relationJoins) [providers: all] → non-ported
 
 ### packages/client/tests/functional/bytes-upsert/tests.ts
 
@@ -284,11 +284,11 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/composites/object/create.ts
 
-- [ ] `set` — create with content set returns snapshot [providers: mongodb-only]
-- [ ] `set shorthand` — create with content shorthand returns snapshot [providers: mongodb-only]
-- [ ] `set null` — create content.set null: required rejects, optional returns null (branches on contentProperty) [providers: mongodb-only]
-- [ ] `set null shorthand` — create content null: required rejects, optional returns null (branches on contentProperty) [providers: mongodb-only]
-- [ ] `set nested list` — create with content set nested upvotes list [providers: mongodb-only]
+- [x] `set` — create with content set returns snapshot [providers: mongodb-only] → ports/prisma/functional/composites-object-create.test.ts
+- [x] `set shorthand` — create with content shorthand returns snapshot [providers: mongodb-only] → ports/prisma/functional/composites-object-create.test.ts
+- [x] `set null` — create content.set null: required rejects, optional returns null (branches on contentProperty) [providers: mongodb-only] → ports/prisma/functional/composites-object-create.test.ts (optional variant ported; required-variant runtime throw is enforced at compile time — content is non-nullable, so `null` is a type error)
+- [x] `set null shorthand` — create content null: required rejects, optional returns null (branches on contentProperty) [providers: mongodb-only] → ports/prisma/functional/composites-object-create.test.ts (optional variant ported; required-variant runtime throw is enforced at compile time)
+- [x] `set nested list` — create with content set nested upvotes list [providers: mongodb-only] → ports/prisma/functional/composites-object-create.test.ts
 
 ### packages/client/tests/functional/composites/object/createMany.ts
 
@@ -421,12 +421,12 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/default-selection/tests.ts
 
-- [ ] `includes scalars` — default selection includes scalar fields (id, value, otherId) [providers: all]
-- [ ] `does not include relations` — default selection excludes relation fields [providers: all]
-- [ ] `includes enums` — (non-sqlite/sqlserver) default selection includes enum field [providers: all]
-- [ ] `includes lists` — (postgres/cockroach/mongo) default selection includes list field [providers: all]
-- [ ] `includes enum lists` — (postgres/cockroach/mongo) default selection includes enum-list field [providers: all]
-- [ ] `includes composites` — (mongo only) default selection includes composite field [providers: all]
+- [x] `includes scalars` — default selection includes scalar fields (id, value, otherId) [providers: all] → test.fails: test/ports/prisma/functional/default-selection.test.ts
+- [x] `does not include relations` — default selection excludes relation fields [providers: all] → test.fails: test/ports/prisma/functional/default-selection.test.ts
+- [x] `includes enums` — (non-sqlite/sqlserver) default selection includes enum field [providers: all] → test.fails: test/ports/prisma/functional/default-selection.test.ts
+- [x] `includes lists` — (postgres/cockroach/mongo) default selection includes list field [providers: all] → test.fails: test/ports/prisma/functional/default-selection.test.ts
+- [x] `includes enum lists` — (postgres/cockroach/mongo) default selection includes enum-list field [providers: all] → test.fails: test/ports/prisma/functional/default-selection.test.ts
+- [ ] `includes composites` — (mongo only) default selection includes composite field [providers: all] → mongo-skip
 
 ### packages/client/tests/functional/distinct/tests.ts
 
@@ -461,17 +461,17 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/enum-array/tests.ts
 
-- [ ] `can create data with an enum array` — create record with an enum array field [providers: postgres,mongodb,cockroachdb]
-- [ ] `can retrieve data with an enum array` — create then findFirstOrThrow returns the enum array with correct type [providers: postgres,mongodb,cockroachdb]
-- [ ] `can retrieve data with an enum array with a raw query and a custom parser` — (js_pg + client runtime only) createManyAndReturn + $queryRaw with custom userDefinedTypeParser parses enum arrays [providers: postgres,mongodb,cockroachdb]
+- [x] `can create data with an enum array` — create record with an enum array field [providers: postgres,mongodb,cockroachdb] → test.fails: test/ports/prisma/functional/enum-array.test.ts
+- [x] `can retrieve data with an enum array` — create then findFirstOrThrow returns the enum array with correct type [providers: postgres,mongodb,cockroachdb] → test.fails: test/ports/prisma/functional/enum-array.test.ts
+- [x] `can retrieve data with an enum array with a raw query and a custom parser` — (js_pg + client runtime only) createManyAndReturn + $queryRaw with custom userDefinedTypeParser parses enum arrays [providers: postgres,mongodb,cockroachdb] → non-ported
 
 ### packages/client/tests/functional/enums/tests.ts
 
-- [ ] `can create data with an enum value` — create record with an enum scalar value [providers: postgres,mysql,mongodb,cockroachdb,sqlite]
-- [ ] `can retrieve data with an enum value` — create then findFirstOrThrow filtering by enum returns correct typed value [providers: postgres,mysql,mongodb,cockroachdb,sqlite]
-- [ ] `the enum type can be assigned its own values` — enum type accepts its own literal values with correct static type [providers: postgres,mysql,mongodb,cockroachdb,sqlite]
-- [ ] `fails at runtime when an invalid entry is entered manually in SQLite` — (sqlite only) raw-inserted invalid enum value errors on read [providers: postgres,mysql,mongodb,cockroachdb,sqlite]
-- [ ] `fails at runtime when an invalid entry is entered manually in Mongo` — (mongo only) runCommandRaw-inserted invalid enum value errors on read [providers: postgres,mysql,mongodb,cockroachdb,sqlite]
+- [x] `can create data with an enum value` — create record with an enum scalar value [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → ports/prisma/functional/enums.test.ts
+- [x] `can retrieve data with an enum value` — create then findFirstOrThrow filtering by enum returns correct typed value [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → ports/prisma/functional/enums.test.ts
+- [x] `the enum type can be assigned its own values` — enum type accepts its own literal values with correct static type [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → ports/prisma/functional/enums.test.ts
+- [x] `fails at runtime when an invalid entry is entered manually in SQLite` — (sqlite only) raw-inserted invalid enum value errors on read [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → non-ported
+- [ ] `fails at runtime when an invalid entry is entered manually in Mongo` — (mongo only) runCommandRaw-inserted invalid enum value errors on read [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → mongo-skip
 
 ### packages/client/tests/functional/extended-where/aggregate.ts
 
