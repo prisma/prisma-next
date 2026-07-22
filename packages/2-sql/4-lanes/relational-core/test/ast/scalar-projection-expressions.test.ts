@@ -85,7 +85,14 @@ describe('scalar projection expressions', () => {
   });
 
   it('rejects an empty searched CASE and preserves an omitted ELSE', () => {
-    expect(() => CaseExpr.of([])).toThrow('CaseExpr requires at least one branch');
+    expect(() => CaseExpr.of([])).toThrow(
+      expect.objectContaining({
+        name: 'StructuredError',
+        code: 'SQL.AST_INVALID',
+        message: 'CaseExpr requires at least one branch',
+        meta: { kind: 'case', field: 'branches' },
+      }),
+    );
 
     const caseExpr = CaseExpr.of([
       {

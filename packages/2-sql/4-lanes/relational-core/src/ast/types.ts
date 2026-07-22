@@ -2,6 +2,7 @@ import type { ParamSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 
 import { ifDefined } from '@prisma-next/utils/defined';
+import { structuredError } from '@prisma-next/utils/structured-error';
 import { type CodecRef, frozenCodecRef } from './codec-types';
 import type { AnyJsonValueProjection } from './json-value-projection';
 
@@ -427,7 +428,9 @@ export class FunctionSource extends FromSource {
   ) {
     super();
     if (alias?.columnAliases?.length === 0) {
-      throw new Error('FunctionSource column aliases must not be empty');
+      throw structuredError('SQL.AST_INVALID', 'FunctionSource column aliases must not be empty', {
+        meta: { kind: 'function-source', field: 'columnAliases' },
+      });
     }
     this.fn = fn;
     this.args = frozenArrayCopy(args);
@@ -961,7 +964,9 @@ export class CaseExpr extends Expression {
   constructor(branches: ReadonlyArray<CaseBranch>, elseExpr?: AnyExpression) {
     super();
     if (branches.length === 0) {
-      throw new Error('CaseExpr requires at least one branch');
+      throw structuredError('SQL.AST_INVALID', 'CaseExpr requires at least one branch', {
+        meta: { kind: 'case', field: 'branches' },
+      });
     }
     this.branches = Object.freeze(
       branches.map((branch) =>

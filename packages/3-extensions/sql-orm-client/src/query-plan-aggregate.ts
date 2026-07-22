@@ -79,7 +79,11 @@ function validateGroupedComparable(value: AnyExpression): AnyExpression {
     case 'function-call':
     case 'cast':
     case 'case':
-      throw new Error(`Unsupported comparable kind in grouped having: "${value.kind}"`);
+      throw ormError(
+        'ORM.HAVING_EXPRESSION_UNSUPPORTED',
+        `Unsupported comparable kind in grouped having: "${value.kind}"`,
+        { meta: { kind: value.kind } },
+      );
     case 'list':
       if (value.values.some((entry) => entry.kind === 'param-ref')) {
         throw ormError(

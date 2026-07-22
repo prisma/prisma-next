@@ -41,6 +41,7 @@ import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
+import { structuredError } from '@prisma-next/utils/structured-error';
 import { createSqliteBuiltinCodecLookup } from './codec-lookup';
 import { SqliteControlAdapter } from './control-adapter';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
@@ -284,10 +285,18 @@ function renderSource(source: AnyFromSource, contract: SqliteContract): string {
       return `(${renderSelect(node.query, contract)}) AS ${quoteIdentifier(node.alias)}`;
     case 'function-source': {
       if (node.ordinality) {
-        throw new Error('SQLite does not support WITH ORDINALITY on function sources');
+        throw structuredError(
+          'ADAPTER.CAPABILITY_MISSING',
+          'SQLite does not support WITH ORDINALITY on function sources',
+          { meta: { target: 'sqlite', feature: 'function-source-with-ordinality' } },
+        );
       }
       if (node.columnAliases !== undefined) {
-        throw new Error('SQLite does not support returned-column aliases on function sources');
+        throw structuredError(
+          'ADAPTER.CAPABILITY_MISSING',
+          'SQLite does not support returned-column aliases on function sources',
+          { meta: { target: 'sqlite', feature: 'function-source-column-aliases' } },
+        );
       }
       const args = node.args.map((arg) => renderExpr(arg, contract)).join(', ');
       const call = `${node.fn}(${args})`;

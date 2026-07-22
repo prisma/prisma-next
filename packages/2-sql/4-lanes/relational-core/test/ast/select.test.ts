@@ -157,6 +157,22 @@ describe('ast/select', () => {
     expect(ast.collectParamRefs()).toEqual([fromParam, whereParam, havingParam, joinParam]);
   });
 
+  it('rejects empty FunctionSource column aliases with a structured error', () => {
+    expect(() =>
+      FunctionSource.of('json_each', [], {
+        alias: 'entry',
+        columnAliases: [],
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        name: 'StructuredError',
+        code: 'SQL.AST_INVALID',
+        message: 'FunctionSource column aliases must not be empty',
+        meta: { kind: 'function-source', field: 'columnAliases' },
+      }),
+    );
+  });
+
   it('collectParamRefs traverses FunctionSource args in top-level from and in joins', () => {
     const fromArg = param('tbl', 'from_fn_p');
     const joinArg = param('col', 'join_fn_p');

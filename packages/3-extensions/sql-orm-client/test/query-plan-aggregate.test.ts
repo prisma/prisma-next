@@ -3,8 +3,11 @@ import {
   AndExpr,
   type AnyExpression,
   BinaryExpr,
+  CaseExpr,
+  CastExpr,
   ColumnRef,
   ExistsExpr,
+  FunctionCallExpr,
   IdentifierRef,
   JsonArrayAggExpr,
   JsonObjectExpr,
@@ -393,6 +396,30 @@ describe('query plan aggregate', () => {
   });
 
   describe('validateGroupedComparable rejects invalid right-side expressions', () => {
+    it.each([
+      {
+        kind: 'function-call',
+        expr: FunctionCallExpr.of('abs', [LiteralExpr.of(1)]),
+      },
+      {
+        kind: 'cast',
+        expr: CastExpr.as(LiteralExpr.of(1), 'integer'),
+      },
+      {
+        kind: 'case',
+        expr: CaseExpr.of([{ condition: LiteralExpr.of(true), value: LiteralExpr.of(1) }]),
+      },
+    ])('rejects $kind with a structured error', ({ kind, expr }) => {
+      expect(() => compileWithHaving(BinaryExpr.gte(AggregateExpr.count(), expr))).toThrow(
+        expect.objectContaining({
+          name: 'StructuredError',
+          code: 'ORM.HAVING_EXPRESSION_UNSUPPORTED',
+          message: `Unsupported comparable kind in grouped having: "${kind}"`,
+          meta: { kind },
+        }),
+      );
+    });
+
     it('rejects SubqueryExpr on right side of binary', () => {
       const sub = SubqueryExpr.of(
         SelectAst.from(TableSource.named('posts')).withProjection([

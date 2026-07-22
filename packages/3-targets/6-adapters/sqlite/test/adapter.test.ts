@@ -239,7 +239,8 @@ describe('SQLite adapter', () => {
       {
         name: 'WITH ORDINALITY',
         source: FunctionSource.of('json_each', []).withOrdinality(),
-        error: 'SQLite does not support WITH ORDINALITY on function sources',
+        message: 'SQLite does not support WITH ORDINALITY on function sources',
+        feature: 'function-source-with-ordinality',
       },
       {
         name: 'returned-column aliases',
@@ -247,14 +248,22 @@ describe('SQLite adapter', () => {
           alias: 'entry',
           columnAliases: ['value'],
         }),
-        error: 'SQLite does not support returned-column aliases on function sources',
+        message: 'SQLite does not support returned-column aliases on function sources',
+        feature: 'function-source-column-aliases',
       },
-    ])('rejects function sources with $name', ({ source, error }) => {
+    ])('rejects function sources with $name', ({ source, message, feature }) => {
       const ast = SelectAst.from(source).withProjection([
         ProjectionItem.of('value', LiteralExpr.of(1)),
       ]);
 
-      expect(() => adapter.lower(ast, { contract })).toThrow(error);
+      expect(() => adapter.lower(ast, { contract })).toThrow(
+        expect.objectContaining({
+          name: 'StructuredError',
+          code: 'ADAPTER.CAPABILITY_MISSING',
+          message,
+          meta: { target: 'sqlite', feature },
+        }),
+      );
     });
 
     it('renders subquery in projection', () => {
