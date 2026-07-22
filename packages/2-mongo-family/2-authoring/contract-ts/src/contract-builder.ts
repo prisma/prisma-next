@@ -59,6 +59,7 @@ import { mongoContractCanonicalizationHooks } from '@prisma-next/mongo-contract/
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { contractError } from './contract-errors';
 import type { EnumTypeHandle } from './enum-type';
 
 /**
@@ -832,8 +833,10 @@ function composeMongoEntityHelpers(
     MONGO_RESERVED_HELPER_KEYS.includes(name),
   );
   if (collisions.length > 0) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_CONTRIBUTION_INVALID',
       `Pack-contributed entity type(s) ${collisions.map((c) => `"${c}"`).join(', ')} collide with the reserved built-in helper key(s) on the Mongo composed helpers surface. Reserved keys: ${MONGO_RESERVED_HELPER_KEYS.map((k) => `"${k}"`).join(', ')}.`,
+      { meta: { reason: 'reserved-helper-key-collision', contribution: collisions } },
     );
   }
   return createEntityHelpersFromNamespace(merged as AuthoringEntityTypeNamespace, {
@@ -1080,8 +1083,17 @@ function normalizeTargetField(
   }
 
   if (value.modelName !== targetModelName) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.RELATION_INVALID',
       `Relation target "${targetModelName}" cannot reference field "${value.modelName}.${value.fieldName}".`,
+      {
+        meta: {
+          modelName: targetModelName,
+          reason: 'cross-model-field-reference',
+          referencedModel: value.modelName,
+          referencedField: value.fieldName,
+        },
+      },
     );
   }
 
@@ -1360,14 +1372,24 @@ function validateTargetPackRef(
   target: TargetPackRef<string, string>,
 ): void {
   if (family.familyId !== 'mongo') {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_FAMILY_MISMATCH',
       `defineContract only accepts Mongo family packs. Received family "${family.familyId}".`,
+      { meta: { packId: family.id, packFamilyId: family.familyId, contractFamilyId: 'mongo' } },
     );
   }
 
   if (target.familyId !== family.familyId) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_FAMILY_MISMATCH',
       `target pack "${target.id}" targets family "${target.familyId}" but contract family is "${family.familyId}".`,
+      {
+        meta: {
+          packId: target.id,
+          packFamilyId: target.familyId,
+          contractFamilyId: family.familyId,
+        },
+      },
     );
   }
 }
@@ -1382,20 +1404,38 @@ function validateExtensionPackRefs(
 
   for (const packRef of Object.values(extensionPacks)) {
     if (packRef.kind !== 'extension') {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.PACK_REF_INVALID',
         `defineContract only accepts extension pack refs in extensionPacks. Received kind "${packRef.kind}".`,
+        { meta: { packId: packRef.id, kind: packRef.kind } },
       );
     }
 
     if (packRef.familyId !== target.familyId) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.PACK_FAMILY_MISMATCH',
         `extension pack "${packRef.id}" targets family "${packRef.familyId}" but contract target family is "${target.familyId}".`,
+        {
+          meta: {
+            packId: packRef.id,
+            packFamilyId: packRef.familyId,
+            contractFamilyId: target.familyId,
+          },
+        },
       );
     }
 
     if (packRef.targetId && packRef.targetId !== target.targetId) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.PACK_TARGET_MISMATCH',
         `extension pack "${packRef.id}" targets "${packRef.targetId}" but contract target is "${target.targetId}".`,
+        {
+          meta: {
+            packId: packRef.id,
+            packTargetId: packRef.targetId,
+            contractTargetId: target.targetId,
+          },
+        },
       );
     }
   }
@@ -1485,8 +1525,10 @@ function buildValueObjects(
 
   for (const valueObjectBuilder of Object.values(valueObjects ?? {})) {
     if (valueObjectBuilder.__name in builtValueObjects) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.NAME_DUPLICATE',
         `Duplicate value object name "${valueObjectBuilder.__name}" in defineContract().`,
+        { meta: { kind: 'valueObject', name: valueObjectBuilder.__name } },
       );
     }
 
@@ -1505,7 +1547,11 @@ function buildModels(
 
   for (const modelBuilder of Object.values(models ?? {})) {
     if (modelBuilder.__name in builtModels) {
-      throw new Error(`Duplicate model name "${modelBuilder.__name}" in defineContract().`);
+      throw contractError(
+        'CONTRACT.NAME_DUPLICATE',
+        `Duplicate model name "${modelBuilder.__name}" in defineContract().`,
+        { meta: { kind: 'model', name: modelBuilder.__name } },
+      );
     }
 
     const storage = {
@@ -1630,8 +1676,10 @@ function scopeVariantIndex(
   const result = applyPolymorphicScopeToMongoIndex(storageIndex, scope);
   if (result.kind === 'conflict') {
     const indexLabel = authoredIndex ? canonicalStringify(authoredIndex) : '<unknown>';
-    throw new Error(
+    throw contractError(
+      'CONTRACT.INDEX_INVALID',
       `Variant model "${variantName}" index ${indexLabel} conflicts with discriminator scope: ${result.reason}`,
+      { meta: { variantName, indexLabel, reason: result.reason } },
     );
   }
   return result.index;
@@ -1651,20 +1699,31 @@ function buildCollections(
   for (const modelBuilder of Object.values(modelMap)) {
     if (!modelBuilder.__collection) {
       if (modelBuilder.__indexes && modelBuilder.__indexes.length > 0) {
-        throw new Error(
+        throw contractError(
+          'CONTRACT.COLLECTION_INVALID',
           `Model "${modelBuilder.__name}" defines indexes but has no collection to attach them to.`,
+          { meta: { modelName: modelBuilder.__name, reason: 'indexes-without-collection' } },
         );
       }
 
       if (modelBuilder.__collectionOptions) {
-        throw new Error(
+        throw contractError(
+          'CONTRACT.COLLECTION_INVALID',
           `Model "${modelBuilder.__name}" defines collectionOptions but has no collection to attach them to.`,
+          {
+            meta: {
+              modelName: modelBuilder.__name,
+              reason: 'collectionOptions-without-collection',
+            },
+          },
         );
       }
 
       if (modelBuilder.__controlPolicy) {
-        throw new Error(
+        throw contractError(
+          'CONTRACT.COLLECTION_INVALID',
           `Model "${modelBuilder.__name}" defines controlPolicy but has no collection to attach it to.`,
+          { meta: { modelName: modelBuilder.__name, reason: 'controlPolicy-without-collection' } },
         );
       }
 
@@ -1675,14 +1734,30 @@ function buildCollections(
     const existingIndexes = existingCollection.indexes ?? [];
 
     if (existingCollection.options && modelBuilder.__collectionOptions) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.COLLECTION_INVALID',
         `Collection "${modelBuilder.__collection}" has collectionOptions declared by multiple models. Author collectionOptions on a single model per collection.`,
+        {
+          meta: {
+            modelName: modelBuilder.__name,
+            collection: modelBuilder.__collection,
+            reason: 'collectionOptions-declared-by-multiple-models',
+          },
+        },
       );
     }
 
     if (existingCollection.control !== undefined && modelBuilder.__controlPolicy) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.COLLECTION_INVALID',
         `Collection "${modelBuilder.__collection}" has controlPolicy declared by multiple models. Author controlPolicy on a single model per collection.`,
+        {
+          meta: {
+            modelName: modelBuilder.__name,
+            collection: modelBuilder.__collection,
+            reason: 'controlPolicy-declared-by-multiple-models',
+          },
+        },
       );
     }
 
@@ -1690,8 +1765,12 @@ function buildCollections(
       const missingField = findMissingIndexField(collectionIndex, modelBuilder.__fields);
       if (missingField !== undefined) {
         const indexSignature = canonicalStringify(collectionIndex);
-        throw new Error(
+        throw contractError(
+          'CONTRACT.FIELD_UNKNOWN',
           `Model "${modelBuilder.__name}" index ${indexSignature} references unknown field "${missingField}".`,
+          {
+            meta: { modelName: modelBuilder.__name, fieldName: missingField, indexSignature },
+          },
         );
       }
     }
@@ -1724,8 +1803,18 @@ function buildCollections(
         const reportedSignature = authoredIndex
           ? canonicalStringify(authoredIndex)
           : indexSignature;
-        throw new Error(
+        throw contractError(
+          'CONTRACT.NAME_DUPLICATE',
           `Collection "${modelBuilder.__collection}" defines duplicate index ${reportedSignature}. First declared on model "${firstOwner}" and duplicated on model "${modelBuilder.__name}".`,
+          {
+            meta: {
+              kind: 'index',
+              name: reportedSignature,
+              collection: modelBuilder.__collection,
+              first: firstOwner,
+              second: modelBuilder.__name,
+            },
+          },
         );
       }
       declaredIndexOwners.set(collectionIndexKey, modelBuilder.__name);
@@ -1834,8 +1923,16 @@ function buildContractFromDefinition<
   const builtEnums: Record<string, ContractEnum> = {};
   for (const [enumName, handle] of Object.entries(definition.enums ?? {})) {
     if (enumName !== handle.enumName) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.ENUM_INVALID',
         `enum declaration key "${enumName}" must match enumType name "${handle.enumName}". Aliases are not supported.`,
+        {
+          meta: {
+            enumName: handle.enumName,
+            declaredKey: enumName,
+            reason: 'declaration-key-mismatch',
+          },
+        },
       );
     }
     builtEnums[enumName] = {
@@ -1852,8 +1949,10 @@ function buildContractFromDefinition<
     for (const [fieldName, fieldBuilder] of Object.entries(modelBuilder.__fields)) {
       const handle = fieldBuilder.__enumHandle;
       if (handle && !(handle.enumName in builtEnums)) {
-        throw new Error(
+        throw contractError(
+          'CONTRACT.ENUM_UNKNOWN',
           `Model "${modelName}" field "${fieldName}" references enum "${handle.enumName}" which is not declared in defineContract({ enums: { ... } }).`,
+          { meta: { modelName, fieldName, enumName: handle.enumName } },
         );
       }
     }

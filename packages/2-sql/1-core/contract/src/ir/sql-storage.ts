@@ -7,6 +7,7 @@ import {
   NamespaceBase,
   type Storage,
 } from '@prisma-next/framework-components/ir';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import { SqlNode } from './sql-node';
 import type { StorageTable } from './storage-table';
 import {
@@ -197,7 +198,7 @@ function normaliseTypeEntry(name: string, entry: SqlStorageTypeEntry): StorageTy
     rawKind === undefined
       ? 'missing `kind` discriminator'
       : `unrecognised \`kind\` discriminator ${JSON.stringify(rawKind)}`;
-  throw new Error(
+  throw new InternalError(
     `storage.types[${JSON.stringify(name)}] has ${kindDescription}; expected ${JSON.stringify('codec-instance')}. Untagged codec triples should be wrapped with toStorageTypeInstance(...) before construction.`,
   );
 }

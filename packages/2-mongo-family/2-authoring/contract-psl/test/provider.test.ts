@@ -60,6 +60,14 @@ describe('mongoContract provider helper', () => {
     expect(config.source.sourceFormat).toBe('psl');
   });
 
+  it('throws InternalError when resolvedInputs is empty', async () => {
+    const contract = mongoContract('./schema.prisma');
+
+    await expect(contract.source.load(createMongoTestContext())).rejects.toMatchObject({
+      isPrismaInternalError: true,
+    });
+  });
+
   it('resolves relative schema paths from configDir when cwd differs', async () => {
     const configDir = await mkdtemp(join(tmpdir(), 'mongo-psl-provider-config-'));
     const cwdDir = await mkdtemp(join(tmpdir(), 'mongo-psl-provider-cwd-'));

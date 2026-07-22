@@ -23,6 +23,7 @@ import type {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { NamedConstraintSpec } from './authoring-type-utils';
+import { contractError } from './contract-errors';
 import type { EnumTypeHandle } from './enum-type';
 import { isEnumTypeHandle } from './enum-type';
 
@@ -402,10 +403,14 @@ export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFie
     const uniqueSpec = 'unique' in spec ? spec.unique : undefined;
 
     if (idSpec && !this.state.id) {
-      throw new Error('field.sql({ id }) requires an existing inline .id(...) declaration.');
+      throw contractError(
+        'CONTRACT.ARGUMENT_INVALID',
+        'field.sql({ id }) requires an existing inline .id(...) declaration.',
+      );
     }
     if (uniqueSpec && !this.state.unique) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.ARGUMENT_INVALID',
         'field.sql({ unique }) requires an existing inline .unique(...) declaration.',
       );
     }
@@ -457,8 +462,10 @@ export class EnumScalarFieldBuilder<
   }
 
   override defaultSql(_expression: never): never {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.DEFAULT_INVALID',
       'defaultSql is not available on an enum field; use .default(members.X) instead',
+      { meta: { reason: 'defaultSql-on-enum-field' } },
     );
   }
 }
@@ -674,7 +681,11 @@ export class RelationBuilder<State extends RelationState = AnyRelationState> {
     spec: SqlSpec,
   ): RelationBuilder<ApplyBelongsToRelationSqlSpec<State, SqlSpec>> {
     if (this.state.kind !== 'belongsTo') {
-      throw new Error('relation.sql(...) is only supported for belongsTo relations.');
+      throw contractError(
+        'CONTRACT.RELATION_INVALID',
+        'relation.sql(...) is only supported for belongsTo relations.',
+        { meta: { relationKind: this.state.kind } },
+      );
     }
 
     return new RelationBuilder({
@@ -860,27 +871,45 @@ function normalizeTargetFieldRefInput(input: TargetFieldRef | readonly TargetFie
   const refs = Array.isArray(input) ? input : [input];
   const [first] = refs;
   if (!first) {
-    throw new Error('Expected at least one target ref');
+    throw contractError('CONTRACT.FOREIGN_KEY_INVALID', 'Expected at least one target ref', {
+      meta: { reason: 'empty-target-refs' },
+    });
   }
   if (refs.some((ref) => ref.modelName !== first.modelName)) {
-    throw new Error('All target refs in a foreign key must point to the same model');
+    throw contractError(
+      'CONTRACT.FOREIGN_KEY_INVALID',
+      'All target refs in a foreign key must point to the same model',
+      { meta: { mismatch: 'modelName', models: refs.map((ref) => ref.modelName) } },
+    );
   }
   // F-compound: all refs in a compound FK must share the same cross-space coordinate.
   // A mismatch in spaceId, namespaceId, or tableName means the refs come from
   // different spaces despite having the same modelName — an impossible FK.
   if (refs.some((ref) => ref.spaceId !== first.spaceId)) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.FOREIGN_KEY_INVALID',
       `All target refs in a compound foreign key must share the same spaceId (found mismatch: "${first.spaceId ?? '<local>'}" vs "${refs.find((r) => r.spaceId !== first.spaceId)?.spaceId ?? '<local>'}")`,
+      {
+        meta: {
+          mismatch: 'spaceId',
+          first: first.spaceId,
+          second: refs.find((r) => r.spaceId !== first.spaceId)?.spaceId,
+        },
+      },
     );
   }
   if (refs.some((ref) => ref.namespaceId !== first.namespaceId)) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.FOREIGN_KEY_INVALID',
       'All target refs in a compound foreign key must share the same namespaceId (found mismatch)',
+      { meta: { mismatch: 'namespaceId' } },
     );
   }
   if (refs.some((ref) => ref.tableName !== first.tableName)) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.FOREIGN_KEY_INVALID',
       'All target refs in a compound foreign key must share the same tableName (found mismatch)',
+      { meta: { mismatch: 'tableName' } },
     );
   }
   return {
@@ -1322,7 +1351,10 @@ export class ContractModelBuilder<
   ): TargetFieldRef<ModelName & string, FieldName> {
     const modelName = this.stageOne.modelName;
     if (!modelName) {
-      throw new Error('Model tokens require model("ModelName", ...) before calling .ref(...)');
+      throw contractError(
+        'CONTRACT.MODEL_TOKEN_INVALID',
+        'Model tokens require model("ModelName", ...) before calling .ref(...)',
+      );
     }
 
     return {
@@ -1346,8 +1378,16 @@ export class ContractModelBuilder<
   > {
     const duplicateRelationName = findDuplicateRelationName(this.stageOne.relations, relations);
     if (duplicateRelationName) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.NAME_DUPLICATE',
         `Model "${this.stageOne.modelName ?? '<anonymous>'}" already defines relation "${duplicateRelationName}".`,
+        {
+          meta: {
+            kind: 'relation',
+            name: duplicateRelationName,
+            modelName: this.stageOne.modelName,
+          },
+        },
       );
     }
 
@@ -1501,7 +1541,8 @@ function resolveNamedModelTokenName(token: {
 }): string {
   const modelName = token.stageOne.modelName;
   if (!modelName) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.MODEL_TOKEN_INVALID',
       'Relation targets require named model tokens. Use model("ModelName", ...) before passing a token to rel.*(...).',
     );
   }
@@ -1668,7 +1709,10 @@ export function model<
   const input = typeof modelNameOrInput === 'string' ? maybeInput : modelNameOrInput;
 
   if (!input) {
-    throw new Error('model("ModelName", ...) requires a model definition.');
+    throw contractError(
+      'CONTRACT.ARGUMENT_INVALID',
+      'model("ModelName", ...) requires a model definition.',
+    );
   }
 
   return new ContractModelBuilder({

@@ -58,6 +58,7 @@ import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
 import { deriveValueSetFromEntity } from '@prisma-next/sql-contract/value-set-derivation-hook';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import type {
   ContractDefinition,
   FieldNode,
@@ -65,6 +66,7 @@ import type {
   RelationNode,
   ValueObjectFieldNode,
 } from './contract-definition';
+import { contractError } from './contract-errors';
 
 type DomainFieldRef =
   | { readonly kind: 'scalar'; readonly many?: boolean }
@@ -92,7 +94,7 @@ function encodeColumnDefault(
   }
   if (many) {
     if (!Array.isArray(defaultInput.value)) {
-      throw new Error(
+      throw new InternalError(
         `Literal default on a list column must be an array; received ${typeof defaultInput.value}. ` +
           'A scalar default on a list field must be rejected at the authoring surface.',
       );
@@ -114,7 +116,11 @@ function assertStorageSemantics(
 ): void {
   const semanticErrors = validateStorageSemantics(contract.storage);
   if (semanticErrors.length > 0) {
-    throw new Error(`Contract semantic validation failed: ${semanticErrors.join('; ')}`);
+    throw contractError(
+      'CONTRACT.VALIDATION_FAILED',
+      `Contract semantic validation failed: ${semanticErrors.join('; ')}`,
+      { meta: { errors: semanticErrors } },
+    );
   }
 
   const indexTypeRegistry = createIndexTypeRegistry();
@@ -130,8 +136,10 @@ function assertStorageSemantics(
       registration === null ||
       !Array.isArray((registration as { entries?: unknown }).entries)
     ) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.PACK_CONTRIBUTION_INVALID',
         `Pack "${pack.id ?? '<unknown>'}" declares "indexTypes" but its value is not an IndexTypeRegistration (expected an object with an "entries" array; got ${typeof registration}).`,
+        { meta: { packId: pack.id, contribution: 'indexTypes', reason: 'invalid-shape' } },
       );
     }
     for (const entry of (registration as IndexTypeRegistration<IndexTypeMap>).entries) {
@@ -158,8 +166,10 @@ function assertKnownTargetModel(
       targetNamespaceId !== undefined && targetNamespaceId.length > 0
         ? `${targetNamespaceId}.${targetModelName}`
         : targetModelName;
-    throw new Error(
+    throw contractError(
+      'CONTRACT.MODEL_UNKNOWN',
       `${context} on model "${sourceModelName}" references unknown model "${qualified}"`,
+      { meta: { sourceModel: sourceModelName, targetModel: qualified, context } },
     );
   }
   return targetModel;
@@ -172,8 +182,17 @@ function assertTargetTableMatches(
   context: string,
 ): void {
   if (targetModel.tableName !== referencedTableName) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.TABLE_MISMATCH',
       `${context} on model "${sourceModelName}" references table "${referencedTableName}" but model "${targetModel.modelName}" maps to "${targetModel.tableName}"`,
+      {
+        meta: {
+          sourceModel: sourceModelName,
+          referencedTable: referencedTableName,
+          mappedTable: targetModel.tableName,
+          context,
+        },
+      },
     );
   }
 }
@@ -310,8 +329,10 @@ function collectEntityFromColumn(
   const forKind = forNs[entityRef.entityKind] ?? {};
   const existing = forKind[entityRef.entityName];
   if (existing !== undefined && existing !== entityRef.entity) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.NAME_DUPLICATE',
       `buildSqlContractFromDefinition: two different "${entityRef.entityKind}" entities named "${entityRef.entityName}" in namespace "${namespaceId}" — pack-entity names must be unique per namespace.`,
+      { meta: { kind: entityRef.entityKind, name: entityRef.entityName, namespaceId } },
     );
   }
   forKind[entityRef.entityName] = entityRef.entity;
@@ -344,8 +365,10 @@ function mergeColumnAndAttachedEntities(
     for (const [name, entity] of Object.entries(columnForKind ?? {})) {
       const existing = attachedForKind?.[name];
       if (existing !== undefined && existing !== entity) {
-        throw new Error(
+        throw contractError(
+          'CONTRACT.NAME_DUPLICATE',
           `buildSqlContractFromDefinition: two different "${kind}" entities named "${name}" in namespace "${namespaceId}" — a column-referenced entity conflicts with an attached one; pack-entity names must be unique per namespace.`,
+          { meta: { kind, name, namespaceId } },
         );
       }
     }
@@ -377,8 +400,10 @@ function buildThroughDescriptor(
   defaultNamespaceId: string,
 ): ContractRelationThrough {
   if (!tableNamespaceByName.has(through.table)) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.MODEL_UNKNOWN',
       `buildSqlContractFromDefinition: junction table "${through.table}" for relation "${modelName}.${fieldName}" is not a declared model.`,
+      { meta: { sourceModel: modelName, relationName: fieldName, junctionTable: through.table } },
     );
   }
   // Junction table names are unique per namespace, not globally. Prefer the
@@ -405,8 +430,10 @@ function targetColumnsForJunction(targetModel: ModelNode, fieldName: string): re
   if (firstUnique) {
     return firstUnique.columns;
   }
-  throw new Error(
+  throw contractError(
+    'CONTRACT.IDENTITY_INVALID',
     `M:N target model "${targetModel.modelName}" (relation field "${fieldName}") has no primary id or unique key to derive junction targetColumns.`,
+    { meta: { modelName: targetModel.modelName, reason: 'no-key-for-junction-target-columns' } },
   );
 }
 
@@ -515,8 +542,10 @@ function assertNoManagedEntityKinds(
   if (entitiesForNs === undefined) return;
   for (const kind of Object.keys(entitiesForNs)) {
     if (MANAGED_ENTRY_KINDS.has(kind)) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.ENTITY_KIND_INVALID',
         `buildSqlContractFromDefinition: attached entity in namespace "${namespaceId}" declares entry kind "${kind}", which is managed by the framework (table/valueSet) and cannot be attached.`,
+        { meta: { entityKind: kind, namespaceId } },
       );
     }
   }
@@ -599,8 +628,10 @@ function mergeNamespaceValueSets(
   if (enumValueSets !== undefined && packValueSets !== undefined) {
     for (const name of Object.keys(packValueSets)) {
       if (Object.hasOwn(enumValueSets, name)) {
-        throw new Error(
+        throw contractError(
+          'CONTRACT.NAME_DUPLICATE',
           `buildSqlContractFromDefinition: value-set "${name}" in namespace "${namespaceId}" is derived from both an enum and a pack entity — names must be unique per namespace.`,
+          { meta: { kind: 'valueSet', name, namespaceId } },
         );
       }
     }
@@ -690,13 +721,29 @@ export function buildSqlContractFromDefinition(
           : undefined;
       if (executionDefaultPhases) {
         if (field.default !== undefined) {
-          throw new Error(
+          throw contractError(
+            'CONTRACT.DEFAULT_INVALID',
             `Field "${semanticModel.modelName}.${field.fieldName}" cannot define both default and executionDefaults.`,
+            {
+              meta: {
+                modelName: semanticModel.modelName,
+                fieldName: field.fieldName,
+                reason: 'default-and-executionDefaults',
+              },
+            },
           );
         }
         if (field.nullable) {
-          throw new Error(
+          throw contractError(
+            'CONTRACT.DEFAULT_INVALID',
             `Field "${semanticModel.modelName}.${field.fieldName}" cannot be nullable when executionDefaults are present.`,
+            {
+              meta: {
+                modelName: semanticModel.modelName,
+                fieldName: field.fieldName,
+                reason: 'nullable-with-executionDefaults',
+              },
+            },
           );
         }
       }
@@ -914,8 +961,10 @@ export function buildSqlContractFromDefinition(
         tablesByNamespace[namespaceId] = nsTables;
       }
       if (nsTables[tableName] !== undefined) {
-        throw new Error(
+        throw contractError(
+          'CONTRACT.NAME_DUPLICATE',
           `buildSqlContractFromDefinition: duplicate table "${tableName}" in namespace "${namespaceId}".`,
+          { meta: { kind: 'table', name: tableName, namespaceId } },
         );
       }
       nsTables[tableName] = tableInput;
@@ -978,8 +1027,16 @@ export function buildSqlContractFromDefinition(
 
       if (relation.cardinality === 'N:M') {
         if (!relation.through) {
-          throw new Error(
+          throw contractError(
+            'CONTRACT.RELATION_INVALID',
             `Relation "${semanticModel.modelName}.${relation.fieldName}" with cardinality "N:M" requires through metadata`,
+            {
+              meta: {
+                modelName: semanticModel.modelName,
+                relationName: relation.fieldName,
+                reason: 'many-to-many-missing-through',
+              },
+            },
           );
         }
         modelRelations[relation.fieldName] = {
@@ -1062,8 +1119,16 @@ export function buildSqlContractFromDefinition(
   const storageValueSetsByNs: Record<string, Record<string, StorageValueSetInput>> = {};
   for (const [enumName, handle] of Object.entries(definition.enums ?? {})) {
     if (enumName !== handle.enumName) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.ENUM_INVALID',
         `enum declaration key "${enumName}" must match enumType name "${handle.enumName}". Aliases are not supported.`,
+        {
+          meta: {
+            enumName: handle.enumName,
+            declarationKey: enumName,
+            reason: 'key-name-mismatch',
+          },
+        },
       );
     }
     const nsId = defaultNamespaceId;

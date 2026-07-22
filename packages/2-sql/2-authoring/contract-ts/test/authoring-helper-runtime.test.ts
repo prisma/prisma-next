@@ -133,6 +133,9 @@ describe('authoring helper runtime', () => {
     expect(() => createTypeHelpersFromNamespace(unsafeNamespace)).toThrow(
       'Invalid authoring helper "nested.__proto__". Helper path segments must not use "__proto__".',
     );
+    expect(() => createTypeHelpersFromNamespace(unsafeNamespace)).toThrow(
+      expect.objectContaining({ code: 'CONTRACT.PACK_CONTRIBUTION_INVALID' }),
+    );
   });
 
   it('creates nested field helpers and passes the resolved helper path to leaf factories', () => {
@@ -197,6 +200,9 @@ describe('authoring helper runtime', () => {
 
     expect(() => helper({ size: 16 }, { name: 'short_link_pkey' }, { name: 'ignored' })).toThrow(
       'field.id.nanoid expects at most 2 argument(s), received 3',
+    );
+    expect(() => helper({ size: 16 }, { name: 'short_link_pkey' }, { name: 'ignored' })).toThrow(
+      expect.objectContaining({ code: 'CONTRACT.ARGUMENT_INVALID' }),
     );
   });
 

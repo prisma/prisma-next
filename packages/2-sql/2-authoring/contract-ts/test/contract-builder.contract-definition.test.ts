@@ -307,6 +307,108 @@ describe('shared contract definition lowering', () => {
     ).toThrow('Field "User.id" cannot define both default and executionDefaults.');
   });
 
+  it('default-and-executionDefaults rejection carries CONTRACT.DEFAULT_INVALID', () => {
+    expect(() =>
+      buildSqlContractFromDefinition({
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+        models: [
+          {
+            modelName: 'User',
+            tableName: 'app_user',
+            fields: [
+              {
+                fieldName: 'id',
+                columnName: 'id',
+                descriptor: {
+                  codecId: 'pg/text@1',
+                  nativeType: 'text',
+                },
+                nullable: false,
+                default: {
+                  kind: 'function',
+                  expression: 'gen_random_uuid()',
+                },
+                executionDefaults: {
+                  onCreate: {
+                    kind: 'generator',
+                    id: 'uuidv4',
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.DEFAULT_INVALID' }));
+  });
+
+  it('rejects a foreign key whose referenced table disagrees with the target model mapping', () => {
+    const build = () =>
+      buildSqlContractFromDefinition({
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+        models: [
+          {
+            modelName: 'User',
+            tableName: 'app_user',
+            fields: [
+              {
+                fieldName: 'id',
+                columnName: 'id',
+                descriptor: {
+                  codecId: 'pg/int4@1',
+                  nativeType: 'int4',
+                },
+                nullable: false,
+              },
+            ],
+            id: { columns: ['id'] },
+          },
+          {
+            modelName: 'Post',
+            tableName: 'blog_post',
+            fields: [
+              {
+                fieldName: 'id',
+                columnName: 'id',
+                descriptor: {
+                  codecId: 'pg/int4@1',
+                  nativeType: 'int4',
+                },
+                nullable: false,
+              },
+              {
+                fieldName: 'authorId',
+                columnName: 'author_id',
+                descriptor: {
+                  codecId: 'pg/int4@1',
+                  nativeType: 'int4',
+                },
+                nullable: false,
+              },
+            ],
+            id: { columns: ['id'] },
+            foreignKeys: [
+              {
+                columns: ['author_id'],
+                references: {
+                  model: 'User',
+                  table: 'wrong_table',
+                  columns: ['id'],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+    expect(build).toThrow(
+      'Foreign key on model "Post" references table "wrong_table" but model "User" maps to "app_user"',
+    );
+    expect(build).toThrow(expect.objectContaining({ code: 'CONTRACT.TABLE_MISMATCH' }));
+  });
+
   it('rejects generated fields that are still marked nullable', () => {
     expect(() =>
       buildSqlContractFromDefinition({

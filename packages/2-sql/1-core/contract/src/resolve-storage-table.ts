@@ -1,4 +1,5 @@
 import { entityAt } from '@prisma-next/framework-components/ir';
+import { contractError } from './contract-errors';
 import type { SqlStorage } from './ir/sql-storage';
 import type { StorageTable } from './ir/storage-table';
 
@@ -47,8 +48,10 @@ export function resolveStorageTable(
       .map((match) => match.namespaceId)
       .sort()
       .join(', ');
-    throw new Error(
+    throw contractError(
+      'CONTRACT.TABLE_AMBIGUOUS',
       `Storage table "${tableName}" is ambiguous across namespaces [${candidates}]; qualify it with a namespace coordinate.`,
+      { meta: { tableName, candidates: matches.map((match) => match.namespaceId).sort() } },
     );
   }
 

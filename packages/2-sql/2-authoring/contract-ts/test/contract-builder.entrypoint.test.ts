@@ -63,6 +63,7 @@ describe('defineContract runtime guards', () => {
           models: {},
         }),
       error: 'defineContract only accepts SQL family packs. Received family "document".',
+      code: 'CONTRACT.PACK_FAMILY_MISMATCH',
     },
     {
       name: 'non-extension pack refs in extensionPacks',
@@ -78,6 +79,7 @@ describe('defineContract runtime guards', () => {
         }),
       error:
         'defineContract only accepts extension pack refs in extensionPacks. Received kind "target".',
+      code: 'CONTRACT.PACK_REF_INVALID',
     },
     {
       name: 'extension packs from another family',
@@ -96,6 +98,7 @@ describe('defineContract runtime guards', () => {
         }),
       error:
         'extension pack "pgvector" targets family "document" but contract target family is "sql".',
+      code: 'CONTRACT.PACK_FAMILY_MISMATCH',
     },
     {
       name: 'extension packs for another target',
@@ -110,9 +113,11 @@ describe('defineContract runtime guards', () => {
           models: {},
         }),
       error: 'extension pack "pgvector" targets "mysql" but contract target is "postgres".',
+      code: 'CONTRACT.PACK_TARGET_MISMATCH',
     },
-  ])('rejects $name', ({ run, error }) => {
+  ])('rejects $name', ({ run, error, code }) => {
     expect(run).toThrow(error);
+    expect(run).toThrow(expect.objectContaining({ code }));
   });
 });
 
@@ -170,6 +175,16 @@ describe('defineContract namespace declaration runtime guards', () => {
         models: {},
       }),
     ).toThrow(/__unbound__.*reserved/i);
+
+    expect(() =>
+      defineContract({
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        namespaces: ['__unbound__'],
+        createNamespace: createTestSqlNamespace,
+        models: {},
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.NAMESPACE_INVALID' }));
   });
 
   it('rejects the reserved parser-synthesised sentinel `__unspecified__` in the declared namespaces list', () => {
@@ -206,6 +221,16 @@ describe('defineContract namespace declaration runtime guards', () => {
         models: {},
       }),
     ).toThrow(/duplicate.*auth/i);
+
+    expect(() =>
+      defineContract({
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        namespaces: ['auth', 'public', 'auth'],
+        createNamespace: createTestSqlNamespace,
+        models: {},
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.NAME_DUPLICATE' }));
   });
 
   it('rejects empty / whitespace-only namespace names', () => {

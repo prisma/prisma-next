@@ -239,6 +239,15 @@ describe('missing-pack fail-fast diagnostic', () => {
         models: { Profile },
       }),
     ).toThrow(/supabase/);
+
+    expect(() =>
+      defineContract({
+        family: bareFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+        models: { Profile },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.PACK_MISSING' }));
   });
 
   it('error message mentions extensionPacks', () => {

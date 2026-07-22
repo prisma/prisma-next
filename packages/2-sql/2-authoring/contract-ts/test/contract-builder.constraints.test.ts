@@ -228,6 +228,21 @@ describe('contract definition constraint support', () => {
         },
       }),
     ).toThrow(/Contract semantic validation failed:.*user_pkey/);
+
+    expect(() =>
+      defineTestContract({
+        models: {
+          User: model('User', {
+            fields: {
+              id: field.column(int4Column).id({ name: 'user_pkey' }),
+            },
+          }).sql(({ cols, constraints }) => ({
+            table: 'user',
+            indexes: [constraints.index([cols.id], { name: 'user_pkey' })],
+          })),
+        },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.VALIDATION_FAILED' }));
   });
 
   it('throws a contextual error when an extension pack declares a malformed indexTypes value', () => {

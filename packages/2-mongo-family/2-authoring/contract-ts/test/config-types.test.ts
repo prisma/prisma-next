@@ -249,10 +249,24 @@ describe('typescriptContract', () => {
             resolvedInputs: [contractPath],
           }),
         ).rejects.toThrow(/has no "default" or "contract" export/);
+        await expect(
+          config.source.load({
+            ...emptyContext,
+            resolvedInputs: [contractPath],
+          }),
+        ).rejects.toMatchObject({ code: 'CONTRACT.MODULE_EXPORT_MISSING' });
       } finally {
         await rm(tempDir, { recursive: true, force: true });
       }
     },
     timeouts.typeScriptCompilation,
   );
+
+  it('throws InternalError when resolvedInputs is empty', async () => {
+    const config = typescriptContractFromPath('./contract.ts');
+
+    await expect(config.source.load(emptyContext)).rejects.toMatchObject({
+      isPrismaInternalError: true,
+    });
+  });
 });

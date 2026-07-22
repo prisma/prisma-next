@@ -36,6 +36,8 @@ import type {
 } from '@prisma-next/psl-parser';
 import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 
+import { InternalError } from '@prisma-next/utils/internal-error';
+import { contractError } from './contract-errors';
 import { lowerDefaultFunctionWithRegistry } from './default-function-registry';
 import {
   getPositionalArguments,
@@ -449,7 +451,7 @@ function resolveEntityRefTypeConstructorCall(input: {
 }): ResolveFieldTypeResult {
   const entityRefArg = input.descriptor.entityRefArg;
   if (entityRefArg === undefined) {
-    throw new Error(
+    throw new InternalError(
       'resolveEntityRefTypeConstructorCall called with a descriptor that does not declare an entityRefArg. This is an interpreter bug.',
     );
   }
@@ -485,8 +487,10 @@ function resolveEntityRefTypeConstructorCall(input: {
   const codecId = input.descriptor.output.codecId;
   const codecDescriptor = input.codecLookup?.descriptorFor?.(codecId);
   if (codecDescriptor === undefined || !hasColumnFromEntityHook(codecDescriptor)) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_CONTRIBUTION_INVALID',
       `Type constructor "${helperPath}" registers codecId "${codecId}" with an entity-ref argument, but its codec descriptor has no "columnFromEntity" authoring hook. This is a contributor bug in the pack registering "${helperPath}", not a user-schema error.`,
+      { meta: { helperPath, codecId } },
     );
   }
 

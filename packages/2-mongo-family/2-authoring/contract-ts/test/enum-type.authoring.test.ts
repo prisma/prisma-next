@@ -230,6 +230,34 @@ describe('defineContract() — undeclared enum reference', () => {
         models: { Account },
       }),
     ).toThrow('references enum "Role" which is not declared');
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { Account },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.ENUM_UNKNOWN' }));
+  });
+});
+
+describe('defineContract() — enum declaration key mismatch', () => {
+  it('throws when the enums key differs from the enumType name', () => {
+    const Role = enumType('Role', mongoString, member('User', 'user'));
+    const Account = model('Account', {
+      collection: 'accounts',
+      fields: { _id: field.objectId(), role: field.namedType(Role) },
+    });
+    const run = () =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        enums: { Alias: Role },
+        models: { Account },
+      });
+    expect(run).toThrow(
+      'enum declaration key "Alias" must match enumType name "Role". Aliases are not supported.',
+    );
+    expect(run).toThrow(expect.objectContaining({ code: 'CONTRACT.ENUM_INVALID' }));
   });
 });
 
