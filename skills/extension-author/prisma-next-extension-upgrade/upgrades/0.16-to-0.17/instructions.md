@@ -83,5 +83,10 @@ or `InternalError` for invariants). Those are internal throw sites: the errors
 are still `Error` instances with unchanged message text, so extension code that
 catches them by message or by `instanceof Error` is unaffected, and the new
 `ORM.*` codes are additive — that change alone requires no extension action. The
-migration contract-snapshot layout change above is the one that requires
-converting your extension's migration tree.
+authoring-plane sweep (TML-3075) is the same shape: internal throw sites in the
+contract authoring packages became structured `CONTRACT.*`/`PSL.*` envelopes or
+`InternalError`, with message text unchanged, and it standardized two ORM error
+`meta` keys (`trait: 'equality'`, `tableName`) that were never part of the
+extension surface — also no extension action. The migration contract-snapshot
+layout change above is the one that requires converting your extension's
+migration tree.
