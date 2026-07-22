@@ -16,7 +16,7 @@ tags: v7.x.y (existing) · v8.0.0-rc.1 · v8.0.0 (later)
 On npm:
 
 - **`prisma`** — becomes the Prisma 8 CLI package (a thin, binary-only package; importing it is deliberately an error). The RC publishes under a dist-tag other than `latest`, so `npm install prisma` keeps installing v7 until 8.0.0 final.
-- **`@prisma/postgres`, `@prisma/sqlite`, `@prisma/mongo`** — the per-database packages users import, renamed from `@prisma-next/*`. These are the *only* scoped packages that get renamed: they plus the CLI are the entire supported import surface, so renaming just them keeps the frozen-name set small.
+- **`@prisma/postgres`, `@prisma/sqlite`, `@prisma/mongo`** — the per-database packages users import, renamed from `@prisma-next/*`. These are the *only* scoped packages that get renamed: they plus the CLI are the entire supported import surface, so renaming just them keeps the frozen-name set small. All three rename regardless of database tier — a partial rename would be noise for little saved effort — and the tier (Postgres GA; MongoDB early access; SQLite proof of concept) is stated in each package's README and on the scoreboard, not encoded in the package scope.
 - **All other `@prisma-next/*` packages** (~60 of them) — unchanged. They're implementation detail, installed transitively. A later, non-breaking consolidation bundles them into the CLI package and stops publishing them; that's explicitly after the RC.
 - **The old `prisma-next` package** — gets a deprecation notice pointing users at `prisma`.
 

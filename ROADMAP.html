@@ -192,12 +192,12 @@
     <p class="org">Prisma Engineering</p>
     <h1>Roadmap to Prisma 8 RC1</h1>
     <p>Prisma Next — the contract-first rewrite of Prisma — ships as <strong>Prisma 8</strong>. On <strong>July 31</strong> we publish <strong><code>prisma@8.0.0-rc.1</code></strong> from the <code>prisma/prisma</code> repository: the same repository and the same npm package Prisma users already know. The release candidate is published under a pre-release tag, so <code>npm install prisma</code> keeps installing Prisma 7 until 8.0.0 final ships.</p>
-    <p>A release candidate freezes the public API; it does not promise Prisma 7 feature parity. Its promise is different: <strong>everything it ships works and is proven by a test</strong>, everything experimental is labeled, and everything absent is named rather than silently missing.</p>
+    <p>Prisma 8 carries <strong>PostgreSQL to general availability</strong> — and that is all: <strong>MongoDB ships in early access</strong>, and <strong>SQLite is a proof of concept</strong> at this stage. A release candidate freezes the public API; it does not promise Prisma 7 feature parity. Its promise is different: <strong>everything it ships works and is proven by a test</strong>, everything experimental is labeled, and everything absent is named rather than silently missing.</p>
     <div class="statusline">
       <span class="item"><span class="k">Ships</span> <span class="v teal">July 31</span></span>
       <span class="item"><span class="k">Health</span> <span class="v ok">On track</span></span>
       <span class="item"><span class="k">Updated</span> <span class="v">July 21</span></span>
-      <span class="item"><span class="k">Scoreboard</span> <span class="v link"><a href="https://github.com/prisma/prisma-next/pull/1000">450 proven · 500 unproven · 250 not in 8.0</a></span></span>
+      <span class="item"><span class="k">Scoreboard</span> <span class="v link"><a href="https://github.com/prisma/prisma-next/pull/1000">450 proven · 500 unproven · 30 experimental · 250 not in 8.0</a></span></span>
     </div>
     <div class="progress">
       <p class="cap">Work on this page: <b>34 tasks</b> — 1 done, 12 in flight, 21 not started</p>
@@ -338,7 +338,7 @@
     <span class="reqno">Requirement 2</span>
     <span class="owner" style="margin-left: 8px;">Serhii</span>
     <h2>The schema language must reach its final form</h2>
-    <p class="soft">Users write their data model in Prisma Schema Language (PSL) files. Whatever syntax the RC accepts is the syntax v8 supports forever — so every planned change to the language must land before July 31 or be abandoned. The changes are coordinated so users' generated files change once, not four times.</p>
+    <p class="soft">Users write their data model in Prisma Schema Language (PSL) files. Whatever syntax the RC accepts is the syntax v8 supports forever — so every planned change to the language must land before July 31 or be abandoned. Four language changes are planned — mixins, native column types, directional relations, and tagged SQL fences — plus two items that follow from them: removing <code>@dbgenerated()</code> builds on the tagged fences, and the example schemas get regenerated once at the end. All of it is coordinated so users' generated files change once, not once per change.</p>
 
     <details class="task">
       <summary><svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">Mixins: reusable, named sets of fields</span><span class="crit">CRITICAL PATH</span><span class="pill flight">Design in progress</span></summary>
@@ -588,7 +588,7 @@
     <details class="task">
       <summary><svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">Claims we haven't verified get verified or softened</span><span class="pill open">Open</span></summary>
       <div class="body">
-        <p>Support statements that end up in the announcement get checked first: Windows, Bun, and Deno support levels; the telemetry consent prompt's wording; and whether the telemetry backend survives announcement-scale traffic.</p>
+        <p>Support statements that end up in the announcement get checked first: Windows, Bun, and Deno support levels; the telemetry first-run notice's wording; and whether the telemetry backend survives announcement-scale traffic.</p>
       </div>
     </details>
   </section>
