@@ -963,7 +963,7 @@ export class CaseExpr extends Expression {
     if (branches.length === 0) {
       throw new Error('CaseExpr requires at least one branch');
     }
-    this.branches = frozenArrayCopy(
+    this.branches = Object.freeze(
       branches.map((branch) =>
         Object.freeze({
           condition: branch.condition,
