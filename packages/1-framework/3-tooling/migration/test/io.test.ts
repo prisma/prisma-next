@@ -814,7 +814,7 @@ describe('copyFilesWithRename', () => {
     await mkdir(sourceDir, { recursive: true });
     const sourceJson = join(sourceDir, 'contract.json');
     const sourceDts = join(sourceDir, 'contract.d.ts');
-    const jsonPayload = JSON.stringify({ storage: { storageHash: 'sha256:abc' } });
+    const jsonPayload = JSON.stringify({ storage: { storageHash: 'abc' } });
     const dtsPayload = 'export type StorageHash = string;';
     await writeFile(sourceJson, jsonPayload);
     await writeFile(sourceDts, dtsPayload);

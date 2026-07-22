@@ -5,10 +5,10 @@ describe('ledgerOriginFromStored', () => {
   it('maps empty origin sentinels to null', () => {
     expect(ledgerOriginFromStored(null)).toBeNull();
     expect(ledgerOriginFromStored('')).toBeNull();
-    expect(ledgerOriginFromStored('sha256:empty')).toBeNull();
+    expect(ledgerOriginFromStored('empty')).toBeNull();
   });
 
   it('preserves a non-empty origin hash', () => {
-    expect(ledgerOriginFromStored('sha256:abc')).toBe('sha256:abc');
+    expect(ledgerOriginFromStored('abc')).toBe('abc');
   });
 });

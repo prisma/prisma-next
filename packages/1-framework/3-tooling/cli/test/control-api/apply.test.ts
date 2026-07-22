@@ -19,7 +19,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { type RunAction, runMigration } from '../../src/control-api/operations/run-migration';
 import type { ControlProgressEvent } from '../../src/control-api/types';
 
-const APP_HASH = `sha256:${'a'.repeat(64)}`;
+const APP_HASH = `${'a'.repeat(64)}`;
 
 function makeAppSpace(): AggregateContractSpace {
   const contract = {

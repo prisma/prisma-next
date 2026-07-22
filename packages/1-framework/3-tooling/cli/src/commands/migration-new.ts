@@ -277,7 +277,7 @@ export function createMigrationNewCommand(): Command {
   );
   setCommandExamples(command, [
     'prisma-next migration new --name split-name',
-    'prisma-next migration new --name custom-fk --from sha256:abc...',
+    'prisma-next migration new --name custom-fk --from abc123...',
   ]);
   addGlobalOptions(command)
     .option('--name <slug>', 'Migration name (used in directory name)')

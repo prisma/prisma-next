@@ -46,7 +46,7 @@ describe('loadContractSpaceAggregate catastrophic ref I/O', () => {
   it('re-throws EACCES when reading an extension head ref', async () => {
     await writeTestPackage(join(migrationsDir, 'ext', '20260101T0000_init'), {
       from: null,
-      to: 'sha256:ext1',
+      to: 'ext1',
     });
 
     const eacces = new Error('permission denied') as NodeJS.ErrnoException;
@@ -65,7 +65,7 @@ describe('loadContractSpaceAggregate catastrophic ref I/O', () => {
   it('tolerates a corrupt head ref as refUnreadable', async () => {
     await writeTestPackage(join(migrationsDir, 'ext', '20260101T0000_init'), {
       from: null,
-      to: 'sha256:ext1',
+      to: 'ext1',
     });
 
     const { errorInvalidJson } = await import('../../src/errors');

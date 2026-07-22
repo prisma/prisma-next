@@ -15,8 +15,8 @@ import {
   writeRef,
 } from '../src/refs';
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const HASH_B = `sha256:${'b'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const HASH_B = `${'b'.repeat(64)}`;
 
 const ENTRY_A: RefEntry = { hash: HASH_A, invariants: [] };
 const ENTRY_B: RefEntry = { hash: HASH_B, invariants: ['split-user-name'] };
@@ -74,32 +74,32 @@ describe('validateRefName', () => {
 });
 
 describe('validateRefValue', () => {
-  it('accepts sha256:empty', () => {
-    expect(validateRefValue('sha256:empty')).toBe(true);
+  it('accepts the empty sentinel', () => {
+    expect(validateRefValue('empty')).toBe(true);
   });
 
   it('accepts valid 64-char hex hash', () => {
-    expect(validateRefValue(`sha256:${'a'.repeat(64)}`)).toBe(true);
-    expect(validateRefValue(`sha256:${'0123456789abcdef'.repeat(4)}`)).toBe(true);
+    expect(validateRefValue('a'.repeat(64))).toBe(true);
+    expect(validateRefValue('0123456789abcdef'.repeat(4))).toBe(true);
   });
 
-  it('rejects missing sha256 prefix', () => {
-    expect(validateRefValue('a'.repeat(64))).toBe(false);
-    expect(validateRefValue('empty')).toBe(false);
+  it('rejects sha256-prefixed values', () => {
+    expect(validateRefValue(`sha256:${'a'.repeat(64)}`)).toBe(false);
+    expect(validateRefValue('sha256:empty')).toBe(false);
   });
 
   it('rejects wrong length hex', () => {
-    expect(validateRefValue('sha256:abc')).toBe(false);
-    expect(validateRefValue(`sha256:${'a'.repeat(63)}`)).toBe(false);
-    expect(validateRefValue(`sha256:${'a'.repeat(65)}`)).toBe(false);
+    expect(validateRefValue('abc')).toBe(false);
+    expect(validateRefValue('a'.repeat(63))).toBe(false);
+    expect(validateRefValue('a'.repeat(65))).toBe(false);
   });
 
   it('rejects uppercase hex', () => {
-    expect(validateRefValue(`sha256:${'A'.repeat(64)}`)).toBe(false);
+    expect(validateRefValue(`${'A'.repeat(64)}`)).toBe(false);
   });
 
   it('rejects non-hex characters', () => {
-    expect(validateRefValue(`sha256:${'g'.repeat(64)}`)).toBe(false);
+    expect(validateRefValue(`${'g'.repeat(64)}`)).toBe(false);
   });
 
   it('rejects empty string', () => {
@@ -517,8 +517,8 @@ describe('round-trip', () => {
   });
 });
 
-const HASH_BRANCH_A = `sha256:${'c'.repeat(64)}`;
-const HASH_POSTGIS = `sha256:${'f'.repeat(64)}`;
+const HASH_BRANCH_A = `${'c'.repeat(64)}`;
+const HASH_POSTGIS = `${'f'.repeat(64)}`;
 
 describe('resolveRefsByContractHash', () => {
   let refsDir: string;

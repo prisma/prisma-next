@@ -29,7 +29,7 @@ describe('readContractSpaceHeadRef', () => {
   });
 
   it('round-trips with emitContractSpaceArtefacts', async () => {
-    const hash = 'sha256:0123456789012345678901234567890123456789012345678901234567890123';
+    const hash = '0123456789012345678901234567890123456789012345678901234567890123';
     const invariants = ['inv-2', 'inv-1', 'inv-3'];
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { foo: 1 },
@@ -46,17 +46,17 @@ describe('readContractSpaceHeadRef', () => {
     await emitContractSpaceArtefacts(migrationsDir, APP_SPACE_ID, {
       contract: {},
       contractDts: '\n',
-      headRef: { hash: 'sha256:app', invariants: [] },
+      headRef: { hash: 'app', invariants: [] },
     });
 
     const result = await readContractSpaceHeadRef(migrationsDir, APP_SPACE_ID);
-    expect(result).toEqual({ hash: 'sha256:app', invariants: [] });
+    expect(result).toEqual({ hash: 'app', invariants: [] });
   });
 
   it('throws when refs/head.json is missing the invariants array', async () => {
     const dir = join(migrationsDir, 'cipherstash', 'refs');
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'head.json'), `${canonicalizeJson({ hash: 'sha256:abc' })}\n`);
+    await writeFile(join(dir, 'head.json'), `${canonicalizeJson({ hash: 'abc' })}\n`);
 
     let captured: unknown;
     try {

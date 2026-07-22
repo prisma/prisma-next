@@ -7,8 +7,8 @@ import { createAggregateContractSpace } from '../../src/aggregate/aggregate';
 import { writeRefSnapshot } from '../../src/refs/snapshot';
 import { createAttestedPackage, createTestContract, writeTestPackage } from '../fixtures';
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const HASH_B = `sha256:${'b'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const HASH_B = `${'b'.repeat(64)}`;
 
 function sampleContractDts(label: string): string {
   return `// generated ${label}\nexport type Contract = unknown;\n`;
@@ -19,7 +19,7 @@ function sampleContractJson(storageHash: string): unknown {
     schemaVersion: '1',
     targetFamily: 'sql',
     target: 'postgres',
-    profileHash: `sha256:${'p'.repeat(64)}`,
+    profileHash: `${'p'.repeat(64)}`,
     storage: { storageHash },
     domain: {
       namespaces: {

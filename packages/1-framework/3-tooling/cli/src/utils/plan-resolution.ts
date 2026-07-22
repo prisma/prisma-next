@@ -19,7 +19,7 @@ import {
 } from './cli-errors';
 import { mapContractAtError } from './contract-at-errors';
 
-const FULL_HASH_PATTERN = /^sha256:([0-9a-f]{64}|empty)$/;
+const FULL_HASH_PATTERN = /^([0-9a-f]{64}|empty)$/;
 
 export function looksLikeFullHash(input: string): boolean {
   return FULL_HASH_PATTERN.test(input);

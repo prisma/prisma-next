@@ -30,12 +30,12 @@ describe('gatherDiskContractSpaceState', () => {
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { id: 'cipher' },
       contractDts: '\n',
-      headRef: { hash: 'sha256:cipher', invariants: ['cipher:create-v1'] },
+      headRef: { hash: 'cipher', invariants: ['cipher:create-v1'] },
     });
     await emitContractSpaceArtefacts(migrationsDir, 'pgvector', {
       contract: { id: 'pgvector' },
       contractDts: '\n',
-      headRef: { hash: 'sha256:pgvector', invariants: ['pgvector:install-v1'] },
+      headRef: { hash: 'pgvector', invariants: ['pgvector:install-v1'] },
     });
 
     const state = await gatherDiskContractSpaceState({
@@ -45,11 +45,11 @@ describe('gatherDiskContractSpaceState', () => {
 
     expect([...state.spaceDirsOnDisk]).toEqual(['cipherstash', 'pgvector']);
     expect(state.headRefsBySpace.get('cipherstash')).toEqual({
-      hash: 'sha256:cipher',
+      hash: 'cipher',
       invariants: ['cipher:create-v1'],
     });
     expect(state.headRefsBySpace.get('pgvector')).toEqual({
-      hash: 'sha256:pgvector',
+      hash: 'pgvector',
       invariants: ['pgvector:install-v1'],
     });
   });
@@ -58,7 +58,7 @@ describe('gatherDiskContractSpaceState', () => {
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { id: 'cipher' },
       contractDts: '\n',
-      headRef: { hash: 'sha256:cipher', invariants: [] },
+      headRef: { hash: 'cipher', invariants: [] },
     });
 
     const state = await gatherDiskContractSpaceState({
@@ -84,7 +84,7 @@ describe('gatherDiskContractSpaceState', () => {
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { id: 'cipher' },
       contractDts: '\n',
-      headRef: { hash: 'sha256:cipher', invariants: [] },
+      headRef: { hash: 'cipher', invariants: [] },
     });
 
     const state = await gatherDiskContractSpaceState({

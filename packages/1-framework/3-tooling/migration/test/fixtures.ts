@@ -28,7 +28,7 @@ export function createTestMetadata(
 ): MigrationMetadata {
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: null,
-    to: 'sha256:abc123',
+    to: 'abc123',
     // Auto-derive from ops by default so fixture-built packages
     // round-trip through `readMigrationPackage`'s verify-time check.
     // Tests that need a deliberate mismatch can override the field.

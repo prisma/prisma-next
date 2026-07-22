@@ -62,7 +62,7 @@ function createMockMigrations(overrides?: {
     kind: 'success',
     plan: {
       targetId: 'postgres',
-      destination: { storageHash: 'sha256:new-hash', profileHash: 'sha256:new-profile' },
+      destination: { storageHash: 'new-hash', profileHash: 'new-profile' },
       operations: [
         {
           id: 'column.user.nickname',
@@ -112,7 +112,7 @@ function createMockMigrations(overrides?: {
 const dummyContract = {
   schemaVersion: '1',
   target: 'postgres',
-  storage: { storageHash: 'sha256:dummy', tables: {}, namespaces: {} },
+  storage: { storageHash: 'dummy', tables: {}, namespaces: {} },
 } as unknown as Contract;
 
 describe('executeDbUpdate', () => {
@@ -141,8 +141,7 @@ describe('executeDbUpdate', () => {
       driver: createMockDriver(),
       adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance({
-        readAllMarkers: async () =>
-          new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
+        readAllMarkers: async () => new Map([['app', markerRecord({ storageHash: 'origin' })]]),
       }),
       contract: dummyContract,
       mode: 'plan',
@@ -177,7 +176,7 @@ describe('executeDbUpdate', () => {
         kind: 'success',
         plan: {
           targetId: 'postgres',
-          destination: { storageHash: 'sha256:dest', profileHash: 'sha256:dest-profile' },
+          destination: { storageHash: 'dest', profileHash: 'dest-profile' },
           operations: [
             {
               id: 'column.user.nickname',
@@ -202,8 +201,8 @@ describe('executeDbUpdate', () => {
             [
               'app',
               markerRecord({
-                storageHash: 'sha256:origin',
-                profileHash: 'sha256:origin-profile',
+                storageHash: 'origin',
+                profileHash: 'origin-profile',
               }),
             ],
           ]),
@@ -221,7 +220,7 @@ describe('executeDbUpdate', () => {
       expect(result.value.mode).toBe('plan');
       expect(result.value.plan.operations).toHaveLength(1);
       expect(result.value.plan.preview).toEqual({ statements: [] });
-      expect(result.value.destination.storageHash).toBe('sha256:dest');
+      expect(result.value.destination.storageHash).toBe('dest');
       expect(result.value.execution).toBeUndefined();
       expect(result.value.marker).toBeUndefined();
     }
@@ -233,8 +232,7 @@ describe('executeDbUpdate', () => {
       driver: createMockDriver(),
       adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance({
-        readAllMarkers: async () =>
-          new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
+        readAllMarkers: async () => new Map([['app', markerRecord({ storageHash: 'origin' })]]),
       }),
       contract: dummyContract,
       mode: 'apply',
@@ -272,8 +270,8 @@ describe('executeDbUpdate', () => {
             [
               'app',
               markerRecord({
-                storageHash: 'sha256:origin',
-                profileHash: 'sha256:origin-profile',
+                storageHash: 'origin',
+                profileHash: 'origin-profile',
               }),
             ],
           ]),
@@ -301,7 +299,7 @@ describe('executeDbUpdate', () => {
         operationsExecuted: 2,
       });
       expect(result.value.marker).toBeDefined();
-      expect(result.value.marker?.storageHash).toBe('sha256:new-hash');
+      expect(result.value.marker?.storageHash).toBe('new-hash');
       expect(result.value.summary).toContain('Applied');
     }
   });
@@ -316,8 +314,8 @@ describe('executeDbUpdate', () => {
             [
               'app',
               markerRecord({
-                storageHash: 'sha256:current',
-                profileHash: 'sha256:current-profile',
+                storageHash: 'current',
+                profileHash: 'current-profile',
               }),
             ],
           ]),
@@ -329,7 +327,7 @@ describe('executeDbUpdate', () => {
           kind: 'success',
           plan: {
             targetId: 'postgres',
-            destination: { storageHash: 'sha256:current', profileHash: 'sha256:current-profile' },
+            destination: { storageHash: 'current', profileHash: 'current-profile' },
             operations: [],
             renderTypeScript: () => {
               throw new Error('not used in db update tests');
@@ -355,7 +353,7 @@ describe('executeDbUpdate', () => {
         operationsPlanned: 0,
         operationsExecuted: 0,
       });
-      expect(result.value.destination.storageHash).toBe('sha256:current');
+      expect(result.value.destination.storageHash).toBe('current');
       expect(result.value.summary).toContain('already matches');
     }
   });
@@ -367,7 +365,7 @@ describe('executeDbUpdate', () => {
         kind: 'success',
         plan: {
           targetId: 'postgres',
-          destination: { storageHash: 'sha256:same', profileHash: 'sha256:same-profile' },
+          destination: { storageHash: 'same', profileHash: 'same-profile' },
           operations: [],
           renderTypeScript: () => {
             throw new Error('not used in db update tests');
@@ -386,8 +384,8 @@ describe('executeDbUpdate', () => {
             [
               'app',
               markerRecord({
-                storageHash: 'sha256:same',
-                profileHash: 'sha256:same-profile',
+                storageHash: 'same',
+                profileHash: 'same-profile',
               }),
             ],
           ]),
@@ -414,7 +412,7 @@ describe('executeDbUpdate', () => {
       kind: 'success',
       plan: {
         targetId: 'postgres',
-        destination: { storageHash: 'sha256:dest' },
+        destination: { storageHash: 'dest' },
         operations: [],
       },
     });
@@ -440,8 +438,7 @@ describe('executeDbUpdate', () => {
       driver: createMockDriver(),
       adapter: STUB_ADAPTER,
       familyInstance: createMockFamilyInstance({
-        readAllMarkers: async () =>
-          new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
+        readAllMarkers: async () => new Map([['app', markerRecord({ storageHash: 'origin' })]]),
       }),
       contract: dummyContract,
       mode: 'plan',
@@ -467,7 +464,7 @@ describe('executeDbUpdate', () => {
           kind: 'success',
           plan: {
             targetId: 'postgres',
-            destination: { storageHash: 'sha256:dest' },
+            destination: { storageHash: 'dest' },
             operations: [
               {
                 id: 'dropColumn.user.nickname',
@@ -498,8 +495,7 @@ describe('executeDbUpdate', () => {
         driver: createMockDriver(),
         adapter: STUB_ADAPTER,
         familyInstance: createMockFamilyInstance({
-          readAllMarkers: async () =>
-            new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
+          readAllMarkers: async () => new Map([['app', markerRecord({ storageHash: 'origin' })]]),
         }),
         contract: dummyContract,
         mode: 'apply',
@@ -526,8 +522,7 @@ describe('executeDbUpdate', () => {
         driver: createMockDriver(),
         adapter: STUB_ADAPTER,
         familyInstance: createMockFamilyInstance({
-          readAllMarkers: async () =>
-            new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
+          readAllMarkers: async () => new Map([['app', markerRecord({ storageHash: 'origin' })]]),
         }),
         contract: dummyContract,
         mode: 'apply',
@@ -550,8 +545,7 @@ describe('executeDbUpdate', () => {
         driver: createMockDriver(),
         adapter: STUB_ADAPTER,
         familyInstance: createMockFamilyInstance({
-          readAllMarkers: async () =>
-            new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
+          readAllMarkers: async () => new Map([['app', markerRecord({ storageHash: 'origin' })]]),
         }),
         contract: dummyContract,
         mode: 'plan',
@@ -581,7 +575,7 @@ describe('executeDbUpdate', () => {
           kind: 'success',
           plan: {
             targetId: 'postgres',
-            destination: { storageHash: 'sha256:dest' },
+            destination: { storageHash: 'dest' },
             operations: [
               {
                 id: 'column.user.nickname',

@@ -886,7 +886,7 @@ export function createMigrateCommand(): Command {
   setCommandExamples(command, [
     'prisma-next migrate --db $DATABASE_URL',
     'prisma-next migrate --to production --db $DATABASE_URL',
-    'prisma-next migrate --to sha256:abc123 --db $DATABASE_URL',
+    'prisma-next migrate --to abc123 --db $DATABASE_URL',
     'prisma-next migrate --show --db $DATABASE_URL',
     'prisma-next migrate --show --from @contract --to production',
   ]);

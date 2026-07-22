@@ -953,10 +953,9 @@ export type PrefixResolutionFailure =
  *
  * Note: matches `metadata.to` (the contract hash this migration produces),
  * not `metadata.migrationHash` (the package's content-addressed identity).
- * Tries exact match first, then prefix match (auto-prepending `sha256:` when
- * the needle omits the scheme). Returns the matched package on success, or a
- * discriminated failure indicating whether the prefix was ambiguous or simply
- * not found.
+ * Tries exact match first, then prefix match. Returns the matched package on
+ * success, or a discriminated failure indicating whether the prefix was
+ * ambiguous or simply not found.
  *
  * @internal Exported for testing only.
  */
@@ -967,8 +966,7 @@ export function resolveBundleByPrefix<T extends { metadata: { to: string } }>(
   const exact = bundles.find((p) => p.metadata.to === needle);
   if (exact) return ok(exact);
 
-  const prefixWithScheme = needle.startsWith('sha256:') ? needle : `sha256:${needle}`;
-  const candidates = bundles.filter((p) => p.metadata.to.startsWith(prefixWithScheme));
+  const candidates = bundles.filter((p) => p.metadata.to.startsWith(needle));
 
   if (candidates.length === 1) return ok(candidates[0]!);
   if (candidates.length > 1) return notOk({ reason: 'ambiguous', count: candidates.length });

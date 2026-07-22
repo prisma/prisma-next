@@ -21,7 +21,7 @@ function edge(from: string, to: string, dirName: string): MigrationEdge {
   return {
     from,
     to,
-    migrationHash: `sha256:mig-${migSeq++}`,
+    migrationHash: `mig-${migSeq++}`,
     dirName,
     createdAt: '2026-01-01T00:00:00.000Z',
     invariants: [],

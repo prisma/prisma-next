@@ -9,9 +9,9 @@ import { writeRef } from '../../src/refs';
 import type { ContractIR } from '../../src/refs/snapshot';
 import { deleteRefSnapshot, readRefSnapshot, writeRefSnapshot } from '../../src/refs/snapshot';
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const HASH_B = `sha256:${'b'.repeat(64)}`;
-const PROFILE_HASH = `sha256:${'c'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const HASH_B = `${'b'.repeat(64)}`;
+const PROFILE_HASH = `${'c'.repeat(64)}`;
 
 function sampleContractDts(label: string): string {
   return `// generated ${label}\nexport type Contract = unknown;\n`;

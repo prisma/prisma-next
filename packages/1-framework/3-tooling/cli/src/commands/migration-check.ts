@@ -7,6 +7,7 @@ import type {
   IntegrityViolation,
 } from '@prisma-next/migration-tools/aggregate';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { verifyMigrationHash } from '@prisma-next/migration-tools/hash';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
@@ -208,7 +209,7 @@ function checkReachability(space: CheckSpace): readonly CheckFailure[] {
     const isReachable =
       pkg.metadata.from === null ||
       allToHashes.has(pkg.metadata.from) ||
-      pkg.metadata.from === 'sha256:empty';
+      pkg.metadata.from === EMPTY_CONTRACT_HASH;
     if (!isReachable) {
       failures.push({
         space: space.spaceId,

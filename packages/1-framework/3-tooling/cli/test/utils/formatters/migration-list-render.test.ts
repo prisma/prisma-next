@@ -14,12 +14,12 @@ import type {
   MigrationSpaceListEntry,
 } from '../../../src/utils/formatters/migration-list-types';
 
-const HASH_A = 'sha256:abcdef0123456789abcdef0123456789abcdef0123456789ab';
-const HASH_B = 'sha256:1234567890abcdef1234567890abcdef1234567890abcdef12';
-const HASH_C = 'sha256:4cb4256c30b7a8123456789012345678901234567890123456';
-const HASH_D = 'sha256:55bada2f123456789012345678901234567890123456789012';
-const HASH_E = 'sha256:2f45cc7123456789012345678901234567890123456789012';
-const HASH_F = 'sha256:804e0181234567890123456789012345678901234567890123';
+const HASH_A = 'abcdef0123456789abcdef0123456789abcdef0123456789ab';
+const HASH_B = '1234567890abcdef1234567890abcdef1234567890abcdef12';
+const HASH_C = '4cb4256c30b7a8123456789012345678901234567890123456';
+const HASH_D = '55bada2f123456789012345678901234567890123456789012';
+const HASH_E = '2f45cc7123456789012345678901234567890123456789012';
+const HASH_F = '804e0181234567890123456789012345678901234567890123';
 
 let migrationHashSeq = 0;
 
@@ -28,7 +28,7 @@ function migration(
     Partial<Omit<MigrationListEntry, 'name' | 'toContract'>>,
 ): MigrationListEntry {
   return {
-    hash: overrides.hash ?? `sha256:list-mig-${migrationHashSeq++}`,
+    hash: overrides.hash ?? `list-mig-${migrationHashSeq++}`,
     fromContract: null,
     operationCount: 1,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -98,7 +98,7 @@ describe('renderMigrationList', () => {
       name: '20250312_full_rollback',
       fromContract: HASH_C,
       toContract: HASH_A,
-      hash: 'sha256:rollback-edge',
+      hash: 'rollback-edge',
     });
     const output = renderMigrationListWithStyle(
       result(
@@ -234,7 +234,7 @@ describe('renderMigrationList', () => {
                 name: 'skip_back',
                 fromContract: HASH_C,
                 toContract: HASH_A,
-                hash: 'sha256:skip-back',
+                hash: 'skip-back',
               }),
             ],
           },
@@ -272,7 +272,7 @@ describe('renderMigrationList', () => {
               migration({
                 name: '20260601T0000_install_postgis_extension',
                 fromContract: null,
-                toContract: 'sha256:9aabbcc123456789012345678901234567890123456789012',
+                toContract: '9aabbcc123456789012345678901234567890123456789012',
               }),
             ],
           },

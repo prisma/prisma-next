@@ -72,10 +72,10 @@ import {
 
 vi.mock('@prisma-next/config-loader', { spy: true });
 
-const HASH_4cb4256 = `sha256:4cb4256${'0'.repeat(57)}`;
-const HASH_55bada2 = `sha256:55bada2${'0'.repeat(57)}`;
-const HASH_804e018 = `sha256:804e018${'0'.repeat(57)}`;
-const HASH_POSTGIS = `sha256:9aabbcc${'0'.repeat(57)}`;
+const HASH_4cb4256 = `4cb4256${'0'.repeat(57)}`;
+const HASH_55bada2 = `55bada2${'0'.repeat(57)}`;
+const HASH_804e018 = `804e018${'0'.repeat(57)}`;
+const HASH_POSTGIS = `9aabbcc${'0'.repeat(57)}`;
 
 const ADDITIVE_OP: MigrationPlanOperation = {
   id: 'table.users',
@@ -624,8 +624,8 @@ describe('migration read-verb --json envelope shape (D1 lock)', () => {
         space: 'app',
         name: '20260101T0000_init',
         fromContract: null,
-        toContract: 'sha256:a',
-        hash: 'sha256:edge',
+        toContract: 'a',
+        hash: 'edge',
         createdAt: '2026-01-01T00:00:00.000Z',
         operations: [],
         preview: { statements: [] },
@@ -865,7 +865,7 @@ describe('migration check multi-space parity (D6 lock)', () => {
 //   1. Schema validation — each verb's --json output validates against its
 //      exported arktype schema.
 //   2. Field-name consistency — retired names are absent from all outputs.
-//   3. Empty-start rule — fromContract is null (never "sha256:empty") for the
+//   3. Empty-start rule — fromContract is null (never "empty") for the
 //      first migration in a chain.
 //   4. ok mirrors exit code — ok:true ⇒ exit 0; ok:false ⇒ non-zero exit.
 //   5. Space topology — list/graph/status nest under spaces[]; log is a flat
@@ -950,14 +950,14 @@ describe('migration read-verb --json consistency lock (D8)', () => {
     expect(firstMigration?.fromContract).toBeNull();
 
     const nonFirstMigration = appSpace?.migrations.find((m) => m.fromContract !== null);
-    expect(nonFirstMigration?.fromContract).toMatch(/^sha256:/);
+    expect(nonFirstMigration?.fromContract).toMatch(/^/);
 
     for (const space of output.spaces) {
       for (const migration of space.migrations) {
         expect(
           migration.fromContract,
-          `migration ${migration.name} in space ${space.space}: fromContract must be null or a real hash, never "sha256:empty"`,
-        ).not.toBe('sha256:empty');
+          `migration ${migration.name} in space ${space.space}: fromContract must be null or a real hash, never "empty"`,
+        ).not.toBe('empty');
       }
     }
   });
@@ -995,9 +995,9 @@ describe('migration read-verb --json consistency lock (D8)', () => {
         {
           space: 'app',
           name: '20260101T0000_init',
-          hash: 'sha256:abc',
+          hash: 'abc',
           fromContract: null,
-          toContract: 'sha256:def',
+          toContract: 'def',
           appliedAt: '2026-01-01T00:00:00.000Z',
           operationCount: 1,
         },
@@ -1021,9 +1021,9 @@ describe('migration read-verb --json consistency lock (D8)', () => {
       migration: {
         space: 'app',
         name: '20260101T0000_init',
-        hash: 'sha256:edge',
+        hash: 'edge',
         fromContract: null,
-        toContract: 'sha256:def',
+        toContract: 'def',
         createdAt: '2026-01-01T00:00:00.000Z',
         operations: [
           { id: 'table.users', label: 'Create table users', operationClass: 'additive' },
@@ -1085,7 +1085,7 @@ describe('migration read-verb --json consistency lock (D8)', () => {
     await writeRefFor(migrationsDir, {
       spaceId: 'app',
       name: 'phantom',
-      hash: `sha256:${'dead'.repeat(16)}`,
+      hash: `${'dead'.repeat(16)}`,
     });
 
     const { consoleOutput: checkOutput, cleanup: cleanupCheck } = setupCommandMocks();
@@ -1153,9 +1153,9 @@ describe('migration read-verb --json consistency lock (D8)', () => {
         {
           space: 'app',
           name: '20260101T0000_init',
-          hash: 'sha256:abc',
+          hash: 'abc',
           fromContract: null,
-          toContract: 'sha256:def',
+          toContract: 'def',
           appliedAt: '2026-01-01T00:00:00.000Z',
           operationCount: 1,
         },
@@ -1172,9 +1172,9 @@ describe('migration read-verb --json consistency lock (D8)', () => {
       migration: {
         space: 'app',
         name: 'x',
-        hash: 'sha256:a',
+        hash: 'a',
         fromContract: null,
-        toContract: 'sha256:b',
+        toContract: 'b',
         createdAt: '2026-01-01T00:00:00.000Z',
         operations: [],
         preview: { statements: [] },

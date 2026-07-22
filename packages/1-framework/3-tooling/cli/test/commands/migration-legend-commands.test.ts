@@ -15,7 +15,7 @@ import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
 
 vi.mock('@prisma-next/config-loader', { spy: true });
 
-const HASH_ROOT = `sha256:4cb4256${'0'.repeat(57)}`;
+const HASH_ROOT = `4cb4256${'0'.repeat(57)}`;
 
 const ADDITIVE_OP: MigrationPlanOperation = {
   id: 'table.users',

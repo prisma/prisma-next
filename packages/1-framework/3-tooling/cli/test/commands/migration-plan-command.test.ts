@@ -97,9 +97,9 @@ vi.mock('@prisma-next/framework-components/control', async () => {
   return { ...actual, createControlStack: mocks.createControlStack };
 });
 
-const SAME_HASH = `sha256:${'a'.repeat(64)}`;
-const OLD_HASH = `sha256:${'b'.repeat(64)}`;
-const NEW_HASH = `sha256:${'c'.repeat(64)}`;
+const SAME_HASH = `${'a'.repeat(64)}`;
+const OLD_HASH = `${'b'.repeat(64)}`;
+const NEW_HASH = `${'c'.repeat(64)}`;
 const REFS_DIR = '/tmp/test/migrations/app/refs';
 
 function makeContractJson(storageHash: string, target = 'mongo'): string {
@@ -220,7 +220,7 @@ function makeBundle(from: string, to: string, dirName: string): OnDiskMigrationP
     metadata: {
       from: from === EMPTY_CONTRACT_HASH ? null : from,
       to,
-      migrationHash: `sha256:mig-${dirName}`,
+      migrationHash: `mig-${dirName}`,
       createdAt: '2026-03-01T09:00:00.000Z',
       providedInvariants: [],
     },
@@ -710,7 +710,7 @@ describe('migration plan command', () => {
         throw errorUnfilledPlaceholder('backfill-users-status:check');
       });
 
-      const NEW_HASH = `sha256:${'n'.repeat(64)}`;
+      const NEW_HASH = `${'n'.repeat(64)}`;
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH, 'postgres'));
       const { bundles } = graphWithPriorMigration(OLD_HASH);
@@ -743,9 +743,9 @@ describe('migration plan command', () => {
         throw errorUnfilledPlaceholder('backfill-users-status:run');
       });
 
-      mocks.readFile.mockResolvedValue(makeContractJson(`sha256:${'c'.repeat(64)}`, 'postgres'));
-      const { bundles } = graphWithPriorMigration(`sha256:${'b'.repeat(64)}`);
-      setupDbRefFromHash(`sha256:${'b'.repeat(64)}`, bundles);
+      mocks.readFile.mockResolvedValue(makeContractJson(`${'c'.repeat(64)}`, 'postgres'));
+      const { bundles } = graphWithPriorMigration(`${'b'.repeat(64)}`);
+      setupDbRefFromHash(`${'b'.repeat(64)}`, bundles);
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
       mocks.copyFilesWithRename.mockResolvedValue(undefined);
@@ -894,7 +894,7 @@ describe('migration plan command', () => {
   describe('contract artifact copying', () => {
     it('copies destination contract only when there is no prior migration', async () => {
       setupBaseConfig();
-      const NEW_HASH = 'sha256:new-hash';
+      const NEW_HASH = 'new-hash';
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
       setupGreenfieldRefs();

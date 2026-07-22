@@ -21,7 +21,7 @@ function makeSpace(
 
 describe('resolveRecordedPath', () => {
   it('walks the shortest path from the live marker to the on-disk head ref', () => {
-    const headHash = 'sha256:cipher-head';
+    const headHash = 'cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
 
     const outcome = resolveRecordedPath({
@@ -40,8 +40,8 @@ describe('resolveRecordedPath', () => {
   });
 
   it('threads package end snapshots onto migration edge refs', () => {
-    const midHash = 'sha256:cipher-mid';
-    const headHash = 'sha256:cipher-head';
+    const midHash = 'cipher-mid';
+    const headHash = 'cipher-head';
     const baseline: OnDiskMigrationPackage = {
       ...createAttestedPackage('20260101T0000_init', { from: null, to: midHash }),
       endContractJson: { models: ['user'] },
@@ -67,7 +67,7 @@ describe('resolveRecordedPath', () => {
   });
 
   it('leaves edge snapshots absent when packages carry none', () => {
-    const headHash = 'sha256:cipher-head';
+    const headHash = 'cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
 
     const outcome = resolveRecordedPath({
@@ -82,11 +82,11 @@ describe('resolveRecordedPath', () => {
   });
 
   it('returns unreachable when the live marker is not connected to the head', () => {
-    const headHash = 'sha256:disconnected';
+    const headHash = 'disconnected';
     // Single migration whose graph has only one node (EMPTY_CONTRACT_HASH → other-target).
     const pkg = createAttestedPackage('20260101T0000_init', {
       from: null,
-      to: 'sha256:not-the-head',
+      to: 'not-the-head',
     });
 
     const outcome = resolveRecordedPath({
@@ -100,7 +100,7 @@ describe('resolveRecordedPath', () => {
 
   it('returns unsatisfiable when the path does not cover required invariants', () => {
     // A package walking baseline → headHash but providing zero invariants.
-    const headHash = 'sha256:cipher-head';
+    const headHash = 'cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
     const space = makeSpace([pkg], headHash, ['cipher:create-v1']);
 
@@ -116,7 +116,7 @@ describe('resolveRecordedPath', () => {
   });
 
   it('decorates the pathDecision with the supplied refName', () => {
-    const headHash = 'sha256:cipher-head';
+    const headHash = 'cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
 
     const outcome = resolveRecordedPath({
@@ -132,7 +132,7 @@ describe('resolveRecordedPath', () => {
   });
 
   it('omits pathDecision.refName when no refName is supplied', () => {
-    const headHash = 'sha256:cipher-head';
+    const headHash = 'cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
 
     const outcome = resolveRecordedPath({
@@ -147,7 +147,7 @@ describe('resolveRecordedPath', () => {
   });
 
   it('returns ok with empty pathOps when the marker is already at the head ref', () => {
-    const headHash = 'sha256:cipher-head';
+    const headHash = 'cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
 
     const outcome = resolveRecordedPath({

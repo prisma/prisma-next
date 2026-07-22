@@ -84,7 +84,7 @@ describe('migration plan → emit end-to-end', () => {
         packageDir,
         {
           from: null,
-          to: 'sha256:initial-hash',
+          to: 'initial-hash',
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },
@@ -93,7 +93,7 @@ describe('migration plan → emit end-to-end', () => {
 
       const pkg = await readMigrationPackage(packageDir);
       expect(pkg.metadata.from).toBeNull();
-      expect(pkg.metadata.to).toBe('sha256:initial-hash');
+      expect(pkg.metadata.to).toBe('initial-hash');
       expect(pkg.metadata.migrationHash).toBe(metadata.migrationHash);
       expect(pkg.ops).toHaveLength(1);
     });
@@ -114,7 +114,7 @@ describe('migration plan → emit end-to-end', () => {
           path1,
           {
             from: null,
-            to: 'sha256:hash-a',
+            to: 'hash-a',
             providedInvariants: [],
             createdAt: new Date().toISOString(),
           },
@@ -128,8 +128,8 @@ describe('migration plan → emit end-to-end', () => {
         await writeTestPackage(
           path2,
           {
-            from: 'sha256:hash-a',
-            to: 'sha256:hash-b',
+            from: 'hash-a',
+            to: 'hash-b',
             providedInvariants: [],
             createdAt: new Date().toISOString(),
           },
@@ -141,11 +141,11 @@ describe('migration plan → emit end-to-end', () => {
 
         const graph = reconstructGraph(packages);
         const leaf = findLeaf(graph);
-        expect(leaf).toBe('sha256:hash-b');
+        expect(leaf).toBe('hash-b');
 
         // Verify chain integrity
-        const pkg1 = packages.find((p) => p.metadata.to === 'sha256:hash-a')!;
-        const pkg2 = packages.find((p) => p.metadata.to === 'sha256:hash-b')!;
+        const pkg1 = packages.find((p) => p.metadata.to === 'hash-a')!;
+        const pkg2 = packages.find((p) => p.metadata.to === 'hash-b')!;
         expect(pkg1.metadata.to).toBe(pkg2.metadata.from);
       });
     },
@@ -164,7 +164,7 @@ describe('migration plan → emit end-to-end', () => {
         path1,
         {
           from: null,
-          to: 'sha256:target-hash',
+          to: 'target-hash',
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },
@@ -177,7 +177,7 @@ describe('migration plan → emit end-to-end', () => {
       const leaf = findLeaf(graph);
 
       // Same hash → no-op
-      const toStorageHash = 'sha256:target-hash';
+      const toStorageHash = 'target-hash';
       expect(leaf).toBe(toStorageHash);
 
       // No new migration should be written — the CLI command checks this condition

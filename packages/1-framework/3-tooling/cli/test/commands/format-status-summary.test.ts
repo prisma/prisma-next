@@ -18,8 +18,8 @@ describe('buildNoPathSummary', () => {
   it('names the live contract when no --to was passed', () => {
     expect(
       buildNoPathSummary({
-        markerHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        targetHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        markerHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        targetHash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         explicitTarget: false,
         refName: undefined,
       }),
@@ -31,8 +31,8 @@ describe('buildNoPathSummary', () => {
   it('names the ref when --to resolved via ref', () => {
     expect(
       buildNoPathSummary({
-        markerHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        targetHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        markerHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        targetHash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         explicitTarget: true,
         refName: 'prod',
       }),
@@ -44,8 +44,8 @@ describe('buildNoPathSummary', () => {
   it('omits via ref when --to was a raw hash', () => {
     expect(
       buildNoPathSummary({
-        markerHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        targetHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        markerHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        targetHash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         explicitTarget: true,
         refName: undefined,
       }),
@@ -58,7 +58,7 @@ describe('buildNoPathSummary', () => {
     expect(
       buildNoPathSummary({
         markerHash: undefined,
-        targetHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        targetHash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         explicitTarget: false,
         refName: undefined,
       }),
@@ -73,9 +73,9 @@ describe('buildStatusHeadline', () => {
     expect(
       buildStatusHeadline({
         pendingCount: 0,
-        targetHash: 'sha256:abc',
+        targetHash: 'abc',
         markerDiverged: false,
-        markerHash: 'sha256:abc',
+        markerHash: 'abc',
       }),
     ).toBe('Up to date');
   });
@@ -84,9 +84,9 @@ describe('buildStatusHeadline', () => {
     expect(
       buildStatusHeadline({
         pendingCount: 2,
-        targetHash: 'sha256:deadbeef',
+        targetHash: 'deadbeef',
         markerDiverged: false,
-        markerHash: 'sha256:marker',
+        markerHash: 'marker',
       }),
     ).toBe('2 pending — run `prisma-next migrate --to deadbeef`');
   });

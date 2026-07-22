@@ -22,7 +22,7 @@ describe('emitContractSpaceArtefacts', () => {
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { foo: 1 },
       contractDts: 'export interface Contract {}\n',
-      headRef: { hash: 'sha256:empty', invariants: [] },
+      headRef: { hash: 'empty', invariants: [] },
     });
 
     const dir = join(migrationsDir, 'cipherstash');
@@ -38,7 +38,7 @@ describe('emitContractSpaceArtefacts', () => {
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract,
       contractDts: '\n',
-      headRef: { hash: 'sha256:empty', invariants: [] },
+      headRef: { hash: 'empty', invariants: [] },
     });
 
     const raw = await readFile(join(migrationsDir, 'cipherstash', 'contract.json'), 'utf-8');
@@ -50,7 +50,7 @@ describe('emitContractSpaceArtefacts', () => {
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: {},
       contractDts: dts,
-      headRef: { hash: 'sha256:empty', invariants: [] },
+      headRef: { hash: 'empty', invariants: [] },
     });
 
     const raw = await readFile(join(migrationsDir, 'cipherstash', 'contract.d.ts'), 'utf-8');
@@ -62,7 +62,7 @@ describe('emitContractSpaceArtefacts', () => {
       contract: {},
       contractDts: '\n',
       headRef: {
-        hash: 'sha256:0123456789012345678901234567890123456789012345678901234567890123',
+        hash: '0123456789012345678901234567890123456789012345678901234567890123',
         invariants: ['z-inv', 'a-inv', 'm-inv'],
       },
     });
@@ -71,7 +71,7 @@ describe('emitContractSpaceArtefacts', () => {
     expect(raw.endsWith('\n')).toBe(true);
     const parsed = JSON.parse(raw);
     expect(parsed).toEqual({
-      hash: 'sha256:0123456789012345678901234567890123456789012345678901234567890123',
+      hash: '0123456789012345678901234567890123456789012345678901234567890123',
       invariants: ['a-inv', 'm-inv', 'z-inv'],
     });
   });
@@ -81,14 +81,14 @@ describe('emitContractSpaceArtefacts', () => {
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { v: 1 },
       contractDts: 'v1\n',
-      headRef: { hash: 'sha256:empty', invariants: ['inv-v1'] },
+      headRef: { hash: 'empty', invariants: ['inv-v1'] },
     });
 
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { v: 2 },
       contractDts: 'v2\n',
       headRef: {
-        hash: 'sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+        hash: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
         invariants: ['inv-v2'],
       },
     });
@@ -99,7 +99,7 @@ describe('emitContractSpaceArtefacts', () => {
     expect(await readFile(join(dir, 'contract.d.ts'), 'utf-8')).toBe('v2\n');
     const headRaw = await readFile(join(dir, 'refs', 'head.json'), 'utf-8');
     expect(JSON.parse(headRaw)).toEqual({
-      hash: 'sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+      hash: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
       invariants: ['inv-v2'],
     });
   });
@@ -109,17 +109,17 @@ describe('emitContractSpaceArtefacts', () => {
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: {},
       contractDts: '\n',
-      headRef: { hash: 'sha256:empty', invariants: ['old'] },
+      headRef: { hash: 'empty', invariants: ['old'] },
     });
 
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: {},
       contractDts: '\n',
-      headRef: { hash: 'sha256:empty', invariants: [] },
+      headRef: { hash: 'empty', invariants: [] },
     });
 
     const headRaw = await readFile(join(dir, 'refs', 'head.json'), 'utf-8');
-    expect(JSON.parse(headRaw)).toEqual({ hash: 'sha256:empty', invariants: [] });
+    expect(JSON.parse(headRaw)).toEqual({ hash: 'empty', invariants: [] });
   });
 
   it('produces byte-identical output across two writes of the same artefact (idempotency)', async () => {
@@ -128,7 +128,7 @@ describe('emitContractSpaceArtefacts', () => {
     const args = {
       contract: { z: 1, a: { y: 2 } },
       contractDts: 'export type X = number;\n',
-      headRef: { hash: 'sha256:empty', invariants: ['b', 'a'] },
+      headRef: { hash: 'empty', invariants: ['b', 'a'] },
     };
 
     await emitContractSpaceArtefacts(dirA, 'cipherstash', args);
@@ -154,7 +154,7 @@ describe('emitContractSpaceArtefacts', () => {
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: {},
       contractDts: '\n',
-      headRef: { hash: 'sha256:empty', invariants },
+      headRef: { hash: 'empty', invariants },
     });
 
     expect(invariants).toEqual(snapshot);
@@ -166,7 +166,7 @@ describe('emitContractSpaceArtefacts', () => {
     await emitContractSpaceArtefacts(migrationsDir, APP_SPACE_ID, {
       contract: { kind: 'app' },
       contractDts: 'export type AppContract = unknown;\n',
-      headRef: { hash: 'sha256:app', invariants: [] },
+      headRef: { hash: 'app', invariants: [] },
     });
 
     const dir = join(migrationsDir, APP_SPACE_ID);
@@ -174,7 +174,7 @@ describe('emitContractSpaceArtefacts', () => {
     expect(entries).toEqual(['contract.d.ts', 'contract.json', 'refs']);
 
     const head = JSON.parse(await readFile(join(dir, 'refs', 'head.json'), 'utf-8'));
-    expect(head).toEqual({ hash: 'sha256:app', invariants: [] });
+    expect(head).toEqual({ hash: 'app', invariants: [] });
   });
 
   it('rejects an invalid space id', async () => {
@@ -183,7 +183,7 @@ describe('emitContractSpaceArtefacts', () => {
       await emitContractSpaceArtefacts(migrationsDir, 'INVALID', {
         contract: {},
         contractDts: '\n',
-        headRef: { hash: 'sha256:empty', invariants: [] },
+        headRef: { hash: 'empty', invariants: [] },
       });
     } catch (err) {
       captured = err;
@@ -199,7 +199,7 @@ describe('emitContractSpaceArtefacts', () => {
     await emitContractSpaceArtefacts(fresh, 'cipherstash', {
       contract: {},
       contractDts: '\n',
-      headRef: { hash: 'sha256:empty', invariants: [] },
+      headRef: { hash: 'empty', invariants: [] },
     });
 
     const entries = (await readdir(join(fresh, 'cipherstash'))).sort();
@@ -216,7 +216,7 @@ describe('emitContractSpaceArtefacts', () => {
     await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: {},
       contractDts: '\n',
-      headRef: { hash: 'sha256:empty', invariants: [] },
+      headRef: { hash: 'empty', invariants: [] },
     });
 
     const entries = (await readdir(dir)).sort();

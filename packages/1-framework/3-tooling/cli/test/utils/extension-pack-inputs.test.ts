@@ -34,7 +34,7 @@ const packWithSpace = {
   targetId: 'postgres',
   contractSpace: {
     contractJson: contractJsonA,
-    headRef: { hash: 'sha256:c1', invariants: ['inv-1'] },
+    headRef: { hash: 'c1', invariants: ['inv-1'] },
     migrations: [migrationPkg],
   },
 } as const;
@@ -44,7 +44,7 @@ const packWithSpaceNoMigrationsField = {
   targetId: 'postgres',
   contractSpace: {
     contractJson: contractJsonB,
-    headRef: { hash: 'sha256:c2', invariants: [] },
+    headRef: { hash: 'c2', invariants: [] },
   },
 } as const;
 
@@ -62,7 +62,7 @@ describe('toExtensionInputs', () => {
         targetId: 'postgres',
         contractSpace: {
           contractJson: contractJsonA,
-          headRef: { hash: 'sha256:c1', invariants: ['inv-1'] },
+          headRef: { hash: 'c1', invariants: ['inv-1'] },
           migrations: [migrationPkg],
         },
       },
@@ -93,7 +93,7 @@ describe('toDeclaredExtensions', () => {
         targetId: 'postgres',
         contractSpace: {
           contractJson: contractJsonA,
-          headRef: { hash: 'sha256:c1', invariants: [] },
+          headRef: { hash: 'c1', invariants: [] },
           migrations: [],
         },
       },

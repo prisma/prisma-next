@@ -41,8 +41,8 @@
  *
  * Output format: `sha512:HEXDIGEST` (128-char hex with the algorithm tag
  * prefix). Self-describing so a future migration to a different hash
- * produces visibly distinct keys, and consistent with the
- * `sha256:HEXDIGEST` shape already used by `meta.storageHash`.
+ * produces visibly distinct keys. This in-memory cache key deliberately
+ * keeps its tag — unlike persisted contract hashes, which are bare hex.
  *
  * @example
  * ```typescript

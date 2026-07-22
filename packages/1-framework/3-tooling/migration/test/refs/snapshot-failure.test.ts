@@ -41,8 +41,8 @@ import { MigrationToolsError } from '../../src/errors';
 import { writeRef } from '../../src/refs';
 import { deleteRefPaired, writeRefPaired, writeRefSnapshot } from '../../src/refs/snapshot';
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const PROFILE_HASH = `sha256:${'c'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const PROFILE_HASH = `${'c'.repeat(64)}`;
 
 const ENTRY_A = { hash: HASH_A, invariants: [] as string[] };
 

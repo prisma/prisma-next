@@ -83,7 +83,7 @@ function makeSyntheticPlan(targetId: string): MigrationPlanWithAuthoringSurface 
   return {
     targetId,
     origin: null,
-    destination: { storageHash: 'sha256:synth-destination' },
+    destination: { storageHash: 'synth-destination' },
     operations: [{ id: 'synth.op', label: 'Synthesised op', operationClass: 'additive' }],
     renderTypeScript: () => 'export {};',
   };
@@ -119,7 +119,7 @@ describe('planMigration', () => {
   });
 
   it('resolves the recorded path for an extension space with a non-empty graph reaching its head ref', async () => {
-    const headHash = 'sha256:cipher-head';
+    const headHash = 'cipher-head';
     const cipherPkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
     const extension = makeSpace({
       spaceId: 'cipherstash',

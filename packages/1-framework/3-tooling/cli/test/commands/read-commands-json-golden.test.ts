@@ -53,8 +53,8 @@ vi.mock('../../src/control-api/client', () => ({
 
 const TARGET = 'postgres';
 const TARGET_FAMILY = 'sql';
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const HASH_B = `sha256:${'b'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const HASH_B = `${'b'.repeat(64)}`;
 
 const ADDITIVE_OP: MigrationPlanOperation = {
   id: 'table.users',
@@ -145,7 +145,7 @@ async function writeEndContract(packageDir: string, storageHash: string): Promis
     schemaVersion: '1',
     targetFamily: TARGET_FAMILY,
     target: TARGET,
-    profileHash: `sha256:${'p'.repeat(64)}`,
+    profileHash: `${'p'.repeat(64)}`,
     storage: { storageHash },
     domain: applicationDomainOf({ models: {} }),
     roots: {},
@@ -244,13 +244,13 @@ describe('read commands --json golden', () => {
         '      "migrations": [',
         '        {',
         `          "name": "${dirInit}",`,
-        '          "hash": "sha256:d5c8739bfe8617fa82603875980b18d7dee1e02637499fd451ec7f1a7087e920",',
+        '          "hash": "19e023091ca806aa87b1b62a346198073a90d47c86df9d2b235bc47908ce43dc",',
         `          "fromContract": null,`,
         `          "toContract": "${HASH_A}"`,
         '        },',
         '        {',
         `          "name": "${dirNext}",`,
-        '          "hash": "sha256:ca2593661d91c77720887ec8ff9ff6de7a7009df17757b7a5952fde8ceae9747",',
+        '          "hash": "fc69130b1171503162cf807101f7c2590ba50ea1ef42087131b5664ae672559f",',
         `          "fromContract": "${HASH_A}",`,
         `          "toContract": "${HASH_B}"`,
         '        }',
@@ -273,7 +273,7 @@ describe('read commands --json golden', () => {
       {
         space: 'app',
         migrationName: dirInit,
-        migrationHash: 'sha256:init-mig',
+        migrationHash: 'init-mig',
         from: null,
         to: HASH_A,
         appliedAt: new Date('2026-03-01T08:00:00.000Z'),
@@ -282,7 +282,7 @@ describe('read commands --json golden', () => {
       {
         space: 'app',
         migrationName: dirNext,
-        migrationHash: 'sha256:next-mig',
+        migrationHash: 'next-mig',
         from: HASH_A,
         to: HASH_B,
         appliedAt: new Date('2026-03-02T08:00:00.000Z'),

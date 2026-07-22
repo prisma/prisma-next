@@ -5,8 +5,8 @@ import {
 } from '../../src/commands/migration-plan';
 import type { GlobalFlags } from '../../src/utils/global-flags';
 
-const HASH_A = `sha256:${'a'.repeat(8)}`;
-const HASH_B = `sha256:${'b'.repeat(8)}`;
+const HASH_A = `${'a'.repeat(8)}`;
+const HASH_B = `${'b'.repeat(8)}`;
 const NO_COLOR_FLAGS = {
   format: 'pretty',
   explicitFormat: false,

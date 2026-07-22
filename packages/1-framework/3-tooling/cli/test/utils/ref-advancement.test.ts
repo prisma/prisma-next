@@ -7,8 +7,8 @@ import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { computeRefAdvancementName, executeRefAdvancement } from '../../src/utils/ref-advancement';
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const PROFILE_HASH = `sha256:${'c'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const PROFILE_HASH = `${'c'.repeat(64)}`;
 
 function sampleContractIR(): ContractIR {
   return {
@@ -100,7 +100,7 @@ describe('executeRefAdvancement', () => {
 
   it('propagates writeRefPaired failures', async () => {
     await expect(
-      executeRefAdvancement(refsDir, 'db', 'sha256:not-a-valid-hash', sampleContractIR()),
+      executeRefAdvancement(refsDir, 'db', 'not-a-valid-hash', sampleContractIR()),
     ).rejects.toSatisfy((error) => {
       expect(MigrationToolsError.is(error)).toBe(true);
       expect((error as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_VALUE');

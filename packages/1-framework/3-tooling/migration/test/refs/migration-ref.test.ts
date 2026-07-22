@@ -6,10 +6,10 @@ import type { Refs } from '../../src/refs';
 import { parseMigrationRef } from '../../src/refs/migration-ref';
 import type { RefResolutionContext, RefResolutionError } from '../../src/refs/types';
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const HASH_B = `sha256:${'b'.repeat(64)}`;
-const MIG_HASH_1 = `sha256:${'1'.repeat(64)}`;
-const MIG_HASH_2 = `sha256:${'2'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const HASH_B = `${'b'.repeat(64)}`;
+const MIG_HASH_1 = `${'1'.repeat(64)}`;
+const MIG_HASH_2 = `${'2'.repeat(64)}`;
 
 function pkg(
   dirName: string,
@@ -112,9 +112,9 @@ describe('parseMigrationRef', () => {
     });
 
     it('returns ambiguous for non-unique migration hash prefix', () => {
-      const MIG_HASH_AMB1 = `sha256:aabbcc${'1'.repeat(58)}`;
-      const MIG_HASH_AMB2 = `sha256:aabbcc${'2'.repeat(58)}`;
-      const HASH_X = `sha256:${'f'.repeat(64)}`;
+      const MIG_HASH_AMB1 = `aabbcc${'1'.repeat(58)}`;
+      const MIG_HASH_AMB2 = `aabbcc${'2'.repeat(58)}`;
+      const HASH_X = `${'f'.repeat(64)}`;
       const ctx = createContext({
         packages: [
           pkg('m1', null, HASH_A, MIG_HASH_AMB1),

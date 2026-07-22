@@ -24,14 +24,14 @@ const emptyNamespacedStorage = () => ({
 });
 
 describe('computeStorageHash', () => {
-  it('returns a sha256-prefixed hex string', () => {
+  it('returns a bare hex string', () => {
     const hash = computeStorageHash({
       target: 'postgres',
       targetFamily: 'sql',
       storage: emptyNamespacedStorage(),
       ...SQL_HOOKS,
     });
-    expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('produces stable hashes for identical input', () => {
@@ -153,13 +153,13 @@ describe('computeStorageHash', () => {
 });
 
 describe('computeProfileHash', () => {
-  it('returns a sha256-prefixed hex string', () => {
+  it('returns a bare hex string', () => {
     const hash = computeProfileHash({
       target: 'postgres',
       targetFamily: 'sql',
       capabilities: { postgres: { jsonAgg: true } },
     });
-    expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('produces different hashes for different capabilities', () => {
@@ -174,7 +174,7 @@ describe('computeProfileHash', () => {
 });
 
 describe('computeExecutionHash', () => {
-  it('returns a sha256-prefixed hex string', () => {
+  it('returns a bare hex string', () => {
     const hash = computeExecutionHash({
       target: 'postgres',
       targetFamily: 'sql',
@@ -189,7 +189,7 @@ describe('computeExecutionHash', () => {
         },
       },
     });
-    expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('produces different hashes for different execution sections', () => {

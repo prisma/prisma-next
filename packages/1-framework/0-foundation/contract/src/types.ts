@@ -18,14 +18,14 @@ export type Brand<TKey extends string | number | symbol, TValue = true> = {
 /**
  * Base type for storage contract hashes.
  * Emitted contract.d.ts files use this with the hash value as a type parameter:
- * `type StorageHash = StorageHashBase<'sha256:abc123...'>`
+ * `type StorageHash = StorageHashBase<'abc123...'>`
  */
 export type StorageHashBase<THash extends string> = THash & Brand<'StorageHash'>;
 
 /**
  * Base type for execution contract hashes.
  * Emitted contract.d.ts files use this with the hash value as a type parameter:
- * `type ExecutionHash = ExecutionHashBase<'sha256:def456...'>`
+ * `type ExecutionHash = ExecutionHashBase<'def456...'>`
  */
 export type ExecutionHashBase<THash extends string> = THash & Brand<'ExecutionHash'>;
 
@@ -40,7 +40,7 @@ export function coreHash<const T extends string>(value: T): StorageHashBase<T> {
 /**
  * Base type for profile contract hashes.
  * Emitted contract.d.ts files use this with the hash value as a type parameter:
- * `type ProfileHash = ProfileHashBase<'sha256:def456...'>`
+ * `type ProfileHash = ProfileHashBase<'def456...'>`
  */
 export type ProfileHashBase<THash extends string> = THash & Brand<'ProfileHash'>;
 

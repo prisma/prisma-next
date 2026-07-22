@@ -117,8 +117,8 @@ function samplePresent(overrides: Partial<MigrationShowPresent> = {}): Migration
     space: 'app',
     name: '20260101_100000_add_user',
     fromContract: null,
-    toContract: 'sha256:hash-a',
-    hash: 'sha256:edge-abc',
+    toContract: 'hash-a',
+    hash: 'edge-abc',
     createdAt: '2026-01-01T10:00:00.000Z',
     operations: [{ id: 'table.user', label: 'Create table "user"', operationClass: 'additive' }],
     preview: {
@@ -186,7 +186,7 @@ describe('formatMigrationShowOutput', () => {
 
     expect(stripped).toContain('20260101_100000_add_user');
     expect(stripped).toContain('from: (baseline)');
-    expect(stripped).toContain('to:   sha256:hash-a');
+    expect(stripped).toContain('to:   hash-a');
     expect(stripped).not.toContain('── app ──');
   });
 
@@ -261,7 +261,7 @@ describe('migration show command', () => {
     const dirName = await setupMigrationDir(
       appDir,
       'init',
-      createMetadata(EMPTY_CONTRACT_HASH, 'sha256:abc'),
+      createMetadata(EMPTY_CONTRACT_HASH, 'abc'),
       [createOp('table.user', 'Create table user', 'additive')],
     );
 
@@ -291,7 +291,7 @@ describe('migration show command', () => {
     const dirName = await setupMigrationDir(
       appDir,
       'init',
-      createMetadata(EMPTY_CONTRACT_HASH, 'sha256:abc'),
+      createMetadata(EMPTY_CONTRACT_HASH, 'abc'),
       [createOp('table.user', 'Create table user', 'additive')],
     );
 
@@ -299,7 +299,7 @@ describe('migration show command', () => {
     await mkdir(contractDir, { recursive: true });
     await writeFile(
       join(contractDir, 'contract.json'),
-      JSON.stringify({ storage: { storageHash: 'sha256:abc', namespaces: {} } }),
+      JSON.stringify({ storage: { storageHash: 'abc', namespaces: {} } }),
     );
 
     process.chdir(cwd);
@@ -336,7 +336,7 @@ describe('migration show command', () => {
     const dirName = await setupMigrationDir(
       appDir,
       'init',
-      createMetadata(EMPTY_CONTRACT_HASH, 'sha256:abc'),
+      createMetadata(EMPTY_CONTRACT_HASH, 'abc'),
       [createOp('table.user', 'Create table user', 'additive')],
     );
 

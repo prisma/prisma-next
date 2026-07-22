@@ -37,11 +37,11 @@ function makeSpaceState(spaceId: string, contract: Contract, isApp = false): Int
 
 describe('computeIntegrityViolations', () => {
   it('surfaces duplicateMigrationHash instead of throwing from graph()', () => {
-    const sharedHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-    const first = createAttestedPackage('20260101T0000_first', { from: null, to: 'sha256:t1' });
+    const sharedHash = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const first = createAttestedPackage('20260101T0000_first', { from: null, to: 't1' });
     const second = createAttestedPackage('20260101T0000_second', {
-      from: 'sha256:t1',
-      to: 'sha256:t2',
+      from: 't1',
+      to: 't2',
     });
     const packages = [
       { ...first, metadata: { ...first.metadata, migrationHash: sharedHash } },
@@ -52,7 +52,7 @@ describe('computeIntegrityViolations', () => {
       spaceId: 'app',
       packages,
       refs: {},
-      headRef: { hash: 'sha256:t2', invariants: [] },
+      headRef: { hash: 't2', invariants: [] },
       refsDir: '/tmp/refs',
       resolveContract: () => {
         throw new Error('unused in this test');
@@ -135,12 +135,12 @@ describe('computeIntegrityViolations', () => {
   it('rethrows when graph() fails for an unexpected reason', () => {
     // Give the space a package so packages.length > 0, which triggers the
     // graph-reachability check and therefore the graph() call.
-    const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: 'sha256:head' });
+    const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: 'head' });
     const space = createAggregateContractSpace({
       spaceId: 'ext',
       packages: [pkg],
       refs: {},
-      headRef: { hash: 'sha256:head', invariants: [] },
+      headRef: { hash: 'head', invariants: [] },
       refsDir: '/tmp/refs',
       resolveContract: () => {
         throw new Error('unused');

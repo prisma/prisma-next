@@ -99,11 +99,11 @@ function buildMongoExtensionContract(): MongoShapedExtensionContract {
           },
         },
       },
-      storageHash: coreHash('sha256:mongo-ext-contract'),
+      storageHash: coreHash('mongo-ext-contract'),
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: profileHash('sha256:mongo-ext-profile'),
+    profileHash: profileHash('mongo-ext-profile'),
     meta: {},
   };
 }

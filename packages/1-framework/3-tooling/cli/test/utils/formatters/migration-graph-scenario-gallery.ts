@@ -139,7 +139,7 @@ function edge(from: string, to: string, dirName: string): MigrationEdge {
   return {
     from,
     to,
-    migrationHash: `sha256:gal${String(_seq++).padStart(3, '0')}-${dirName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 32)}`,
+    migrationHash: `gal${String(_seq++).padStart(3, '0')}-${dirName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 32)}`,
     dirName,
     createdAt: '2026-06-06T17:01:00.000Z',
     invariants: [],

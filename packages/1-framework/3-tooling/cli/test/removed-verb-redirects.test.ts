@@ -36,7 +36,7 @@ describe('removed verb redirects', () => {
 
   it('removed `ref set` under `migration` redirects to top-level `ref set`', async () => {
     try {
-      await execFileAsync('node', [CLI_PATH, 'migration', 'ref', 'set', 'prod', 'sha256:abc'], {
+      await execFileAsync('node', [CLI_PATH, 'migration', 'ref', 'set', 'prod', 'abc'], {
         timeout: 5000,
       });
       expect.unreachable('should have exited with non-zero');

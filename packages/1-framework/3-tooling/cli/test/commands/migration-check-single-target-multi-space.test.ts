@@ -28,8 +28,8 @@ afterAll(() => {
 
 const TARGET = 'mock';
 const TARGET_FAMILY = 'mock';
-const HASH_APP = `sha256:${'a'.repeat(64)}`;
-const HASH_EXT = `sha256:${'b'.repeat(64)}`;
+const HASH_APP = `${'a'.repeat(64)}`;
+const HASH_EXT = `${'b'.repeat(64)}`;
 
 const ADDITIVE_OPS: readonly MigrationPlanOperation[] = [
   { id: 'table.users', label: 'Create table users', operationClass: 'additive' },

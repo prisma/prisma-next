@@ -28,7 +28,7 @@ import type { MigrationListEntry } from '../../src/utils/formatters/migration-li
 // Fixture builders — small in-memory graphs, no on-disk I/O.
 // ---------------------------------------------------------------------------
 
-const LIVE_CONTRACT_HASH = `sha256:c0ffee${'0'.repeat(58)}`;
+const LIVE_CONTRACT_HASH = `c0ffee${'0'.repeat(58)}`;
 
 let edgeSeq = 0;
 
@@ -36,7 +36,7 @@ function makeEdge(from: string, to: string, dirName: string): MigrationEdge {
   return {
     from,
     to,
-    migrationHash: `sha256:edge${String(edgeSeq++).padStart(4, '0')}${'0'.repeat(53)}`,
+    migrationHash: `edge${String(edgeSeq++).padStart(4, '0')}${'0'.repeat(53)}`,
     dirName,
     createdAt: '2026-06-06T17:01:00.000Z',
     invariants: [],
