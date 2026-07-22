@@ -5,20 +5,20 @@ Source: prisma/prisma@a6d01554528e016bea1467a072776b0e2b94dcba — packages/clie
 Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus reviewer sub-agent checks `[x]` ONLY when satisfied that the test is (a) faithfully ported and passing, (b) faithfully ported as `test.fails` with a `failing.md` entry, or (c) covered by a justified individual `non-ported.md` entry. Implementer sub-agents never check boxes.
 
 ### packages/client/tests/functional/methods/count/tests.ts
-- [ ] `simple` — `user.count()` returns 3 (all seeded users) [providers: all]
-- [ ] `take` — `count({ take: 2 })` returns 2 [providers: all]
-- [ ] `where` — `count({ where: { age: 111 } })` returns 1 [providers: all]
-- [ ] `select where` — `count({ select: true, where: { age: 111 } })` returns 1 [providers: all]
-- [ ] `select mixed where` — `count` with per-field select (`_all`,email,age,name) + where returns object of 1s [providers: all]
-- [ ] `select all true` — `count({ select: true })` returns 3 [providers: all]
-- [ ] `select all false` — `count({ select: false })` returns 3 (select:false is @ts-expect-error, known bug) [providers: all]
-- [ ] `select mixed` — `count` with per-field select returns object of 3s [providers: all]
-- [ ] `bad prop` — count with unknown field `posts` in select rejects with validation error snapshot (Unknown field on UserCountAggregateOutputType) [providers: all]
+- [x] `simple` — `user.count()` returns 3 (all seeded users) [providers: all] → ports/prisma/functional/methods-count.test.ts
+- [x] `take` — `count({ take: 2 })` returns 2 [providers: all] → ports/prisma/functional/methods-count.test.ts
+- [x] `where` — `count({ where: { age: 111 } })` returns 1 [providers: all] → ports/prisma/functional/methods-count.test.ts
+- [x] `select where` — `count({ select: true, where: { age: 111 } })` returns 1 [providers: all] → ports/prisma/functional/methods-count.test.ts
+- [x] `select mixed where` — `count` with per-field select (`_all`,email,age,name) + where returns object of 1s [providers: all] → non-ported
+- [x] `select all true` — `count({ select: true })` returns 3 [providers: all] → ports/prisma/functional/methods-count.test.ts
+- [x] `select all false` — `count({ select: false })` returns 3 (select:false is @ts-expect-error, known bug) [providers: all] → ports/prisma/functional/methods-count.test.ts
+- [x] `select mixed` — `count` with per-field select returns object of 3s [providers: all] → non-ported
+- [x] `bad prop` — count with unknown field `posts` in select rejects with validation error snapshot (Unknown field on UserCountAggregateOutputType) [providers: all] → non-ported
 
 ### packages/client/tests/functional/methods/createMany/tests.ts
-- [ ] `should create many records` — `createMany` with 4 rows returns `count` of 4 [providers: all]
-- [ ] `should create a single record with a single nested create` — `create` with nested `posts.createMany` (single) creates user + 1 post [providers: all]
-- [ ] `should create a single record with many nested create` — `create` with nested `posts.createMany` (4) creates user + all 4 posts found by title [providers: all]
+- [x] `should create many records` — `createMany` with 4 rows returns `count` of 4 [providers: all] → ports/prisma/functional/methods-createMany.test.ts
+- [x] `should create a single record with a single nested create` — `create` with nested `posts.createMany` (single) creates user + 1 post [providers: all] → ports/prisma/functional/methods-createMany.test.ts
+- [x] `should create a single record with many nested create` — `create` with nested `posts.createMany` (4) creates user + all 4 posts found by title [providers: all] → ports/prisma/functional/methods-createMany.test.ts
 
 ### packages/client/tests/functional/methods/createManyAndReturn-supported/tests.ts
 - [ ] `should create one record` — `createManyAndReturn` with single object returns array of 1 matching email/id/name:null [providers: postgres,cockroach,sqlite]
@@ -44,11 +44,11 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `reports correct method name in case of validation error` — invalid where field rejects with message containing `prisma.user.findFirstOrThrow()` invocation [providers: all]
 
 ### packages/client/tests/functional/methods/findUniqueOrThrow/tests.ts
-- [ ] `finds existing record` — `findUniqueOrThrow` returns seeded user by email, type not nullable [providers: all]
-- [ ] `throws if record was not found` — rejects with PrismaClientKnownRequestError code P2025 [providers: all]
-- [ ] `works with transactions` — batch `$transaction` with failing findUniqueOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all]
-- [ ] `works with interactive transactions` — interactive `$transaction` with failing findUniqueOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all]
-- [ ] `reports correct method name in case of validation error` — invalid where field rejects with message containing `prisma.user.findUniqueOrThrow()` invocation [providers: all]
+- [x] `finds existing record` — `findUniqueOrThrow` returns seeded user by email, type not nullable [providers: all] → ports/prisma/functional/methods-findUniqueOrThrow.test.ts
+- [x] `throws if record was not found` — rejects with PrismaClientKnownRequestError code P2025 [providers: all] → ports/prisma/functional/methods-findUniqueOrThrow.test.ts
+- [x] `works with transactions` — batch `$transaction` with failing findUniqueOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all] → non-ported
+- [x] `works with interactive transactions` — interactive `$transaction` with failing findUniqueOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all] → non-ported
+- [x] `reports correct method name in case of validation error` — invalid where field rejects with message containing `prisma.user.findUniqueOrThrow()` invocation [providers: all] → non-ported
 
 ### packages/client/tests/functional/methods/updateManyAndReturn-supported/tests.ts
 - [ ] `should update and return many records` — `updateManyAndReturn` with empty where updates name on all 4 and returns them [providers: postgres,cockroach,sqlite]
@@ -76,8 +76,8 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `should perform an upsert using ON CONFLICT with compound uniques` — compound `uniques` (field1,field2) upsert creates then updates val; native upsert used [providers: sqlite,postgres,cockroach]
 
 ### packages/client/tests/functional/methods/upsert/simple/tests.ts
-- [ ] `should create a record using upsert` — upsert on non-existent name creates it; count where name is 1 [providers: all]
-- [ ] `should update a record using upsert` — upsert on existing name updates to name+'new'; old name count 0, new name count 1 [providers: all]
+- [x] `should create a record using upsert` — upsert on non-existent name creates it; count where name is 1 [providers: all] → ports/prisma/functional/methods-upsert-simple.test.ts
+- [x] `should update a record using upsert` — upsert on existing name updates to name+'new'; old name count 0, new name count 1 [providers: all] → ports/prisma/functional/methods-upsert-simple.test.ts
 
 ### packages/client/tests/functional/mixed-string-uuid-datetime-list-inputs/tests.ts
 - [ ] `create with two strings` — creates a Post with `words: ['hello','world']`, asserts the created row and the findUnique read-back both equal the input array [providers: postgres,cockroach,mongodb]
@@ -95,12 +95,12 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `multischema > delete` — deleteMany post and user, asserts both findMany return length 0 [providers: postgres,sqlserver]
 
 ### packages/client/tests/functional/multiple-types/tests.ts
-- [ ] `Bool field: true or false should succeed` — creates bool true/false rows, asserts $queryRaw result equals findMany (all-null other fields); skipped on D1/MySQL [providers: exclude:mongodb (skipTestIf D1||mysql)]
-- [ ] `String field: true or false as string should succeed` — creates string 'true'/'false' rows, asserts $queryRaw equals findMany [providers: exclude:mongodb]
-- [ ] `shows differences between queryRaw and findMany` — creates row with all scalar types, asserts queryRaw vs findMany differ for bool/dec on D1/MySQL and match otherwise [providers: exclude:mongodb]
-- [ ] `a record with all fields set to null should succeed` — creates empty record, asserts queryRaw equals findMany with all nulls [providers: exclude:mongodb]
-- [ ] `2 records, 1st with null, 2nd with values should succeed` — creates null + full record, asserts queryRaw shape and D1/MySQL divergence from findMany [providers: exclude:mongodb]
-- [ ] `all fields are null` — creates empty record, asserts queryRaw equals findMany with all nulls [providers: exclude:mongodb]
+- [x] `Bool field: true or false should succeed` — creates bool true/false rows, asserts $queryRaw result equals findMany (all-null other fields); skipped on D1/MySQL [providers: exclude:mongodb (skipTestIf D1||mysql)] → ports/prisma/functional/multiple-types.test.ts
+- [x] `String field: true or false as string should succeed` — creates string 'true'/'false' rows, asserts $queryRaw equals findMany [providers: exclude:mongodb] → ports/prisma/functional/multiple-types.test.ts
+- [x] `shows differences between queryRaw and findMany` — creates row with all scalar types, asserts queryRaw vs findMany differ for bool/dec on D1/MySQL and match otherwise [providers: exclude:mongodb] → non-ported
+- [x] `a record with all fields set to null should succeed` — creates empty record, asserts queryRaw equals findMany with all nulls [providers: exclude:mongodb] → ports/prisma/functional/multiple-types.test.ts
+- [x] `2 records, 1st with null, 2nd with values should succeed` — creates null + full record, asserts queryRaw shape and D1/MySQL divergence from findMany [providers: exclude:mongodb] → ports/prisma/functional/multiple-types.test.ts
+- [x] `all fields are null` — creates empty record, asserts queryRaw equals findMany with all nulls [providers: exclude:mongodb] → ports/prisma/functional/multiple-types.test.ts
 
 ### packages/client/tests/functional/mysql-bit-type/tests.ts
 - [ ] `bytes field > all bytes` — creates row with 8-byte uint64, asserts result.uint64 equals input bytes [providers: mysql-only]
@@ -426,24 +426,24 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `throws on nested omit` — findFirst with nested `select.posts.omit.id: undefined` rejects with undefined-not-allowed error for `id` [providers: all]
 
 ### packages/client/tests/functional/string-filters/tests.ts
-- [ ] `startsWith matches prefix` — `value: { startsWith: 'foo' }` returns `['foo','foo bar baz']` [providers: all]
-- [ ] `startsWith with no match` — `startsWith: 'xyz'` returns 0 rows [providers: all]
-- [ ] `startsWith with empty string matches all` — `startsWith: ''` returns all 6 rows [providers: all]
-- [ ] `endsWith matches suffix` — `endsWith: 'baz'` returns `['baz','foo bar baz']` [providers: all]
-- [ ] `endsWith with no match` — `endsWith: 'xyz'` returns 0 rows [providers: all]
-- [ ] `endsWith with empty string matches all` — `endsWith: ''` returns all 6 rows [providers: all]
-- [ ] `contains matches substring` — `contains: 'bar'` returns `['bar','foo bar baz']` [providers: all]
-- [ ] `contains with no match` — `contains: 'xyz'` returns 0 rows [providers: all]
-- [ ] `contains with empty string matches all` — `contains: ''` returns all 6 rows [providers: all]
-- [ ] `combined startsWith + endsWith` — `startsWith:'foo', endsWith:'baz'` returns only `'foo bar baz'` [providers: all]
-- [ ] `combined startsWith + contains` — `startsWith:'foo', contains:'bar'` returns only `'foo bar baz'` [providers: all]
-- [ ] `combined contains + endsWith` — `contains:'bar', endsWith:'baz'` returns only `'foo bar baz'` [providers: all]
-- [ ] `NOT startsWith` — `NOT: { value: { startsWith:'foo' } }` returns `['','bar','baz','completely different']` [providers: all]
-- [ ] `NOT contains` — `NOT: { value: { contains:'bar' } }` returns `['','baz','completely different','foo']` [providers: all]
-- [ ] `NOT endsWith` — `NOT: { value: { endsWith:'baz' } }` returns `['','bar','completely different','foo']` [providers: all]
-- [ ] `mode: insensitive > contains case-insensitive` — with extra `FOO BAR BAZ`/`Foo` rows, `contains:'bar', mode:'insensitive'` returns `['FOO BAR BAZ','bar','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)]
-- [ ] `mode: insensitive > startsWith case-insensitive` — `startsWith:'foo', mode:'insensitive'` returns `['FOO BAR BAZ','Foo','foo','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)]
-- [ ] `mode: insensitive > endsWith case-insensitive` — `endsWith:'baz', mode:'insensitive'` returns `['FOO BAR BAZ','baz','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)]
+- [x] `startsWith matches prefix` — `value: { startsWith: 'foo' }` returns `['foo','foo bar baz']` [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `startsWith with no match` — `startsWith: 'xyz'` returns 0 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `startsWith with empty string matches all` — `startsWith: ''` returns all 6 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `endsWith matches suffix` — `endsWith: 'baz'` returns `['baz','foo bar baz']` [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `endsWith with no match` — `endsWith: 'xyz'` returns 0 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `endsWith with empty string matches all` — `endsWith: ''` returns all 6 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `contains matches substring` — `contains: 'bar'` returns `['bar','foo bar baz']` [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `contains with no match` — `contains: 'xyz'` returns 0 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `contains with empty string matches all` — `contains: ''` returns all 6 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `combined startsWith + endsWith` — `startsWith:'foo', endsWith:'baz'` returns only `'foo bar baz'` [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `combined startsWith + contains` — `startsWith:'foo', contains:'bar'` returns only `'foo bar baz'` [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `combined contains + endsWith` — `contains:'bar', endsWith:'baz'` returns only `'foo bar baz'` [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `NOT startsWith` — `NOT: { value: { startsWith:'foo' } }` returns `['','bar','baz','completely different']` [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `NOT contains` — `NOT: { value: { contains:'bar' } }` returns `['','baz','completely different','foo']` [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `NOT endsWith` — `NOT: { value: { endsWith:'baz' } }` returns `['','bar','completely different','foo']` [providers: all] → ports/prisma/functional/string-filters.test.ts
+- [x] `mode: insensitive > contains case-insensitive` — with extra `FOO BAR BAZ`/`Foo` rows, `contains:'bar', mode:'insensitive'` returns `['FOO BAR BAZ','bar','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)] → ports/prisma/functional/string-filters.test.ts
+- [x] `mode: insensitive > startsWith case-insensitive` — `startsWith:'foo', mode:'insensitive'` returns `['FOO BAR BAZ','Foo','foo','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)] → ports/prisma/functional/string-filters.test.ts
+- [x] `mode: insensitive > endsWith case-insensitive` — `endsWith:'baz', mode:'insensitive'` returns `['FOO BAR BAZ','baz','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)] → ports/prisma/functional/string-filters.test.ts
 
 ### packages/client/tests/functional/too-many-instances-of-prisma-client/tests.ts
 - [ ] `should not console warn when spawning too many instances of PrismaClient` — spawns 15 clients and `$connect`s each; asserts no console.warn output (empty snapshot); 60s timeout [providers: all]

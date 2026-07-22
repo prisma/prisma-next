@@ -475,9 +475,9 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/extended-where/aggregate.ts
 
-- [ ] `aggregate with cursor 1 unique (PK)` — aggregate _count with cursor on PK id [providers: all]
-- [ ] `aggregate with cursor 2 uniques (PK & non-PK)` — aggregate _count with cursor on id + title [providers: all]
-- [ ] `update with where 1 unique (non-PK)` — aggregate _count with cursor on non-PK title [providers: all]
+- [x] `aggregate with cursor 1 unique (PK)` — aggregate _count with cursor on PK id [providers: all] → non-ported
+- [x] `aggregate with cursor 2 uniques (PK & non-PK)` — aggregate _count with cursor on id + title [providers: all] → non-ported
+- [x] `update with where 1 unique (non-PK)` — aggregate _count with cursor on non-PK title [providers: all] → non-ported
 
 ### packages/client/tests/functional/extended-where/create.ts
 
@@ -493,21 +493,21 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/extended-where/findFirst.ts
 
-- [ ] `findFirst with cursor 1 unique (PK)` — findFirst with cursor on PK id [providers: all]
-- [ ] `findFirst with cursor 2 uniques (PK & non-PK)` — findFirst with cursor on id + title [providers: all]
-- [ ] `findFirst with cursor 1 unique (non-PK)` — findFirst with cursor on non-PK title [providers: all]
+- [x] `findFirst with cursor 1 unique (PK)` — findFirst with cursor on PK id [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
+- [x] `findFirst with cursor 2 uniques (PK & non-PK)` — findFirst with cursor on id + title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
+- [x] `findFirst with cursor 1 unique (non-PK)` — findFirst with cursor on non-PK title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/findFirstOrThrow.ts
 
-- [ ] `findFirstOrThrow with cursor 1 unique (PK)` — findFirstOrThrow with cursor on PK id [providers: all]
-- [ ] `findFirstOrThrow with cursor 2 uniques (PK & non-PK)` — findFirstOrThrow with cursor on id + title [providers: all]
-- [ ] `findFirstOrThrow with cursor 1 unique (non-PK)` — findFirstOrThrow with cursor on non-PK title [providers: all]
+- [x] `findFirstOrThrow with cursor 1 unique (PK)` — findFirstOrThrow with cursor on PK id [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
+- [x] `findFirstOrThrow with cursor 2 uniques (PK & non-PK)` — findFirstOrThrow with cursor on id + title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
+- [x] `findFirstOrThrow with cursor 1 unique (non-PK)` — findFirstOrThrow with cursor on non-PK title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/findMany.ts
 
-- [ ] `findMany with cursor 1 unique (PK)` — findMany with cursor on PK id [providers: all]
-- [ ] `findMany with cursor 2 uniques (PK & non-PK)` — findMany with cursor on id + title [providers: all]
-- [ ] `findMany with cursor 1 unique (non-PK)` — findMany with cursor on non-PK title [providers: all]
+- [x] `findMany with cursor 1 unique (PK)` — findMany with cursor on PK id [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
+- [x] `findMany with cursor 2 uniques (PK & non-PK)` — findMany with cursor on id + title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
+- [x] `findMany with cursor 1 unique (non-PK)` — findMany with cursor on non-PK title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/findUnique.ts
 
@@ -537,10 +537,10 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/extended-where/validation.ts
 
-- [ ] `where and no keys provided` — delete with empty where rejects with inline snapshot error [providers: all]
-- [ ] `where and missing unique keys` — delete with where lacking unique key rejects with inline snapshot [providers: all]
-- [ ] `AtLeast type with optional object` — type-level AtLeast on optional object with one required key [providers: all]
-- [ ] `AtLeast type with optional object and no keys` — type-level AtLeast with never required key [providers: all]
+- [x] `where and no keys provided` — delete with empty where rejects with inline snapshot error [providers: all] → non-ported
+- [x] `where and missing unique keys` — delete with where lacking unique key rejects with inline snapshot [providers: all] → non-ported
+- [x] `AtLeast type with optional object` — type-level AtLeast on optional object with one required key [providers: all] → non-ported
+- [x] `AtLeast type with optional object and no keys` — type-level AtLeast with never required key [providers: all] → non-ported
 
 ### packages/client/tests/functional/extensions/client.ts
 
@@ -722,8 +722,8 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/field-reference/enum/tests.ts
 
-- [ ] `simple enum equality` — findMany where enum1 equals field reference to enum2 [providers: postgres,mongodb,cockroachdb,mysql]
-- [ ] `via extended client` — same enum field-reference equality through $extends client [providers: postgres,mongodb,cockroachdb,mysql]
+- [x] `simple enum equality` — findMany where enum1 equals field reference to enum2 [providers: postgres,mongodb,cockroachdb,mysql] → non-ported
+- [x] `via extended client` — same enum field-reference equality through $extends client [providers: postgres,mongodb,cockroachdb,mysql] → non-ported
 
 ### packages/client/tests/functional/field-reference/json/tests.ts
 
@@ -736,26 +736,26 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/field-reference/list/tests.ts
 
-- [ ] `in` — scalar/enum `in` filter against a list field reference [providers: postgres,mongodb,cockroachdb]
-- [ ] `notIn` — scalar/enum `notIn` filter against a list field reference [providers: postgres,mongodb,cockroachdb]
-- [ ] `via extended client` — list field-reference notIn through $extends client [providers: postgres,mongodb,cockroachdb]
+- [x] `in` — scalar/enum `in` filter against a list field reference [providers: postgres,mongodb,cockroachdb] → non-ported
+- [x] `notIn` — scalar/enum `notIn` filter against a list field reference [providers: postgres,mongodb,cockroachdb] → non-ported
+- [x] `via extended client` — list field-reference notIn through $extends client [providers: postgres,mongodb,cockroachdb] → non-ported
 
 ### packages/client/tests/functional/field-reference/numeric/tests.ts
 
-- [ ] `single condition` — findMany where quantity gt maxQuantity field reference [providers: all]
-- [ ] `multiple condition` — quantity gt minQuantity and lt maxQuantity field references [providers: all]
-- [ ] `aggregate` — aggregate _sum with field-reference where filter [providers: all]
-- [ ] `relationship` — nested relation select with field-reference where filter [providers: all]
-- [ ] `wrong column numeric type` — referencing mismatched-type column rejects with error snapshot [providers: all]
-- [ ] `via extended client` — numeric field-reference gt through $extends client [providers: all]
+- [x] `single condition` — findMany where quantity gt maxQuantity field reference [providers: all] → non-ported
+- [x] `multiple condition` — quantity gt minQuantity and lt maxQuantity field references [providers: all] → non-ported
+- [x] `aggregate` — aggregate _sum with field-reference where filter [providers: all] → non-ported
+- [x] `relationship` — nested relation select with field-reference where filter [providers: all] → non-ported
+- [x] `wrong column numeric type` — referencing mismatched-type column rejects with error snapshot [providers: all] → non-ported
+- [x] `via extended client` — numeric field-reference gt through $extends client [providers: all] → non-ported
 
 ### packages/client/tests/functional/field-reference/string/tests.ts
 
-- [ ] `simple equality` — findMany where string equals otherString field reference [providers: all]
-- [ ] `advanced filter` — string startsWith field reference [providers: all]
-- [ ] `wrong field type` — referencing an Int field for a String filter rejects with inline snapshot [providers: all]
-- [ ] `wrong model` — referencing a field of another model rejects with inline snapshot [providers: all]
-- [ ] `wrong identical model` — referencing a field of an identical-shaped model rejects with inline snapshot [providers: all]
+- [x] `simple equality` — findMany where string equals otherString field reference [providers: all] → non-ported
+- [x] `advanced filter` — string startsWith field reference [providers: all] → non-ported
+- [x] `wrong field type` — referencing an Int field for a String filter rejects with inline snapshot [providers: all] → non-ported
+- [x] `wrong model` — referencing a field of another model rejects with inline snapshot [providers: all] → non-ported
+- [x] `wrong identical model` — referencing a field of an identical-shaped model rejects with inline snapshot [providers: all] → non-ported
 
 ### packages/client/tests/functional/filter-count-relations/tests.ts
 
