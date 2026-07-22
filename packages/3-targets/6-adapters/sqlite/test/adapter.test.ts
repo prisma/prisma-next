@@ -3,18 +3,25 @@ import {
   AndExpr,
   type AnyQueryAst,
   BinaryExpr,
+  CaseExpr,
+  CastExpr,
+  CodecJsonValueProjection,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
   DerivedTableSource,
   ExistsExpr,
+  FunctionCallExpr,
+  FunctionSource,
   InsertAst,
   InsertOnConflict,
   JoinAst,
   JsonArrayAggExpr,
+  JsonDocumentProjection,
   JsonObjectExpr,
   ListExpression,
   LiteralExpr,
+  NativeJsonValueProjection,
   NullCheckExpr,
   OrderByItem,
   OrExpr,
@@ -207,6 +214,56 @@ describe('SQLite adapter', () => {
 
       const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('FROM "user" AS "u"');
+    });
+
+    it.each([
+      {
+        name: 'without arguments or alias',
+        source: FunctionSource.of('json_each', []),
+        sql: 'SELECT 1 AS "value" FROM json_each()',
+      },
+      {
+        name: 'with arguments and alias',
+        source: FunctionSource.of('json_each', [ParamRef.of('[1, 2]')], { alias: 'entry' }),
+        sql: 'SELECT 1 AS "value" FROM json_each(?) AS "entry"',
+      },
+    ])('preserves legacy function-source SQL $name', ({ source, sql }) => {
+      const ast = SelectAst.from(source).withProjection([
+        ProjectionItem.of('value', LiteralExpr.of(1)),
+      ]);
+
+      expect(adapter.lower(ast, { contract }).sql).toBe(sql);
+    });
+
+    it.each([
+      {
+        name: 'WITH ORDINALITY',
+        source: FunctionSource.of('json_each', []).withOrdinality(),
+        message: 'SQLite does not support WITH ORDINALITY on function sources',
+        feature: 'function-source-with-ordinality',
+      },
+      {
+        name: 'returned-column aliases',
+        source: FunctionSource.of('json_each', [], {
+          alias: 'entry',
+          columnAliases: ['value'],
+        }),
+        message: 'SQLite does not support returned-column aliases on function sources',
+        feature: 'function-source-column-aliases',
+      },
+    ])('rejects function sources with $name', ({ source, message, feature }) => {
+      const ast = SelectAst.from(source).withProjection([
+        ProjectionItem.of('value', LiteralExpr.of(1)),
+      ]);
+
+      expect(() => adapter.lower(ast, { contract })).toThrow(
+        expect.objectContaining({
+          name: 'StructuredError',
+          code: 'ADAPTER.CAPABILITY_MISSING',
+          message,
+          meta: { target: 'sqlite', feature },
+        }),
+      );
     });
 
     it('renders subquery in projection', () => {
@@ -411,8 +468,11 @@ describe('SQLite adapter', () => {
         ProjectionItem.of(
           'payload',
           JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('email', ColumnRef.of('user', 'email')),
-            JsonObjectExpr.entry('count', AggregateExpr.count()),
+            JsonObjectExpr.entry(
+              'email',
+              new NativeJsonValueProjection(ColumnRef.of('user', 'email')),
+            ),
+            JsonObjectExpr.entry('count', new NativeJsonValueProjection(AggregateExpr.count())),
           ]),
         ),
       ]);
@@ -421,9 +481,109 @@ describe('SQLite adapter', () => {
       expect(sql).toContain('json_object(\'email\', "user"."email", \'count\', COUNT(*))');
     });
 
+    it.each([
+      {
+        name: 'codec',
+        projection: new CodecJsonValueProjection(ColumnRef.of('user', 'email'), {
+          codecId: 'sqlite/text@1',
+        }),
+      },
+      {
+        name: 'native',
+        projection: new NativeJsonValueProjection(ColumnRef.of('user', 'email')),
+      },
+      {
+        name: 'document',
+        projection: new JsonDocumentProjection(ColumnRef.of('user', 'email')),
+      },
+    ])('renders $name JSON value projections as structural pass-throughs', ({ projection }) => {
+      const ast = SelectAst.from(TableSource.named('user')).withProjection([
+        ProjectionItem.of(
+          'object',
+          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', projection)]),
+        ),
+        ProjectionItem.of('array', JsonArrayAggExpr.of(projection)),
+      ]);
+
+      const { sql } = adapter.lower(ast, { contract });
+
+      expect(sql).toBe(
+        `SELECT json_object('value', "user"."email") AS "object", json_group_array("user"."email") AS "array" FROM "user"`,
+      );
+    });
+
+    it('renders nested scalar projection expressions with exact precedence', () => {
+      const decision = CaseExpr.of(
+        [
+          {
+            condition: BinaryExpr.eq(
+              FunctionCallExpr.of('lower', [ColumnRef.of('user', 'email')]),
+              ParamRef.of('a@example.com'),
+            ),
+            value: CastExpr.as(
+              FunctionCallExpr.of('concat', [ColumnRef.of('user', 'email'), ParamRef.of('!')]),
+              'text',
+            ),
+          },
+          {
+            condition: NullCheckExpr.isNull(ColumnRef.of('user', 'metadata')),
+            value: FunctionCallExpr.of('coalesce', [
+              ColumnRef.of('user', 'email'),
+              LiteralExpr.of('missing'),
+            ]),
+          },
+        ],
+        CastExpr.as(ParamRef.of('fallback'), 'text'),
+      );
+      const ast = SelectAst.from(TableSource.named('user')).withProjection([
+        ProjectionItem.of('zero', FunctionCallExpr.of('random', [])),
+        ProjectionItem.of('decision', NullCheckExpr.isNotNull(decision)),
+      ]);
+
+      const { sql } = adapter.lower(ast, { contract });
+
+      expect(sql).toBe(
+        `SELECT random() AS "zero", CASE WHEN lower("user"."email") = ? THEN CAST(concat("user"."email", ?) AS text) WHEN "user"."metadata" IS NULL THEN coalesce("user"."email", 'missing') ELSE CAST(? AS text) END IS NOT NULL AS "decision" FROM "user"`,
+      );
+    });
+
+    it.each([
+      {
+        name: 'function call',
+        expression: FunctionCallExpr.of('lower', [ColumnRef.of('user', 'email')]),
+        sql: 'lower("user"."email")',
+      },
+      {
+        name: 'cast',
+        expression: CastExpr.as(ColumnRef.of('user', 'email'), 'text'),
+        sql: 'CAST("user"."email" AS text)',
+      },
+      {
+        name: 'searched CASE',
+        expression: CaseExpr.of([
+          {
+            condition: BinaryExpr.eq(ColumnRef.of('user', 'id'), LiteralExpr.of(1)),
+            value: LiteralExpr.of('found'),
+          },
+        ]),
+        sql: `CASE WHEN "user"."id" = 1 THEN 'found' END`,
+      },
+    ])('treats $name expressions as atomic under null checks', ({ expression, sql }) => {
+      const ast = SelectAst.from(TableSource.named('user')).withProjection([
+        ProjectionItem.of('value', NullCheckExpr.isNotNull(expression)),
+      ]);
+
+      expect(adapter.lower(ast, { contract }).sql).toBe(
+        `SELECT ${sql} IS NOT NULL AS "value" FROM "user"`,
+      );
+    });
+
     it('renders json_group_array instead of json_agg', () => {
       const ast = SelectAst.from(TableSource.named('post')).withProjection([
-        ProjectionItem.of('posts', JsonArrayAggExpr.of(ColumnRef.of('post', 'title'))),
+        ProjectionItem.of(
+          'posts',
+          JsonArrayAggExpr.of(new NativeJsonValueProjection(ColumnRef.of('post', 'title'))),
+        ),
       ]);
 
       const { sql } = adapter.lower(ast, { contract });
@@ -434,7 +594,10 @@ describe('SQLite adapter', () => {
       const ast = SelectAst.from(TableSource.named('post')).withProjection([
         ProjectionItem.of(
           'posts',
-          JsonArrayAggExpr.of(ColumnRef.of('post', 'title'), 'emptyArray'),
+          JsonArrayAggExpr.of(
+            new NativeJsonValueProjection(ColumnRef.of('post', 'title')),
+            'emptyArray',
+          ),
         ),
       ]);
 

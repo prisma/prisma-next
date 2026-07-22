@@ -75,18 +75,26 @@ changes:
     detection:
       glob: "**/refs/*.contract.json"
       anyMatch: true
+  - id: adopt-sql-json-projection-ast-foundations
+    summary: Migrate relational AST construction and traversal to explicit JSON projection wrappers, expanded scalar-expression variants, grouped function-source aliases, and codec-preserving forwarded projections.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "JsonObjectExpr"
+        - "JsonArrayAggExpr"
+        - "ExprVisitor"
+        - "AnyExpression"
+        - "FunctionSource.of"
+        - "ProjectionItem.of"
+      anyMatch: true
 ---
 
-Also in this release, the ORM client's internal `throw new Error(...)` sites
-were converted to a structured-error scheme (`ORM.*` codes via `structuredError`,
-or `InternalError` for invariants). Those are internal throw sites: the errors
-are still `Error` instances with unchanged message text, so extension code that
-catches them by message or by `instanceof Error` is unaffected, and the new
-`ORM.*` codes are additive — that change alone requires no extension action. The
-authoring-plane sweep (TML-3075) is the same shape: internal throw sites in the
-contract authoring packages became structured `CONTRACT.*`/`PSL.*` envelopes or
-`InternalError`, with message text unchanged, and it standardized two ORM error
-`meta` keys (`trait: 'equality'`, `tableName`) that were never part of the
-extension surface — also no extension action. The migration contract-snapshot
-layout change above is the one that requires converting your extension's
-migration tree.
+## `adopt-sql-json-projection-ast-foundations`
+
+Relational JSON container AST construction now requires an explicit value-projection variant. Import `NativeJsonValueProjection` from `@prisma-next/sql-relational-core/ast` and wrap every expression that 0.16 code passed directly to `JsonObjectExpr.entry(key, expression)` or `JsonArrayAggExpr.of(expression, ...)`: use `JsonObjectExpr.entry(key, new NativeJsonValueProjection(expression))` and `JsonArrayAggExpr.of(new NativeJsonValueProjection(expression), ...)`. `NativeJsonValueProjection` preserves the pre-0.17 target-native JSON conversion. Use `CodecJsonValueProjection` only when the extension deliberately supplies a `CodecRef` for codec-owned JSON conversion, and use `JsonDocumentProjection` only when the wrapped expression already produces a JSON document.
+
+`ExprVisitor<R>` and the `AnyExpression` union now include `FunctionCallExpr` (`kind: 'function-call'`), `CastExpr` (`kind: 'cast'`), and `CaseExpr` (`kind: 'case'`). Add `functionCall`, `cast`, and `case` methods to every visitor object, and add all three discriminants to exhaustive `expr.kind` switches. Binding or rewriting visitors should route these nodes through their normal recursive expression path; restricted visitors such as grouped `HAVING` validators should reject them explicitly when the context does not support them.
+
+`FunctionSource.of(fn, args, alias)` now groups alias state so returned-column aliases cannot exist without a table alias. Replace a string third argument such as `FunctionSource.of(fn, args, 'rows')` with `FunctionSource.of(fn, args, { alias: 'rows' })`; when returned-column names are required, pass `{ alias: 'rows', columnAliases: ['value', 'ordinality'] }`. Calls that omit the alias remain unchanged.
+
+When an extension forwards an existing `ProjectionItem` through a derived-table or row-number wrapper, preserve its known codec in the reconstructed projection: use `ProjectionItem.of(item.alias, ColumnRef.of(wrapperAlias, item.alias), item.codec)`. Leave the codec undefined only for computed or otherwise unknown projected results. After applying the applicable edits, run the extension's typecheck and tests; update AST-shape fixtures to assert the explicit wrapper nodes and preserved codec metadata.

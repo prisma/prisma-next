@@ -615,7 +615,7 @@ describe('integration/include', () => {
         const includeAggregateProjection = postsProjection.expr.query.projection[0];
         expectJsonArrayAggExpr(includeAggregateProjection?.expr);
         expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
-        expect(includeAggregateProjection.expr.expr.kind).toBe('json-object');
+        expect(includeAggregateProjection.expr.expr.value.kind).toBe('json-object');
         expect(includeAggregateProjection.expr.orderBy).toEqual([
           OrderByItem.asc(ColumnRef.of('posts__rows', 'posts__order_0')),
         ]);
@@ -756,7 +756,7 @@ describe('integration/include', () => {
         const includeAggregateProjection = postsProjection.expr.query.projection[0];
         expectJsonArrayAggExpr(includeAggregateProjection?.expr);
         expect(includeAggregateProjection.expr.onEmpty).toBe('emptyArray');
-        expect(includeAggregateProjection.expr.expr.kind).toBe('json-object');
+        expect(includeAggregateProjection.expr.expr.value.kind).toBe('json-object');
       });
     },
     timeouts.spinUpPpgDev,

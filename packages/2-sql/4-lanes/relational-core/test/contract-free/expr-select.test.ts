@@ -26,12 +26,65 @@ describe('FunctionSource', () => {
     expect(src.args).toHaveLength(1);
     expect(src.args[0]).toBe(arg);
     expect(src.alias).toBeUndefined();
+    expect(src.columnAliases).toBeUndefined();
+    expect(src.ordinality).toBe(false);
     expect(Object.isFrozen(src)).toBe(true);
   });
 
   it('supports an optional alias', () => {
-    const src = FunctionSource.of('pragma_table_info', [ParamRef.of('t')], 'pti');
+    const src = FunctionSource.of('pragma_table_info', [ParamRef.of('t')], { alias: 'pti' });
     expect(src.alias).toBe('pti');
+  });
+
+  it('configures column aliases and ordinality without mutating construction inputs', () => {
+    const arg = ParamRef.of('input');
+    const args = [arg];
+    const columnAliases = ['element', 'ord'];
+    const source = FunctionSource.of('unnest', args, {
+      alias: 'u',
+      columnAliases,
+    }).withOrdinality();
+
+    args.push(ParamRef.of('ignored'));
+    columnAliases.push('ignored');
+
+    expect(source.args).toEqual([arg]);
+    expect(source.columnAliases).toEqual(['element', 'ord']);
+    expect(source.ordinality).toBe(true);
+    expect(Object.isFrozen(source)).toBe(true);
+    expect(Object.isFrozen(source.args)).toBe(true);
+    expect(Object.isFrozen(source.columnAliases)).toBe(true);
+  });
+
+  it('rejects an empty column-alias list', () => {
+    expect(() => FunctionSource.of('unnest', [], { alias: 'u', columnAliases: [] })).toThrow(
+      'FunctionSource column aliases must not be empty',
+    );
+  });
+
+  it('preserves configuration while rewriting arguments', () => {
+    const originalArg = ParamRef.of('before');
+    const replacementArg = ParamRef.of('after');
+    const source = FunctionSource.of('unnest', [originalArg], {
+      alias: 'u',
+      columnAliases: ['element', 'ord'],
+    }).withOrdinality();
+
+    expect(source.rewrite({})).toBe(source);
+
+    const rewritten = source.rewrite({
+      paramRef: (ref) => (ref === originalArg ? replacementArg : ref),
+    });
+
+    expect(rewritten).toBeInstanceOf(FunctionSource);
+    if (!(rewritten instanceof FunctionSource)) {
+      throw new Error('Expected FunctionSource');
+    }
+    expect(rewritten.args).toEqual([replacementArg]);
+    expect(rewritten.alias).toBe('u');
+    expect(rewritten.columnAliases).toEqual(['element', 'ord']);
+    expect(rewritten.ordinality).toBe(true);
+    expect(Object.isFrozen(rewritten.columnAliases)).toBe(true);
   });
 
   it('toFromSource() returns itself', () => {

@@ -3,6 +3,7 @@ import {
   BinaryExpr,
   ColumnRef,
   JsonObjectExpr,
+  NativeJsonValueProjection,
   ProjectionItem,
   SelectAst,
   SubqueryExpr,
@@ -162,7 +163,9 @@ describe('variant-owned include child alias collisions', () => {
       .withProjection([
         ProjectionItem.of(
           'featureCount',
-          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', AggregateExpr.count())]),
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('value', new NativeJsonValueProjection(AggregateExpr.count())),
+          ]),
         ),
       ])
       .withWhere(

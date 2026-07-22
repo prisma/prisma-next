@@ -10,6 +10,7 @@ import {
   JsonArrayAggExpr,
   JsonObjectExpr,
   ListExpression,
+  NativeJsonValueProjection,
   NullCheckExpr,
   OrderByItem,
   SelectAst,
@@ -22,12 +23,14 @@ describe('ast/visitors', () => {
     const operation = lowerExpr(col('user', 'email'), param(0, 'email'), lit(true));
     const list = ListExpression.of([param(1, 'firstId'), lit(2)]);
     const objectExpr = JsonObjectExpr.fromEntries([
-      JsonObjectExpr.entry('email', operation),
-      JsonObjectExpr.entry('active', lit(false)),
+      JsonObjectExpr.entry('email', new NativeJsonValueProjection(operation)),
+      JsonObjectExpr.entry('active', new NativeJsonValueProjection(lit(false))),
     ]);
-    const arrayExpr = JsonArrayAggExpr.of(col('post', 'id'), 'emptyArray', [
-      OrderByItem.desc(col('post', 'createdAt')),
-    ]);
+    const arrayExpr = JsonArrayAggExpr.of(
+      new NativeJsonValueProjection(col('post', 'id')),
+      'emptyArray',
+      [OrderByItem.desc(col('post', 'createdAt'))],
+    );
 
     const rewrittenOperation = operation.rewrite({
       columnRef: (expr) => (expr.table === 'user' ? col('member', expr.column) : expr),
@@ -51,12 +54,12 @@ describe('ast/visitors', () => {
     expect(rewrittenList).toEqual(ListExpression.of([param(21, 'firstId'), lit('mapped')]));
     expect(rewrittenObject).toEqual(
       JsonObjectExpr.fromEntries([
-        JsonObjectExpr.entry('email', operation),
-        JsonObjectExpr.entry('active', lit('FALSE')),
+        JsonObjectExpr.entry('email', new NativeJsonValueProjection(operation)),
+        JsonObjectExpr.entry('active', new NativeJsonValueProjection(lit('FALSE'))),
       ]),
     );
     expect(rewrittenArray).toEqual(
-      JsonArrayAggExpr.of(col('article', 'id'), 'emptyArray', [
+      JsonArrayAggExpr.of(new NativeJsonValueProjection(col('article', 'id')), 'emptyArray', [
         OrderByItem.desc(col('article', 'createdAt')),
       ]),
     );

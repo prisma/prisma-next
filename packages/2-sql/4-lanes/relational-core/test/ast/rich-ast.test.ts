@@ -17,6 +17,7 @@ import {
   JsonObjectExpr,
   ListExpression,
   LiteralExpr,
+  NativeJsonValueProjection,
   NotExpr,
   NullCheckExpr,
   OperationExpr,
@@ -66,10 +67,12 @@ describe('rich SQL AST', () => {
     expect(SubqueryExpr.of(select).kind).toBe('subquery');
     expect(lowerEmail(column, param, literal).kind).toBe('operation');
     expect(AggregateExpr.sum(column).kind).toBe('aggregate');
-    expect(JsonObjectExpr.fromEntries([JsonObjectExpr.entry('id', column)]).kind).toBe(
-      'json-object',
-    );
-    expect(JsonArrayAggExpr.of(column).kind).toBe('json-array-agg');
+    expect(
+      JsonObjectExpr.fromEntries([
+        JsonObjectExpr.entry('id', new NativeJsonValueProjection(column)),
+      ]).kind,
+    ).toBe('json-object');
+    expect(JsonArrayAggExpr.of(new NativeJsonValueProjection(column)).kind).toBe('json-array-agg');
     expect(binary.kind).toBe('binary');
     expect(AndExpr.of([binary]).kind).toBe('and');
     expect(OrExpr.of([binary]).kind).toBe('or');
