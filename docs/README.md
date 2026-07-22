@@ -21,6 +21,7 @@ This directory contains the primary documentation for the repository.
 ## Reference
 
 - [Glossary](./glossary.md) — user-facing terminology (source of truth for naming)
+- [Error reference](./reference/error-reference.md) — every published `NAMESPACE.SUBCODE` error code; completeness enforced by `pnpm check:error-reference`
 - [Commands](./commands/README.md) — command docs and entry points
 - [Reference docs](./reference/) — conventions and patterns used across the codebase
 - [Codec authoring guide](./reference/codec-authoring-guide.md) — class-based codecs (`CodecImpl`, `CodecDescriptorImpl`) and column helpers
