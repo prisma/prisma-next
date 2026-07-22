@@ -53,7 +53,7 @@ const controlStack = createControlStack({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
   driver: postgresDriverDescriptor,
-  extensionPacks: [],
+  extensions: [],
 });
 const familyInstance = sqlFamilyDescriptor.create(controlStack);
 const controlAdapter = postgresAdapterDescriptor.create(controlStack);

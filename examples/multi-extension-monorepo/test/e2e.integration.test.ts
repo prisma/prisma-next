@@ -40,7 +40,7 @@
  *          (proving the apply path actually ran the DDL, not just
  *          updated the marker).
  *
- *   4. **Order-independent across `extensionPacks` declaration order
+ *   4. **Order-independent across `extensions` declaration order
  *      .** Re-running the apply path with the extensions
  *      declared in reverse order produces the same marker hashes —
  *      cross-space ordering is determined by space id, not by
@@ -123,7 +123,7 @@ const FEATURE_FLAGS_STORAGE_HASH = featureFlagsContractSpace.headRef.hash;
 const featureFlagsHeadRef = featureFlagsContractSpace.headRef;
 
 function buildControlStack(declarationOrder: 'natural' | 'reverse') {
-  const extensionPacks =
+  const extensions =
     declarationOrder === 'natural'
       ? [auditExtensionDescriptor, featureFlagsExtensionDescriptor]
       : [featureFlagsExtensionDescriptor, auditExtensionDescriptor];
@@ -132,7 +132,7 @@ function buildControlStack(declarationOrder: 'natural' | 'reverse') {
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
     driver: postgresDriverDescriptor,
-    extensionPacks,
+    extensions,
   });
 }
 
@@ -277,7 +277,7 @@ describe.sequential('multi-extension-monorepo end-to-end (PGlite)', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir: project.migrationsDir,
       targetId: 'postgres',
-      extensionPacks: [auditExtensionDescriptor, featureFlagsExtensionDescriptor],
+      extensions: [auditExtensionDescriptor, featureFlagsExtensionDescriptor],
     });
 
     if (!result.ok) {
@@ -313,7 +313,7 @@ describe.sequential('multi-extension-monorepo end-to-end (PGlite)', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir: project.migrationsDir,
       targetId: 'postgres',
-      extensionPacks: [auditExtensionDescriptor, featureFlagsExtensionDescriptor],
+      extensions: [auditExtensionDescriptor, featureFlagsExtensionDescriptor],
     });
 
     if (!result.ok) {
@@ -390,7 +390,7 @@ describe.sequential('multi-extension-monorepo end-to-end (PGlite)', {
     expect(appRows.rows[0]?.email).toBe('alice@example.com');
   });
 
-  it('marker hashes are independent of `extensionPacks` declaration order', async () => {
+  it('marker hashes are independent of `extensions` declaration order', async () => {
     project = await setupTestProject();
 
     const result = await executeDbInit({
@@ -403,7 +403,7 @@ describe.sequential('multi-extension-monorepo end-to-end (PGlite)', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir: project.migrationsDir,
       targetId: 'postgres',
-      extensionPacks: [featureFlagsExtensionDescriptor, auditExtensionDescriptor],
+      extensions: [featureFlagsExtensionDescriptor, auditExtensionDescriptor],
     });
 
     if (!result.ok) {

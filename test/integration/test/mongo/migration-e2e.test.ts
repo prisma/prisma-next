@@ -58,7 +58,7 @@ const emptyContract: MongoContract = {
     storageHash: coreHash('sha256:empty-contract'),
   },
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   profileHash: profileHash('sha256:test'),
   meta: {},
 };
@@ -98,7 +98,7 @@ const indexedContract: MongoContract = {
     storageHash: coreHash('sha256:indexed-contract'),
   },
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   profileHash: profileHash('sha256:test'),
   meta: {},
 };

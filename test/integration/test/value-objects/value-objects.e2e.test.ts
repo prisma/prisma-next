@@ -132,7 +132,7 @@ describe('value objects e2e: SQL → real Postgres → typed round-trip', () => 
             target: postgresTarget,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensionPacks: [],
+            extensions: [],
           });
 
           const stackInstance = instantiateExecutionStack(stack);

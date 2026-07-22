@@ -11,6 +11,6 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensions: [],
   contract: typescriptContract(contract, 'output/contract.json'),
 });

@@ -83,7 +83,7 @@ export const mongoTestContractSpaceContract: MongoContract = {
     },
   },
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   profileHash: profileHash('synthetic-mongo-test-contract-space-profile-v1'),
   storage: {

@@ -10,7 +10,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensionPacks: [],
+  extensions: [],
   contract: typescriptContract(contract, 'output/contract.json'),
   db: {
     connection: '{{DB_URL}}', // Placeholder to be replaced in tests

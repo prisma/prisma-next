@@ -9,7 +9,7 @@ export default defineConfig({
   target: mongoTargetDescriptor,
   adapter: mongoAdapter,
   driver: mongoDriver,
-  extensionPacks: [],
+  extensions: [],
   contract: {
     source: {
       load: async () => ({ ok: true, value: {} }),

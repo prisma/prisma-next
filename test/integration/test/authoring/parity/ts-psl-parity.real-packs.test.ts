@@ -27,7 +27,7 @@ const stack = createControlStack({
   family: sqlFamilyControl,
   target: postgresControl,
   adapter: postgresAdapter,
-  extensionPacks: [pgvectorControl],
+  extensions: [pgvectorControl],
 });
 
 function buildColumnDescriptorMap() {
@@ -58,7 +58,7 @@ function interpretWithRealPacks(schema: string) {
     controlMutationDefaults: stack.controlMutationDefaults,
     authoringContributions: stack.authoringContributions,
     composedExtensionContracts: new Map(),
-    composedExtensionPacks: [pgvectorControl.id],
+    composedExtensions: [pgvectorControl.id],
     composedExtensionPackRefs: [pgvectorPack],
     createNamespace: postgresCreateNamespace,
     capabilities: stack.capabilities,
@@ -70,7 +70,7 @@ describe('TS and PSL authoring parity with real packs', () => {
   it('lowers family-owned and extension-owned type constructors to identical output', () => {
     const tsContract = defineContract(
       {
-        extensionPacks: { pgvector: pgvectorPack },
+        extensions: { pgvector: pgvectorPack },
       },
       ({ type, field, model }) => {
         const types = {
@@ -118,7 +118,7 @@ model Document {
   it('lowers inline field constructor expressions to the same output as direct TS column descriptors', () => {
     const tsContract = defineContract(
       {
-        extensionPacks: { pgvector: pgvectorPack },
+        extensions: { pgvector: pgvectorPack },
       },
       ({ type, field, model }) => ({
         models: {
@@ -154,7 +154,7 @@ model Document {
     const AalLevel = nativeEnum('AalLevel', 'aal1', 'aal2', 'aal3').map('aal_level');
 
     const tsContract = defineContract({
-      extensionPacks: { pgvector: pgvectorPack },
+      extensions: { pgvector: pgvectorPack },
       models: {
         Session: model('Session', {
           fields: {
@@ -190,7 +190,7 @@ model Document {
     const AalLevel = nativeEnum('AalLevel', 'aal1', 'aal2', 'aal3').map('aal_level');
 
     const tsContract = defineContract({
-      extensionPacks: { pgvector: pgvectorPack },
+      extensions: { pgvector: pgvectorPack },
       namespaces: ['auth'],
       models: {
         Session: model('Session', {

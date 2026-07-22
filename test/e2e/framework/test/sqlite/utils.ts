@@ -186,7 +186,7 @@ async function createSqliteRuntime<TContract extends Contract<SqlStorage>>(
     target: sqliteTarget,
     adapter: sqliteAdapter,
     driver: sqliteDriver,
-    extensionPacks: [],
+    extensions: [],
   });
 
   const stackInstance = instantiateExecutionStack(stack);

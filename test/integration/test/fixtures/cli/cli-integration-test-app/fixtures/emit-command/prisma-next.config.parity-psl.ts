@@ -11,7 +11,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensions: [],
   contract: prismaContract('./schema.prisma', {
     output: 'output/contract.json',
     target: postgres,

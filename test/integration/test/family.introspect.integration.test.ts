@@ -70,7 +70,7 @@ describe('family instance introspect', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -104,7 +104,7 @@ describe('family instance introspect', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -170,7 +170,7 @@ describe('family instance introspect', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -209,7 +209,7 @@ describe('family instance introspect', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -251,7 +251,7 @@ describe('family instance introspect', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -302,7 +302,7 @@ describe('family instance introspect', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -344,7 +344,7 @@ describe('family instance introspect', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -376,7 +376,7 @@ describe('family instance introspect', () => {
           target: postgres,
           adapter: adapterWithInvalidCreate,
           driver: postgresDriver,
-          extensionPacks: [],
+          extensions: [],
         }),
       );
 
@@ -412,7 +412,7 @@ describe('family instance introspect', () => {
             target: postgres,
             adapter: postgresAdapter,
             driver: postgresDriver,
-            extensionPacks: [],
+            extensions: [],
           }),
         );
 

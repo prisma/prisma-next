@@ -30,8 +30,8 @@ describe('demo contract visualization DX', () => {
     expect(contract.storage.namespaces).toBeDefined();
     expect(contract.capabilities).toBeDefined();
     expect(typeof contract.capabilities).toBe('object');
-    expect(contract.extensionPacks).toBeDefined();
-    expect(typeof contract.extensionPacks).toBe('object');
+    expect(contract.extensions).toBeDefined();
+    expect(typeof contract.extensions).toBe('object');
   });
 
   it('validated contract exposes model storage field mappings', () => {

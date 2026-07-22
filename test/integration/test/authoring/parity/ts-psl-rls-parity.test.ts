@@ -39,7 +39,7 @@ const stack = createControlStack({
   family: sqlFamilyControl,
   target: postgresControl,
   adapter: postgresAdapter,
-  extensionPacks: [],
+  extensions: [],
 });
 
 function buildColumnDescriptorMap() {

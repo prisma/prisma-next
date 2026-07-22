@@ -27,7 +27,7 @@ async function getRuntime(connectionString: string): Promise<Runtime> {
   const client = postgres<Contract>({
     contractJson,
     url: connectionString,
-    extensions: db.stack.extensionPacks,
+    extensions: db.stack.extensions,
   });
   return client.connect();
 }

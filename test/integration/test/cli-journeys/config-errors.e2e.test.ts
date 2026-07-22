@@ -80,7 +80,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensionPacks: [],
+  extensions: [],
 } as any);
 `,
           'utf-8',

@@ -49,6 +49,6 @@ export default defineConfig({
       close: async () => {},
     }),
   },
-  extensionPacks: [],
+  extensions: [],
   contract: typescriptContract(contract, 'output/contract.json'),
 });

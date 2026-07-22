@@ -44,7 +44,7 @@ async function getRuntime(connectionString: string): Promise<Runtime> {
   const client = postgres<Contract>({
     contractJson,
     url: connectionString,
-    extensions: db.stack.extensionPacks,
+    extensions: db.stack.extensions,
   });
   return client.connect();
 }
@@ -57,7 +57,7 @@ async function getRuntimeWithMiddleware(
     contractJson,
     url: connectionString,
     middleware,
-    extensions: db.stack.extensionPacks,
+    extensions: db.stack.extensions,
   });
   const runtime = await client.connect();
   const driver = (runtime as unknown as { driver: SqlDriver<unknown> }).driver;

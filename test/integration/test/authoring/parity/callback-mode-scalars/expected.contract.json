@@ -336,7 +336,7 @@
       "scalarList": true
     }
   },
-  "extensionPacks": {
+  "extensions": {
     "pgvector": {
       "capabilities": {
         "postgres": {

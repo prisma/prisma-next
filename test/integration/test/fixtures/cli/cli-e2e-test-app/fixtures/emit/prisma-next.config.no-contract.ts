@@ -7,6 +7,6 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensionPacks: [],
+  extensions: [],
   // contract is intentionally missing
 });

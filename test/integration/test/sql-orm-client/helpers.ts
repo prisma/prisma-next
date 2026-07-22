@@ -110,7 +110,7 @@ const testContext: ExecutionContext<TestContract> = createExecutionContext({
   stack: createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    extensionPacks: [pgvectorRuntime],
+    extensions: [pgvectorRuntime],
   }),
 });
 
@@ -142,7 +142,7 @@ const polyTestContext: ExecutionContext<PolyContract> = createExecutionContext({
   stack: createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    extensionPacks: [pgvectorRuntime],
+    extensions: [pgvectorRuntime],
   }),
 });
 

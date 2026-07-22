@@ -65,7 +65,7 @@ describe('family instance schemaVerify', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -142,7 +142,7 @@ describe('family instance schemaVerify', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -220,7 +220,7 @@ describe('family instance schemaVerify', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -323,7 +323,7 @@ describe('family instance schemaVerify', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 

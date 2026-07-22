@@ -74,7 +74,7 @@ function makeContract(
       storageHash: coreHash(`sha256:${hashSeed}`),
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: profileHash('sha256:test'),
     meta: {},
   };

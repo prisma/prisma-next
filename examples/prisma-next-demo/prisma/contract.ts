@@ -15,7 +15,7 @@ const UserEnum = enumType('user_type', pgText, member('admin', 'admin'), member(
 
 export const contract = defineContract(
   {
-    extensionPacks: { pgvector },
+    extensions: { pgvector },
   },
   ({ field, model, type }) => {
     const types = {

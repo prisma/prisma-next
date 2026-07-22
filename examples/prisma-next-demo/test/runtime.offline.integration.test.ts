@@ -37,7 +37,7 @@ describe('static context (no runtime)', () => {
     const executionStack = db.stack;
     const adapterSpy = vi.spyOn(executionStack.adapter, 'create');
     const targetSpy = vi.spyOn(executionStack.target, 'create');
-    const extensionSpies = executionStack.extensionPacks.map((ext) => vi.spyOn(ext, 'create'));
+    const extensionSpies = executionStack.extensions.map((ext) => vi.spyOn(ext, 'create'));
 
     db.sql.public.user.select('id', 'email').limit(1).build();
 

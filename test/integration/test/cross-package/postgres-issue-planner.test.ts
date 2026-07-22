@@ -51,7 +51,7 @@ function makeContract(
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -653,7 +653,7 @@ describe('planIssues', () => {
         roots: {},
         domain: applicationDomainOf({ models: {} }),
         capabilities: {},
-        extensionPacks: {},
+        extensions: {},
         meta: {},
       };
     }
@@ -763,7 +763,7 @@ describe('planIssues', () => {
         roots: {},
         domain: applicationDomainOf({ models: {} }),
         capabilities: {},
-        extensionPacks: {},
+        extensions: {},
         meta: {},
       };
       const actual = new PostgresDatabaseSchemaNode({

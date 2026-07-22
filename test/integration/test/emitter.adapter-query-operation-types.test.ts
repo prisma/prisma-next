@@ -26,7 +26,7 @@ describe('emitter + postgres adapter descriptor', () => {
         },
       },
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       profileHash: 'profile:sha256:test' as never,
       meta: {},
     };

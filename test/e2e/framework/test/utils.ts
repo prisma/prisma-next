@@ -42,7 +42,7 @@ export function createControlClientForTests(connectionString: string): ControlCl
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: [pgvector, arktypeJson],
+    extensions: [pgvector, arktypeJson],
     connection: connectionString,
   });
 }
@@ -265,10 +265,10 @@ export async function withTestRuntime<TContract extends Contract<SqlStorage>>(
       await withClient(connectionString, async (client: Client) => {
         const adapter = createStubAdapter();
         const context = createTestContext(contract, adapter, {
-          extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
+          extensions: [pgvectorRuntime, arktypeJsonRuntime],
         });
         const runtime = await createTestRuntimeFromClient(contract, client, {
-          extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
+          extensions: [pgvectorRuntime, arktypeJsonRuntime],
         });
 
         try {

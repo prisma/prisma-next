@@ -86,7 +86,7 @@ const authIntrospectionContract: Contract<SqlStorage> = {
   roots: {},
   domain: applicationDomainOf({ models: {} }),
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
 };
 
@@ -95,7 +95,7 @@ const controlStack = createControlStack({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
   driver: postgresDriverDescriptor,
-  extensionPacks: [],
+  extensions: [],
 });
 const familyInstance = sqlFamilyDescriptor.create(controlStack);
 

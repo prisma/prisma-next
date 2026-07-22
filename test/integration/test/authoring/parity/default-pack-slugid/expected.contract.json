@@ -100,7 +100,7 @@
       "scalarList": true
     }
   },
-  "extensionPacks": {
+  "extensions": {
     "slugid-defaults": {
       "familyId": "sql",
       "id": "slugid-defaults",

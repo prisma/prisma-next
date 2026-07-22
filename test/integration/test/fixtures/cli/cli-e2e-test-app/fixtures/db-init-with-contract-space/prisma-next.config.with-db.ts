@@ -15,7 +15,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [testContractSpaceExtension],
+  extensions: [testContractSpaceExtension],
   contract: {
     source: {
       load: async () => ({ ok: true, value: contract }),

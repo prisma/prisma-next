@@ -10,7 +10,7 @@ export default {
   target: postgres,
   adapter: postgresAdapter,
   // driver is missing - this is what we're testing
-  extensionPacks: [],
+  extensions: [],
   contract: {
     source: {
       load: async () => ({ ok: true, value: contract }),

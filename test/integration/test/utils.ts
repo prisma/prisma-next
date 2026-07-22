@@ -23,7 +23,7 @@ import { bootstrapPostgresSignMarkerTables } from './postgres-bootstrap';
 
 export interface CreateTestRuntimeOptions {
   readonly verifyMarker?: VerifyMarkerOption;
-  readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<'postgres'>[];
+  readonly extensions?: readonly SqlRuntimeExtensionDescriptor<'postgres'>[];
   readonly middleware?: readonly SqlMiddleware[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
@@ -55,7 +55,7 @@ export async function createTestRuntime(
               return postgresDriver.create({ cursor: driverOptions.cursor });
             },
           },
-    extensionPacks: options?.extensionPacks ?? [],
+    extensions: options?.extensions ?? [],
   });
 
   const stackInstance = instantiateExecutionStack(stack);

@@ -32,7 +32,7 @@ export function createPrismaNextControlClient(options: TestControlClientOptions)
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: [pgvector],
+    extensions: [pgvector],
     connection: options.connection,
   });
 }

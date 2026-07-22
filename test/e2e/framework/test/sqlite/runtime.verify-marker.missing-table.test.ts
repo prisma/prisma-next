@@ -59,7 +59,7 @@ async function buildHarness(log: Log): Promise<Harness> {
     target: sqliteTarget,
     adapter: sqliteAdapter,
     driver: sqliteDriver,
-    extensionPacks: [],
+    extensions: [],
   });
 
   const stackInstance = instantiateExecutionStack(stack);

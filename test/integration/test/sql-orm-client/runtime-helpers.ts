@@ -82,7 +82,7 @@ export async function createPgIntegrationRuntime(
   // must build the runtime against that same contract. Defaults to the base
   // sql-orm-client fixture.
   contractOverride?: Contract<SqlStorage>,
-  additionalExtensionPacks: readonly SqlRuntimeExtensionDescriptor<'postgres'>[] = [],
+  additionalExtensions: readonly SqlRuntimeExtensionDescriptor<'postgres'>[] = [],
 ): Promise<PgIntegrationRuntime> {
   // Use a single client, not a pool: the `@prisma/dev` server is PGlite-backed
   // and allows only one concurrent connection. The mutation path opens a
@@ -107,7 +107,7 @@ export async function createPgIntegrationRuntime(
         target: postgresTarget,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [pgvectorRuntime, ...additionalExtensionPacks],
+        extensions: [pgvectorRuntime, ...additionalExtensions],
       });
 
       const context = createExecutionContext<Contract<SqlStorage>>({ contract, stack });

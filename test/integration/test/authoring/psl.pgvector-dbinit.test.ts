@@ -59,7 +59,7 @@ describe(
       family: sql,
       target: postgres,
       adapter: postgresAdapter,
-      extensionPacks: [pgvector],
+      extensions: [pgvector],
     });
 
     beforeEach(() => {
@@ -84,7 +84,7 @@ describe(
       });
 
       const pslResult = await contractConfig.source.load({
-        composedExtensionPacks: [pgvector.id],
+        composedExtensions: [pgvector.id],
         composedExtensionContracts: new Map(),
         scalarTypeDescriptors: stack.scalarTypeDescriptors,
         authoringContributions: stack.authoringContributions,
@@ -118,7 +118,7 @@ describe(
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [pgvector],
+        extensions: [pgvector],
       });
 
       try {

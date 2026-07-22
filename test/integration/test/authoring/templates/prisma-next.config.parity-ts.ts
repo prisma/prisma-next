@@ -5,13 +5,13 @@ import sql from '@prisma-next/family-sql/control';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgres from '@prisma-next/target-postgres/control';
 import { contract } from './contract';
-import { extensionPacks } from './packs';
+import { extensions } from './packs';
 
 export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks,
+  extensions,
   contract: typescriptContract(contract, 'output/contract.json'),
 });

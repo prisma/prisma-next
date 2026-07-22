@@ -69,7 +69,7 @@ export function createFamilyInstance(
       target: postgres,
       adapter: postgresAdapter,
       driver: postgresDriver,
-      extensionPacks: extensions,
+      extensions: extensions,
     }),
   );
 }

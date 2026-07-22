@@ -11,7 +11,7 @@ export default {
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensions: [],
   // Omit output intentionally; loadConfig should finalize it to src/prisma/contract.json.
   contract: typescriptContract(contract),
 };

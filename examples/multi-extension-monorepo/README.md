@@ -4,7 +4,7 @@ Worked example: a Prisma Next application that depends on **two** internal contr
 
 ## What this demonstrates
 
-Prisma Next's contract-space mechanism is symmetric across origin: a contract space contributed by an installed extension package, a published extension on npm, and an internal monorepo package all flow through the same descriptor surface. The framework reads each `extensionPacks` entry's descriptor at authoring time, emits pinned per-space artefacts into the user's repo, and applies migrations from each space in cross-space order (extensions first, app last) inside a single transaction.
+Prisma Next's contract-space mechanism is symmetric across origin: a contract space contributed by an installed extension package, a published extension on npm, and an internal monorepo package all flow through the same descriptor surface. The framework reads each `extensions` entry's descriptor at authoring time, emits pinned per-space artefacts into the user's repo, and applies migrations from each space in cross-space order (extensions first, app last) inside a single transaction.
 
 This example exercises that property end-to-end against PGlite (the embedded Postgres-compatible engine the framework uses for tests). Two trivial "internal extensions" each declare:
 
@@ -23,7 +23,7 @@ The aggregator (`app/`) declares its own `User` table and lists both internal ex
 ```text
 examples/multi-extension-monorepo/
 ├── app/                                 ← aggregate root (the "application")
-│   ├── prisma-next.config.ts            ← composes extensionPacks: [audit, featureFlags]
+│   ├── prisma-next.config.ts            ← composes extensions: [audit, featureFlags]
 │   └── src/
 │       ├── constants.ts                  ← shared identifiers (table names, etc.)
 │       ├── contract.prisma               ← application contract (declares `User`)
@@ -46,7 +46,7 @@ examples/multi-extension-monorepo/
     └── e2e.integration.test.ts
 ```
 
-The aggregate root at `app/prisma-next.config.ts` is the config an application author writes — the CLI reads it for `contract emit`, `migration plan`, `db init`, and `db update`. It imports the extension descriptors from `packages/*/src/control.ts` and lists them in `extensionPacks`, exactly as a real application would import published extensions from npm.
+The aggregate root at `app/prisma-next.config.ts` is the config an application author writes — the CLI reads it for `contract emit`, `migration plan`, `db init`, and `db update`. It imports the extension descriptors from `packages/*/src/control.ts` and lists them in `extensions`, exactly as a real application would import published extensions from npm.
 
 This example is shipped as a single workspace package for ergonomic reasons (the framework's package layering treats `examples/*` as the top-level glob — see `pnpm-workspace.yaml`). The internal `packages/*` subdirectories play the role of separately-published packages in a real monorepo: each has its own descriptor module exporting an `SqlControlExtensionDescriptor` exactly as a published extension would. The framework code path is identical either way — the descriptor module is the only seam.
 

@@ -63,7 +63,7 @@ export const testContractSpaceContract: Contract<SqlStorage> = {
     },
   },
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   profileHash: profileHash('synthetic-test-contract-space-profile-v1'),
   storage: new SqlStorage({

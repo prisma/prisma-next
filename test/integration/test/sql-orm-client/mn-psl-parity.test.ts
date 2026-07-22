@@ -47,7 +47,7 @@ const mnPslContext: ExecutionContext<MnPslContract> = createExecutionContext({
   stack: createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    extensionPacks: [pgvectorRuntime],
+    extensions: [pgvectorRuntime],
   }),
 });
 

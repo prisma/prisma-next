@@ -61,7 +61,7 @@ const testExternalSpaceContract: Contract<SqlStorage> = {
     },
   },
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   profileHash: profileHash('synthetic-test-external-space-profile-v1'),
   storage: new SqlStorage({

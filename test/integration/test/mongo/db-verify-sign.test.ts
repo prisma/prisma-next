@@ -53,7 +53,7 @@ const baseContract: MongoContract = {
     storageHash: coreHash('sha256:verify-test'),
   },
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   profileHash: profileHash('sha256:verify-test'),
   meta: {},
 };

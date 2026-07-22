@@ -4,7 +4,7 @@ import { defineConfig } from '@prisma-next/postgres/config';
 
 export default defineConfig({
   contract: './prisma/contract.ts',
-  outputPath: './src/prisma',
+  output: './src/prisma',
   extensions: [paradedb],
   db: {
     // biome-ignore lint/style/noNonNullAssertion: loaded from .env

@@ -279,7 +279,7 @@ the pattern is easy to copy.
 ```typescript
 // prisma-next.config.ts (control plane)
 import postgis from '@prisma-next/extension-postgis/control';
-extensionPacks: [postgis];
+extensions: [postgis];
 ```
 
 ```typescript

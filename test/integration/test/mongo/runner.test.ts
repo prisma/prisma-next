@@ -109,7 +109,7 @@ function buildAppContract(): MongoContract {
       storageHash: coreHash('sha256:app-contract-multi-space'),
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: profileHash('sha256:app-profile'),
     meta: {},
   };
@@ -164,7 +164,7 @@ function buildAppContractMissingPosts(): MongoContract {
       storageHash: coreHash('sha256:app-contract-trimmed'),
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: profileHash('sha256:app-profile'),
     meta: {},
   };
@@ -200,7 +200,7 @@ function buildExtContract(): MongoContract {
       storageHash: coreHash('sha256:ext-contract-multi-space'),
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: profileHash('sha256:ext-profile'),
     meta: {},
   };

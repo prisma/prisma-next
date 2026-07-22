@@ -16,7 +16,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
   it('typechecks and accepts a well-formed bm25 index via the helpers factory', () => {
     const contract = defineContract(
       {
-        extensionPacks: { paradedb: paradedbPack },
+        extensions: { paradedb: paradedbPack },
       },
       ({ model: helperModel, field: helperField }) => {
         const Doc = helperModel('Doc', {
@@ -52,7 +52,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
     expect(() =>
       defineContract(
         {
-          extensionPacks: { paradedb: paradedbPack },
+          extensions: { paradedb: paradedbPack },
         },
         ({ model: helperModel, field: helperField }) => {
           const Doc = helperModel('Doc', {
@@ -80,7 +80,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
     expect(() =>
       defineContract(
         {
-          extensionPacks: { paradedb: paradedbPack },
+          extensions: { paradedb: paradedbPack },
         },
         ({ model: helperModel, field: helperField }) => {
           const Doc = helperModel('Doc', {
@@ -108,7 +108,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
     expect(() =>
       defineContract(
         {
-          extensionPacks: { paradedb: paradedbPack },
+          extensions: { paradedb: paradedbPack },
         },
         ({ model: helperModel, field: helperField }) => {
           const Doc = helperModel('Doc', {
@@ -136,7 +136,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
     expect(() =>
       defineContract(
         {
-          extensionPacks: { paradedb: paradedbPack },
+          extensions: { paradedb: paradedbPack },
         },
         ({ model: helperModel, field: helperField }) => {
           const Doc = helperModel('Doc', {
@@ -201,7 +201,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
   it("helpers-bound model() carries the merged packs' index-type map", () => {
     defineContract(
       {
-        extensionPacks: { paradedb: paradedbPack },
+        extensions: { paradedb: paradedbPack },
       },
       ({ model: helperModel, field: helperField }) => {
         const Doc = helperModel('Doc', {

@@ -50,7 +50,7 @@ async function emitContract(
     target: postgres,
     adapter: postgresAdapter,
     driver: undefined,
-    extensionPacks: [],
+    extensions: [],
   });
 
   const emitResult = await emit(contract, stack, sqlEmission, {
@@ -101,7 +101,7 @@ describe('control-api', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             });
 
             await client.connect(connectionString);
@@ -120,7 +120,7 @@ describe('control-api', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             });
 
             await client.connect(connectionString);
@@ -150,7 +150,7 @@ describe('control-api', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             });
 
             try {
@@ -185,7 +185,7 @@ describe('control-api', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             });
 
             try {
@@ -229,7 +229,7 @@ describe('control-api', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             });
 
             try {
@@ -266,7 +266,7 @@ describe('control-api', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             });
 
             try {
@@ -312,7 +312,7 @@ describe('control-api', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             });
 
             try {
@@ -368,7 +368,7 @@ describe('control-api', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             });
 
             try {
@@ -415,7 +415,7 @@ describe('control-api', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             });
 
             try {

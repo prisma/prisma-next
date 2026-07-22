@@ -4,7 +4,7 @@ The canonical runnable Prisma Next + Supabase app, and the walking skeleton the 
 
 ## What it demonstrates
 
-- **`external` contract** — the app composes `supabasePack` via `extensionPacks`; the planner emits no DDL for `auth.*` / `storage.*`, and `db verify` confirms they exist in the database.
+- **`external` contract** — the app composes `supabasePack` via `extensions`; the planner emits no DDL for `auth.*` / `storage.*`, and `db verify` confirms they exist in the database.
 - **Cross-contract FK with cascade** — `Profile.userId → supabase:auth.AuthUser.id` (`onDelete: Cascade`); deleting an `auth.users` row removes the profile.
 - **RLS through the framework authoring surface** — the `Profile` policies are declared in PSL (`policy_select` / `policy_update` + `@@rls` in [`src/contract.prisma`](src/contract.prisma)) and applied by `dbInit` — no hand-authored `CREATE POLICY`.
 - **Role-bound runtime** — `asUser(jwt)` (RLS-scoped to the token owner), `asAnon()` (public-read policy), `asServiceRole()` (BYPASSRLS).
@@ -16,7 +16,7 @@ The canonical runnable Prisma Next + Supabase app, and the walking skeleton the 
 [`prisma-next.config.ts`](prisma-next.config.ts) wires the SQL family + Postgres target and composes the Supabase pack:
 
 ```ts
-extensionPacks: [supabasePack],
+extensions: [supabasePack],
 contract: prismaContract('./src/contract.prisma', {
   output: 'src/contract.json',
   target: postgresPackRef,

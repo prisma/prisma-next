@@ -10,7 +10,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensionPacks: [pgvector],
+  extensions: [pgvector],
   contract: {
     source: {
       load: async () => ok(contract),

@@ -135,7 +135,7 @@ function buildMultiNamespaceRuntimeContract(): Contract<SqlStorage> {
       },
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   } as unknown as Contract<SqlStorage>;
 }

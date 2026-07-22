@@ -91,7 +91,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'config outputPath field routes artifacts to the configured directory',
+      'config output field routes artifacts to the configured directory',
       async () => {
         const originalCwd = process.cwd();
         const setup = setupTestDirectoryFromFixtures(
