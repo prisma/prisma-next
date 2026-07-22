@@ -34,15 +34,15 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/0-legacy-ports/batch-find-unique/tests.ts
 
-- [ ] `findUnique batching` — concurrent findUnique calls compact into one batched query; asserts per-provider SQL snapshot and results [providers: all]
+- [x] `findUnique batching` — concurrent findUnique calls compact into one batched query; asserts per-provider SQL snapshot and results [providers: all] → non-ported
 
 ### packages/client/tests/functional/0-legacy-ports/execute-raw/tests.ts
 
-- [ ] `update via executeRawUnsafe` — $executeRawUnsafe UPDATE returns affected count [providers: exclude:mongodb]
-- [ ] `update via queryRawUnsafe with values` — $executeRawUnsafe with positional params returns affected count [providers: exclude:mongodb]
-- [ ] `update via executeRaw` — tagged-template $executeRaw UPDATE returns affected count [providers: exclude:mongodb]
-- [ ] `update via executeRaw using Prisma.join` — $executeRaw with Prisma.join in IN clause [providers: exclude:mongodb]
-- [ ] `update via executeRaw using Prisma.join and Prisma.sql` — $executeRaw(Prisma.sql`...`) with Prisma.join [providers: exclude:mongodb]
+- [x] `update via executeRawUnsafe` — $executeRawUnsafe UPDATE returns affected count [providers: exclude:mongodb] → non-ported
+- [x] `update via queryRawUnsafe with values` — $executeRawUnsafe with positional params returns affected count [providers: exclude:mongodb] → non-ported
+- [x] `update via executeRaw` — tagged-template $executeRaw UPDATE returns affected count [providers: exclude:mongodb] → non-ported
+- [x] `update via executeRaw using Prisma.join` — $executeRaw with Prisma.join in IN clause [providers: exclude:mongodb] → non-ported
+- [x] `update via executeRaw using Prisma.join and Prisma.sql` — $executeRaw(Prisma.sql`...`) with Prisma.join [providers: exclude:mongodb] → non-ported
 
 ### packages/client/tests/functional/0-legacy-ports/find-raw/tests.ts
 
@@ -61,9 +61,9 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/0-legacy-ports/malformed-id/tests.ts
 
-- [ ] `should throw Malformed ObjectID error: in 2 different fields` — create with invalid id and ids rejects with error snapshot [providers: mongodb-only]
-- [ ] `should throw Malformed ObjectID error for: _id` — create with invalid ids array element rejects [providers: mongodb-only]
-- [ ] `should throw Malformed ObjectID error for: ids String[] @db.ObjectId` — create with invalid id rejects [providers: mongodb-only]
+- [x] `should throw Malformed ObjectID error: in 2 different fields` — create with invalid id and ids rejects with error snapshot [providers: mongodb-only] → non-ported
+- [x] `should throw Malformed ObjectID error for: _id` — create with invalid ids array element rejects [providers: mongodb-only] → non-ported
+- [x] `should throw Malformed ObjectID error for: ids String[] @db.ObjectId` — create with invalid id rejects [providers: mongodb-only] → non-ported
 
 ### packages/client/tests/functional/0-legacy-ports/optional-relation-filters/tests.ts
 
@@ -76,15 +76,15 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/0-legacy-ports/query-raw/tests.ts
 
-- [ ] `select 1 via queryRaw` — tagged $queryRaw SELECT 1, per-provider/driver result [providers: exclude:mongodb]
-- [ ] `select 1 via queryRawUnsafe` — $queryRawUnsafe SELECT 1 as number, per-provider result [providers: exclude:mongodb]
-- [ ] `select with alias via queryRaw` — tagged $queryRaw SELECT 1 as number [providers: exclude:mongodb]
-- [ ] `select values via queryRawUnsafe` — $queryRawUnsafe SELECT 1, per-provider/driver result [providers: exclude:mongodb]
-- [ ] `select * via queryRawUnsafe` — $queryRawUnsafe SELECT * with inline range filter [providers: exclude:mongodb]
-- [ ] `select * via queryRawUnsafe with values` — $queryRawUnsafe SELECT * with positional params [providers: exclude:mongodb]
-- [ ] `select * via queryRaw` — tagged $queryRaw SELECT * with range filter [providers: exclude:mongodb]
-- [ ] `select fields via queryRaw using Prisma.join` — $queryRaw with Prisma.join for columns and IN values [providers: exclude:mongodb]
-- [ ] `select fields via queryRaw using Prisma.join and Prisma.sql` — $queryRaw(Prisma.sql`...`) with Prisma.join [providers: exclude:mongodb]
+- [x] `select 1 via queryRaw` — tagged $queryRaw SELECT 1, per-provider/driver result [providers: exclude:mongodb] → non-ported
+- [x] `select 1 via queryRawUnsafe` — $queryRawUnsafe SELECT 1 as number, per-provider result [providers: exclude:mongodb] → non-ported
+- [x] `select with alias via queryRaw` — tagged $queryRaw SELECT 1 as number [providers: exclude:mongodb] → non-ported
+- [x] `select values via queryRawUnsafe` — $queryRawUnsafe SELECT 1, per-provider/driver result [providers: exclude:mongodb] → non-ported
+- [x] `select * via queryRawUnsafe` — $queryRawUnsafe SELECT * with inline range filter [providers: exclude:mongodb] → non-ported
+- [x] `select * via queryRawUnsafe with values` — $queryRawUnsafe SELECT * with positional params [providers: exclude:mongodb] → non-ported
+- [x] `select * via queryRaw` — tagged $queryRaw SELECT * with range filter [providers: exclude:mongodb] → non-ported
+- [x] `select fields via queryRaw using Prisma.join` — $queryRaw with Prisma.join for columns and IN values [providers: exclude:mongodb] → non-ported
+- [x] `select fields via queryRaw using Prisma.join and Prisma.sql` — $queryRaw(Prisma.sql`...`) with Prisma.join [providers: exclude:mongodb] → non-ported
 
 ### packages/client/tests/functional/0-legacy-ports/run-command-raw/tests.ts
 
@@ -160,7 +160,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/bytes-upsert/tests.ts
 
-- [ ] `bytes upsert should work correctly` — repeated upsert by bytes id is idempotent and record persists [providers: exclude:sqlserver]
+- [x] `bytes upsert should work correctly` — repeated upsert by bytes id is idempotent and record persists [providers: exclude:sqlserver] → test.fails: ports/prisma/functional/bytes-upsert.test.ts
 
 ### packages/client/tests/functional/chunking-query/tests.ts
 
@@ -404,9 +404,9 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/decimal/list/tests.ts
 
-- [ ] `with decimal instances` — create record with a decimal list from numeric values [providers: postgres,cockroachdb]
-- [ ] `with numbers` — create record with a decimal list from numbers [providers: postgres,cockroachdb]
-- [ ] `create with strings` — create record with a decimal list from string values [providers: postgres,cockroachdb]
+- [x] `with decimal instances` — create record with a decimal list from numeric values [providers: postgres,cockroachdb] → ports/prisma/functional/decimal-list.test.ts
+- [x] `with numbers` — create record with a decimal list from numbers [providers: postgres,cockroachdb] → ports/prisma/functional/decimal-list.test.ts
+- [x] `create with strings` — create record with a decimal list from string values [providers: postgres,cockroachdb] → ports/prisma/functional/decimal-list.test.ts
 
 ### packages/client/tests/functional/decimal/precision/tests.ts
 

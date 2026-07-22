@@ -6,7 +6,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/4004/tests.ts
 
-- [ ] `should not throw error when updating fields on a many to many join table` — updating scalar fields on an implicit m2m join model must not throw [providers: all]
+- [x] `should not throw error when updating fields on a many to many join table` — updating scalar fields on an implicit m2m join model must not throw [providers: all] → ports/prisma/functional/issues-4004.test.ts
 
 ### packages/client/tests/functional/issues/5952-decimal-batch/tests.ts
 
@@ -17,20 +17,20 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/6578/tests.ts
 
-- [ ] `should assert Dates, DateTimes, Times and UUIDs are wrapped in quotes and are deserializable` — raw-query JSON output quotes Date/DateTime/Time/UUID so JSON.parse does not throw [providers: sql]
+- [x] `should assert Dates, DateTimes, Times and UUIDs are wrapped in quotes and are deserializable` — raw-query JSON output quotes Date/DateTime/Time/UUID so JSON.parse does not throw [providers: sql] → non-ported
 
 ### packages/client/tests/functional/issues/9007/tests.ts
 
-- [ ] `should throw an error if using contains filter on uuid type` — `contains` filter on a UUID column raises a validation error [providers: postgres, cockroachdb]
-- [ ] `should not generate the contains field on the where type` — `contains` is absent from the generated where-input type for UUID (type test) [providers: postgres, cockroachdb]
+- [x] `should throw an error if using contains filter on uuid type` — `contains` filter on a UUID column raises a validation error [providers: postgres, cockroachdb] → non-ported
+- [x] `should not generate the contains field on the where type` — `contains` is absent from the generated where-input type for UUID (type test) [providers: postgres, cockroachdb] → non-ported
 
 ### packages/client/tests/functional/issues/9372/tests.ts
 
-- [ ] `does not crash on large amount of items inserted` — createMany with a very large batch does not crash [providers: sqlite]
+- [x] `does not crash on large amount of items inserted` — createMany with a very large batch does not crash [providers: sqlite] → non-ported
 
 ### packages/client/tests/functional/issues/9678/tests.ts
 
-- [ ] `concurrent deleteMany/createMany` — concurrent deleteMany+createMany retries on write-conflict/deadlock (P2034) without corrupting data [providers: postgres, mysql, sqlserver, cockroachdb]
+- [x] `concurrent deleteMany/createMany` — concurrent deleteMany+createMany retries on write-conflict/deadlock (P2034) without corrupting data [providers: postgres, mysql, sqlserver, cockroachdb] → non-ported
 
 ### packages/client/tests/functional/issues/10000/tests.ts
 
@@ -71,26 +71,26 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/11974/tests.ts
 
-- [ ] `should not throw an error when counting two relation fields using find` — selecting `_count` of two relations via find does not throw [providers: sql]
-- [ ] `should not throw an error when aggregating two relation fields using aggregate` — counting two relations via aggregate does not throw [providers: sql]
+- [x] `should not throw an error when counting two relation fields using find` — selecting `_count` of two relations via find does not throw [providers: sql] → test.fails: ports/prisma/functional/issues-11974.test.ts
+- [x] `should not throw an error when aggregating two relation fields using aggregate` — counting two relations via aggregate does not throw [providers: sql] → ports/prisma/functional/issues-11974.test.ts
 
 ### packages/client/tests/functional/issues/12003-order-by-self/tests.ts
 
-- [ ] `findFirst` — orderBy across a self-relation works in findFirst [providers: all]
-- [ ] `findMany` — orderBy across a self-relation works in findMany [providers: all]
-- [ ] `aggregate` — orderBy across a self-relation works in aggregate [providers: all]
+- [x] `findFirst` — orderBy across a self-relation works in findFirst [providers: all] → non-ported
+- [x] `findMany` — orderBy across a self-relation works in findMany [providers: all] → non-ported
+- [x] `aggregate` — orderBy across a self-relation works in aggregate [providers: all] → non-ported
 
 ### packages/client/tests/functional/issues/12378/tests.ts
 
-- [ ] `issue 12378 > issue 12378` — create/connect/update across a m2m through-model with implicit relation works end to end [providers: postgres, mysql, cockroachdb, sqlserver]
+- [x] `issue 12378 > issue 12378` — create/connect/update across a m2m through-model with implicit relation works end to end [providers: postgres, mysql, cockroachdb, sqlserver] → ports/prisma/functional/issues-12378.test.ts
 
 ### packages/client/tests/functional/issues/12557/tests.ts
 
-- [ ] `issue 12557 > issue 12557` — `_count` on a relation stays correct after deleting a related record [providers: postgres, mysql]
+- [x] `issue 12557 > issue 12557` — `_count` on a relation stays correct after deleting a related record [providers: postgres, mysql] → test.fails: ports/prisma/functional/issues-12557.test.ts
 
 ### packages/client/tests/functional/issues/12572/tests.ts
 
-- [ ] `should have equal dates on record creation for @default(now) and @updatedAt` — `@default(now())` and `@updatedAt` produce equal timestamps at creation [providers: all]
+- [x] `should have equal dates on record creation for @default(now) and @updatedAt` — `@default(now())` and `@updatedAt` produce equal timestamps at creation [providers: all] → ports/prisma/functional/issues-12572.test.ts
 
 ### packages/client/tests/functional/issues/12862-errors-are-obfuscated-by-interactive-transactions/tests.ts
 
@@ -188,7 +188,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/16535-select-enum/tests.ts
 
-- [ ] `allows to select enum field` — selecting an enum field returns its value [providers: postgres, mysql, cockroachdb]
+- [x] `allows to select enum field` — selecting an enum field returns its value [providers: postgres, mysql, cockroachdb] → ports/prisma/functional/issues-16535-select-enum.test.ts
 
 ### packages/client/tests/functional/issues/17005-args-type-conflict/tests.ts
 

@@ -1,0 +1,90 @@
+// Faithful translation of prisma/prisma@a6d0155
+// packages/client/tests/functional/naming-conflict/built-in-types-vs-model
+// (postgres matrix entry).
+//
+// Upstream tests 63 model names that conflict with Prisma's generated built-in
+// TypeScript type names (Keys, Promise, Result, Union, …). prisma-next has no
+// client-side code generation, so naming conflicts with generated types cannot
+// arise. Four representative names cover the observable runtime behavior:
+// creating a model whose name is a built-in TS/JS name, and querying it via
+// a relation.
+//
+// Upstream schema template (per typeName):
+//   model <typeName> {
+//     id                String         @id @default(cuid())
+//     isUserProvidedType Boolean
+//     holder             RelationHolder?
+//   }
+//   model RelationHolder {
+//     id      String     @id @default(cuid())
+//     modelId String     @unique
+//     model   <typeName> @relation(fields: [modelId], references: [id])
+//   }
+//
+// We create four fixtures (one per representative name) as separate model +
+// relation-holder pairs, all in a single schema file with @@map to disambiguate
+// the DB tables.
+
+model Promise {
+  id                 String            @id @default(cuid(2))
+  isUserProvidedType Boolean
+  holder             RelationHolderPromise?
+
+  @@map("promise")
+}
+
+model RelationHolderPromise {
+  id      String  @id @default(cuid(2))
+  modelId String  @unique
+  model   Promise @relation(fields: [modelId], references: [id])
+
+  @@map("relation_holder_promise")
+}
+
+model Result {
+  id                 String            @id @default(cuid(2))
+  isUserProvidedType Boolean
+  holder             RelationHolderResult?
+
+  @@map("result")
+}
+
+model RelationHolderResult {
+  id      String @id @default(cuid(2))
+  modelId String @unique
+  model   Result @relation(fields: [modelId], references: [id])
+
+  @@map("relation_holder_result")
+}
+
+model Union {
+  id                 String            @id @default(cuid(2))
+  isUserProvidedType Boolean
+  holder             RelationHolderUnion?
+
+  @@map("union")
+}
+
+model RelationHolderUnion {
+  id      String @id @default(cuid(2))
+  modelId String @unique
+  model   Union  @relation(fields: [modelId], references: [id])
+
+  @@map("relation_holder_union")
+}
+
+model Keys {
+  id                 String            @id @default(cuid(2))
+  isUserProvidedType Boolean
+  holder             RelationHolderKeys?
+
+  @@map("keys")
+}
+
+model RelationHolderKeys {
+  id      String @id @default(cuid(2))
+  modelId String @unique
+  model   Keys   @relation(fields: [modelId], references: [id])
+
+  @@map("relation_holder_keys")
+}

@@ -67,26 +67,26 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `should fail as updateManyAndReturn is not supported on tested providers` — `prisma.user` lacks `updateManyAndReturn` (@ts-expect-error + expectTypeOf not.toHaveProperty) [providers: sqlserver,mongodb,mysql]
 
 ### packages/client/tests/functional/methods/upsert/native-atomic/tests.ts
-- [ ] `should only use ON CONFLICT when update arguments do not have any nested queries` — verifies upsert avoids ON CONFLICT for nested upsert/create/update/delete in update, but uses it with no nested mutation (via query-log checker) [providers: sqlite,postgres,cockroach]
-- [ ] `should only use ON CONFLICT when there is only 1 unique field in the where clause` — two unique fields in where → no ON CONFLICT; single unique field → ON CONFLICT [providers: sqlite,postgres,cockroach]
-- [ ] `should only use ON CONFLICT when the unique field defined in where clause has the same value as defined in the create arguments` — mismatched where/create name → no ON CONFLICT; matching → ON CONFLICT [providers: sqlite,postgres,cockroach]
-- [ ] `should perform an upsert using ON CONFLICT` — insert then update by name; asserts values and native upsert used both times [providers: sqlite,postgres,cockroach]
-- [ ] `should perform an upsert using ON CONFLICT with id` — upsert by id then by name; asserts values and native upsert used [providers: sqlite,postgres,cockroach]
-- [ ] `should perform an upsert using ON CONFLICT with compound id` — compound `id1_id2` upsert creates then updates val; native upsert used [providers: sqlite,postgres,cockroach]
-- [ ] `should perform an upsert using ON CONFLICT with compound uniques` — compound `uniques` (field1,field2) upsert creates then updates val; native upsert used [providers: sqlite,postgres,cockroach]
+- [x] `should only use ON CONFLICT when update arguments do not have any nested queries` — verifies upsert avoids ON CONFLICT for nested upsert/create/update/delete in update, but uses it with no nested mutation (via query-log checker) [providers: sqlite,postgres,cockroach] → non-ported
+- [x] `should only use ON CONFLICT when there is only 1 unique field in the where clause` — two unique fields in where → no ON CONFLICT; single unique field → ON CONFLICT [providers: sqlite,postgres,cockroach] → non-ported
+- [x] `should only use ON CONFLICT when the unique field defined in where clause has the same value as defined in the create arguments` — mismatched where/create name → no ON CONFLICT; matching → ON CONFLICT [providers: sqlite,postgres,cockroach] → non-ported
+- [x] `should perform an upsert using ON CONFLICT` — insert then update by name; asserts values and native upsert used both times [providers: sqlite,postgres,cockroach] → ports/prisma/functional/methods-upsert-native-atomic.test.ts
+- [x] `should perform an upsert using ON CONFLICT with id` — upsert by id then by name; asserts values and native upsert used [providers: sqlite,postgres,cockroach] → ports/prisma/functional/methods-upsert-native-atomic.test.ts
+- [x] `should perform an upsert using ON CONFLICT with compound id` — compound `id1_id2` upsert creates then updates val; native upsert used [providers: sqlite,postgres,cockroach] → ports/prisma/functional/methods-upsert-native-atomic.test.ts
+- [x] `should perform an upsert using ON CONFLICT with compound uniques` — compound `uniques` (field1,field2) upsert creates then updates val; native upsert used [providers: sqlite,postgres,cockroach] → ports/prisma/functional/methods-upsert-native-atomic.test.ts
 
 ### packages/client/tests/functional/methods/upsert/simple/tests.ts
 - [x] `should create a record using upsert` — upsert on non-existent name creates it; count where name is 1 [providers: all] → ports/prisma/functional/methods-upsert-simple.test.ts
 - [x] `should update a record using upsert` — upsert on existing name updates to name+'new'; old name count 0, new name count 1 [providers: all] → ports/prisma/functional/methods-upsert-simple.test.ts
 
 ### packages/client/tests/functional/mixed-string-uuid-datetime-list-inputs/tests.ts
-- [ ] `create with two strings` — creates a Post with `words: ['hello','world']`, asserts the created row and the findUnique read-back both equal the input array [providers: postgres,cockroach,mongodb]
-- [ ] `create with a string that looks like a date` — creates rows with one and two ISO-date-looking strings, round-trips them unchanged [providers: postgres,cockroach,mongodb]
-- [ ] `create with a string and a string that looks like a date` — creates rows mixing a plain string and a date-looking string in both orders, round-trips unchanged [providers: postgres,cockroach,mongodb]
-- [ ] `create a string that looks like a uuid` — creates rows with one and two UUID-looking strings, round-trips unchanged [providers: postgres,cockroach,mongodb]
-- [ ] `create with a string and a string that looks like a uuid` — mixes plain string with lower/upper-case UUID strings in different order, round-trips unchanged [providers: postgres,cockroach,mongodb]
-- [ ] `create with a date and uuid` — creates rows combining date-looking and UUID-looking strings, round-trips unchanged [providers: postgres,cockroach,mongodb]
-- [ ] `create with a string, date and uuid` — creates all permutations of [string, date, uuid] array, asserts each permutation round-trips unchanged [providers: postgres,cockroach,mongodb]
+- [x] `create with two strings` — creates a Post with `words: ['hello','world']`, asserts the created row and the findUnique read-back both equal the input array [providers: postgres,cockroach,mongodb] → ports/prisma/functional/mixed-string-uuid-datetime-list-inputs.test.ts
+- [x] `create with a string that looks like a date` — creates rows with one and two ISO-date-looking strings, round-trips them unchanged [providers: postgres,cockroach,mongodb] → ports/prisma/functional/mixed-string-uuid-datetime-list-inputs.test.ts
+- [x] `create with a string and a string that looks like a date` — creates rows mixing a plain string and a date-looking string in both orders, round-trips unchanged [providers: postgres,cockroach,mongodb] → ports/prisma/functional/mixed-string-uuid-datetime-list-inputs.test.ts
+- [x] `create a string that looks like a uuid` — creates rows with one and two UUID-looking strings, round-trips unchanged [providers: postgres,cockroach,mongodb] → ports/prisma/functional/mixed-string-uuid-datetime-list-inputs.test.ts
+- [x] `create with a string and a string that looks like a uuid` — mixes plain string with lower/upper-case UUID strings in different order, round-trips unchanged [providers: postgres,cockroach,mongodb] → ports/prisma/functional/mixed-string-uuid-datetime-list-inputs.test.ts
+- [x] `create with a date and uuid` — creates rows combining date-looking and UUID-looking strings, round-trips unchanged [providers: postgres,cockroach,mongodb] → ports/prisma/functional/mixed-string-uuid-datetime-list-inputs.test.ts
+- [x] `create with a string, date and uuid` — creates all permutations of [string, date, uuid] array, asserts each permutation round-trips unchanged [providers: postgres,cockroach,mongodb] → ports/prisma/functional/mixed-string-uuid-datetime-list-inputs.test.ts
 
 ### packages/client/tests/functional/multi-schema/tests.ts
 - [ ] `multischema > create` — creates a User with nested post, asserts result matches email + posts [providers: postgres,sqlserver] (mapTable axis: IDENTICAL_NAMES/DIFFERENT_NAMES/false)
@@ -110,11 +110,11 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `raw query` — `$queryRaw SELECT b'1' AS bit` returns Uint8Array [1] [providers: mysql-only]
 
 ### packages/client/tests/functional/naming-conflict/built-in-types-vs-enum/tests.ts
-- [ ] `allows to create enum with conflicting name` — creates enumHolder with value 'ONE', asserts value is 'ONE' and type is `'ONE'|'TWO'` [providers: postgres,mysql,mongodb,cockroach] (enumName axis: all builtInNames)
+- [x] `allows to create enum with conflicting name` — creates enumHolder with value 'ONE', asserts value is 'ONE' and type is `'ONE'|'TWO'` [providers: postgres,mysql,mongodb,cockroach] (enumName axis: all builtInNames) → ports/prisma/functional/naming-conflict-builtin-vs-enum.test.ts (4 representative names Promise/Result/Union/Keys ported; remaining names behaviorally identical — prisma-next has no codegen-naming surface)
 
 ### packages/client/tests/functional/naming-conflict/built-in-types-vs-model/tests.ts
-- [ ] `allows to use ${typeName} name for a model name` — creates model of conflicting builtin type name, findFirstOrThrow asserts row {id, isUserProvidedType:true} and non-any type [providers: all] (typeName axis: all builtInNames)
-- [ ] `allows to use ${typeName} name for a model name (relation)` — findFirstOrThrow relationHolder including the model relation, asserts included model row and non-any type [providers: all] (typeName axis: all builtInNames)
+- [x] `allows to use ${typeName} name for a model name` — creates model of conflicting builtin type name, findFirstOrThrow asserts row {id, isUserProvidedType:true} and non-any type [providers: all] (typeName axis: all builtInNames) → ports/prisma/functional/naming-conflict-builtin-vs-model.test.ts (4 representative names Promise/Result/Union/Keys ported; remaining names behaviorally identical — prisma-next has no codegen-naming surface)
+- [x] `allows to use ${typeName} name for a model name (relation)` — findFirstOrThrow relationHolder including the model relation, asserts included model row and non-any type [providers: all] (typeName axis: all builtInNames) → ports/prisma/functional/naming-conflict-builtin-vs-model.test.ts (4 representative names Promise/Result/Union/Keys ported; remaining names behaviorally identical — prisma-next has no codegen-naming surface)
 
 ### packages/client/tests/functional/naming-conflict/model-vs-model/tests.ts
 - [x] `allows to use models of conflicting names` — creates model with nested `other`, findFirstOrThrow with include asserts other row {id,name} and non-any type [providers: all] (conflictingModel axis: ModelUpdate…ModelGroupBy) → ports/prisma/functional/naming-conflict-model-vs-model.test.ts
@@ -141,11 +141,11 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `excluding dependency of a computed field` — omit password (a computed field's `needs` dependency), asserts password absent but computed sanitizedPassword still resolves [providers: all]
 
 ### packages/client/tests/functional/optimistic-concurrency-control/tests.ts
-- [ ] `updateMany` — 5 parallel OCC updateMany on occStamp, asserts final occStamp is 1 (documents non-atomic behavior); skipped on relationMode=prisma [providers: all (skipTestIf relationMode=prisma)]
-- [ ] `update` — 5 parallel OCC update on occStamp, asserts final occStamp is 1; skipped on relationMode=prisma [providers: all (skipTestIf relationMode=prisma)]
-- [ ] `deleteMany` — 5 parallel deleteMany where occStamp=0, asserts total deleted count is 1; only runs excluding mongodb/cockroach/sqlite [providers: postgres,mysql,sqlserver (testIf)]
-- [ ] `upsert` — 5 parallel OCC upsert, asserts final occStamp is 1; excludes mysql [providers: exclude:mysql (testIf)]
-- [ ] `update with upsert relation` — 5 parallel update with nested child upsert, asserts occStamp 1 and child count 1 [providers: all]
+- [x] `updateMany` — 5 parallel OCC updateMany on occStamp, asserts final occStamp is 1 (documents non-atomic behavior); skipped on relationMode=prisma [providers: all (skipTestIf relationMode=prisma)] → non-ported
+- [x] `update` — 5 parallel OCC update on occStamp, asserts final occStamp is 1; skipped on relationMode=prisma [providers: all (skipTestIf relationMode=prisma)] → non-ported
+- [x] `deleteMany` — 5 parallel deleteMany where occStamp=0, asserts total deleted count is 1; only runs excluding mongodb/cockroach/sqlite [providers: postgres,mysql,sqlserver (testIf)] → ports/prisma/functional/optimistic-concurrency-control.test.ts
+- [x] `upsert` — 5 parallel OCC upsert, asserts final occStamp is 1; excludes mysql [providers: exclude:mysql (testIf)] → non-ported
+- [x] `update with upsert relation` — 5 parallel update with nested child upsert, asserts occStamp 1 and child count 1 [providers: all] → non-ported
 
 ### packages/client/tests/functional/order-by-null/tests.ts
 - [ ] `should return records sorted by name asc and null first` — findMany orderBy name asc nulls first, asserts nulls precede 'a','b' [providers: exclude:mongodb]
@@ -171,22 +171,22 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `findFirstOrThrow when error thrown` — findFirstOrThrow rejects with P2025; asserts one error LogEvent, same message, target contains `user.findFirstOrThrow` [providers: all]
 
 ### packages/client/tests/functional/query-validation/tests.ts
-- [ ] `include and select are used at the same time` — findMany with both select+include rejects with inline-snapshot error "Please either use include or select, but not both" [providers: all]
-- [ ] `include used on scalar field` — findMany include on scalar `id` rejects: "Invalid scalar field id for include statement on model User" [providers: all]
-- [ ] `undefined within array` — findMany where OR:[undefined] rejects: "Can not use undefined value within array" [providers: all]
-- [ ] `unknown selection field` — findMany select notThere rejects: "Unknown field notThere for select statement on model User" [providers: all]
-- [ ] `empty selection` — findMany select:{} rejects: "The select statement for type User must not be empty" [providers: all]
-- [ ] `unknown argument` — findMany with notAnArgument rejects "Unknown argument"; branches snapshot on relationJoins previewFeature + provider support (extra relationLoadStrategy option) [providers: all]
-- [ ] `unknown object field` — findMany where notAValidField rejects "Unknown argument notAValidField" listing UserWhereInput options [providers: all]
-- [ ] `missing required argument: nested` — user.create data:{} rejects "Argument email is missing" [providers: all]
-- [ ] `invalid argument type` — findUnique where email:123 rejects "Expected String, provided Int" [providers: all]
-- [ ] `invalid field ref` — findFirst where name.gt=prisma.pet.fields.name rejects "Expected a referenced scalar field of model User, but found a field of model Pet" [providers: all]
-- [ ] `union error` — findMany where email:123 rejects "Expected StringFilter or String, provided Int" [providers: all]
-- [ ] `union error: different paths` — findMany where email.gt:123 rejects "Expected String or StringFieldRefInput, provided Int" [providers: all]
-- [ ] `union error: invalid argument type vs required argument missing` — user.create with email:123 rejects "Expected String, provided Int" (issue 19707) [providers: all]
-- [ ] `invalid argument value` — findMany where createdAt.gt:'yesterday' rejects "input contains invalid characters. Expected ISO-8601 DateTime" [providers: all]
-- [ ] `missing one of the specific required fields` — findUnique where:{} rejects "needs at least one of id, email or organizationId arguments" [providers: all]
-- [ ] `non-serializable value` — findMany where name:()=>'foo' rejects "We could not serialize [object Function] value" [providers: all]
+- [x] `include and select are used at the same time` — findMany with both select+include rejects with inline-snapshot error "Please either use include or select, but not both" [providers: all] → non-ported
+- [x] `include used on scalar field` — findMany include on scalar `id` rejects: "Invalid scalar field id for include statement on model User" [providers: all] → non-ported
+- [x] `undefined within array` — findMany where OR:[undefined] rejects: "Can not use undefined value within array" [providers: all] → non-ported
+- [x] `unknown selection field` — findMany select notThere rejects: "Unknown field notThere for select statement on model User" [providers: all] → non-ported
+- [x] `empty selection` — findMany select:{} rejects: "The select statement for type User must not be empty" [providers: all] → non-ported
+- [x] `unknown argument` — findMany with notAnArgument rejects "Unknown argument"; branches snapshot on relationJoins previewFeature + provider support (extra relationLoadStrategy option) [providers: all] → non-ported
+- [x] `unknown object field` — findMany where notAValidField rejects "Unknown argument notAValidField" listing UserWhereInput options [providers: all] → non-ported
+- [x] `missing required argument: nested` — user.create data:{} rejects "Argument email is missing" [providers: all] → non-ported
+- [x] `invalid argument type` — findUnique where email:123 rejects "Expected String, provided Int" [providers: all] → non-ported
+- [x] `invalid field ref` — findFirst where name.gt=prisma.pet.fields.name rejects "Expected a referenced scalar field of model User, but found a field of model Pet" [providers: all] → non-ported
+- [x] `union error` — findMany where email:123 rejects "Expected StringFilter or String, provided Int" [providers: all] → non-ported
+- [x] `union error: different paths` — findMany where email.gt:123 rejects "Expected String or StringFieldRefInput, provided Int" [providers: all] → non-ported
+- [x] `union error: invalid argument type vs required argument missing` — user.create with email:123 rejects "Expected String, provided Int" (issue 19707) [providers: all] → non-ported
+- [x] `invalid argument value` — findMany where createdAt.gt:'yesterday' rejects "input contains invalid characters. Expected ISO-8601 DateTime" [providers: all] → non-ported
+- [x] `missing one of the specific required fields` — findUnique where:{} rejects "needs at least one of id, email or organizationId arguments" [providers: all] → non-ported
+- [x] `non-serializable value` — findMany where name:()=>'foo' rejects "We could not serialize [object Function] value" [providers: all] → non-ported
 
 ### packages/client/tests/functional/raw-queries/mongo-sequential-tx/tests.ts
 - [ ] `mongo raw queries should work in a sequential transaction` — `$transaction([$runCommandRaw insert, findRaw, aggregateRaw])` returns `[{n:1,ok:1}, [{_id:10,field:'A'}], [{_id:10,field:'A'}]]` [providers: mongodb-only]

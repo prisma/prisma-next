@@ -1,0 +1,65 @@
+// Faithful translation of prisma/prisma@a6d0155
+// packages/client/tests/functional/naming-conflict/built-in-types-vs-enum
+// (postgres matrix entry).
+//
+// Upstream tests 63 enum names that conflict with Prisma's generated built-in
+// TypeScript type names (Keys, Promise, Result, Union, …). prisma-next has no
+// client-side code generation, so naming conflicts with generated types cannot
+// arise. Four representative names cover the observable runtime behavior:
+// storing/reading an enum value whose type name clashes with common JS/TS names.
+//
+// Upstream schema template (per enumName):
+//   enum <enumName> { ONE TWO }
+//   model EnumHolder { id String @id @default(cuid()); value <enumName> }
+
+enum Promise {
+  @@type("pg/text@1")
+  ONE = "ONE"
+  TWO = "TWO"
+}
+
+enum Result {
+  @@type("pg/text@1")
+  ONE = "ONE"
+  TWO = "TWO"
+}
+
+enum Union {
+  @@type("pg/text@1")
+  ONE = "ONE"
+  TWO = "TWO"
+}
+
+enum Keys {
+  @@type("pg/text@1")
+  ONE = "ONE"
+  TWO = "TWO"
+}
+
+model EnumHolderPromise {
+  id    String  @id @default(cuid(2))
+  value Promise
+
+  @@map("enum_holder_promise")
+}
+
+model EnumHolderResult {
+  id    String @id @default(cuid(2))
+  value Result
+
+  @@map("enum_holder_result")
+}
+
+model EnumHolderUnion {
+  id    String @id @default(cuid(2))
+  value Union
+
+  @@map("enum_holder_union")
+}
+
+model EnumHolderKeys {
+  id    String @id @default(cuid(2))
+  value Keys
+
+  @@map("enum_holder_keys")
+}

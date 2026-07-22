@@ -1,0 +1,169 @@
+# port-all-tests
+
+Port every in-scope functional/integration test from `prisma/prisma` and `prisma/prisma-engines` into prisma-next, faithfully, with per-test accounting for everything that cannot be ported or does not pass.
+
+## Purpose
+
+Give prisma-next a behavioral-compatibility corpus derived from the two upstream Prisma test suites, so that "does prisma-next cover Prisma's behavior?" stops being a guess and becomes a measurable ledger: every upstream test either runs (green) against prisma-next's public API, runs as a documented expected-failure, or has an individually recorded reason it cannot be expressed. The resulting corpus doubles as a permanent regression net and as a precise, test-granular map of prisma-next's remaining feature gaps.
+
+## At a glance
+
+Two source corpora, pinned at the SHAs investigated for this spec, are ported into a new corpus inside the existing integration-test package:
+
+| Source | Pinned SHA | In-scope surface | Approx. volume | Target directory |
+| --- | --- | --- | --- | --- |
+| `prisma/prisma` | `a6d0155` | Generated-client ORM API (queries, writes, regressions), `prisma migrate`/`db` workflows, CLI commands | ~740 client-functional files (218 suites + 92 issue-regression dirs), 34 migrate test files, 21 CLI test files, 23 legacy integration files | `test/integration/test/ports/prisma/` |
+| `prisma/prisma-engines` | `e922089` | Query-engine JSON/GraphQL protocol tests, schema-engine JSON-RPC behavior (createMigration/applyMigrations/diff/schemaPush/introspect/…), schema-engine CLI black-box tests | ~1,672 `connector_test` fns + 185 `relation_link_test` fns (query engine), 775 migration + 584 introspection + 116 mongo-schema + 25 CLI-JSON-RPC test fns | `test/integration/test/ports/engines/` |
+
+The full suite-level enumeration — every source directory, its file/test counts, and its in/out-of-scope verdict with reason — lives in [`inventory.md`](./inventory.md). That inventory is the scope contract for this project: a suite not listed there as in-scope is not silently in play.
+
+Each ported test lands in exactly one of three buckets, and every in-scope source test lands in exactly one bucket (the accounting invariant):
+
+1. **Ported and passing** — a vitest test under `test/integration/test/ports/{prisma,engines}/` that uses the same database schema (translated to prisma-next contract authoring), performs logically the same query through prisma-next's nearest public API, and asserts the same assertions.
+2. **Ported and failing** — a faithful port that does not pass against today's prisma-next: converted to `test.fails`, with an entry in `failing.md` naming its location and the reason for failure.
+3. **Non-portable** — an individual entry in `non-ported.md` naming the exact source location, what the test verifies, and the specific reason it cannot be faithfully expressed. One line per test; no generalized "and similar" entries.
+
+Worked example of a faithful port (prisma/prisma functional test → prisma-next):
+
+```ts
+// upstream: packages/client/tests/functional/distinct/tests.ts (postgres matrix entry)
+const users = await prisma.user.findMany({ distinct: ['name'], orderBy: { name: 'asc' } })
+expect(users).toEqual([{ id: expect.any(String), name: 'a' }, { id: expect.any(String), name: 'b' }])
+
+// port: test/integration/test/ports/prisma/functional/distinct.test.ts
+// same table shape authored via contract builders; same rows seeded; same assertion
+const users = await db.public.User.orderBy((u) => u.name).distinctOn('name').select('id', 'name').all()
+expect(users).toEqual([{ id: expect.any(String), name: 'a' }, { id: expect.any(String), name: 'b' }])
+```
+
+Porting is executed by fleets of implementer sub-agents (≤10 source files per batch), each batch gated by a reviewer sub-agent that judges faithfulness against the criteria above and loops the implementer until satisfied (see Cross-cutting requirements § Execution process).
+
+## Non-goals
+
+- **No production-code changes.** Gaps discovered by ported tests are recorded (`test.fails` + `failing.md`, or `non-ported.md`) — never worked around in the test and never fixed in framework code inside this project. Feature work that failing ports reveal is future, separate projects.
+- **No emulation of unsupported databases.** MySQL-, MariaDB-, SQL Server-, CockroachDB-, Vitess/PlanetScale-, and D1-only tests are not approximated on Postgres; each gets its `non-ported.md` line.
+- **No SQLite corpus.** prisma-next's SQLite target is pre-GA with no self-contained integration harness in `test/integration`; SQLite-only source tests are recorded as non-ported (revisit as a follow-up project when SQLite matures — Open question 6).
+- **No wire-protocol emulation.** The query-engine JSON/GraphQL protocol and schema-engine JSON-RPC stdio transport are not re-implemented; engine tests are re-expressed through prisma-next's public surfaces (see Place in the larger world § Surface mapping).
+- **Out-of-scope upstream suites stay out**: bundler/packaging e2e (`packages/client/tests/e2e`), type-level tests, benchmarks, memory tests, and internal-API unit tests (e.g. `sql-schema-describer`) — per-suite verdicts in `inventory.md`.
+- **No re-creation of upstream harnesses.** No provider-matrix generator, no schema templating engine, no insta-snapshot runner; each ported test is a plain vitest test using the repo's existing PGlite/Mongo helpers.
+
+## Place in the larger world
+
+- **Sources**: `/tmp/prisma` (SHA `a6d01554528e016bea1467a072776b0e2b94dcba`) and `/tmp/prisma-engines` (SHA `e922089b7d7502aff4249d5da3420f6fa55fc6ad`). Shallow clones; if a checkout is recreated, it must be pinned to the same SHA so the accounting ledger stays stable.
+- **Target package**: `@prisma-next/integration-tests` (`test/integration/`), whose vitest config includes `test/**/*.test.ts` and already carries the two self-contained DB harnesses this project relies on: PGlite via `@prisma-next/test-utils` (`withDevDatabase`, `withClient`, single-connection constraint, `retry: 2` CI flakiness policy) and MongoDB via `mongodb-memory-server` (`MongoMemoryReplSet`, `fileParallelism: false`, `timeouts.spinUpMongoMemoryServer`).
+- **Surface mapping** (which prisma-next public API each upstream surface ports onto):
+
+  | Upstream surface | prisma-next target surface |
+  | --- | --- |
+  | Prisma Client queries/writes (`findMany`, `create`, `$transaction`, …) | `orm()` / `Collection` API from `@prisma-next/sql-orm-client` (`where/include/select/orderBy/groupBy/aggregate/create/update/delete/…`), `withTransaction` from `@prisma-next/sql-runtime`; mongo equivalents from the mongo family packages |
+  | Prisma Client raw queries (`$queryRaw` / `$executeRaw`) | `sql()` builder raw-SQL path (`param()`, raw expression) |
+  | Query-engine `connector_test` (GraphQL/JSON protocol request → JSON response snapshot) | ORM/`sql()` query producing equivalent result data; snapshot assertions translated to explicit `toEqual` on the equivalent result (Open question 7) |
+  | Schema-engine JSON-RPC (`createMigration`, `applyMigrations`, `diff`, `schemaPush`, `evaluateDataLoss`, `introspect`, `dbExecute`, …) and `prisma migrate`/`db` CLI tests | prisma-next CLI commands (`migration-new`, `migration-plan`, `migrate`, `migration-status`, `db-init`, `db-update`, `db-verify`, `db-schema`, …) and the CLI's programmatic Control API; existing patterns in `test/integration/test/cli-journeys/` |
+  | `prisma` CLI (validate/format/generate/init/version) | prisma-next CLI equivalents (`format`, `contract-emit`, …) where an equivalent command exists; otherwise non-ported |
+  | Schema definitions (`schema.prisma` fragments) | prisma-next PSL (`.prisma`) or TS contract builders (`defineContract`, `field`, `model`, `rel`) — whichever expresses the source schema faithfully; PSL preferred when the source schema translates 1:1 |
+
+- **Known-gap references that predict `non-ported.md`/`failing.md` density**: `packages/2-sql/4-lanes/sql-builder/STATUS.md` (no CTEs, set ops, window functions, `CASE`, arithmetic, `IS NULL`/`LIKE`/`BETWEEN`, JSON/array operators, …), `docs/reference/framework-gaps.md`, `docs/reference/mongodb-feature-support-priorities.md`, and API-shape mismatches (no `$extends`/`$use`, no array-form `$transaction`, `Numeric` branded string instead of `Prisma.Decimal`, `Uint8Array` instead of `Buffer`).
+- **Repo boundaries the corpus must respect**: `test/integration/test/contract-imports.test.ts` enforces the allowed public-import boundary; ported tests import only public package exports (which is also this project's faithfulness premise).
+
+## Cross-cutting requirements
+
+### Faithfulness (the porting contract)
+
+Every ported test must satisfy all three, and the reviewer gate judges exactly these:
+
+1. **Same database schema** — the source test's models/tables, columns, types, constraints, and relations, translated to prisma-next contract authoring (PSL). No simplifying the schema to dodge an unsupported construct.
+2. **Logically the same query** — the same operation with the same inputs through prisma-next's nearest public API per the surface mapping. API-shape translation (`findMany` → `.where().all()`) is expected; changing what the query does is not.
+3. **The same assertions** — the same expected data, ordering, counts, and error conditions. Error-code assertions map to prisma-next's equivalent error condition (Open question 4); snapshot assertions become explicit equality assertions on the equivalent payload.
+
+### No workarounds — THE hard gate (read this before porting anything)
+
+**A ported test must exercise the same thing the upstream test exists to verify. If it cannot, it is NOT ported — it is `non-ported` (can't be expressed) or `test.fails` (expressed faithfully but fails today). Producing a green test that verifies something *different* is strictly worse than an honest `non-ported.md` line: it is a false positive that corrupts the ledger and lies about prisma-next's coverage.**
+
+**The subject test.** Before porting, name the test's SUBJECT in one phrase — the specific behaviour/feature/input/mechanism it exists to prove (not "it returns some rows"). Then ask: *does prisma-next's public API let me exercise that exact subject?*
+- **Yes** → port it (passing, or `test.fails` if it runs but the result diverges).
+- **No** → `non-ported.md`. Do **NOT** reach for a different mechanism that happens to produce a passing assertion.
+
+**Allowed — API-shape translation** (syntax changes that preserve the subject):
+- `findMany({ where })` → `.where().all()`; `findUnique({ where: pk })` → `.where(pk).all()` then the single row; `updateMany(data)` → `.updateAll(data)`; `count` → `.aggregate(a => ({ n: a.count() }))`.
+- Snapshot/inline-snapshot → explicit `toEqual` on the same payload. Prisma error code → the equivalent prisma-next error *condition* on the same operation.
+- Result-type shape that prisma-next genuinely uses (Numeric branded string vs `Prisma.Decimal`, `Uint8Array` vs `Buffer`) — assert prisma-next's real shape of the *same value*.
+
+**FORBIDDEN — feature substitution (this is a workaround; the test becomes `non-ported`/`test.fails` instead):**
+- Swapping the **mechanism under test** for a different supported one — e.g. a `$queryRaw`/`$executeRaw` raw-SQL test rewritten as an ORM `.where().all()` query. Raw-SQL execution is the subject; the ORM is a different feature. → `non-ported`.
+- Swapping the **input under test** — e.g. a "Decimal.js instance input" test rewritten to pass a string; a `Prisma.skip` sentinel test rewritten without it. The input form is the subject. → `non-ported`.
+- Replacing an **unsupported operation** with a hand-rolled emulation — atomic `{ increment: 1 }` → read-modify-write; nested relation `create`/`update`/`updateMany` → manually inserting join/child rows; `_count`-in-`include` → a separate `aggregate` query. → `non-ported`, or `test.fails` if you write the faithful (unsupported) call and it throws.
+- Silently accepting **different semantics** — inclusive cursor asserted against prisma-next's exclusive cursor and "fixed" by changing the expected rows. Write the faithful cursor call and mark `test.fails`.
+- **Weakening the assertion** to pass — dropping the count/ordering/exact-value the upstream test asserts, or asserting only "does not throw" when upstream checks a value. If prisma-next can't produce the asserted result, that's `test.fails`, not a weaker green.
+- **Under-porting a matrix** — porting 4 of 63 cases and checking the rest off. Port every in-scope case, or, if the whole phenomenon doesn't exist in prisma-next (e.g. client-codegen name collisions), `non-ported` the suite with that reason — don't ship a green that tests nothing.
+
+**Litmus for the reviewer (reject the port if any is "yes"):** Did the port change the *mechanism*, the *input*, or the *asserted result* relative to upstream, in order to pass? Would this test still pass if prisma-next's missing feature were suddenly added and behaved like Prisma's? (A faithful `test.fails` would flip to green; a workaround wouldn't change.)
+
+Faithfulness takes precedence over local test-style rules (e.g. the sql-orm-client whole-shape-assertion rule) inside `test/ports/**`; repo-wide mechanical rules (no `should` in titles, no `any`, lint) still apply. When in doubt, `non-ported` with a precise reason beats a clever green.
+
+### Accounting
+
+- The ledger is the checklist corpus at [`checklists/`](./checklists/): one checkbox line per in-scope source test function/case (not per file), enumerated **up-front by Opus enumeration sub-agents before any porting batch runs** — one checklist file per corpus segment, each line carrying the source test identifier, a one-line description, and its connector/provider applicability tags parsed from source.
+- **Checkbox protocol**: boxes start `[ ]`. The Opus reviewer sub-agent — and only the reviewer — checks `[x]`, and only once satisfied that the test is (a) faithfully ported and passing, (b) faithfully ported as `test.fails` with a `failing.md` entry, or (c) covered by a justified individual `non-ported.md` entry. Implementer sub-agents never check boxes. Roll-up totals live in `test/integration/test/ports/README.md`.
+- `non-ported.md` — one entry per test: exact source location (file path + test name), a one-line description of what it tests, and the specific reason it cannot be ported. No grouped or generalized entries.
+- `failing.md` — one entry per `test.fails` test: ported-test location and the reason for the failure (what prisma-next does instead / which gap it hits).
+- Locations: `test/integration/test/ports/prisma/{non-ported.md,failing.md}` and `test/integration/test/ports/engines/{non-ported.md,failing.md}` (Open question 2).
+
+### Corpus mechanics
+
+- Target tree: `test/integration/test/ports/{prisma,engines}/`, mirroring source-suite structure beneath (e.g. `ports/prisma/functional/…`, `ports/prisma/issues/…`, `ports/engines/queries/…`, `ports/engines/migrations/…`). The extra `test/` path segment vs. the originally stated `test/integration/ports/` is deliberate — it is what the package's vitest `include` picks up (Open question 1).
+- Ported tests run under `pnpm test:integration`; given corpus scale, a dedicated vitest project/script (`pnpm test:ports`) may be split out for CI sharding, but the corpus must stay in CI either way.
+- Databases: Postgres tests run on PGlite, Mongo tests on `MongoMemoryReplSet`. For upstream provider-matrix suites, port the postgres entry (and the mongo entry when the suite's matrix includes mongo); provider-exclusive suites for unsupported databases go to `non-ported.md`.
+- Shared fixtures (contracts, seed helpers, schema translations reused across suites) live under `test/integration/test/ports/_fixtures/` and are built by dedicated fixture sub-agents *before* the batches that depend on them.
+
+### Execution process (operator-mandated)
+
+- **Enumeration precedes porting**: parallel **Opus enumeration sub-agents** produce the full per-test checklist corpus (`checklists/*.md`) before the first porting batch is dispatched; the checklists are the work-list every batch draws from.
+- Porting is done by parallel **Sonnet 5 implementer sub-agents**, each given **at most 10 source files** per batch, with the faithfulness contract and accounting rules above in their brief.
+- When several tests depend on a fixture that does not yet exist, a **fixture sub-agent** implements the fixture first; dependent batches dispatch only after it lands.
+- After each implementer batch, an **Opus reviewer sub-agent** evaluates every ported test in the batch against the faithfulness criteria (diffing against the upstream source). If unsatisfied, the review is forwarded to the implementer for fixes; the loop repeats until the reviewer is satisfied. A batch is done only on reviewer satisfaction.
+- Reviewer satisfaction covers all three buckets: ported tests are faithful, `test.fails` entries are genuinely faithful-but-failing (not botched ports), and `non-ported.md` reasons are real (the API truly cannot express the test).
+
+## Transitional-shape constraints
+
+- Every merged batch leaves CI green: ported tests pass or carry `test.fails`, and the batch's `non-ported.md`/`failing.md`/ledger updates land in the same PR as its tests.
+- The accounting invariant holds at every merge for all suites processed so far — no "port now, account later" gaps between batches.
+- Source checkouts stay pinned at the SHAs above for the project's lifetime.
+
+## Contract-impact
+
+N/A — test-only project. No changes to `packages/0-shared/contract/**` or `packages/1-framework-core/**`. Ported fixtures author contracts exclusively through public authoring surfaces.
+
+## Adapter-impact
+
+Exercises (read-only) the postgres adapter/driver stack via PGlite and the mongo family via mongodb-memory-server. No adapter code changes are in scope; adapter gaps surfaced by ports are recorded in `failing.md`/`non-ported.md`.
+
+## ADR pointer
+
+N/A — no architectural shift. The corpus location, accounting convention, and faithfulness contract are documented in `test/integration/test/ports/README.md` as part of close-out.
+
+## Project Definition of Done
+
+- [ ] Team-DoD floor items (inherited; see [`drive/calibration/dod.md`](../../drive/calibration/dod.md)).
+- [ ] Every in-scope source test enumerated in [`inventory.md`](./inventory.md) has a checklist line in [`checklists/`](./checklists/), and every checklist box is checked `[x]` by the reviewer: ported-passing, `test.fails` + `failing.md` entry, or `non-ported.md` entry.
+- [ ] `test/integration/test/ports/{prisma,engines}/` exist, are included in CI (`pnpm test:integration` or a wired `pnpm test:ports`), and the full corpus is green (with `test.fails` markers counting as green).
+- [ ] Every batch in the project history carries a satisfied Opus-reviewer verdict; no batch merged on an unsatisfied review.
+- [ ] `non-ported.md` files contain only individual per-test entries (source location + description + reason); spot-audit confirms no generalized/grouped entries.
+- [ ] `failing.md` entries each name the ported-test location and failure reason, and match the set of `test.fails` markers in the corpus one-to-one.
+- [ ] `test/integration/test/ports/README.md` publishes the final roll-up: per-corpus totals of ported / failing / non-ported, with links to the ledgers.
+
+## Open Questions
+
+1. **Corpus path.** The request said `test/integration/ports/{prisma,engines}`; the package's vitest `include` is `test/**/*.test.ts`. Working position: `test/integration/test/ports/{prisma,engines}` so the corpus runs under the existing config without vitest changes.
+2. **Ledger file placement.** "`non-ported.md`" was stated as a single file. Working position: one `non-ported.md` + `failing.md` pair per corpus (`ports/prisma/`, `ports/engines/`) to keep files reviewable at this scale, with totals rolled up in `ports/README.md`.
+3. **Unsupported-database-only tests.** Individually listing every MySQL/MSSQL/CockroachDB/Vitess/SQLite-only test will produce thousands of `non-ported.md` lines. Working position: yes, individual lines as instructed — generated per batch from the source's own connector tags (`_matrix.ts` entries, `only(...)`/`exclude(...)` attributes), which make the per-test reason precise.
+4. **Error assertions.** Upstream asserts Prisma error codes (`P2002`, `P4001`, …) prisma-next does not emit. Working position: assert the logically equivalent prisma-next error condition (e.g. unique-constraint violation error on the same operation); when no equivalent error surface exists, the test goes to `non-ported.md`.
+5. **Ordering of corpora.** Working position (final say in `plan.md`): highest-signal-first — prisma client functional (postgres) → engines query-engine `queries`/`writes`/`regressions` → migrations/JSON-RPC → CLI → mongo suites → introspection — so gap discovery front-loads onto the most-used surfaces.
+6. **SQLite.** prisma-next has an early SQLite target with e2e-only coverage. Working position: out of scope (non-ported lines with reason "SQLite target pre-GA / no integration harness"); a follow-up project can lift those entries when SQLite matures.
+7. **Engine snapshot assertions.** `insta::assert_snapshot!` asserts exact protocol-response strings. Working position: translate the snapshot's expected payload into explicit `toEqual` assertions on the equivalent prisma-next result — same data, prisma-next's result shape; response-envelope formatting itself is not asserted.
+
+## References
+
+- [`inventory.md`](./inventory.md) — full suite-level source inventory with in/out-of-scope verdicts (the scope contract).
+- Sources: `prisma/prisma@a6d01554528e016bea1467a072776b0e2b94dcba`, `prisma/prisma-engines@e922089b7d7502aff4249d5da3420f6fa55fc6ad` (checked out at `/tmp/prisma`, `/tmp/prisma-engines`).
+- Target-surface docs: `packages/2-sql/4-lanes/sql-builder/STATUS.md`, `packages/1-framework/3-tooling/cli/README.md`, `docs/Testing Guide.md`, `docs/reference/framework-gaps.md`, `docs/reference/mongodb-feature-support-priorities.md`.
+- Linear Project: _to be created at project kickoff (drive-create-project ceremony)._
