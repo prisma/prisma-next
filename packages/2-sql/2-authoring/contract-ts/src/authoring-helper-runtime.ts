@@ -10,6 +10,7 @@ import {
   validateAuthoringHelperArguments,
 } from '@prisma-next/framework-components/authoring';
 import { type StorageTypeInstance, toStorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { contractError } from './contract-errors';
 
 export type RuntimeNamedConstraintSpec = {
   readonly name?: string;
@@ -33,8 +34,10 @@ const blockedSegments = new Set(['__proto__', 'constructor', 'prototype']);
 
 function assertSafeHelperKey(key: string, path: readonly string[]): void {
   if (blockedSegments.has(key)) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_CONTRIBUTION_INVALID',
       `Invalid authoring helper "${[...path, key].join('.')}". Helper path segments must not use "${key}".`,
+      { meta: { helperPath: [...path, key].join('.'), segment: key } },
     );
   }
 }
@@ -83,8 +86,16 @@ export function createFieldPresetHelper<Result>(options: {
     const declaredArguments = options.descriptor.args ?? [];
 
     if (acceptsNamedConstraintOptions && rawArgs.length > declaredArguments.length + 1) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.ARGUMENT_INVALID',
         `${options.helperPath} expects at most ${declaredArguments.length + 1} argument(s), received ${rawArgs.length}`,
+        {
+          meta: {
+            helperPath: options.helperPath,
+            expected: declaredArguments.length + 1,
+            received: rawArgs.length,
+          },
+        },
       );
     }
 
@@ -94,8 +105,10 @@ export function createFieldPresetHelper<Result>(options: {
     if (acceptsNamedConstraintOptions && rawArgs.length === declaredArguments.length + 1) {
       const maybeNamedConstraintOptions = rawArgs.at(-1);
       if (!isNamedConstraintOptionsLike(maybeNamedConstraintOptions)) {
-        throw new Error(
+        throw contractError(
+          'CONTRACT.ARGUMENT_INVALID',
           `${options.helperPath} accepts an optional trailing { name?: string } constraint options object`,
+          { meta: { helperPath: options.helperPath } },
         );
       }
       namedConstraintOptions = maybeNamedConstraintOptions;

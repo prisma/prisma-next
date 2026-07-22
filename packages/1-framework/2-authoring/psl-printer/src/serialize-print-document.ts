@@ -11,6 +11,7 @@ import type {
 } from '@prisma-next/framework-components/psl-ast';
 import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
 import { blindCast } from '@prisma-next/utils/casts';
+import { contractError } from './contract-errors';
 import type { PrintDocument, PrintNamespaceSection } from './print-document';
 import type { PrinterField, PrinterNamedType } from './types';
 
@@ -125,13 +126,24 @@ function serializeExtensionBlock(
 ): string {
   const descriptor = blockDispatchMap.byKeyword.get(extensionBlock.keyword);
   if (!descriptor) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_CONTRIBUTION_INVALID',
       `No pslBlockDescriptors contribution registered for extension-contributed block keyword "${extensionBlock.keyword}". Provide a matching pslBlockDescriptors contribution to serializePrintDocument, or remove the block from the input AST.`,
+      { meta: { reason: 'block-descriptor-missing', keyword: extensionBlock.keyword } },
     );
   }
   if (descriptor.discriminator !== extensionBlock.kind) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_CONTRIBUTION_INVALID',
       `The pslBlockDescriptors contribution for keyword "${extensionBlock.keyword}" owns discriminator "${descriptor.discriminator}", but the block carries kind "${extensionBlock.kind}". Provide a matching pslBlockDescriptors contribution to serializePrintDocument, or remove the block from the input AST.`,
+      {
+        meta: {
+          reason: 'block-descriptor-kind-mismatch',
+          keyword: extensionBlock.keyword,
+          descriptorDiscriminator: descriptor.discriminator,
+          blockKind: extensionBlock.kind,
+        },
+      },
     );
   }
   const lines: string[] = [`${extensionBlock.keyword} ${extensionBlock.name} {`];
@@ -196,33 +208,25 @@ function renderParamValue(
   switch (descriptor.kind) {
     case 'ref': {
       if (paramValue.kind !== 'ref') {
-        throw new Error(
-          `Extension block parameter "${paramName}": descriptor is "ref" but AST node has kind "${paramValue.kind}"`,
-        );
+        throw paramKindMismatchError(paramName, 'ref', paramValue.kind);
       }
       return paramValue.identifier;
     }
     case 'value': {
       if (paramValue.kind !== 'value') {
-        throw new Error(
-          `Extension block parameter "${paramName}": descriptor is "value" but AST node has kind "${paramValue.kind}"`,
-        );
+        throw paramKindMismatchError(paramName, 'value', paramValue.kind);
       }
       return renderValueParam(paramValue.raw, descriptor.codecId, codecLookup, paramName);
     }
     case 'option': {
       if (paramValue.kind !== 'option') {
-        throw new Error(
-          `Extension block parameter "${paramName}": descriptor is "option" but AST node has kind "${paramValue.kind}"`,
-        );
+        throw paramKindMismatchError(paramName, 'option', paramValue.kind);
       }
       return paramValue.token;
     }
     case 'list': {
       if (paramValue.kind !== 'list') {
-        throw new Error(
-          `Extension block parameter "${paramName}": descriptor is "list" but AST node has kind "${paramValue.kind}"`,
-        );
+        throw paramKindMismatchError(paramName, 'list', paramValue.kind);
       }
       const items = paramValue.items.map((item) =>
         renderParamValue(item, descriptor.of, codecLookup, paramName),
@@ -230,6 +234,18 @@ function renderParamValue(
       return `[${items.join(', ')}]`;
     }
   }
+}
+
+function paramKindMismatchError(
+  paramName: string,
+  descriptorKind: PslBlockParam['kind'],
+  valueKind: PslExtensionBlockParamValue['kind'],
+) {
+  return contractError(
+    'CONTRACT.PACK_CONTRIBUTION_INVALID',
+    `Extension block parameter "${paramName}": descriptor is "${descriptorKind}" but AST node has kind "${valueKind}"`,
+    { meta: { reason: 'param-kind-mismatch', paramName, descriptorKind, valueKind } },
+  );
 }
 
 function renderValueParam(
@@ -243,16 +259,20 @@ function renderValueParam(
   }
   const codec = codecLookup.get(codecId);
   if (!codec) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_CONTRIBUTION_INVALID',
       `Extension block parameter "${paramName}": no codec registered for id "${codecId}"`,
+      { meta: { reason: 'codec-unregistered', paramName, codecId } },
     );
   }
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(raw);
   } catch (e) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_CONTRIBUTION_INVALID',
       `Extension block parameter "${paramName}": codec "${codecId}" — raw literal is not valid JSON: ${String(e)}`,
+      { meta: { reason: 'raw-literal-invalid-json', paramName, codecId }, cause: e },
     );
   }
   return JSON.stringify(

@@ -309,6 +309,13 @@ describe('mongo contract builder', () => {
     ).toThrow(
       'Collection "tasks" defines duplicate index {"fields":{"title":1},"options":{"unique":true}}. First declared on model "TaskBase" and duplicated on model "TaskAlt".',
     );
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { TaskBase, TaskAlt },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.NAME_DUPLICATE' }));
   });
 
   it('rejects indexes on models without collections', () => {
@@ -327,6 +334,13 @@ describe('mongo contract builder', () => {
         models: { Comment },
       }),
     ).toThrow('Model "Comment" defines indexes but has no collection to attach them to.');
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { Comment },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.COLLECTION_INVALID' }));
   });
 
   it('rejects index field references that are not declared on the model', () => {
@@ -353,6 +367,56 @@ describe('mongo contract builder', () => {
         models: { User },
       }),
     ).toThrow(/nonexistent/);
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { User },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.FIELD_UNKNOWN' }));
+  });
+
+  it('rejects relation targets referencing a field of another model', () => {
+    const User = model('User', {
+      collection: 'users',
+      fields: {
+        _id: field.objectId(),
+      },
+    });
+    const Post = model('Post', {
+      collection: 'posts',
+      fields: {
+        _id: field.objectId(),
+      },
+    });
+
+    const makeRelation = () =>
+      rel.belongsTo(User, {
+        from: 'authorId',
+        to: Post.ref('_id') as never,
+      });
+
+    expect(makeRelation).toThrow('Relation target "User" cannot reference field "Post._id".');
+    expect(makeRelation).toThrow(expect.objectContaining({ code: 'CONTRACT.RELATION_INVALID' }));
+  });
+
+  it('rejects pack-contributed entity types that collide with reserved helper keys', () => {
+    const familyPackWithModelEntityType = {
+      ...mongoFamilyPack,
+      authoring: { entityTypes: { model: {} } },
+    } as unknown as typeof mongoFamilyPack;
+
+    const run = () =>
+      defineContract(
+        {
+          family: familyPackWithModelEntityType,
+          target: mongoTargetPack,
+        },
+        () => ({ models: {} }),
+      );
+
+    expect(run).toThrow(/collide with the reserved built-in helper key/);
+    expect(run).toThrow(expect.objectContaining({ code: 'CONTRACT.PACK_CONTRIBUTION_INVALID' }));
   });
 
   it('throws once and names the missing field when a multi-key index mixes valid and invalid fields', () => {

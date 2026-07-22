@@ -57,6 +57,13 @@ describe('composeSqlEntityKinds', () => {
     };
     expect(() => composeSqlEntityKinds([collide2])).toThrow(/duplicate entity kind/);
   });
+
+  it('duplicate entity kind error carries CONTRACT.PACK_CONTRIBUTION_INVALID', () => {
+    const collide = { kind: 'table', schema: tableEntityKind.schema, construct: (v: unknown) => v };
+    expect(() => composeSqlEntityKinds([collide])).toThrowError(
+      expect.objectContaining({ code: 'CONTRACT.PACK_CONTRIBUTION_INVALID' }) as unknown as Error,
+    );
+  });
 });
 
 describe('hydrateNamespaceEntities with SQL kinds (carry)', () => {

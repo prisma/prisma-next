@@ -73,6 +73,19 @@ changes:
     detection:
       glob: "**/refs/*.contract.json"
       anyMatch: true
+  - id: psl-format-error-class-removed
+    summary: |
+      The `PslFormatError` class is deleted from `@prisma-next/psl-parser`. `format()`
+      on source with parse errors now throws a structured envelope with code
+      `PSL.PARSE_FAILED`; the diagnostics previously on `error.diagnostics` are at
+      `error.meta.diagnostics`. Replace `error instanceof PslFormatError` with
+      `isStructuredError(error) && error.code === 'PSL.PARSE_FAILED'`
+      (`isStructuredError` from `@prisma-next/utils/structured-error`). The message
+      text is unchanged.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "PslFormatError"
 ---
 
 Also in this release, the ORM client's internal `throw new Error(...)` sites

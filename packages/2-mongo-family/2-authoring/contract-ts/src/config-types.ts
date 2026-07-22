@@ -3,7 +3,9 @@ import type { ContractConfig } from '@prisma-next/config/config-types';
 import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-specifier-default-control-policy';
 import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import { ok } from '@prisma-next/utils/result';
+import { contractError } from './contract-errors';
 
 export interface TypeScriptContractSpecifierOptions {
   readonly defaultControlPolicy?: ControlPolicy;
@@ -38,15 +40,17 @@ export function typescriptContractFromPath(
       load: async (context) => {
         const [absolutePath] = context.resolvedInputs;
         if (absolutePath === undefined) {
-          throw new Error(
+          throw new InternalError(
             'typescriptContractFromPath: context.resolvedInputs is empty. The CLI config loader should populate it positional-matched with source.inputs.',
           );
         }
         const mod = await import(pathToFileURL(absolutePath).href);
         const contract: Contract | undefined = mod.default ?? mod.contract;
         if (contract === undefined) {
-          throw new Error(
+          throw contractError(
+            'CONTRACT.MODULE_EXPORT_MISSING',
             `typescriptContractFromPath: module at "${absolutePath}" has no "default" or "contract" export.`,
+            { meta: { path: absolutePath } },
           );
         }
         return ok(applySpecifierDefaultControlPolicy(contract, options?.defaultControlPolicy));

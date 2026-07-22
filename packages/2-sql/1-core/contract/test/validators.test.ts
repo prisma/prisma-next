@@ -74,6 +74,21 @@ describe('SQL contract validators', () => {
       expect(() => validateStorage(invalid)).toThrow();
     });
 
+    it('invalid storage error carries CONTRACT.VALIDATION_FAILED', () => {
+      const invalid = {
+        storageHash: 'sha256:test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: { table: 'not-an-object' },
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(invalid)).toThrowError(
+        expect.objectContaining({ code: 'CONTRACT.VALIDATION_FAILED' }) as unknown as Error,
+      );
+    });
+
     it('throws on invalid table structure', () => {
       const invalid = {
         storageHash: 'sha256:test',

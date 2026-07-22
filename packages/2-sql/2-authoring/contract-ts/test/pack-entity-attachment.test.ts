@@ -204,6 +204,16 @@ describe('generic pack-entity attachment via the entities channel', () => {
         entities: [nativeEnumHandle('AalLevel', entity, { emitKind: 'table' })],
       }),
     ).toThrow(/entry kind "table"/);
+
+    expect(() =>
+      defineContract({
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+        extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
+        entities: [nativeEnumHandle('AalLevel', entity, { emitKind: 'table' })],
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.ENTITY_KIND_INVALID' }));
   });
 
   it('rejects two attached entities colliding on name+kind in one namespace with different instances', () => {

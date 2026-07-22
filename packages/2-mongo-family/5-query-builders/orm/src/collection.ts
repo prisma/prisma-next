@@ -32,6 +32,7 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
+import { castAs } from '@prisma-next/utils/casts';
 import { InternalError } from '@prisma-next/utils/internal-error';
 import type { MongoIncludeExpr } from './collection-state';
 import { emptyCollectionState, type MongoCollectionState } from './collection-state';
@@ -235,7 +236,7 @@ class MongoCollectionImpl<
     if (!relation) {
       throw ormError(
         'ORM.RELATION_UNKNOWN',
-        `Unknown relation "${relationName}" on model "${this.#modelName as string}"`,
+        `Unknown relation "${relationName}" on model "${this.#modelName}"`,
         { meta: { model: this.#modelName, relation: relationName } },
       );
     }
@@ -265,9 +266,9 @@ class MongoCollectionImpl<
     }
 
     const targetModelName = ref.to.model;
-    const targetModel = domainModelsAtDefaultNamespace(this.#contract.domain)[targetModelName] as
-      | MongoModelDefinition
-      | undefined;
+    const targetModel = castAs<MongoModelDefinition | undefined>(
+      domainModelsAtDefaultNamespace(this.#contract.domain)[targetModelName],
+    );
     if (!targetModel) {
       throw new InternalError(
         `Target model "${targetModelName}" not found for relation "${relationName}"`,

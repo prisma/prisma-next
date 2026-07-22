@@ -33,6 +33,7 @@ import {
   type ScalarFieldBuilder,
   type SqlStageSpec,
 } from './contract-dsl';
+import { contractError } from './contract-errors';
 import { buildContractDefinition } from './contract-lowering';
 import type { SqlContractResult } from './contract-types';
 import type { EnumTypeHandle } from './enum-type';
@@ -125,14 +126,24 @@ function validateTargetPackRef(
   target: TargetPackRef<'sql', string>,
 ): void {
   if (family.familyId !== 'sql') {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_FAMILY_MISMATCH',
       `defineContract only accepts SQL family packs. Received family "${family.familyId}".`,
+      { meta: { packId: family.id, packFamilyId: family.familyId, contractFamilyId: 'sql' } },
     );
   }
 
   if (target.familyId !== family.familyId) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_FAMILY_MISMATCH',
       `target pack "${target.id}" targets family "${target.familyId}" but contract family is "${family.familyId}".`,
+      {
+        meta: {
+          packId: target.id,
+          packFamilyId: target.familyId,
+          contractFamilyId: family.familyId,
+        },
+      },
     );
   }
 }
@@ -161,33 +172,51 @@ function validateNamespaceDeclarations(
   }
 
   if (target.targetId === 'sqlite' && namespaces.length > 0) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.NAMESPACE_UNSUPPORTED',
       `defineContract: SQLite contracts cannot declare namespaces (SQLite has no schema concept; emitted DDL is always unqualified). Received namespaces: [${namespaces
         .map((name) => `"${name}"`)
         .join(', ')}].`,
+      { meta: { namespaces, targetId: target.targetId } },
     );
   }
 
   const seen = new Set<string>();
   for (const namespace of namespaces) {
     if (namespace.length === 0) {
-      throw new Error('defineContract: namespace names cannot be empty.');
+      throw contractError(
+        'CONTRACT.NAMESPACE_INVALID',
+        'defineContract: namespace names cannot be empty.',
+        { meta: { namespace, reason: 'empty' } },
+      );
     }
     if (namespace.trim().length === 0) {
-      throw new Error(`defineContract: namespace name "${namespace}" cannot be whitespace-only.`);
+      throw contractError(
+        'CONTRACT.NAMESPACE_INVALID',
+        `defineContract: namespace name "${namespace}" cannot be whitespace-only.`,
+        { meta: { namespace, reason: 'whitespace-only' } },
+      );
     }
     if (namespace === '__unbound__' || namespace === '__unspecified__') {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.NAMESPACE_INVALID',
         `defineContract: namespace name "${namespace}" is a reserved IR sentinel and cannot appear in the declared namespaces list.`,
+        { meta: { namespace, reason: 'reserved-ir-sentinel' } },
       );
     }
     if (target.targetId === 'postgres' && namespace === 'unbound') {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.NAMESPACE_INVALID',
         `defineContract: namespace name "unbound" is reserved by Postgres for the late-binding opt-in (use \`namespace unbound { … }\` in PSL instead of declaring it as a regular schema).`,
+        { meta: { namespace, reason: 'reserved-by-postgres' } },
       );
     }
     if (seen.has(namespace)) {
-      throw new Error(`defineContract: namespaces list contains duplicate entry "${namespace}".`);
+      throw contractError(
+        'CONTRACT.NAME_DUPLICATE',
+        `defineContract: namespaces list contains duplicate entry "${namespace}".`,
+        { meta: { kind: 'namespace', name: namespace } },
+      );
     }
     seen.add(namespace);
   }
@@ -228,20 +257,26 @@ function validatePerModelNamespaces(
     }
 
     if (target.targetId === 'sqlite') {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.NAMESPACE_UNSUPPORTED',
         `defineContract: model "${modelKey}" sets \`namespace: "${perModelNamespace}"\` but the target is SQLite (SQLite has no schema concept; remove the per-model \`namespace\` field).`,
+        { meta: { modelKey, namespace: perModelNamespace, targetId: target.targetId } },
       );
     }
 
     if (perModelNamespace === '__unbound__' || perModelNamespace === '__unspecified__') {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.NAMESPACE_INVALID',
         `defineContract: model "${modelKey}" sets \`namespace: "${perModelNamespace}"\` but that name is a reserved IR sentinel and cannot appear in user code.`,
+        { meta: { modelKey, namespace: perModelNamespace, reason: 'reserved-ir-sentinel' } },
       );
     }
 
     if (target.targetId === 'postgres' && perModelNamespace === 'unbound') {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.NAMESPACE_INVALID',
         `defineContract: model "${modelKey}" sets \`namespace: "unbound"\` but that name is reserved by Postgres for the late-binding opt-in (use \`namespace unbound { … }\` in PSL instead — there is no equivalent surface in the TS builder today).`,
+        { meta: { modelKey, namespace: perModelNamespace, reason: 'reserved-by-postgres' } },
       );
     }
 
@@ -250,8 +285,10 @@ function validatePerModelNamespaces(
         declaredNamespaces.size > 0
           ? ` Declared namespaces: [${[...declaredNamespaces].map((name) => `"${name}"`).join(', ')}].`
           : ' The contract does not declare any namespaces; add `namespaces: ["…"]` to `defineContract` first.';
-      throw new Error(
+      throw contractError(
+        'CONTRACT.NAMESPACE_UNKNOWN',
         `defineContract: model "${modelKey}" references namespace "${perModelNamespace}" but that name does not appear in the contract's declared \`namespaces\` list.${hint}`,
+        { meta: { modelKey, namespace: perModelNamespace, declared: [...declaredNamespaces] } },
       );
     }
   }
@@ -267,20 +304,38 @@ function validateExtensionPackRefs(
 
   for (const packRef of Object.values(extensionPacks)) {
     if (packRef.kind !== 'extension') {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.PACK_REF_INVALID',
         `defineContract only accepts extension pack refs in extensionPacks. Received kind "${packRef.kind}".`,
+        { meta: { packId: packRef.id, kind: packRef.kind } },
       );
     }
 
     if (packRef.familyId !== target.familyId) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.PACK_FAMILY_MISMATCH',
         `extension pack "${packRef.id}" targets family "${packRef.familyId}" but contract target family is "${target.familyId}".`,
+        {
+          meta: {
+            packId: packRef.id,
+            packFamilyId: packRef.familyId,
+            contractFamilyId: target.familyId,
+          },
+        },
       );
     }
 
     if (packRef.targetId && packRef.targetId !== target.targetId) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.PACK_TARGET_MISMATCH',
         `extension pack "${packRef.id}" targets "${packRef.targetId}" but contract target is "${target.targetId}".`,
+        {
+          meta: {
+            packId: packRef.id,
+            packTargetId: packRef.targetId,
+            contractTargetId: target.targetId,
+          },
+        },
       );
     }
   }

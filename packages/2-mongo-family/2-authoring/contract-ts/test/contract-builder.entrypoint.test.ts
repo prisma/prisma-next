@@ -54,6 +54,7 @@ describe('defineContract runtime guards', () => {
           models: {},
         }),
       error: 'defineContract only accepts Mongo family packs. Received family "sql".',
+      code: 'CONTRACT.PACK_FAMILY_MISMATCH',
     },
     {
       name: 'non-extension pack refs in extensionPacks',
@@ -68,6 +69,7 @@ describe('defineContract runtime guards', () => {
         }),
       error:
         'defineContract only accepts extension pack refs in extensionPacks. Received kind "target".',
+      code: 'CONTRACT.PACK_REF_INVALID',
     },
     {
       name: 'extension packs from another family',
@@ -85,6 +87,7 @@ describe('defineContract runtime guards', () => {
         }),
       error:
         'extension pack "vector-search" targets family "sql" but contract target family is "mongo".',
+      code: 'CONTRACT.PACK_FAMILY_MISMATCH',
     },
     {
       name: 'extension packs for another target',
@@ -101,8 +104,10 @@ describe('defineContract runtime guards', () => {
           models: {},
         }),
       error: 'extension pack "vector-search" targets "atlas" but contract target is "mongo".',
+      code: 'CONTRACT.PACK_TARGET_MISMATCH',
     },
-  ])('rejects $name', ({ run, error }) => {
+  ])('rejects $name', ({ run, error, code }) => {
     expect(run).toThrow(error);
+    expect(run).toThrow(expect.objectContaining({ code }));
   });
 });

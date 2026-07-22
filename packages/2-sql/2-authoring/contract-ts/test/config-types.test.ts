@@ -151,6 +151,13 @@ describe('typescriptContract', () => {
             resolvedInputs: [contractPath],
           }),
         ).rejects.toThrow(/has no "default" or "contract" export/);
+
+        await expect(
+          config.source.load({
+            ...stubContext,
+            resolvedInputs: [contractPath],
+          }),
+        ).rejects.toThrow(expect.objectContaining({ code: 'CONTRACT.MODULE_EXPORT_MISSING' }));
       } finally {
         await rm(tempDir, { recursive: true, force: true });
       }

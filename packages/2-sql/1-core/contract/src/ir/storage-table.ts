@@ -1,5 +1,6 @@
 import type { ControlPolicy } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import { CheckConstraint, type CheckConstraintInput } from './check-constraint';
 import { ForeignKey, type ForeignKeyInput } from './foreign-key';
 import { PrimaryKey, type PrimaryKeyInput } from './primary-key';
@@ -86,7 +87,7 @@ export class StorageTable extends SqlNode {
     coordinate: string,
   ): asserts value is StorageTable {
     if (!StorageTable.is(value)) {
-      throw new Error(`Expected a StorageTable at ${coordinate}`);
+      throw new InternalError(`Expected a StorageTable at ${coordinate}`);
     }
   }
 }

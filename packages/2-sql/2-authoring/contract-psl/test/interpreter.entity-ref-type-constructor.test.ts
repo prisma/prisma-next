@@ -439,6 +439,25 @@ namespace docs {
     ).toThrow(/no "columnFromEntity" authoring hook/);
   });
 
+  it('missing columnFromEntity hook error carries CONTRACT.PACK_CONTRIBUTION_INVALID', () => {
+    expect(() =>
+      interpretWith(`
+namespace docs {
+  native_enum AalLevel {
+    aal1
+  }
+
+  model AuthSession {
+    id Int @id
+    aal pg.broken(AalLevel)
+  }
+}
+`),
+    ).toThrowError(
+      expect.objectContaining({ code: 'CONTRACT.PACK_CONTRIBUTION_INVALID' }) as unknown as Error,
+    );
+  });
+
   it('rejects a value-set-typed entity-ref resolution when the field has no resolvable namespace', () => {
     // Composite-type field resolution never threads a namespace id or
     // namespace-extension-entities map (`buildValueObjects` in the

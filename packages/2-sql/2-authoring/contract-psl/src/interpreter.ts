@@ -78,6 +78,7 @@ import { invariant } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { contractError } from './contract-errors';
 
 import { getAttribute, getNamedArgument, mapFieldNamesToColumns } from './psl-attribute-parsing';
 import type { ColumnDescriptor } from './psl-column-resolution';
@@ -2485,8 +2486,10 @@ export function interpretPslDocumentToSqlContract(
     if (attributeEntities !== undefined) {
       for (const slot of Object.keys(attributeEntities)) {
         if (Object.hasOwn(nsInput.entries, slot) || (entities !== undefined && slot in entities)) {
-          throw new Error(
+          throw contractError(
+            'CONTRACT.PACK_CONTRIBUTION_INVALID',
             `entries slot "${slot}" in namespace "${nsInput.id}" is contributed by both a model attribute and a block/base entry kind. A model-attribute entries key must be unique across the namespace's entry kinds.`,
+            { meta: { slot, namespaceId: nsInput.id } },
           );
         }
       }
