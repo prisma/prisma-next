@@ -40,7 +40,7 @@
  * process tree, which PGlite rejects. A real PostgreSQL instance is required.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
@@ -115,7 +115,7 @@ function hashContent(content: string): string {
 function probeCliOutput(command: string, cwd: string): string {
   const args = command.replace(/^prisma-next\s+/, '');
   try {
-    return execSync(`node ${CLI_BIN} ${args}`, {
+    return execFileSync(process.execPath, [CLI_BIN, ...args.split(/\s+/).filter(Boolean)], {
       cwd,
       encoding: 'utf-8',
       env: { ...process.env, NO_COLOR: '1', CI: 'true' },
@@ -356,7 +356,7 @@ async function waitForDb(connStr: string, maxRetries = 10, delayMs = 500): Promi
 }
 
 function runCliIn(workspaceDir: string, _connStr: string, args: string[]): void {
-  execSync(`node ${CLI_BIN} ${args.join(' ')}`, {
+  execFileSync(process.execPath, [CLI_BIN, ...args], {
     cwd: workspaceDir,
     encoding: 'utf-8',
     env: { ...process.env, NO_COLOR: '1', CI: 'true' },
@@ -495,7 +495,7 @@ function parseMaxContentY(svg: string): number {
 }
 
 function runVhs(tapePath: string): void {
-  execSync(`vhs ${tapePath}`, { cwd: CLI_ROOT, stdio: 'pipe' });
+  execFileSync('vhs', [tapePath], { cwd: CLI_ROOT, stdio: 'pipe' });
 }
 
 // --- Record a single per-command recording (legacy mode) ---

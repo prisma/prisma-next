@@ -75,6 +75,7 @@ function parseCliArgs(argv) {
 function escapeTableCell(value) {
   return String(value ?? '')
     .replace(/\r?\n/g, ' ')
+    .replace(/\\/g, '\\\\')
     .replace(/\|/g, '\\|')
     .replace(/\s+/g, ' ')
     .trim();
