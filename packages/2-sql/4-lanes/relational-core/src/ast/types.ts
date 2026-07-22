@@ -240,6 +240,10 @@ function rewriteUpdateSet(
   return result;
 }
 
+function rewriteLimitOffset<T extends number | AnyExpression | undefined>(
+  value: T,
+  rewriter: AstRewriter,
+): T;
 function rewriteLimitOffset(
   value: number | AnyExpression | undefined,
   rewriter: AstRewriter,
