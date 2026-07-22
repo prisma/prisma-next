@@ -11,10 +11,6 @@ import { timeouts, withPostgresPort } from '../../_harness/postgres';
 //   B: firstName=a lastName=x   (full duplicate of A)
 //   C: firstName=a lastName=y   (half duplicate)
 //   D: firstName=b lastName=z
-const DDL = [
-  'create table "User" ("id" text primary key, "firstName" text not null, "lastName" text not null)',
-];
-
 const SEED = [
   { id: '1', firstName: 'a', lastName: 'x' },
   { id: '2', firstName: 'a', lastName: 'x' },
@@ -26,13 +22,9 @@ function withDistinct(fn: Parameters<typeof withPostgresPort<Contract>>[1]) {
   return withPostgresPort<Contract>(
     {
       contractJson,
-      ddl: DDL,
     },
     async (ctx) => {
-      await ctx.runtime.query(
-        'insert into "User" ("id", "firstName", "lastName") values ($1,$2,$3),($4,$5,$6),($7,$8,$9),($10,$11,$12)',
-        SEED.flatMap((u) => [u.id, u.firstName, u.lastName]),
-      );
+      await ctx.db.public.User.createAll(SEED);
       await fn(ctx);
     },
   );

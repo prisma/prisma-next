@@ -4,7 +4,7 @@
   "target": "postgres",
   "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
-    "User": {
+    "user": {
       "model": "User",
       "namespace": "public"
     }
@@ -51,7 +51,7 @@
                 }
               },
               "namespaceId": "public",
-              "table": "User"
+              "table": "user"
             }
           }
         }
@@ -63,7 +63,7 @@
       "public": {
         "entries": {
           "table": {
-            "User": {
+            "user": {
               "columns": {
                 "firstName": {
                   "codecId": "pg/text@1",
@@ -96,7 +96,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:5a0963f4d42220faade9ed6f39c7085f300b619f670704908bb389826a4161b0"
+    "storageHash": "sha256:4353d8806fb950d388806c5404a1bf34e635ffcd8ca67286fd2d0eff22bede04"
   },
   "capabilities": {
     "postgres": {

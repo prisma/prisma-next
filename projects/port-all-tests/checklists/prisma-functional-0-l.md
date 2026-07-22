@@ -27,10 +27,10 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/0-legacy-ports/atomic-increment-decrement/tests.ts
 
-- [x] `atomic increment` — update with increment on credit and age [providers: all] → non-ported
-- [x] `atomic decrement` — update with decrement on credit and age [providers: all] → non-ported
-- [x] `atomic increment with negative value` — increment by negative values decrements [providers: all] → non-ported
-- [x] `atomic decrement with negative` — decrement by negative values increments [providers: all] → non-ported
+- [ ] `atomic increment` — update with increment on credit and age [providers: all]
+- [ ] `atomic decrement` — update with decrement on credit and age [providers: all]
+- [ ] `atomic increment with negative value` — increment by negative values decrements [providers: all]
+- [ ] `atomic decrement with negative` — decrement by negative values increments [providers: all]
 
 ### packages/client/tests/functional/0-legacy-ports/batch-find-unique/tests.ts
 
@@ -153,10 +153,10 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/blog-update/tests.ts
 
-- [x] `should create a user and update that field on that user` — create then update user email [providers: all] → ports/prisma/functional/blog-update.test.ts
-- [x] `should create a user and post and connect them together` — update user to connect an existing post [providers: all] → ports/prisma/functional/blog-update.test.ts
-- [x] `should create a user and post and disconnect them` — update user to disconnect a created post [providers: all] → ports/prisma/functional/blog-update.test.ts
-- [x] `should create a user with posts and a profile and update itself and nested connections setting fields to null` — nested update setting many fields/relations to null (skipTestIf: postgres+driverAdapter+relationJoins) [providers: all] → non-ported
+- [ ] `should create a user and update that field on that user` — create then update user email [providers: all]
+- [ ] `should create a user and post and connect them together` — update user to connect an existing post [providers: all]
+- [ ] `should create a user and post and disconnect them` — update user to disconnect a created post [providers: all]
+- [ ] `should create a user with posts and a profile and update itself and nested connections setting fields to null` — nested update setting many fields/relations to null (skipTestIf: postgres+driverAdapter+relationJoins) [providers: all]
 
 ### packages/client/tests/functional/bytes-upsert/tests.ts
 
@@ -396,7 +396,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/create-default-date/test.ts
 
-- [x] `correctly creates a field with default date` — creating a record with no args populates a default date field as a Date [providers: sqlite,postgres,mysql,sqlserver] → ports/prisma/functional/create-default-date.test.ts
+- [ ] `correctly creates a field with default date` — creating a record with no args populates a default date field as a Date [providers: sqlite,postgres,mysql,sqlserver]
 
 ### packages/client/tests/functional/dataproxy-engine/version/tests.ts
 
@@ -421,12 +421,12 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/default-selection/tests.ts
 
-- [x] `includes scalars` — default selection includes scalar fields (id, value, otherId) [providers: all] → ports/prisma/functional/default-selection.test.ts
-- [x] `does not include relations` — default selection excludes relation fields [providers: all] → ports/prisma/functional/default-selection.test.ts
-- [x] `includes enums` — (non-sqlite/sqlserver) default selection includes enum field [providers: all] → ports/prisma/functional/default-selection.test.ts
-- [x] `includes lists` — (postgres/cockroach/mongo) default selection includes list field [providers: all] → non-ported
-- [x] `includes enum lists` — (postgres/cockroach/mongo) default selection includes enum-list field [providers: all] → non-ported
-- [x] `includes composites` — (mongo only) default selection includes composite field [providers: all] → non-ported
+- [ ] `includes scalars` — default selection includes scalar fields (id, value, otherId) [providers: all]
+- [ ] `does not include relations` — default selection excludes relation fields [providers: all]
+- [ ] `includes enums` — (non-sqlite/sqlserver) default selection includes enum field [providers: all]
+- [ ] `includes lists` — (postgres/cockroach/mongo) default selection includes list field [providers: all]
+- [ ] `includes enum lists` — (postgres/cockroach/mongo) default selection includes enum-list field [providers: all]
+- [ ] `includes composites` — (mongo only) default selection includes composite field [providers: all]
 
 ### packages/client/tests/functional/distinct/tests.ts
 

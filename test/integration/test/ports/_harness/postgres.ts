@@ -1,8 +1,13 @@
-import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import postgresAdapterControl from '@prisma-next/adapter-postgres/control';
+import postgresAdapterRuntime from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
-import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import postgresDriverControl from '@prisma-next/driver-postgres/control';
+import postgresDriverRuntime from '@prisma-next/driver-postgres/runtime';
+import sqlFamilyControl, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
+import { buildFabricatedMigrationEdge } from '@prisma-next/migration-tools/aggregate';
 import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { type OrmOptions, orm, type RuntimeQueryable } from '@prisma-next/sql-orm-client';
@@ -12,29 +17,51 @@ import {
   createSqlExecutionStack,
   type SqlRuntimeExtensionDescriptor,
 } from '@prisma-next/sql-runtime';
-import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
+import postgresTargetControl from '@prisma-next/target-postgres/control';
+import postgresTargetRuntime, {
+  PostgresContractSerializer,
+} from '@prisma-next/target-postgres/runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 
 /**
  * Generic Postgres harness for ported tests.
  *
- * Each ported suite authors its own contract fixture (see `../_fixtures/`) and
- * hands the harness the emitted `contract.json` plus the DDL that materialises
- * the same tables. The harness deserialises the contract, spins up a PGlite dev
- * database, applies the DDL, and yields both an `orm()` handle (for the
- * query-under-test) and a raw `sql()` escape hatch (for seeding/inspection).
+ * Each ported suite authors its schema as PSL (`_fixtures/<suite>/contract.prisma`)
+ * and emits a `contract.json`/`contract.d.ts`. The harness:
+ *   1. spins up a PGlite dev database,
+ *   2. **pushes the contract to the database** through prisma-next's own
+ *      plan → apply path (the same mechanism `prisma-next db init` uses) — no
+ *      hand-written DDL, so the materialised schema can never drift from the
+ *      contract under test,
+ *   3. yields an `orm()` handle for the query-under-test plus a raw `sql()`
+ *      escape hatch for seeding/inspection.
  *
- * The `returning` capability is enabled by default so `create()/update()/
- * delete()` read rows back, matching Prisma Client behaviour.
+ * `returning` capability is enabled by default so `create/update/delete` read
+ * rows back, matching Prisma Client behaviour.
  */
 
 const serializer = new PostgresContractSerializer();
 
+const controlStack = createControlStack({
+  family: sqlFamilyControl,
+  target: postgresTargetControl,
+  adapter: postgresAdapterControl,
+  driver: postgresDriverControl,
+  extensionPacks: [],
+});
+const controlFamily = sqlFamilyControl.create(controlStack);
+const controlAdapter = postgresAdapterControl.create(controlStack);
+const frameworkComponents = [
+  postgresTargetControl,
+  postgresAdapterControl,
+  postgresDriverControl,
+] as const;
+
 export interface PortRuntime extends RuntimeQueryable {
   /** Every plan executed through `orm()`, lowered to SQL (for count assertions). */
   readonly executions: readonly SqlExecutionPlan[];
-  /** Raw SQL against the same backend — used for DDL and seeding. */
+  /** Raw SQL against the same backend — used for seeding and inspection. */
   query<Row extends Record<string, unknown> = Record<string, unknown>>(
     text: string,
     params?: readonly unknown[],
@@ -53,8 +80,6 @@ export interface PortContext<TContract extends Contract<SqlStorage>> {
 export interface WithPostgresPortOptions<TContract extends Contract<SqlStorage>> {
   /** The emitted `contract.json` (imported with `{ type: 'json' }`). */
   readonly contractJson: unknown;
-  /** DDL statements applied before the test body, in order. */
-  readonly ddl: readonly string[];
   /** Extra runtime extension packs (e.g. pgvector) if the fixture needs them. */
   readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<'postgres'>[];
   /** ORM collection subclasses, forwarded to `orm({ collections })`. */
@@ -70,10 +95,58 @@ function enableReturning<T extends Contract<SqlStorage>>(contract: T): T {
   } as T;
 }
 
-export async function createPortRuntime<TContract extends Contract<SqlStorage>>(
+/** Pushes `contract` into a fresh database via plan → apply (greenfield init). */
+async function pushContract(connectionString: string, contractJson: unknown): Promise<void> {
+  const contract = controlFamily.deserializeContract(contractJson) as Contract<SqlStorage>;
+  const driver = await postgresDriverControl.create(connectionString);
+  try {
+    const schema = await controlFamily.introspect({ driver, contract });
+    const planner = postgresTargetControl.createPlanner(controlAdapter);
+    const planResult = planner.plan({
+      contract,
+      schema,
+      policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
+      frameworkComponents,
+      spaceId: APP_SPACE_ID,
+    });
+    if (planResult.kind !== 'success') {
+      throw new Error(`Contract push planning failed: ${JSON.stringify(planResult)}`);
+    }
+    const plan = planResult.plan;
+    const runner = postgresTargetControl.createRunner(controlFamily);
+    const executeResult = await runner.execute({
+      driver,
+      perSpaceOptions: [
+        {
+          space: plan.spaceId ?? APP_SPACE_ID,
+          plan,
+          migrationEdges: [
+            buildFabricatedMigrationEdge({
+              currentMarkerStorageHash: plan.origin?.storageHash,
+              destinationStorageHash: plan.destination.storageHash,
+              operationCount: plan.operations.length,
+            }),
+          ],
+          driver,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        },
+      ],
+    });
+    if (!executeResult.ok) {
+      throw new Error(`Contract push apply failed: ${JSON.stringify(executeResult.failure)}`);
+    }
+  } finally {
+    await driver.close();
+  }
+}
+
+async function createPortRuntime<TContract extends Contract<SqlStorage>>(
   connectionString: string,
   contract: TContract,
-  extensionPacks: readonly SqlRuntimeExtensionDescriptor<'postgres'>[] = [],
+  extensionPacks: readonly SqlRuntimeExtensionDescriptor<'postgres'>[],
 ): Promise<PortRuntime> {
   const client = new Client({ connectionString });
   await client.connect();
@@ -82,9 +155,9 @@ export async function createPortRuntime<TContract extends Contract<SqlStorage>>(
     try {
       await client.query('select 1');
       const stack = createSqlExecutionStack({
-        target: postgresTarget,
-        adapter: postgresAdapter,
-        driver: postgresDriver,
+        target: postgresTargetRuntime,
+        adapter: postgresAdapterRuntime,
+        driver: postgresDriverRuntime,
         extensionPacks,
       });
       const context = createExecutionContext<Contract<SqlStorage>>({ contract, stack });
@@ -182,18 +255,19 @@ export async function withPostgresPort<TContract extends Contract<SqlStorage>>(
 
   await withDevDatabase(
     async ({ connectionString }) => {
+      // Push the schema the way prisma-next itself does, then reconnect the
+      // runtime (PGlite allows a single connection; the dev-db server persists
+      // the pushed schema across the reconnect).
+      await pushContract(connectionString, options.contractJson);
       const runtime = await createPortRuntime(connectionString, contract, extensionPacks);
       try {
-        for (const statement of options.ddl) {
-          await runtime.query(statement);
-        }
         const db = orm<TContract, Record<string, never>>({
           runtime,
           context: createExecutionContext<TContract>({
             contract,
             stack: createSqlExecutionStack({
-              target: postgresTarget,
-              adapter: postgresAdapter,
+              target: postgresTargetRuntime,
+              adapter: postgresAdapterRuntime,
               extensionPacks,
             }),
           }),

@@ -29,14 +29,16 @@ ports/
 
 ## Adding a fixture
 
-Author `_fixtures/<suite>/contract.ts` (TS contract builders) + `prisma-next.config.ts`, then emit:
+Author the schema as **PSL** in `_fixtures/<suite>/contract.prisma` (faithful translation of the upstream `schema.prisma`) plus a `prisma-next.config.ts` (`@prisma-next/postgres/config`, `contract: './contract.prisma'`, `outputPath: 'generated'`). Then emit:
 
 ```bash
 node packages/1-framework/3-tooling/cli/dist/cli.js contract emit \
   --config test/integration/test/ports/_fixtures/<suite>/prisma-next.config.ts
 ```
 
-Commit the generated `contract.json` + `contract.d.ts`. Tests import the typed `Contract` and the JSON, and pass both to `withPostgresPort` along with the DDL that materialises the same tables. See `_fixtures/distinct/` + `prisma/functional/distinct.test.ts` for the reference pattern.
+Commit the generated `contract.json` + `contract.d.ts`. The test imports the typed `Contract` + the JSON and passes the JSON to `withPostgresPort`. **The harness pushes the contract into the database via prisma-next's own plan→apply path (the same mechanism `db init` uses) — no hand-written DDL.** Seed and query through the ORM (`ctx.db.public.<Model>...`); `ctx.runtime.query(sql)` is a raw escape hatch for inspection. See `_fixtures/distinct/` + `prisma/functional/distinct.test.ts` for the reference pattern.
+
+Notes: prisma-next PSL lowercases table names (model `User` → table `user`) but keeps column names verbatim; scalar lists (`String[]`, `Int[]`) are supported and emit native pg arrays. MongoDB suites port against prisma-next's dedicated mongo ORM (`mongoOrm()`) with a `mongodb-memory-server` harness — not marked non-ported.
 
 ## Roll-up
 
