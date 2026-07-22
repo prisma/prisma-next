@@ -32,7 +32,7 @@ describe('FunctionSource', () => {
   });
 
   it('supports an optional alias', () => {
-    const src = FunctionSource.of('pragma_table_info', [ParamRef.of('t')], 'pti');
+    const src = FunctionSource.of('pragma_table_info', [ParamRef.of('t')], { alias: 'pti' });
     expect(src.alias).toBe('pti');
   });
 
@@ -40,14 +40,14 @@ describe('FunctionSource', () => {
     const arg = ParamRef.of('input');
     const args = [arg];
     const columnAliases = ['element', 'ord'];
-    const base = FunctionSource.of('unnest', args, 'u');
-    const source = base.withColumnAliases(columnAliases).withOrdinality();
+    const source = FunctionSource.of('unnest', args, {
+      alias: 'u',
+      columnAliases,
+    }).withOrdinality();
 
     args.push(ParamRef.of('ignored'));
     columnAliases.push('ignored');
 
-    expect(base.columnAliases).toBeUndefined();
-    expect(base.ordinality).toBe(false);
     expect(source.args).toEqual([arg]);
     expect(source.columnAliases).toEqual(['element', 'ord']);
     expect(source.ordinality).toBe(true);
@@ -56,14 +56,8 @@ describe('FunctionSource', () => {
     expect(Object.isFrozen(source.columnAliases)).toBe(true);
   });
 
-  it('rejects column aliases without a table alias', () => {
-    expect(() => FunctionSource.of('unnest', []).withColumnAliases(['element'])).toThrow(
-      'FunctionSource column aliases require a table alias',
-    );
-  });
-
   it('rejects an empty column-alias list', () => {
-    expect(() => FunctionSource.of('unnest', [], 'u').withColumnAliases([])).toThrow(
+    expect(() => FunctionSource.of('unnest', [], { alias: 'u', columnAliases: [] })).toThrow(
       'FunctionSource column aliases must not be empty',
     );
   });
@@ -71,9 +65,10 @@ describe('FunctionSource', () => {
   it('preserves configuration while rewriting arguments', () => {
     const originalArg = ParamRef.of('before');
     const replacementArg = ParamRef.of('after');
-    const source = FunctionSource.of('unnest', [originalArg], 'u')
-      .withColumnAliases(['element', 'ord'])
-      .withOrdinality();
+    const source = FunctionSource.of('unnest', [originalArg], {
+      alias: 'u',
+      columnAliases: ['element', 'ord'],
+    }).withOrdinality();
 
     expect(source.rewrite({})).toBe(source);
 

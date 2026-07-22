@@ -431,7 +431,7 @@ describe('Postgres adapter', () => {
     },
     {
       name: 'with arguments and alias',
-      source: FunctionSource.of('rows', [LiteralExpr.of(1), LiteralExpr.of(2)], 'r'),
+      source: FunctionSource.of('rows', [LiteralExpr.of(1), LiteralExpr.of(2)], { alias: 'r' }),
       sql: 'SELECT 1 AS "value" FROM rows(1, 2) AS "r"',
     },
     {
@@ -441,7 +441,10 @@ describe('Postgres adapter', () => {
     },
     {
       name: 'with returned-column aliases',
-      source: FunctionSource.of('rows', [], 'r').withColumnAliases(['value', 'position']),
+      source: FunctionSource.of('rows', [], {
+        alias: 'r',
+        columnAliases: ['value', 'position'],
+      }),
       sql: 'SELECT 1 AS "value" FROM rows() AS "r"("value", "position")',
     },
   ])('renders function sources $name', ({ source, sql }) => {
@@ -461,8 +464,10 @@ describe('Postgres adapter', () => {
       name: 'rewrittenInput',
       codec: { codecId: 'pg/int4@1', many: true },
     });
-    const source = FunctionSource.of('unnest', [originalArg], 'u')
-      .withColumnAliases(['element', 'ord'])
+    const source = FunctionSource.of('unnest', [originalArg], {
+      alias: 'u',
+      columnAliases: ['element', 'ord'],
+    })
       .withOrdinality()
       .rewrite({ paramRef: () => replacementArg });
 

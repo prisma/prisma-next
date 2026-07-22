@@ -406,6 +406,11 @@ export class DerivedTableSource extends FromSource {
   }
 }
 
+export interface FunctionSourceAlias {
+  readonly alias: string;
+  readonly columnAliases?: ReadonlyArray<string>;
+}
+
 export class FunctionSource extends FromSource {
   readonly kind = 'function-source' as const;
   readonly fn: string;
@@ -417,48 +422,47 @@ export class FunctionSource extends FromSource {
   protected constructor(
     fn: string,
     args: ReadonlyArray<AnyExpression>,
-    alias?: string,
-    columnAliases?: ReadonlyArray<string>,
+    alias?: FunctionSourceAlias,
     ordinality = false,
   ) {
     super();
-    if (columnAliases?.length === 0) {
+    if (alias?.columnAliases?.length === 0) {
       throw new Error('FunctionSource column aliases must not be empty');
-    }
-    if (columnAliases !== undefined && alias === undefined) {
-      throw new Error('FunctionSource column aliases require a table alias');
     }
     this.fn = fn;
     this.args = frozenArrayCopy(args);
-    this.alias = alias;
-    this.columnAliases = columnAliases === undefined ? undefined : frozenArrayCopy(columnAliases);
+    this.alias = alias?.alias;
+    this.columnAliases =
+      alias?.columnAliases === undefined ? undefined : frozenArrayCopy(alias.columnAliases);
     this.ordinality = ordinality;
     this.freeze();
   }
 
-  static of(fn: string, args: ReadonlyArray<AnyExpression>, alias?: string): FunctionSource {
+  static of(
+    fn: string,
+    args: ReadonlyArray<AnyExpression>,
+    alias?: FunctionSourceAlias,
+  ): FunctionSource {
     return new FunctionSource(fn, args, alias);
   }
 
-  withColumnAliases(columnAliases: ReadonlyArray<string>): FunctionSource {
-    return new FunctionSource(this.fn, this.args, this.alias, columnAliases, this.ordinality);
+  #aliasOptions(): FunctionSourceAlias | undefined {
+    if (this.alias === undefined) return undefined;
+    return {
+      alias: this.alias,
+      ...ifDefined('columnAliases', this.columnAliases),
+    };
   }
 
   withOrdinality(): FunctionSource {
     if (this.ordinality) return this;
-    return new FunctionSource(this.fn, this.args, this.alias, this.columnAliases, true);
+    return new FunctionSource(this.fn, this.args, this.#aliasOptions(), true);
   }
 
   override rewrite(rewriter: AstRewriter): AnyFromSource {
     const rewrittenArgs = this.args.map((arg) => rewriteComparable(arg, rewriter));
     if (rewrittenArgs.every((arg, i) => arg === this.args[i])) return this;
-    return new FunctionSource(
-      this.fn,
-      rewrittenArgs,
-      this.alias,
-      this.columnAliases,
-      this.ordinality,
-    );
+    return new FunctionSource(this.fn, rewrittenArgs, this.#aliasOptions(), this.ordinality);
   }
 
   override toFromSource(): AnyFromSource {

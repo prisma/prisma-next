@@ -224,7 +224,7 @@ describe('SQLite adapter', () => {
       },
       {
         name: 'with arguments and alias',
-        source: FunctionSource.of('json_each', [ParamRef.of('[1, 2]')], 'entry'),
+        source: FunctionSource.of('json_each', [ParamRef.of('[1, 2]')], { alias: 'entry' }),
         sql: 'SELECT 1 AS "value" FROM json_each(?) AS "entry"',
       },
     ])('preserves legacy function-source SQL $name', ({ source, sql }) => {
@@ -243,7 +243,10 @@ describe('SQLite adapter', () => {
       },
       {
         name: 'returned-column aliases',
-        source: FunctionSource.of('json_each', [], 'entry').withColumnAliases(['value']),
+        source: FunctionSource.of('json_each', [], {
+          alias: 'entry',
+          columnAliases: ['value'],
+        }),
         error: 'SQLite does not support returned-column aliases on function sources',
       },
     ])('rejects function sources with $name', ({ source, error }) => {
