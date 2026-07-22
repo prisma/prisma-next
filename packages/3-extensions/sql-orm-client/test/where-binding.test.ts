@@ -329,10 +329,8 @@ describe('bindWhereExpr', () => {
       const json = bound as JsonObjectExpr;
       const projection = json.entries[0]?.value;
       expect(projection).toBeInstanceOf(NativeJsonValueProjection);
-      if (!(projection instanceof NativeJsonValueProjection)) {
-        throw new Error('Expected NativeJsonValueProjection');
-      }
-      const innerQuery = (projection.value as SubqueryExpr).query as SelectAst;
+      const nativeProjection = projection as NativeJsonValueProjection;
+      const innerQuery = (nativeProjection.value as SubqueryExpr).query as SelectAst;
       const innerWhere = innerQuery.where as BinaryExpr;
       expect(innerWhere.right.kind).toBe('param-ref');
     });
@@ -374,40 +372,28 @@ describe('bindWhereExpr', () => {
       const bound = bindWhereExpr(contract, expr);
 
       expect(bound).toBeInstanceOf(CaseExpr);
-      if (!(bound instanceof CaseExpr)) {
-        throw new Error('Expected CaseExpr');
-      }
-      const condition = bound.branches[0]?.condition;
+      const caseExpr = bound as CaseExpr;
+      const condition = caseExpr.branches[0]?.condition;
       expect(condition).toBeInstanceOf(BinaryExpr);
-      if (!(condition instanceof BinaryExpr)) {
-        throw new Error('Expected BinaryExpr');
-      }
-      expect(condition.left).toBeInstanceOf(FunctionCallExpr);
-      const value = bound.branches[0]?.value;
+      const binaryCondition = condition as BinaryExpr;
+      expect(binaryCondition.left).toBeInstanceOf(FunctionCallExpr);
+      const value = caseExpr.branches[0]?.value;
       expect(value).toBeInstanceOf(CastExpr);
-      if (!(value instanceof CastExpr)) {
-        throw new Error('Expected CastExpr');
-      }
-      expect(value.expr).toBeInstanceOf(FunctionCallExpr);
-      if (!(value.expr instanceof FunctionCallExpr)) {
-        throw new Error('Expected FunctionCallExpr');
-      }
-      const nestedSubquery = value.expr.args[0];
-      expect(nestedSubquery).toBeInstanceOf(SubqueryExpr);
-      if (!(nestedSubquery instanceof SubqueryExpr)) {
-        throw new Error('Expected SubqueryExpr');
-      }
+      const castValue = value as CastExpr;
+      expect(castValue.expr).toBeInstanceOf(FunctionCallExpr);
+      const functionCall = castValue.expr as FunctionCallExpr;
+      const nestedValue = functionCall.args[0];
+      expect(nestedValue).toBeInstanceOf(SubqueryExpr);
+      const nestedSubquery = nestedValue as SubqueryExpr;
       const innerWhere = nestedSubquery.query.where;
       expect(innerWhere).toBeInstanceOf(BinaryExpr);
-      if (!(innerWhere instanceof BinaryExpr)) {
-        throw new Error('Expected BinaryExpr');
-      }
-      expect(innerWhere.right).toMatchObject({
+      const binaryWhere = innerWhere as BinaryExpr;
+      expect(binaryWhere.right).toMatchObject({
         kind: 'param-ref',
         value: 100,
         codec: { codecId: 'pg/int4@1' },
       });
-      expect(bound.elseExpr).toBeInstanceOf(CastExpr);
+      expect(caseExpr.elseExpr).toBeInstanceOf(CastExpr);
     });
 
     it('binds inner expressions of top-level ListExpression', () => {
