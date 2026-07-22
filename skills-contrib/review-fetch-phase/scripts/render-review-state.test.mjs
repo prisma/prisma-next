@@ -57,3 +57,25 @@ test('renders sourcePath in the Source code span with literal backslashes and es
     `expected code-span source in:\n${markdown}`,
   );
 });
+
+test('renders sourcePath containing a backtick as an intact code span', () => {
+  const markdown = renderReviewStateMarkdown(buildPayload(), {
+    sourcePath: 'wip/a`b/review-state.json',
+  });
+
+  assert.ok(
+    markdown.includes('Source: ``wip/a`b/review-state.json``'),
+    `expected fenced code-span source in:\n${markdown}`,
+  );
+});
+
+test('pads the code span when sourcePath starts and ends with a backtick', () => {
+  const markdown = renderReviewStateMarkdown(buildPayload(), {
+    sourcePath: '`review-state.json`',
+  });
+
+  assert.ok(
+    markdown.includes('Source: `` `review-state.json` ``'),
+    `expected padded code-span source in:\n${markdown}`,
+  );
+});

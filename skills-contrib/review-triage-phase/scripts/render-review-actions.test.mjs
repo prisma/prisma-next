@@ -55,3 +55,28 @@ test('renders sourcePath and target-file code spans with literal backslashes and
     `expected code-span target file in:\n${markdown}`,
   );
 });
+
+test('renders a target file containing a backtick as an intact code span', () => {
+  const payload = buildPayload();
+  payload.actions[0].targetFiles = ['src/a`b.ts'];
+
+  const markdown = renderReviewActionsMarkdown(payload, {
+    sourcePath: 'wip/review-actions.json',
+  });
+
+  assert.ok(
+    markdown.includes('``src/a`b.ts``'),
+    `expected fenced code-span target file in:\n${markdown}`,
+  );
+});
+
+test('pads the code span when a target file starts and ends with a backtick', () => {
+  const payload = buildPayload();
+  payload.actions[0].targetFiles = ['`a.ts`'];
+
+  const markdown = renderReviewActionsMarkdown(payload, {
+    sourcePath: 'wip/review-actions.json',
+  });
+
+  assert.ok(markdown.includes('`` `a.ts` ``'), `expected padded code span in:\n${markdown}`);
+});

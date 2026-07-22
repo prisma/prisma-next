@@ -87,7 +87,13 @@ function formatCodeSpan(value) {
     .replace(/\|/g, '\\|')
     .replace(/\s+/g, ' ')
     .trim();
-  return `\`${text}\``;
+  const longestBacktickRun = (text.match(/`+/g) ?? []).reduce(
+    (max, run) => Math.max(max, run.length),
+    0,
+  );
+  const fence = '`'.repeat(longestBacktickRun + 1);
+  const pad = text.startsWith('`') || text.endsWith('`') ? ' ' : '';
+  return `${fence}${pad}${text}${pad}${fence}`;
 }
 
 function formatLines(startLine, endLine) {
