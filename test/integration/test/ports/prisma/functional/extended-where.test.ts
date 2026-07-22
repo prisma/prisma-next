@@ -30,8 +30,12 @@ import { timeouts, withPostgresPort } from '../../_harness/postgres';
 //   - upsert() does not support nested relation callbacks; where the
 //     upstream upsert create clause uses `payment: { create: {} }` we
 //     instead pre-create the Payment and provide paymentId directly.
-//   - update({}) with no fields returns null (ORM skips the SQL round-trip);
-//     we update a real field (referralId) instead to get a row back.
+//   - update({}) with no fields returns null (ORM skips the SQL round-trip),
+//     so the faithful empty-data update ('update with where 1 unique (PK)')
+//     is an it.fails (see failing.md).
+//   - 'create with connect 2 uniques' is non-ported: prisma-next's connect
+//     criterion accepts a single unique key, not a compound { id, referralId }
+//     (see non-ported.md).
 
 type DbHandle = import('../../_harness/postgres').PortContext<Contract>['db'];
 
@@ -43,11 +47,12 @@ async function createTestData(db: DbHandle) {
   const postId3 = `03${randomBytes(11).toString('hex')}`;
   const profileAlias = randomBytes(6).toString('hex');
   const profileEmail = `${randomBytes(6).toString('hex')}@test.io`;
+  const ccn = randomBytes(12).toString('hex');
 
   const user = await db.public.User.create({
     id: userId,
     referralId,
-    payment: (p) => p.create({}),
+    payment: (p) => p.create({ ccn }),
   });
 
   await db.public.Post.createAll([
@@ -62,7 +67,7 @@ async function createTestData(db: DbHandle) {
     alias: profileAlias,
   });
 
-  return { userId: user.id, postId1, postId2, postId3, referralId };
+  return { userId: user.id, postId1, postId2, postId3, referralId, ccn };
 }
 
 function withExtendedWhere(fn: Parameters<typeof withPostgresPort<Contract>>[1]) {
@@ -246,12 +251,14 @@ describe('ports/prisma/functional/extended-where', () => {
     () =>
       withExtendedWhere(async ({ db }) => {
         const { userId } = await createTestData(db);
-        const payment = await db.public.Payment.where({
-          id: (await db.public.User.first({ id: userId }))?.paymentId ?? '',
-        })
-          .where({ ccn: 'not there' })
+        // Faithful port of upstream filtered nested include:
+        //   findUnique({ where: { id }, include: { payment: { where: { ccn: 'not there' } } } })
+        // prisma-next expresses this as .include('payment', p => p.where(...)); a
+        // non-matching filter nulls out the to-one relation.
+        const data = await db.public.User.where({ id: userId })
+          .include('payment', (p) => p.where({ ccn: 'not there' }))
           .first();
-        expect(payment).toBeNull();
+        expect(data?.payment).toBeNull();
       }),
     timeouts.spinUpPpgDev,
   );
@@ -260,11 +267,13 @@ describe('ports/prisma/functional/extended-where', () => {
     'findUnique with nested where on optional 1:1 found',
     () =>
       withExtendedWhere(async ({ db }) => {
-        const { userId } = await createTestData(db);
-        const user = await db.public.User.first({ id: userId });
-        const paymentId = user?.paymentId ?? '';
-        const payment = await db.public.Payment.first({ id: paymentId });
-        expect(payment).not.toBeNull();
+        const { userId, ccn } = await createTestData(db);
+        // Faithful port of upstream filtered nested include with a matching filter:
+        //   include: { payment: { where: { ccn: vars.ccn } } } → payment not null
+        const data = await db.public.User.where({ id: userId })
+          .include('payment', (p) => p.where({ ccn }))
+          .first();
+        expect(data?.payment).not.toBeNull();
       }),
     timeouts.spinUpPpgDev,
   );
@@ -320,7 +329,7 @@ describe('ports/prisma/functional/extended-where', () => {
         const user = await db.public.User.create({
           id: userId,
           referralId: userReferralId,
-          payment: (p) => p.create({}),
+          payment: (p) => p.create({ ccn: randomBytes(12).toString('hex') }),
         });
 
         await db.public.Profile.create({
@@ -335,29 +344,13 @@ describe('ports/prisma/functional/extended-where', () => {
     timeouts.spinUpPpgDev,
   );
 
-  it(
-    'create with connect 2 uniques (PK & non-PK)',
-    () =>
-      withExtendedWhere(async ({ db }) => {
-        const userId = randomBytes(12).toString('hex');
-        const userReferralId = randomBytes(12).toString('hex');
-        const user = await db.public.User.create({
-          id: userId,
-          referralId: userReferralId,
-          payment: (p) => p.create({}),
-        });
-
-        await db.public.Profile.create({
-          alias: `alias_${randomBytes(4).toString('hex')}`,
-          email: `${randomBytes(4).toString('hex')}@test.io`,
-          user: (u) => u.connect({ id: user.id }),
-        });
-
-        const profile = await db.public.Profile.first({ userId: user.id });
-        expect(profile).not.toBeNull();
-      }),
-    timeouts.spinUpPpgDev,
-  );
+  // 'create with connect 2 uniques (PK & non-PK)' is non-ported.
+  // Upstream (create.ts:62-67) connects via a COMPOUND criterion
+  //   user: { connect: { id: userId, referralId: userReferralId } }
+  // — two unique keys in a single connect object. prisma-next's connect
+  // criterion is a union of per-constraint objects (one unique key at a time);
+  // a compound { id, referralId } connect is a type error, so the multi-key
+  // connect input cannot be faithfully expressed. Recorded in non-ported.md.
 
   it(
     'create with connect 1 unique (non-PK)',
@@ -368,7 +361,7 @@ describe('ports/prisma/functional/extended-where', () => {
         const user = await db.public.User.create({
           id: userId,
           referralId: userReferralId,
-          payment: (p) => p.create({}),
+          payment: (p) => p.create({ ccn: randomBytes(12).toString('hex') }),
         });
 
         await db.public.Profile.create({
@@ -385,13 +378,16 @@ describe('ports/prisma/functional/extended-where', () => {
 
   // ─── update ──────────────────────────────────────────────────────────────
 
-  it(
+  it.fails(
     'update with where 1 unique (PK)',
     () =>
       withExtendedWhere(async ({ db }) => {
         const { userId } = await createTestData(db);
-        const newReferral = randomBytes(8).toString('hex');
-        const data = await db.public.User.where({ id: userId }).update({ referralId: newReferral });
+        // Faithful port: upstream update({ where: { id }, data: {} }) — empty
+        // no-op update still returns the addressed row (update.ts:15-22).
+        // prisma-next's update({}) skips the SQL round-trip and returns null,
+        // so data?.id is undefined → assertion fails. Recorded in failing.md.
+        const data = await db.public.User.where({ id: userId }).update({});
         expect(data?.id).toBe(userId);
       }),
     timeouts.spinUpPpgDev,
@@ -512,8 +508,9 @@ describe('ports/prisma/functional/extended-where', () => {
     () =>
       withExtendedWhere(async ({ db }) => {
         const { userId } = await createTestData(db);
-        await db.public.Post.where((p) => p.authorId.eq(userId)).deleteAll();
-        await db.public.Profile.where((p) => p.userId.eq(userId)).deleteAll();
+        // Faithful port: single PK delete. onDelete: Cascade on Post.author and
+        // Profile.user (restored in the fixture) removes the child rows, matching
+        // upstream prisma.user.delete({ where: { id } }) (delete.ts:31-37).
         const deleted = await db.public.User.where({ id: userId }).delete();
         expect(deleted).not.toBeNull();
         const row = await db.public.User.first({ id: userId });

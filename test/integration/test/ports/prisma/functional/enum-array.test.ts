@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from '../../_fixtures/enum-array/generated/contract';
 import contractJson from '../../_fixtures/enum-array/generated/contract.json' with { type: 'json' };
 import { timeouts, withPostgresPort } from '../../_harness/postgres';
+
+type Plan = 'FREE' | 'PAID' | 'CUSTOM';
 
 // Port of prisma/prisma@a6d0155 packages/client/tests/functional/enum-array
 // (postgres matrix entry; sqlserver/mysql/sqlite opted-out upstream).
@@ -45,6 +47,7 @@ describe('ports/prisma/functional/enum-array', () => {
 
         expect(found).not.toBeNull();
         expect(found!.plans).toEqual(['FREE']);
+        expectTypeOf(found!.plans).toEqualTypeOf<ReadonlyArray<Plan>>();
       }),
     timeouts.spinUpPpgDev,
   );

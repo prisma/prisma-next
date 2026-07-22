@@ -31,7 +31,7 @@ const REQUIRED_JSON = {
 
 function withLegacyJson(fn: Parameters<typeof withPostgresPort<Contract>>[1]) {
   return withPostgresPort<Contract>({ contractJson }, async (ctx) => {
-    await ctx.db.public.Resource.deleteAll();
+    await ctx.db.public.Resource.where((r) => r.id.like('%')).deleteAll();
     await fn(ctx);
   });
 }

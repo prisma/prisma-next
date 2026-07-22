@@ -29,14 +29,14 @@ describe('ports/prisma/functional/methods-upsert-native-atomic', () => {
         const name = 'native-atomic-upsert-user';
 
         const user = await db.public.User.upsert({
-          create: { name },
+          create: { id: 'native-atomic-upsert-id', name },
           update: { name: `${name}-updated` },
           conflictOn: { name },
         });
         expect(user.name).toEqual(name);
 
         const userUpdated = await db.public.User.upsert({
-          create: { name },
+          create: { id: 'native-atomic-upsert-id', name },
           update: { name: `${name}-updated` },
           conflictOn: { name },
         });

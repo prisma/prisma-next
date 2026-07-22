@@ -30,11 +30,8 @@
               "ccn": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "id": {
@@ -90,11 +87,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "title": {
@@ -223,11 +217,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "paymentId": {
@@ -320,12 +311,9 @@
             "payment": {
               "columns": {
                 "ccn": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "id": {
                   "codecId": "sql/char@1",
@@ -359,12 +347,9 @@
                   "nullable": true
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "title": {
                   "codecId": "pg/text@1",
@@ -374,6 +359,7 @@
               },
               "foreignKeys": [
                 {
+                  "onDelete": "cascade",
                   "source": {
                     "columns": [
                       "authorId"
@@ -448,6 +434,7 @@
               },
               "foreignKeys": [
                 {
+                  "onDelete": "cascade",
                   "source": {
                     "columns": [
                       "userId"
@@ -491,12 +478,9 @@
             "user": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "paymentId": {
                   "codecId": "pg/text@1",
@@ -552,10 +536,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:73068dcad44ab6492dbc4dcdc33ca5b966d446fa78449e638762dff003abe2e2"
+    "storageHash": "sha256:3b4d2fa525a4d35d82b1194bda0cf92a4604151fa6dd72bb0948159e7f101cdb"
   },
   "execution": {
-    "executionHash": "sha256:bb3f800fbe384249d00caf5b48891804c513b65c0181a4fb5a14d3db5823d67f",
+    "executionHash": "sha256:3444ca6e1bfd115d8f5518f4530b19c73c91abee11f9d003244bc0f41f4468b4",
     "mutations": {
       "defaults": [
         {
@@ -564,31 +548,9 @@
             "kind": "generator"
           },
           "ref": {
-            "column": "ccn",
-            "namespace": "public",
-            "table": "payment"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "cuid2",
-            "kind": "generator"
-          },
-          "ref": {
             "column": "id",
             "namespace": "public",
             "table": "payment"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "cuid2",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "namespace": "public",
-            "table": "post"
           }
         },
         {
@@ -600,17 +562,6 @@
             "column": "id",
             "namespace": "public",
             "table": "profile"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "cuid2",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "namespace": "public",
-            "table": "user"
           }
         }
       ]

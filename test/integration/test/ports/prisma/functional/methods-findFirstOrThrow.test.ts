@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from '../../_fixtures/methods-findFirstOrThrow/generated/contract';
 import contractJson from '../../_fixtures/methods-findFirstOrThrow/generated/contract.json' with {
   type: 'json',
@@ -40,6 +40,7 @@ describe('ports/prisma/functional/methods-findFirstOrThrow', () => {
         const record = await db.public.User.where({ email: existingEmail }).all().firstOrThrow();
         expect(record).toMatchObject({ email: existingEmail });
         expect(typeof record.id).toBe('string');
+        expectTypeOf(record).not.toBeNullable();
       }),
     timeouts.spinUpPpgDev,
   );

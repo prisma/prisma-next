@@ -112,6 +112,39 @@ describe('ports/prisma/functional/composites/object/create', () => {
         }),
       timeouts.spinUpMongoMemoryServer,
     );
+
+    // Upstream asserts null on required `content` is BOTH a type error and a
+    // runtime throw (`Argument must not be null`). prisma-next rejects it at the
+    // type level (the @ts-expect-error holds), but mongo has no runtime
+    // validation for the required embedded field, so it does not throw — faithful
+    // port, it.fails.
+    it.fails(
+      'set null',
+      () =>
+        withComposites(async ({ db }) => {
+          const comment = db.comments_required.create({
+            country: 'France',
+            // @ts-expect-error required `content` cannot be null
+            content: null,
+          });
+          await expect(comment).rejects.toThrow();
+        }),
+      timeouts.spinUpMongoMemoryServer,
+    );
+
+    it.fails(
+      'set null shorthand',
+      () =>
+        withComposites(async ({ db }) => {
+          const comment = db.comments_required.create({
+            country: 'France',
+            // @ts-expect-error required `content` cannot be null
+            content: null,
+          });
+          await expect(comment).rejects.toThrow();
+        }),
+      timeouts.spinUpMongoMemoryServer,
+    );
   });
 
   describe('optional content', () => {
@@ -185,6 +218,7 @@ describe('ports/prisma/functional/composites/object/create', () => {
         withComposites(async ({ db }) => {
           const comment = await db.comments_optional.create({
             country: 'France',
+            content: null,
           });
 
           expect(comment.country).toBe('France');

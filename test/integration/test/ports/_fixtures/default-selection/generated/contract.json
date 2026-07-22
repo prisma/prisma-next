@@ -58,11 +58,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "list": {
@@ -135,11 +132,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               }
             },
@@ -227,12 +221,9 @@
                   }
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "list": {
                   "codecId": "pg/text@1",
@@ -286,12 +277,9 @@
             "other": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 }
               },
               "foreignKeys": [],
@@ -318,36 +306,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:abcfe9ab555c91bf413e1ae17033f48a2f1e5ae3e3a962b40af67ec0982df7fd"
-  },
-  "execution": {
-    "executionHash": "sha256:9e9cfe8da32d02ccdb629e725f10b3463e865e9773e31206d2d4dd2d73d24a5c",
-    "mutations": {
-      "defaults": [
-        {
-          "onCreate": {
-            "id": "cuid2",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "namespace": "public",
-            "table": "model"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "cuid2",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "namespace": "public",
-            "table": "other"
-          }
-        }
-      ]
-    }
+    "storageHash": "sha256:e37d34522b5cc02a7cf8421b580109b2164fa9229f5e784bad8edc45e4bb2dd5"
   },
   "capabilities": {
     "postgres": {

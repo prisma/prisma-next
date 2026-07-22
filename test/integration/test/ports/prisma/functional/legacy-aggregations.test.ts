@@ -12,12 +12,9 @@ import { timeouts, withPostgresPort } from '../../_harness/postgres';
 // prisma-next aggregate builder: agg.count(), agg.min('age'), agg.max('age'),
 // agg.sum('age'), agg.avg('age').
 //
-// Non-ported (type-check-only, no runtime equivalent):
-//   - 'invalid min'  — @ts-expect-error on posts field; prisma-next enforces via TS types
-//   - 'invalid max'  — same
-//   - 'invalid sum'  — @ts-expect-error on email field; same
-//   - 'invalid count' — @ts-expect-error on posts field; same
-//   - 'invalid avg'  — @ts-expect-error on email field; same
+// The `invalid *` tests assert BOTH a compile-time rejection (`@ts-expect-error`
+// on a non-numeric/relation field, or an argument to `count()`) AND a runtime
+// rejection. Ported faithfully with both assertions inline.
 //
 // 'multiple aggregations with where' in upstream uses _count: { email: true }
 // (count of non-null email values). prisma-next agg.count() counts all rows —
@@ -126,6 +123,64 @@ describe('ports/prisma/functional/legacy-aggregations', () => {
           _sum: agg.sum('age'),
         }));
         expect(result).toEqual({ _avg: 56, _count: 3, _max: 63, _min: 45, _sum: 168 });
+      }),
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'invalid min',
+    () =>
+      withAggregations(async ({ db }) => {
+        // @ts-expect-error `posts` is a relation, not a numeric field
+        const result = db.public.User.aggregate((agg) => ({ _min: agg.min('posts') }));
+        await expect(result).rejects.toThrow();
+      }),
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'invalid max',
+    () =>
+      withAggregations(async ({ db }) => {
+        // @ts-expect-error `posts` is a relation, not a numeric field
+        const result = db.public.User.aggregate((agg) => ({ _max: agg.max('posts') }));
+        await expect(result).rejects.toThrow();
+      }),
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'invalid sum',
+    () =>
+      withAggregations(async ({ db }) => {
+        // @ts-expect-error `email` is text, not a numeric field
+        const result = db.public.User.aggregate((agg) => ({ _sum: agg.sum('email') }));
+        await expect(result).rejects.toThrow();
+      }),
+    timeouts.spinUpPpgDev,
+  );
+
+  // `count()` type-rejects a field argument (the @ts-expect-error holds), but at
+  // runtime prisma-next ignores the extra argument and returns COUNT(*) instead
+  // of throwing (Prisma validates and throws). Faithful port, marked it.fails.
+  it.fails(
+    'invalid count',
+    () =>
+      withAggregations(async ({ db }) => {
+        // @ts-expect-error `count()` takes no field argument
+        const result = db.public.User.aggregate((agg) => ({ _count: agg.count('posts') }));
+        await expect(result).rejects.toThrow();
+      }),
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'invalid avg',
+    () =>
+      withAggregations(async ({ db }) => {
+        // @ts-expect-error `email` is text, not a numeric field
+        const result = db.public.User.aggregate((agg) => ({ _avg: agg.avg('email') }));
+        await expect(result).rejects.toThrow();
       }),
     timeouts.spinUpPpgDev,
   );

@@ -110,14 +110,14 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `raw query` — `$queryRaw SELECT b'1' AS bit` returns Uint8Array [1] [providers: mysql-only]
 
 ### packages/client/tests/functional/naming-conflict/built-in-types-vs-enum/tests.ts
-- [x] `allows to create enum with conflicting name` — creates enumHolder with value 'ONE', asserts value is 'ONE' and type is `'ONE'|'TWO'` [providers: postgres,mysql,mongodb,cockroach] (enumName axis: all builtInNames) → ports/prisma/functional/naming-conflict-builtin-vs-enum.test.ts (4 representative names Promise/Result/Union/Keys ported; remaining names behaviorally identical — prisma-next has no codegen-naming surface)
+- [x] `allows to create enum with conflicting name` — creates enumHolder with value 'ONE', asserts value is 'ONE' and type is `'ONE'|'TWO'` [providers: postgres,mysql,mongodb,cockroach] (enumName axis: all builtInNames) → non-ported (whole enumName axis, 67 name-cases; per-case entries in non-ported.md)
 
 ### packages/client/tests/functional/naming-conflict/built-in-types-vs-model/tests.ts
-- [x] `allows to use ${typeName} name for a model name` — creates model of conflicting builtin type name, findFirstOrThrow asserts row {id, isUserProvidedType:true} and non-any type [providers: all] (typeName axis: all builtInNames) → ports/prisma/functional/naming-conflict-builtin-vs-model.test.ts (4 representative names Promise/Result/Union/Keys ported; remaining names behaviorally identical — prisma-next has no codegen-naming surface)
-- [x] `allows to use ${typeName} name for a model name (relation)` — findFirstOrThrow relationHolder including the model relation, asserts included model row and non-any type [providers: all] (typeName axis: all builtInNames) → ports/prisma/functional/naming-conflict-builtin-vs-model.test.ts (4 representative names Promise/Result/Union/Keys ported; remaining names behaviorally identical — prisma-next has no codegen-naming surface)
+- [x] `allows to use ${typeName} name for a model name` — creates model of conflicting builtin type name, findFirstOrThrow asserts row {id, isUserProvidedType:true} and non-any type [providers: all] (typeName axis: all builtInNames) → non-ported (whole typeName axis, 67 name-cases; per-case entries in non-ported.md)
+- [x] `allows to use ${typeName} name for a model name (relation)` — findFirstOrThrow relationHolder including the model relation, asserts included model row and non-any type [providers: all] (typeName axis: all builtInNames) → non-ported (whole typeName axis, 67 name-cases; per-case entries in non-ported.md)
 
 ### packages/client/tests/functional/naming-conflict/model-vs-model/tests.ts
-- [x] `allows to use models of conflicting names` — creates model with nested `other`, findFirstOrThrow with include asserts other row {id,name} and non-any type [providers: all] (conflictingModel axis: ModelUpdate…ModelGroupBy) → ports/prisma/functional/naming-conflict-model-vs-model.test.ts
+- [x] `allows to use models of conflicting names` — creates model with nested `other`, findFirstOrThrow with include asserts other row {id,name} and non-any type [providers: all] (conflictingModel axis: ModelUpdate…ModelGroupBy) → non-ported (whole conflictingModel axis, 12 cases; per-case entries in non-ported.md)
 
 ### packages/client/tests/functional/omit/test.ts
 - [ ] `non-existing true field in omit throw validation error` — findFirstOrThrow with unknown omit field `true` rejects with inline-snapshot validation error [providers: all]

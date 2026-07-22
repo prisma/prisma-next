@@ -30,9 +30,9 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:73068dcad44ab6492dbc4dcdc33ca5b966d446fa78449e638762dff003abe2e2'>;
+  StorageHashBase<'sha256:3b4d2fa525a4d35d82b1194bda0cf92a4604151fa6dd72bb0948159e7f101cdb'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:bb3f800fbe384249d00caf5b48891804c513b65c0181a4fb5a14d3db5823d67f'>;
+  ExecutionHashBase<'sha256:3444ca6e1bfd115d8f5518f4530b19c73c91abee11f9d003244bc0f41f4468b4'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
@@ -45,9 +45,9 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly public: {
-    readonly Payment: { readonly id: Char<24>; readonly ccn: Char<24> };
+    readonly Payment: { readonly id: Char<24>; readonly ccn: CodecTypes['pg/text@1']['output'] };
     readonly Post: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly authorId: CodecTypes['pg/text@1']['output'] | null;
     };
@@ -59,7 +59,7 @@ export type FieldOutputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
     };
     readonly User: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly referralId: CodecTypes['pg/text@1']['output'];
       readonly paymentId: CodecTypes['pg/text@1']['output'];
     };
@@ -69,10 +69,10 @@ export type FieldInputTypes = {
   readonly public: {
     readonly Payment: {
       readonly id: CodecTypes['sql/char@1']['input'];
-      readonly ccn: CodecTypes['sql/char@1']['input'];
+      readonly ccn: CodecTypes['pg/text@1']['input'];
     };
     readonly Post: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly authorId: CodecTypes['pg/text@1']['input'] | null;
     };
@@ -84,7 +84,7 @@ export type FieldInputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
     };
     readonly User: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly referralId: CodecTypes['pg/text@1']['input'];
       readonly paymentId: CodecTypes['pg/text@1']['input'];
     };
@@ -92,10 +92,10 @@ export type FieldInputTypes = {
 };
 export type StorageColumnTypes = {
   readonly public: {
-    readonly payment: { readonly ccn: Char<24>; readonly id: Char<24> };
+    readonly payment: { readonly ccn: CodecTypes['pg/text@1']['output']; readonly id: Char<24> };
     readonly post: {
       readonly authorId: CodecTypes['pg/text@1']['output'] | null;
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly title: CodecTypes['pg/text@1']['output'];
     };
     readonly profile: {
@@ -106,7 +106,7 @@ export type StorageColumnTypes = {
       readonly userId: CodecTypes['pg/text@1']['output'];
     };
     readonly user: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly paymentId: CodecTypes['pg/text@1']['output'];
       readonly referralId: CodecTypes['pg/text@1']['output'];
     };
@@ -115,12 +115,12 @@ export type StorageColumnTypes = {
 export type StorageColumnInputTypes = {
   readonly public: {
     readonly payment: {
-      readonly ccn: CodecTypes['sql/char@1']['input'];
+      readonly ccn: CodecTypes['pg/text@1']['input'];
       readonly id: CodecTypes['sql/char@1']['input'];
     };
     readonly post: {
       readonly authorId: CodecTypes['pg/text@1']['input'] | null;
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly title: CodecTypes['pg/text@1']['input'];
     };
     readonly profile: {
@@ -131,7 +131,7 @@ export type StorageColumnInputTypes = {
       readonly userId: CodecTypes['pg/text@1']['input'];
     };
     readonly user: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly paymentId: CodecTypes['pg/text@1']['input'];
       readonly referralId: CodecTypes['pg/text@1']['input'];
     };
@@ -163,10 +163,9 @@ type ContractBase = Omit<
                   readonly typeParams: { readonly length: 24 };
                 };
                 readonly ccn: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
@@ -177,10 +176,9 @@ type ContractBase = Omit<
             readonly post: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly title: {
                   readonly nativeType: 'text';
@@ -268,10 +266,9 @@ type ContractBase = Omit<
             readonly user: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly referralId: {
                   readonly nativeType: 'text';
@@ -337,11 +334,7 @@ type ContractBase = Omit<
               };
               readonly ccn: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
             };
             readonly relations: {
@@ -367,11 +360,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly title: {
                 readonly nullable: false;
@@ -455,11 +444,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly referralId: {
                 readonly nullable: false;
@@ -542,22 +527,6 @@ type ContractBase = Omit<
           readonly ref: {
             readonly namespace: 'public';
             readonly table: 'payment';
-            readonly column: 'ccn';
-          };
-          readonly onCreate: { readonly kind: 'generator'; readonly id: 'cuid2' };
-        },
-        {
-          readonly ref: {
-            readonly namespace: 'public';
-            readonly table: 'payment';
-            readonly column: 'id';
-          };
-          readonly onCreate: { readonly kind: 'generator'; readonly id: 'cuid2' };
-        },
-        {
-          readonly ref: {
-            readonly namespace: 'public';
-            readonly table: 'post';
             readonly column: 'id';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'cuid2' };
@@ -566,14 +535,6 @@ type ContractBase = Omit<
           readonly ref: {
             readonly namespace: 'public';
             readonly table: 'profile';
-            readonly column: 'id';
-          };
-          readonly onCreate: { readonly kind: 'generator'; readonly id: 'cuid2' };
-        },
-        {
-          readonly ref: {
-            readonly namespace: 'public';
-            readonly table: 'user';
             readonly column: 'id';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'cuid2' };

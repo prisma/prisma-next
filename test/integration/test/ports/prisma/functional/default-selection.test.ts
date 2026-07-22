@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from '../../_fixtures/default-selection/generated/contract';
 import contractJson from '../../_fixtures/default-selection/generated/contract.json' with {
   type: 'json',
@@ -64,6 +64,8 @@ describe('ports/prisma/functional/default-selection', () => {
         const model = await db.public.Model.first({ id: 'model-1' });
         expect(model).not.toBeNull();
         expect(model).not.toHaveProperty('relation');
+        expectTypeOf(model!).not.toBeAny();
+        expectTypeOf(model!).not.toHaveProperty('relation');
       }),
     timeouts.spinUpPpgDev,
   );

@@ -19,11 +19,11 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [x] `avg` — aggregate _avg of age [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
 - [x] `multiple aggregations` — aggregate combining _min/_max/_sum/_count/_avg [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
 - [x] `multiple aggregations with where` — combined aggregations with a where filter [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `invalid min` — aggregate _min on non-existent field rejects with error snapshot [providers: all] → non-ported
-- [x] `invalid max` — aggregate _max on non-existent field rejects with error snapshot [providers: all] → non-ported
-- [x] `invalid sum` — aggregate _sum on non-numeric field rejects with error snapshot [providers: all] → non-ported
-- [x] `invalid count` — aggregate _count on non-existent field rejects with error snapshot [providers: all] → non-ported
-- [x] `invalid avg` — aggregate _avg on non-numeric field rejects with error snapshot [providers: all] → non-ported
+- [x] `invalid min` — aggregate _min on non-existent field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `invalid max` — aggregate _max on non-existent field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `invalid sum` — aggregate _sum on non-numeric field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `invalid count` — aggregate _count on non-existent field rejects with error snapshot [providers: all] → test.fails: ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `invalid avg` — aggregate _avg on non-numeric field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
 
 ### packages/client/tests/functional/0-legacy-ports/atomic-increment-decrement/tests.ts
 
@@ -186,8 +186,8 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 - [ ] `set` — create with contents set as list returns snapshot [providers: mongodb-only]
 - [ ] `set shorthand` — create with contents shorthand (no set) returns snapshot [providers: mongodb-only]
-- [ ] `set null` — create with contents.set null rejects with `set` must not be null [providers: mongodb-only]
-- [ ] `set null shorthand` — create with contents null rejects with `contents` must not be null [providers: mongodb-only]
+- [x] `set null` — create with contents.set null rejects with `set` must not be null [providers: mongodb-only] → test.fails: ports/prisma/functional/composites-object-create.test.ts
+- [x] `set null shorthand` — create with contents null rejects with `contents` must not be null [providers: mongodb-only] → test.fails: ports/prisma/functional/composites-object-create.test.ts
 - [ ] `set nested list` — create with nested upvotes list returns snapshot [providers: mongodb-only]
 
 ### packages/client/tests/functional/composites/list/createMany.ts
@@ -481,15 +481,15 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/extended-where/create.ts
 
-- [ ] `create with connect 1 unique (PK)` — create profile connecting user by PK id [providers: all]
-- [ ] `create with connect 2 uniques (PK & non-PK)` — create profile connecting user by id + referralId [providers: all]
-- [ ] `create with connect 1 unique (non-PK)` — create profile connecting user by non-PK referralId [providers: all]
+- [x] `create with connect 1 unique (PK)` — create profile connecting user by PK id [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `create with connect 2 uniques (PK & non-PK)` — create profile connecting user by id + referralId [providers: all] → non-ported
+- [x] `create with connect 1 unique (non-PK)` — create profile connecting user by non-PK referralId [providers: all] → ports/prisma/functional/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/delete.ts
 
-- [ ] `delete with where 2 uniques (PK & non-PK)` — delete post by id + title [providers: all]
-- [ ] `delete with where 1 unique (non-PK)` — delete post by non-PK title [providers: all]
-- [ ] `delete with where 1 unique (PK)` — delete user by PK id [providers: all]
+- [x] `delete with where 2 uniques (PK & non-PK)` — delete post by id + title [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `delete with where 1 unique (non-PK)` — delete post by non-PK title [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `delete with where 1 unique (PK)` — delete user by PK id [providers: all] → ports/prisma/functional/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/findFirst.ts
 
@@ -511,29 +511,29 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/extended-where/findUnique.ts
 
-- [ ] `findUnique with where 1 unique (PK)` — findUnique user by PK id [providers: all]
-- [ ] `findUnique with where 2 uniques (PK & non-PK)` — findUnique post by id + title [providers: all]
-- [ ] `findUnique with where 1 unique (non-PK)` — findUnique post by non-PK title [providers: all]
-- [ ] `findUnique with nested where on optional 1:1 not found` — nested where on payment relation yields null [providers: all]
-- [ ] `findUnique with nested where on optional 1:1 found` — nested where on payment relation matches ccn [providers: all]
+- [x] `findUnique with where 1 unique (PK)` — findUnique user by PK id [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `findUnique with where 2 uniques (PK & non-PK)` — findUnique post by id + title [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `findUnique with where 1 unique (non-PK)` — findUnique post by non-PK title [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `findUnique with nested where on optional 1:1 not found` — nested where on payment relation yields null [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `findUnique with nested where on optional 1:1 found` — nested where on payment relation matches ccn [providers: all] → ports/prisma/functional/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/findUniqueOrThrow.ts
 
-- [ ] `findUniqueOrThrow with where 1 unique (PK)` — findUniqueOrThrow user by PK id [providers: all]
-- [ ] `findUniqueOrThrow with where 2 uniques (PK & non-PK)` — findUniqueOrThrow post by id + title [providers: all]
-- [ ] `finUniqueOrThrow with where 1 unique (non-PK)` — findUniqueOrThrow post by non-PK title (sic title) [providers: all]
+- [x] `findUniqueOrThrow with where 1 unique (PK)` — findUniqueOrThrow user by PK id [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `findUniqueOrThrow with where 2 uniques (PK & non-PK)` — findUniqueOrThrow post by id + title [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `finUniqueOrThrow with where 1 unique (non-PK)` — findUniqueOrThrow post by non-PK title (sic title) [providers: all] → ports/prisma/functional/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/update.ts
 
-- [ ] `update with where 1 unique (PK)` — update user by PK id [providers: all]
-- [ ] `update with where 2 uniques (PK & non-PK)` — update post by id + title [providers: all]
-- [ ] `update with where 1 unique (non-PK)` — update post by non-PK title [providers: all]
+- [x] `update with where 1 unique (PK)` — update user by PK id [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
+- [x] `update with where 2 uniques (PK & non-PK)` — update post by id + title [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `update with where 1 unique (non-PK)` — update post by non-PK title [providers: all] → ports/prisma/functional/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/upsert.ts
 
-- [ ] `upsert with where 1 unique (PK)` — upsert user by PK id [providers: all]
-- [ ] `upsert with where 2 uniques (PK & non-PK)` — upsert post by id + title [providers: all]
-- [ ] `upsert with where 1 unique (non-PK)` — upsert post by non-PK title [providers: all]
+- [x] `upsert with where 1 unique (PK)` — upsert user by PK id [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `upsert with where 2 uniques (PK & non-PK)` — upsert post by id + title [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `upsert with where 1 unique (non-PK)` — upsert post by non-PK title [providers: all] → ports/prisma/functional/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/validation.ts
 

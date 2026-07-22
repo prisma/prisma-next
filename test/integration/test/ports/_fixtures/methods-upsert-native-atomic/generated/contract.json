@@ -147,11 +147,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "name": {
@@ -309,12 +306,9 @@
             "user": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "name": {
                   "codecId": "pg/text@1",
@@ -343,10 +337,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:c71ab3db9d6bb09a358350124e119c32c972b8dcb32706be298818c1c80109b9"
+    "storageHash": "sha256:dd40c1ea7424333c131b1f3b073656e208a43d60de38ed8c35e27a34ad93d934"
   },
   "execution": {
-    "executionHash": "sha256:6581ab173602de22a7d50f19cd197a37cac5e89b81c73a335874f6988ec64281",
+    "executionHash": "sha256:c29be9473a5ebbcc991643c2058bc564d36a6e92327051156ef3cf8a9dbccf0d",
     "mutations": {
       "defaults": [
         {
@@ -358,17 +352,6 @@
             "column": "id",
             "namespace": "public",
             "table": "post"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "cuid2",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "namespace": "public",
-            "table": "user"
           }
         }
       ]

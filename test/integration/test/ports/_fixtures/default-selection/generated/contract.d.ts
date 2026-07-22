@@ -30,9 +30,8 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:abcfe9ab555c91bf413e1ae17033f48a2f1e5ae3e3a962b40af67ec0982df7fd'>;
-export type ExecutionHash =
-  ExecutionHashBase<'sha256:9e9cfe8da32d02ccdb629e725f10b3463e865e9773e31206d2d4dd2d73d24a5c'>;
+  StorageHashBase<'sha256:e37d34522b5cc02a7cf8421b580109b2164fa9229f5e784bad8edc45e4bb2dd5'>;
+export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
@@ -46,27 +45,27 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 export type FieldOutputTypes = {
   readonly public: {
     readonly Model: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly value: CodecTypes['pg/text@1']['output'];
       readonly otherId: CodecTypes['pg/text@1']['output'];
       readonly list: ReadonlyArray<CodecTypes['pg/text@1']['output']>;
       readonly enum: 'A' | 'B';
       readonly enumList: ReadonlyArray<'A' | 'B'>;
     };
-    readonly Other: { readonly id: Char<24> };
+    readonly Other: { readonly id: CodecTypes['pg/text@1']['output'] };
   };
 };
 export type FieldInputTypes = {
   readonly public: {
     readonly Model: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly value: CodecTypes['pg/text@1']['input'];
       readonly otherId: CodecTypes['pg/text@1']['input'];
       readonly list: ReadonlyArray<CodecTypes['pg/text@1']['input']>;
       readonly enum: 'A' | 'B';
       readonly enumList: ReadonlyArray<'A' | 'B'>;
     };
-    readonly Other: { readonly id: CodecTypes['sql/char@1']['input'] };
+    readonly Other: { readonly id: CodecTypes['pg/text@1']['input'] };
   };
 };
 export type StorageColumnTypes = {
@@ -74,12 +73,12 @@ export type StorageColumnTypes = {
     readonly model: {
       readonly enum: 'A' | 'B';
       readonly enumList: ReadonlyArray<'A' | 'B'>;
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly list: ReadonlyArray<CodecTypes['pg/text@1']['output']>;
       readonly otherId: CodecTypes['pg/text@1']['output'];
       readonly value: CodecTypes['pg/text@1']['output'];
     };
-    readonly other: { readonly id: Char<24> };
+    readonly other: { readonly id: CodecTypes['pg/text@1']['output'] };
   };
 };
 export type StorageColumnInputTypes = {
@@ -87,12 +86,12 @@ export type StorageColumnInputTypes = {
     readonly model: {
       readonly enum: 'A' | 'B';
       readonly enumList: ReadonlyArray<'A' | 'B'>;
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly list: ReadonlyArray<CodecTypes['pg/text@1']['input']>;
       readonly otherId: CodecTypes['pg/text@1']['input'];
       readonly value: CodecTypes['pg/text@1']['input'];
     };
-    readonly other: { readonly id: CodecTypes['sql/char@1']['input'] };
+    readonly other: { readonly id: CodecTypes['pg/text@1']['input'] };
   };
 };
 export type TypeMaps = TypeMapsType<
@@ -115,10 +114,9 @@ type ContractBase = Omit<
             readonly model: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly value: {
                   readonly nativeType: 'text';
@@ -167,10 +165,9 @@ type ContractBase = Omit<
             readonly other: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
@@ -203,11 +200,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly value: {
                 readonly nullable: false;
@@ -262,11 +255,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
             };
             readonly relations: {
@@ -319,29 +308,6 @@ type ContractBase = Omit<
     };
   };
   readonly extensionPacks: {};
-  readonly execution: {
-    readonly executionHash: ExecutionHash;
-    readonly mutations: {
-      readonly defaults: readonly [
-        {
-          readonly ref: {
-            readonly namespace: 'public';
-            readonly table: 'model';
-            readonly column: 'id';
-          };
-          readonly onCreate: { readonly kind: 'generator'; readonly id: 'cuid2' };
-        },
-        {
-          readonly ref: {
-            readonly namespace: 'public';
-            readonly table: 'other';
-            readonly column: 'id';
-          };
-          readonly onCreate: { readonly kind: 'generator'; readonly id: 'cuid2' };
-        },
-      ];
-    };
-  };
   readonly meta: {};
 
   readonly profileHash: ProfileHash;

@@ -45,7 +45,7 @@ describe('ports/prisma/functional/methods-createMany', () => {
         expect(res.email).toEqual(email);
         expect(res.name).toEqual(name);
         expect(res.posts.length).toEqual(1);
-        expect(res.posts[0]?.title).toEqual(title);
+        expect(res.posts[0]?.['title']).toEqual(title);
       }),
     timeouts.spinUpPpgDev,
   );
@@ -69,7 +69,7 @@ describe('ports/prisma/functional/methods-createMany', () => {
         expect(res.posts.length).toEqual(4);
 
         for (const title of titles) {
-          const post = res.posts.find((p) => p.title === title);
+          const post = res.posts.find((p) => p['title'] === title);
           expect(post).toBeTruthy();
         }
       }),

@@ -271,7 +271,7 @@ export async function withPostgresPort<TContract extends Contract<SqlStorage>>(
               extensionPacks,
             }),
           }),
-          collections: options.collections,
+          ...(options.collections ? { collections: options.collections } : {}),
         });
         await fn({ runtime, db, contract });
       } finally {
