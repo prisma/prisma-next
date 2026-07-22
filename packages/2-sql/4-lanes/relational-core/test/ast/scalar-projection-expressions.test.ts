@@ -71,6 +71,19 @@ describe('scalar projection expressions', () => {
     expect(caseExpr.accept(visitor)).toBe('case');
   });
 
+  it('preserves concrete expression identity through toExpr', () => {
+    const functionCall = FunctionCallExpr.of('lower', [col('record', 'name')]);
+    const expressions = [
+      functionCall,
+      CastExpr.as(functionCall, 'text'),
+      CaseExpr.of([{ condition: lit(true), value: functionCall }]),
+    ];
+
+    for (const expression of expressions) {
+      expect(expression.toExpr()).toBe(expression);
+    }
+  });
+
   it('rejects an empty searched CASE and preserves an omitted ELSE', () => {
     expect(() => CaseExpr.of([])).toThrow('CaseExpr requires at least one branch');
 

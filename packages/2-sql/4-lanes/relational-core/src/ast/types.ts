@@ -303,7 +303,7 @@ abstract class Expression extends AstNode implements ExpressionSource {
     throw new Error(`${this.constructor.name} does not expose a base column reference`);
   }
 
-  private asAnyExpression(): AnyExpression {
+  #asAnyExpression(): AnyExpression {
     return blindCast<
       AnyExpression,
       'every concrete Expression subclass is included in AnyExpression'
@@ -311,11 +311,11 @@ abstract class Expression extends AstNode implements ExpressionSource {
   }
 
   toExpr(): AnyExpression {
-    return this.asAnyExpression();
+    return this.#asAnyExpression();
   }
 
   not(): NotExpr {
-    return new NotExpr(this.asAnyExpression());
+    return new NotExpr(this.#asAnyExpression());
   }
 }
 
