@@ -1,5 +1,4 @@
-import type { JsonValue } from '@prisma-next/contract/types';
-import type { CodecRef } from './codec-types';
+import { type CodecRef, frozenCodecRef } from './codec-types';
 import type {
   AnyParamRef,
   ColumnRef,
@@ -7,41 +6,6 @@ import type {
   ExpressionRewriter,
   ProjectionExpr,
 } from './types';
-
-function isJsonArray(value: JsonValue): value is readonly JsonValue[] {
-  return Array.isArray(value);
-}
-
-function freezeJsonValue(value: JsonValue): void {
-  if (value === null || typeof value !== 'object') {
-    return;
-  }
-
-  if (isJsonArray(value)) {
-    for (const item of value) {
-      freezeJsonValue(item);
-    }
-  } else {
-    for (const item of Object.values(value)) {
-      freezeJsonValue(item);
-    }
-  }
-
-  Object.freeze(value);
-}
-
-function frozenCodecRef(codec: CodecRef): CodecRef {
-  const typeParams = codec.typeParams === undefined ? undefined : structuredClone(codec.typeParams);
-  if (typeParams !== undefined) {
-    freezeJsonValue(typeParams);
-  }
-
-  return Object.freeze({
-    codecId: codec.codecId,
-    ...(typeParams === undefined ? {} : { typeParams }),
-    ...(codec.many === undefined ? {} : { many: codec.many }),
-  });
-}
 
 abstract class JsonValueProjection {
   abstract readonly kind: string;

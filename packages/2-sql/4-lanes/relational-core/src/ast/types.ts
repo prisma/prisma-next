@@ -2,7 +2,7 @@ import type { ParamSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { CodecRef } from './codec-types';
+import { type CodecRef, frozenCodecRef } from './codec-types';
 import type { AnyJsonValueProjection } from './json-value-projection';
 
 export type Direction = 'asc' | 'desc';
@@ -105,15 +105,6 @@ function frozenOptionalRecordCopy<T extends Record<string, unknown>>(
 
 function frozenRecordCopy<T>(record: Readonly<Record<string, T>>): Readonly<Record<string, T>> {
   return Object.freeze({ ...record });
-}
-
-function frozenCodecRef(codec: CodecRef): CodecRef {
-  const typeParams = codec.typeParams === undefined ? undefined : structuredClone(codec.typeParams);
-  const base = {
-    codecId: codec.codecId,
-    ...ifDefined('typeParams', typeParams),
-  };
-  return Object.freeze(codec.many ? { ...base, many: true } : base);
 }
 
 function freezeRows(
