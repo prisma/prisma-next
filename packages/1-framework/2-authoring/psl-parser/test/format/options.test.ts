@@ -1,5 +1,6 @@
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it } from 'vitest';
-import { type FormatOptions, format, PslFormatError } from '../../src/exports/format';
+import { type FormatOptions, format } from '../../src/exports/format';
 
 describe('format indent option', () => {
   it('defaults to two spaces', () => {
@@ -60,8 +61,8 @@ describe('format newline option', () => {
 });
 
 describe('format refuse-on-diagnostics', () => {
-  it('throws PslFormatError carrying diagnostics on diagnostic-bearing input', () => {
-    expect(() => format('model {\n}')).toThrow(PslFormatError);
+  it('throws PSL.PARSE_FAILED on diagnostic-bearing input', () => {
+    expect(() => format('model {\n}')).toThrow('Cannot format PSL with parse errors');
   });
 
   it('exposes the parser diagnostics on the thrown error', () => {
@@ -71,13 +72,19 @@ describe('format refuse-on-diagnostics', () => {
     } catch (error) {
       thrown = error;
     }
-    expect(thrown).toBeInstanceOf(PslFormatError);
-    const error = thrown as PslFormatError;
-    expect(error.diagnostics.length).toBeGreaterThan(0);
-    expect(error.diagnostics[0]?.message).toBeTypeOf('string');
+    expect(isStructuredError(thrown)).toBe(true);
+    if (!isStructuredError(thrown)) {
+      throw new Error('expected a structured error');
+    }
+    expect(thrown.code).toBe('PSL.PARSE_FAILED');
+    const diagnostics = thrown.meta?.['diagnostics'] as ReadonlyArray<{ message: string }>;
+    expect(diagnostics.length).toBeGreaterThan(0);
+    expect(diagnostics[0]?.message).toBeTypeOf('string');
   });
 
   it('does not emit best-effort output for malformed input', () => {
-    expect(() => format('model User {\nid Int @\n}')).toThrow(PslFormatError);
+    expect(() => format('model User {\nid Int @\n}')).toThrow(
+      'Cannot format PSL with parse errors',
+    );
   });
 });

@@ -1,12 +1,12 @@
 import type { StructuredError, StructuredErrorOptions } from '@prisma-next/utils/structured-error';
 import { structuredError } from '@prisma-next/utils/structured-error';
 
-export type PslCode = `PSL.${PslSubcode}`;
+export type ContractCode = `CONTRACT.${ContractSubcode}`;
 
-type PslSubcode = 'PARSE_FAILED';
+type ContractSubcode = 'ENUM_INVALID';
 
-export function pslError(
-  code: PslCode,
+export function contractError(
+  code: ContractCode,
   message: string,
   options?: StructuredErrorOptions,
 ): StructuredError {

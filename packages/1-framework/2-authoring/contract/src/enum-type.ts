@@ -1,5 +1,6 @@
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import { blindCast } from '@prisma-next/utils/casts';
+import { contractError } from './contract-errors';
 
 /**
  * A single enum member produced by `member()`. The `Name` and `Value` generics
@@ -181,23 +182,31 @@ export function enumType(
   ...members: EnumMember<string, unknown>[]
 ): EnumTypeHandle {
   if (members.length === 0) {
-    throw new Error(`enumType("${name}"): must have at least one member.`);
+    throw contractError(
+      'CONTRACT.ENUM_INVALID',
+      `enumType("${name}"): must have at least one member.`,
+      { meta: { enumName: name, reason: 'no-members' } },
+    );
   }
 
   const seenNames = new Set<string>();
   const seenValues = new Set<string>();
   for (const m of members) {
     if (seenNames.has(m.name)) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.ENUM_INVALID',
         `enumType("${name}"): duplicate member name "${m.name}". Member names must be unique.`,
+        { meta: { enumName: name, member: m.name, reason: 'duplicate-member-name' } },
       );
     }
     seenNames.add(m.name);
 
     const loweredValue = String(m.value);
     if (seenValues.has(loweredValue)) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.ENUM_INVALID',
         `enumType("${name}"): duplicate member value "${loweredValue}". Member values must be unique.`,
+        { meta: { enumName: name, member: loweredValue, reason: 'duplicate-member-value' } },
       );
     }
     seenValues.add(loweredValue);

@@ -39,6 +39,7 @@ import {
   makePslNamespaceEntries,
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it } from 'vitest';
 import { printPslFromAst } from '../src/print-psl';
 import {
@@ -386,6 +387,27 @@ describe('generic extension-block printer (P2)', () => {
           codecLookup,
         }),
       ).toThrow('not valid JSON');
+    });
+
+    it('reports an invalid value literal as CONTRACT.PACK_CONTRIBUTION_INVALID', () => {
+      let thrown: unknown;
+      try {
+        printPslFromAst(astWith({ target: refParam('Post'), using: valueParam('not json {') }), {
+          pslBlockDescriptors: assembled.pslBlockDescriptors,
+          codecLookup,
+        });
+      } catch (error) {
+        thrown = error;
+      }
+      expect(isStructuredError(thrown)).toBe(true);
+      if (!isStructuredError(thrown)) {
+        throw new Error('expected a structured error');
+      }
+      expect(thrown.code).toBe('CONTRACT.PACK_CONTRIBUTION_INVALID');
+      expect(thrown.meta).toMatchObject({
+        reason: 'raw-literal-invalid-json',
+        paramName: 'using',
+      });
     });
 
     it('throws when an AST parameter kind does not match its descriptor kind', () => {

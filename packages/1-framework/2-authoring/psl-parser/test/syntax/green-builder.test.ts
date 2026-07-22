@@ -1,3 +1,4 @@
+import { isInternalError } from '@prisma-next/utils/internal-error';
 import { describe, expect, it } from 'vitest';
 import type { GreenElement } from '../../src/syntax/green';
 import { GreenNodeBuilder } from '../../src/syntax/green-builder';
@@ -59,6 +60,21 @@ describe('GreenNodeBuilder', () => {
   it('throws on token with no open node', () => {
     const b = new GreenNodeBuilder();
     expect(() => b.token('Ident', 'x')).toThrow('no open node');
+  });
+
+  it('reports the no-open-node invariants as InternalError', () => {
+    for (const trigger of [
+      () => new GreenNodeBuilder().finishNode(),
+      () => new GreenNodeBuilder().token('Ident', 'x'),
+    ]) {
+      let thrown: unknown;
+      try {
+        trigger();
+      } catch (error) {
+        thrown = error;
+      }
+      expect(isInternalError(thrown)).toBe(true);
+    }
   });
 
   it('produces lossless round-trip', () => {
