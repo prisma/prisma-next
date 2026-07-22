@@ -1,6 +1,6 @@
 import type { ParamSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
-import { blindCast } from '@prisma-next/utils/casts';
+
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type CodecRef, frozenCodecRef } from './codec-types';
 import type { AnyJsonValueProjection } from './json-value-projection';
@@ -69,6 +69,31 @@ export interface ExprVisitor<R> {
   list(expr: ListExpression): R;
   rawExpr(expr: RawExpr): R;
 }
+
+const toAnyExpressionVisitor: ExprVisitor<AnyExpression> = {
+  columnRef: (expr) => expr,
+  identifierRef: (expr) => expr,
+  subquery: (expr) => expr,
+  operation: (expr) => expr,
+  aggregate: (expr) => expr,
+  windowFunc: (expr) => expr,
+  functionCall: (expr) => expr,
+  cast: (expr) => expr,
+  case: (expr) => expr,
+  jsonObject: (expr) => expr,
+  jsonArrayAgg: (expr) => expr,
+  binary: (expr) => expr,
+  and: (expr) => expr,
+  or: (expr) => expr,
+  exists: (expr) => expr,
+  nullCheck: (expr) => expr,
+  not: (expr) => expr,
+  literal: (expr) => expr,
+  param: (expr) => expr,
+  preparedParam: (expr) => expr,
+  list: (expr) => expr,
+  rawExpr: (expr) => expr,
+};
 
 export interface ExpressionFolder<T> {
   empty: T;
@@ -304,10 +329,7 @@ abstract class Expression extends AstNode implements ExpressionSource {
   }
 
   #asAnyExpression(): AnyExpression {
-    return blindCast<
-      AnyExpression,
-      'every concrete Expression subclass is included in AnyExpression'
-    >(this);
+    return this.accept(toAnyExpressionVisitor);
   }
 
   toExpr(): AnyExpression {
