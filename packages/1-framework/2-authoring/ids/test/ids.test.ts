@@ -86,6 +86,11 @@ describe('@prisma-next/ids', () => {
     }
     expect(thrown.code).toBe('CONTRACT.ARGUMENT_INVALID');
     expect(thrown.message).toBe('nanoid size must be an integer between 2 and 255');
+    expect(thrown.meta).toEqual({
+      helperPath: 'nanoid',
+      paramName: 'size',
+      received: 1,
+    });
   });
 
   it('rejects nanoid with invalid size', () => {
