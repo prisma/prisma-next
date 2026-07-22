@@ -238,7 +238,7 @@ describe('createComposedAuthoringHelpers', () => {
     const helpers = createComposedAuthoringHelpers({
       family: bareFamilyPack,
       target: bareTargetPack,
-      extensionPacks: {
+      extensions: {
         slugPack,
       },
     });
@@ -272,7 +272,7 @@ describe('createComposedAuthoringHelpers', () => {
       createComposedAuthoringHelpers({
         family: bareFamilyPack,
         target: targetPack,
-        extensionPacks: {
+        extensions: {
           conflictingPack,
         },
       }),
@@ -299,7 +299,7 @@ describe('createComposedAuthoringHelpers', () => {
       createComposedAuthoringHelpers({
         family: bareFamilyPack,
         target: bareTargetPack,
-        extensionPacks: {
+        extensions: {
           reservedFieldPack,
         },
       }),
@@ -345,7 +345,7 @@ describe('createComposedAuthoringHelpers', () => {
       createComposedAuthoringHelpers({
         family: bareFamilyPack,
         target: targetWithFieldPreset,
-        extensionPacks: {
+        extensions: {
           extensionWithTypeConstructor,
         },
       }),

@@ -115,7 +115,7 @@ function makeContract(options: { readonly withEnum: boolean }): Contract<SqlStor
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -497,7 +497,7 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
   }

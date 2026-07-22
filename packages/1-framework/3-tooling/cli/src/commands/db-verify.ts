@@ -318,7 +318,7 @@ function createVerifyClient(setup: VerifySetup) {
     target: setup.config.target,
     adapter: setup.config.adapter,
     driver: setup.config.driver!,
-    extensionPacks: setup.config.extensionPacks ?? [],
+    extensions: setup.config.extensions ?? [],
   });
 }
 

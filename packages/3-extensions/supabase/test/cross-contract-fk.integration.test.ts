@@ -50,7 +50,7 @@ const pgUuid = { codecId: 'pg/uuid@1', nativeType: 'uuid', nullable: false } as 
  *   - `user: belongsTo(AuthUser, { from: 'userId', to: 'id' })`
  *   - `constraints.foreignKey(cols.userId, AuthUser.refs.id, { onDelete: 'cascade' })`
  *
- * The contract declares `extensionPacks: { supabase: supabasePack }` so the
+ * The contract declares `extensions: { supabase: supabasePack }` so the
  * cross-space FK lowering can validate the space is composed.
  */
 function buildAppContract() {
@@ -68,7 +68,7 @@ function buildAppContract() {
   }));
 
   return defineContract({
-    extensionPacks: { supabase: supabasePack },
+    extensions: { supabase: supabasePack },
     models: { Profile },
   });
 }
@@ -148,7 +148,7 @@ describe('AC7 — cross-contract FK: public.profile.user_id → auth.users.id', 
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [supabasePack],
+        extensions: [supabasePack],
       });
 
       try {

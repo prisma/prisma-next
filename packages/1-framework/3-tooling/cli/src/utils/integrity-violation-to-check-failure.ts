@@ -69,15 +69,15 @@ export function integrityViolationToCheckFailure(
         code: 'MIGRATION.CHECK_ORPHAN_SPACE_DIR',
         where: spaceRelative(violation.spaceId),
         why: `Contract-space directory "${violation.spaceId}" exists on disk but no extension declares it.`,
-        fix: 'Remove the orphan directory, or declare the extension in `extensionPacks`.',
+        fix: 'Remove the orphan directory, or declare the extension in `extensions`.',
       };
     case 'declaredButUnmigrated':
       return {
         space: violation.spaceId,
         code: 'MIGRATION.CHECK_DECLARED_BUT_UNMIGRATED',
         where: spaceRelative(violation.spaceId),
-        why: `Extension "${violation.spaceId}" is declared in \`extensionPacks\` but has no on-disk migrations directory.`,
-        fix: 'Re-emit the extension contract-space artefacts with `prisma-next contract emit` and migration planning, or remove the extension from `extensionPacks` if it is unused.',
+        why: `Extension "${violation.spaceId}" is declared in \`extensions\` but has no on-disk migrations directory.`,
+        fix: 'Re-emit the extension contract-space artefacts with `prisma-next contract emit` and migration planning, or remove the extension from `extensions` if it is unused.',
       };
     case 'headRefMissing':
       return {

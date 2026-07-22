@@ -103,7 +103,7 @@ class ControlClientImpl implements ControlClient {
       target: this.options.target,
       adapter: this.options.adapter,
       driver: this.options.driver,
-      extensionPacks: this.options.extensionPacks,
+      extensions: this.options.extensions,
     });
 
     this.familyInstance = this.options.family.create(this.stack);
@@ -112,7 +112,7 @@ class ControlClientImpl implements ControlClient {
     const rawComponents = [
       this.options.target,
       this.options.adapter,
-      ...(this.options.extensionPacks ?? []),
+      ...(this.options.extensions ?? []),
     ];
     this.frameworkComponents = assertFrameworkComponentsCompatible(
       this.options.family.familyId,
@@ -404,7 +404,7 @@ class ControlClientImpl implements ControlClient {
       frameworkComponents,
       migrationsDir: options.migrationsDir,
       targetId: this.options.target.targetId,
-      extensionPacks: this.options.extensionPacks ?? [],
+      extensions: this.options.extensions ?? [],
       ...ifDefined('onProgress', onProgress),
     });
   }
@@ -438,7 +438,7 @@ class ControlClientImpl implements ControlClient {
       frameworkComponents,
       migrationsDir: options.migrationsDir,
       targetId: this.options.target.targetId,
-      extensionPacks: this.options.extensionPacks ?? [],
+      extensions: this.options.extensions ?? [],
       ...ifDefined('acceptDataLoss', options.acceptDataLoss),
       ...ifDefined('onProgress', onProgress),
     });
@@ -455,7 +455,7 @@ class ControlClientImpl implements ControlClient {
       contract: options.contract,
       migrationsDir: options.migrationsDir,
       targetId: this.options.target.targetId,
-      extensionPacks: this.options.extensionPacks ?? [],
+      extensions: this.options.extensions ?? [],
       frameworkComponents,
       mode: options.strict ? 'strict' : 'lenient',
       skipSchema: options.skipSchema,
@@ -508,7 +508,7 @@ class ControlClientImpl implements ControlClient {
       migrations: this.options.target.migrations,
       frameworkComponents,
       migrationsDir: options.migrationsDir,
-      extensionPacks: this.options.extensionPacks ?? [],
+      extensions: this.options.extensions ?? [],
       targetId: this.options.target.targetId,
       ...ifDefined('refHash', options.refHash),
       ...ifDefined('refInvariants', options.refInvariants),
@@ -607,7 +607,7 @@ class ControlClientImpl implements ControlClient {
     try {
       const stack = this.stack!;
       const sourceContext = {
-        composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+        composedExtensions: stack.extensions.map((p) => p.id),
         composedExtensionContracts: stack.extensionContracts,
         scalarTypeDescriptors: stack.scalarTypeDescriptors,
         authoringContributions: stack.authoringContributions,

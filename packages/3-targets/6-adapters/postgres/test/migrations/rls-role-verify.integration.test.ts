@@ -77,7 +77,7 @@ function buildContract(input: {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
     ...(input.defaultControlPolicy !== undefined
       ? { defaultControlPolicy: input.defaultControlPolicy }

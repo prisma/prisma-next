@@ -1598,11 +1598,11 @@ export type ContractInput<
       SqlStageSpec | undefined
     >
   > = Record<never, never>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
 > = {
   readonly family: Family;
   readonly target: Target;
-  readonly extensionPacks?: ExtensionPacks;
+  readonly extensions?: Extensions;
   readonly naming?: NamingConfig;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;

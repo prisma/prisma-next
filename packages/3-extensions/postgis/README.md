@@ -39,7 +39,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensionPacks: [postgis],
+  extensions: [postgis],
 });
 ```
 
@@ -136,7 +136,7 @@ import postgres from '@prisma-next/target-postgres/pack';
 export const contract = defineContract({
   family: sqlFamily,
   target: postgres,
-  extensionPacks: { postgis },
+  extensions: { postgis },
   models: {
     Cafe: model('Cafe', {
       fields: {

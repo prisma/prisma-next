@@ -163,7 +163,7 @@ export function errorDuplicateSpaceId(spaceId: string): MigrationToolsError {
     'Duplicate contract space identifier',
     {
       why: `The space id "${spaceId}" appears more than once in the per-space planner input. Each space id must be unique across the inputs (the per-space planner emits one output entry per id).`,
-      fix: 'Deduplicate the inputs before passing them to `planAllSpaces` — typically by checking your `extensionPacks` declaration for repeated entries.',
+      fix: 'Deduplicate the inputs before passing them to `planAllSpaces` — typically by checking your `extensions` declaration for repeated entries.',
       details: { spaceId },
     },
   );

@@ -39,7 +39,7 @@ export interface SeedPhaseExtensionInput {
 
 export interface ContractSpaceSeedPhaseInputs {
   readonly migrationsDir: string;
-  readonly extensionPacks: ReadonlyArray<SeedPhaseExtensionInput>;
+  readonly extensions: ReadonlyArray<SeedPhaseExtensionInput>;
 }
 
 /**
@@ -98,7 +98,7 @@ export interface ContractSpaceSeedPhaseResult {
 export async function runContractSpaceSeedPhase(
   inputs: ContractSpaceSeedPhaseInputs,
 ): Promise<ContractSpaceSeedPhaseResult> {
-  const planInputs = inputs.extensionPacks
+  const planInputs = inputs.extensions
     .filter(
       (
         pack,
@@ -134,7 +134,7 @@ export async function runContractSpaceSeedPhase(
     string,
     NonNullable<SeedPhaseExtensionInput['contractSpace']>
   >();
-  for (const pack of inputs.extensionPacks) {
+  for (const pack of inputs.extensions) {
     if (pack.contractSpace !== undefined) descriptorBySpace.set(pack.id, pack.contractSpace);
   }
 

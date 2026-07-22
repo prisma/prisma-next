@@ -64,7 +64,7 @@ function buildAppContract() {
   }).sql({ table: 'item' });
 
   return defineContract({
-    extensionPacks: { supabase: supabasePack },
+    extensions: { supabase: supabasePack },
     models: { Item },
   });
 }
@@ -122,7 +122,7 @@ describe('reference fixture round-trip verify', () => {
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [supabasePack],
+        extensions: [supabasePack],
       });
 
       try {
@@ -176,7 +176,7 @@ describe('reference fixture round-trip verify', () => {
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [supabasePack],
+        extensions: [supabasePack],
       });
 
       try {

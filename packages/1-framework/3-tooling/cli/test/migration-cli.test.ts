@@ -145,7 +145,7 @@ const okConfig = {
   family: { familyId: 'sql' },
   target: { targetId: 'postgres' },
   adapter: { kind: 'adapter' },
-  extensionPacks: [],
+  extensions: [],
 };
 
 describe('MigrationCLI.run', () => {

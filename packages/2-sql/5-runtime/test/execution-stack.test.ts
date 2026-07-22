@@ -106,7 +106,7 @@ describe('createExecutionStack', () => {
     });
 
     expect(stack.driver).toBeUndefined();
-    expect(stack.extensionPacks).toEqual([]);
+    expect(stack.extensions).toEqual([]);
   });
 
   it('creates an execution context from descriptors-only stack', () => {
@@ -119,7 +119,7 @@ describe('createExecutionStack', () => {
       stack: {
         target: createStubTargetDescriptor(),
         adapter: createStubAdapterDescriptor(),
-        extensionPacks: [createStubExtensionDescriptor()],
+        extensions: [createStubExtensionDescriptor()],
       },
     }) as ExecutionContext<typeof contract>;
 
@@ -139,15 +139,15 @@ describe('createSqlExecutionStack', () => {
 
     expect(stack.target).toBe(target);
     expect(stack.adapter).toBe(adapter);
-    expect(stack.extensionPacks).toEqual([]);
+    expect(stack.extensions).toEqual([]);
   });
 
   it('keeps extension packs intact', () => {
     const target = createStubTargetDescriptor();
     const adapter = createStubAdapterDescriptor();
     const extension = createStubExtensionDescriptor();
-    const stack = createSqlExecutionStack({ target, adapter, extensionPacks: [extension] });
+    const stack = createSqlExecutionStack({ target, adapter, extensions: [extension] });
 
-    expect(stack.extensionPacks).toEqual([extension]);
+    expect(stack.extensions).toEqual([extension]);
   });
 });

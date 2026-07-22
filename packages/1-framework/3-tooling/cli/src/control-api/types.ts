@@ -52,7 +52,7 @@ export interface ControlClientOptions {
   // biome-ignore lint/suspicious/noExplicitAny: required for contravariance in driver.create()
   readonly driver?: ControlDriverDescriptor<any, any, any, any>;
   // biome-ignore lint/suspicious/noExplicitAny: required for contravariance in extension.create()
-  readonly extensionPacks?: ReadonlyArray<ControlExtensionDescriptor<any, any, any>>;
+  readonly extensions?: ReadonlyArray<ControlExtensionDescriptor<any, any, any>>;
   /**
    * Optional default connection for auto-connect.
    * When provided, operations will auto-connect if not already connected.

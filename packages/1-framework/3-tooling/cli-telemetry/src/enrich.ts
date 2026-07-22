@@ -63,7 +63,7 @@ export async function loadProjectConfig(projectRoot: string): Promise<ProjectCon
     validate(config);
     return {
       databaseTarget: config.target.targetId,
-      extensions: (config.extensionPacks ?? []).map((pack) => pack.id),
+      extensions: (config.extensions ?? []).map((pack) => pack.id),
     };
   } catch {
     return EMPTY_PROJECT_CONFIG;

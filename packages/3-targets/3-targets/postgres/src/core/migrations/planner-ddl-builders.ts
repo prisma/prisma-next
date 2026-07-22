@@ -112,7 +112,7 @@ function expandParameterizedTypeSql(
     throw new Error(
       `Column declares typeParams for nativeType "${column.nativeType}" ` +
         `but no expandNativeType hook is registered for codecId "${column.codecId}". ` +
-        'Ensure the extension providing this codec is included in extensionPacks.',
+        'Ensure the extension providing this codec is included in extensions.',
     );
   }
 

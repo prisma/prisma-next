@@ -543,7 +543,7 @@ describe('migration plan command', () => {
         },
         contract: { output: '/tmp/test/contract.json' },
         migrations: { dir: '/tmp/test/migrations' },
-        extensionPacks: [
+        extensions: [
           {
             id: 'cipherstash',
             contractSpace: {

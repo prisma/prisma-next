@@ -749,14 +749,14 @@ describe('interpretPslDocumentToMongoContract', () => {
       expect(ir.storage.storageHash).toMatch(/^sha256:/);
     });
 
-    it('includes empty extensionPacks, capabilities, and meta', () => {
+    it('includes empty extensions, capabilities, and meta', () => {
       const ir = interpretOk(`
         model Item {
           id ObjectId @id @map("_id")
         }
       `);
 
-      expect(ir.extensionPacks).toEqual({});
+      expect(ir.extensions).toEqual({});
       expect(ir.capabilities).toEqual({});
       expect(ir.meta).toEqual({});
     });
@@ -1014,7 +1014,7 @@ describe('interpretPslDocumentToMongoContract', () => {
             }),
           },
         }),
-        extensionPacks: {},
+        extensions: {},
         capabilities: {},
         meta: {},
       });

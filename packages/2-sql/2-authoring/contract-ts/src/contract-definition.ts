@@ -183,7 +183,7 @@ export interface ModelNode {
 export interface ContractDefinition {
   readonly target: TargetPackRef<'sql', string>;
   readonly defaultControlPolicy?: ControlPolicy;
-  readonly extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>;
+  readonly extensions?: Record<string, ExtensionPackRef<'sql', string>>;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
   readonly storageTypes?: Record<string, StorageTypeInstance>;

@@ -60,7 +60,7 @@ export interface ExecuteMigrateOptions<TFamilyId extends string, TTargetId exten
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly migrationsDir: string;
-  readonly extensionPacks: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
+  readonly extensions: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   readonly targetId: TTargetId;
   /**
    * Optional app-space ref override. When provided, the app space's
@@ -122,7 +122,7 @@ export async function executeMigrate<TFamilyId extends string, TTargetId extends
     migrations,
     frameworkComponents,
     migrationsDir,
-    extensionPacks,
+    extensions,
     targetId,
     refHash,
     refInvariants,
@@ -134,7 +134,7 @@ export async function executeMigrate<TFamilyId extends string, TTargetId extends
     targetId,
     migrationsDir,
     appContract: contract,
-    extensionPacks,
+    extensions,
     deserializeContract: (json) => familyInstance.deserializeContract(json),
   };
   const loaded = await buildContractSpaceAggregate(loadInputs);

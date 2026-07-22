@@ -154,7 +154,7 @@ export async function prepareMigrationContext(
     target: config.target,
     adapter: config.adapter,
     driver: config.driver,
-    extensionPacks: config.extensionPacks ?? [],
+    extensions: config.extensions ?? [],
   });
 
   // Create progress adapter

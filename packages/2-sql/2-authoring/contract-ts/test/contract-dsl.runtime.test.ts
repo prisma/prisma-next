@@ -32,7 +32,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 const { model } = createComposedAuthoringHelpers({
   family: bareFamilyPack,
   target: postgresTargetPack,
-  extensionPacks: { testIndexes: testIndexPack },
+  extensions: { testIndexes: testIndexPack },
 });
 
 const int4Column = columnDescriptor('pg/int4@1');

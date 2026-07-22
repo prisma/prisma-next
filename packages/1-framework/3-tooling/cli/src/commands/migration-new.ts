@@ -196,7 +196,7 @@ async function executeMigrationNewCommand(
     assertFrameworkComponentsCompatible(config.family.familyId, config.target.targetId, [
       config.target,
       config.adapter,
-      ...(config.extensionPacks ?? []),
+      ...(config.extensions ?? []),
     ]);
 
     await writeMigrationPackage(packageDir, metadata, []);

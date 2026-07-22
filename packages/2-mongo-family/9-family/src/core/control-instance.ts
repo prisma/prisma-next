@@ -130,8 +130,7 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
   // inconsistent descriptor" into an explicit, actionable error
   // (`MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH`) rather than a confusing
   // mismatch surfacing several layers downstream. Mirrors the SQL family.
-  const extensions = (controlStack.extensionPacks ??
-    []) as readonly MongoControlExtensionDescriptor[];
+  const extensions = (controlStack.extensions ?? []) as readonly MongoControlExtensionDescriptor[];
   for (const extension of extensions) {
     if (extension.contractSpace) {
       const { contractJson, headRef } = extension.contractSpace;

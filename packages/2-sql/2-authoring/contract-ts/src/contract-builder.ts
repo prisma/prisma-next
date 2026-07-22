@@ -58,7 +58,7 @@ type ContractDefinition<
   Target extends TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance>,
   Models extends Record<string, ModelLike>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Naming extends ContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
@@ -67,7 +67,7 @@ type ContractDefinition<
 > = {
   readonly family: Family;
   readonly target: Target;
-  readonly extensionPacks?: ExtensionPacks;
+  readonly extensions?: Extensions;
   readonly naming?: Naming;
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
@@ -84,7 +84,7 @@ type ContractDefinition<
 type ContractScaffold<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Naming extends ContractInput['naming'] | undefined,
   StorageHash extends string | undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined,
@@ -93,7 +93,7 @@ type ContractScaffold<
 > = {
   readonly family: Family;
   readonly target: Target;
-  readonly extensionPacks?: ExtensionPacks;
+  readonly extensions?: Extensions;
   readonly naming?: Naming;
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
@@ -112,9 +112,9 @@ type ContractFactory<
   Target extends TargetPackRef<'sql', string>,
   Types extends Record<string, StorageTypeInstance>,
   Models extends Record<string, ModelLike>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Enums extends Record<string, EnumTypeHandle> = Record<string, EnumTypeHandle>,
-> = (helpers: ComposedAuthoringHelpers<Family, Target, ExtensionPacks>) => {
+> = (helpers: ComposedAuthoringHelpers<Family, Target, Extensions>) => {
   readonly types?: Types;
   readonly models?: Models;
   readonly enums?: Enums;
@@ -296,17 +296,17 @@ function validatePerModelNamespaces(
 
 function validateExtensionPackRefs(
   target: TargetPackRef<'sql', string>,
-  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
+  extensions?: Record<string, ExtensionPackRef<'sql', string>>,
 ): void {
-  if (!extensionPacks) {
+  if (!extensions) {
     return;
   }
 
-  for (const packRef of Object.values(extensionPacks)) {
+  for (const packRef of Object.values(extensions)) {
     if (packRef.kind !== 'extension') {
       throw contractError(
         'CONTRACT.PACK_REF_INVALID',
-        `defineContract only accepts extension pack refs in extensionPacks. Received kind "${packRef.kind}".`,
+        `defineContract only accepts extension pack refs in extensions. Received kind "${packRef.kind}".`,
         { meta: { packId: packRef.id, kind: packRef.kind } },
       );
     }
@@ -345,7 +345,7 @@ function buildContractFromDsl<Definition extends ContractInput>(
   definition: Definition,
 ): SqlContractResult<Definition> {
   validateTargetPackRef(definition.family, definition.target);
-  validateExtensionPackRefs(definition.target, definition.extensionPacks);
+  validateExtensionPackRefs(definition.target, definition.extensions);
   validateNamespaceDeclarations(definition.target, definition.namespaces);
   validatePerModelNamespaces(
     definition.target,
@@ -364,13 +364,13 @@ function buildContractFromDsl<Definition extends ContractInput>(
 type BoundDefinitionInput<
   Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   Models extends Record<string, ModelLike> = Record<never, never>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
   Naming extends ContractInput['naming'] | undefined = undefined,
   StorageHash extends string | undefined = undefined,
   ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
   Namespaces extends readonly string[] | undefined = undefined,
 > = {
-  readonly extensionPacks?: ExtensionPacks;
+  readonly extensions?: Extensions;
   readonly naming?: Naming;
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
@@ -457,7 +457,7 @@ export function buildBoundContract<
   target: T,
   definition: Definition,
   factory: (
-    helpers: ComposedAuthoringHelpers<F, T, NonNullable<Definition['extensionPacks']>>,
+    helpers: ComposedAuthoringHelpers<F, T, NonNullable<Definition['extensions']>>,
   ) => Built,
 ): SqlContractResult<WithFamilyTarget<Definition & Built, F, T>>;
 /** Implementation. */
@@ -487,7 +487,7 @@ export function buildBoundContract(
       createComposedAuthoringHelpers({
         family,
         target,
-        extensionPacks: definition.extensionPacks,
+        extensions: definition.extensions,
       }),
     );
     const mergedEnums = { ...(definition.enums ?? {}), ...built.enums };
@@ -509,9 +509,7 @@ export function defineContract<
   const Target extends TargetPackRef<'sql', string>,
   const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   const Models extends Record<string, ModelLike> = Record<never, never>,
-  const ExtensionPacks extends
-    | Record<string, ExtensionPackRef<'sql', string>>
-    | undefined = undefined,
+  const Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
   const Naming extends ContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
@@ -523,7 +521,7 @@ export function defineContract<
     Target,
     Types,
     Models,
-    ExtensionPacks,
+    Extensions,
     Naming,
     StorageHash,
     ForeignKeyDefaults,
@@ -536,7 +534,7 @@ export function defineContract<
     Target,
     Types,
     Models,
-    ExtensionPacks,
+    Extensions,
     Naming,
     StorageHash,
     ForeignKeyDefaults,
@@ -549,9 +547,7 @@ export function defineContract<
   const Target extends TargetPackRef<'sql', string>,
   const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
   const Models extends Record<string, ModelLike> = Record<never, never>,
-  const ExtensionPacks extends
-    | Record<string, ExtensionPackRef<'sql', string>>
-    | undefined = undefined,
+  const Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
   const Naming extends ContractInput['naming'] | undefined = undefined,
   const StorageHash extends string | undefined = undefined,
   const ForeignKeyDefaults extends ForeignKeyDefaultsState | undefined = undefined,
@@ -562,21 +558,21 @@ export function defineContract<
   definition: ContractScaffold<
     Family,
     Target,
-    ExtensionPacks,
+    Extensions,
     Naming,
     StorageHash,
     ForeignKeyDefaults,
     Namespaces,
     ScaffoldEnums
   >,
-  factory: ContractFactory<Family, Target, Types, Models, ExtensionPacks, FactoryEnums>,
+  factory: ContractFactory<Family, Target, Types, Models, Extensions, FactoryEnums>,
 ): SqlContractResult<
   ContractDefinition<
     Family,
     Target,
     Types,
     Models,
-    ExtensionPacks,
+    Extensions,
     Naming,
     StorageHash,
     ForeignKeyDefaults,

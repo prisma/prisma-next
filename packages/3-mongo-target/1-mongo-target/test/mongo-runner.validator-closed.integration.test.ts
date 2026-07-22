@@ -69,7 +69,7 @@ function makeContractWithValidator(
     targetFamily: 'mongo',
     profileHash: 'sha256:test-profile',
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
     roots: {},
     models: {},

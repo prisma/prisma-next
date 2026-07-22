@@ -40,7 +40,7 @@ export async function gatherDiskContractSpaceState(args: {
   readonly projectMigrationsDir: string;
   /**
    * Set of space ids the project declares: `'app'` plus each entry in
-   * `extensionPacks` whose descriptor exposes a `contractSpace`. The
+   * `extensions` whose descriptor exposes a `contractSpace`. The
    * helper reads on-disk head data only for the extension spaces.
    */
   readonly loadedSpaceIds: ReadonlySet<string>;

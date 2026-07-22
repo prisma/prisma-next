@@ -30,7 +30,7 @@ pnpm add @prisma-next/extension-pgvector
 
 ## Database Setup
 
-The pgvector extension ships an on-disk baseline migration in its contract space; applying that migration installs pgvector with `CREATE EXTENSION IF NOT EXISTS vector`. When the extension is composed into an application via `extensionPacks`, `prisma-next db init` and `prisma-next db update` apply the baseline (and any subsequent migrations) automatically.
+The pgvector extension ships an on-disk baseline migration in its contract space; applying that migration installs pgvector with `CREATE EXTENSION IF NOT EXISTS vector`. When the extension is composed into an application via `extensions`, `prisma-next db init` and `prisma-next db update` apply the baseline (and any subsequent migrations) automatically.
 
 For manual database setup, the equivalent DDL is:
 
@@ -55,7 +55,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensionPacks: [pgvector],
+  extensions: [pgvector],
 });
 ```
 
@@ -76,7 +76,7 @@ import postgres from '@prisma-next/target-postgres/pack';
 export const contract = defineContract({
   family: sqlFamily,
   target: postgres,
-  extensionPacks: { pgvector },
+  extensions: { pgvector },
   models: {
     Post: model('Post', {
       fields: {
@@ -106,7 +106,7 @@ import pgvector from '@prisma-next/extension-pgvector/runtime';
 const stack = createSqlExecutionStack({
   target: postgresTarget,
   adapter: postgresAdapter,
-  extensionPacks: [pgvector],
+  extensions: [pgvector],
 });
 const context = createExecutionContext({ contract, stack });
 const stackInstance = instantiateExecutionStack(stack);

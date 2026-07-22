@@ -350,9 +350,9 @@ interface DescriptorWithStorageTypes {
 function buildSqlTypeMetadataRegistry(options: {
   readonly target: DescriptorWithStorageTypes;
   readonly adapter: DescriptorWithStorageTypes & { readonly targetId: string };
-  readonly extensionPacks: readonly DescriptorWithStorageTypes[];
+  readonly extensions: readonly DescriptorWithStorageTypes[];
 }): SqlTypeMetadataRegistry {
-  const { target, adapter, extensionPacks: extensions } = options;
+  const { target, adapter, extensions } = options;
   const registry = new Map<string, SqlTypeMetadata>();
   const targetId = adapter.targetId;
   const descriptors = [target, adapter, ...extensions];
@@ -384,7 +384,7 @@ interface CrossSpaceFkView {
   readonly id: string;
   readonly contractSpace?: {
     readonly contractJson?: {
-      readonly extensionPacks?: Readonly<Record<string, unknown>>;
+      readonly extensions?: Readonly<Record<string, unknown>>;
       readonly storage?: {
         readonly namespaces?: Readonly<Record<string, unknown>>;
       };
@@ -402,7 +402,7 @@ function buildTransitiveDependsOnMap(
 ): Map<string, Set<string>> {
   const directDeps = new Map<string, readonly string[]>();
   for (const ext of extensions) {
-    const packs = ext.contractSpace?.contractJson?.extensionPacks;
+    const packs = ext.contractSpace?.contractJson?.extensions;
     const deps = packs !== null && typeof packs === 'object' ? Object.keys(packs) : [];
     directDeps.set(ext.id, deps);
   }
@@ -499,7 +499,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   const adapter = stack.adapter as unknown as SqlControlAdapterDescriptor<TTargetId> &
     DescriptorWithStorageTypes;
   const extensions =
-    stack.extensionPacks as unknown as readonly (SqlControlExtensionDescriptor<TTargetId> &
+    stack.extensions as unknown as readonly (SqlControlExtensionDescriptor<TTargetId> &
       DescriptorWithStorageTypes)[];
 
   // Descriptor self-consistency check.
@@ -533,7 +533,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
     target,
     adapter,
-    extensionPacks: extensions,
+    extensions: extensions,
   });
 
   // Lazily construct the control adapter on first use, then memoize it.

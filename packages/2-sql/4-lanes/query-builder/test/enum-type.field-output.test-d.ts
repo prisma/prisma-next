@@ -115,7 +115,7 @@ type EnumContractBase = {
     };
   };
   readonly capabilities: Record<string, never>;
-  readonly extensionPacks: Record<string, never>;
+  readonly extensions: Record<string, never>;
   readonly meta: Record<string, never>;
   readonly profileHash: StorageHashBase<string>;
 };

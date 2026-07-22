@@ -87,7 +87,7 @@ function buildContractWithPolicy(): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -206,7 +206,7 @@ describe.sequential('RLS verify extension issues', () => {
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
     await applyContract(driver!, noPolicyContract);
@@ -259,7 +259,7 @@ describe.sequential('RLS verify extension issues', () => {
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
     await applyContract(driver!, noPolicyContract);

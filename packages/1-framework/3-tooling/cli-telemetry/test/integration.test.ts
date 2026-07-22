@@ -33,7 +33,7 @@ function validConfigSource(extensionPackIds: readonly string[]): string {
     `  family: { kind: 'family', id: 'sql', familyId: 'sql', version: '0.0.1', emission: {}, create: () => ({}) },`,
     `  target: ${descriptor('target')},`,
     `  adapter: ${descriptor('adapter')},`,
-    `  extensionPacks: [${packs}],`,
+    `  extensions: [${packs}],`,
     '};\n',
   ].join('\n');
 }

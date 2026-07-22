@@ -98,7 +98,7 @@ describe('entities namespace — synthetic pack exemplar', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
-        extensionPacks: { demo: demoEntitiesExtensionPack },
+        extensions: { demo: demoEntitiesExtensionPack },
       },
       ({ demoEntity, field, model }) => {
         expectTypeOf(demoEntity).parameters.toEqualTypeOf<[DemoEntityInput]>();
@@ -126,7 +126,7 @@ describe('entities namespace — synthetic pack exemplar', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
-        extensionPacks: { demo: demoEntitiesExtensionPack },
+        extensions: { demo: demoEntitiesExtensionPack },
       },
       ({ demoEntity, field, model }) => {
         constructed = demoEntity({ name: 'orders', columns: ['id', 'total'] });

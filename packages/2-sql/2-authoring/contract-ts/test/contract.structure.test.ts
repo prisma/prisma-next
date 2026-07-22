@@ -116,7 +116,7 @@ describe('SqlContractSerializer structure validation', () => {
       ...validContractInput,
       profileHash: 'sha256:profile',
       capabilities: { feature: { enabled: true } },
-      extensionPacks: { pack: { config: true } },
+      extensions: { pack: { config: true } },
       meta: { key: 'value' },
       roots: {},
     };

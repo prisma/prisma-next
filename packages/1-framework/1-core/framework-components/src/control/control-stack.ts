@@ -53,7 +53,7 @@ export interface ControlStack<
   readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter?: ControlAdapterDescriptor<TFamilyId, TTargetId> | undefined;
   readonly driver?: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
-  readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+  readonly extensions: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
 
   readonly extensionContracts: ReadonlyMap<string, Contract>;
 
@@ -75,9 +75,7 @@ export interface CreateControlStackInput<
   readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter?: ControlAdapterDescriptor<TFamilyId, TTargetId> | undefined;
   readonly driver?: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
-  readonly extensionPacks?:
-    | ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>
-    | undefined;
+  readonly extensions?: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>> | undefined;
 }
 
 function addUniqueId(ids: string[], seen: Set<string>, id: string): void {
@@ -428,7 +426,7 @@ interface DependencyDeclaringDescriptor {
   readonly id: string;
   readonly contractSpace?: {
     readonly contractJson?: {
-      readonly extensionPacks?: Readonly<Record<string, unknown>>;
+      readonly extensions?: Readonly<Record<string, unknown>>;
     };
   };
 }
@@ -447,7 +445,7 @@ function assembleExtensionContracts(
 }
 
 function readDeclaredDependencyIds(descriptor: DependencyDeclaringDescriptor): readonly string[] {
-  const packs = descriptor.contractSpace?.contractJson?.extensionPacks;
+  const packs = descriptor.contractSpace?.contractJson?.extensions;
   if (packs === null || typeof packs !== 'object') return [];
   return Object.keys(packs);
 }
@@ -455,14 +453,14 @@ function readDeclaredDependencyIds(descriptor: DependencyDeclaringDescriptor): r
 /**
  * Builds a dependency-respecting load order for the given extension descriptors
  * using Kahn's topological sort algorithm. Dependencies (packs declared in
- * `contractSpace.contractJson.extensionPacks`) are placed before the extensions
+ * `contractSpace.contractJson.extensions`) are placed before the extensions
  * that depend on them.
  *
  * Throws if the dependency graph contains a cycle, with an error message that
  * names every extension involved in the cycle.
  *
  * Throws if any extension declares a dependency on a pack ID that is not present
- * in the provided list — add the missing pack to the `extensionPacks` list to
+ * in the provided list — add the missing pack to the `extensions` list to
  * resolve the error.
  */
 
@@ -484,7 +482,7 @@ export function buildExtensionLoadOrder(
     for (const depId of readDeclaredDependencyIds(ext)) {
       if (!idSet.has(depId)) {
         throw new Error(
-          `Extension "${ext.id}" declares a dependency on "${depId}", but "${depId}" is not in the provided extension set. Add the missing space to extensionPacks.`,
+          `Extension "${ext.id}" declares a dependency on "${depId}", but "${depId}" is not in the provided extension set. Add the missing space to extensions.`,
         );
       }
       inDegree.set(ext.id, (inDegree.get(ext.id) ?? 0) + 1);
@@ -529,15 +527,15 @@ export function buildExtensionLoadOrder(
 export function createControlStack<TFamilyId extends string, TTargetId extends string>(
   input: CreateControlStackInput<TFamilyId, TTargetId>,
 ): ControlStack<TFamilyId, TTargetId> {
-  const { family, target, adapter, driver, extensionPacks = [] } = input;
+  const { family, target, adapter, driver, extensions = [] } = input;
 
-  const orderedIds = buildExtensionLoadOrder(extensionPacks);
-  const extensionById = new Map(extensionPacks.map((ext) => [ext.id, ext]));
-  const orderedExtensionPacks = orderedIds
+  const orderedIds = buildExtensionLoadOrder(extensions);
+  const extensionById = new Map(extensions.map((ext) => [ext.id, ext]));
+  const orderedExtensions = orderedIds
     .map((id) => extensionById.get(id))
     .filter((ext): ext is ControlExtensionDescriptor<TFamilyId, TTargetId> => ext !== undefined);
 
-  const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...orderedExtensionPacks];
+  const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...orderedExtensions];
 
   const codecLookup = extractCodecLookup(allDescriptors);
   const scalarTypeDescriptors = assembleScalarTypeDescriptors(allDescriptors);
@@ -547,12 +545,12 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     target,
     adapter,
     driver,
-    extensionPacks: orderedExtensionPacks,
-    extensionContracts: assembleExtensionContracts(orderedExtensionPacks),
+    extensions: orderedExtensions,
+    extensionContracts: assembleExtensionContracts(orderedExtensions),
 
     codecTypeImports: extractCodecTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
-    extensionIds: extractComponentIds(family, target, adapter, orderedExtensionPacks),
+    extensionIds: extractComponentIds(family, target, adapter, orderedExtensions),
     codecLookup,
     authoringContributions: assembleAuthoringContributions(allDescriptors),
     scalarTypeDescriptors,
@@ -560,7 +558,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     capabilities: mergeCapabilityMatrices({}, [
       target,
       ...(adapter ? [adapter] : []),
-      ...orderedExtensionPacks,
+      ...orderedExtensions,
     ]),
   };
 }

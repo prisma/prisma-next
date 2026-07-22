@@ -616,7 +616,7 @@ describe('SQL contract validators', () => {
       });
       const c = createContract<SqlStorage>({
         storage: unboundTables({ user: userTable }),
-        extensionPacks: {
+        extensions: {
           postgres: {
             id: 'postgres',
             version: '0.0.1',

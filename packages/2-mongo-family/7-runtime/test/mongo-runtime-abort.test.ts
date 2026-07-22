@@ -88,7 +88,7 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
     target,
     adapter: adapterDescriptor,
     driver: undefined,
-    extensionPacks: [],
+    extensions: [],
   };
   return Object.freeze({ contract: {}, codecs, stack });
 }

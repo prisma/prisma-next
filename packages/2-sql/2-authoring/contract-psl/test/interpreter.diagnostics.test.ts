@@ -259,7 +259,7 @@ model User {
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: [],
+      composedExtensions: [],
     });
 
     expect(result.ok).toBe(false);
@@ -288,7 +288,7 @@ model User {
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: [],
+      composedExtensions: [],
     });
 
     expect(result.ok).toBe(false);
@@ -591,7 +591,7 @@ model User {
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: [],
+      composedExtensions: [],
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -622,7 +622,7 @@ model User {
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: [],
+      composedExtensions: [],
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -655,7 +655,7 @@ model User {
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: [],
+      composedExtensions: [],
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -682,7 +682,7 @@ model User {
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: [],
+      composedExtensions: [],
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -711,7 +711,7 @@ model User {
     const malformedResult = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...malformed,
-      composedExtensionPacks: [],
+      composedExtensions: [],
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 
@@ -732,7 +732,7 @@ model User {
     const uncomposedResult = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...uncomposed,
-      composedExtensionPacks: [],
+      composedExtensions: [],
       controlMutationDefaults: builtinControlMutationDefaults,
     });
 

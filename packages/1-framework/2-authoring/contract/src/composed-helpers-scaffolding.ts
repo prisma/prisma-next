@@ -44,21 +44,21 @@ export type ExtractAuthoringNamespaceFromPack<
   : EmptyNamespace;
 
 export type MergeExtensionAuthoringNamespaces<
-  ExtensionPacks,
+  Extensions,
   Key extends AuthoringNamespaceKey,
   EmptyNamespace = Record<never, never>,
 > =
-  ExtensionPacks extends Record<string, unknown>
-    ? keyof ExtensionPacks extends never
+  Extensions extends Record<string, unknown>
+    ? keyof Extensions extends never
       ? EmptyNamespace
       : UnionToIntersection<
           {
-            [K in keyof ExtensionPacks]: ExtractAuthoringNamespaceFromPack<
-              ExtensionPacks[K],
+            [K in keyof Extensions]: ExtractAuthoringNamespaceFromPack<
+              Extensions[K],
               Key,
               EmptyNamespace
             >;
-          }[keyof ExtensionPacks]
+          }[keyof Extensions]
         >
     : EmptyNamespace;
 

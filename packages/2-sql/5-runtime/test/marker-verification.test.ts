@@ -51,7 +51,7 @@ const testContract: Contract<SqlStorage> = {
       __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
     },
   }),
-  extensionPacks: {},
+  extensions: {},
   capabilities: {},
   meta: {},
 };
@@ -188,12 +188,12 @@ function buildRuntime({
   const stack = createSqlExecutionStack({
     target,
     adapter: adapterDesc,
-    extensionPacks: [],
+    extensions: [],
   });
   const stackInstance = instantiateExecutionStack(stack) as SqlTestStackInstance;
   const context = createExecutionContext({
     contract: testContract,
-    stack: { target, adapter: adapterDesc, extensionPacks: [] },
+    stack: { target, adapter: adapterDesc, extensions: [] },
   });
   return createRuntime({
     stackInstance,

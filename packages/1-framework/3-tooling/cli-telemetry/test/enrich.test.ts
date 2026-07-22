@@ -190,18 +190,18 @@ describe('buildTelemetryEvent', () => {
  * Build a `prisma-next.config.mjs` source string that satisfies
  * `validateConfig` from `@prisma-next/config/config-validation`.
  * `target.targetId` is the only structurally-significant variable
- * the telemetry projection cares about; `extensionPacks` defaults to
+ * the telemetry projection cares about; `extensions` defaults to
  * empty. Caller can override either via the parameters; pass a
- * pre-formed `extensionPacks` literal to inject specific ids, or
- * `omitExtensionPacks: true` to drop the field entirely (validator
+ * pre-formed `extensions` literal to inject specific ids, or
+ * `omitExtensions: true` to drop the field entirely (validator
  * accepts the absent-field branch separately from the empty-array
  * branch — useful for cases that mean to exercise the former).
  */
 function validConfigSource(
   options: {
     readonly targetId?: string;
-    readonly extensionPacksLiteral?: string;
-    readonly omitExtensionPacks?: boolean;
+    readonly extensionsLiteral?: string;
+    readonly omitExtensions?: boolean;
   } = {},
 ): string {
   const targetId = options.targetId ?? 'postgres';
@@ -213,9 +213,9 @@ function validConfigSource(
     `  target: ${descriptor('target')},`,
     `  adapter: ${descriptor('adapter')},`,
   ];
-  if (options.omitExtensionPacks !== true) {
-    const extensionPacksLiteral = options.extensionPacksLiteral ?? '[]';
-    lines.push(`  extensionPacks: ${extensionPacksLiteral},`);
+  if (options.omitExtensions !== true) {
+    const extensionsLiteral = options.extensionsLiteral ?? '[]';
+    lines.push(`  extensions: ${extensionsLiteral},`);
   }
   lines.push('};\n');
   return lines.join('\n');
@@ -236,11 +236,11 @@ describe('loadProjectConfig', () => {
     expect(await loadProjectConfig(projectDir)).toEqual(EMPTY_PROJECT_CONFIG);
   });
 
-  it('extracts target.targetId and extensionPacks[].id from a validated .mjs config', async () => {
+  it('extracts target.targetId and extensions[].id from a validated .mjs config', async () => {
     writeFileSync(
       join(projectDir, 'prisma-next.config.mjs'),
       validConfigSource({
-        extensionPacksLiteral:
+        extensionsLiteral:
           "[{ kind: 'extension', id: 'pgvector', familyId: 'sql', targetId: 'postgres', version: '0.0.1', create: () => ({}) }, { kind: 'extension', id: 'paradedb', familyId: 'sql', targetId: 'postgres', version: '0.0.1', create: () => ({}) }]",
       }),
     );
@@ -250,14 +250,14 @@ describe('loadProjectConfig', () => {
     });
   });
 
-  it('returns empty extensions when extensionPacks is truly omitted from an otherwise valid config', async () => {
+  it('returns empty extensions when extensions is truly omitted from an otherwise valid config', async () => {
     // Exercises the validator's absent-field branch, which is
     // distinct from the empty-array branch. The projection collapses
-    // both to `extensions: []` via `(config.extensionPacks ?? []).map(…)`,
+    // both to `extensions: []` via `(config.extensions ?? []).map(…)`,
     // but the validator paths differ — worth covering directly.
     writeFileSync(
       join(projectDir, 'prisma-next.config.mjs'),
-      validConfigSource({ omitExtensionPacks: true }),
+      validConfigSource({ omitExtensions: true }),
     );
     expect(await loadProjectConfig(projectDir)).toEqual({
       databaseTarget: 'postgres',
@@ -274,12 +274,12 @@ describe('loadProjectConfig', () => {
     expect(await loadProjectConfig(projectDir)).toEqual(EMPTY_PROJECT_CONFIG);
   });
 
-  it('returns empty config when an extensionPacks entry fails validation', async () => {
+  it('returns empty config when an extensions entry fails validation', async () => {
     writeFileSync(
       join(projectDir, 'prisma-next.config.mjs'),
       validConfigSource({
         // Missing `create: function` field on the pack — validator rejects.
-        extensionPacksLiteral:
+        extensionsLiteral:
           "[{ kind: 'extension', id: 'pgvector', familyId: 'sql', targetId: 'postgres', version: '0.0.1' }]",
       }),
     );

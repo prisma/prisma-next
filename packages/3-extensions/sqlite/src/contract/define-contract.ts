@@ -23,7 +23,7 @@ type ModelsConstraint = Record<string, ModelLike>;
 type SqliteResult<
   Types extends TypesConstraint,
   Models extends ModelsConstraint,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 > = ReturnType<
   typeof buildBoundContract<
     SqlFamily,
@@ -31,55 +31,49 @@ type SqliteResult<
     {
       readonly types?: Types;
       readonly models?: Models;
-      readonly extensionPacks?: ExtensionPacks;
+      readonly extensions?: Extensions;
       readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
     }
   >
 >;
 
 type SqliteBaseScaffold<
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 > = Omit<
-  ContractInput<SqlFamily, SqlitePack, Record<never, never>, Record<never, never>, ExtensionPacks>,
+  ContractInput<SqlFamily, SqlitePack, Record<never, never>, Record<never, never>, Extensions>,
   'family' | 'target' | 'types' | 'models' | 'createNamespace'
 >;
 
 type SqliteDefinition<
   Types extends TypesConstraint,
   Models extends ModelsConstraint,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-> = SqliteBaseScaffold<ExtensionPacks> & {
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+> = SqliteBaseScaffold<Extensions> & {
   readonly types?: Types;
   readonly models?: Models;
 };
 
 type SqliteScaffold<
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-> = SqliteBaseScaffold<ExtensionPacks>;
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+> = SqliteBaseScaffold<Extensions>;
 
 export function defineContract<
   const Types extends TypesConstraint = Record<never, never>,
   const Models extends ModelsConstraint = Record<never, never>,
-  const ExtensionPacks extends
-    | Record<string, ExtensionPackRef<'sql', string>>
-    | undefined = undefined,
->(
-  definition: SqliteDefinition<Types, Models, ExtensionPacks>,
-): SqliteResult<Types, Models, ExtensionPacks>;
+  const Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
+>(definition: SqliteDefinition<Types, Models, Extensions>): SqliteResult<Types, Models, Extensions>;
 
 export function defineContract<
   const Types extends TypesConstraint = Record<never, never>,
   const Models extends ModelsConstraint = Record<never, never>,
-  const ExtensionPacks extends
-    | Record<string, ExtensionPackRef<'sql', string>>
-    | undefined = undefined,
+  const Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
 >(
-  scaffold: SqliteScaffold<ExtensionPacks>,
-  factory: (helpers: ComposedAuthoringHelpers<SqlFamily, SqlitePack, ExtensionPacks>) => {
+  scaffold: SqliteScaffold<Extensions>,
+  factory: (helpers: ComposedAuthoringHelpers<SqlFamily, SqlitePack, Extensions>) => {
     readonly types?: Types;
     readonly models?: Models;
   },
-): SqliteResult<Types, Models, ExtensionPacks>;
+): SqliteResult<Types, Models, Extensions>;
 
 // Implementation — delegates to buildBoundContract which pre-binds family/target,
 // carrying zero casts at this layer.

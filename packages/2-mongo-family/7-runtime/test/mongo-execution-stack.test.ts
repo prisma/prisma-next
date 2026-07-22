@@ -29,7 +29,7 @@ describe('createMongoExecutionStack', () => {
     expect(stack.target).toBe(mongoRuntimeTarget);
     expect(stack.adapter).toBe(mongoRuntimeAdapter);
     expect(stack.driver).toBeUndefined();
-    expect(stack.extensionPacks).toEqual([]);
+    expect(stack.extensions).toEqual([]);
   });
 
   it('exposes the supplied extension packs', () => {
@@ -45,9 +45,9 @@ describe('createMongoExecutionStack', () => {
     const stack = createMongoExecutionStack({
       target: mongoRuntimeTarget,
       adapter: mongoRuntimeAdapter,
-      extensionPacks: [pack],
+      extensions: [pack],
     });
-    expect(stack.extensionPacks).toEqual([pack]);
+    expect(stack.extensions).toEqual([pack]);
   });
 });
 
@@ -85,7 +85,7 @@ describe('createMongoExecutionContext', () => {
     const stack = createMongoExecutionStack({
       target: mongoRuntimeTarget,
       adapter: mongoRuntimeAdapter,
-      extensionPacks: [pack],
+      extensions: [pack],
     });
     const context = createMongoExecutionContext({ contract: {}, stack });
     expect(context.codecs.get('test/custom@1')).toBe(customCodec);
@@ -114,7 +114,7 @@ describe('createMongoExecutionContext', () => {
     const stack = createMongoExecutionStack({
       target: mongoRuntimeTarget,
       adapter: mongoRuntimeAdapter,
-      extensionPacks: [conflictingPack],
+      extensions: [conflictingPack],
     });
 
     let caught: unknown;

@@ -640,7 +640,7 @@ model OrderItem {
       const result = interpretPslDocumentToSqlContract({
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
-        composedExtensionPacks: [testIndexPack.id],
+        composedExtensions: [testIndexPack.id],
         composedExtensionPackRefs: [testIndexPack],
       });
 
@@ -682,7 +682,7 @@ model OrderItem {
       const result = interpretPslDocumentToSqlContract({
         ...document,
         controlMutationDefaults: builtinControlMutationDefaults,
-        composedExtensionPacks: [testIndexPack.id],
+        composedExtensions: [testIndexPack.id],
         composedExtensionPackRefs: [testIndexPack],
       });
       expect(result.ok).toBe(true);

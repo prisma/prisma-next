@@ -88,9 +88,9 @@ export interface SpaceMarkerRecord {
 export interface VerifyContractSpacesInputs {
   /**
    * Set of contract spaces the project declares: `'app'` plus each
-   * extension space in `extensionPacks`. The caller's discovery path
+   * extension space in `extensions`. The caller's discovery path
    * never reads the extension descriptor module — it walks the
-   * `extensionPacks` configuration in `prisma-next.config.ts` for the
+   * `extensions` configuration in `prisma-next.config.ts` for the
    * space ids.
    */
   readonly loadedSpaces: ReadonlySet<string>;
@@ -196,7 +196,7 @@ export function verifyContractSpaces(
       violations.push({
         kind: 'declaredButUnmigrated',
         spaceId,
-        remediation: `Extension '${spaceId}' is declared in extensionPacks but has not been emitted; run \`prisma-next migrate\`.`,
+        remediation: `Extension '${spaceId}' is declared in extensions but has not been emitted; run \`prisma-next migrate\`.`,
       });
       continue;
     }
@@ -237,7 +237,7 @@ export function verifyContractSpaces(
       violations.push({
         kind: 'orphanSpaceDir',
         spaceId: dir,
-        remediation: `Orphan contract-space directory \`${join('migrations', dir)}/\` for an extension not in extensionPacks; remove the directory or re-add the extension.`,
+        remediation: `Orphan contract-space directory \`${join('migrations', dir)}/\` for an extension not in extensions; remove the directory or re-add the extension.`,
       });
     }
   }
@@ -247,7 +247,7 @@ export function verifyContractSpaces(
       violations.push({
         kind: 'orphanMarker',
         spaceId: space,
-        remediation: `Orphan marker row for space '${space}' (no longer in extensionPacks); remediation: manually delete the row from \`prisma_contract.marker\`.`,
+        remediation: `Orphan marker row for space '${space}' (no longer in extensions); remediation: manually delete the row from \`prisma_contract.marker\`.`,
       });
     }
   }

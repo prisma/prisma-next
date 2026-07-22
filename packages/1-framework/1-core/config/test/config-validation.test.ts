@@ -75,7 +75,7 @@ function createValidConfig(overrides: Record<string, unknown> = {}): PrismaNextC
           close: async () => {},
         }) as ControlDriverInstance<'sql', 'postgres'>,
     },
-    extensionPacks: [],
+    extensions: [],
     ...overrides,
   } as PrismaNextConfig;
 }
@@ -217,36 +217,36 @@ describe('validateConfig', () => {
     );
   });
 
-  it('validates extensionPacks collection and extension descriptors', () => {
-    expectFieldError(createValidRawConfig({ extensionPacks: 'invalid' }), 'extensionPacks');
-    expectFieldError(createValidRawConfig({ extensionPacks: ['invalid'] }), 'extensionPacks[]');
+  it('validates extensions collection and extension descriptors', () => {
+    expectFieldError(createValidRawConfig({ extensions: 'invalid' }), 'extensions');
+    expectFieldError(createValidRawConfig({ extensions: ['invalid'] }), 'extensions[]');
     expectFieldError(
       createValidRawConfig({
-        extensionPacks: [{ kind: 'invalid', id: 'ext', familyId: 'sql', targetId: 'postgres' }],
+        extensions: [{ kind: 'invalid', id: 'ext', familyId: 'sql', targetId: 'postgres' }],
       }),
-      'extensionPacks[].kind',
+      'extensions[].kind',
     );
     expectFieldError(
       createValidRawConfig({
-        extensionPacks: [{ kind: 'extension', id: 123, familyId: 'sql', targetId: 'postgres' }],
+        extensions: [{ kind: 'extension', id: 123, familyId: 'sql', targetId: 'postgres' }],
       }),
-      'extensionPacks[].id',
+      'extensions[].id',
     );
     expectFieldError(
       createValidRawConfig({
-        extensionPacks: [{ kind: 'extension', id: 'ext', familyId: 123, targetId: 'postgres' }],
+        extensions: [{ kind: 'extension', id: 'ext', familyId: 123, targetId: 'postgres' }],
       }),
-      'extensionPacks[].familyId',
+      'extensions[].familyId',
     );
     expectFieldError(
       createValidRawConfig({
-        extensionPacks: [{ kind: 'extension', id: 'ext', familyId: 'sql', version: 123 }],
+        extensions: [{ kind: 'extension', id: 'ext', familyId: 'sql', version: 123 }],
       }),
-      'extensionPacks[].version',
+      'extensions[].version',
     );
     expectFieldError(
       createValidRawConfig({
-        extensionPacks: [
+        extensions: [
           {
             kind: 'extension',
             id: 'ext',
@@ -257,11 +257,11 @@ describe('validateConfig', () => {
           },
         ],
       }),
-      'extensionPacks[].familyId',
+      'extensions[].familyId',
     );
     expectFieldError(
       createValidRawConfig({
-        extensionPacks: [
+        extensions: [
           {
             kind: 'extension',
             id: 'ext',
@@ -272,11 +272,11 @@ describe('validateConfig', () => {
           },
         ],
       }),
-      'extensionPacks[].targetId',
+      'extensions[].targetId',
     );
     expectFieldError(
       createValidRawConfig({
-        extensionPacks: [
+        extensions: [
           {
             kind: 'extension',
             id: 'ext',
@@ -287,11 +287,11 @@ describe('validateConfig', () => {
           },
         ],
       }),
-      'extensionPacks[].targetId',
+      'extensions[].targetId',
     );
     expectFieldError(
       createValidRawConfig({
-        extensionPacks: [
+        extensions: [
           {
             kind: 'extension',
             id: 'ext',
@@ -302,17 +302,23 @@ describe('validateConfig', () => {
           },
         ],
       }),
-      'extensionPacks[].create',
+      'extensions[].create',
     );
   });
 
-  it('rejects legacy extensions key', () => {
-    expectFieldError(
-      createValidRawConfig({
-        extensions: [],
-      }),
-      'extensions',
-    );
+  it('accepts extensions key', () => {
+    expect(() => validateConfig(createValidRawConfig({ extensions: [] }))).not.toThrow();
+  });
+
+  it('rejects removed extensionPacks key with a pointer to extensions', () => {
+    try {
+      validateConfig(createValidRawConfig({ extensionPacks: [] }));
+      throw new Error('expected validateConfig to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigValidationError);
+      expect((error as ConfigValidationError).field).toBe('extensionPacks');
+      expect((error as ConfigValidationError).message).toContain('rename it to Config.extensions');
+    }
   });
 
   it('validates driver descriptor fields and compatibility', () => {
@@ -434,7 +440,7 @@ describe('validateConfig', () => {
 
   it('accepts valid optional sections', () => {
     const config = createValidRawConfig({
-      extensionPacks: [
+      extensions: [
         {
           kind: 'extension',
           id: 'pgvector',
@@ -459,7 +465,7 @@ describe('validateConfig', () => {
       target: { manifest: undefined },
       adapter: { manifest: undefined },
       driver: { manifest: undefined },
-      extensionPacks: [
+      extensions: [
         {
           kind: 'extension',
           id: 'pgvector',
@@ -566,21 +572,21 @@ describe('defineConfig', () => {
     expect(() => validateConfig(config)).not.toThrow();
   });
 
-  it('accepts a provider with an unknown sourceFormat string', () => {
+  it('accepts a provider with an unknown format string', () => {
     const config = createValidConfig({
       contract: {
-        source: createSourceProvider({ sourceFormat: 'made-up-format' }),
+        source: createSourceProvider({ format: 'made-up-format' }),
       },
     });
 
     const result = defineConfig(config);
-    expect(result.contract?.source.sourceFormat).toBe('made-up-format');
+    expect(result.contract?.source.format).toBe('made-up-format');
   });
 
-  it('rejects a non-string sourceFormat', () => {
+  it('rejects a non-string format', () => {
     const config = createValidConfig({
       contract: {
-        source: createSourceProvider({ sourceFormat: 123 }),
+        source: createSourceProvider({ format: 123 }),
       },
     });
 
@@ -589,7 +595,7 @@ describe('defineConfig', () => {
 
   it('passes a provider carrying an extra interpret key through validation untouched', () => {
     const source = createSourceProvider({
-      sourceFormat: 'psl',
+      format: 'psl',
       inputs: ['./schema.prisma'],
       interpret: () => [],
     });
@@ -603,12 +609,12 @@ describe('defineConfig', () => {
     // Config (core) cannot import the authoring packages, so their provider shapes are mirrored here.
     const pslConfig = createValidConfig({
       contract: {
-        source: createSourceProvider({ sourceFormat: 'psl', inputs: ['./schema.prisma'] }),
+        source: createSourceProvider({ format: 'psl', inputs: ['./schema.prisma'] }),
       },
     });
     const typescriptConfig = createValidConfig({
       contract: {
-        source: createSourceProvider({ sourceFormat: 'typescript' }),
+        source: createSourceProvider({ format: 'typescript' }),
       },
     });
 

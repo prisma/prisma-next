@@ -50,7 +50,7 @@ export interface ExecuteDbVerifyOptions<TFamilyId extends string, TTargetId exte
   readonly contract: Contract;
   readonly migrationsDir: string;
   readonly targetId: TTargetId;
-  readonly extensionPacks: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
+  readonly extensions: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly mode: 'strict' | 'lenient';
   readonly skipSchema: boolean;
@@ -149,7 +149,7 @@ function buildLoadInputs<TFamilyId extends string, TTargetId extends string>(
     targetId: options.targetId,
     migrationsDir: options.migrationsDir,
     appContract: options.contract,
-    extensionPacks: options.extensionPacks,
+    extensions: options.extensions,
     deserializeContract: (json) => options.familyInstance.deserializeContract(json),
   };
 }
@@ -349,7 +349,7 @@ function mapMarkerCheckFailures(
     violations.push({
       kind: 'orphanMarker',
       spaceId: orphan.spaceId,
-      remediation: `Add the corresponding extension to \`extensionPacks\` in \`prisma-next.config.ts\`, or delete the orphan marker row for "${orphan.spaceId}".`,
+      remediation: `Add the corresponding extension to \`extensions\` in \`prisma-next.config.ts\`, or delete the orphan marker row for "${orphan.spaceId}".`,
     });
   }
   if (violations.length === 0) return null;
@@ -359,7 +359,7 @@ function mapMarkerCheckFailures(
       ? 'Contract-space verifier found a violation'
       : `Contract-space verifier found violations (${violations.length})`;
   return new CliStructuredError('MIGRATION.CONTRACT_SPACE_VIOLATION', summary, {
-    why: `The on-disk \`migrations/\` directory, the \`extensionPacks\` declaration, and the live database marker rows are not in agreement.\n${lines.join('\n')}`,
+    why: `The on-disk \`migrations/\` directory, the \`extensions\` declaration, and the live database marker rows are not in agreement.\n${lines.join('\n')}`,
     fix: violations[0]?.remediation ?? 'Review and reconcile the violations listed above.',
     docsUrl: 'https://pris.ly/contract-spaces',
     meta: { violations },

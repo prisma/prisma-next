@@ -54,7 +54,7 @@ function makeMinimalContract(overrides: MongoContractTestOverrides = {}): MongoC
     storage: storageWithItemsCollections({ items: new MongoCollection() }),
     domain: domain ?? applicationDomainOf({ models: models ?? defaultModels }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: profileHash('sha256:test'),
     meta: {},
     ...rest,

@@ -23,7 +23,7 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 };
 
 const stubContext: ContractSourceContext = {
-  composedExtensionPacks: [],
+  composedExtensions: [],
   composedExtensionContracts: new Map(),
   scalarTypeDescriptors: new Map(),
   authoringContributions: {
@@ -47,12 +47,12 @@ const stubContext: ContractSourceContext = {
 describe('source format discriminator', () => {
   it('typescriptContract tags the source as TypeScript', () => {
     const config = typescriptContract({ targetFamily: 'sql', target: 'postgres' } as Contract);
-    expect(config.source.sourceFormat).toBe('typescript');
+    expect(config.source.format).toBe('typescript');
   });
 
   it('typescriptContractFromPath tags the source as TypeScript', () => {
     const config = typescriptContractFromPath('./contract.ts');
-    expect(config.source.sourceFormat).toBe('typescript');
+    expect(config.source.format).toBe('typescript');
   });
 
   it('emptyContract tags the source as TypeScript', () => {
@@ -60,7 +60,7 @@ describe('source format discriminator', () => {
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
     });
-    expect(config.source.sourceFormat).toBe('typescript');
+    expect(config.source.format).toBe('typescript');
   });
 });
 
@@ -314,7 +314,7 @@ describe('emptyContract', () => {
     expect(domainModelsAtDefaultNamespace(contract.domain)).toEqual({});
     expect(contract.targetFamily).toBe('sql');
     expect(contract.target).toBe('postgres');
-    expect(contract.extensionPacks).toEqual({});
+    expect(contract.extensions).toEqual({});
     expect(contract.capabilities).toEqual({});
     const publicNamespace = contract.storage.namespaces['public'] as unknown as Record<
       string,

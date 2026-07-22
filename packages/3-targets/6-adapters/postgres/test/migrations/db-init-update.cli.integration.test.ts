@@ -86,7 +86,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -284,7 +284,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
         frameworkComponents: [...frameworkComponents],
         migrationsDir,
         targetId: 'postgres',
-        extensionPacks: [
+        extensions: [
           buildExtensionPack({
             contractJson: extContractV1,
             headHash: extContractV1.storage.storageHash,
@@ -338,7 +338,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
         frameworkComponents: [...frameworkComponents],
         migrationsDir: baseline.migrationsDir,
         targetId: 'postgres',
-        extensionPacks: [
+        extensions: [
           buildExtensionPack({
             contractJson: extContractV1,
             headHash: extContractV1.storage.storageHash,
@@ -380,7 +380,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
         frameworkComponents: [...frameworkComponents],
         migrationsDir: baseline.migrationsDir,
         targetId: 'postgres',
-        extensionPacks: [
+        extensions: [
           buildExtensionPack({
             contractJson: extContractV2,
             headHash: extContractV2.storage.storageHash,
@@ -430,7 +430,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
         frameworkComponents: [...frameworkComponents],
         migrationsDir: baseline.migrationsDir,
         targetId: 'postgres',
-        extensionPacks: [
+        extensions: [
           buildExtensionPack({
             contractJson: extContractV1,
             headHash: extContractV1.storage.storageHash,
@@ -476,7 +476,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
         frameworkComponents: [...frameworkComponents],
         migrationsDir: baseline.migrationsDir,
         targetId: 'postgres',
-        extensionPacks: [
+        extensions: [
           buildExtensionPack({
             contractJson: extContractV2,
             headHash: extContractV2.storage.storageHash,

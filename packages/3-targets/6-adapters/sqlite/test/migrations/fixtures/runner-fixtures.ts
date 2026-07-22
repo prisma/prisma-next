@@ -61,7 +61,7 @@ export const contract: Contract<SqlStorage> = {
   roots: {},
   domain: applicationDomainOf({ models: {} }),
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
 };
 
@@ -74,7 +74,7 @@ const controlStack = createControlStack({
   target: sqliteTargetDescriptor,
   adapter: sqliteAdapterDescriptor,
   driver: sqliteDriverDescriptor,
-  extensionPacks: [],
+  extensions: [],
 });
 export const familyInstance = sqlFamilyDescriptor.create(controlStack);
 export const controlAdapter = sqliteAdapterDescriptor.create(controlStack);

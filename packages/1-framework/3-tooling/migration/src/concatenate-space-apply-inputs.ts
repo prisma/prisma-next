@@ -44,7 +44,7 @@ export interface SpaceApplyInput<TOp> {
  * extension-space declaration in the same transaction.
  *
  * Determinism (NFR6): the output order is independent of the input
- * order, so two callers with the same set of `extensionPacks` produce
+ * order, so two callers with the same set of `extensions` produce
  * identical apply sequences.
  *
  * Atomicity: rejects duplicate `spaceId`s with

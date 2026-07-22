@@ -254,7 +254,7 @@ model Post {
 
 const representativeTsAuthoring = `const Role = enumType('Role', pgText, member('USER', 'user'), member('ADMIN', 'admin'));
 defineContract(
-  { family: sqlFamilyPack, target: portablePostgresTargetPack, extensionPacks: { pgvector: pgvectorExtensionPack } },
+  { family: sqlFamilyPack, target: portablePostgresTargetPack, extensions: { pgvector: pgvectorExtensionPack } },
   ({ type, field, model, rel }) => {
     const types = {
       Embedding1536: type.pgvector.Vector(1536),

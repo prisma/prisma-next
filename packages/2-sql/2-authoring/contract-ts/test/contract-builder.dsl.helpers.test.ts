@@ -627,7 +627,7 @@ describe('contract DSL helper vocabulary', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
-        extensionPacks: {
+        extensions: {
           pgvector: pgvectorExtensionPack,
         },
       },
@@ -720,7 +720,7 @@ describe('contract DSL helper vocabulary', () => {
           family: sqlFamilyPack,
           target: postgresTargetPack,
           createNamespace: createTestSqlNamespace,
-          extensionPacks: {
+          extensions: {
             conflictingPack,
           },
         },
@@ -764,7 +764,7 @@ describe('contract DSL helper vocabulary', () => {
             family: sqlFamilyPack,
             target: postgresTargetPack,
             createNamespace: createTestSqlNamespace,
-            extensionPacks: {
+            extensions: {
               maliciousPack,
             },
           },

@@ -48,7 +48,7 @@ function makeSupabaseExtensionContract(): Contract {
       },
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: profileHash(`sha256:${'b'.repeat(64)}`),
     meta: {},
   });
@@ -90,7 +90,7 @@ function makeSupabaseExtensionContractUnbound(): Contract {
       },
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: profileHash(`sha256:${'d'.repeat(64)}`),
     meta: {},
   });
@@ -342,7 +342,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: ['supabase'],
+      composedExtensions: ['supabase'],
       composedExtensionContracts: new Map([['supabase', makeSupabaseExtensionContract()]]),
     });
 
@@ -381,7 +381,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: ['supabase'],
+      composedExtensions: ['supabase'],
       composedExtensionContracts: new Map([['supabase', makeSupabaseExtensionContractUnbound()]]),
     });
 
@@ -403,7 +403,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
     });
   });
 
-  it('emits PSL_UNKNOWN_CONTRACT_SPACE when the space is not in composedExtensionPacks (AC5)', () => {
+  it('emits PSL_UNKNOWN_CONTRACT_SPACE when the space is not in composedExtensions (AC5)', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model Profile {
   id Int @id
@@ -414,7 +414,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
       sourceId: 'schema.prisma',
     });
 
-    // supabase is NOT in composedExtensionPacks
+    // supabase is NOT in composedExtensions
     const result = interpretPslDocumentToSqlContract({ ...baseInput, ...document });
 
     expect(result.ok).toBe(false);
@@ -444,7 +444,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: ['supabase'],
+      composedExtensions: ['supabase'],
     });
 
     // The result should fail with a diagnostic (not silently succeed with 0 FKs)
@@ -475,7 +475,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: ['supabase'],
+      composedExtensions: ['supabase'],
       composedExtensionContracts: new Map([['supabase', makeSupabaseExtensionContract()]]),
     });
 
@@ -508,7 +508,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: ['supabase'],
+      composedExtensions: ['supabase'],
       composedExtensionContracts: new Map([['supabase', makeSupabaseExtensionContract()]]),
     });
 
@@ -542,11 +542,11 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
       sourceId: 'schema.prisma',
     });
 
-    // supabase IS in composedExtensionPacks but NOT in composedExtensionContracts
+    // supabase IS in composedExtensions but NOT in composedExtensionContracts
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: ['supabase'],
+      composedExtensions: ['supabase'],
       composedExtensionContracts: new Map(), // empty — no contract for supabase
     });
 
@@ -581,7 +581,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: ['supabase'],
+      composedExtensions: ['supabase'],
       composedExtensionContracts: new Map([['supabase', makeSupabaseExtensionContract()]]),
     });
 

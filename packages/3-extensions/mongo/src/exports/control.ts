@@ -11,7 +11,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 
 export interface MongoControlClientOptions {
   readonly connection?: string;
-  readonly extensionPacks?: ControlClientOptions['extensionPacks'];
+  readonly extensions?: ControlClientOptions['extensions'];
 }
 
 export function createMongoControlClient(options: MongoControlClientOptions = {}): ControlClient {
@@ -21,7 +21,7 @@ export function createMongoControlClient(options: MongoControlClientOptions = {}
     adapter: mongoAdapter,
     driver: mongoDriver,
     ...ifDefined('connection', options.connection),
-    ...ifDefined('extensionPacks', options.extensionPacks),
+    ...ifDefined('extensions', options.extensions),
   };
   return createControlClient(clientOptions);
 }

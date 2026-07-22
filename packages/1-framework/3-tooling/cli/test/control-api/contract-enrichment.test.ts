@@ -11,7 +11,7 @@ function makeIR(overrides?: Partial<Contract>): Contract {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     storage: { storageHash: coreHash('sha256:test'), namespaces: {} },
-    extensionPacks: {},
+    extensions: {},
     capabilities: {},
     profileHash: profileHash('sha256:test'),
     meta: {},
@@ -116,7 +116,7 @@ describe('enrichContract', () => {
 
     const result = enrichContract(makeIR(), [extension]);
 
-    expect(result.extensionPacks).toEqual({
+    expect(result.extensions).toEqual({
       pgvector: {
         kind: 'extension',
         id: 'pgvector',
@@ -144,7 +144,7 @@ describe('enrichContract', () => {
 
     const result = enrichContract(
       makeIR({
-        extensionPacks: {
+        extensions: {
           pgvector: {
             kind: 'extension',
             id: 'pgvector',
@@ -159,7 +159,7 @@ describe('enrichContract', () => {
       [extension],
     );
 
-    expect(result.extensionPacks).toEqual({
+    expect(result.extensions).toEqual({
       pgvector: {
         kind: 'extension',
         id: 'pgvector',
@@ -195,7 +195,7 @@ describe('enrichContract', () => {
     });
 
     const result = enrichContract(makeIR(), [extension]);
-    const packMeta = result.extensionPacks['pgvector'] as Record<string, unknown>;
+    const packMeta = result.extensions['pgvector'] as Record<string, unknown>;
     const types = packMeta['types'] as Record<string, unknown>;
     const codecTypes = types['codecTypes'] as Record<string, unknown>;
 
@@ -210,7 +210,7 @@ describe('enrichContract', () => {
 
     const result = enrichContract(makeIR(), [adapter]);
 
-    expect(result.extensionPacks).toEqual({});
+    expect(result.extensions).toEqual({});
   });
 
   it('ignores non-boolean values in capabilities', () => {

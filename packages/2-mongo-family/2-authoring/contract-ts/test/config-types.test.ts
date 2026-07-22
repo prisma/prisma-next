@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { typescriptContract, typescriptContractFromPath } from '../src/config-types';
 
 const emptyContext: ContractSourceContext = {
-  composedExtensionPacks: [],
+  composedExtensions: [],
   composedExtensionContracts: new Map(),
   scalarTypeDescriptors: new Map(),
   authoringContributions: {
@@ -41,12 +41,12 @@ function minimalMongoContract(overrides?: {
 describe('source format discriminator', () => {
   it('typescriptContract tags the source as TypeScript', () => {
     const config = typescriptContract(minimalMongoContract());
-    expect(config.source.sourceFormat).toBe('typescript');
+    expect(config.source.format).toBe('typescript');
   });
 
   it('typescriptContractFromPath tags the source as TypeScript', () => {
     const config = typescriptContractFromPath('./contract.ts');
-    expect(config.source.sourceFormat).toBe('typescript');
+    expect(config.source.format).toBe('typescript');
   });
 });
 

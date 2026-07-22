@@ -80,7 +80,7 @@ function createSetup(options?: {
   const stack = createSqlExecutionStack({
     target: targetDescriptor,
     adapter: adapterDescriptor,
-    extensionPacks: [],
+    extensions: [],
   });
   const stackInstance = instantiateExecutionStack(stack);
   const context = createTestContext(testContract, adapter);

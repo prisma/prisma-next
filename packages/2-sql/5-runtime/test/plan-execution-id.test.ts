@@ -63,7 +63,7 @@ function createSetup(middleware: readonly SqlMiddleware[]) {
   const stack = createSqlExecutionStack({
     target: targetDescriptor,
     adapter: adapterDescriptor,
-    extensionPacks: [],
+    extensions: [],
   });
   const stackInstance = instantiateExecutionStack(stack);
   const context = createTestContext(testContract, adapter);

@@ -72,7 +72,7 @@ function buildContract(
       },
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: 'sha256:profile',
     meta: {},
     ...overrides,

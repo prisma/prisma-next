@@ -80,7 +80,7 @@ export interface ExecuteRunOptions<TFamilyId extends string, TTargetId extends s
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly migrationsDir: string;
-  readonly extensionPacks: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
+  readonly extensions: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   readonly targetId: TTargetId;
   readonly policy: MigrationOperationPolicy;
   readonly action: 'dbInit' | 'dbUpdate';
@@ -119,7 +119,7 @@ export async function executeRun<TFamilyId extends string, TTargetId extends str
     migrations,
     frameworkComponents,
     migrationsDir,
-    extensionPacks,
+    extensions,
     targetId,
     policy,
     action,
@@ -131,7 +131,7 @@ export async function executeRun<TFamilyId extends string, TTargetId extends str
     targetId,
     migrationsDir,
     appContract: contract,
-    extensionPacks,
+    extensions,
     deserializeContract: (json) => familyInstance.deserializeContract(json),
   };
   const loaded = await buildContractSpaceAggregate(loadInputs);
@@ -283,7 +283,7 @@ function aggregatePlannerWarnings(
  * Compare the live `_prisma_marker` rows against the aggregate's
  * declared contract spaces. Any marker row whose `space` is not a space of
  * the aggregate is an "orphan" — typically a marker left behind by
- * an extension that was removed from `extensionPacks` without first
+ * an extension that was removed from `extensions` without first
  * cleaning up its on-disk migrations / database tables.
  *
  * Returns a {@link CliStructuredError} envelope (code
@@ -319,8 +319,8 @@ function detectOrphanMarkers(
       .map((s) => `"${s}"`)
       .join(
         ', ',
-      )}) that are not declared in the project's \`extensionPacks\`. The aggregate pipeline refuses to advance markers it cannot account for.`,
-    fix: 'Either re-declare the missing extension(s) in `extensionPacks` (so the aggregate owns them again), or remove the orphan marker row(s) from `_prisma_marker` once you have confirmed the corresponding tables can be safely retired.',
+      )}) that are not declared in the project's \`extensions\`. The aggregate pipeline refuses to advance markers it cannot account for.`,
+    fix: 'Either re-declare the missing extension(s) in `extensions` (so the aggregate owns them again), or remove the orphan marker row(s) from `_prisma_marker` once you have confirmed the corresponding tables can be safely retired.',
     docsUrl: 'https://pris.ly/contract-spaces',
     meta: {
       violations: orphans.map((spaceId) => ({ kind: 'orphanMarker', spaceId })),

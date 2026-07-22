@@ -52,7 +52,7 @@ function contract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
     domain: applicationDomainOf({ models: {} }),
     roots: {},
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

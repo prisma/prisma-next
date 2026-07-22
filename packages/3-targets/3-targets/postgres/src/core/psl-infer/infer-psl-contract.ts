@@ -805,7 +805,7 @@ function buildDanglingForeignKeyWarning(
   return (
     `Foreign key ${descriptions.join(', ')} exists in the database, but its target schema is ` +
     'outside the introspected scope, so no relation field was generated. If the target schema ' +
-    'is described by an extension pack, add it to extensionPacks and re-run infer.'
+    'is described by an extension pack, add it to extensions and re-run infer.'
   );
 }
 

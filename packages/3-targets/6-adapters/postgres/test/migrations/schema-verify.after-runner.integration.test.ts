@@ -166,7 +166,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         roots: {},
         domain: applicationDomainOf({ models: {} }),
         capabilities: {},
-        extensionPacks: {},
+        extensions: {},
         meta: {},
       };
 

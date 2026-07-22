@@ -55,7 +55,7 @@ describe('contract emit command', () => {
       family: { familyId: 'sql' },
       target: { targetId: 'postgres' },
       adapter: {},
-      extensionPacks: [],
+      extensions: [],
       contract: {
         source: { load: vi.fn() },
         output: outputJsonPath,

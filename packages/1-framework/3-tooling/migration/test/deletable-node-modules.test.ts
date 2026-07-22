@@ -189,7 +189,7 @@ describe('per-space verifier + runner against a project with deleted node_module
  * operate purely on the in-memory aggregate. This test exercises that
  * property end-to-end: with `node_modules` deleted, declared extension
  * entries supplied **inline** (the same shape `cli/control-api/utils/contract-space-aggregate-loader`
- * builds from `Config.extensionPacks`), the full pipeline succeeds.
+ * builds from `Config.extensions`), the full pipeline succeeds.
  *
  * The test deliberately constructs `DeclaredExtensionEntry` values
  * directly — no descriptor module is imported. If the post-load

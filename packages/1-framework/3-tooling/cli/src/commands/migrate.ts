@@ -330,7 +330,7 @@ async function executeMigrateShowCommand(
       target: config.target,
       adapter: config.adapter,
       driver: config.driver!,
-      extensionPacks: config.extensionPacks ?? [],
+      extensions: config.extensions ?? [],
     });
     try {
       await client.connect(dbConnection);
@@ -675,7 +675,7 @@ async function executeMigrateCommand(
     targetId: config.target.targetId,
     migrationsDir,
     appContract: contractRaw,
-    extensionPacks: config.extensionPacks ?? [],
+    extensions: config.extensions ?? [],
     deserializeContract: (json) => familyInstance.deserializeContract(json),
   });
   if (!loadedAggregate.ok) {
@@ -684,7 +684,7 @@ async function executeMigrateCommand(
   const aggregate = loadedAggregate.value;
   const integrityFailure = refuseContractSpaceIntegrity(aggregate, {
     declaredExtensions: toDeclaredExtensionsFromRaw(
-      (config.extensionPacks ?? []) as ReadonlyArray<unknown>,
+      (config.extensions ?? []) as ReadonlyArray<unknown>,
     ),
     checkContracts: true,
   });
@@ -740,7 +740,7 @@ async function executeMigrateCommand(
     target: config.target,
     adapter: config.adapter,
     driver: config.driver,
-    extensionPacks: config.extensionPacks ?? [],
+    extensions: config.extensions ?? [],
   });
 
   try {

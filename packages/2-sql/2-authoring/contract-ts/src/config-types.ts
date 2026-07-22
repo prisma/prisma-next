@@ -35,7 +35,7 @@ export function emptyContract(options: {
 }): ContractConfig {
   return {
     source: {
-      sourceFormat: 'typescript',
+      format: 'typescript',
       load: async () => {
         const built = buildSqlContractFromDefinition({
           target: options.target,
@@ -56,7 +56,7 @@ export function typescriptContract(
 ): ContractConfig {
   return {
     source: {
-      sourceFormat: 'typescript',
+      format: 'typescript',
       load: async () =>
         ok(applySpecifierDefaultControlPolicy(contract, options?.defaultControlPolicy)),
     },
@@ -73,7 +73,7 @@ export function typescriptContractFromPath(
 ): ContractConfig {
   return {
     source: {
-      sourceFormat: 'typescript',
+      format: 'typescript',
       inputs: [contractPath],
       load: async (context) => {
         const [absolutePath] = context.resolvedInputs;

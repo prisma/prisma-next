@@ -25,7 +25,7 @@ const TARGET_FAMILY = 'sql' as const;
 
 function buildContract(
   tables: Record<string, unknown>,
-  extensionPacks: Record<string, unknown> = {},
+  extensions: Record<string, unknown> = {},
   foreignKeys: unknown[] = [],
 ): Contract<SqlStorage> {
   const allTables = Object.fromEntries(
@@ -62,7 +62,7 @@ function buildContract(
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks,
+    extensions,
     meta: {},
     profileHash: profileHash('fixture-profile-v1'),
     storage: new SqlStorage({
@@ -80,12 +80,12 @@ function buildContract(
 function buildExtension(opts: {
   readonly id: string;
   readonly tables?: Record<string, unknown>;
-  readonly extensionPacks?: Record<string, unknown>;
+  readonly extensions?: Record<string, unknown>;
   readonly foreignKeys?: unknown[];
 }): SqlControlExtensionDescriptor<'postgres'> {
   const tables = opts.tables ?? {};
   const fks = opts.foreignKeys ?? [];
-  const contract = buildContract(tables, opts.extensionPacks ?? {}, fks);
+  const contract = buildContract(tables, opts.extensions ?? {}, fks);
   const hash = contract.storage.storageHash as string;
 
   return {
@@ -109,7 +109,7 @@ function buildExtensionWithCrossSpaceFK(opts: {
   readonly dependsOn?: readonly string[];
 }): SqlControlExtensionDescriptor<'postgres'> {
   const localTable = `${opts.id.replace(/-/g, '_')}_table`;
-  const extensionPacks = opts.dependsOn
+  const extensions = opts.dependsOn
     ? Object.fromEntries(opts.dependsOn.map((dep) => [dep, {}]))
     : {};
 
@@ -136,7 +136,7 @@ function buildExtensionWithCrossSpaceFK(opts: {
     },
   ];
 
-  return buildExtension({ id: opts.id, tables, extensionPacks, foreignKeys: fks });
+  return buildExtension({ id: opts.id, tables, extensions, foreignKeys: fks });
 }
 
 function makeStack(
@@ -179,7 +179,7 @@ function makeStack(
       targetId: 'postgres',
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
-    extensionPacks: extensions,
+    extensions: extensions,
   });
 }
 
@@ -222,7 +222,7 @@ describe('cross-space FK reverse-reference rejection', () => {
     const extB = buildExtension({
       id: 'ext-b',
       tables: { users: { id: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false } } },
-      extensionPacks: { 'ext-a': {} },
+      extensions: { 'ext-a': {} },
     });
     expect(() => createSqlFamilyInstance(makeStack([extA, extB]))).toThrow(/ext-a/);
     expect(() => createSqlFamilyInstance(makeStack([extA, extB]))).toThrow(/ext-b/);
@@ -236,7 +236,7 @@ describe('cross-space FK reverse-reference rejection', () => {
     const extB = buildExtension({
       id: 'ext-b',
       tables: { users: { id: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false } } },
-      extensionPacks: { 'ext-a': {} },
+      extensions: { 'ext-a': {} },
     });
     const msg = (() => {
       try {

@@ -31,7 +31,7 @@ function buildAppContract() {
   }).sql({ table: 'item' });
 
   return defineContract({
-    extensionPacks: { supabase: supabasePack },
+    extensions: { supabase: supabasePack },
     models: { Item },
   });
 }

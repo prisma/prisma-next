@@ -95,7 +95,7 @@ export interface ContractComponentRequirementsCheckInput {
   readonly contract: {
     readonly target: string;
     readonly targetFamily?: string | undefined;
-    readonly extensionPacks?: Record<string, unknown> | undefined;
+    readonly extensions?: Record<string, unknown> | undefined;
   };
   readonly expectedTargetFamily?: string | undefined;
   readonly expectedTargetId?: string | undefined;
@@ -116,8 +116,8 @@ export function checkContractComponentRequirements(
     providedIds.add(id);
   }
 
-  const requiredExtensionPackIds = input.contract.extensionPacks
-    ? Object.keys(input.contract.extensionPacks)
+  const requiredExtensionPackIds = input.contract.extensions
+    ? Object.keys(input.contract.extensions)
     : [];
   const missingExtensionPackIds = requiredExtensionPackIds.filter((id) => !providedIds.has(id));
 

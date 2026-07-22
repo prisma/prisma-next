@@ -4,7 +4,7 @@ Supabase extension pack for Prisma Next.
 
 ## Overview
 
-This extension pack ships a **complete, faithful contract of everything Supabase owns in the database** — every `auth` (23) and `storage` (10) table of the reference platform version, their native enum types, and the three platform roles (`anon`, `authenticated`, `service_role`) — all `external`: an application contract composes them via `extensionPacks: [supabasePack]`, the migration planner emits no DDL for them (they're Supabase-managed), and `db verify` confirms they exist in the live database while tolerating the Supabase-internal schemas the pack doesn't declare (`realtime`, `vault`, …).
+This extension pack ships a **complete, faithful contract of everything Supabase owns in the database** — every `auth` (23) and `storage` (10) table of the reference platform version, their native enum types, and the three platform roles (`anon`, `authenticated`, `service_role`) — all `external`: an application contract composes them via `extensions: [supabasePack]`, the migration planner emits no DDL for them (they're Supabase-managed), and `db verify` confirms they exist in the live database while tolerating the Supabase-internal schemas the pack doesn't declare (`realtime`, `vault`, …).
 
 It also ships the role-binding runtime: `supabase({...})` returns a db whose `asUser(jwt)` / `asAnon()` / `asServiceRole()` bind the Postgres role + JWT claims per session, and `asServiceRole().supabase.{sql,orm}` exposes the pack's own `auth`/`storage` tables as a secondary root for admin reads. The secondary-root design is [ADR 237](../../../docs/architecture%20docs/adrs/ADR%20237%20-%20Supabase-internal%20access%20is%20a%20service_role-only%20secondary%20root.md).
 
@@ -15,7 +15,7 @@ The contract is **introspected, not hand-authored**: `pnpm contract:generate` re
 ## Responsibilities
 
 - **Supabase contract**: the complete introspection-generated contract described above, `defaultControlPolicy: 'external'`, roles contributed as first-class `role` entities during emit (`prisma-next.config.ts`).
-- **`/pack` subpath**: an `ExtensionPack` value (`supabasePack` default + `supabasePackWith(options)` factory) that an app composes into its config via `extensionPacks`. Tree-shaking-clean — `/pack` imports no runtime code.
+- **`/pack` subpath**: an `ExtensionPack` value (`supabasePack` default + `supabasePackWith(options)` factory) that an app composes into its config via `extensions`. Tree-shaking-clean — `/pack` imports no runtime code.
 - **`/runtime` subpath**: the `SupabaseRuntime` role-binding runtime and `supabase({...})` facade (session-coupled `set_config` role + claims binding, per [ADR 230](../../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md)), plus the `service_role`-only `.supabase` secondary root.
 - **`/contract` subpath**: branded model handles for the commonly-referenced models (`AuthUser`, `AuthIdentity`, `AuthSession`, `StorageBucket`, `StorageObject`) used for cross-space FK references from app contracts. The handle set is deliberately curated, not one-per-table.
 - **Internal test substrate** (not published): `test/fixtures/supabase-reference/set-up-mock-schema.ts` exports `setUpSupabaseMockSchema(client)`, restoring the reference fixture (all Supabase schemas, tables, roles, and the platform's real default privileges) into a test database. Used only by this package's tests — including the hermetic PGlite coverage of the example app's flows (`test/fixtures/example-app/`); `examples/supabase` itself ships only the real-Supabase acceptance suite.
@@ -39,7 +39,7 @@ pnpm add @prisma-next/extension-supabase
 
 ## Configuration
 
-Compose the pack into your application contract via `extensionPacks`. The pack's contract space (the `auth` and `storage` namespaces) joins the app's aggregate at emit time:
+Compose the pack into your application contract via `extensions`. The pack's contract space (the `auth` and `storage` namespaces) joins the app's aggregate at emit time:
 
 ```ts
 // prisma-next.config.ts
@@ -56,7 +56,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   contract: prismaContract('./src/contract.prisma', { target: postgresPackRef }),
-  extensionPacks: [supabasePack],
+  extensions: [supabasePack],
 });
 ```
 

@@ -59,7 +59,7 @@ describe('runContractSpaceSeedPhase', () => {
   it('emits on-disk artifacts on first emit and reports action=updated', async () => {
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
-      extensionPacks: [
+      extensions: [
         {
           id: 'cipherstash',
           contractSpace: {
@@ -92,7 +92,7 @@ describe('runContractSpaceSeedPhase', () => {
 
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
-      extensionPacks: [
+      extensions: [
         {
           id: 'cipherstash',
           contractSpace: {
@@ -124,7 +124,7 @@ describe('runContractSpaceSeedPhase', () => {
 
     await runContractSpaceSeedPhase({
       migrationsDir,
-      extensionPacks: [
+      extensions: [
         {
           id: 'cipherstash',
           contractSpace: {
@@ -152,7 +152,7 @@ describe('runContractSpaceSeedPhase', () => {
 
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
-      extensionPacks: [
+      extensions: [
         {
           id: 'cipherstash',
           contractSpace: {
@@ -177,7 +177,7 @@ describe('runContractSpaceSeedPhase', () => {
   it('materialises every descriptor-shipped migration package not yet on disk', async () => {
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
-      extensionPacks: [
+      extensions: [
         {
           id: 'cipherstash',
           contractSpace: {
@@ -213,7 +213,7 @@ describe('runContractSpaceSeedPhase', () => {
 
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
-      extensionPacks: [
+      extensions: [
         {
           id: 'cipherstash',
           contractSpace: {
@@ -245,7 +245,7 @@ describe('runContractSpaceSeedPhase', () => {
     // Descriptor ships a migration package not yet on disk.
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
-      extensionPacks: [
+      extensions: [
         {
           id: 'cipherstash',
           contractSpace: {
@@ -267,7 +267,7 @@ describe('runContractSpaceSeedPhase', () => {
   it('skips extensions without a contractSpace (codec-only packs)', async () => {
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
-      extensionPacks: [{ id: 'codec-only' }],
+      extensions: [{ id: 'codec-only' }],
     });
     expect(out.seeded).toEqual([]);
   });
@@ -275,7 +275,7 @@ describe('runContractSpaceSeedPhase', () => {
   it('orders per-space output deterministically (alphabetical by spaceId)', async () => {
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
-      extensionPacks: [
+      extensions: [
         {
           id: 'zeta',
           contractSpace: {

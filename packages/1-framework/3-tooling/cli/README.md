@@ -52,7 +52,7 @@ Commands that enforce wiring validation:
 - **`db init`**
 - **`db update`**
 
-If you hit a wiring validation error: add the required descriptors to `config.extensionPacks` (matched by descriptor `id`) and re-run the command.
+If you hit a wiring validation error: add the required descriptors to `config.extensions` (matched by descriptor `id`) and re-run the command.
 
 **Note**: Control plane domain actions (database verification, contract emission) are implemented in `@prisma-next/emitter` and `@prisma-next/framework-components/control`. The CLI uses the control plane domain actions programmatically but does not define control plane types itself.
 
@@ -92,7 +92,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensionPacks: [],
+  extensions: [],
   contract: typescriptContract(contract, 'src/prisma/contract.json'),
 });
 ```
@@ -181,7 +181,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensions: [],
   contract: typescriptContract(contract, 'src/prisma/contract.json'),
   db: {
     connection: process.env.DATABASE_URL, // Optional: can also use --db flag
@@ -297,7 +297,7 @@ interface ControlStack<TFamilyId, TTargetId> {
   readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
   readonly driver: ControlDriverDescriptor<TFamilyId, TTargetId> | undefined;
-  readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+  readonly extensions: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
 }
 
 interface ControlFamilyInstance {
@@ -311,7 +311,7 @@ interface ControlFamilyInstance {
 }
 ```
 
-Use `createControlStack()` from `@prisma-next/framework-components/control` to create the stack with sensible defaults (`driver` defaults to `undefined`, `extensionPacks` defaults to `[]`).
+Use `createControlStack()` from `@prisma-next/framework-components/control` to create the stack with sensible defaults (`driver` defaults to `undefined`, `extensions` defaults to `[]`).
 
 The SQL family provides this via `@prisma-next/family-sql/control`. The `verify()` method handles marker checks, full `db verify` follows it with `schemaVerify()`, `--marker-only` skips that schema step, and `--schema-only` runs `schemaVerify()` without marker checks.
 
@@ -404,7 +404,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensions: [],
   db: {
     connection: process.env.DATABASE_URL, // Optional: can also use --db flag
   },
@@ -555,7 +555,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensions: [],
   contract: typescriptContract(contract, 'src/prisma/contract.json'),
   db: {
     connection: process.env.DATABASE_URL, // Optional: can also use --db flag
@@ -761,7 +761,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensions: [],
   contract: typescriptContract(contract, 'src/prisma/contract.json'),
   db: {
     connection: process.env.DATABASE_URL, // Optional: can also use --db flag
@@ -778,7 +778,7 @@ export default defineConfig({
 5. **Validate wiring**: Ensures the contract is compatible with the CLI config:
    - `contract.targetFamily` matches `config.family.familyId`
    - `contract.target` matches `config.target.targetId`
-   - `contract.extensionPacks` (if present) are provided by `config.extensionPacks` (matched by descriptor `id`)
+   - `contract.extensions` (if present) are provided by `config.extensions` (matched by descriptor `id`)
 6. **Create Planner/Runner**: Uses `config.target.migrations.createPlanner()` and `config.target.migrations.createRunner()`
 7. **Plan Migration**: Calls `planner.plan()` with the contract, schema IR, additive-only policy, and `frameworkComponents` (the active target/adapter/extension descriptors)
    - On conflict: Returns a structured failure with conflict list
@@ -891,7 +891,7 @@ prisma-next db update [--db <url>] [--config <path>] [--dry-run] [-y|--yes] [--i
 
 **Config File (`prisma-next.config.ts`):**
 
-The CLI uses a config file to specify the target family, target, adapter, extensionPacks, and contract.
+The CLI uses a config file to specify the target family, target, adapter, extensions, and contract.
 
 **Config Discovery:**
 - `--config <path>`: Explicit path (relative or absolute)
@@ -912,7 +912,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensionPacks: [],
+  extensions: [],
   contract: typescriptContract(contract, 'src/prisma/contract.json'),
 });
 ```
@@ -1294,7 +1294,7 @@ import exampleExtension from '@prisma-next/extension-example/control';
 
 export default defineConfig({
   // family/target/adapter/driver omitted for brevity
-  extensionPacks: [exampleExtension],
+  extensions: [exampleExtension],
 });
 ```
 
@@ -1389,7 +1389,7 @@ const client = createControlClient({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensions: [],
 });
 
 try {

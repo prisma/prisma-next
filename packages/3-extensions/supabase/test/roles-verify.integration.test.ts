@@ -38,7 +38,7 @@ function buildAppContract() {
   }).sql({ table: 'item' });
 
   return defineContract({
-    extensionPacks: { supabase: supabasePack },
+    extensions: { supabase: supabasePack },
     models: { Item },
   });
 }
@@ -92,7 +92,7 @@ describe('roles enter db verify — declared in the pack contract, checked again
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [supabasePack],
+        extensions: [supabasePack],
       });
 
       try {
@@ -149,7 +149,7 @@ describe('roles enter db verify — declared in the pack contract, checked again
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [supabasePack],
+        extensions: [supabasePack],
       });
 
       try {

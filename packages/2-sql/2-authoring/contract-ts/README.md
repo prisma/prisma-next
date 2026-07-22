@@ -124,7 +124,7 @@ export const contract = defineContract(
   {
     family: sqlFamily,
     target: postgresPack,
-    extensionPacks: { pgvector },
+    extensions: { pgvector },
   },
   ({ type, field, model, rel }) => {
     const types = {

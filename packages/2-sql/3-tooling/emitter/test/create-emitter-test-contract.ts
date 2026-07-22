@@ -30,7 +30,7 @@ export function createEmitterTestContract(
         ...(valueObjects !== undefined ? { valueObjects } : {}),
         namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
       }),
-    extensionPacks: {},
+    extensions: {},
     capabilities: {},
     meta: {},
     profileHash: profileHash('sha256:test'),

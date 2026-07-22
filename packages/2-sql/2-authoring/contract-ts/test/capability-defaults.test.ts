@@ -88,7 +88,7 @@ describe('capability contribution at authoring time', () => {
     const contract = buildOneModelContract({
       family: sqlFamilyPack,
       target: targetWithCapabilities,
-      extensionPacks: { pgvector: extensionWithCapabilities },
+      extensions: { pgvector: extensionWithCapabilities },
       createNamespace: createTestSqlNamespace,
     });
 
@@ -124,12 +124,12 @@ describe('capability contribution at authoring time', () => {
     const decorated = buildOneModelContract({
       family: sqlFamilyPack,
       target: targetWithCapabilities,
-      extensionPacks: { pgvector: extensionWithCapabilities },
+      extensions: { pgvector: extensionWithCapabilities },
       createNamespace: createTestSqlNamespace,
     });
     expect(bare.profileHash).toEqual(decorated.profileHash);
     expect(bare.profileHash).toEqual(
-      'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb',
+      'sha256:3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2',
     );
   });
 });

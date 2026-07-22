@@ -56,7 +56,7 @@ function hashContract(section: HashContractSection): string {
     roots: {},
     domain: { namespaces: {} },
     execution: sectionData['execution'],
-    extensionPacks: {},
+    extensions: {},
     capabilities: sectionData['capabilities'] ?? {},
     meta: {},
     profileHash: '',

@@ -112,7 +112,7 @@ const baseConfig = {
   target: { targetId: 'postgres' },
   adapter: {},
   driver: {},
-  extensionPacks: [],
+  extensions: [],
   contract: {
     output: 'output/contract.json',
   },

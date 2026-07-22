@@ -108,7 +108,7 @@ describe('SqlControlFamilyInstance OperationPreviewCapable', () => {
         // biome-ignore lint/suspicious/noExplicitAny: minimal stub for capability test
         create: () => ({ introspect: () => ({}), readMarker: () => null }) as any,
       },
-      extensionPacks: [],
+      extensions: [],
       codecTypeImports: [],
       extensionIds: [],
       // biome-ignore lint/suspicious/noExplicitAny: minimal stub

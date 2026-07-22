@@ -130,7 +130,7 @@ export interface SqlRuntimeExtensionDescriptor<TTargetId extends string = string
 export interface SqlExecutionStack<TTargetId extends string = string> {
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
   readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId>;
-  readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
+  readonly extensions: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
 }
 
 export type SqlExecutionStackWithDriver<TTargetId extends string = string> = Omit<
@@ -141,14 +141,14 @@ export type SqlExecutionStackWithDriver<TTargetId extends string = string> = Omi
     SqlRuntimeDriverInstance<TTargetId>,
     SqlRuntimeExtensionInstance<TTargetId>
   >,
-  'target' | 'adapter' | 'driver' | 'extensionPacks'
+  'target' | 'adapter' | 'driver' | 'extensions'
 > & {
   readonly target: SqlRuntimeTargetDescriptor<TTargetId>;
   readonly adapter: SqlRuntimeAdapterDescriptor<TTargetId, SqlRuntimeAdapterInstance<TTargetId>>;
   readonly driver:
     | RuntimeDriverDescriptor<'sql', TTargetId, unknown, SqlRuntimeDriverInstance<TTargetId>>
     | undefined;
-  readonly extensionPacks: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
+  readonly extensions: readonly SqlRuntimeExtensionDescriptor<TTargetId>[];
 };
 
 export interface SqlRuntimeExtensionInstance<TTargetId extends string>
@@ -175,13 +175,13 @@ export function createSqlExecutionStack<TTargetId extends string>(options: {
   readonly driver?:
     | RuntimeDriverDescriptor<'sql', TTargetId, unknown, SqlRuntimeDriverInstance<TTargetId>>
     | undefined;
-  readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<TTargetId>[] | undefined;
+  readonly extensions?: readonly SqlRuntimeExtensionDescriptor<TTargetId>[] | undefined;
 }): SqlExecutionStackWithDriver<TTargetId> {
   return createExecutionStack({
     target: options.target,
     adapter: options.adapter,
     driver: options.driver,
-    extensionPacks: options.extensionPacks,
+    extensions: options.extensions,
   });
 }
 
@@ -194,7 +194,7 @@ export function assertExecutionStackContractRequirements(
   const providedComponentIds = new Set<string>([
     stack.target.id,
     stack.adapter.id,
-    ...stack.extensionPacks.map((pack) => pack.id),
+    ...stack.extensions.map((pack) => pack.id),
   ]);
 
   const result = checkContractComponentRequirements({
@@ -774,7 +774,7 @@ export function createExecutionContext<
     stack.target,
     stack.adapter,
     ...(driver ? [driver] : []),
-    ...stack.extensionPacks,
+    ...stack.extensions,
   ];
   const mergedCapabilities = mergeCapabilityMatrices(
     options.contract.capabilities,
@@ -788,7 +788,7 @@ export function createExecutionContext<
   const contributors: Array<SqlStaticContributions & ComponentDescriptor<string>> = [
     stack.target,
     stack.adapter,
-    ...stack.extensionPacks,
+    ...stack.extensions,
   ];
 
   const { all: allCodecDescriptors, parameterized: parameterizedCodecDescriptors } =

@@ -115,7 +115,7 @@ function buildListContract(): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -203,7 +203,7 @@ describe.sequential('scalar-list codec round-trip (element-wise encode/decode)',
     const stack = createSqlExecutionStack({
       target: postgresRuntimeTargetDescriptor,
       adapter: postgresRuntimeAdapterDescriptor,
-      extensionPacks: [],
+      extensions: [],
     });
     const context = createExecutionContext({ contract, stack });
     const stackInstance = instantiateExecutionStack(stack);

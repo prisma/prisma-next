@@ -309,7 +309,7 @@ export function createTestContext<TContract extends Contract<SqlStorage>>(
   contract: TContract,
   adapter: StubAdapter,
   options?: {
-    extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
+    extensions?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   },
 ): ExecutionContext<TContract> {
   return createExecutionContext({
@@ -317,13 +317,13 @@ export function createTestContext<TContract extends Contract<SqlStorage>>(
     stack: {
       target: createTestTargetDescriptor(),
       adapter: createTestAdapterDescriptor(adapter),
-      extensionPacks: options?.extensionPacks ?? [],
+      extensions: options?.extensions ?? [],
     },
   });
 }
 
 export function createTestStackInstance(options?: {
-  extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
+  extensions?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   driver?: RuntimeDriverDescriptor<
     'sql',
     'postgres',
@@ -335,7 +335,7 @@ export function createTestStackInstance(options?: {
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(createStubAdapter()),
     driver: options?.driver,
-    extensionPacks: options?.extensionPacks ?? [],
+    extensions: options?.extensions ?? [],
   });
 
   return instantiateExecutionStack(stack);
@@ -485,7 +485,7 @@ export function createTestContract(
     domain: rest['domain'] ?? applicationDomainOf({ models: rest['models'] ?? {} }),
     roots: rest['roots'] ?? {},
     capabilities: rest['capabilities'] ?? {},
-    extensionPacks: rest['extensionPacks'] ?? {},
+    extensions: rest['extensions'] ?? {},
     meta: rest['meta'] ?? {},
     ...(execution ? { execution } : {}),
     profileHash: profileHash(rest['profileHash'] ?? 'sha256:testprofile'),

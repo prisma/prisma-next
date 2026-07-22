@@ -114,7 +114,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
 
@@ -189,7 +189,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
 
@@ -292,7 +292,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
 
@@ -363,7 +363,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
 
@@ -434,7 +434,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
 

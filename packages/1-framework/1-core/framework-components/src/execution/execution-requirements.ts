@@ -14,16 +14,16 @@ export function assertRuntimeContractRequirementsSatisfied<
   family,
   target,
   adapter,
-  extensionPacks,
+  extensions,
 }: {
-  readonly contract: { readonly target: string; readonly extensionPacks?: Record<string, unknown> };
+  readonly contract: { readonly target: string; readonly extensions?: Record<string, unknown> };
   readonly family: RuntimeFamilyDescriptor<TFamilyId>;
   readonly target: RuntimeTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: RuntimeAdapterDescriptor<TFamilyId, TTargetId>;
-  readonly extensionPacks: readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId>[];
+  readonly extensions: readonly RuntimeExtensionDescriptor<TFamilyId, TTargetId>[];
 }): void {
   const providedComponentIds = new Set<string>([family.id, target.id, adapter.id]);
-  for (const extension of extensionPacks) {
+  for (const extension of extensions) {
     providedComponentIds.add(extension.id);
   }
 

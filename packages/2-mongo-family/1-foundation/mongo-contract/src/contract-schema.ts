@@ -431,7 +431,7 @@ export function createMongoContractSchema(
     'profileHash?': 'string',
     roots: type({ '[string]': CrossReferenceSchema }),
     'capabilities?': 'Record<string, unknown>',
-    'extensionPacks?': 'Record<string, unknown>',
+    'extensions?': 'Record<string, unknown>',
     'meta?': 'Record<string, unknown>',
     'defaultControlPolicy?': ControlPolicySchema,
     'sources?': 'Record<string, unknown>',

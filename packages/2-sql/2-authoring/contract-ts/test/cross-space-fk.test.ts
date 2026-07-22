@@ -174,7 +174,7 @@ describe('cross-space FK via constraints.foreignKey in sql()', () => {
       family: bareFamilyPack,
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { supabase: supabasePack },
+      extensions: { supabase: supabasePack },
       models: { Profile },
     });
 
@@ -203,7 +203,7 @@ describe('cross-space FK via constraints.foreignKey in sql()', () => {
       family: bareFamilyPack,
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { supabase: supabasePack },
+      extensions: { supabase: supabasePack },
       models: { Profile },
     });
 
@@ -217,7 +217,7 @@ describe('cross-space FK via constraints.foreignKey in sql()', () => {
 // ---------------------------------------------------------------------------
 
 describe('missing-pack fail-fast diagnostic', () => {
-  it('throws when the referenced spaceId is not in extensionPacks', () => {
+  it('throws when the referenced spaceId is not in extensions', () => {
     const ExtUser = buildSyntheticSupabaseAuthUser();
 
     const Profile = model('Profile', {
@@ -235,7 +235,7 @@ describe('missing-pack fail-fast diagnostic', () => {
         family: bareFamilyPack,
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
-        // extensionPacks intentionally omitted — 'supabase' is not declared
+        // extensions intentionally omitted — 'supabase' is not declared
         models: { Profile },
       }),
     ).toThrow(/supabase/);
@@ -250,7 +250,7 @@ describe('missing-pack fail-fast diagnostic', () => {
     ).toThrow(expect.objectContaining({ code: 'CONTRACT.PACK_MISSING' }));
   });
 
-  it('error message mentions extensionPacks', () => {
+  it('error message mentions extensions', () => {
     const ExtUser = buildSyntheticSupabaseAuthUser();
 
     const Profile = model('Profile', {
@@ -270,7 +270,7 @@ describe('missing-pack fail-fast diagnostic', () => {
         createNamespace: createTestSqlNamespace,
         models: { Profile },
       }),
-    ).toThrow(/extensionPacks/i);
+    ).toThrow(/extensions/i);
   });
 });
 
@@ -296,7 +296,7 @@ describe('cascade on cross-space FK (AC4)', () => {
       family: bareFamilyPack,
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { supabase: supabasePack },
+      extensions: { supabase: supabasePack },
       models: { Profile },
     });
 
@@ -370,7 +370,7 @@ describe('F-col: cross-space FK target columns prefer physical column name', () 
       family: bareFamilyPack,
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { supabase: supabasePack },
+      extensions: { supabase: supabasePack },
       models: { Profile },
     });
 
@@ -449,7 +449,7 @@ describe('F-compound: normalizeTargetFieldRefInput rejects mixed-space compound 
         family: bareFamilyPack,
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
-        extensionPacks: { supabase: supabasePack, other_space: otherPack },
+        extensions: { supabase: supabasePack, other_space: otherPack },
         models: { Profile },
       }),
     ).toThrow(/spaceId/i);

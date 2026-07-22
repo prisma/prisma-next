@@ -45,7 +45,7 @@ function twoNamespaceContract(): Contract<SqlStorage> {
         }),
       },
     }),
-    extensionPacks: {},
+    extensions: {},
     capabilities: {},
     meta: {},
   };

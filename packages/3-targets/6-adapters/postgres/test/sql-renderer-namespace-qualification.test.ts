@@ -39,7 +39,7 @@ const publicContract = {
   profileHash: 'sha256:test-profile',
   roots: {},
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   storage: new SqlStorage({
     storageHash: 'sha256:test-core-public' as StorageHashBase<'sha256:test-core-public'>,

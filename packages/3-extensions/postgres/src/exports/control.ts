@@ -29,7 +29,7 @@ export interface PostgresControlClientOptions {
    * Composed extension descriptors. Pass the same descriptors here that
    * the contract was authored against.
    */
-  readonly extensionPacks?: ControlClientOptions['extensionPacks'];
+  readonly extensions?: ControlClientOptions['extensions'];
 }
 
 export function createPostgresControlClient(
@@ -41,7 +41,7 @@ export function createPostgresControlClient(
     adapter: postgresAdapter,
     driver: postgresDriver,
     ...ifDefined('connection', options.connection),
-    ...ifDefined('extensionPacks', options.extensionPacks),
+    ...ifDefined('extensions', options.extensions),
   };
   return createControlClient(clientOptions);
 }

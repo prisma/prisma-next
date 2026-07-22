@@ -15,7 +15,7 @@ import { extname, join } from 'pathe';
 
 export interface PostgresConfigOptions {
   readonly contract: string;
-  readonly outputPath?: string;
+  readonly output?: string;
   readonly db?: {
     readonly connection?: string;
   };
@@ -36,8 +36,8 @@ function deriveOutputPath(contractPath: string): string {
 export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'sql', 'postgres'> {
   const extensions = options.extensions ?? [];
   const output =
-    options.outputPath !== undefined
-      ? join(options.outputPath, 'contract.json')
+    options.output !== undefined
+      ? join(options.output, 'contract.json')
       : deriveOutputPath(options.contract);
   const ext = extname(options.contract);
 
@@ -56,7 +56,7 @@ export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: extensions,
+    extensions,
     contract: contractConfig,
     ...ifDefined('db', options.db),
     ...ifDefined('migrations', options.migrations),

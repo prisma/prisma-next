@@ -88,7 +88,7 @@ function minimal(overrides?: Record<string, unknown>): Contract {
             ),
           }),
     storage: { storageHash: coreHash('sha256:stub'), namespaces: {} },
-    extensionPacks: {},
+    extensions: {},
     capabilities: {},
     meta: {},
     profileHash: profileHash('sha256:stub'),
@@ -139,7 +139,7 @@ describe('canonicalizeContractToObject', () => {
       'domain',
       'storage',
       'capabilities',
-      'extensionPacks',
+      'extensions',
       'meta',
     ]);
   });
@@ -264,10 +264,10 @@ describe('canonicalizeContractToObject', () => {
     expect(result).not.toHaveProperty('defaultControlPolicy');
   });
 
-  it('places defaultControlPolicy after extensionPacks and before meta', () => {
+  it('places defaultControlPolicy after extensions and before meta', () => {
     const result = canonicalizeContractToObject(minimal({ defaultControlPolicy: 'tolerated' }));
     const keys = Object.keys(result);
-    expect(keys.indexOf('extensionPacks')).toBeLessThan(keys.indexOf('defaultControlPolicy'));
+    expect(keys.indexOf('extensions')).toBeLessThan(keys.indexOf('defaultControlPolicy'));
     expect(keys.indexOf('defaultControlPolicy')).toBeLessThan(keys.indexOf('meta'));
   });
 
@@ -401,7 +401,7 @@ describe('default omission', () => {
   it('preserves required empty objects at top level', () => {
     const result = canonicalizeContractToObject(minimal());
     expect(drill(result, 'domain', 'namespaces', UNBOUND, 'models')).toEqual({});
-    expect(result['extensionPacks']).toEqual({});
+    expect(result['extensions']).toEqual({});
     expect(result['capabilities']).toEqual({});
     expect(result['meta']).toEqual({});
   });
@@ -501,8 +501,8 @@ describe('default omission', () => {
   });
 
   it('preserves empty extension namespace entries', () => {
-    const result = canonicalizeContractToObject(minimal({ extensionPacks: { paradedb: {} } }));
-    expect(drill(result, 'extensionPacks')['paradedb']).toEqual({});
+    const result = canonicalizeContractToObject(minimal({ extensions: { paradedb: {} } }));
+    expect(drill(result, 'extensions')['paradedb']).toEqual({});
   });
 
   it('preserves empty per-namespace table entries when shouldPreserveEmpty hook provided', () => {

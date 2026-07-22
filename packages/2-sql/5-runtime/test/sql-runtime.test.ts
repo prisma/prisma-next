@@ -48,7 +48,7 @@ const testContract: Contract<SqlStorage> = {
       __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
     },
   }),
-  extensionPacks: {},
+  extensions: {},
   capabilities: {},
   meta: {},
 };
@@ -207,7 +207,7 @@ function createTestSetup(options?: { extraCodecs?: readonly Codec<string>[] }) {
   const stack = createSqlExecutionStack({
     target: targetDescriptor,
     adapter: adapterDescriptor,
-    extensionPacks: [],
+    extensions: [],
   });
   type SqlTestStackInstance = ExecutionStackInstance<
     'sql',
@@ -220,7 +220,7 @@ function createTestSetup(options?: { extraCodecs?: readonly Codec<string>[] }) {
 
   const context = createExecutionContext({
     contract: testContract,
-    stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
+    stack: { target: targetDescriptor, adapter: adapterDescriptor, extensions: [] },
   });
 
   return { stackInstance, context, driver };
@@ -475,7 +475,7 @@ describe('SqlRuntime', () => {
     const stack = createSqlExecutionStack({
       target: targetDescriptor,
       adapter: adapterDescriptor,
-      extensionPacks: [],
+      extensions: [],
     });
     const stackInstance = instantiateExecutionStack(stack) as ExecutionStackInstance<
       'sql',
@@ -486,7 +486,7 @@ describe('SqlRuntime', () => {
     >;
     const context = createExecutionContext({
       contract: testContract,
-      stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
+      stack: { target: targetDescriptor, adapter: adapterDescriptor, extensions: [] },
     });
 
     const rewriteA: SqlMiddleware = {

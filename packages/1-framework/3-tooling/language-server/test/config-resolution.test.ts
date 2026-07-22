@@ -15,15 +15,15 @@ import { resolveConfigInputs } from '../src/config-resolution';
 vi.mock('@prisma-next/config-loader', { spy: true });
 vi.mock('@prisma-next/framework-components/control', { spy: true });
 
-function loadedConfig(sourceFormat: string, inputs: readonly string[]): PrismaNextConfig {
-  return { contract: { source: { sourceFormat, inputs } } } as unknown as PrismaNextConfig;
+function loadedConfig(format: string, inputs: readonly string[]): PrismaNextConfig {
+  return { contract: { source: { format, inputs } } } as unknown as PrismaNextConfig;
 }
 
 function interpretCapableConfig(inputs: readonly string[]): PrismaNextConfig {
   return {
     contract: {
       source: {
-        sourceFormat: 'psl',
+        format: 'psl',
         inputs,
         load: async () => ({}) as never,
         interpret: () => ({}) as never,
@@ -34,7 +34,7 @@ function interpretCapableConfig(inputs: readonly string[]): PrismaNextConfig {
 
 function stubStackWithContext(): ControlStack {
   return {
-    extensionPacks: [{ id: 'ext-a' }, { id: 'ext-b' }],
+    extensions: [{ id: 'ext-a' }, { id: 'ext-b' }],
     extensionContracts: new Map([['ext-a', { targetFamily: 'demo' }]]),
     scalarTypeDescriptors: new Map([['Int', 'int']]),
     authoringContributions: {
@@ -194,7 +194,7 @@ describe('interpretation resolution', () => {
     expect(result.interpretation).toBeDefined();
     expect(result.interpretation?.source).toBe(config.contract?.source);
     const context = result.interpretation?.context;
-    expect(context?.composedExtensionPacks).toEqual(['ext-a', 'ext-b']);
+    expect(context?.composedExtensions).toEqual(['ext-a', 'ext-b']);
     expect(context?.composedExtensionContracts).toBe(stack.extensionContracts);
     expect(context?.scalarTypeDescriptors).toBe(stack.scalarTypeDescriptors);
     expect(context?.authoringContributions).toBe(stack.authoringContributions);

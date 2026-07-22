@@ -440,7 +440,7 @@ async function introspectSchema(
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
     driver: postgresDriverDescriptor,
-    extensionPacks: [],
+    extensions: [],
   });
   const controlAdapter = postgresAdapterDescriptor.create(controlStack);
 

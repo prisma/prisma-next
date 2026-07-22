@@ -118,7 +118,7 @@ function setupConfigMock(): void {
 function setupConfigMockWithExtension(extId: string): void {
   mocks.loadConfig.mockResolvedValue({
     ...baseConfig(),
-    extensionPacks: [
+    extensions: [
       {
         id: extId,
         targetId: TARGET,

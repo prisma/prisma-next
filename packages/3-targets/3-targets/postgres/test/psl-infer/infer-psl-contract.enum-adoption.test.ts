@@ -153,7 +153,7 @@ function describedContractWithNativeEnum(input: {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
   return { spaceId: 'pack', contract };

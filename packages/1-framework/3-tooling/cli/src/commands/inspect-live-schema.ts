@@ -131,7 +131,7 @@ export async function inspectLiveSchema(
     target: config.target,
     adapter: config.adapter,
     driver: config.driver,
-    extensionPacks: config.extensionPacks ?? [],
+    extensions: config.extensions ?? [],
   });
   const onProgress = createProgressAdapter({ ui, flags });
 

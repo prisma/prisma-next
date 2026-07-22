@@ -142,7 +142,7 @@ describe('verifyContractSpaces', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('rejects when extensionPacks declares a space without a contract-space dir on disk (declaredButUnmigrated)', () => {
+  it('rejects when extensions declares a space without a contract-space dir on disk (declaredButUnmigrated)', () => {
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app', 'cipherstash']),
       spaceDirsOnDisk: [],
@@ -158,7 +158,7 @@ describe('verifyContractSpaces', () => {
     });
   });
 
-  it('rejects when a contract-space dir on disk is not in extensionPacks (orphanSpaceDir)', () => {
+  it('rejects when a contract-space dir on disk is not in extensions (orphanSpaceDir)', () => {
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app']),
       spaceDirsOnDisk: ['cipherstash'],
@@ -174,7 +174,7 @@ describe('verifyContractSpaces', () => {
     });
   });
 
-  it('rejects when a marker row exists for a space not in extensionPacks (orphanMarker)', () => {
+  it('rejects when a marker row exists for a space not in extensions (orphanMarker)', () => {
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app']),
       spaceDirsOnDisk: [],

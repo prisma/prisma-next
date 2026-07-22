@@ -277,11 +277,11 @@ export function errorDriverRequired(options?: { readonly why?: string }): CliStr
 /**
  * Contract requires extension packs that are not provided by config descriptors.
  */
-export function errorContractMissingExtensionPacks(options: {
-  readonly missingExtensionPacks: readonly string[];
+export function errorContractMissingExtensions(options: {
+  readonly missingExtensions: readonly string[];
   readonly providedComponentIds: readonly string[];
 }): CliStructuredError {
-  const missing = [...options.missingExtensionPacks].sort();
+  const missing = [...options.missingExtensions].sort();
   return new CliStructuredError(
     'CONFIG.MISSING_EXTENSION_PACKS',
     'Missing extension packs in config',
@@ -293,7 +293,7 @@ export function errorContractMissingExtensionPacks(options: {
       fix: 'Add the missing extension descriptors to `extensions` in prisma-next.config.ts',
       docsUrl: 'https://prisma-next.dev/docs/cli/config',
       meta: {
-        missingExtensionPacks: missing,
+        missingExtensions: missing,
         providedComponentIds: [...options.providedComponentIds].sort(),
       },
     },

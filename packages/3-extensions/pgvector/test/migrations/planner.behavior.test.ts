@@ -646,7 +646,7 @@ function createTestContract(
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
     ...rest,
   };

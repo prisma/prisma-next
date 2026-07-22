@@ -84,7 +84,7 @@ function makeContract(options: {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -246,7 +246,7 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
 
@@ -327,7 +327,7 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespac
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
   }
@@ -402,7 +402,7 @@ describe('contractToPostgresDatabaseSchemaNode — unbound-slot projection', () 
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
   }
@@ -499,7 +499,7 @@ describe('contractToPostgresDatabaseSchemaNode — native_enum projection', () =
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
     };
   }

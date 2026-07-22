@@ -39,7 +39,7 @@ const testContract: Contract<SqlStorage> = {
       __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
     },
   }),
-  extensionPacks: {},
+  extensions: {},
   capabilities: {},
   meta: {},
 };
@@ -119,7 +119,7 @@ describe('SQL middleware context surface', () => {
         ) as SqlRuntimeAdapterInstance<'postgres'>;
       },
     };
-    const stack = createSqlExecutionStack({ target, adapter: adapterDesc, extensionPacks: [] });
+    const stack = createSqlExecutionStack({ target, adapter: adapterDesc, extensions: [] });
     type SqlTestStackInstance = ExecutionStackInstance<
       'sql',
       'postgres',
@@ -130,7 +130,7 @@ describe('SQL middleware context surface', () => {
     const stackInstance = instantiateExecutionStack(stack) as SqlTestStackInstance;
     const context = createExecutionContext({
       contract: testContract,
-      stack: { target, adapter: adapterDesc, extensionPacks: [] },
+      stack: { target, adapter: adapterDesc, extensions: [] },
     });
 
     let observedNow: number | undefined;

@@ -118,7 +118,7 @@ export default function postgresServerless<TContract extends Contract<SqlStorage
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: options.extensions ?? [],
+    extensions: options.extensions ?? [],
   });
 
   const context = createExecutionContext({

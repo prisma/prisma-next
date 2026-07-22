@@ -34,7 +34,7 @@ export function validSqlContractJson(overrides: Record<string, unknown> = {}) {
     targetFamily: 'sql',
     profileHash: 'sha256:test',
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
     roots: {},
     domain:

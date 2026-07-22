@@ -66,7 +66,7 @@ describe('emitter integration', () => {
             },
           },
         },
-        extensionPacks: {
+        extensions: {
           postgres: {
             version: '0.0.1',
           },
@@ -144,7 +144,7 @@ describe('emitter integration', () => {
             },
           },
         },
-        extensionPacks: {
+        extensions: {
           postgres: {
             version: '0.0.1',
           },
@@ -210,7 +210,7 @@ describe('emitter integration', () => {
             },
           },
         },
-        extensionPacks: {
+        extensions: {
           postgres: {
             version: '0.0.1',
           },
@@ -234,7 +234,7 @@ describe('emitter integration', () => {
         roots: contractJson1['roots'] as Record<string, CrossReference>,
         models: modelsFromCanonicalContract(contractJson1),
         storage: contractJson1['storage'] as Record<string, unknown>,
-        extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
+        extensions: contractJson1['extensions'] as Record<string, unknown>,
         capabilities:
           (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
         meta: (contractJson1['meta'] as Record<string, unknown>) || {},
@@ -314,7 +314,7 @@ describe('emitter integration', () => {
             },
           },
         },
-        extensionPacks: { postgres: { version: '0.0.1' }, pg: {} },
+        extensions: { postgres: { version: '0.0.1' }, pg: {} },
       });
 
       const enumResolvingSpi = createMockSpi({
@@ -380,7 +380,7 @@ describe('emitter integration', () => {
             },
           },
         },
-        extensionPacks: { postgres: { version: '0.0.1' }, pg: {} },
+        extensions: { postgres: { version: '0.0.1' }, pg: {} },
       });
 
       const result = await emit(
@@ -425,7 +425,7 @@ describe('emitter integration', () => {
             },
           },
         },
-        extensionPacks: { postgres: { version: '0.0.1' }, pg: {} },
+        extensions: { postgres: { version: '0.0.1' }, pg: {} },
       });
 
       const result = await emit(
@@ -464,7 +464,7 @@ describe('emitter integration', () => {
             },
           },
         },
-        extensionPacks: { postgres: { version: '0.0.1' }, pg: {} },
+        extensions: { postgres: { version: '0.0.1' }, pg: {} },
       });
 
       const result = await emit(
@@ -492,7 +492,7 @@ describe('emitter integration', () => {
             },
           },
         },
-        extensionPacks: { postgres: { version: '0.0.1' }, pg: {} },
+        extensions: { postgres: { version: '0.0.1' }, pg: {} },
       });
 
       const result = await emit(

@@ -57,18 +57,18 @@ describe('defineContract runtime guards', () => {
       code: 'CONTRACT.PACK_FAMILY_MISMATCH',
     },
     {
-      name: 'non-extension pack refs in extensionPacks',
+      name: 'non-extension pack refs in extensions',
       run: () =>
         defineContract({
           family: mongoFamilyPack,
           target: mongoTargetPack,
-          extensionPacks: {
+          extensions: {
             invalid: unsafeExtensionPackRefForRuntimeTest(mongoTargetPack),
           },
           models: {},
         }),
       error:
-        'defineContract only accepts extension pack refs in extensionPacks. Received kind "target".',
+        'defineContract only accepts extension pack refs in extensions. Received kind "target".',
       code: 'CONTRACT.PACK_REF_INVALID',
     },
     {
@@ -77,7 +77,7 @@ describe('defineContract runtime guards', () => {
         defineContract({
           family: mongoFamilyPack,
           target: mongoTargetPack,
-          extensionPacks: {
+          extensions: {
             invalid: unsafeExtensionPackRefForRuntimeTest({
               ...vectorExtensionPack,
               familyId: 'sql',
@@ -95,7 +95,7 @@ describe('defineContract runtime guards', () => {
         defineContract({
           family: mongoFamilyPack,
           target: mongoTargetPack,
-          extensionPacks: {
+          extensions: {
             invalid: {
               ...vectorExtensionPack,
               targetId: 'atlas',

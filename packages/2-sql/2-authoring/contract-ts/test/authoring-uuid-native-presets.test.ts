@@ -102,7 +102,7 @@ describe('uuid native presets', () => {
         createComposedAuthoringHelpers({
           family: makeFamilyPack(),
           target: makePostgresPack(),
-          extensionPacks: {},
+          extensions: {},
         }),
       ).not.toThrow();
     });
@@ -111,7 +111,7 @@ describe('uuid native presets', () => {
       const helpers = createComposedAuthoringHelpers({
         family: makeFamilyPack(),
         target: makePostgresPack(),
-        extensionPacks: {},
+        extensions: {},
       });
 
       expect(helpers.field.uuidString).toBeDefined();
@@ -122,7 +122,7 @@ describe('uuid native presets', () => {
       const helpers = createComposedAuthoringHelpers({
         family: makeFamilyPack(),
         target: makePostgresPack(),
-        extensionPacks: {},
+        extensions: {},
       });
 
       expect(helpers.field.id.uuidv4String).toBeDefined();

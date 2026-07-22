@@ -47,7 +47,7 @@ export default function postgresStatic<TContract extends Contract<SqlStorage>>(o
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    extensionPacks: options.extensions ?? [],
+    extensions: options.extensions ?? [],
   });
   const context = createExecutionContext({ contract, stack });
   return buildPostgresStaticContext(context, stack.adapter.rawCodecInferer);

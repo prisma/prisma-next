@@ -126,7 +126,7 @@ function assertStorageSemantics(
   const indexTypeRegistry = createIndexTypeRegistry();
   const packsToRegister: ReadonlyArray<{ readonly id?: string; readonly indexTypes?: unknown }> = [
     definition.target,
-    ...Object.values(definition.extensionPacks ?? {}),
+    ...Object.values(definition.extensions ?? {}),
   ];
   for (const pack of packsToRegister) {
     const registration = pack.indexTypes;
@@ -557,7 +557,7 @@ function assertNoManagedEntityKinds(
  * the same string a pack entity's entries-map key (`entries.<kind>`) uses.
  * Mirrors `contract-psl`'s `buildEntityTypesByDiscriminator`, recomposed here
  * from the packs `ContractDefinition` already carries (`target` +
- * `extensionPacks`) since the TS assembler has no single pre-merged
+ * `extensions`) since the TS assembler has no single pre-merged
  * `AuthoringContributions` input to read the way the PSL interpreter does.
  */
 function collectEntityTypeDescriptorsByDiscriminator(
@@ -573,7 +573,7 @@ function collectEntityTypeDescriptorsByDiscriminator(
       }
     }
   };
-  const components = [definition.target, ...Object.values(definition.extensionPacks ?? {})];
+  const components = [definition.target, ...Object.values(definition.extensions ?? {})];
   for (const component of components) {
     const entityTypes = component.authoring?.entityTypes;
     if (entityTypes !== undefined) {
@@ -1219,21 +1219,21 @@ export function buildSqlContractFromDefinition(
         }
       : undefined;
 
-  const extensionNamespaces = definition.extensionPacks
-    ? Object.values(definition.extensionPacks).map((pack) => pack.id)
+  const extensionNamespaces = definition.extensions
+    ? Object.values(definition.extensions).map((pack) => pack.id)
     : undefined;
 
-  const extensionPacks: Record<string, unknown> = { ...(definition.extensionPacks || {}) };
+  const extensions: Record<string, unknown> = { ...(definition.extensions || {}) };
   if (extensionNamespaces) {
     for (const namespace of extensionNamespaces) {
-      if (!Object.hasOwn(extensionPacks, namespace)) {
-        extensionPacks[namespace] = {};
+      if (!Object.hasOwn(extensions, namespace)) {
+        extensions[namespace] = {};
       }
     }
   }
 
-  const extensionPackCapabilitySources = definition.extensionPacks
-    ? Object.values(definition.extensionPacks).map(
+  const extensionPackCapabilitySources = definition.extensions
+    ? Object.values(definition.extensions).map(
         (pack) => pack.capabilities as CapabilityMatrix | undefined,
       )
     : [];
@@ -1323,7 +1323,7 @@ export function buildSqlContractFromDefinition(
     roots,
     storage,
     ...(executionWithHash ? { execution: executionWithHash } : {}),
-    extensionPacks,
+    extensions,
     capabilities,
     profileHash,
     meta: {},

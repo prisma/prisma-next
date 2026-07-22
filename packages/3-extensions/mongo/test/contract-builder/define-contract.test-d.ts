@@ -8,10 +8,10 @@ type SoleNamespaceModels<
 > = T['domain']['namespaces'][keyof T['domain']['namespaces']]['models'];
 
 // @ts-expect-error — family is no longer accepted; the facade pre-binds it
-defineContract({ family: mongoFamilyPack, extensionPacks: undefined });
+defineContract({ family: mongoFamilyPack, extensions: undefined });
 
 // @ts-expect-error — target is no longer accepted; the facade pre-binds it
-defineContract({ target: mongoTargetPack, extensionPacks: undefined });
+defineContract({ target: mongoTargetPack, extensions: undefined });
 
 // Literal target and targetFamily are preserved on the result
 const result = defineContract({});

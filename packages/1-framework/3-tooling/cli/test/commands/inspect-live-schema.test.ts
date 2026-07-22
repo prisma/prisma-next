@@ -102,7 +102,7 @@ describe('inspectLiveSchema', () => {
   it('uses the explicit db url, masks it in output/meta, and falls back to the default config path', async () => {
     mocks.loadConfigMock.mockResolvedValue({
       ...baseConfig,
-      extensionPacks: undefined,
+      extensions: undefined,
     });
 
     const { flags, ui } = createUi();
@@ -123,7 +123,7 @@ describe('inspectLiveSchema', () => {
     });
     expect(mocks.createControlClientMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        extensionPacks: [],
+        extensions: [],
       }),
     );
     expect(mocks.introspectMock).toHaveBeenCalledWith(

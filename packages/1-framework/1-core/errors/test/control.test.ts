@@ -4,7 +4,7 @@ import {
   errorConfigFileNotFound,
   errorConfigValidation,
   errorContractConfigMissing,
-  errorContractMissingExtensionPacks,
+  errorContractMissingExtensions,
   errorContractValidationFailed,
   errorDatabaseConnectionRequired,
   errorDriverRequired,
@@ -312,28 +312,28 @@ describe('Config Errors', () => {
     expect(error.meta?.['supportedFormats']).toEqual(['compact', 'detailed']);
   });
 
-  it('errorContractMissingExtensionPacks with single pack', () => {
-    const error = errorContractMissingExtensionPacks({
-      missingExtensionPacks: ['pgvector'],
+  it('errorContractMissingExtensions with single pack', () => {
+    const error = errorContractMissingExtensions({
+      missingExtensions: ['pgvector'],
       providedComponentIds: ['postgres', 'postgres-adapter'],
     });
     expect(error.code).toBe('CONFIG.MISSING_EXTENSION_PACKS');
     expect(error.message).toBe('Missing extension packs in config');
     expect(error.why).toContain("'pgvector'");
     expect(error.why).toContain('extension pack');
-    expect(error.meta?.['missingExtensionPacks']).toEqual(['pgvector']);
+    expect(error.meta?.['missingExtensions']).toEqual(['pgvector']);
     expect(error.meta?.['providedComponentIds']).toEqual(['postgres', 'postgres-adapter']);
   });
 
-  it('errorContractMissingExtensionPacks with multiple packs', () => {
-    const error = errorContractMissingExtensionPacks({
-      missingExtensionPacks: ['pgvector', 'uuid-ossp'],
+  it('errorContractMissingExtensions with multiple packs', () => {
+    const error = errorContractMissingExtensions({
+      missingExtensions: ['pgvector', 'uuid-ossp'],
       providedComponentIds: ['postgres'],
     });
     expect(error.code).toBe('CONFIG.MISSING_EXTENSION_PACKS');
     expect(error.why).toContain("'pgvector'");
     expect(error.why).toContain("'uuid-ossp'");
-    expect(error.meta?.['missingExtensionPacks']).toEqual(['pgvector', 'uuid-ossp']);
+    expect(error.meta?.['missingExtensions']).toEqual(['pgvector', 'uuid-ossp']);
   });
 
   it('errorConfigValidation creates correct error', () => {

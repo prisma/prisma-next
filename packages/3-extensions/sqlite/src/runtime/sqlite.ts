@@ -139,7 +139,7 @@ export default function sqlite<TContract extends Contract<SqlStorage>>(
     target: sqliteTarget,
     adapter: sqliteAdapter,
     driver: sqliteDriver,
-    extensionPacks: options.extensions ?? [],
+    extensions: options.extensions ?? [],
   });
 
   const context = createExecutionContext<TContract, SqliteTargetId>({

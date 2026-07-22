@@ -42,7 +42,7 @@ export function createMongoContract(
         namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID,
       }),
     storage: namespacedMongoStorageFromCollections({}) as Contract['storage'],
-    extensionPacks: {},
+    extensions: {},
     capabilities: {},
     meta: {},
     roots: {},

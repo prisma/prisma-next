@@ -114,7 +114,7 @@ function buildExtensionWithPublicTable(
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
     profileHash: profileHash('fixture-profile-v1'),
     storage: new SqlStorage({ storageHash: coreHash(hash), namespaces: { public: namespace } }),
@@ -176,7 +176,7 @@ function makeStack(
       targetId: 'postgres',
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
-    extensionPacks: extensions,
+    extensions: extensions,
   });
 }
 

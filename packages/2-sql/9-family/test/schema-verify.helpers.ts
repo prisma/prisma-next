@@ -30,7 +30,7 @@ import type { CodecControlHooks, ExpandNativeTypeInput } from '../src/core/migra
  */
 export function createTestContract(
   tables: Record<string, StorageTable>,
-  extensionPacks: Record<string, unknown> = {},
+  extensions: Record<string, unknown> = {},
   storageTypes?: Record<string, import('@prisma-next/sql-contract/types').SqlStorageTypeEntry>,
   contractOverrides?: {
     defaultControlPolicy?: ControlPolicy;
@@ -56,7 +56,7 @@ export function createTestContract(
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
     meta: {},
-    extensionPacks,
+    extensions,
   };
 }
 

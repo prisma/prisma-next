@@ -55,7 +55,7 @@ describe('createExecutionStack', () => {
       target,
       adapter,
       driver: undefined,
-      extensionPacks: [],
+      extensions: [],
     });
   });
 
@@ -73,10 +73,10 @@ describe('createExecutionStack', () => {
     const stack = createExecutionStack({
       target,
       adapter,
-      extensionPacks: [extension],
+      extensions: [extension],
     });
 
-    expect(stack.extensionPacks).toEqual([extension]);
+    expect(stack.extensions).toEqual([extension]);
   });
 });
 
@@ -124,7 +124,7 @@ describe('instantiateExecutionStack', () => {
     const stack = createExecutionStack({
       target,
       adapter,
-      extensionPacks: [extension],
+      extensions: [extension],
     });
 
     const instance = instantiateExecutionStack(stack);
@@ -137,7 +137,7 @@ describe('instantiateExecutionStack', () => {
       stack,
       target: targetInstance,
       adapter: adapterInstance,
-      extensionPacks: [extensionInstance],
+      extensions: [extensionInstance],
     });
   });
 
@@ -163,7 +163,7 @@ describe('instantiateExecutionStack', () => {
     const stack = createExecutionStack({ target, adapter });
     const instance = instantiateExecutionStack(stack);
 
-    expect(instance.extensionPacks).toEqual([]);
+    expect(instance.extensions).toEqual([]);
   });
 
   it('returns instance with driver defined when stack has driver descriptor', () => {

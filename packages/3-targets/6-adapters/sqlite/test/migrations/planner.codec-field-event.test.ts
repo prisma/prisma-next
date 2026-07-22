@@ -38,7 +38,7 @@ function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Cont
     domain: applicationDomainOf({ models: {} }),
     roots: {},
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

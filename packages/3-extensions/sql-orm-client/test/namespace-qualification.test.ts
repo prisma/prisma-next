@@ -38,7 +38,7 @@ const publicPostgresContract = {
   profileHash: 'sha256:test-profile',
   roots: {},
   capabilities: { returning: { enabled: true } },
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   storage: new SqlStorage({
     storageHash: 'sha256:test-core-public-orm',
@@ -132,7 +132,7 @@ describe('ORM namespace qualification', () => {
       profileHash: 'sha256:test-profile',
       roots: {},
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
       storage: new SqlStorage({
         storageHash: 'sha256:test-core-sqlite-orm',

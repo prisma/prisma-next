@@ -77,7 +77,7 @@ function buildColumnDescriptorMap(
 
 export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
   const source: PslInterpretCapable = {
-    sourceFormat: 'psl',
+    format: 'psl',
     inputs: [schemaPath],
     interpret(input, context) {
       const scalarTypeDescriptors = buildColumnDescriptorMap(
@@ -93,10 +93,8 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         authoringContributions: context.authoringContributions,
         scalarTypeDescriptors,
         ...ifDefined(
-          'composedExtensionPacks',
-          context.composedExtensionPacks.length > 0
-            ? [...context.composedExtensionPacks]
-            : undefined,
+          'composedExtensions',
+          context.composedExtensions.length > 0 ? [...context.composedExtensions] : undefined,
         ),
         composedExtensionContracts: context.composedExtensionContracts,
         ...ifDefined(

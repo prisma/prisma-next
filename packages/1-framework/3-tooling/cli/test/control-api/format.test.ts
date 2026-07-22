@@ -15,7 +15,7 @@ function pslConfig(
 ) {
   return mockConfig({
     contract: {
-      source: { sourceFormat: 'psl', inputs: [inputPath], load: () => {} },
+      source: { format: 'psl', inputs: [inputPath], load: () => {} },
       output: join(inputPath, '..', 'contract.json'),
     },
     ...(formatter ? { formatter } : {}),
@@ -86,7 +86,7 @@ describe('executeFormat', () => {
     const result = await withMockedConfig(
       mockConfig({
         contract: {
-          source: { sourceFormat: 'typescript', inputs: [inputPath], load: () => {} },
+          source: { format: 'typescript', inputs: [inputPath], load: () => {} },
           output: join(tmpDir, 'contract.json'),
         },
       }),
@@ -100,7 +100,7 @@ describe('executeFormat', () => {
     expect(await readFile(inputPath, 'utf-8')).toBe(original);
   });
 
-  it('leaves an absent-sourceFormat source untouched', async () => {
+  it('leaves an absent-format source untouched', async () => {
     const inputPath = join(tmpDir, 'schema.prisma');
     await writeFile(inputPath, MESSY_PSL, 'utf-8');
 

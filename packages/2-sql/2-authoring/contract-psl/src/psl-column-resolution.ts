@@ -199,7 +199,7 @@ export function reportUncomposedNamespace(input: {
 }): void {
   input.diagnostics.push({
     code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
-    message: `${input.subjectLabel} uses unrecognized namespace "${input.namespace}". Add extension pack "${input.namespace}" to extensionPacks in prisma-next.config.ts.`,
+    message: `${input.subjectLabel} uses unrecognized namespace "${input.namespace}". Add extension pack "${input.namespace}" to extensions in prisma-next.config.ts.`,
     sourceId: input.sourceId,
     span: input.span,
     data: { namespace: input.namespace, suggestedPack: input.namespace },

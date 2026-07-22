@@ -31,7 +31,7 @@ function makeContract(
     domain: applicationDomainOf({ models: {} }),
     roots: {},
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
     ...(defaultControlPolicy !== undefined ? { defaultControlPolicy } : {}),
   };

@@ -1,5 +1,5 @@
 /**
- * Single descriptor-import boundary for CLI consumers of `Config.extensionPacks`.
+ * Single descriptor-import boundary for CLI consumers of `Config.extensions`.
  *
  * Every CLI command / utility that reads an extension descriptor's
  * `contractSpace` projection (loader, migrate-pass, extension-migrations
@@ -54,9 +54,9 @@ export interface ExtensionPackInput {
 }
 
 /**
- * Structural shape we read off each `Config.extensionPacks` entry.
+ * Structural shape we read off each `Config.extensions` entry.
  *
- * The CLI is the descriptor-import boundary; `extensionPacks` is the only
+ * The CLI is the descriptor-import boundary; `extensions` is the only
  * surface where the SQL-family-typed `ControlExtensionDescriptor` flows
  * into framework-neutral helpers. The structural cast lives here, and
  * here alone — every other CLI consumer reads the canonical
@@ -76,14 +76,14 @@ type ExtensionPackLike = {
 };
 
 /**
- * Project the CLI's `Config.extensionPacks` array into the canonical
+ * Project the CLI's `Config.extensions` array into the canonical
  * {@link ExtensionPackInput} shape. The single `as ExtensionPackLike`
  * structural cast in the CLI lives inside this function.
  */
 export function toExtensionInputs(
-  extensionPacks: ReadonlyArray<unknown>,
+  extensions: ReadonlyArray<unknown>,
 ): readonly ExtensionPackInput[] {
-  return extensionPacks.map((raw) => {
+  return extensions.map((raw) => {
     const pack = raw as ExtensionPackLike;
     if (pack.contractSpace === undefined) {
       return { id: pack.id, targetId: pack.targetId };
@@ -147,10 +147,10 @@ export function toDeclaredExtensions(
  * always reads the contract from on-disk artefacts instead.
  */
 export function toDeclaredExtensionsFromRaw(
-  extensionPacks: ReadonlyArray<unknown>,
+  extensions: ReadonlyArray<unknown>,
 ): readonly DeclaredExtensionEntry[] {
   const entries: DeclaredExtensionEntry[] = [];
-  for (const raw of extensionPacks) {
+  for (const raw of extensions) {
     if (typeof raw !== 'object' || raw === null) continue;
     const descriptor = Object.getOwnPropertyDescriptor(raw, 'contractSpace');
     if (descriptor === undefined) continue;

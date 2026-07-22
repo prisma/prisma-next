@@ -10,10 +10,10 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensions: [],
   contract: {
     source: {
-      sourceFormat: 'typescript',
+      format: 'typescript',
       load: async () => ({ ok: true, value: contract }),
     },
     output: './contract.json',

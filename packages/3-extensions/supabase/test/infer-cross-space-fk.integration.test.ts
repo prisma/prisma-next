@@ -78,7 +78,7 @@ describe('contract infer — cross-space FK into the Supabase pack', () => {
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [supabasePack],
+        extensions: [supabasePack],
       });
 
       try {

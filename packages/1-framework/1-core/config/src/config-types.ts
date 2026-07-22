@@ -74,7 +74,7 @@ export interface PrismaNextConfig<
   readonly family: ControlFamilyDescriptor<TFamilyId>;
   readonly target: ControlTargetDescriptor<TFamilyId, TTargetId>;
   readonly adapter: ControlAdapterDescriptor<TFamilyId, TTargetId>;
-  readonly extensionPacks?: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
+  readonly extensions?: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
   /**
    * Driver descriptor for DB-connected CLI commands.
    * Required for DB-connected commands (e.g., db verify).
@@ -117,7 +117,7 @@ export interface PrismaNextConfig<
 const ContractSourceInputSchema = type('string');
 
 export const ContractSourceProviderSchema = type({
-  'sourceFormat?': 'string',
+  'format?': 'string',
   'inputs?': ContractSourceInputSchema.array(),
   load: 'Function',
 });
@@ -146,7 +146,7 @@ const PrismaNextConfigSchema = type({
   family: 'unknown', // ControlFamilyDescriptor - validated separately
   target: 'unknown', // ControlTargetDescriptor - validated separately
   adapter: 'unknown', // ControlAdapterDescriptor - validated separately
-  'extensionPacks?': 'unknown[]',
+  'extensions?': 'unknown[]',
   'driver?': 'unknown', // ControlDriverDescriptor - validated separately (optional)
   'db?': 'unknown',
   'contract?': ContractConfigSchema,

@@ -3,7 +3,7 @@
  *
  * Proves the core claim of `@prisma-next/extension-supabase`:
  *
- *   When a composed contract declares `extensionPacks: [supabasePack]`, the
+ *   When a composed contract declares `extensions: [supabasePack]`, the
  *   framework treats the Supabase `auth.*` and `storage.*` tables as
  *   `external`. Concretely:
  *
@@ -148,7 +148,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [supabasePack],
+        extensions: [supabasePack],
       });
 
       try {
@@ -301,7 +301,7 @@ describe('supabase walking skeleton — external-contract migrate/verify + publi
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [supabasePack],
+        extensions: [supabasePack],
       });
       try {
         await client.connect(connectionString);
@@ -422,7 +422,7 @@ describe('supabase RLS behavioral e2e — filtering + drift-fails-verify', () =>
       target: postgres,
       adapter: postgresAdapter,
       driver: postgresDriver,
-      extensionPacks: [supabasePack],
+      extensions: [supabasePack],
     });
 
     await client.connect(database.connectionString);

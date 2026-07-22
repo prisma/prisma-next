@@ -539,7 +539,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
       driver: { kind: 'driver', create: vi.fn() },
       contract: { output: 'contract.json' },
       migrations: { dir: 'migrations' },
-      extensionPacks: [
+      extensions: [
         {
           id: 'pgvector',
           targetId: TARGET,
@@ -655,7 +655,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
       driver: { kind: 'driver', create: vi.fn() },
       contract: { output: 'contract.json' },
       migrations: { dir: 'migrations' },
-      extensionPacks: [
+      extensions: [
         {
           id: 'pgvector',
           targetId: TARGET,
@@ -785,7 +785,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
       driver: { kind: 'driver', create: vi.fn() },
       contract: { output: 'contract.json' },
       migrations: { dir: 'migrations' },
-      extensionPacks: [
+      extensions: [
         {
           id: 'pgvector',
           targetId: TARGET,

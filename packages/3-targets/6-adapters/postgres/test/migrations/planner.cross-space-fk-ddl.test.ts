@@ -92,7 +92,7 @@ function buildCrossSpaceFkContract(targetNamespaceId: string): Contract<SqlStora
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -155,7 +155,7 @@ function buildLocalFkContract(): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

@@ -63,7 +63,7 @@ type TestContractOverrides = {
   enum?: Record<string, unknown>;
   storage?: Record<string, unknown>;
   capabilities?: Record<string, Record<string, boolean>>;
-  extensionPacks?: Record<string, unknown>;
+  extensions?: Record<string, unknown>;
   execution?: Record<string, unknown>;
   meta?: Record<string, unknown>;
   storageHash?: string;

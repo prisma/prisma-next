@@ -299,7 +299,7 @@ export default async function supabase<TContract extends Contract<SqlStorage>>(
     target: postgresTarget,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: withSupabaseDescriptor(options.extensions),
+    extensions: withSupabaseDescriptor(options.extensions),
   });
 
   const context = createExecutionContext({ contract, stack });

@@ -551,13 +551,10 @@ type DefinitionRoots<Definition> = Definition extends {
   ? NormalizeRoots<Roots>
   : DerivedRootModels<DefinitionModels<Definition>>;
 
-type DefinitionExtensionPacks<Definition> = Definition extends {
-  readonly extensionPacks?: infer ExtensionPacks extends Record<
-    string,
-    ExtensionPackRef<string, string>
-  >;
+type DefinitionExtensions<Definition> = Definition extends {
+  readonly extensions?: infer Extensions extends Record<string, ExtensionPackRef<string, string>>;
 }
-  ? ExtensionPacks
+  ? Extensions
   : Record<never, never>;
 
 type DefinitionFamilyId<Definition> = Definition extends {
@@ -627,7 +624,7 @@ type MongoContractBaseFromDefinition<Definition> = Simplify<{
   };
   readonly storage: DefinitionStorage<Definition>;
   readonly capabilities: Record<string, never>;
-  readonly extensionPacks: DefinitionExtensionPacks<Definition>;
+  readonly extensions: DefinitionExtensions<Definition>;
   readonly profileHash: ProfileHashBase<string>;
   readonly meta: Record<string, never>;
   readonly defaultControlPolicy?: ControlPolicy;
@@ -635,7 +632,7 @@ type MongoContractBaseFromDefinition<Definition> = Simplify<{
 }>;
 
 type CodecTypesFromDefinition<Definition> = MongoCodecTypes &
-  MergeExtensionCodecTypesSafe<DefinitionExtensionPacks<Definition>>;
+  MergeExtensionCodecTypesSafe<DefinitionExtensions<Definition>>;
 
 // The enum value union for a field builder — `EnumTypeHandle['values'][number]`
 // when the builder carries an enum handle, `never` otherwise.
@@ -766,19 +763,19 @@ type ExtractEntitiesNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
   Record<never, never>
 >;
 
-type MergeExtensionEntityNamespaces<ExtensionPacks> = MergeExtensionAuthoringNamespaces<
-  ExtensionPacks,
+type MergeExtensionEntityNamespaces<Extensions> = MergeExtensionAuthoringNamespaces<
+  Extensions,
   'entityTypes'
 >;
 
 export type ContractAuthoringHelpers<
   Family extends FamilyPackRef<string> = FamilyPackRef<string>,
   Target extends TargetPackRef<string, string> = TargetPackRef<string, string>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
+  Extensions extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
 > = EntityHelpersFromNamespace<
   ExtractEntitiesNamespaceFromPack<Family> &
     ExtractEntitiesNamespaceFromPack<Target> &
-    MergeExtensionEntityNamespaces<ExtensionPacks>
+    MergeExtensionEntityNamespaces<Extensions>
 > & {
   readonly field: typeof field;
   readonly index: typeof index;
@@ -806,12 +803,12 @@ const MONGO_RESERVED_HELPER_KEYS: readonly string[] = [
 function composeMongoEntityHelpers(
   family: FamilyPackRef<string>,
   target: TargetPackRef<string, string>,
-  extensionPacks: Record<string, ExtensionPackRef<string, string>> | undefined,
+  extensions: Record<string, ExtensionPackRef<string, string>> | undefined,
 ): Record<string, unknown> {
   const components: readonly AuthoringComponent[] = [
     family,
     target,
-    ...Object.values(extensionPacks ?? {}),
+    ...Object.values(extensions ?? {}),
   ];
   const merged: Record<string, unknown> = {};
   for (const component of components) {
@@ -847,12 +844,12 @@ function composeMongoEntityHelpers(
 export type ContractScaffold<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<string, string>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
+  Extensions extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
   Roots extends Record<string, ModelNameInput> | undefined = undefined,
 > = {
   readonly family: Family;
   readonly target: Target;
-  readonly extensionPacks?: ExtensionPacks;
+  readonly extensions?: Extensions;
   readonly roots?: Roots;
   readonly defaultControlPolicy?: ControlPolicy;
 };
@@ -862,9 +859,9 @@ export type ContractDefinition<
   Target extends TargetPackRef<string, string>,
   Models extends Record<string, AnyModelBuilder> = Record<never, never>,
   ValueObjects extends Record<string, AnyValueObjectBuilder> = Record<never, never>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
+  Extensions extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
   Roots extends Record<string, ModelNameInput> | undefined = undefined,
-> = ContractScaffold<Family, Target, ExtensionPacks, Roots> & {
+> = ContractScaffold<Family, Target, Extensions, Roots> & {
   readonly models?: Models;
   readonly valueObjects?: ValueObjects;
   readonly enums?: Record<string, EnumTypeHandle>;
@@ -876,8 +873,8 @@ export type ContractFactory<
   Roots extends Record<string, ModelNameInput> | undefined = undefined,
   Family extends FamilyPackRef<string> = FamilyPackRef<string>,
   Target extends TargetPackRef<string, string> = TargetPackRef<string, string>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
-> = (helpers: ContractAuthoringHelpers<Family, Target, ExtensionPacks>) => {
+  Extensions extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
+> = (helpers: ContractAuthoringHelpers<Family, Target, Extensions>) => {
   readonly models?: Models;
   readonly valueObjects?: ValueObjects;
   readonly roots?: Roots;
@@ -1396,17 +1393,17 @@ function validateTargetPackRef(
 
 function validateExtensionPackRefs(
   target: TargetPackRef<string, string>,
-  extensionPacks?: Record<string, ExtensionPackRef<string, string>>,
+  extensions?: Record<string, ExtensionPackRef<string, string>>,
 ): void {
-  if (!extensionPacks) {
+  if (!extensions) {
     return;
   }
 
-  for (const packRef of Object.values(extensionPacks)) {
+  for (const packRef of Object.values(extensions)) {
     if (packRef.kind !== 'extension') {
       throw contractError(
         'CONTRACT.PACK_REF_INVALID',
-        `defineContract only accepts extension pack refs in extensionPacks. Received kind "${packRef.kind}".`,
+        `defineContract only accepts extension pack refs in extensions. Received kind "${packRef.kind}".`,
         { meta: { packId: packRef.id, kind: packRef.kind } },
       );
     }
@@ -1858,7 +1855,7 @@ function buildContractFromDefinition<
   >,
 >(definition: Definition): MongoContractResult<Definition> {
   validateTargetPackRef(definition.family, definition.target);
-  validateExtensionPackRefs(definition.target, definition.extensionPacks);
+  validateExtensionPackRefs(definition.target, definition.extensions);
 
   const builtModels = buildModels(definition.models);
   const builtValueObjects = buildValueObjects(definition.valueObjects);
@@ -1974,7 +1971,7 @@ function buildContractFromDefinition<
     },
     storage,
     capabilities,
-    extensionPacks: definition.extensionPacks ?? {},
+    extensions: definition.extensions ?? {},
     profileHash: computeProfileHash({
       target: definition.target.targetId,
       targetFamily: definition.family.familyId,
@@ -1993,10 +1990,10 @@ function buildContractFromDefinition<
 type BoundDefinitionInput<
   Models extends Record<string, AnyModelBuilder> = Record<never, never>,
   ValueObjects extends Record<string, AnyValueObjectBuilder> = Record<never, never>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
+  Extensions extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
   Roots extends Record<string, ModelNameInput> | undefined = undefined,
 > = {
-  readonly extensionPacks?: ExtensionPacks;
+  readonly extensions?: Extensions;
   readonly roots?: Roots;
   readonly defaultControlPolicy?: ControlPolicy;
   readonly models?: Models;
@@ -2056,7 +2053,7 @@ export function buildBoundContract<
   target: T,
   definition: Definition,
   factory: (
-    helpers: ContractAuthoringHelpers<F, T, NonNullable<Definition['extensionPacks']>>,
+    helpers: ContractAuthoringHelpers<F, T, NonNullable<Definition['extensions']>>,
   ) => Built,
 ): MongoContractResult<WithFamilyTarget<Definition & Built, F, T>>;
 /** Implementation. */
@@ -2079,15 +2076,13 @@ export function buildBoundContract<
   target: T,
   definition: Definition,
   factory?:
-    | ((
-        helpers: ContractAuthoringHelpers<F, T, NonNullable<Definition['extensionPacks']>>,
-      ) => Built)
+    | ((helpers: ContractAuthoringHelpers<F, T, NonNullable<Definition['extensions']>>) => Built)
     | undefined,
 ) {
   const full = { ...definition, family, target };
 
   if (factory !== undefined) {
-    const entities = composeMongoEntityHelpers(family, target, definition.extensionPacks);
+    const entities = composeMongoEntityHelpers(family, target, definition.extensions);
     // composeMongoEntityHelpers returns Record<string, unknown> via an opaque runtime
     // namespace walk; there is no way to reconstruct ContractAuthoringHelpers<F,T,Ext>
     // structurally from that return type, so this single cast is irreducible.
@@ -2098,7 +2093,7 @@ export function buildBoundContract<
       model,
       rel,
       valueObject,
-    } as unknown as ContractAuthoringHelpers<F, T, NonNullable<Definition['extensionPacks']>>;
+    } as unknown as ContractAuthoringHelpers<F, T, NonNullable<Definition['extensions']>>;
     const built = factory(helpers);
     return buildContractFromDefinition({
       ...full,
@@ -2125,7 +2120,7 @@ export function defineContract<
   const Definition extends ContractScaffold<
     Family,
     Target,
-    ExtensionPacks,
+    Extensions,
     Record<string, ModelNameInput> | undefined
   >,
   const Built extends {
@@ -2135,12 +2130,10 @@ export function defineContract<
   },
   const Family extends FamilyPackRef<string> = FamilyPackRef<string>,
   const Target extends TargetPackRef<string, string> = TargetPackRef<string, string>,
-  const ExtensionPacks extends
-    | Record<string, ExtensionPackRef<string, string>>
-    | undefined = undefined,
+  const Extensions extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
 >(
   definition: Definition,
-  factory: (helpers: ContractAuthoringHelpers<Family, Target, ExtensionPacks>) => Built,
+  factory: (helpers: ContractAuthoringHelpers<Family, Target, Extensions>) => Built,
 ): MongoContractResult<Definition & Built>;
 export function defineContract(
   definition: ContractScaffold<

@@ -41,7 +41,7 @@ After emit, `Product.spec` in `contract.d.ts` resolves to `{ name: string; price
 
 ## Pack registration
 
-Add the runtime descriptor to your runtime stack and the control descriptor to your `prisma-next.config.ts` `extensionPacks`:
+Add the runtime descriptor to your runtime stack and the control descriptor to your `prisma-next.config.ts` `extensions`:
 
 ```ts
 import arktypeJsonPack from '@prisma-next/extension-arktype-json/pack';
@@ -49,7 +49,7 @@ import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 
 // prisma-next.config.ts
 export default {
-  extensionPacks: { arktypeJson: arktypeJsonPack },
+  extensions: { arktypeJson: arktypeJsonPack },
   // ...
 };
 
@@ -57,7 +57,7 @@ export default {
 const stack = createSqlExecutionStack({
   target: postgresTarget,
   adapter: postgresAdapter,
-  extensionPacks: [arktypeJsonRuntime],
+  extensions: [arktypeJsonRuntime],
 });
 ```
 
