@@ -408,9 +408,3 @@ PPg is optional, but using it delivers zero-touch guardrails for teams and agent
 - **Drift handling:** Marker checks, plan hashes, and contract verification detect drift at startup, before queries, and throughout migration workflows
 - **Environment policies:** Development environments allow automatic reconciliation while staging and production enforce strict guardrails and human approval
 - **Observability:** Plans, guardrail outcomes, and contract changes are logged in machine-readable formats for agents and dashboards
-
-## Roadmap Snapshot
-
-1. **MVP:** Postgres support, contract emit, plan factories, runtime guardrails, PPg preflight previews
-2. **Pilot:** Rename/drop with policy hints, richer diagnostics, pack catalog
-3. **GA:** Hardened runtime, policy packs, additional database adapters, contributor-friendly extension tooling

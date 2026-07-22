@@ -178,7 +178,7 @@ When no marker is set, `agent` is `null`. The detection is **best-effort**: it c
 Telemetry events feed a small set of product questions:
 
 - **Is Prisma Next being used, and by how many people?** Monthly active users, computed from distinct `installationId`s.
-- **Which databases do users target?** Distribution over `databaseTarget`, so target maintenance and roadmap effort can follow real usage.
+- **Which databases do users target?** Distribution over `databaseTarget`, so target maintenance effort follows real usage.
 - **Which extensions are adopted?** Counts over `extensions`, so first-party extension packs and community packs get visible adoption signal.
 - **Which runtime and TypeScript versions are in use?** So deprecations follow actual user impact.
 - **How much CLI usage flows through AI coding agents?** From the `agent` field, to inform docs and UX targeted at agent-driven workflows.
