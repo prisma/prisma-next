@@ -83,7 +83,7 @@ function setupTagCollection(): {
     stack: createSqlExecutionStack({
       target: postgresTarget,
       adapter: postgresAdapter,
-      extensionPacks: [pgvectorRuntime],
+      extensions: [pgvectorRuntime],
     }),
   });
   const runtime = createMockRuntime();

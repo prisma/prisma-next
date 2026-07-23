@@ -23,7 +23,7 @@ const contract = new SqlContractSerializer().deserializeContract({
   profileHash: 'test',
   roots: {},
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   storage: {
     storageHash: 'test-hash',
@@ -55,7 +55,7 @@ describe('Operation lowering', () => {
   // The bare `createPostgresAdapter()` factory cannot see extension codecs
   // (ADR 205); these tests use `pg/vector@1` which lives in pgvector, so we
   // compose a stack with the pgvector runtime descriptor.
-  const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
+  const adapter = createComposedPostgresAdapter({ extensions: [pgvectorRuntime] });
 
   function distanceExpr() {
     return new OperationExpr({

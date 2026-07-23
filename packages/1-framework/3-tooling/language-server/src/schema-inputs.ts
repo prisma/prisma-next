@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url';
 export interface SchemaInputConfig {
   readonly contract?: {
     readonly source: {
-      readonly sourceFormat?: string;
+      readonly format?: string;
       readonly inputs?: readonly string[];
     };
   };
@@ -16,7 +16,7 @@ export interface SchemaInputSet {
 
 export function hasPslInputs(config: SchemaInputConfig): boolean {
   const source = config.contract?.source;
-  return source?.sourceFormat === 'psl' && source.inputs !== undefined;
+  return source?.format === 'psl' && source.inputs !== undefined;
 }
 
 export function resolveSchemaInputs(config: SchemaInputConfig): SchemaInputSet {

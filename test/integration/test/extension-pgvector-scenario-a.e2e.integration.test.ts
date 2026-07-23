@@ -167,7 +167,7 @@ function buildAppContractPojo(opts: { readonly withLength: boolean }): Contract<
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -177,7 +177,7 @@ const controlStack = createControlStack({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
   driver: postgresDriverDescriptor,
-  extensionPacks: [pgvectorExtensionDescriptor],
+  extensions: [pgvectorExtensionDescriptor],
 });
 const familyInstance = sqlFamilyDescriptor.create(controlStack);
 const controlAdapter = postgresAdapterDescriptor.create(controlStack);
@@ -339,7 +339,7 @@ describe.sequential('pgvector Scenario A end-to-end (PGlite, T4.3)', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir: project.migrationsDir,
       targetId: 'postgres',
-      extensionPacks: [pgvectorExtensionDescriptor],
+      extensions: [pgvectorExtensionDescriptor],
     });
 
     if (!result.ok) {
@@ -373,7 +373,7 @@ describe.sequential('pgvector Scenario A end-to-end (PGlite, T4.3)', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir: project.migrationsDir,
       targetId: 'postgres',
-      extensionPacks: [pgvectorExtensionDescriptor],
+      extensions: [pgvectorExtensionDescriptor],
     });
 
     if (!result.ok) {

@@ -28,8 +28,8 @@ describe('sqlite defineContract wrap', () => {
     expect(domainModelsAtDefaultNamespace(result.domain)['Foo']).toBeDefined();
   });
 
-  it('accepts extensionPacks: undefined', () => {
-    const result = defineContract({ extensionPacks: undefined });
+  it('accepts extensions: undefined', () => {
+    const result = defineContract({ extensions: undefined });
     expect(result.target).toBe('sqlite');
   });
 

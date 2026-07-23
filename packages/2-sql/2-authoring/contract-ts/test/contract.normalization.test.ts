@@ -173,9 +173,9 @@ describe('SqlContractSerializer structural validation', () => {
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).not.toThrow();
   });
 
-  it('accepts contract with extensionPacks', () => {
+  it('accepts contract with extensions', () => {
     const contract = validateSqlContractFully<Contract<SqlStorage>>(validSqlContractJson());
-    expect(contract.extensionPacks).toEqual({});
+    expect(contract.extensions).toEqual({});
   });
 
   it('accepts contract with capabilities', () => {

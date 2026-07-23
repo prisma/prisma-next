@@ -156,10 +156,10 @@ describe('emit command: additional fixtures', () => {
           family: providerConfig.family,
           target: providerConfig.target,
           adapter: providerConfig.adapter,
-          extensionPacks: providerConfig.extensionPacks ?? [],
+          extensions: providerConfig.extensions ?? [],
         });
         sourceResult = await contractConfig!.source.load({
-          composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+          composedExtensions: stack.extensions.map((p) => p.id),
           composedExtensionContracts: new Map(),
           authoringContributions: stack.authoringContributions,
           codecLookup: stack.codecLookup,

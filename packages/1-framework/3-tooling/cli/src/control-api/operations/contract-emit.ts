@@ -195,7 +195,7 @@ export async function executeContractEmit(
     const stack = createControlStack(config);
 
     const sourceContext = {
-      composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+      composedExtensions: stack.extensions.map((p) => p.id),
       composedExtensionContracts: stack.extensionContracts,
       authoringContributions: stack.authoringContributions,
       codecLookup: stack.codecLookup,
@@ -230,7 +230,7 @@ export async function executeContractEmit(
     let emitResult: Awaited<ReturnType<typeof emit>>;
     try {
       const familyInstance = config.family.create(stack);
-      const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
+      const rawComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
       const frameworkComponents = assertFrameworkComponentsCompatible(
         config.family.familyId,
         config.target.targetId,

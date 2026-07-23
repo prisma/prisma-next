@@ -84,7 +84,7 @@ export async function executeMigrationLogCommand(
     target: config.target,
     adapter: config.adapter,
     ...ifDefined('driver', config.driver),
-    extensionPacks: config.extensionPacks ?? [],
+    extensions: config.extensions ?? [],
   });
 
   try {

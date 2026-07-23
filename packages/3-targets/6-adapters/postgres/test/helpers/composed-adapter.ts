@@ -29,13 +29,13 @@ const stubRuntimeTarget: RuntimeTargetDescriptor<'sql', 'postgres'> = {
  * with the relevant extension pack(s).
  */
 export function createComposedPostgresAdapter(options: {
-  readonly extensionPacks: readonly RuntimeExtensionDescriptor<'sql', 'postgres'>[];
+  readonly extensions: readonly RuntimeExtensionDescriptor<'sql', 'postgres'>[];
 }) {
   return postgresRuntimeAdapterDescriptor.create({
     target: stubRuntimeTarget,
     adapter: postgresRuntimeAdapterDescriptor,
     driver: undefined,
-    extensionPacks: options.extensionPacks,
+    extensions: options.extensions,
   });
 }
 
@@ -49,13 +49,13 @@ export function createComposedPostgresAdapter(options: {
  * codec lookup is assembled from the same metadata sources production uses.
  */
 export function createComposedPostgresControlAdapter(options: {
-  readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', 'postgres'>[];
+  readonly extensions: readonly ControlExtensionDescriptor<'sql', 'postgres'>[];
 }): SqlControlAdapter<'postgres'> {
   const stack = createControlStack({
     family: sqlFamilyDescriptor,
     target: postgresTargetControlDescriptor,
     adapter: postgresAdapterControlDescriptor,
-    extensionPacks: options.extensionPacks,
+    extensions: options.extensions,
   });
   return postgresAdapterControlDescriptor.create(stack) as SqlControlAdapter<'postgres'>;
 }

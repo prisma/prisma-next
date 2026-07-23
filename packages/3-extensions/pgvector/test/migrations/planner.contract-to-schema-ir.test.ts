@@ -93,7 +93,7 @@ function createTestContract(
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
     ...overrides,
   };
@@ -906,7 +906,7 @@ function createDemoContract(
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: { pgvector: {} },
+    extensions: { pgvector: {} },
     meta: {},
     ...overrides,
   };

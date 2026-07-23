@@ -65,7 +65,7 @@ function resolveInterpretation(
   return {
     source,
     context: {
-      composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+      composedExtensions: stack.extensions.map((p) => p.id),
       composedExtensionContracts: stack.extensionContracts,
       authoringContributions: stack.authoringContributions,
       codecLookup: stack.codecLookup,

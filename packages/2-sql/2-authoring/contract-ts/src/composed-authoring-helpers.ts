@@ -56,16 +56,16 @@ type ExtractEntitiesNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
   Record<never, never>
 >;
 
-type MergeExtensionTypeNamespaces<ExtensionPacks> = MergeExtensionAuthoringNamespaces<
-  ExtensionPacks,
+type MergeExtensionTypeNamespaces<Extensions> = MergeExtensionAuthoringNamespaces<
+  Extensions,
   'type'
 >;
-type MergeExtensionFieldNamespaces<ExtensionPacks> = MergeExtensionAuthoringNamespaces<
-  ExtensionPacks,
+type MergeExtensionFieldNamespaces<Extensions> = MergeExtensionAuthoringNamespaces<
+  Extensions,
   'field'
 >;
-type MergeExtensionEntityNamespaces<ExtensionPacks> = MergeExtensionAuthoringNamespaces<
-  ExtensionPacks,
+type MergeExtensionEntityNamespaces<Extensions> = MergeExtensionAuthoringNamespaces<
+  Extensions,
   'entityTypes'
 >;
 
@@ -101,12 +101,12 @@ type TypeHelpersFromNamespace<Namespace> = {
 
 type CoreFieldHelpers = Pick<typeof field, 'column' | 'generated' | 'namedType'>;
 
-type MergeAllPackIndexTypes<Family, Target, ExtensionPacks> = MergeExtensionIndexTypes<
-  { readonly __family: Family; readonly __target: Target } & (ExtensionPacks extends Record<
+type MergeAllPackIndexTypes<Family, Target, Extensions> = MergeExtensionIndexTypes<
+  { readonly __family: Family; readonly __target: Target } & (Extensions extends Record<
     string,
     unknown
   >
-    ? ExtensionPacks
+    ? Extensions
     : Record<never, never>)
 >;
 
@@ -132,24 +132,24 @@ type PackAwareModel<IndexTypes extends IndexTypeMap> = {
 export type ComposedAuthoringHelpers<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 > = EntityHelpersFromNamespace<
   ExtractEntitiesNamespaceFromPack<Family> &
     ExtractEntitiesNamespaceFromPack<Target> &
-    MergeExtensionEntityNamespaces<ExtensionPacks>
+    MergeExtensionEntityNamespaces<Extensions>
 > & {
   readonly field: CoreFieldHelpers &
     FieldHelpersFromNamespace<
       ExtractFieldNamespaceFromPack<Family> &
         ExtractFieldNamespaceFromPack<Target> &
-        MergeExtensionFieldNamespaces<ExtensionPacks>
+        MergeExtensionFieldNamespaces<Extensions>
     >;
-  readonly model: PackAwareModel<MergeAllPackIndexTypes<Family, Target, ExtensionPacks>>;
+  readonly model: PackAwareModel<MergeAllPackIndexTypes<Family, Target, Extensions>>;
   readonly rel: typeof rel;
   readonly type: TypeHelpersFromNamespace<
     ExtractTypeNamespaceFromPack<Family> &
       ExtractTypeNamespaceFromPack<Target> &
-      MergeExtensionTypeNamespaces<ExtensionPacks>
+      MergeExtensionTypeNamespaces<Extensions>
   >;
 };
 
@@ -272,14 +272,14 @@ function createComposedFieldHelpers(
 export function createComposedAuthoringHelpers<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 >(options: {
   readonly family: Family;
   readonly target: Target;
-  readonly extensionPacks?: ExtensionPacks;
-}): ComposedAuthoringHelpers<Family, Target, ExtensionPacks> {
+  readonly extensions?: Extensions;
+}): ComposedAuthoringHelpers<Family, Target, Extensions> {
   const extensionValues: readonly ExtensionPackRef<'sql', string>[] = Object.values(
-    (options.extensionPacks ?? {}) as Record<string, ExtensionPackRef<'sql', string>>,
+    (options.extensions ?? {}) as Record<string, ExtensionPackRef<'sql', string>>,
   );
   const components: readonly AuthoringComponent[] = [
     options.family,
@@ -303,5 +303,5 @@ export function createComposedAuthoringHelpers<
     model,
     rel,
     type: createTypeHelpersFromNamespace(typeNamespace),
-  } as ComposedAuthoringHelpers<Family, Target, ExtensionPacks>;
+  } as ComposedAuthoringHelpers<Family, Target, Extensions>;
 }

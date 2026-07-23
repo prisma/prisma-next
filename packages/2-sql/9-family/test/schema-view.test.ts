@@ -51,7 +51,7 @@ function createMockStack() {
 
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
-    extensionPacks: [],
+    extensions: [],
   });
 }
 

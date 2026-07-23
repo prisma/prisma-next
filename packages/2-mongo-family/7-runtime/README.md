@@ -46,7 +46,7 @@ Custom or third-party codecs (encryption, vendor scalars) are contributed via an
 
 ## Responsibilities
 
-- **Stack/context composition**: `createMongoExecutionStack` and `createMongoExecutionContext` mirror SQL's `createSqlExecutionStack` / `createExecutionContext`. The context aggregates codec contributions from `[stack.target, stack.adapter, ...stack.extensionPacks]` into a single `MongoCodecRegistry`.
+- **Stack/context composition**: `createMongoExecutionStack` and `createMongoExecutionContext` mirror SQL's `createSqlExecutionStack` / `createExecutionContext`. The context aggregates codec contributions from `[stack.target, stack.adapter, ...stack.extensions]` into a single `MongoCodecRegistry`.
 - **Runtime executor**: `createMongoRuntime({ context, driver, ... })` composes context and driver into a `MongoRuntime` with a single `execute(plan)` entry point accepting `MongoQueryPlan<Row>` from `@prisma-next/mongo-query-ast`. The adapter is reached via `context.stack.adapter` (instantiated lazily through the stack's `create(stack)` factory). Execution lowers the plan through the adapter, runs the wire command on the driver, then **optionally decodes** each row when `plan.resultShape` is present.
 - **Unified flow**: There is no separate `execute` vs `executeCommand`; all operations use `execute(plan)`.
 - **Lowering**: Happens in the adapter (`lower(plan)`), wrapped by the runtime's `lower` override into a `MongoExecutionPlan`.

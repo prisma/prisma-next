@@ -94,7 +94,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -291,7 +291,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir,
       targetId: 'sqlite',
-      extensionPacks: [
+      extensions: [
         buildExtensionPack({
           contractJson: extContractV1,
           headHash: extContractV1.storage.storageHash,
@@ -340,7 +340,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir: baseline.migrationsDir,
       targetId: 'sqlite',
-      extensionPacks: [
+      extensions: [
         buildExtensionPack({
           contractJson: extContractV1,
           headHash: extContractV1.storage.storageHash,
@@ -383,7 +383,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir: baseline.migrationsDir,
       targetId: 'sqlite',
-      extensionPacks: [
+      extensions: [
         buildExtensionPack({
           contractJson: extContractV2,
           headHash: extContractV2.storage.storageHash,
@@ -504,7 +504,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       frameworkComponents: [...frameworkComponents, codecHookComponent],
       migrationsDir,
       targetId: 'sqlite',
-      extensionPacks: [
+      extensions: [
         buildExtensionPack({
           contractJson: extContractV1,
           headHash: extContractV1.storage.storageHash,
@@ -529,7 +529,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
 
   it('collapses cleanly to a single app member when no extensions are declared (n=1 aggregate-path regression)', async () => {
     // Every other test in this file declares at least one extension
-    // pack; this one exercises the empty-extensionPacks path through
+    // pack; this one exercises the empty-extensions path through
     // the aggregate loader / planner / runner so a future refactor
     // that breaks app-only SQLite does not slip past CI.
     const tmpDir = createTmpDir();
@@ -546,7 +546,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir,
       targetId: 'sqlite',
-      extensionPacks: [],
+      extensions: [],
     });
 
     if (!initResult.ok) {
@@ -585,7 +585,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir,
       targetId: 'sqlite',
-      extensionPacks: [],
+      extensions: [],
     });
 
     if (!updateResult.ok) {
@@ -616,7 +616,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir: baseline.migrationsDir,
       targetId: 'sqlite',
-      extensionPacks: [
+      extensions: [
         buildExtensionPack({
           contractJson: extContractV1,
           headHash: extContractV1.storage.storageHash,
@@ -662,7 +662,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       frameworkComponents: [...frameworkComponents],
       migrationsDir: baseline.migrationsDir,
       targetId: 'sqlite',
-      extensionPacks: [
+      extensions: [
         buildExtensionPack({
           contractJson: extContractV2,
           headHash: extContractV2.storage.storageHash,

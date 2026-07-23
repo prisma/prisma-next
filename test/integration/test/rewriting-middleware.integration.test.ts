@@ -130,7 +130,7 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
           return postgresDriver.create({ cursor: { disabled: true } });
         },
       },
-      extensionPacks: [pgvector],
+      extensions: [pgvector],
     });
 
     stackInstance = instantiateExecutionStack(stack) as TestStackInstance;

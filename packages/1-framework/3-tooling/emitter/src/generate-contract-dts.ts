@@ -206,7 +206,7 @@ ${domainNamespacesType};
     };
   };
   readonly capabilities: ${serializeValue(contract.capabilities)};
-  readonly extensionPacks: ${serializeValue(contract.extensionPacks)};${executionClause}
+  readonly extensions: ${serializeValue(contract.extensions)};${executionClause}
   readonly meta: ${serializeValue(contract.meta)};
   ${valueObjects ? `readonly valueObjects: ${valueObjectsDescriptor};` : ''}
   readonly profileHash: ProfileHash;

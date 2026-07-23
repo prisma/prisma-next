@@ -152,7 +152,7 @@ describe('createExecutionContext — column codec integrity', () => {
       domain: applicationDomainOf({ models: {} }),
       roots: {},
       storage,
-      extensionPacks: {},
+      extensions: {},
       capabilities: {},
       meta: {},
     };
@@ -165,7 +165,7 @@ describe('createExecutionContext — column codec integrity', () => {
     });
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [parameterizedExtension()],
+        extensions: [parameterizedExtension()],
       }),
     ).toThrow(/CODEC_DESCRIPTOR_MISSING|nope\/missing@1/);
   });
@@ -177,7 +177,7 @@ describe('createExecutionContext — column codec integrity', () => {
     });
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [parameterizedExtension()],
+        extensions: [parameterizedExtension()],
       }),
     ).toThrow(/CODEC_PARAMETERIZATION_MISMATCH|pgvector\/vector@1/);
   });
@@ -190,7 +190,7 @@ describe('createExecutionContext — column codec integrity', () => {
     });
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [nonParameterizedExtension()],
+        extensions: [nonParameterizedExtension()],
       }),
     ).toThrow(/CODEC_PARAMETERIZATION_MISMATCH|test\/scalar@1/);
   });
@@ -208,7 +208,7 @@ describe('createExecutionContext — column codec integrity', () => {
     });
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [nonParameterizedExtension()],
+        extensions: [nonParameterizedExtension()],
       }),
     ).not.toThrow();
   });
@@ -260,13 +260,13 @@ describe('createExecutionContext — column codec integrity', () => {
       domain: applicationDomainOf({ models: {} }),
       roots: {},
       storage,
-      extensionPacks: {},
+      extensions: {},
       capabilities: {},
       meta: {},
     };
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [nonParameterizedExtension()],
+        extensions: [nonParameterizedExtension()],
       }),
     ).not.toThrow();
   });
@@ -278,7 +278,7 @@ describe('createExecutionContext — column codec integrity', () => {
     });
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [parameterizedExtension()],
+        extensions: [parameterizedExtension()],
       }),
     ).toThrow(/Doc.*field|field.*Doc/);
   });
@@ -290,7 +290,7 @@ describe('createExecutionContext — column codec integrity', () => {
     });
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [parameterizedExtension()],
+        extensions: [parameterizedExtension()],
       }),
     ).toThrow(/Doc.*field|field.*Doc/);
   });
@@ -303,7 +303,7 @@ describe('createExecutionContext — column codec integrity', () => {
     });
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [parameterizedExtension()],
+        extensions: [parameterizedExtension()],
       }),
     ).not.toThrow();
   });
@@ -315,7 +315,7 @@ describe('createExecutionContext — column codec integrity', () => {
     });
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [nonParameterizedExtension()],
+        extensions: [nonParameterizedExtension()],
       }),
     ).not.toThrow();
   });
@@ -327,7 +327,7 @@ describe('createExecutionContext — column codec integrity', () => {
     });
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [asyncParamsSchemaExtension()],
+        extensions: [asyncParamsSchemaExtension()],
       }),
     ).toThrow(/TYPE_PARAMS_INVALID|Promise|synchronous/);
   });
@@ -340,7 +340,7 @@ describe('createExecutionContext — column codec integrity', () => {
     });
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [asyncParamsSchemaExtension()],
+        extensions: [asyncParamsSchemaExtension()],
       }),
     ).toThrow(/TYPE_PARAMS_INVALID|Promise|synchronous/);
   });
@@ -387,13 +387,13 @@ describe('createExecutionContext — column codec integrity', () => {
       domain: applicationDomainOf({ models: {} }),
       roots: {},
       storage,
-      extensionPacks: {},
+      extensions: {},
       capabilities: {},
       meta: {},
     };
     expect(() =>
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [parameterizedExtension()],
+        extensions: [parameterizedExtension()],
       }),
     ).not.toThrow();
   });

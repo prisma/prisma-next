@@ -30,7 +30,7 @@ const textColumn = columnDescriptor('pg/text@1');
 const { model } = createComposedAuthoringHelpers({
   family: bareFamilyPack,
   target: postgresTargetPack,
-  extensionPacks: { testIndexes: testIndexPack },
+  extensions: { testIndexes: testIndexPack },
 });
 
 function buildDefinition(

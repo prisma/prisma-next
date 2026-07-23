@@ -35,7 +35,7 @@ describe('assertRuntimeContractRequirementsSatisfied', () => {
   };
 
   it('does nothing when requirements are satisfied', () => {
-    const extensionPacks: RuntimeExtensionDescriptor<'sql', 'postgres'>[] = [
+    const extensions: RuntimeExtensionDescriptor<'sql', 'postgres'>[] = [
       {
         kind: 'extension',
         id: 'pgvector',
@@ -48,11 +48,11 @@ describe('assertRuntimeContractRequirementsSatisfied', () => {
 
     expect(() =>
       assertRuntimeContractRequirementsSatisfied({
-        contract: { target: 'postgres', extensionPacks: { pgvector: {} } },
+        contract: { target: 'postgres', extensions: { pgvector: {} } },
         family,
         target,
         adapter,
-        extensionPacks,
+        extensions,
       }),
     ).not.toThrow();
   });
@@ -64,7 +64,7 @@ describe('assertRuntimeContractRequirementsSatisfied', () => {
         family,
         target,
         adapter,
-        extensionPacks: [],
+        extensions: [],
       }),
     ).toThrow(`Contract target 'mysql' does not match runtime target descriptor 'postgres'.`);
   });
@@ -72,11 +72,11 @@ describe('assertRuntimeContractRequirementsSatisfied', () => {
   it('throws when required extension pack is missing', () => {
     expect(() =>
       assertRuntimeContractRequirementsSatisfied({
-        contract: { target: 'postgres', extensionPacks: { pgvector: {} } },
+        contract: { target: 'postgres', extensions: { pgvector: {} } },
         family,
         target,
         adapter,
-        extensionPacks: [],
+        extensions: [],
       }),
     ).toThrow(
       `Contract requires extension pack 'pgvector', but runtime descriptors do not provide a matching component.`,

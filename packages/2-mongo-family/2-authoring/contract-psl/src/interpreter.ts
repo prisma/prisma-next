@@ -1355,7 +1355,7 @@ export function interpretPslDocumentToMongoContract(
       },
     },
     storage,
-    extensionPacks: {},
+    extensions: {},
     capabilities,
     profileHash: computeProfileHash({ target, targetFamily, capabilities }),
     meta: {},

@@ -14,11 +14,11 @@ import { TestSqlContractSerializer as SqlContractSerializer } from '../../../2-s
 import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 
 describe('pgvector cast policy', () => {
-  it('emits $1::vector when pgvector is installed via stack.extensionPacks', async () => {
+  it('emits $1::vector when pgvector is installed via stack.extensions', async () => {
     // Regression: `pgvectorRuntimeDescriptor` must expose its codecs via `types.codecTypes.codecDescriptors` so the adapter's runtime-plane codec lookup resolves `pg/vector@1` and the renderer emits the `::vector` cast. If the descriptor stops surfacing those codecs, the rendered SQL silently regresses to bare `$1`.
     const pgvectorRuntime = (await import('../src/exports/runtime')).default;
 
-    const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
+    const adapter = createComposedPostgresAdapter({ extensions: [pgvectorRuntime] });
 
     const vectorContract = new SqlContractSerializer().deserializeContract({
       target: 'postgres',
@@ -26,7 +26,7 @@ describe('pgvector cast policy', () => {
       profileHash: 'vector-cast-policy',
       roots: {},
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       meta: {},
       storage: {
         storageHash: 'vector-cast-policy',

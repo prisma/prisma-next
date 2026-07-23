@@ -117,7 +117,7 @@ describe('integration: rawSql expression in typed builder', {
           return postgresDriver.create({ cursor: { disabled: true } });
         },
       },
-      extensionPacks: [pgvector],
+      extensions: [pgvector],
     });
 
     stackInstance = instantiateExecutionStack(stack) as TestStackInstance;

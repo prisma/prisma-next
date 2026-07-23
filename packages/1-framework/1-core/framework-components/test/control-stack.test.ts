@@ -1325,7 +1325,7 @@ describe('createControlStack', () => {
             },
           },
         }),
-        extensionPacks: [],
+        extensions: [],
       }),
     );
 
@@ -1341,7 +1341,7 @@ describe('createControlStack', () => {
         family: createDescriptor({ kind: 'family', id: 'fam' }),
         target: createDescriptor({ kind: 'target', id: 'tgt' }),
         adapter: createDescriptor({ kind: 'adapter', id: 'adp' }),
-        extensionPacks: [
+        extensions: [
           createDescriptor({ kind: 'extension', id: 'ext1' }),
           createDescriptor({ kind: 'extension', id: 'ext2' }),
         ],
@@ -1503,14 +1503,14 @@ describe('validateScalarTypeCodecIds', () => {
 function makeExtension(
   id: string,
   deps: readonly string[] = [],
-): { id: string; contractSpace?: { contractJson: { extensionPacks?: Record<string, unknown> } } } {
+): { id: string; contractSpace?: { contractJson: { extensions?: Record<string, unknown> } } } {
   return {
     id,
     contractSpace:
       deps.length > 0
         ? {
             contractJson: {
-              extensionPacks: Object.fromEntries(deps.map((dep) => [dep, {}])),
+              extensions: Object.fromEntries(deps.map((dep) => [dep, {}])),
             },
           }
         : { contractJson: {} },
@@ -1554,9 +1554,7 @@ describe('buildExtensionLoadOrder', () => {
 
   it('throws when a declared dependency is absent from the provided set', () => {
     const b = makeExtension('b', ['missing-pack']);
-    expect(() => buildExtensionLoadOrder([b])).toThrow(
-      /missing dependency|add .* to extensionPacks/i,
-    );
+    expect(() => buildExtensionLoadOrder([b])).toThrow(/missing dependency|add .* to extensions/i);
     expect(() => buildExtensionLoadOrder([b])).toThrow(/missing-pack/);
   });
 
@@ -1593,7 +1591,7 @@ describe('buildExtensionLoadOrder', () => {
     expect(order.indexOf('plain')).toBeLessThan(order.indexOf('withSpace'));
   });
 
-  it('extensions with contractSpace but empty extensionPacks have no declared dependencies', () => {
+  it('extensions with contractSpace but empty extensions have no declared dependencies', () => {
     const a = makeExtension('a');
     const b = makeExtension('b');
     const order = buildExtensionLoadOrder([a, b]);
@@ -1604,52 +1602,52 @@ describe('buildExtensionLoadOrder', () => {
   it('createControlStack throws on a 2-cycle in extension dependencies', () => {
     const a = {
       ...createDescriptor({ kind: 'extension' as const, id: 'ext-a' }),
-      contractSpace: { contractJson: { extensionPacks: { 'ext-b': {} } } },
+      contractSpace: { contractJson: { extensions: { 'ext-b': {} } } },
     };
     const b = {
       ...createDescriptor({ kind: 'extension' as const, id: 'ext-b' }),
-      contractSpace: { contractJson: { extensionPacks: { 'ext-a': {} } } },
+      contractSpace: { contractJson: { extensions: { 'ext-a': {} } } },
     };
     expect(() =>
       createControlStack(
         stubInput({
           family: createDescriptor({ kind: 'family', id: 'sql' }),
           target: createDescriptor({ kind: 'target', id: 'postgres' }),
-          extensionPacks: [a, b],
+          extensions: [a, b],
         }),
       ),
     ).toThrow(/cycle/i);
   });
 
-  it('assembles extensionPacks in dependency order even when input lists dependent before dependency', () => {
+  it('assembles extensions in dependency order even when input lists dependent before dependency', () => {
     const dep = {
       ...createDescriptor({ kind: 'extension' as const, id: 'dep' }),
       contractSpace: { contractJson: {} },
     };
     const consumer = {
       ...createDescriptor({ kind: 'extension' as const, id: 'consumer' }),
-      contractSpace: { contractJson: { extensionPacks: { dep: {} } } },
+      contractSpace: { contractJson: { extensions: { dep: {} } } },
     };
     // Input order: consumer first (would fail ordering if not reordered)
     const stack = createControlStack(
       stubInput({
         family: createDescriptor({ kind: 'family', id: 'sql' }),
         target: createDescriptor({ kind: 'target', id: 'postgres' }),
-        extensionPacks: [consumer, dep],
+        extensions: [consumer, dep],
       }),
     );
-    const extIds = stack.extensionPacks.map((e: { id: string }) => e.id);
+    const extIds = stack.extensions.map((e: { id: string }) => e.id);
     expect(extIds.indexOf('dep')).toBeLessThan(extIds.indexOf('consumer'));
   });
 });
 
 describe('createControlStack extensionContracts', () => {
-  it('maps each contract-space extension id to its contractJson, in extensionPacks order', () => {
+  it('maps each contract-space extension id to its contractJson, in extensions order', () => {
     const depContract = { targetFamily: 'sql', space: 'dep' };
     const consumerContract = {
       targetFamily: 'sql',
       space: 'consumer',
-      extensionPacks: { dep: {} },
+      extensions: { dep: {} },
     };
     const dep = {
       ...createDescriptor({ kind: 'extension' as const, id: 'dep' }),
@@ -1663,11 +1661,11 @@ describe('createControlStack extensionContracts', () => {
       stubInput({
         family: createDescriptor({ kind: 'family', id: 'sql' }),
         target: createDescriptor({ kind: 'target', id: 'postgres' }),
-        extensionPacks: [consumer, dep],
+        extensions: [consumer, dep],
       }),
     );
 
-    expect([...stack.extensionContracts.keys()]).toEqual(stack.extensionPacks.map((e) => e.id));
+    expect([...stack.extensionContracts.keys()]).toEqual(stack.extensions.map((e) => e.id));
     expect(stack.extensionContracts.get('dep')).toBe(depContract);
     expect(stack.extensionContracts.get('consumer')).toBe(consumerContract);
   });
@@ -1683,7 +1681,7 @@ describe('createControlStack extensionContracts', () => {
       stubInput({
         family: createDescriptor({ kind: 'family', id: 'sql' }),
         target: createDescriptor({ kind: 'target', id: 'postgres' }),
-        extensionPacks: [withSpace, plain],
+        extensions: [withSpace, plain],
       }),
     );
 
@@ -1702,8 +1700,8 @@ describe('createControlStack extensionContracts', () => {
     expect(stack.extensionContracts.size).toBe(0);
   });
 
-  it('extensionIds prefixes component ids and is not the extensionPacks id list', () => {
-    // Pins the difference so consumers deriving pack ids map over extensionPacks
+  it('extensionIds prefixes component ids and is not the extensions id list', () => {
+    // Pins the difference so consumers deriving pack ids map over extensions
     // instead of reusing extensionIds.
     const ext = {
       ...createDescriptor({ kind: 'extension' as const, id: 'ext1' }),
@@ -1714,11 +1712,11 @@ describe('createControlStack extensionContracts', () => {
         family: createDescriptor({ kind: 'family', id: 'fam' }),
         target: createDescriptor({ kind: 'target', id: 'tgt' }),
         adapter: createDescriptor({ kind: 'adapter', id: 'adp' }),
-        extensionPacks: [ext],
+        extensions: [ext],
       }),
     );
 
-    const packIds = stack.extensionPacks.map((e) => e.id);
+    const packIds = stack.extensions.map((e) => e.id);
     expect(packIds).toEqual(['ext1']);
     expect(stack.extensionIds).toEqual(['fam', 'tgt', 'adp', 'ext1']);
     expect(stack.extensionIds).not.toEqual(packIds);

@@ -104,7 +104,7 @@ describe('contract infer — brownfield: app tables alongside the full Supabase 
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [supabasePack],
+        extensions: [supabasePack],
       });
 
       try {

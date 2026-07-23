@@ -83,7 +83,7 @@ function buildContract(): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -139,7 +139,7 @@ describe.sequential('mixed-case native-enum cast against a live database', () =>
     const stack = createSqlExecutionStack({
       target: postgresRuntimeTargetDescriptor,
       adapter: postgresRuntimeAdapterDescriptor,
-      extensionPacks: [],
+      extensions: [],
     });
     const context = createExecutionContext({ contract, stack });
     const stackInstance = instantiateExecutionStack(stack);

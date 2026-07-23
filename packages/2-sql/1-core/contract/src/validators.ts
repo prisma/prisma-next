@@ -345,7 +345,7 @@ export function createSqlContractSchema(
     'coreHash?': 'string',
     profileHash: 'string',
     'capabilities?': 'Record<string, Record<string, boolean>>',
-    'extensionPacks?': 'Record<string, unknown>',
+    'extensions?': 'Record<string, unknown>',
     'meta?': ContractMetaSchema,
     'defaultControlPolicy?': ControlPolicySchema,
     'roots?': type({ '[string]': CrossReferenceSchema }),

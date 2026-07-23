@@ -7,7 +7,7 @@ describe('checkContractComponentRequirements', () => {
       contract: {
         targetFamily: 'sql',
         target: 'postgres',
-        extensionPacks: { pgvector: {} },
+        extensions: { pgvector: {} },
       },
       expectedTargetFamily: 'sql',
       expectedTargetId: 'postgres',
@@ -24,7 +24,7 @@ describe('checkContractComponentRequirements', () => {
       contract: {
         targetFamily: 'document',
         target: 'postgres',
-        extensionPacks: {},
+        extensions: {},
       },
       expectedTargetFamily: 'sql',
       expectedTargetId: 'postgres',
@@ -42,7 +42,7 @@ describe('checkContractComponentRequirements', () => {
       contract: {
         targetFamily: 'sql',
         target: 'mysql',
-        extensionPacks: {},
+        extensions: {},
       },
       expectedTargetFamily: 'sql',
       expectedTargetId: 'postgres',
@@ -59,7 +59,7 @@ describe('checkContractComponentRequirements', () => {
     const result = checkContractComponentRequirements({
       contract: {
         target: 'postgres',
-        extensionPacks: { pgvector: {} },
+        extensions: { pgvector: {} },
       },
       expectedTargetId: 'postgres',
       providedComponentIds: ['postgres', 'postgres-adapter'],

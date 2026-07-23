@@ -27,7 +27,7 @@ type EnumsConstraint = Record<string, EnumTypeHandle>;
 type PostgresResult<
   Types extends TypesConstraint,
   Models extends ModelsConstraint,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Enums extends EnumsConstraint,
 > = ReturnType<
   typeof buildBoundContract<
@@ -36,7 +36,7 @@ type PostgresResult<
     {
       readonly types?: Types;
       readonly models?: Models;
-      readonly extensionPacks?: ExtensionPacks;
+      readonly extensions?: Extensions;
       readonly enums?: Enums;
       readonly createNamespace: (input: SqlNamespaceInput) => SqlNamespaceBase;
     }
@@ -44,15 +44,9 @@ type PostgresResult<
 >;
 
 type PostgresBaseScaffold<
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 > = Omit<
-  ContractInput<
-    SqlFamily,
-    PostgresPack,
-    Record<never, never>,
-    Record<never, never>,
-    ExtensionPacks
-  >,
+  ContractInput<SqlFamily, PostgresPack, Record<never, never>, Record<never, never>, Extensions>,
   'family' | 'target' | 'types' | 'models' | 'enums' | 'createNamespace' | 'entities'
 > & {
   /**
@@ -68,18 +62,18 @@ type PostgresBaseScaffold<
 type PostgresDefinition<
   Types extends TypesConstraint,
   Models extends ModelsConstraint,
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Enums extends EnumsConstraint,
-> = PostgresBaseScaffold<ExtensionPacks> & {
+> = PostgresBaseScaffold<Extensions> & {
   readonly types?: Types;
   readonly models?: Models;
   readonly enums?: Enums;
 };
 
 type PostgresScaffold<
-  ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Enums extends EnumsConstraint,
-> = PostgresBaseScaffold<ExtensionPacks> & {
+> = PostgresBaseScaffold<Extensions> & {
   readonly types?: never;
   readonly models?: never;
   readonly enums?: Enums;
@@ -88,30 +82,26 @@ type PostgresScaffold<
 export function defineContract<
   const Types extends TypesConstraint = Record<never, never>,
   const Models extends ModelsConstraint = Record<never, never>,
-  const ExtensionPacks extends
-    | Record<string, ExtensionPackRef<'sql', string>>
-    | undefined = undefined,
+  const Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
   const Enums extends EnumsConstraint = Record<never, never>,
 >(
-  definition: PostgresDefinition<Types, Models, ExtensionPacks, Enums>,
-): PostgresResult<Types, Models, ExtensionPacks, Enums>;
+  definition: PostgresDefinition<Types, Models, Extensions, Enums>,
+): PostgresResult<Types, Models, Extensions, Enums>;
 
 export function defineContract<
   const Types extends TypesConstraint = Record<never, never>,
   const Models extends ModelsConstraint = Record<never, never>,
-  const ExtensionPacks extends
-    | Record<string, ExtensionPackRef<'sql', string>>
-    | undefined = undefined,
+  const Extensions extends Record<string, ExtensionPackRef<'sql', string>> | undefined = undefined,
   const ScaffoldEnums extends EnumsConstraint = Record<never, never>,
   const FactoryEnums extends EnumsConstraint = Record<never, never>,
 >(
-  scaffold: PostgresScaffold<ExtensionPacks, ScaffoldEnums>,
-  factory: (helpers: ComposedAuthoringHelpers<SqlFamily, PostgresPack, ExtensionPacks>) => {
+  scaffold: PostgresScaffold<Extensions, ScaffoldEnums>,
+  factory: (helpers: ComposedAuthoringHelpers<SqlFamily, PostgresPack, Extensions>) => {
     readonly types?: Types;
     readonly models?: Models;
     readonly enums?: FactoryEnums;
   },
-): PostgresResult<Types, Models, ExtensionPacks, MergeEnums<ScaffoldEnums, FactoryEnums>>;
+): PostgresResult<Types, Models, Extensions, MergeEnums<ScaffoldEnums, FactoryEnums>>;
 
 // Implementation — delegates to buildBoundContract which pre-binds family/target,
 // carrying zero casts and zero entity-kind logic at this layer: the generic

@@ -69,7 +69,7 @@ export interface MongoExecutionStack<TTargetId extends string = 'mongo'> {
         RuntimeDriverInstance<'mongo', TTargetId>
       >
     | undefined;
-  readonly extensionPacks: readonly MongoRuntimeExtensionDescriptor<TTargetId>[];
+  readonly extensions: readonly MongoRuntimeExtensionDescriptor<TTargetId>[];
 }
 
 export function createMongoExecutionStack<TTargetId extends string = 'mongo'>(options: {
@@ -83,13 +83,13 @@ export function createMongoExecutionStack<TTargetId extends string = 'mongo'>(op
         RuntimeDriverInstance<'mongo', TTargetId>
       >
     | undefined;
-  readonly extensionPacks?: readonly MongoRuntimeExtensionDescriptor<TTargetId>[] | undefined;
+  readonly extensions?: readonly MongoRuntimeExtensionDescriptor<TTargetId>[] | undefined;
 }): MongoExecutionStack<TTargetId> {
   const stack = createExecutionStack({
     target: options.target,
     adapter: options.adapter,
     driver: options.driver,
-    extensionPacks: options.extensionPacks,
+    extensions: options.extensions,
   });
   return stack as ExecutionStack<'mongo', TTargetId> as MongoExecutionStack<TTargetId>;
 }
@@ -130,7 +130,7 @@ export function createMongoExecutionContext<
   const contributors: ReadonlyArray<MongoStaticContributions & { readonly id: string }> = [
     options.stack.target,
     options.stack.adapter,
-    ...options.stack.extensionPacks,
+    ...options.stack.extensions,
   ];
 
   for (const contributor of contributors) {

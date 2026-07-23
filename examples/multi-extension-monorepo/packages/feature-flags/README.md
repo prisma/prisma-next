@@ -1,6 +1,6 @@
 # feature-flags (internal contract-space package)
 
-Internal "extension package" for the [`multi-extension-monorepo`](../../README.md) example. Contributes a single `feature_flag` table to applications that include this package in their `extensionPacks`.
+Internal "extension package" for the [`multi-extension-monorepo`](../../README.md) example. Contributes a single `feature_flag` table to applications that include this package in their `extensions`.
 
 ## Authoring (maintainers)
 

@@ -35,7 +35,7 @@ const testContract: Contract<SqlStorage> = {
       __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
     },
   }),
-  extensionPacks: {},
+  extensions: {},
   capabilities: {},
   meta: {},
 };
@@ -84,12 +84,12 @@ function createTestExtensionDescriptor(options?: {
 }
 
 function createStack(options?: {
-  extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
+  extensions?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
 }): SqlExecutionStack<'postgres'> {
   return {
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(createStubAdapter()),
-    extensionPacks: options?.extensionPacks ?? [],
+    extensions: options?.extensions ?? [],
   };
 }
 
@@ -108,7 +108,7 @@ describe('createExecutionContext', () => {
   it('creates context with empty extension packs', () => {
     const context = createExecutionContext({
       contract: testContract,
-      stack: createStack({ extensionPacks: [] }),
+      stack: createStack({ extensions: [] }),
     });
 
     expect(context.codecDescriptors.descriptorFor('pg/int4@1')).toBeDefined();
@@ -119,7 +119,7 @@ describe('createExecutionContext', () => {
     const context = createExecutionContext({
       contract: testContract,
       stack: createStack({
-        extensionPacks: [createTestExtensionDescriptor({ hasCodecs: true })],
+        extensions: [createTestExtensionDescriptor({ hasCodecs: true })],
       }),
     });
 
@@ -131,7 +131,7 @@ describe('createExecutionContext', () => {
     const context = createExecutionContext({
       contract: testContract,
       stack: createStack({
-        extensionPacks: [createTestExtensionDescriptor({ hasOperations: true })],
+        extensions: [createTestExtensionDescriptor({ hasOperations: true })],
       }),
     });
 
@@ -143,7 +143,7 @@ describe('createExecutionContext', () => {
     const context = createExecutionContext({
       contract: testContract,
       stack: createStack({
-        extensionPacks: [createTestExtensionDescriptor({ hasCodecs: false, hasOperations: false })],
+        extensions: [createTestExtensionDescriptor({ hasCodecs: false, hasOperations: false })],
       }),
     });
 
@@ -186,7 +186,7 @@ describe('comprehensive descriptor-based derivation', () => {
     const stack: SqlExecutionStack<'postgres'> = {
       target,
       adapter: createTestAdapterDescriptor(createStubAdapter()),
-      extensionPacks: [createTestExtensionDescriptor({ hasCodecs: true, hasOperations: true })],
+      extensions: [createTestExtensionDescriptor({ hasCodecs: true, hasOperations: true })],
     };
 
     const context = createExecutionContext({ contract: testContract, stack });
@@ -259,7 +259,7 @@ describe('contract/stack validation errors', () => {
   it('throws RUNTIME.MISSING_EXTENSION_PACK when contract requires extension not in stack', () => {
     const contractWithExtension: Contract<SqlStorage> = {
       ...testContract,
-      extensionPacks: {
+      extensions: {
         'required-extension': { id: 'required-extension', version: '1.0.0', capabilities: {} },
       },
     };
@@ -281,7 +281,7 @@ describe('contract/stack validation errors', () => {
   it('lists all missing extension packs in a single error', () => {
     const contractWithExtensions: Contract<SqlStorage> = {
       ...testContract,
-      extensionPacks: {
+      extensions: {
         'ext-a': { id: 'ext-a', version: '1.0.0', capabilities: {} },
         'ext-b': { id: 'ext-b', version: '1.0.0', capabilities: {} },
       },
@@ -605,7 +605,7 @@ describe('applyMutationDefaults', () => {
 
     const context = createExecutionContext({
       contract: contractWithCounter,
-      stack: createStack({ extensionPacks: [counterGeneratorExtension] }),
+      stack: createStack({ extensions: [counterGeneratorExtension] }),
     });
 
     const defaultValueCache = new Map<string, unknown>();
@@ -711,7 +711,7 @@ describe('applyMutationDefaults', () => {
 
     const context = createExecutionContext({
       contract: contractWithCorrelationId,
-      stack: createStack({ extensionPacks: [rowGeneratorExtension] }),
+      stack: createStack({ extensions: [rowGeneratorExtension] }),
     });
 
     const row1 = context.applyMutationDefaults({
@@ -796,7 +796,7 @@ describe('applyMutationDefaults', () => {
 
     const context = createExecutionContext({
       contract: contractWithCounter,
-      stack: createStack({ extensionPacks: [perFieldGeneratorExtension] }),
+      stack: createStack({ extensions: [perFieldGeneratorExtension] }),
     });
 
     const defaultValueCache = new Map<string, unknown>();
@@ -878,7 +878,7 @@ describe('capability folding', () => {
     const stack: SqlExecutionStack<'postgres'> = {
       target: createTestTargetDescriptor(),
       adapter: adapterWithCapabilities({ sql: { returning: true } }),
-      extensionPacks: [],
+      extensions: [],
     };
 
     const context = createExecutionContext({ contract: testContract, stack });
@@ -892,7 +892,7 @@ describe('capability folding', () => {
       stack: {
         target: createTestTargetDescriptor(),
         adapter: createTestAdapterDescriptor(createStubAdapter()),
-        extensionPacks: [],
+        extensions: [],
       },
       driver: driverWithCapabilities({ postgres: { cursor: true } }),
     });
@@ -904,7 +904,7 @@ describe('capability folding', () => {
     const stack: SqlExecutionStack<'postgres'> = {
       target: targetWithCapabilities({ sql: { returning: false } }),
       adapter: adapterWithCapabilities({ sql: { returning: true } }),
-      extensionPacks: [],
+      extensions: [],
     };
 
     const context = createExecutionContext({ contract: testContract, stack });
@@ -924,7 +924,7 @@ describe('capability folding', () => {
       stack: {
         target: createTestTargetDescriptor(),
         adapter: adapterWithCapabilities({ sql: { returning: true } }),
-        extensionPacks: [],
+        extensions: [],
       },
     });
 
@@ -953,7 +953,7 @@ describe('capability folding', () => {
 
     const context = createExecutionContext({
       contract: testContract,
-      stack: { target, adapter, extensionPacks: [extension] },
+      stack: { target, adapter, extensions: [extension] },
       driver,
     });
 
@@ -967,7 +967,7 @@ describe('capability folding', () => {
     const stack: SqlExecutionStack<'postgres'> = {
       target: createTestTargetDescriptor(),
       adapter: createTestAdapterDescriptor(createStubAdapter()),
-      extensionPacks: [extension, extension],
+      extensions: [extension, extension],
     };
 
     const context = createExecutionContext({ contract: testContract, stack });

@@ -59,7 +59,7 @@ const baseContract = new SqlContractSerializer().deserializeContract({
   profileHash: 'cast-policy-test',
   roots: {},
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   storage: {
     storageHash: 'cast-policy',
@@ -362,7 +362,7 @@ describe('renderLoweredSql cast policy', () => {
 });
 
 describe('renderLoweredSql cast policy via stack-derived lookup', () => {
-  it('emits the extension-codec cast when the codec is contributed via stack.extensionPacks', () => {
+  it('emits the extension-codec cast when the codec is contributed via stack.extensions', () => {
     const geographyCodec: Codec = defineTestCodec({
       typeId: 'app/geography@1',
       encode: (value: string): string => value,
@@ -396,7 +396,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
       },
     };
 
-    const adapter = createComposedPostgresAdapter({ extensionPacks: [geographyExtension] });
+    const adapter = createComposedPostgresAdapter({ extensions: [geographyExtension] });
     const ast = selectWithParam('geo', 'app/geography@1', 'POINT(0 0)');
     const lowered = adapter.lower(ast, { contract: baseContract });
 
@@ -409,7 +409,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
     // No hand-built lookup — this goes through the production extractCodecLookup
     // path, proving the codec-instance cast works end-to-end from descriptor
     // registration to rendered SQL.
-    const adapter = createComposedPostgresAdapter({ extensionPacks: [] });
+    const adapter = createComposedPostgresAdapter({ extensions: [] });
     const ast = selectWithTypeParams('status', 'pg/enum@1', { typeName: 'auth.aal_level' }, 'aal2');
     const lowered = adapter.lower(ast, { contract: baseContract });
 

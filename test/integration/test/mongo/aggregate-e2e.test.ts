@@ -111,7 +111,7 @@ function buildAppContract(): MongoContract {
       storageHash: coreHash('p5-app-contract'),
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: profileHash('p5-app-profile'),
     meta: {},
   };

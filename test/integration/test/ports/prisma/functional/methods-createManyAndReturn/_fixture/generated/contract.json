@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "post": {
       "model": "Post",
@@ -22,11 +22,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "title": {
@@ -89,11 +86,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "name": {
@@ -149,12 +143,9 @@
             "post": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "title": {
                   "codecId": "pg/text@1",
@@ -208,12 +199,9 @@
                   "nullable": false
                 },
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "name": {
                   "codecId": "pg/text@1",
@@ -242,10 +230,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:e03ad6b7ab69310bed2ea8b5f33c27092c47b3df227907689f38c361b56eda00"
+    "storageHash": "3337d1f72f92bf6d543a9b51f859d84ab6c07398f6d00b380a5c86cefae24365"
   },
   "execution": {
-    "executionHash": "sha256:6581ab173602de22a7d50f19cd197a37cac5e89b81c73a335874f6988ec64281",
+    "executionHash": "12a1460155d0d555a24cffe4056bf68f34ebeeddef72dacf04da57763e6b6504",
     "mutations": {
       "defaults": [
         {
@@ -290,7 +278,7 @@
       "scalarList": true
     }
   },
-  "extensionPacks": {},
+  "extensions": {},
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",

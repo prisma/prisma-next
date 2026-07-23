@@ -83,7 +83,7 @@ function createTestRuntime(mockDriver: MockDriver): Runtime {
   const stack = createSqlExecutionStack({
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(adapter),
-    extensionPacks: [],
+    extensions: [],
   });
   const stackInstance = instantiateExecutionStack(stack);
   const context = createTestContext(fixtureContract, adapter);

@@ -54,14 +54,14 @@ export async function withCollectionRuntime(
   // fixture) when a test drives that contract: the runtime validates each
   // plan's storageHash against the contract it was built with.
   contractOverride?: Contract<SqlStorage>,
-  additionalExtensionPacks: readonly SqlRuntimeExtensionDescriptor<'postgres'>[] = [],
+  additionalExtensions: readonly SqlRuntimeExtensionDescriptor<'postgres'>[] = [],
 ): Promise<void> {
   await withDevDatabase(
     async ({ connectionString }) => {
       const runtime = await createPgIntegrationRuntime(
         connectionString,
         contractOverride,
-        additionalExtensionPacks,
+        additionalExtensions,
       );
 
       try {

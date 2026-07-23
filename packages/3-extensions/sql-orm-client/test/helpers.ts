@@ -162,9 +162,9 @@ export function buildTestContextFromContract<TContract extends FrameworkContract
   },
 ): ExecutionContext<TContract> {
   const generators = options?.mutationDefaultGenerators ?? [];
-  const extensionPacks: SqlRuntimeExtensionDescriptor<'postgres'>[] = [pgVectorCodecStubExtension];
+  const extensions: SqlRuntimeExtensionDescriptor<'postgres'>[] = [pgVectorCodecStubExtension];
   if (generators.length > 0) {
-    extensionPacks.push({
+    extensions.push({
       kind: 'extension',
       id: 'test-mutation-default-generators',
       version: '0.0.0',
@@ -183,7 +183,7 @@ export function buildTestContextFromContract<TContract extends FrameworkContract
     stack: createSqlExecutionStack({
       target: postgresTarget,
       adapter: postgresAdapter,
-      extensionPacks,
+      extensions,
     }),
   });
 }

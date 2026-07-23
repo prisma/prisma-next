@@ -40,7 +40,7 @@ export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId exte
   readonly acceptDataLoss?: boolean;
   readonly migrationsDir: string;
   readonly targetId: TTargetId;
-  readonly extensionPacks?: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
+  readonly extensions?: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   readonly onProgress?: OnControlProgress;
 }
 
@@ -65,7 +65,7 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     frameworkComponents: options.frameworkComponents,
     migrationsDir: options.migrationsDir,
     targetId: options.targetId,
-    extensionPacks: options.extensionPacks ?? [],
+    extensions: options.extensions ?? [],
     policy: DB_UPDATE_POLICY,
     action: 'dbUpdate' as const,
     ...ifDefined('onProgress', options.onProgress),

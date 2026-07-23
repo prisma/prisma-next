@@ -80,7 +80,7 @@ async function buildHarness(middleware?: readonly SqlMiddleware[]): Promise<Harn
     target: sqliteTarget,
     adapter: sqliteAdapter,
     driver: sqliteDriver,
-    extensionPacks: [],
+    extensions: [],
   });
 
   const stackInstance = instantiateExecutionStack(stack);

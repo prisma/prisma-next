@@ -30,7 +30,7 @@ const controlStack = createControlStack({
   target: sqliteTargetDescriptor,
   adapter: sqliteAdapterDescriptor,
   driver: sqliteDriverDescriptor,
-  extensionPacks: [],
+  extensions: [],
 });
 const familyInstance = sqlFamilyDescriptor.create(controlStack);
 const controlAdapter = sqliteAdapterDescriptor.create(controlStack);

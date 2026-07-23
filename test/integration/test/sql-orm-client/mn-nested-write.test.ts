@@ -587,7 +587,7 @@ describe('integration/mn-nested-write', () => {
           stack: createSqlExecutionStack({
             target: postgresTarget,
             adapter: postgresAdapter,
-            extensionPacks: [pgvectorRuntime],
+            extensions: [pgvectorRuntime],
           }),
         });
         const users = new Collection({ runtime, context }, 'User', { namespaceId: 'public' });

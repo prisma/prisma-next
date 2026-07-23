@@ -113,7 +113,7 @@ const context = createExecutionContext({
   stack: createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    extensionPacks: [includedTextExtension],
+    extensions: [includedTextExtension],
   }),
 });
 

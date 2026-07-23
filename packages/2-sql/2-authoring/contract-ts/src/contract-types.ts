@@ -67,8 +67,8 @@ export type MergeExtensionPackRefs<
   Added extends Record<string, ExtensionPackRef<'sql', string>>,
 > = Existing extends Record<string, unknown> ? Existing & Added : Added;
 
-type DefinitionExtensionPacks<Definition> = Definition extends {
-  readonly extensionPacks?: infer Packs extends Record<string, ExtensionPackRef<'sql', string>>;
+type DefinitionExtensions<Definition> = Definition extends {
+  readonly extensions?: infer Packs extends Record<string, ExtensionPackRef<'sql', string>>;
 }
   ? Packs
   : Record<never, never>;
@@ -101,7 +101,7 @@ type DerivedCapabilities<Definition> = Defaulted<
   ExtractPackCapabilities<DefinitionTarget<Definition>>,
   Record<string, never>
 > &
-  MergeExtensionPackCapabilities<DefinitionExtensionPacks<Definition>>;
+  MergeExtensionPackCapabilities<DefinitionExtensions<Definition>>;
 
 type DefinitionTargetId<Definition> = Definition extends {
   readonly target: TargetPackRef<'sql', infer Target>;
@@ -114,13 +114,13 @@ type Present<T> = Exclude<T, undefined>;
 type CodecTypesFromDefinition<Definition> = ExtractCodecTypesFromPack<
   Definition extends { readonly target: infer Target } ? Target : never
 > &
-  MergeExtensionCodecTypesSafe<DefinitionExtensionPacks<Definition>>;
+  MergeExtensionCodecTypesSafe<DefinitionExtensions<Definition>>;
 
 type DefinitionTarget<Definition> = Definition extends { readonly target: infer Target }
   ? Target
   : never;
 
-type AllPacks<Definition> = DefinitionExtensionPacks<Definition> & {
+type AllPacks<Definition> = DefinitionExtensions<Definition> & {
   readonly __target: DefinitionTarget<Definition>;
 };
 
@@ -799,9 +799,9 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
       readonly namespaces: Readonly<Record<string, BuiltDomainNamespace<Definition>>>;
     } & BuiltDomain<Definition>;
   } & {
-    readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
+    readonly extensions: keyof DefinitionExtensions<Definition> extends never
       ? Record<string, never>
-      : DefinitionExtensionPacks<Definition>;
+      : DefinitionExtensions<Definition>;
     readonly capabilities: DerivedCapabilities<Definition>;
     readonly enumAccessors: BuiltEnumAccessors<Definition>;
   },

@@ -400,7 +400,7 @@ export function createPostgresTestContext(
   overrides?: Partial<ContractSourceContext>,
 ): ContractSourceContext {
   return {
-    composedExtensionPacks: [],
+    composedExtensions: [],
     composedExtensionContracts: new Map(),
     authoringContributions: {
       field: {},

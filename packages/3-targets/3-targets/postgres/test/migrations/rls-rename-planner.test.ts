@@ -92,7 +92,7 @@ function buildContract(
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

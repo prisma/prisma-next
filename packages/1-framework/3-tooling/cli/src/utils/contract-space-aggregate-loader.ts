@@ -114,8 +114,8 @@ export function mapIntegrityViolations(
         ? 'Contract-space layout violation detected'
         : `Contract-space layout violations detected (${layout.length})`;
     return new CliStructuredError('MIGRATION.CONTRACT_SPACE_LAYOUT_VIOLATION', summary, {
-      why: `The on-disk \`migrations/\` directory and your \`extensionPacks\` declaration are not in agreement.\n${lines.join('\n')}`,
-      fix: 'Declare the extension in `extensionPacks` and re-emit its contract-space artefacts, or remove the orphan `migrations/<space>` directory.',
+      why: `The on-disk \`migrations/\` directory and your \`extensions\` declaration are not in agreement.\n${lines.join('\n')}`,
+      fix: 'Declare the extension in `extensions` and re-emit its contract-space artefacts, or remove the orphan `migrations/<space>` directory.',
       docsUrl: CONTRACT_SPACES_DOCS_URL,
       meta: { violations: layout },
     });
@@ -177,14 +177,14 @@ export interface BuildAggregateInputs<TFamilyId extends string, TTargetId extend
   readonly targetId: TTargetId;
   readonly migrationsDir: string;
   readonly appContract: Contract;
-  readonly extensionPacks: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
+  readonly extensions: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   readonly deserializeContract: (contractJson: unknown) => Contract;
 }
 
 function declaredExtensionsFromInputs(
-  extensionPacks: BuildAggregateInputs<string, string>['extensionPacks'],
+  extensions: BuildAggregateInputs<string, string>['extensions'],
 ): readonly DeclaredExtensionEntry[] {
-  return toDeclaredExtensionsFromRaw(extensionPacks as ReadonlyArray<unknown>);
+  return toDeclaredExtensionsFromRaw(extensions as ReadonlyArray<unknown>);
 }
 
 /**
@@ -195,7 +195,7 @@ export function refuseDeclaredExtensionTargetMismatch<
   TFamilyId extends string,
   TTargetId extends string,
 >(inputs: BuildAggregateInputs<TFamilyId, TTargetId>): CliStructuredError | null {
-  for (const declared of declaredExtensionsFromInputs(inputs.extensionPacks)) {
+  for (const declared of declaredExtensionsFromInputs(inputs.extensions)) {
     if (declared.targetId !== inputs.targetId) {
       return targetMismatchError(declared.id, inputs.targetId, declared.targetId);
     }
@@ -271,7 +271,7 @@ export async function buildContractSpaceAggregate<
 >(
   inputs: BuildAggregateInputs<TFamilyId, TTargetId>,
 ): Promise<Result<ContractSpaceAggregate, CliStructuredError>> {
-  const declaredExtensions = declaredExtensionsFromInputs(inputs.extensionPacks);
+  const declaredExtensions = declaredExtensionsFromInputs(inputs.extensions);
   const loaded = await loadContractSpaceAggregateForCli(inputs);
   if (!loaded.ok) {
     return loaded;
@@ -375,7 +375,7 @@ export async function buildReadAggregate(
       targetId: config.target.id,
       migrationsDir: options.migrationsDir,
       appContract: appContractForLoad,
-      extensionPacks: config.extensionPacks ?? [],
+      extensions: config.extensions ?? [],
       deserializeContract,
     });
     if (!loaded.ok) {

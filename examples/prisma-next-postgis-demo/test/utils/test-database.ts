@@ -68,7 +68,7 @@ export async function isPostgisAvailable(): Promise<boolean> {
 function createPostgisControlClient(connection: string): ControlClient {
   return createPostgresControlClient({
     connection,
-    extensionPacks: [postgis],
+    extensions: [postgis],
   });
 }
 

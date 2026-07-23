@@ -64,7 +64,7 @@ function buildContract(): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
     profileHash: profileHash('fixture-profile-v1'),
     storage: new SqlStorage({
@@ -137,7 +137,7 @@ function makeStack(
       targetId: 'postgres',
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
-    extensionPacks: extensions,
+    extensions: extensions,
   });
 }
 

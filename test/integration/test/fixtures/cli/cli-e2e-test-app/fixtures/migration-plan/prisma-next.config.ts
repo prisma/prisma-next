@@ -8,7 +8,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensionPacks: [],
+  extensions: [],
   contract: {
     source: {
       load: async () => ({ ok: true as const, value: contract }),

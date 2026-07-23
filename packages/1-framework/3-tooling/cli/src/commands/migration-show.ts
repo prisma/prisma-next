@@ -119,7 +119,7 @@ async function executeMigrationShowCommand(
     target: config.target,
     adapter: config.adapter,
     ...ifDefined('driver', config.driver),
-    extensionPacks: config.extensionPacks ?? [],
+    extensions: config.extensions ?? [],
   });
 
   let contractJsonContent: string;

@@ -201,7 +201,7 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
       family: sqlFamilyPack,
       target: postgresPack,
       createNamespace: postgresCreateNamespace,
-      extensionPacks: {
+      extensions: {
         pgvector: pgvectorPack,
       },
     },
@@ -467,7 +467,7 @@ test('arktypeJson and jsonbColumn currently resolve to never in no-emit type pat
   // descriptor; without it the AST-bound integrity check refuses to build a
   // context for the `payload` column.
   const context = createTestContext(validated, createStubAdapter(), {
-    extensionPacks: [arktypeJsonRuntime],
+    extensions: [arktypeJsonRuntime],
   });
 
   const db = sql({ context, rawCodecInferer: { inferCodec: () => 'pg/text' } });

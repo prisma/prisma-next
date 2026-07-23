@@ -23,7 +23,7 @@ export function createFormatCommand(): Command {
     command,
     'Format your PSL contract source',
     'Formats the Prisma schema (PSL) contract source declared in your config\n' +
-      '(contract.source.inputs[0]) in place. Only runs when contract.source.sourceFormat\n' +
+      '(contract.source.inputs[0]) in place. Only runs when contract.source.format\n' +
       "is 'psl'; a TypeScript or unset source is left untouched. Indent and newline are\n" +
       'read from the optional formatter config section, defaulting to two spaces and the\n' +
       'system newline.',

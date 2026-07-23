@@ -63,7 +63,7 @@ function buildContract(overrides?: Partial<Contract>): Contract {
     capabilities: {
       sql: { returning: true },
     },
-    extensionPacks: {
+    extensions: {
       pgvector: {},
     },
   });

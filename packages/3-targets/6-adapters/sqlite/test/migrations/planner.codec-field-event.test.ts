@@ -38,7 +38,7 @@ function contract(tables: Record<string, StorageTable>, hash = 'c'): Contract<Sq
     domain: applicationDomainOf({ models: {} }),
     roots: {},
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

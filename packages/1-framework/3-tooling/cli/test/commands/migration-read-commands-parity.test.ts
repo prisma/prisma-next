@@ -459,7 +459,7 @@ describe('migration read commands pretty parity', () => {
       driver: { kind: 'driver' },
       contract: { output: 'src/prisma/contract.json', source: 'src/prisma/contract.json' },
       migrations: { dir: 'migrations' },
-      extensionPacks: [],
+      extensions: [],
     } as unknown as LoadedConfig);
     try {
       const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
@@ -509,7 +509,7 @@ function makeOfflineConfig(cwd: string): LoadedConfig {
     driver: { kind: 'driver' },
     contract: { output: join(cwd, 'src', 'prisma', 'contract.json') },
     migrations: { dir: 'migrations' },
-    extensionPacks: [],
+    extensions: [],
   } as unknown as LoadedConfig;
 }
 

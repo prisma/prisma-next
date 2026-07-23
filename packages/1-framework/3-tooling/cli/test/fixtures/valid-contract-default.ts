@@ -20,7 +20,7 @@ const contractObj = defineContract({
 
 export default {
   ...contractObj,
-  extensionPacks: {
+  extensions: {
     postgres: {
       version: '0.0.1',
     },

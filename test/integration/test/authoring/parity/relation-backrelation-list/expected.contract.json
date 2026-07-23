@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "post": {
       "model": "Post",
@@ -162,7 +162,7 @@
         "id": "public"
       }
     },
-    "storageHash": "f859ffe2108c1a6316790f52926fc4a3c6bc2a2ec939213efd72df1acd4452fa"
+    "storageHash": "56438e019d4d80afbe4cb3811a880d064225c5e045014ed96e4da1f191e0be30"
   },
   "capabilities": {
     "postgres": {
@@ -181,7 +181,7 @@
       "scalarList": true
     }
   },
-  "extensionPacks": {},
+  "extensions": {},
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",

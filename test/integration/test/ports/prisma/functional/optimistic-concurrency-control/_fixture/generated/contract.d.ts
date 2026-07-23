@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:f407e1a8449a9232f1bece496f0a4fbfc3866efb8c9c4d881cb4d0cf9db022cd'>;
+  StorageHashBase<'da4f0965fd9135c76b7af031b51ed4b0eb5926273c690f984bcda01fa2e4aea1'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:745ea83df9ded287d699e3f8b378564e84115fea1f254caff1fc751c5a7bee78'>;
+  ExecutionHashBase<'c5f4e6787b21eeb6c991cf15ee7b5081d85bc1272130a7d77404720c05f05435'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -45,9 +45,12 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly public: {
-    readonly Child: { readonly id: Char<24>; readonly parentId: CodecTypes['pg/text@1']['output'] };
+    readonly Child: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly parentId: CodecTypes['pg/text@1']['output'];
+    };
     readonly Resource: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly occStamp: CodecTypes['pg/int4@1']['output'];
     };
   };
@@ -55,20 +58,23 @@ export type FieldOutputTypes = {
 export type FieldInputTypes = {
   readonly public: {
     readonly Child: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly parentId: CodecTypes['pg/text@1']['input'];
     };
     readonly Resource: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly occStamp: CodecTypes['pg/int4@1']['input'];
     };
   };
 };
 export type StorageColumnTypes = {
   readonly public: {
-    readonly child: { readonly id: Char<24>; readonly parentId: CodecTypes['pg/text@1']['output'] };
+    readonly child: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly parentId: CodecTypes['pg/text@1']['output'];
+    };
     readonly resource: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly occStamp: CodecTypes['pg/int4@1']['output'];
     };
   };
@@ -76,11 +82,11 @@ export type StorageColumnTypes = {
 export type StorageColumnInputTypes = {
   readonly public: {
     readonly child: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly parentId: CodecTypes['pg/text@1']['input'];
     };
     readonly resource: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly occStamp: CodecTypes['pg/int4@1']['input'];
     };
   };
@@ -105,10 +111,9 @@ type ContractBase = Omit<
             readonly child: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly parentId: {
                   readonly nativeType: 'text';
@@ -137,10 +142,9 @@ type ContractBase = Omit<
             readonly resource: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly occStamp: {
                   readonly nativeType: 'int4';
@@ -179,11 +183,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly parentId: {
                 readonly nullable: false;
@@ -216,11 +216,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly occStamp: {
                 readonly nullable: false;
@@ -270,7 +266,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly execution: {
     readonly executionHash: ExecutionHash;
     readonly mutations: {

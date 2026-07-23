@@ -35,11 +35,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'deea76c69cfebee2f62b4419407b0bb82193ece65dd393cc2983f2c27311d289'>;
+  StorageHashBase<'6dab54a392d7ed9e3ad614c49817092426b5cbca2087836b8fc3bfa78bc821dd'>;
 export type ExecutionHash =
-  ExecutionHashBase<'b6740166f10149e86e0e83710d377bb3c9df8aa49d2150770a50d7a76dbc816d'>;
+  ExecutionHashBase<'8fc1f2214ea8abb8d650648f7b286159ba8e7ff3daf808591e38ed139ac3dcf9'>;
 export type ProfileHash =
-  ProfileHashBase<'9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -1176,7 +1176,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {
+  readonly extensions: {
     readonly pgvector: {
       readonly capabilities: { readonly postgres: { readonly 'pgvector.cosine': true } };
       readonly familyId: 'sql';

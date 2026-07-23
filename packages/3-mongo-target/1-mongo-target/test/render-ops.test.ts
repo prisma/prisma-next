@@ -57,7 +57,7 @@ function makeContract(collections: Record<string, MongoCollectionData>): MongoCo
     targetFamily: 'mongo',
     profileHash: 'test-profile',
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
     roots: {},
     models: {},

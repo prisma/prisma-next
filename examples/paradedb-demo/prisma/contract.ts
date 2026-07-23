@@ -4,7 +4,7 @@ import { defineContract } from '@prisma-next/postgres/contract-builder';
 
 export const contract = defineContract(
   {
-    extensionPacks: { paradedb },
+    extensions: { paradedb },
   },
   ({ field, model }) => {
     const Item = model('Item', {

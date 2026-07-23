@@ -74,7 +74,7 @@ const TOP_LEVEL_ORDER = [
   'storage',
   'execution',
   'capabilities',
-  'extensionPacks',
+  'extensions',
   'defaultControlPolicy',
   'meta',
 ] as const;
@@ -133,7 +133,7 @@ function omitDefaults(
         STORAGE_NAMESPACE_ENTRIES_PATTERN,
       );
       const isRequiredRoots = isArrayEqual(currentPath, ['roots']);
-      const isRequiredExtensionPacks = isArrayEqual(currentPath, ['extensionPacks']);
+      const isRequiredExtensions = isArrayEqual(currentPath, ['extensions']);
       const isRequiredCapabilities = isArrayEqual(currentPath, ['capabilities']);
       const isRequiredMeta = isArrayEqual(currentPath, ['meta']);
       const isRequiredExecutionDefaults = isArrayEqual(currentPath, [
@@ -141,7 +141,7 @@ function omitDefaults(
         'mutations',
         'defaults',
       ]);
-      const isExtensionNamespace = currentPath.length === 2 && currentPath[0] === 'extensionPacks';
+      const isExtensionNamespace = currentPath.length === 2 && currentPath[0] === 'extensions';
       const isModelRelations = matchesPathPattern(currentPath, DOMAIN_MODEL_RELATIONS_PATTERN);
       const isModelStorage = matchesPathPattern(currentPath, DOMAIN_MODEL_STORAGE_PATTERN);
 
@@ -156,7 +156,7 @@ function omitDefaults(
         !isRequiredStorageNamespaces &&
         !isStorageNamespaceEntries &&
         !isRequiredRoots &&
-        !isRequiredExtensionPacks &&
+        !isRequiredExtensions &&
         !isRequiredCapabilities &&
         !isRequiredMeta &&
         !isRequiredExecutionDefaults &&
@@ -261,7 +261,7 @@ export function canonicalizeContractToObject(
     domain: serialized['domain'],
     storage: serialized['storage'],
     ...ifDefined('execution', serialized['execution']),
-    extensionPacks: serialized['extensionPacks'],
+    extensions: serialized['extensions'],
     capabilities: serialized['capabilities'],
     ...ifDefined('defaultControlPolicy', serialized['defaultControlPolicy']),
     meta: serialized['meta'],

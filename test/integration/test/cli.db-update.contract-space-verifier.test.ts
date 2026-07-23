@@ -13,8 +13,8 @@ import { runDbUpdateAllowFailure, setupDbUpdateFixture } from './utils/db-update
  * into `db update`. Locks two `db update`-level rejection cases:
  *
  * - `db update` rejects when an orphan marker row exists in the database
- *   (a marker for a space that is not declared in `extensionPacks`).
- * - `db update` rejects when an extension is declared in `extensionPacks`
+ *   (a marker for a space that is not declared in `extensions`).
+ * - `db update` rejects when an extension is declared in `extensions`
  *   but no pinned `migrations/<space-id>/` directory exists on disk yet
  *   (`declaredButUnmigrated`).
  *
@@ -38,7 +38,7 @@ withTempDir(({ createTempDir }) => {
     });
 
     it(
-      'rejects when an orphan marker row exists for a space not in extensionPacks (AC-13)',
+      'rejects when an orphan marker row exists for a space not in extensions (AC-13)',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           await withClient(connectionString, async (client) => {

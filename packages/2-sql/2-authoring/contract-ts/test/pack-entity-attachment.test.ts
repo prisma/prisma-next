@@ -144,7 +144,7 @@ describe('generic pack-entity attachment via the entities channel', () => {
       family: sqlFamilyPack,
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
+      extensions: { nativeEnumDemo: nativeEnumExtensionPack },
       entities: [nativeEnumHandle('AalLevel', aalLevel)],
     });
 
@@ -171,7 +171,7 @@ describe('generic pack-entity attachment via the entities channel', () => {
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
       namespaces: ['auth'],
-      extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
+      extensions: { nativeEnumDemo: nativeEnumExtensionPack },
       entities: [
         nativeEnumHandle('AalLevel', publicAalLevel, { namespaceId: 'public' }),
         nativeEnumHandle('AalLevel', authAalLevel, { namespaceId: 'auth' }),
@@ -200,7 +200,7 @@ describe('generic pack-entity attachment via the entities channel', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
-        extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
+        extensions: { nativeEnumDemo: nativeEnumExtensionPack },
         entities: [nativeEnumHandle('AalLevel', entity, { emitKind: 'table' })],
       }),
     ).toThrow(/entry kind "table"/);
@@ -210,7 +210,7 @@ describe('generic pack-entity attachment via the entities channel', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
-        extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
+        extensions: { nativeEnumDemo: nativeEnumExtensionPack },
         entities: [nativeEnumHandle('AalLevel', entity, { emitKind: 'table' })],
       }),
     ).toThrow(expect.objectContaining({ code: 'CONTRACT.ENTITY_KIND_INVALID' }));
@@ -230,7 +230,7 @@ describe('generic pack-entity attachment via the entities channel', () => {
           family: sqlFamilyPack,
           target: postgresTargetPack,
           createNamespace: createTestSqlNamespace,
-          extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
+          extensions: { nativeEnumDemo: nativeEnumExtensionPack },
           entities: [nativeEnumHandle('AalLevel', scaffoldEntity)],
         },
         () => ({ entities: [nativeEnumHandle('AalLevel', factoryEntity)] }),
@@ -246,7 +246,7 @@ describe('generic pack-entity attachment via the entities channel', () => {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
-        extensionPacks: { nativeEnumDemo: nativeEnumExtensionPack },
+        extensions: { nativeEnumDemo: nativeEnumExtensionPack },
         entities: [nativeEnumHandle('AalLevel', shared)],
       },
       () => ({ entities: [nativeEnumHandle('AalLevel', shared)] }),

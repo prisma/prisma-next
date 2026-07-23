@@ -22,7 +22,7 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [],
+  extensions: [],
   contract: {
     source: {
       load: async () => ({ ok: true, value: contract }),

@@ -35,7 +35,7 @@ describe('prismaContract provider helper', () => {
   describe('source format discriminator', () => {
     it('tags the source as PSL', () => {
       const contract = prismaContract('./src/contract/schema.prisma', baseOptions);
-      expect(contract.source.sourceFormat).toBe('psl');
+      expect(contract.source.format).toBe('psl');
     });
   });
 
@@ -510,7 +510,7 @@ model Other {
       });
       const result = await contract.source.load(
         createPostgresTestContext({
-          composedExtensionPacks: ['pgvector'],
+          composedExtensions: ['pgvector'],
           authoringContributions: pgvectorAuthoringContributions,
           resolvedInputs: [schemaPath],
         }),
@@ -530,7 +530,7 @@ model Other {
           },
         },
       });
-      expect(result.value.extensionPacks).toMatchObject({
+      expect(result.value.extensions).toMatchObject({
         pgvector: {
           version: pgvectorExtensionPack.version,
         },
@@ -564,7 +564,7 @@ model Document {
       });
       const result = await contract.source.load(
         createPostgresTestContext({
-          composedExtensionPacks: ['pgvector'],
+          composedExtensions: ['pgvector'],
           authoringContributions: pgvectorAuthoringContributions,
           resolvedInputs: [schemaPath],
         }),

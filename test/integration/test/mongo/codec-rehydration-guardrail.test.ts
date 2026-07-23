@@ -34,7 +34,7 @@ const controlAdapter = new MongoControlAdapterImpl();
  * `serializeMongoOps`, rehydrates by re-parsing JSON, and executes
  * the rehydrated plans against `mongodb-memory-server` through a
  * `MongoFamilyInstance` whose stack has **no codec runtime
- * instances loaded** (no `extensionPacks`, no `controlStack`).
+ * instances loaded** (no `extensions`, no `controlStack`).
  *
  * Both markers advance because rehydrated ops carry every byte they
  * need to execute — JSON Schema fragments, index keys, collection
@@ -103,7 +103,7 @@ function appContract(): MongoContract {
       storageHash: coreHash('tc18-app-contract'),
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: profileHash('tc18-app-profile'),
     meta: {},
   };
@@ -139,7 +139,7 @@ function extContract(): MongoContract {
       storageHash: coreHash('tc18-ext-contract'),
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: profileHash('tc18-ext-profile'),
     meta: {},
   };
@@ -202,7 +202,7 @@ describe('codec-rehydration guardrail', { timeout: timeouts.spinUpMongoMemorySer
 
   it('runs a rehydrated aggregate across spaces without consulting codec runtime instances', async () => {
     // Family stack carries NO codec runtime instances — empty
-    // `controlStack` means no `extensionPacks`, no codec
+    // `controlStack` means no `extensions`, no codec
     // descriptors, nothing for the runner to consult. If the runner
     // ever needed to resolve a codec instance at apply time, this
     // call would surface a missing-codec failure (or throw).

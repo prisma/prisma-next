@@ -13,7 +13,7 @@ Some framework components (targets, adapters, extensions) require database-side 
 - Functions / operators
 - Other catalog-level prerequisites
 
-Historically, it’s tempting to encode this knowledge in targets (e.g., hardcoding `pgvector → vector`) or to infer it from `contract.extensionPacks`. Both approaches couple low-level components to ecosystem details and lead to fragile “fuzzy matching” logic.
+Historically, it’s tempting to encode this knowledge in targets (e.g., hardcoding `pgvector → vector`) or to infer it from `contract.extensions`. Both approaches couple low-level components to ecosystem details and lead to fragile “fuzzy matching” logic.
 
 ## Decision
 
@@ -32,7 +32,7 @@ The target architecture is that components own both:
 
 ### Key constraints
 
-- **No inference from `contract.extensionPacks`**: schema verification must not interpret `contract.extensionPacks` as database prerequisites.
+- **No inference from `contract.extensions`**: schema verification must not interpret `contract.extensions` as database prerequisites.
 - **No fuzzy matching**: matching component IDs to database facts via string heuristics is forbidden. Dependencies must be declared explicitly by components.
 - **Pure verification**: dependency verification must be a pure function over the in-memory `SqlSchemaIR` (no DB I/O).
 - **Idempotent install operations**: dependency install operations are migration operations with pre/post checks; they must be safe to include in an init plan.
@@ -48,7 +48,7 @@ A component can declare `databaseDependencies.init`, where each dependency provi
 - `install` operations (`SqlMigrationPlanOperation`) for `db init`
 - (future target architecture) component-owned verification logic (pure over `SqlSchemaIR`) that determines installed-state for that dependency
 
-Planner and verifier stay structural consumers: they avoid target-level fuzzy matching or inference from `contract.extensionPacks`.
+Planner and verifier stay structural consumers: they avoid target-level fuzzy matching or inference from `contract.extensions`.
 
 ### Schema IR representation
 
@@ -62,7 +62,7 @@ Planner and verifier stay structural consumers: they avoid target-level fuzzy ma
 
 This ADR distinguishes three concepts:
 
-- **Framework extensions / packs**: registered via config; their identity and namespace appear in `contract.extensionPacks` for type/codec/operation namespacing.
+- **Framework extensions / packs**: registered via config; their identity and namespace appear in `contract.extensions` for type/codec/operation namespacing.
 - **Database dependencies** (`DependencyIR`): a target-agnostic node in `SqlSchemaIR` representing an installed prerequisite. Populated by introspection (online) or `contractToSchemaIR` (offline).
 - **Component database dependencies**: the bridge between components and schema facts, declared by components. The dependency `id` matches the `DependencyIR.id` in the schema IR.
 

@@ -51,7 +51,7 @@ describe('index-type pack threading', () => {
   it('IndexTypesFromDefinition merges target + extension packs', () => {
     type Definition = {
       readonly target: TargetPackRef<'sql', 'postgres'>;
-      readonly extensionPacks: { readonly demo: DemoPack; readonly analytics: AnalyticsPack };
+      readonly extensions: { readonly demo: DemoPack; readonly analytics: AnalyticsPack };
     };
     type Resolved = IndexTypesFromDefinition<Definition>;
     type DemoOptions = Resolved['demo']['options'];

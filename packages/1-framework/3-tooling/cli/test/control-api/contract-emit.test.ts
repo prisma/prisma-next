@@ -60,7 +60,7 @@ function createSourceProvider(load: () => Promise<unknown>): {
 function createMockContract(): Contract {
   return {
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
   } as unknown as Contract;
 }
 
@@ -104,7 +104,7 @@ function createSuccessfulConfig(output: string) {
       familyId: 'test-family',
       targetId: 'test-target',
     },
-    extensionPacks: [],
+    extensions: [],
     contract: {
       source: createSourceProvider(async () => ({
         ok: true as const,

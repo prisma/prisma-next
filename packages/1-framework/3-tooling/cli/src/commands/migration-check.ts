@@ -335,7 +335,7 @@ async function loadAggregateIntegrityViolations(
   try {
     const contractJsonContent = await readFile(resolveContractPath(config), 'utf-8');
     const familyInstance = config.family.create(createControlStack(config));
-    const declaredExtensions = toDeclaredExtensionsFromRaw(config.extensionPacks ?? []);
+    const declaredExtensions = toDeclaredExtensionsFromRaw(config.extensions ?? []);
 
     const parsedAppContract: unknown = JSON.parse(contractJsonContent);
     const aggregate = await loadContractSpaceAggregate({

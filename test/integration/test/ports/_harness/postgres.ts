@@ -39,7 +39,7 @@ const controlStack = createControlStack({
   target: postgresTargetControl,
   adapter: postgresAdapterControl,
   driver: postgresDriverControl,
-  extensionPacks: [],
+  extensions: [],
 });
 const controlFamily = sqlFamilyControl.create(controlStack);
 const controlAdapter = postgresAdapterControl.create(controlStack);

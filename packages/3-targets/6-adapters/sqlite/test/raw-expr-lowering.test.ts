@@ -19,7 +19,7 @@ const contract = new SqlContractSerializer().deserializeContract({
   profileHash: 'raw-expr-test',
   roots: {},
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   storage: {
     storageHash: 'raw-expr-core',

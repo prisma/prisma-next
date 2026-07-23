@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "child": {
       "model": "Child",
@@ -22,11 +22,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "parentId": {
@@ -72,11 +69,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "occStamp": {
@@ -129,12 +123,9 @@
             "child": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "parentId": {
                   "codecId": "pg/text@1",
@@ -178,12 +169,9 @@
             "resource": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "occStamp": {
                   "codecId": "pg/int4@1",
@@ -216,10 +204,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:f407e1a8449a9232f1bece496f0a4fbfc3866efb8c9c4d881cb4d0cf9db022cd"
+    "storageHash": "da4f0965fd9135c76b7af031b51ed4b0eb5926273c690f984bcda01fa2e4aea1"
   },
   "execution": {
-    "executionHash": "sha256:745ea83df9ded287d699e3f8b378564e84115fea1f254caff1fc751c5a7bee78",
+    "executionHash": "c5f4e6787b21eeb6c991cf15ee7b5081d85bc1272130a7d77404720c05f05435",
     "mutations": {
       "defaults": [
         {
@@ -264,7 +252,7 @@
       "scalarList": true
     }
   },
-  "extensionPacks": {},
+  "extensions": {},
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",

@@ -28,10 +28,10 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 function defineTestContract<
   const Types extends NonNullable<ContractInput['types']> = Record<never, never>,
   const Models extends NonNullable<ContractInput['models']> = Record<never, never>,
-  const ExtensionPacks extends NonNullable<ContractInput['extensionPacks']> | undefined = undefined,
+  const Extensions extends NonNullable<ContractInput['extensions']> | undefined = undefined,
 >(
   definition: Omit<
-    ContractInput<typeof bareFamilyPack, typeof postgresTargetPack, Types, Models, ExtensionPacks>,
+    ContractInput<typeof bareFamilyPack, typeof postgresTargetPack, Types, Models, Extensions>,
     'family' | 'target' | 'createNamespace'
   >,
 ) {
@@ -261,7 +261,7 @@ describe('contract definition constraint support', () => {
         target: postgresTargetPack,
         // The pack is intentionally malformed for this test; the runtime
         // shape check is what we want to exercise.
-        extensionPacks: { malformed: malformedIndexPack as unknown as typeof testIndexPack },
+        extensions: { malformed: malformedIndexPack as unknown as typeof testIndexPack },
         createNamespace: createTestSqlNamespace,
         models: {
           Doc: model('Doc', {
@@ -280,7 +280,7 @@ describe('contract definition constraint support', () => {
         {
           family: bareFamilyPack,
           target: postgresTargetPack,
-          extensionPacks: { testIndexes: testIndexPack },
+          extensions: { testIndexes: testIndexPack },
           createNamespace: createTestSqlNamespace,
         },
         ({ model: helperModel, field: helperField }) => ({

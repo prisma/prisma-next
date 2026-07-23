@@ -56,7 +56,7 @@ export default function sqliteStatic<TContract extends Contract<SqlStorage>>(opt
   const stack = createSqlExecutionStack({
     target: sqliteTarget,
     adapter: sqliteAdapter,
-    extensionPacks: options.extensions ?? [],
+    extensions: options.extensions ?? [],
   });
   const context = createExecutionContext({ contract, stack });
   return buildSqliteStaticContext(context, stack.adapter.rawCodecInferer);

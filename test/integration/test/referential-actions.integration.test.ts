@@ -77,7 +77,7 @@ describe('referential actions integration', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -114,7 +114,7 @@ describe('referential actions integration', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -165,7 +165,7 @@ describe('referential actions integration', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -254,7 +254,7 @@ describe('referential actions integration', () => {
                 target: postgres,
                 adapter: postgresAdapter,
                 driver: postgresDriver,
-                extensionPacks: [],
+                extensions: [],
               }),
             );
 
@@ -352,7 +352,7 @@ describe('referential actions integration', () => {
                 target: postgres,
                 adapter: postgresAdapter,
                 driver: postgresDriver,
-                extensionPacks: [],
+                extensions: [],
               }),
             );
 
@@ -425,7 +425,7 @@ describe('referential actions integration', () => {
                 target: postgres,
                 adapter: postgresAdapter,
                 driver: postgresDriver,
-                extensionPacks: [],
+                extensions: [],
               }),
             );
 
@@ -520,7 +520,7 @@ describe('referential actions integration', () => {
                 target: postgres,
                 adapter: postgresAdapter,
                 driver: postgresDriver,
-                extensionPacks: [],
+                extensions: [],
               }),
             );
 
@@ -603,7 +603,7 @@ describe('referential actions integration', () => {
           target: postgres,
           adapter: postgresAdapter,
           driver: postgresDriver,
-          extensionPacks: [],
+          extensions: [],
         });
         const familyInstance = sql.create(controlStack);
 

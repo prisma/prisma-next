@@ -520,7 +520,7 @@ const contract: Contract = {
   models: {},
   storage: { tables: {} } as Contract['storage'],
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   profileHash: 'stub' as Contract['profileHash'],
   meta: {},
 };
@@ -528,7 +528,7 @@ const contract: Contract = {
 
 **Why?** Factory functions ensure required fields (including nested hashes such as `storage.storageHash`) are present with proper defaults, making tests more maintainable and less error-prone.
 
-**Note:** The `capabilities` field in `Contract` is typed as `Record<string, Record<string, boolean>>`, not `Record<string, unknown>`. Extension pack metadata is represented as a simple object map (`contract.extensionPacks`) keyed by descriptor ID—there is no manifest/path wrapper in tests.
+**Note:** The `capabilities` field in `Contract` is typed as `Record<string, Record<string, boolean>>`, not `Record<string, unknown>`. Extension pack metadata is represented as a simple object map (`contract.extensions`) keyed by descriptor ID—there is no manifest/path wrapper in tests.
 
 See `.cursor/rules/use-contract-ir-factories.mdc` for detailed guidelines.
 

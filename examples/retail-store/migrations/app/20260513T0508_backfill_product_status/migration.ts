@@ -10,12 +10,12 @@ import {
   RawUpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
 import { dataTransform, setValidation } from '@prisma-next/target-mongo/migration';
-import type { Contract as End } from '../../snapshots/71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c/contract';
-import endContract from '../../snapshots/71f1cc5c3f4de1ea7c9c8426fde682cd78c7c005f6688f58c2d9d6ddd8b2284c/contract.json' with {
+import type { Contract as Start } from '../../snapshots/977a060afe52c4a56f93f2f33d65b8b6b4cc4ded04d16fe6b4f8e7e9e61192d3/contract';
+import startContract from '../../snapshots/977a060afe52c4a56f93f2f33d65b8b6b4cc4ded04d16fe6b4f8e7e9e61192d3/contract.json' with {
   type: 'json',
 };
-import type { Contract as Start } from '../../snapshots/059f3f35403c5a7a90851c23f1028e16d5250630f8a82fba33053e9a50534589/contract';
-import startContract from '../../snapshots/059f3f35403c5a7a90851c23f1028e16d5250630f8a82fba33053e9a50534589/contract.json' with {
+import type { Contract as End } from '../../snapshots/9414a8f88a64f9decc0e019967459e49da083f011cf91898094b7bccab6c1810/contract';
+import endContract from '../../snapshots/9414a8f88a64f9decc0e019967459e49da083f011cf91898094b7bccab6c1810/contract.json' with {
   type: 'json',
 };
 

@@ -77,7 +77,7 @@ describe('canonicalization of literal column defaults', () => {
           },
         },
       },
-      extensionPacks: {},
+      extensions: {},
       capabilities: {},
       meta: {},
     });

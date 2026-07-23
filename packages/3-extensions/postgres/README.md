@@ -91,7 +91,7 @@ Re-exports the TypeScript contract authoring DSL (`defineContract`, `field`, `mo
 import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 
 export const contract = defineContract(
-  { extensionPacks: {} },
+  { extensions: {} },
   ({ field: f, model: m }) => ({
     models: {
       User: m('User', { fields: { id: f.id.uuidv4String() } }),

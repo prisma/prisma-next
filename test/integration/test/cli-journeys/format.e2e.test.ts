@@ -30,7 +30,7 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensionPacks: [],
+  extensions: [],
   formatter: { newline: 'LF' },
   contract: prismaContract('./contract.prisma', {
     output: 'output/contract.json',
@@ -80,10 +80,10 @@ export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  extensionPacks: [],
+  extensions: [],
   contract: {
     source: {
-      sourceFormat: 'typescript',
+      format: 'typescript',
       inputs: ['./contract.prisma'],
       load: async () => ({ ok: false as const, error: { summary: 'not loaded', diagnostics: [] } }),
     },

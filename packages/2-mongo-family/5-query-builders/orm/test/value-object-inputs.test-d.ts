@@ -39,7 +39,7 @@ type VOContract = MongoContractWithTypeMaps<
     readonly targetFamily: 'mongo';
     readonly profileHash: ProfileHashBase<'test'>;
     readonly capabilities: Record<string, never>;
-    readonly extensionPacks: Record<string, never>;
+    readonly extensions: Record<string, never>;
     readonly meta: Record<string, never>;
     readonly roots: { readonly users: CrossReference & { readonly model: 'User' } };
     readonly domain: {
@@ -188,7 +188,7 @@ type VOContractWithFieldTypes = MongoContractWithTypeMaps<
     readonly targetFamily: 'mongo';
     readonly profileHash: ProfileHashBase<'test'>;
     readonly capabilities: Record<string, never>;
-    readonly extensionPacks: Record<string, never>;
+    readonly extensions: Record<string, never>;
     readonly meta: Record<string, never>;
     readonly roots: { readonly users: CrossReference & { readonly model: 'User' } };
     readonly domain: {
@@ -315,7 +315,7 @@ type ExtContract = MongoContractWithTypeMaps<
     readonly targetFamily: 'mongo';
     readonly profileHash: ProfileHashBase<'test'>;
     readonly capabilities: Record<string, never>;
-    readonly extensionPacks: Record<string, never>;
+    readonly extensions: Record<string, never>;
     readonly meta: Record<string, never>;
     readonly roots: {
       readonly tasks: CrossReference & { readonly model: 'Task' };

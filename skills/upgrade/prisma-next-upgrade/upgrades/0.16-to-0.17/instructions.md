@@ -96,6 +96,48 @@ changes:
     detection:
       glob: "**/refs/*.contract.json"
       anyMatch: true
+  - id: extension-packs-config-key-renamed-to-extensions
+    summary: |
+      The `extensionPacks` key is renamed to `extensions` everywhere: the
+      low-level `defineConfig` in `prisma-next.config.ts`, the TS builder's
+      `defineContract` (record form), runtime/control client options, and the
+      top-level key of the emitted `contract.json` / `contract.d.ts`. The old
+      config key now fails loudly with "Config.extensionPacks is no longer
+      supported; rename it to Config.extensions" — it is never silently
+      ignored. Rename the key in `prisma-next.config.ts` (and `contract.ts` /
+      `db.ts` if they pass `extensionPacks` to client factories). The target
+      façades' `defineConfig` already used `extensions`; only projects on the
+      low-level config change. Because the key sits in the canonicalized bytes
+      of every contract hash, all three hashes (`storageHash`,
+      `executionHash`, `profileHash`) change for every contract: re-emit with
+      `prisma-next contract emit`, then re-anchor migrations — regenerate
+      `migrations/snapshots/<hex>/` store entries and refs for the new hashes
+      (a schema-unchanged project needs a hash-advance migration or a
+      re-baseline; the database schema itself does not change).
+    detection:
+      glob: "**/{prisma-next.config.ts,contract.ts,db.ts}"
+      contains:
+        - "extensionPacks"
+  - id: contract-source-format-key-renamed
+    summary: |
+      The contract source provider field `sourceFormat` is renamed to `format`
+      (`contract.source.format` in the low-level config; provider objects from
+      `prismaContract()` / `typescriptContract()` emit the new field
+      automatically once upgraded). Rename any literal `sourceFormat:` in
+      hand-written provider objects or config assertions.
+    detection:
+      glob: "**/prisma-next.config.ts"
+      contains:
+        - "sourceFormat"
+  - id: sugar-output-path-key-renamed-to-output
+    summary: |
+      The target façades' `defineConfig` option `outputPath` is renamed to
+      `output`. Semantics are unchanged (a directory; `contract.json` is
+      written inside it). Rename the key in `prisma-next.config.ts`.
+    detection:
+      glob: "**/prisma-next.config.ts"
+      contains:
+        - "outputPath"
   - id: psl-format-error-class-removed
     summary: |
       The `PslFormatError` class is deleted from `@prisma-next/psl-parser`. `format()`

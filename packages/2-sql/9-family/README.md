@@ -44,7 +44,7 @@ const stack = createControlStack({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
   driver: postgresDriverDescriptor,
-  extensionPacks: [pgVectorExtensionDescriptor],
+  extensions: [pgVectorExtensionDescriptor],
 });
 
 // Create a family instance for control-plane operations

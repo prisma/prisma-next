@@ -180,7 +180,7 @@ export type TestContract = Omit<MongoContract<TestStorage>, 'domain'> & {
   };
   readonly profileHash: ProfileHashBase<'test-profile'>;
   readonly capabilities: Record<string, never>;
-  readonly extensionPacks: Record<string, never>;
+  readonly extensions: Record<string, never>;
   readonly meta: Record<string, never>;
 };
 
@@ -328,7 +328,7 @@ export const testContractJson = {
     },
   },
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   profileHash: 'test-profile',
   meta: {},
 };

@@ -41,7 +41,7 @@ type ContractBase = {
   readonly targetFamily: 'mongo';
   readonly profileHash: ProfileHash;
   readonly capabilities: {};
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly meta: {};
   readonly roots: { readonly shop: { readonly model: 'Shop'; readonly namespace: NamespaceId } };
   readonly domain: {

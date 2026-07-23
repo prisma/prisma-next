@@ -41,7 +41,7 @@ describe('sqlite extensions', () => {
     const contract = createContract<SqlStorage>({
       target: 'sqlite',
       storage: unboundSqlStorage(),
-      extensionPacks: {
+      extensions: {
         [extensionPackId]: { id: extensionPackId, version: '0.0.1' },
       },
     });
@@ -60,7 +60,7 @@ describe('sqlite extensions', () => {
     const contract = createContract<SqlStorage>({
       target: 'sqlite',
       storage: unboundSqlStorage(),
-      extensionPacks: {
+      extensions: {
         [extensionPackId]: { id: extensionPackId, version: '0.0.1' },
       },
     });

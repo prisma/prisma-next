@@ -61,7 +61,7 @@ describe('runtime verify-marker: missing marker table', {
       target: postgresTarget,
       adapter: postgresAdapter,
       driver: postgresDriver,
-      extensionPacks: [pgvector],
+      extensions: [pgvector],
     });
     const stackInstance = instantiateExecutionStack(stack);
     const context = createExecutionContext({ contract: sqlContract, stack });

@@ -11,7 +11,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 
 export interface SqliteControlClientOptions {
   readonly connection?: string;
-  readonly extensionPacks?: ControlClientOptions['extensionPacks'];
+  readonly extensions?: ControlClientOptions['extensions'];
 }
 
 export function createSqliteControlClient(options: SqliteControlClientOptions = {}): ControlClient {
@@ -21,7 +21,7 @@ export function createSqliteControlClient(options: SqliteControlClientOptions = 
     adapter: sqliteAdapter,
     driver: sqliteDriver,
     ...ifDefined('connection', options.connection),
-    ...ifDefined('extensionPacks', options.extensionPacks),
+    ...ifDefined('extensions', options.extensions),
   };
   return createControlClient(clientOptions);
 }

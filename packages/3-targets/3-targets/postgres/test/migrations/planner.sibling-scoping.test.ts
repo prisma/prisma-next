@@ -64,7 +64,7 @@ function buildContract(): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -159,7 +159,7 @@ function buildContractWithSecondNamespace(): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

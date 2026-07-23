@@ -89,7 +89,7 @@ describe('emitter', () => {
             foreignKeys: [],
           },
         }),
-        extensionPacks: {
+        extensions: {
           postgres: {
             version: '0.0.1',
           },
@@ -171,7 +171,7 @@ describe('emitter', () => {
     expect(result.contractDts).toBeDefined();
   });
 
-  it('handles missing extensionPacks field', async () => {
+  it('handles missing extensions field', async () => {
     const ir = createTestContract({
       storage: unboundNamespaceTables({
         user: {
@@ -291,7 +291,7 @@ describe('emitter', () => {
     });
   });
 
-  it('emits contract even when extensionIds are not in contract.extensionPacks', async () => {
+  it('emits contract even when extensionIds are not in contract.extensions', async () => {
     const ir = createTestContract({
       storage: emptySqlStorage,
     });

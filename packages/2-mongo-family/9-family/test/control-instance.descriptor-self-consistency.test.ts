@@ -44,7 +44,7 @@ function buildContract(): MongoContract<MongoStorage> {
     roots: {},
     domain: applicationDomainOf({}),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
     profileHash: profileHash('fixture-profile-v1'),
     storage: new MongoStorage({
@@ -83,7 +83,7 @@ function makeStack(
   return createControlStack({
     family: mongoFamilyDescriptor,
     target: mongoTargetDescriptor,
-    extensionPacks: extensions,
+    extensions: extensions,
   });
 }
 

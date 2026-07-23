@@ -123,7 +123,7 @@ function resolutionForInputs(
 ): ConfigResolutionWithFormatter {
   const resolution = {
     inputs: resolveSchemaInputs({
-      contract: { source: { sourceFormat: 'psl', inputs } },
+      contract: { source: { format: 'psl', inputs } },
     }),
     controlStack: { scalarTypes: [...scalarTypes], pslBlockDescriptors: descriptors },
   };
@@ -2114,7 +2114,7 @@ describe('language server interpreter diagnostics', { timeout: timeouts.database
   } {
     const spy = vi.fn(interpret);
     const source = {
-      sourceFormat: 'psl',
+      format: 'psl',
       inputs: [schemaPath],
       load: async () => ok({} as never),
       interpret: spy,
@@ -2248,7 +2248,7 @@ describe('language server config failure surfacing', {
 
   function interpretingResolution(): ConfigResolution {
     const source = {
-      sourceFormat: 'psl',
+      format: 'psl',
       inputs: [schemaPath],
       load: async () => ok({} as never),
       interpret: () =>

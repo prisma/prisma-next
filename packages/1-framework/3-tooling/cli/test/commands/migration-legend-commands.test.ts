@@ -91,7 +91,7 @@ function mockConfig(): void {
     driver: { kind: 'driver' },
     contract: { output: 'src/prisma/contract.json', source: 'src/prisma/contract.json' },
     migrations: { dir: 'migrations' },
-    extensionPacks: [],
+    extensions: [],
   } as unknown as LoadedConfig);
 }
 

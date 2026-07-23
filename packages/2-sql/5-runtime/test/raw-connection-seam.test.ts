@@ -42,7 +42,7 @@ const testContract: Contract<SqlStorage> = {
       __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
     },
   }),
-  extensionPacks: {},
+  extensions: {},
   capabilities: {},
   meta: {},
 };
@@ -179,7 +179,7 @@ function createTestSetup(options?: { middleware?: readonly SqlMiddleware[] }) {
   const stack = createSqlExecutionStack({
     target: targetDescriptor,
     adapter: adapterDescriptor,
-    extensionPacks: [],
+    extensions: [],
   });
 
   type SqlTestStackInstance = ExecutionStackInstance<
@@ -193,7 +193,7 @@ function createTestSetup(options?: { middleware?: readonly SqlMiddleware[] }) {
 
   const context = createExecutionContext({
     contract: testContract,
-    stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
+    stack: { target: targetDescriptor, adapter: adapterDescriptor, extensions: [] },
   });
 
   const runtimeOptions: RuntimeOptions = {

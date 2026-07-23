@@ -25,7 +25,7 @@ import { executeRun } from './db-run';
  * 3. The runner's `execute` applies the per-space plans
  *    inside one outer transaction.
  *
- * `extensionPacks` mirrors `Config.extensionPacks` (descriptor list).
+ * `extensions` mirrors `Config.extensions` (descriptor list).
  * The loader (sub-spec § Loader) is the sole descriptor-import boundary.
  */
 export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extends string> {
@@ -55,7 +55,7 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
    * routes through the same loader → planner → runner pipeline with no
    * extension spaces in the aggregate.
    */
-  readonly extensionPacks?: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
+  readonly extensions?: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }
@@ -80,7 +80,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     frameworkComponents: options.frameworkComponents,
     migrationsDir: options.migrationsDir,
     targetId: options.targetId,
-    extensionPacks: options.extensionPacks ?? [],
+    extensions: options.extensions ?? [],
     policy: { allowedOperationClasses: ['additive'] },
     action: 'dbInit',
     ...ifDefined('onProgress', options.onProgress),

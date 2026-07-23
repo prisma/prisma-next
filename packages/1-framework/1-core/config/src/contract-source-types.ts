@@ -38,7 +38,7 @@ export interface ContractSourceDiagnostics {
 }
 
 export interface ContractSourceContext {
-  readonly composedExtensionPacks: readonly string[];
+  readonly composedExtensions: readonly string[];
   /** Extension contracts keyed by space ID, required for cross-space FK resolution. */
   readonly composedExtensionContracts: ReadonlyMap<string, Contract>;
   readonly authoringContributions: AssembledAuthoringContributions;
@@ -59,21 +59,21 @@ export interface ContractSourceProviderBase {
 }
 
 export interface PslContractSourceProvider extends ContractSourceProviderBase {
-  readonly sourceFormat: 'psl';
+  readonly format: 'psl';
 }
 
 export interface TypeScriptContractSourceProvider extends ContractSourceProviderBase {
-  readonly sourceFormat: 'typescript';
+  readonly format: 'typescript';
 }
 
 /**
  * Third-party or unspecified source formats. Absent (or unrecognized)
- * `sourceFormat` means format-aware tooling must leave the source untouched.
+ * `format` means format-aware tooling must leave the source untouched.
  * Narrowing to a known format flows only through capability guards owned by
  * the authoring layer.
  */
 export interface OpaqueContractSourceProvider extends ContractSourceProviderBase {
-  readonly sourceFormat?: string;
+  readonly format?: string;
 }
 
 export type ContractSourceProvider =

@@ -54,7 +54,7 @@ describe('unified contract types', () => {
         }),
         storage: { storageHash: hash, namespaces: {} },
         capabilities: {},
-        extensionPacks: {},
+        extensions: {},
         meta: {},
         profileHash: profHash,
       };
@@ -73,7 +73,7 @@ describe('unified contract types', () => {
         domain: applicationDomainOf({ models: {} }),
         storage: { storageHash: hash, namespaces: {} },
         capabilities: {},
-        extensionPacks: {},
+        extensions: {},
         meta: {},
         execution: {
           executionHash: execHash,
@@ -117,7 +117,7 @@ describe('unified contract types', () => {
         }),
         storage: { storageHash: hash, namespaces: {} },
         capabilities: {},
-        extensionPacks: {},
+        extensions: {},
         meta: {},
         profileHash: profHash,
       };

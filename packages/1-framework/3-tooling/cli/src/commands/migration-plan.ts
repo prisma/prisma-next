@@ -307,7 +307,7 @@ async function executeMigrationPlanCommand(
     targetId: config.target.targetId,
     migrationsDir,
     appContract: toContract,
-    extensionPacks: config.extensionPacks ?? [],
+    extensions: config.extensions ?? [],
     deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
   });
   if (!tolerantAggregateResult.ok) {
@@ -376,10 +376,10 @@ async function executeMigrationPlanCommand(
   // descriptor-shipped migration packages not yet on disk. Runs before
   // the no-op check so that an extension bump alone (with no structural
   // app-space change) still re-pins extension artifacts on disk.
-  const canonicalExtensionInputs = toExtensionInputs(config.extensionPacks ?? []);
+  const canonicalExtensionInputs = toExtensionInputs(config.extensions ?? []);
   const seedResult = await runContractSpaceSeedPhase({
     migrationsDir,
-    extensionPacks: canonicalExtensionInputs,
+    extensions: canonicalExtensionInputs,
   });
   if (!flags.json && !flags.quiet) {
     for (const record of seedResult.seeded) {
@@ -434,7 +434,7 @@ async function executeMigrationPlanCommand(
     targetId: config.target.targetId,
     migrationsDir,
     appContract: toContract,
-    extensionPacks: config.extensionPacks ?? [],
+    extensions: config.extensions ?? [],
     deserializeContract: (json: unknown) => familyInstance.deserializeContract(json),
   });
   if (!aggregateResult.ok) {
@@ -445,7 +445,7 @@ async function executeMigrationPlanCommand(
   const frameworkComponents = assertFrameworkComponentsCompatible(
     config.family.familyId,
     config.target.targetId,
-    [config.target, config.adapter, ...(config.extensionPacks ?? [])],
+    [config.target, config.adapter, ...(config.extensions ?? [])],
   );
 
   // Write the planned package's destination contract into the snapshot store.

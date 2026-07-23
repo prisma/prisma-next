@@ -50,7 +50,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

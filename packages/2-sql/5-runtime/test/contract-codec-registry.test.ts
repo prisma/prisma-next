@@ -148,7 +148,7 @@ function createTestContract(
       },
       ...ifDefined('types', types),
     }),
-    extensionPacks: {},
+    extensions: {},
     capabilities: {},
     meta: {},
   };
@@ -168,7 +168,7 @@ describe('ContractCodecRegistry', () => {
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createVectorExtensionDescriptor()],
+      extensions: [createVectorExtensionDescriptor()],
     });
 
     const resolved = context.contractCodecs.forColumn('__unbound__', 'Doc', 'embedding');
@@ -208,7 +208,7 @@ describe('ContractCodecRegistry', () => {
     );
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createVectorExtensionDescriptor()],
+      extensions: [createVectorExtensionDescriptor()],
     });
 
     const docCodec = context.contractCodecs.forColumn('__unbound__', 'Doc', 'embedding');
@@ -230,7 +230,7 @@ describe('ContractCodecRegistry', () => {
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createNonParameterizedExtensionDescriptor()],
+      extensions: [createNonParameterizedExtensionDescriptor()],
     });
 
     const primaryCodec = context.contractCodecs.forColumn('__unbound__', 'User', 'primary');
@@ -251,7 +251,7 @@ describe('ContractCodecRegistry', () => {
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createNonParameterizedExtensionDescriptor()],
+      extensions: [createNonParameterizedExtensionDescriptor()],
     });
 
     expect(context.contractCodecs.forColumn('__unbound__', 'User', 'nonexistent')).toBeUndefined();
@@ -275,7 +275,7 @@ describe('CodecDescriptorRegistry', () => {
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createVectorExtensionDescriptor()],
+      extensions: [createVectorExtensionDescriptor()],
     });
 
     const descriptor = context.codecDescriptors.descriptorFor('pg/vector@1');
@@ -291,7 +291,7 @@ describe('CodecDescriptorRegistry', () => {
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createNonParameterizedExtensionDescriptor()],
+      extensions: [createNonParameterizedExtensionDescriptor()],
     });
 
     const descriptor = context.codecDescriptors.descriptorFor('test/scalar@1');
@@ -317,10 +317,7 @@ describe('CodecDescriptorRegistry', () => {
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [
-        createVectorExtensionDescriptor(),
-        createNonParameterizedExtensionDescriptor(),
-      ],
+      extensions: [createVectorExtensionDescriptor(), createNonParameterizedExtensionDescriptor()],
     });
 
     const traitsByCodecId = (codecId: string): readonly string[] =>
@@ -337,7 +334,7 @@ describe('CodecDescriptorRegistry', () => {
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createNonParameterizedExtensionDescriptor()],
+      extensions: [createNonParameterizedExtensionDescriptor()],
     });
 
     expect(context.codecDescriptors.descriptorFor('unknown/codec@1')).toBeUndefined();
@@ -349,7 +346,7 @@ describe('CodecDescriptorRegistry', () => {
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createNonParameterizedExtensionDescriptor()],
+      extensions: [createNonParameterizedExtensionDescriptor()],
     });
 
     const codecIds = Array.from(context.codecDescriptors.values()).map((d) => d.codecId);
@@ -369,7 +366,7 @@ describe('CodecDescriptorRegistry', () => {
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createVectorExtensionDescriptor()],
+      extensions: [createVectorExtensionDescriptor()],
     });
 
     const byVector = context.codecDescriptors.byTargetType('vector');

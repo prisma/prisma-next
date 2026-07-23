@@ -38,7 +38,7 @@
       }
     }
   },
-  "extensionPacks": {},
+  "extensions": {},
   "capabilities": {
     "postgres": {
       "returning": true

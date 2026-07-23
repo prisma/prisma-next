@@ -498,7 +498,7 @@ type VOContractBase = Omit<
     };
   };
   readonly capabilities: Record<string, never>;
-  readonly extensionPacks: Record<string, never>;
+  readonly extensions: Record<string, never>;
   readonly profileHash: string;
 };
 

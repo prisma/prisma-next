@@ -61,7 +61,7 @@ describe('buildContractSpaceAggregate — AC15: does not read contractSpace.cont
       targetId: 'postgres',
       migrationsDir: join(tempDir, 'migrations'),
       appContract: STUB_APP_CONTRACT,
-      extensionPacks: [throwingExtension],
+      extensions: [throwingExtension],
       deserializeContract: () => STUB_APP_CONTRACT,
     });
 

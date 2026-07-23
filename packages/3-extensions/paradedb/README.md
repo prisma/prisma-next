@@ -42,7 +42,7 @@ import postgres from '@prisma-next/target-postgres/pack';
 export const contract = defineContract({
   family: sqlFamily,
   target: postgres,
-  extensionPacks: { paradedb },
+  extensions: { paradedb },
   models: {
     Item: model('Item', {
       fields: {

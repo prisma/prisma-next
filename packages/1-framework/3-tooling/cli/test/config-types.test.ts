@@ -60,7 +60,7 @@ describe('defineConfig', () => {
         readMarker: async () => null,
         readAllMarkers: async () => new Map(),
         readLedger: async () => [],
-        introspect: async () => ({ tables: {}, extensionPacks: [] }),
+        introspect: async () => ({ tables: {}, extensions: [] }),
       }),
     },
     target: {
@@ -96,7 +96,7 @@ describe('defineConfig', () => {
         close: async () => {},
       }),
     },
-    extensionPacks: [],
+    extensions: [],
   };
 
   it('returns the config object unchanged when no contract', () => {
@@ -192,7 +192,7 @@ describe('defineConfig', () => {
     const contract = { targetFamily: 'sql' } as Contract;
     const config = typescriptContract(contract, 'output/contract.json');
     const result = await config.source.load({
-      composedExtensionPacks: [],
+      composedExtensions: [],
       composedExtensionContracts: new Map(),
       authoringContributions: {
         field: {},

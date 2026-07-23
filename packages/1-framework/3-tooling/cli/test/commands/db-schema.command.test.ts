@@ -43,7 +43,7 @@ const baseConfig = {
   target: { targetId: 'postgres' },
   adapter: {},
   driver: {},
-  extensionPacks: [],
+  extensions: [],
   db: {
     connection: 'postgres://user:pass@localhost:5432/prisma_next',
   },

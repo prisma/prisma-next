@@ -1,7 +1,7 @@
 {
   "from": null,
-  "to": "b0d547223488b4a8cea642a0bb2cc8e8f6cd9b2a6e490f23832865146ac51468",
+  "to": "d009a7c12d910e42e7319f0e56ef3113548bd5d3262f06759caf861afd4468f5",
   "providedInvariants": ["audit:create-audit_event-v1"],
   "createdAt": "2026-05-09T04:24:04.431Z",
-  "migrationHash": "6d1d2b2cfa34e545c355fc582be11f65cde13c63def05385dc0655bbbc83b3e3"
+  "migrationHash": "8bbd6de33c78a6206691f6f15199a36b414465f5b7af7475ce5f7c37f13ef5ad"
 }

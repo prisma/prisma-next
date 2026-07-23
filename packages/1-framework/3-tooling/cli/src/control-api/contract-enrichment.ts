@@ -65,21 +65,21 @@ export function enrichContract(
 ): Contract {
   const mergedCapabilities = mergeCapabilityMatrices(ir.capabilities, components);
 
-  const extensionPacksMeta: Record<string, unknown> = {};
+  const extensionsMeta: Record<string, unknown> = {};
   for (const component of components) {
     if (component.kind === 'extension') {
-      extensionPacksMeta[component.id] = extractExtensionPackMeta(component);
+      extensionsMeta[component.id] = extractExtensionPackMeta(component);
     }
   }
 
-  const extensionPacks =
-    Object.keys(extensionPacksMeta).length > 0
-      ? { ...ir.extensionPacks, ...extensionPacksMeta }
-      : ir.extensionPacks;
+  const extensions =
+    Object.keys(extensionsMeta).length > 0
+      ? { ...ir.extensions, ...extensionsMeta }
+      : ir.extensions;
 
   return {
     ...ir,
     capabilities: sortDeepTyped(mergedCapabilities),
-    extensionPacks: sortDeepTyped(extensionPacks),
+    extensions: sortDeepTyped(extensions),
   };
 }

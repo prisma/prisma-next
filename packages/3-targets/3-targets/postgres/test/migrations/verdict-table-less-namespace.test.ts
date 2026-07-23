@@ -53,7 +53,7 @@ function makeContract(): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

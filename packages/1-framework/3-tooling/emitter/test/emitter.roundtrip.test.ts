@@ -40,7 +40,7 @@ describe('emitter round-trip', () => {
             foreignKeys: [],
           },
         }),
-        extensionPacks: {
+        extensions: {
           postgres: { version: '0.0.1' },
           pg: {},
         },
@@ -62,7 +62,7 @@ describe('emitter round-trip', () => {
         roots: contractJson1['roots'] as Record<string, CrossReference>,
         models: modelsFromCanonicalContract(contractJson1),
         storage: contractJson1['storage'] as Record<string, unknown>,
-        extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
+        extensions: contractJson1['extensions'] as Record<string, unknown>,
         capabilities:
           (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
         meta: (contractJson1['meta'] as Record<string, unknown>) || {},
@@ -148,7 +148,7 @@ describe('emitter round-trip', () => {
             ],
           },
         }),
-        extensionPacks: {
+        extensions: {
           postgres: { version: '0.0.1' },
         },
       });
@@ -169,7 +169,7 @@ describe('emitter round-trip', () => {
         roots: contractJson1['roots'] as Record<string, CrossReference>,
         models: modelsFromCanonicalContract(contractJson1),
         storage: contractJson1['storage'] as Record<string, unknown>,
-        extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
+        extensions: contractJson1['extensions'] as Record<string, unknown>,
         capabilities:
           (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
         meta: (contractJson1['meta'] as Record<string, unknown>) || {},
@@ -200,7 +200,7 @@ describe('emitter round-trip', () => {
             foreignKeys: [],
           },
         }),
-        extensionPacks: {
+        extensions: {
           postgres: { version: '0.0.1' },
           pg: {},
         },
@@ -222,7 +222,7 @@ describe('emitter round-trip', () => {
         roots: contractJson1['roots'] as Record<string, CrossReference>,
         models: modelsFromCanonicalContract(contractJson1),
         storage: contractJson1['storage'] as Record<string, unknown>,
-        extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
+        extensions: contractJson1['extensions'] as Record<string, unknown>,
         capabilities:
           (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
         meta: (contractJson1['meta'] as Record<string, unknown>) || {},
@@ -261,7 +261,7 @@ describe('emitter round-trip', () => {
           foreignKeys: [],
         },
       }),
-      extensionPacks: {
+      extensions: {
         postgres: { version: '0.0.1' },
         pg: {},
       },
@@ -289,7 +289,7 @@ describe('emitter round-trip', () => {
       roots: contractJson1['roots'] as Record<string, CrossReference>,
       models: modelsFromCanonicalContract(contractJson1),
       storage: contractJson1['storage'] as Record<string, unknown>,
-      extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
+      extensions: contractJson1['extensions'] as Record<string, unknown>,
       capabilities:
         (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
       meta: (contractJson1['meta'] as Record<string, unknown>) || {},

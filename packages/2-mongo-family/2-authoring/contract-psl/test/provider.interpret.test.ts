@@ -21,7 +21,7 @@ const mongoScalarAuthoringTypes = {
 
 function createMongoTestContext(overrides?: Partial<ContractSourceContext>): ContractSourceContext {
   return {
-    composedExtensionPacks: [],
+    composedExtensions: [],
     composedExtensionContracts: new Map(),
     authoringContributions: {
       field: {},

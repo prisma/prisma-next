@@ -80,7 +80,7 @@ interface MongoShapedExtensionContract {
     readonly storageHash: string;
   };
   readonly capabilities: Record<string, never>;
-  readonly extensionPacks: Record<string, never>;
+  readonly extensions: Record<string, never>;
   readonly profileHash: string;
   readonly meta: Record<string, never>;
 }
@@ -108,7 +108,7 @@ function buildMongoExtensionContract(): MongoShapedExtensionContract {
       storageHash: coreHash('e'.repeat(64)),
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: profileHash('mongo-ext-profile'),
     meta: {},
   };
@@ -132,7 +132,7 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
 
     const out = await runContractSpaceSeedPhase({
       migrationsDir,
-      extensionPacks: [
+      extensions: [
         {
           id: EXT_SPACE,
           contractSpace: {
@@ -194,7 +194,7 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
 
     const seedInput = {
       migrationsDir,
-      extensionPacks: [
+      extensions: [
         {
           id: EXT_SPACE,
           contractSpace: {

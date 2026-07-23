@@ -102,7 +102,7 @@ test('accepts compatible control descriptors', () => {
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
     driver: postgresDriverDescriptor,
-    extensionPacks: [postgresExtensionDescriptor],
+    extensions: [postgresExtensionDescriptor],
   };
 
   const result = defineConfig(config);
@@ -116,7 +116,7 @@ test('accepts contract source providers with declared inputs', () => {
     adapter: postgresAdapterDescriptor,
     contract: {
       source: {
-        sourceFormat: 'psl',
+        format: 'psl',
         inputs: ['./schema.prisma'],
         load: async (_context) => ok({} as never),
       },
@@ -124,33 +124,33 @@ test('accepts contract source providers with declared inputs', () => {
   };
 
   const result = defineConfig(config);
-  expectTypeOf(result.contract!.source.sourceFormat).toEqualTypeOf<string | undefined>();
+  expectTypeOf(result.contract!.source.format).toEqualTypeOf<string | undefined>();
   expectTypeOf(result.contract!.source.inputs).toEqualTypeOf<readonly string[] | undefined>();
   expectTypeOf(result.contract!.source.load).toEqualTypeOf<ContractSourceProvider['load']>();
 });
 
-test('contract source providers form a sourceFormat-keyed union', () => {
+test('contract source providers form a format-keyed union', () => {
   expectTypeOf<ContractSourceProvider>().toEqualTypeOf<
     PslContractSourceProvider | TypeScriptContractSourceProvider | OpaqueContractSourceProvider
   >();
-  expectTypeOf<PslContractSourceProvider['sourceFormat']>().toEqualTypeOf<'psl'>();
-  expectTypeOf<TypeScriptContractSourceProvider['sourceFormat']>().toEqualTypeOf<'typescript'>();
-  expectTypeOf<OpaqueContractSourceProvider['sourceFormat']>().toEqualTypeOf<string | undefined>();
-  expectTypeOf<PslContractSourceProvider['sourceFormat']>().toExtend<ContractSourceFormat>();
-  expectTypeOf<TypeScriptContractSourceProvider['sourceFormat']>().toExtend<ContractSourceFormat>();
+  expectTypeOf<PslContractSourceProvider['format']>().toEqualTypeOf<'psl'>();
+  expectTypeOf<TypeScriptContractSourceProvider['format']>().toEqualTypeOf<'typescript'>();
+  expectTypeOf<OpaqueContractSourceProvider['format']>().toEqualTypeOf<string | undefined>();
+  expectTypeOf<PslContractSourceProvider['format']>().toExtend<ContractSourceFormat>();
+  expectTypeOf<TypeScriptContractSourceProvider['format']>().toExtend<ContractSourceFormat>();
 });
 
 test('provider literals remain assignable to the union without casts', () => {
   const load: ContractSourceProvider['load'] = async (_context) => ok({} as never);
 
   const psl: ContractSourceProvider = {
-    sourceFormat: 'psl',
+    format: 'psl',
     inputs: ['./schema.prisma'],
     load,
   };
-  const typescript: ContractSourceProvider = { sourceFormat: 'typescript', load };
+  const typescript: ContractSourceProvider = { format: 'typescript', load };
   const absent: ContractSourceProvider = { load };
-  const thirdParty: ContractSourceProvider = { sourceFormat: 'made-up-format', load };
+  const thirdParty: ContractSourceProvider = { format: 'made-up-format', load };
 
   expectTypeOf(psl).toExtend<ContractSourceProvider>();
   expectTypeOf(typescript).toExtend<ContractSourceProvider>();

@@ -30,10 +30,10 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:a815ff49f4020a6dce92ec2987dc8c15a571b2372a62387ab49d185a85efe658'>;
+  StorageHashBase<'c70bd8930c375d443f8971c1fc6e78261fde3d64bfec53060850fa5f9732991d'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -46,7 +46,7 @@ export type FieldOutputTypes = {
   readonly public: {
     readonly Entry: {
       readonly id: CodecTypes['pg/text@1']['output'];
-      readonly json: CodecTypes['pg/jsonb@1']['output'];
+      readonly json: CodecTypes['pg/json@1']['output'];
     };
   };
 };
@@ -54,7 +54,7 @@ export type FieldInputTypes = {
   readonly public: {
     readonly Entry: {
       readonly id: CodecTypes['pg/text@1']['input'];
-      readonly json: CodecTypes['pg/jsonb@1']['input'];
+      readonly json: CodecTypes['pg/json@1']['input'];
     };
   };
 };
@@ -62,7 +62,7 @@ export type StorageColumnTypes = {
   readonly public: {
     readonly entry: {
       readonly id: CodecTypes['pg/text@1']['output'];
-      readonly json: CodecTypes['pg/jsonb@1']['output'];
+      readonly json: CodecTypes['pg/json@1']['output'];
     };
   };
 };
@@ -70,7 +70,7 @@ export type StorageColumnInputTypes = {
   readonly public: {
     readonly entry: {
       readonly id: CodecTypes['pg/text@1']['input'];
-      readonly json: CodecTypes['pg/jsonb@1']['input'];
+      readonly json: CodecTypes['pg/json@1']['input'];
     };
   };
 };
@@ -99,8 +99,8 @@ type ContractBase = Omit<
                   readonly nullable: false;
                 };
                 readonly json: {
-                  readonly nativeType: 'jsonb';
-                  readonly codecId: 'pg/jsonb@1';
+                  readonly nativeType: 'json';
+                  readonly codecId: 'pg/json@1';
                   readonly nullable: false;
                 };
               };
@@ -134,7 +134,7 @@ type ContractBase = Omit<
               };
               readonly json: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/json@1' };
               };
             };
             readonly relations: Record<string, never>;
@@ -168,7 +168,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly meta: {};
 
   readonly profileHash: ProfileHash;

@@ -89,7 +89,7 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
           __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: tables } }),
         },
       }),
-      extensionPacks: {},
+      extensions: {},
       capabilities: {},
       meta: {},
     };
@@ -104,7 +104,7 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
+      extensions: [descriptor],
     });
 
     const columnInstance = context.contractCodecs.forColumn('__unbound__', 'users', 'field');
@@ -222,7 +222,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
       domain: applicationDomainOf({ models: {} }),
       roots: {},
       storage,
-      extensionPacks: {},
+      extensions: {},
       capabilities: {},
       meta: {},
     };
@@ -233,7 +233,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     const contract = contractWithVector({ Doc: { typeParams: { length: 1536 } } });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
+      extensions: [descriptor],
     });
 
     const a = context.contractCodecs.forCodecRef({
@@ -255,7 +255,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
+      extensions: [descriptor],
     });
 
     const a = context.contractCodecs.forCodecRef({
@@ -275,7 +275,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     const contract = contractWithVector({ Doc: { typeParams: { length: 1536 } } });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
+      extensions: [descriptor],
     });
 
     const callsAfterContextConstruction = factoryCalls();
@@ -295,7 +295,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     const contract = contractWithVector({ Doc: { typeParams: { length: 1536 } } });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
+      extensions: [descriptor],
     });
 
     const before = factoryCalls();
@@ -316,7 +316,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     );
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
+      extensions: [descriptor],
     });
 
     const codec = context.contractCodecs.forCodecRef({
@@ -344,7 +344,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     );
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
+      extensions: [descriptor],
     });
 
     const codec = context.contractCodecs.forCodecRef({
@@ -363,7 +363,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     const contract = contractWithVector({ Doc: { typeParams: { length: 1536 } } });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
+      extensions: [descriptor],
     });
 
     expect(() => context.contractCodecs.forCodecRef({ codecId: 'nope/missing@1' })).toThrow(
@@ -447,7 +447,7 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
           __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: tables } }),
         },
       }),
-      extensionPacks: {},
+      extensions: {},
       capabilities: {},
       meta: {},
     };
@@ -460,7 +460,7 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
+      extensions: [descriptor],
     });
 
     const fromColumn = context.contractCodecs.forColumn('__unbound__', 'users', 'field');
@@ -480,7 +480,7 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
     });
 
     const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
+      extensions: [descriptor],
     });
 
     const usersInstance = context.contractCodecs.forColumn('__unbound__', 'users', 'field');

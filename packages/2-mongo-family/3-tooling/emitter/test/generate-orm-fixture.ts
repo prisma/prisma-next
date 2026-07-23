@@ -33,7 +33,7 @@ const contract: Contract = {
     storageHash: coreHash('orm-storage'),
   },
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
 } as Contract;
 

@@ -4,7 +4,7 @@ import {
   type TargetBoundComponentDescriptor,
 } from '@prisma-next/framework-components/components';
 import type { ControlStack } from '@prisma-next/framework-components/control';
-import { errorConfigValidation, errorContractMissingExtensionPacks } from './cli-errors';
+import { errorConfigValidation, errorContractMissingExtensions } from './cli-errors';
 
 /**
  * Asserts that all framework components are compatible with the expected family and target.
@@ -27,7 +27,7 @@ import { errorConfigValidation, errorContractMissingExtensionPacks } from './cli
  * @example
  * ```ts
  * const config = await loadConfig();
- * const frameworkComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
+ * const frameworkComponents = [config.target, config.adapter, ...(config.extensions ?? [])];
  *
  * // Validate and type-narrow components before passing to planner
  * const typedComponents = assertFrameworkComponentsCompatible(
@@ -114,12 +114,12 @@ export function assertFrameworkComponentsCompatible<
  * This check ensures the emitted contract matches the CLI config before running
  * commands that depend on the contract (e.g., db verify, db sign).
  *
- * @param contract - The contract to validate (must include targetFamily, target, extensionPacks).
- * @param stack - The control plane stack (target, adapter, driver, extensionPacks).
+ * @param contract - The contract to validate (must include targetFamily, target, extensions).
+ * @param stack - The control plane stack (target, adapter, driver, extensions).
  *
  * @throws {CliStructuredError} errorConfigValidation when contract.targetFamily or contract.target
  *   doesn't match the configured family/target.
- * @throws {CliStructuredError} errorContractMissingExtensionPacks when the contract requires
+ * @throws {CliStructuredError} errorContractMissingExtensions when the contract requires
  *   extension packs that are not provided in the config (includes all missing packs in error.meta).
  *
  * @example
@@ -141,14 +141,14 @@ export function assertContractRequirementsSatisfied<
   contract,
   stack,
 }: {
-  readonly contract: Pick<Contract, 'targetFamily' | 'target' | 'extensionPacks'>;
+  readonly contract: Pick<Contract, 'targetFamily' | 'target' | 'extensions'>;
   readonly stack: ControlStack<TFamilyId, TTargetId>;
 }): void {
   const providedComponentIds = new Set<string>([
     stack.target.id,
     ...(stack.adapter ? [stack.adapter.id] : []),
   ]);
-  for (const extension of stack.extensionPacks) {
+  for (const extension of stack.extensions) {
     providedComponentIds.add(extension.id);
   }
 
@@ -172,8 +172,8 @@ export function assertContractRequirementsSatisfied<
   }
 
   if (result.missingExtensionPackIds.length > 0) {
-    throw errorContractMissingExtensionPacks({
-      missingExtensionPacks: result.missingExtensionPackIds,
+    throw errorContractMissingExtensions({
+      missingExtensions: result.missingExtensionPackIds,
       providedComponentIds: [...providedComponentIds],
     });
   }

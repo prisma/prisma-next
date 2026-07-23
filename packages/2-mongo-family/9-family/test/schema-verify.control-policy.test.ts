@@ -39,7 +39,7 @@ function buildContract(
       },
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     profileHash: 'profile',
     meta: {},
     ...(defaultControlPolicy !== undefined ? { defaultControlPolicy } : {}),

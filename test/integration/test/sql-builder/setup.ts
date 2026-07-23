@@ -115,7 +115,7 @@ export function setupIntegrationTest() {
       target: postgresTarget,
       adapter: postgresAdapter,
       driver: cursorDisabledDriver,
-      extensionPacks: [pgvector],
+      extensions: [pgvector],
     });
 
     const stackInstance = instantiateExecutionStack(stack);

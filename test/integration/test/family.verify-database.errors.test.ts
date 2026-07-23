@@ -39,7 +39,7 @@ function createTestContract(): Contract<SqlStorage> {
 
   return {
     ...contractObj,
-    extensionPacks: {
+    extensions: {
       postgres: {
         version: '0.0.1',
       },
@@ -61,7 +61,7 @@ async function emitContract(
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: [],
+    extensions: [],
   });
 
   const emitResult = await emit(contract, stack, sqlEmission, {
@@ -99,7 +99,7 @@ function loadContract(testDir: string): { contract: Contract; contractPath: stri
       target: postgres,
       adapter: postgresAdapter,
       driver: postgresDriver,
-      extensionPacks: [],
+      extensions: [],
     }),
   );
   const contract = familyInstance.deserializeContract(contractJson);
@@ -126,7 +126,7 @@ async function verifyDatabase(options: {
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [],
+        extensions: [],
       }),
     );
 

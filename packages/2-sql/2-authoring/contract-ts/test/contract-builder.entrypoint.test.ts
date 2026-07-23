@@ -66,19 +66,19 @@ describe('defineContract runtime guards', () => {
       code: 'CONTRACT.PACK_FAMILY_MISMATCH',
     },
     {
-      name: 'non-extension pack refs in extensionPacks',
+      name: 'non-extension pack refs in extensions',
       run: () =>
         defineContract({
           family: sqlFamilyPack,
           target: postgresTargetPack,
           createNamespace: createTestSqlNamespace,
-          extensionPacks: {
+          extensions: {
             invalid: unsafeExtensionPackRefForRuntimeTest(postgresTargetPack),
           },
           models: {},
         }),
       error:
-        'defineContract only accepts extension pack refs in extensionPacks. Received kind "target".',
+        'defineContract only accepts extension pack refs in extensions. Received kind "target".',
       code: 'CONTRACT.PACK_REF_INVALID',
     },
     {
@@ -88,7 +88,7 @@ describe('defineContract runtime guards', () => {
           family: sqlFamilyPack,
           target: postgresTargetPack,
           createNamespace: createTestSqlNamespace,
-          extensionPacks: {
+          extensions: {
             invalid: unsafeExtensionPackRefForRuntimeTest({
               ...pgvectorExtensionPack,
               familyId: 'document',
@@ -107,7 +107,7 @@ describe('defineContract runtime guards', () => {
           family: sqlFamilyPack,
           target: postgresTargetPack,
           createNamespace: createTestSqlNamespace,
-          extensionPacks: {
+          extensions: {
             invalid: mysqlExtensionPack,
           },
           models: {},

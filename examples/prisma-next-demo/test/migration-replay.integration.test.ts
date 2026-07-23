@@ -109,7 +109,7 @@ describe('demo migration replay (dev database)', () => {
             target: postgresTargetDescriptor,
             adapter: postgresAdapterDescriptor,
             driver: postgresDriverDescriptor,
-            extensionPacks: [pgvectorPack],
+            extensions: [pgvectorPack],
           });
           const familyInstance = sqlFamilyDescriptor.create(controlStack);
           const schema = await familyInstance.introspect({ driver, contract });

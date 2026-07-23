@@ -63,7 +63,7 @@ async function runDbInit(connectionString: string, migrationsDir: string): Promi
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: [supabasePack],
+    extensions: [supabasePack],
   });
 
   try {

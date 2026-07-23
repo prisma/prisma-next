@@ -392,7 +392,7 @@ function lowerBelongsToRelation(
   relation: Extract<RelationState, { kind: 'belongsTo' }>,
   currentSpec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
-  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
+  extensions?: Record<string, ExtensionPackRef<'sql', string>>,
 ): RelationNode {
   const targetModelName = resolveRelationModelName(relation.toModel);
   const fromFields = normalizeRelationFieldNames(relation.from);
@@ -412,7 +412,7 @@ function lowerBelongsToRelation(
   // requiring a local model spec — matching how the FK lowering works.
   if (relation.spaceId !== undefined) {
     assertKnownExtensionPack(
-      extensionPacks,
+      extensions,
       relation.spaceId,
       `Relation "${currentSpec.modelName}.${relationName}"`,
     );
@@ -610,10 +610,10 @@ function resolveRelationNode(
   relation: RelationState,
   currentSpec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
-  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
+  extensions?: Record<string, ExtensionPackRef<'sql', string>>,
 ): RelationNode {
   if (relation.kind === 'belongsTo') {
-    return lowerBelongsToRelation(relationName, relation, currentSpec, allSpecs, extensionPacks);
+    return lowerBelongsToRelation(relationName, relation, currentSpec, allSpecs, extensions);
   }
 
   if (relation.kind === 'hasMany' || relation.kind === 'hasOne') {
@@ -691,16 +691,16 @@ function lowerCrossSpaceForeignKeyNode(
 }
 
 function assertKnownExtensionPack(
-  extensionPacks: Record<string, ExtensionPackRef<'sql', string>> | undefined,
+  extensions: Record<string, ExtensionPackRef<'sql', string>> | undefined,
   spaceId: string,
   context: string,
 ): void {
-  if (extensionPacks !== undefined && Object.hasOwn(extensionPacks, spaceId)) {
+  if (extensions !== undefined && Object.hasOwn(extensions, spaceId)) {
     return;
   }
   throw contractError(
     'CONTRACT.PACK_MISSING',
-    `${context} references contract space "${spaceId}" but "${spaceId}" is not declared in extensionPacks. Add the pack to extensionPacks.`,
+    `${context} references contract space "${spaceId}" but "${spaceId}" is not declared in extensions. Add the pack to extensions.`,
     { meta: { spaceId, context } },
   );
 }
@@ -708,14 +708,14 @@ function assertKnownExtensionPack(
 function resolveForeignKeyNodes(
   spec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
-  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
+  extensions?: Record<string, ExtensionPackRef<'sql', string>>,
 ): readonly ForeignKeyNode[] {
   const relationForeignKeys = resolveRelationForeignKeys(spec, allSpecs).map((foreignKey) => {
     // F-relfk: relation-derived FKs for cross-space targets carry targetSpaceId;
     // route them through the cross-space path, just like explicit sql() FKs.
     if (foreignKey.targetSpaceId !== undefined) {
       assertKnownExtensionPack(
-        extensionPacks,
+        extensions,
         foreignKey.targetSpaceId,
         `Relation-derived foreign key on "${spec.modelName}"`,
       );
@@ -740,7 +740,7 @@ function resolveForeignKeyNodes(
   const sqlForeignKeys = (spec.sqlSpec?.foreignKeys ?? []).map((foreignKey) => {
     if (foreignKey.targetSpaceId !== undefined) {
       assertKnownExtensionPack(
-        extensionPacks,
+        extensions,
         foreignKey.targetSpaceId,
         `Foreign key on "${spec.modelName}"`,
       );
@@ -770,7 +770,7 @@ function resolveModelNode(
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
   storageTypes: Record<string, StorageTypeInstance>,
   storageTypeReverseLookup: ReadonlyMap<StorageTypeInstance, string>,
-  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
+  extensions?: Record<string, ExtensionPackRef<'sql', string>>,
 ): ModelNode {
   const fields: FieldNode[] = [];
 
@@ -816,9 +816,9 @@ function resolveModelNode(
     ...ifDefined('type', index.type),
     ...ifDefined('options', index.options),
   })) satisfies readonly IndexNode[];
-  const foreignKeys = resolveForeignKeyNodes(spec, allSpecs, extensionPacks);
+  const foreignKeys = resolveForeignKeyNodes(spec, allSpecs, extensions);
   const relations = Object.entries(spec.relations).map(([relationName, relationBuilder]) =>
-    resolveRelationNode(relationName, relationBuilder.build(), spec, allSpecs, extensionPacks),
+    resolveRelationNode(relationName, relationBuilder.build(), spec, allSpecs, extensions),
   );
 
   return {
@@ -925,7 +925,7 @@ function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection 
 
 function lowerModels(
   collection: RuntimeCollection,
-  extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
+  extensions?: Record<string, ExtensionPackRef<'sql', string>>,
 ): readonly ModelNode[] {
   emitTypedCrossModelFallbackWarnings(collection);
 
@@ -936,7 +936,7 @@ function lowerModels(
       collection.modelSpecs,
       collection.storageTypes,
       storageTypeReverseLookup,
-      extensionPacks,
+      extensions,
     ),
   );
 }
@@ -972,7 +972,7 @@ function lowerPackEntityHandles(
     readonly authoring?: import('@prisma-next/framework-components/authoring').AuthoringContributions;
   }[] = [
     definition.target,
-    ...Object.values<ExtensionPackRef<'sql', string>>(definition.extensionPacks ?? {}),
+    ...Object.values<ExtensionPackRef<'sql', string>>(definition.extensions ?? {}),
   ];
   const owningComponent = new Map<string, (typeof components)[number]>();
   const walkEntityTypes = (
@@ -1089,13 +1089,13 @@ function lowerPackEntityHandles(
 
 export function buildContractDefinition(definition: ContractInput): ContractDefinition {
   const collection = collectRuntimeModelSpecs(definition);
-  const models = lowerModels(collection, definition.extensionPacks);
+  const models = lowerModels(collection, definition.extensions);
   const attachedEntities = lowerPackEntityHandles(definition, collection.modelSpecs);
 
   return {
     target: definition.target,
     ...ifDefined('defaultControlPolicy', definition.defaultControlPolicy),
-    ...(definition.extensionPacks ? { extensionPacks: definition.extensionPacks } : {}),
+    ...(definition.extensions ? { extensions: definition.extensions } : {}),
     ...(definition.storageHash ? { storageHash: definition.storageHash } : {}),
     ...(definition.foreignKeyDefaults ? { foreignKeyDefaults: definition.foreignKeyDefaults } : {}),
     ...(Object.keys(collection.storageTypes).length > 0

@@ -4,7 +4,7 @@ export {
   errorConfigFileNotFound,
   errorConfigValidation,
   errorContractConfigMissing,
-  errorContractMissingExtensionPacks,
+  errorContractMissingExtensions,
   errorContractValidationFailed,
   errorDatabaseConnectionRequired,
   errorDriverRequired,

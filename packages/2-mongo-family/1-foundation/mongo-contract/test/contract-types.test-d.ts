@@ -27,7 +27,7 @@ type ContractWithEnum = MongoContractWithTypeMaps<
     readonly targetFamily: 'mongo';
     readonly profileHash: ProfileHashBase<'enum-test'>;
     readonly capabilities: Record<string, never>;
-    readonly extensionPacks: Record<string, never>;
+    readonly extensions: Record<string, never>;
     readonly meta: Record<string, never>;
     readonly roots: Record<string, never>;
     readonly domain: {
@@ -178,7 +178,7 @@ type ContractWithVO = MongoContractWithTypeMaps<
     readonly targetFamily: 'mongo';
     readonly profileHash: ProfileHashBase<'test'>;
     readonly capabilities: Record<string, never>;
-    readonly extensionPacks: Record<string, never>;
+    readonly extensions: Record<string, never>;
     readonly meta: Record<string, never>;
     readonly roots: { readonly users: CrossReference & { readonly model: 'User' } };
     readonly domain: {
@@ -306,7 +306,7 @@ test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () 
       readonly targetFamily: 'mongo';
       readonly profileHash: ProfileHashBase<'test'>;
       readonly capabilities: Record<string, never>;
-      readonly extensionPacks: Record<string, never>;
+      readonly extensions: Record<string, never>;
       readonly meta: Record<string, never>;
       readonly roots: Record<string, never>;
       readonly domain: {
@@ -333,7 +333,7 @@ test('ExtractMongoFieldInputTypes extracts fieldInputTypes from contract', () =>
       readonly targetFamily: 'mongo';
       readonly profileHash: ProfileHashBase<'test'>;
       readonly capabilities: Record<string, never>;
-      readonly extensionPacks: Record<string, never>;
+      readonly extensions: Record<string, never>;
       readonly meta: Record<string, never>;
       readonly roots: Record<string, never>;
       readonly domain: {
@@ -365,7 +365,7 @@ type MinimalContractWithFieldTypes<TFieldTypes extends Record<string, Record<str
       readonly targetFamily: 'mongo';
       readonly profileHash: ProfileHashBase<'test'>;
       readonly capabilities: Record<string, never>;
-      readonly extensionPacks: Record<string, never>;
+      readonly extensions: Record<string, never>;
       readonly meta: Record<string, never>;
       readonly roots: Record<string, never>;
       readonly domain: {
@@ -478,7 +478,7 @@ type BigContract = MongoContractWithTypeMaps<
     readonly targetFamily: 'mongo';
     readonly profileHash: ProfileHashBase<'stress'>;
     readonly capabilities: Record<string, never>;
-    readonly extensionPacks: Record<string, never>;
+    readonly extensions: Record<string, never>;
     readonly meta: Record<string, never>;
     readonly roots: Record<string, never>;
     readonly domain: {
@@ -646,7 +646,7 @@ type ContractNoMap = MongoContractWithTypeMaps<
     readonly targetFamily: 'mongo';
     readonly profileHash: ProfileHashBase<'no-map'>;
     readonly capabilities: Record<string, never>;
-    readonly extensionPacks: Record<string, never>;
+    readonly extensions: Record<string, never>;
     readonly meta: Record<string, never>;
     readonly roots: Record<string, never>;
     readonly domain: {

@@ -76,7 +76,7 @@ function createParamTypesTestContract(
       },
       ...ifDefined('types', options?.types),
     }),
-    extensionPacks: {},
+    extensions: {},
     capabilities: {},
     meta: {},
   };
@@ -169,7 +169,7 @@ describe('parameterized types', () => {
       });
 
       const context = createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [createVectorExtensionDescriptor()],
+        extensions: [createVectorExtensionDescriptor()],
       });
 
       expect(context.types['Vector1536']).toBeDefined();
@@ -190,7 +190,7 @@ describe('parameterized types', () => {
       let thrownError: unknown;
       try {
         createTestContext(contract, createStubAdapter(), {
-          extensionPacks: [createVectorExtensionDescriptor()],
+          extensions: [createVectorExtensionDescriptor()],
         });
       } catch (e) {
         thrownError = e;
@@ -223,7 +223,7 @@ describe('parameterized types', () => {
       let thrownError: unknown;
       try {
         createTestContext(contract, createStubAdapter(), {
-          extensionPacks: [createVectorExtensionDescriptor()],
+          extensions: [createVectorExtensionDescriptor()],
         });
       } catch (e) {
         thrownError = e;
@@ -291,7 +291,7 @@ describe('parameterized types', () => {
       });
 
       const context = createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [extensionDescriptor],
+        extensions: [extensionDescriptor],
       });
 
       expect(context.types['Vector1536']).toBe(taggedCodec);
@@ -339,7 +339,7 @@ describe('parameterized types', () => {
       });
 
       createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [extensionDescriptor],
+        extensions: [extensionDescriptor],
       });
 
       // Locate the per-column factory call by the type-instance ctx the test contract declares.
@@ -412,7 +412,7 @@ describe('parameterized types', () => {
       });
 
       const context = createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [createBasicVectorExt()],
+        extensions: [createBasicVectorExt()],
       });
 
       expect(context.contract).toEqual(contract);
@@ -434,7 +434,7 @@ describe('parameterized types', () => {
       let thrownError: unknown;
       try {
         createTestContext(contract, createStubAdapter(), {
-          extensionPacks: [createBasicVectorExt()],
+          extensions: [createBasicVectorExt()],
         });
       } catch (e) {
         thrownError = e;
@@ -493,7 +493,7 @@ describe('parameterized types', () => {
 
       expect(() =>
         createTestContext(contract, createStubAdapter(), {
-          extensionPacks: [createVectorExtension('ext-1'), createVectorExtension('ext-2')],
+          extensions: [createVectorExtension('ext-1'), createVectorExtension('ext-2')],
         }),
       ).toThrow(
         expect.objectContaining({

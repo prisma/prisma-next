@@ -155,7 +155,7 @@ const User = UserBase.relations({
 }).sql({ table: 'users' });
 
 const baseContract = defineContract({
-  extensionPacks: { pgvector },
+  extensions: { pgvector },
   models: {
     User,
     Post,

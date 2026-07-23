@@ -71,7 +71,7 @@ function makeContractWithCheck(values: readonly string[]): Contract<SqlStorage> 
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -105,7 +105,7 @@ function makeContractWithoutCheck(): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

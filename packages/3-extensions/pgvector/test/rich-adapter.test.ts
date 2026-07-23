@@ -35,7 +35,7 @@ const contract = new SqlContractSerializer().deserializeContract({
   profileHash: 'test-profile',
   roots: {},
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   storage: {
     storageHash: 'test-core',
@@ -81,7 +81,7 @@ describe('Postgres rich AST lowering', () => {
   // Compose a stack with pgvector so the renderer's codec lookup contains
   // `pg/vector@1`. Bare `createPostgresAdapter()` cannot see extension
   // codecs by design (ADR 205).
-  const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
+  const adapter = createComposedPostgresAdapter({ extensions: [pgvectorRuntime] });
 
   it('lowers selects with derived lateral joins and rich JSON expressions', () => {
     const childRows = SelectAst.from(TableSource.named('post'))
@@ -243,7 +243,7 @@ describe('Postgres rich AST lowering', () => {
   });
 
   it('renders RETURNING with `AS <alias>` when the projection alias differs from the column name', () => {
-    const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
+    const adapter = createComposedPostgresAdapter({ extensions: [pgvectorRuntime] });
     const insertAst = InsertAst.into(TableSource.named('user'))
       .withRows([{ id: ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }) }])
       .withReturning([ProjectionItem.of('user_id', ColumnRef.of('user', 'id'))]);

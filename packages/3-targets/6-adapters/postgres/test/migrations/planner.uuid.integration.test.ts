@@ -58,7 +58,7 @@ const contractWithUuid: Contract<SqlStorage> = {
   roots: {},
   domain: applicationDomainOf({ models: {} }),
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
 };
 

@@ -40,7 +40,7 @@ function mapParseDiagnostics(
 
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
   const source: PslInterpretCapable = {
-    sourceFormat: 'psl',
+    format: 'psl',
     inputs: [schemaPath],
     interpret(input, context) {
       return interpretPslDocumentToMongoContract({

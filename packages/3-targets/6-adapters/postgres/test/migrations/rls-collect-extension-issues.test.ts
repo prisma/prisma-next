@@ -131,7 +131,7 @@ function buildContract(policies: readonly PostgresRlsPolicy[]): Contract<SqlStor
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

@@ -123,7 +123,7 @@ export function ContractView({ contract }: { contract: Contract }) {
       .filter(([, enabled]) => enabled)
       .map(([key]) => `${namespace}/${key}`),
   );
-  const extensionNames = Object.keys(contract.extensionPacks);
+  const extensionNames = Object.keys(contract.extensions);
 
   return (
     <>

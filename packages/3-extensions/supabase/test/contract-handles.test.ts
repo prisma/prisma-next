@@ -9,7 +9,7 @@
  *    expected cross-space `TargetFieldRef` coordinates.
  *
  * 2. Lowering smoke test (AC1): a `defineContract` fixture with
- *    `extensionPacks:[supabasePack]`, a `Profile` model with
+ *    `extensions:[supabasePack]`, a `Profile` model with
  *    `rel.belongsTo(AuthUser, …)` and
  *    `constraints.foreignKey(cols.userId, AuthUser.refs.id, { onDelete:'cascade' })`
  *    lowers to a storage `ForeignKeyReference` with `spaceId:'supabase'` +
@@ -125,7 +125,7 @@ describe('lowering smoke test — FK + relation to AuthUser via real supabasePac
     return defineContract({
       family: bareFamilyPack,
       target: postgresTargetPack,
-      extensionPacks: { supabase: supabasePack },
+      extensions: { supabase: supabasePack },
       models: { Profile },
       createNamespace: createTestSqlNamespace,
     });

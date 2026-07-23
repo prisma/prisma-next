@@ -35,7 +35,7 @@ function createTestContract(): Contract<SqlStorage> {
 
   return {
     ...contractObj,
-    extensionPacks: {
+    extensions: {
       postgres: {
         version: '0.0.1',
       },
@@ -102,7 +102,7 @@ describe('family instance sign', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -187,7 +187,7 @@ describe('family instance sign', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -253,7 +253,7 @@ describe('family instance sign', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 
@@ -317,7 +317,7 @@ describe('family instance sign', () => {
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [],
+              extensions: [],
             }),
           );
 

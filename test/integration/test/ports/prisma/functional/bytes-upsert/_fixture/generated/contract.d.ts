@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:3f23b61da0561bd89f5771bd214b1262fc24a4879548517b8ca307106512ce44'>;
+  StorageHashBase<'cdaf3dc2b0878f5162c0e73200191c9e0af03fb534ae64a67becee0c0b00f916'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:75920393ec10b7c0c8dd7857953df6dd6d6c6b076516d2e1ec07153db5ed7366'>;
+  ExecutionHashBase<'ddc9c7b58572025ea5f5416316a8edff6d46a18e806b54e9495eec17bed38d36'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -46,7 +46,7 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 export type FieldOutputTypes = {
   readonly public: {
     readonly TestByteId: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly bytes: CodecTypes['pg/bytea@1']['output'];
     };
   };
@@ -54,7 +54,7 @@ export type FieldOutputTypes = {
 export type FieldInputTypes = {
   readonly public: {
     readonly TestByteId: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly bytes: CodecTypes['pg/bytea@1']['input'];
     };
   };
@@ -63,7 +63,7 @@ export type StorageColumnTypes = {
   readonly public: {
     readonly testByteId: {
       readonly bytes: CodecTypes['pg/bytea@1']['output'];
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
     };
   };
 };
@@ -71,7 +71,7 @@ export type StorageColumnInputTypes = {
   readonly public: {
     readonly testByteId: {
       readonly bytes: CodecTypes['pg/bytea@1']['input'];
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
     };
   };
 };
@@ -95,10 +95,9 @@ type ContractBase = Omit<
             readonly testByteId: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly bytes: {
                   readonly nativeType: 'bytea';
@@ -135,11 +134,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly bytes: {
                 readonly nullable: false;
@@ -177,7 +172,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly execution: {
     readonly executionHash: ExecutionHash;
     readonly mutations: {

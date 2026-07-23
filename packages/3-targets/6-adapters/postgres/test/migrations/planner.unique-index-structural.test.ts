@@ -212,7 +212,7 @@ function createTestContract(tables: Record<string, StorageTableInput> = {}): Con
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

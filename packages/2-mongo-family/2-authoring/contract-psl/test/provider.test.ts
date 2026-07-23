@@ -19,7 +19,7 @@ const mongoScalarAuthoringTypes = {
 
 function createMongoTestContext(overrides?: Partial<ContractSourceContext>): ContractSourceContext {
   return {
-    composedExtensionPacks: [],
+    composedExtensions: [],
     composedExtensionContracts: new Map(),
     authoringContributions: {
       field: {},
@@ -59,7 +59,7 @@ describe('mongoContract provider helper', () => {
 
   it('tags the source as PSL', () => {
     const config = mongoContract('./schema.prisma');
-    expect(config.source.sourceFormat).toBe('psl');
+    expect(config.source.format).toBe('psl');
   });
 
   it('throws InternalError when resolvedInputs is empty', async () => {

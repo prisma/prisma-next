@@ -87,7 +87,7 @@ describe('cross-space belongsTo relation lowering', () => {
       family: bareFamilyPack,
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { supabase: supabasePack },
+      extensions: { supabase: supabasePack },
       models: { Profile },
     });
 
@@ -115,7 +115,7 @@ describe('cross-space belongsTo relation lowering', () => {
       family: bareFamilyPack,
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { supabase: supabasePack },
+      extensions: { supabase: supabasePack },
       models: { Profile },
     });
 
@@ -142,7 +142,7 @@ describe('cross-space belongsTo relation lowering', () => {
       family: bareFamilyPack,
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { supabase: supabasePack },
+      extensions: { supabase: supabasePack },
       models: { Profile },
     });
 
@@ -167,7 +167,7 @@ describe('cross-space belongsTo relation lowering', () => {
       family: bareFamilyPack,
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { supabase: supabasePack },
+      extensions: { supabase: supabasePack },
       models: { Profile },
     });
 
@@ -187,7 +187,7 @@ describe('cross-space belongsTo relation lowering', () => {
 // ---------------------------------------------------------------------------
 
 describe('cross-space belongsTo relation — missing-pack fail-fast', () => {
-  it('throws when a cross-space relation references a space not in extensionPacks', () => {
+  it('throws when a cross-space relation references a space not in extensions', () => {
     const ExtUser = buildSyntheticSupabaseAuthUser();
 
     const Profile = model('Profile', {
@@ -204,13 +204,13 @@ describe('cross-space belongsTo relation — missing-pack fail-fast', () => {
         family: bareFamilyPack,
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
-        // intentionally no extensionPacks — 'supabase' undeclared
+        // intentionally no extensions — 'supabase' undeclared
         models: { Profile },
       }),
     ).toThrow(/supabase/);
   });
 
-  it('error message mentions extensionPacks', () => {
+  it('error message mentions extensions', () => {
     const ExtUser = buildSyntheticSupabaseAuthUser();
 
     const Profile = model('Profile', {
@@ -229,7 +229,7 @@ describe('cross-space belongsTo relation — missing-pack fail-fast', () => {
         createNamespace: createTestSqlNamespace,
         models: { Profile },
       }),
-    ).toThrow(/extensionPacks/i);
+    ).toThrow(/extensions/i);
   });
 });
 
@@ -255,7 +255,7 @@ describe('F-lazy: lazy cross-space belongsTo handle carries the brand', () => {
       family: bareFamilyPack,
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { supabase: supabasePack },
+      extensions: { supabase: supabasePack },
       models: { Profile },
     });
 
@@ -292,7 +292,7 @@ describe('F-relfk: cross-space belongsTo().sql({ fk }) produces a cross-space FK
       family: bareFamilyPack,
       target: postgresTargetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { supabase: supabasePack },
+      extensions: { supabase: supabasePack },
       models: { Profile },
     });
 

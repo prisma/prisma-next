@@ -74,7 +74,7 @@ export type IntegrityViolation =
     };
 
 /**
- * One declared extension entry, drawn from `Config.extensionPacks`.
+ * One declared extension entry, drawn from `Config.extensions`.
  *
  * The integrity layer needs only:
  *

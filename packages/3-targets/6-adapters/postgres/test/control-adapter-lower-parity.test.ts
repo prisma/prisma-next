@@ -28,7 +28,7 @@ const contract = new SqlContractSerializer().deserializeContract({
   profileHash: 'test-profile',
   roots: {},
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   storage: {
     storageHash: 'test-core',
@@ -56,8 +56,8 @@ const contract = new SqlContractSerializer().deserializeContract({
   domain: applicationDomainOf({ models: {} }),
 }) as PostgresContract;
 
-const runtimeAdapter = createComposedPostgresAdapter({ extensionPacks: [] });
-const controlAdapter = createComposedPostgresControlAdapter({ extensionPacks: [] });
+const runtimeAdapter = createComposedPostgresAdapter({ extensions: [] });
+const controlAdapter = createComposedPostgresControlAdapter({ extensions: [] });
 
 function expectParity(ast: AnyQueryAst): void {
   const runtime = runtimeAdapter.lower(ast, { contract });

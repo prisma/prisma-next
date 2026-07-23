@@ -37,4 +37,4 @@ const slugidDefaultsPack: SqlControlExtensionDescriptor<'postgres'> = {
   },
 };
 
-export const extensionPacks = [slugidDefaultsPack] as const;
+export const extensions = [slugidDefaultsPack] as const;

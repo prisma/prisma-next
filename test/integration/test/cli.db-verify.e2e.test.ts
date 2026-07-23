@@ -92,7 +92,7 @@ function createTestContract(
         },
       },
     },
-    extensionPacks: {},
+    extensions: {},
     capabilities: {},
     meta: {},
     profileHash: 'test',
@@ -1050,7 +1050,7 @@ withTempDir(({ createTempDir }) => {
             target: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             adapter: { id: 'postgres', familyId: 'sql', targetId: 'postgres', create: vi.fn() },
             // driver is missing - this is what we're testing
-            extensionPacks: [],
+            extensions: [],
             contract: typescriptContract(contract, 'output/contract.json'),
             db: {
               connection: connectionString,

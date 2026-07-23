@@ -167,9 +167,10 @@ function rewriteMigrationToHash(migrationTsPath, newHash) {
     return false;
   }
   if (matches.length === 0) {
-    throw new Error(
-      `regen-extension-migrations: could not find 'to: ...' hash literal in ${migrationTsPath}`,
-    );
+    // Migrations that import their end contract from the snapshot store carry
+    // no `to:` literal; their `to` derives from the imported endContractJson
+    // after the snapshot import specifiers are rewritten.
+    return false;
   }
   if (matches.length > 1) {
     throw new Error(
@@ -285,27 +286,37 @@ async function processExtension(extDir) {
     throw new Error(`regen-extension-migrations: no migration.ts in ${headMigrationDir}`);
   }
 
-  rewriteMigrationToHash(migrationTsPath, newHash);
-  reemitMigrationArtifacts(extDir, migrationTsPath);
-  biomeFormatInPlace(join(headMigrationDir, 'migration.json'));
-  biomeFormatInPlace(join(headMigrationDir, 'ops.json'));
-  repinHeadRef(headRefPath, newHash);
-
   const contractSrcDir = dirname(contractJsonPath);
   const contractDts = readFileSync(join(contractSrcDir, 'contract.d.ts'), 'utf8');
   await writeContractSnapshot(migrationsDir, newHash, { contractJson, contractDts });
 
-  const freshMigrationMeta = readJson(join(headMigrationDir, 'migration.json'));
   const snapshotsImportPath = snapshotsImportPathFrom(headMigrationDir, migrationsDir);
   const migrationTsSrc = readFileSync(migrationTsPath, 'utf8');
+  const hasSnapshotImports = /import\s+endContract\s+from\s+'/.test(migrationTsSrc);
   const rewrittenMigrationTs = rewriteContractSnapshotSpecifiers(
     migrationTsSrc,
     snapshotsImportPath,
-    freshMigrationMeta.to,
+    newHash,
   );
   if (rewrittenMigrationTs !== migrationTsSrc) {
     writeFileSync(migrationTsPath, rewrittenMigrationTs, 'utf8');
   }
+  const rewroteToLiteral = rewriteMigrationToHash(migrationTsPath, newHash);
+  if (!rewroteToLiteral && !hasSnapshotImports) {
+    throw new Error(
+      `regen-extension-migrations: ${migrationTsPath} carries neither a 'to: ...' hash literal nor snapshot-store contract imports; cannot re-anchor`,
+    );
+  }
+  reemitMigrationArtifacts(extDir, migrationTsPath);
+  const freshMigrationMeta = readJson(join(headMigrationDir, 'migration.json'));
+  if (freshMigrationMeta.to !== newHash) {
+    throw new Error(
+      `regen-extension-migrations: ${headMigrationDir} re-emitted "to": "${freshMigrationMeta.to}" but expected "${newHash}"`,
+    );
+  }
+  biomeFormatInPlace(join(headMigrationDir, 'migration.json'));
+  biomeFormatInPlace(join(headMigrationDir, 'ops.json'));
+  repinHeadRef(headRefPath, newHash);
 
   return 'updated';
 }

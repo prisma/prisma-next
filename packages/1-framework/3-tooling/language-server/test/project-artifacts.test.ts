@@ -28,7 +28,7 @@ afterEach(() => {
 
 const schemaUri = pathToFileURL('/abs/schema.psl').toString();
 const inputs = resolveSchemaInputs({
-  contract: { source: { sourceFormat: 'psl', inputs: ['/abs/schema.psl'] } },
+  contract: { source: { format: 'psl', inputs: ['/abs/schema.psl'] } },
 });
 
 const controlStack: PipelineInputs = {
@@ -53,7 +53,7 @@ function projectWithMirror(interpretation?: ProjectInterpretation): {
   return { texts, store };
 }
 
-const interpretContext = { composedExtensionPacks: [] } as unknown as ContractSourceContext;
+const interpretContext = { composedExtensions: [] } as unknown as ContractSourceContext;
 
 function interpretationDouble(interpret: PslInterpretCapable['interpret']): {
   readonly interpretation: ProjectInterpretation;
@@ -61,7 +61,7 @@ function interpretationDouble(interpret: PslInterpretCapable['interpret']): {
 } {
   const spy = vi.fn(interpret);
   const source = {
-    sourceFormat: 'psl',
+    format: 'psl',
     load: async () => ok({} as never),
     interpret: spy,
   } as unknown as PslInterpretCapable;
@@ -140,7 +140,7 @@ describe('createProjectArtifacts', () => {
     const schema2Uri = pathToFileURL('/abs/schema2.psl').toString();
     const twoInputs = resolveSchemaInputs({
       contract: {
-        source: { sourceFormat: 'psl', inputs: ['/abs/schema.psl', '/abs/schema2.psl'] },
+        source: { format: 'psl', inputs: ['/abs/schema.psl', '/abs/schema2.psl'] },
       },
     });
     const texts = new Map<string, string>();

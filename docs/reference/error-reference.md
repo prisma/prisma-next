@@ -260,11 +260,11 @@ A pack passed to `defineContract` belongs to the wrong family: a non-SQL pack in
 
 ### CONTRACT.PACK_MISSING
 
-A cross-space reference names a contract space that is not declared in the contract's `extensionPacks`, so the space cannot be resolved. Raised during SQL contract lowering. Meta: `spaceId`, `context`.
+A cross-space reference names a contract space that is not declared in the contract's `extensions`, so the space cannot be resolved. Raised during SQL contract lowering. Meta: `spaceId`, `context`.
 
 ### CONTRACT.PACK_REF_INVALID
 
-Something other than an extension pack reference was passed in `defineContract`'s `extensionPacks` list (e.g. a family or target pack). Meta: `packId`, `kind`.
+Something other than an extension pack reference was passed in `defineContract`'s `extensions` list (e.g. a family or target pack). Meta: `packId`, `kind`.
 
 ### CONTRACT.PACK_TARGET_MISMATCH
 
@@ -574,7 +574,7 @@ A `migration check` failure row: a ref file points at a contract hash that does 
 
 ### MIGRATION.CHECK_DECLARED_BUT_UNMIGRATED
 
-A `migration check` failure row: an extension is declared in `extensionPacks` but has no on-disk migrations directory under `migrations/`. Re-emit the extension's contract-space artifacts, or remove the extension from `extensionPacks`.
+A `migration check` failure row: an extension is declared in `extensions` but has no on-disk migrations directory under `migrations/`. Re-emit the extension's contract-space artifacts, or remove the extension from `extensions`.
 
 ### MIGRATION.CHECK_DUPLICATE_MIGRATION_HASH
 
@@ -602,7 +602,7 @@ A `migration check` failure row: a migration has identical source and target has
 
 ### MIGRATION.CHECK_ORPHAN_SPACE_DIR
 
-A `migration check` failure row: a contract-space directory exists under `migrations/` but no declared extension claims it. Remove the directory or declare the extension in `extensionPacks`.
+A `migration check` failure row: a contract-space directory exists under `migrations/` but no declared extension claims it. Remove the directory or declare the extension in `extensions`.
 
 ### MIGRATION.CHECK_PACKAGE_UNLOADABLE
 
@@ -650,7 +650,7 @@ A contract snapshot expected under `migrations/snapshots/` for a given storage h
 
 ### MIGRATION.CONTRACT_SPACE_LAYOUT_VIOLATION
 
-The on-disk `migrations/` directory and the `extensionPacks` declaration in config disagree: an orphan space directory exists with no declaring extension, or a declared extension has no migrations directory. All layout offences are bundled into one envelope. Raised when db commands load the contract-space aggregate. Meta: `violations` (list of `{kind, spaceId}`).
+The on-disk `migrations/` directory and the `extensions` declaration in config disagree: an orphan space directory exists with no declaring extension, or a declared extension has no migrations directory. All layout offences are bundled into one envelope. Raised when db commands load the contract-space aggregate. Meta: `violations` (list of `{kind, spaceId}`).
 
 ### MIGRATION.CONTRACT_SPACE_VIOLATION
 
@@ -690,7 +690,7 @@ While reconstructing the migration graph, two migrations were found sharing the 
 
 ### MIGRATION.DUPLICATE_SPACE_ID
 
-The per-space migration planner received the same contract-space id more than once, usually a repeated entry in `extensionPacks`. Deduplicate the inputs. Meta: `spaceId`.
+The per-space migration planner received the same contract-space id more than once, usually a repeated entry in `extensions`. Deduplicate the inputs. Meta: `spaceId`.
 
 ### MIGRATION.EXECUTION_FAILED
 

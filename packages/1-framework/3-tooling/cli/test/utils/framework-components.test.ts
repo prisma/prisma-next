@@ -142,10 +142,10 @@ describe('assertFrameworkComponentsCompatible', () => {
 });
 
 describe('assertContractRequirementsSatisfied', () => {
-  const contract: Pick<Contract, 'targetFamily' | 'target' | 'extensionPacks'> = {
+  const contract: Pick<Contract, 'targetFamily' | 'target' | 'extensions'> = {
     targetFamily: 'sql',
     target: 'postgres',
-    extensionPacks: {
+    extensions: {
       pgvector: {},
     },
   };
@@ -181,9 +181,8 @@ describe('assertContractRequirementsSatisfied', () => {
     targetId: 'postgres',
   } as unknown as ControlExtensionDescriptor<'sql', 'postgres'>;
 
-  const createStack = (
-    extensionPacks: readonly ControlExtensionDescriptor<'sql', 'postgres'>[] = [],
-  ) => createControlStack({ family, target, adapter, extensionPacks });
+  const createStack = (extensions: readonly ControlExtensionDescriptor<'sql', 'postgres'>[] = []) =>
+    createControlStack({ family, target, adapter, extensions });
 
   it('passes when target and extension packs are satisfied', () => {
     expect(() =>
@@ -225,16 +224,16 @@ describe('assertContractRequirementsSatisfied', () => {
       }
 
       expect(error.meta).toMatchObject({
-        missingExtensionPacks: ['pgvector'],
+        missingExtensions: ['pgvector'],
       });
     }
   });
 
   it('includes all missing extension packs in error meta', () => {
-    const contractWithTwoPacks: Pick<Contract, 'targetFamily' | 'target' | 'extensionPacks'> = {
+    const contractWithTwoPacks: Pick<Contract, 'targetFamily' | 'target' | 'extensions'> = {
       targetFamily: 'sql',
       target: 'postgres',
-      extensionPacks: {
+      extensions: {
         pgvector: {},
         other: {},
       },
@@ -252,7 +251,7 @@ describe('assertContractRequirementsSatisfied', () => {
       }
 
       expect(error.meta).toMatchObject({
-        missingExtensionPacks: ['other', 'pgvector'],
+        missingExtensions: ['other', 'pgvector'],
       });
     }
   });

@@ -13,7 +13,7 @@ export default defineConfig({
   target: postgres,
   driver: postgresDriver,
   adapter: postgresAdapter,
-  extensionPacks: [pgvector],
+  extensions: [pgvector],
   contract: typescriptContract(contract, 'src/prisma/contract.json'),
   db: {
     // biome-ignore lint/style/noNonNullAssertion: loaded from .env

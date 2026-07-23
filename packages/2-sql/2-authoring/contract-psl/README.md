@@ -82,7 +82,7 @@ Contract-level default (specifier options bag):
 ## Public API
 
 - `@prisma-next/sql-contract-psl`
-  - `interpretPslDocumentToSqlContract({ symbolTable, sourceFile, sourceId, target, scalarColumnDescriptors, composedExtensionContracts, seedDiagnostics?, authoringContributions?, controlMutationDefaults?, composedExtensionPacks? })` — build `symbolTable`/`sourceFile` via `parse(schema)` + `buildSymbolTable(...)` from `@prisma-next/psl-parser`.
+  - `interpretPslDocumentToSqlContract({ symbolTable, sourceFile, sourceId, target, scalarColumnDescriptors, composedExtensionContracts, seedDiagnostics?, authoringContributions?, controlMutationDefaults?, composedExtensions? })` — build `symbolTable`/`sourceFile` via `parse(schema)` + `buildSymbolTable(...)` from `@prisma-next/psl-parser`.
 - `@prisma-next/sql-contract-psl/provider`
   - `prismaContract(schemaPath, { output?, target, createNamespace, composedExtensionPackRefs?, defaultControlPolicy?, enumInferenceCodecs? })` — scalar column descriptors are derived from the composed stack's authoring type namespace at load time.
   - Provider input is fully preassembled by composition layers (for example `@prisma-next/family-sql/control` helpers).

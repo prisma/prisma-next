@@ -21,7 +21,7 @@ const contract: Contract<SqlStorage> = {
       __unbound__: sqliteCreateNamespace({ id: '__unbound__', entries: { table: {} } }),
     },
   }),
-  extensionPacks: {},
+  extensions: {},
   capabilities: {},
   meta: {},
 };

@@ -18,7 +18,7 @@ import type { DocumentAst } from '../src/syntax/ast/declarations';
 
 test('guard narrows the union to expose a fully typed interpret method', () => {
   const source: ContractSourceProvider = {
-    sourceFormat: 'psl',
+    format: 'psl',
     load: async () => ok({} as never),
   };
 
@@ -32,7 +32,7 @@ test('guard narrows the union to expose a fully typed interpret method', () => {
     >();
     expectTypeOf(source.load).toEqualTypeOf<PslContractSourceProvider['load']>();
     expectTypeOf(source.inputs).toEqualTypeOf<readonly string[] | undefined>();
-    expectTypeOf(source.sourceFormat).toEqualTypeOf<'psl'>();
+    expectTypeOf(source.format).toEqualTypeOf<'psl'>();
   }
 });
 
@@ -45,5 +45,5 @@ test('interpret input carries the parser artifact vocabulary', () => {
 
 test('capability carries the full psl provider shape', () => {
   expectTypeOf<PslInterpretCapable>().toExtend<PslContractSourceProvider>();
-  expectTypeOf<PslInterpretCapable['sourceFormat']>().toEqualTypeOf<'psl'>();
+  expectTypeOf<PslInterpretCapable['format']>().toEqualTypeOf<'psl'>();
 });

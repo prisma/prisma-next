@@ -42,7 +42,7 @@ export async function executeFormat(
   }
 
   const source = config.contract?.source;
-  if (source?.sourceFormat !== 'psl') {
+  if (source?.format !== 'psl') {
     return ok({ formatted: false });
   }
 

@@ -24,10 +24,10 @@ function sourceContextFromConfig(config: PrismaNextConfig): ContractSourceContex
     family: config.family,
     target: config.target,
     adapter: config.adapter,
-    extensionPacks: config.extensionPacks ?? [],
+    extensions: config.extensions ?? [],
   });
   return {
-    composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+    composedExtensions: stack.extensions.map((p) => p.id),
     composedExtensionContracts: new Map(),
     authoringContributions: stack.authoringContributions,
     codecLookup: stack.codecLookup,
@@ -125,14 +125,14 @@ describe('emit parity fixtures', () => {
           target: tsConfig.target,
           adapter: tsConfig.adapter,
           driver: tsConfig.driver,
-          extensionPacks: tsConfig.extensionPacks ?? [],
+          extensions: tsConfig.extensions ?? [],
         });
         const familyInstance = tsConfig.family.create(stack);
 
         const frameworkComponents = [
           tsConfig.target,
           tsConfig.adapter,
-          ...(tsConfig.extensionPacks ?? []),
+          ...(tsConfig.extensions ?? []),
         ];
         const enrichedTs = enrichContract(tsProviderResultFirst.value, frameworkComponents);
         const enrichedPsl = enrichContract(pslProviderResultFirst.value, frameworkComponents);

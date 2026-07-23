@@ -19,7 +19,7 @@ function buildControlStack(config: Awaited<ReturnType<typeof loadConfig>>) {
     target: config.target,
     adapter: config.adapter,
     driver: config.driver,
-    extensionPacks: config.extensionPacks ?? [],
+    extensions: config.extensions ?? [],
   });
 }
 
@@ -28,7 +28,7 @@ function buildSourceContext(
   resolvedInputs: readonly string[] = [],
 ): ContractSourceContext {
   return {
-    composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+    composedExtensions: stack.extensions.map((p) => p.id),
     composedExtensionContracts: new Map(),
     authoringContributions: stack.authoringContributions,
     codecLookup: stack.codecLookup,

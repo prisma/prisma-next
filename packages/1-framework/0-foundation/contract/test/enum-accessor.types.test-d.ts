@@ -28,7 +28,7 @@ type EnumContract = {
   readonly roots: Record<string, never>;
   readonly storage: StorageBase<'abc'>;
   readonly capabilities: Record<string, Record<string, boolean>>;
-  readonly extensionPacks: Record<string, never>;
+  readonly extensions: Record<string, never>;
   readonly profileHash: ProfileHashBase<'def'>;
   readonly meta: Record<string, never>;
   readonly enumAccessors: {

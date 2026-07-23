@@ -122,14 +122,14 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly sourceId: string;
   readonly target: TargetPackRef<'sql', string>;
   readonly scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor>;
-  readonly composedExtensionPacks?: readonly string[];
+  readonly composedExtensions?: readonly string[];
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
   readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly authoringContributions?: AuthoringContributions;
   /**
    * Extension contracts keyed by space ID. Required for cross-space FK
    * resolution. A composed space must have an entry here; if the space ID
-   * appears in `composedExtensionPacks` but is absent from this map, the
+   * appears in `composedExtensions` but is absent from this map, the
    * interpreter emits `PSL_UNKNOWN_CONTRACT_SPACE` and fails fast — there
    * is no silent fallback. If a space's contract is present but the
    * referenced model or namespace is not found in it, the interpreter
@@ -1133,7 +1133,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (extContractForSpace === undefined) {
         diagnostics.push({
           code: 'PSL_UNKNOWN_CONTRACT_SPACE',
-          message: `Relation field "${model.name}.${relationAttribute.field.name}" references contract space "${fieldTypeContractSpaceId}" which is not declared in extensionPacks. Add "${fieldTypeContractSpaceId}" to extensionPacks in prisma-next.config.ts.`,
+          message: `Relation field "${model.name}.${relationAttribute.field.name}" references contract space "${fieldTypeContractSpaceId}" which is not declared in extensions. Add "${fieldTypeContractSpaceId}" to extensions in prisma-next.config.ts.`,
           sourceId,
           span: relationAttribute.field.span,
           data: { space: fieldTypeContractSpaceId, suggestedPack: fieldTypeContractSpaceId },
@@ -2038,7 +2038,7 @@ export function interpretPslDocumentToSqlContract(
 
   const modelNames = new Set(models.map((model) => model.name));
   const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
-  const composedExtensions = new Set(input.composedExtensionPacks ?? []);
+  const composedExtensions = new Set(input.composedExtensions ?? []);
   const composedExtensionContracts: ReadonlyMap<string, Contract> =
     input.composedExtensionContracts;
   const defaultFunctionRegistry: ControlMutationDefaultRegistry =
@@ -2516,7 +2516,7 @@ export function interpretPslDocumentToSqlContract(
     {
       target: input.target,
       ...ifDefined(
-        'extensionPacks',
+        'extensions',
         buildComposedExtensionPackRefs(
           input.target,
           [...composedExtensions].sort(compareStrings),

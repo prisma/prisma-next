@@ -61,7 +61,5 @@ export function withSeedDiagnostics(
 
 /** The single seam that narrows a contract source to the interpret capability. */
 export function hasPslInterpreter(source: ContractSourceProvider): source is PslInterpretCapable {
-  return (
-    source.sourceFormat === 'psl' && 'interpret' in source && typeof source.interpret === 'function'
-  );
+  return source.format === 'psl' && 'interpret' in source && typeof source.interpret === 'function';
 }

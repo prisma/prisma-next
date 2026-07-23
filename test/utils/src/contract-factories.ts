@@ -26,7 +26,7 @@ type ContractOverrides<TStorage extends StorageBase = StorageBase> = {
   valueObjects?: Record<string, ContractValueObject>;
   enum?: Record<string, ContractEnum>;
   capabilities?: Record<string, Record<string, boolean>>;
-  extensionPacks?: Record<string, unknown>;
+  extensions?: Record<string, unknown>;
   execution?: Omit<ExecutionSection, 'executionHash'>;
   profileHash?: ProfileHashBase<string>;
   meta?: Record<string, unknown>;
@@ -89,7 +89,7 @@ export function createContract<TStorage extends StorageBase = StorageBase>(
     },
     storage,
     capabilities,
-    extensionPacks: overrides.extensionPacks ?? {},
+    extensions: overrides.extensions ?? {},
     ...(overrides.execution !== undefined
       ? {
           execution: {

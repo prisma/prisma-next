@@ -27,7 +27,7 @@ function interpret(schema: string) {
     target: postgresPack,
     scalarColumnDescriptors,
     composedExtensionContracts: new Map(),
-    composedExtensionPacks: [paradedbPack.id],
+    composedExtensions: [paradedbPack.id],
     composedExtensionPackRefs: [paradedbPack],
     createNamespace: postgresCreateNamespace,
     capabilities: { sql: { scalarList: true } },

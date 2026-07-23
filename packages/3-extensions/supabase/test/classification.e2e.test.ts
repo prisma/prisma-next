@@ -81,7 +81,7 @@ function buildAppContract(): Contract<SqlStorage> {
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }
@@ -141,7 +141,7 @@ describe('supabase external-schema classification (db init + db verify)', () => 
         target: postgres,
         adapter: postgresAdapter,
         driver: postgresDriver,
-        extensionPacks: [supabasePack],
+        extensions: [supabasePack],
       });
 
       try {

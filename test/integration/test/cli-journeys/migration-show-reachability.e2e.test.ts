@@ -31,7 +31,7 @@ function declarePgvectorExtension(ctx: JourneyContext): void {
       "import sql from '@prisma-next/family-sql/control';",
       "import sql from '@prisma-next/family-sql/control';\nimport pgvector from '@prisma-next/extension-pgvector/control';",
     )
-    .replace('extensionPacks: []', 'extensionPacks: [pgvector]');
+    .replace('extensions: []', 'extensions: [pgvector]');
   writeFileSync(ctx.configPath, next);
 }
 

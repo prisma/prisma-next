@@ -11,6 +11,6 @@ export default defineConfig({
   target: sqlite,
   adapter: sqliteAdapter,
   driver: sqliteDriver,
-  extensionPacks: [],
+  extensions: [],
   contract: typescriptContract(contract, 'generated/contract.json'),
 });

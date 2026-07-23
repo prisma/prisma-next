@@ -15,7 +15,7 @@ describe('createContract', () => {
     expect(contract.roots).toEqual({});
     expect(contract.domain.namespaces['__unbound__']?.models).toEqual({});
     expect(contract.capabilities).toEqual({});
-    expect(contract.extensionPacks).toEqual({});
+    expect(contract.extensions).toEqual({});
     expect(contract.meta).toEqual({});
     expect(contract.storage.storageHash).toMatch(/^[a-f0-9]{64}$/);
     expect(contract.profileHash).toMatch(/^[a-f0-9]{64}$/);

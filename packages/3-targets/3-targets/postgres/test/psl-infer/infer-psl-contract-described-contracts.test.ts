@@ -86,7 +86,7 @@ function describedContract(
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 
@@ -146,7 +146,7 @@ function describedContractWithModel(options: {
       },
     },
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 
@@ -438,7 +438,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
     expect(postsModel?.comment).toBe(
       '// WARNING: Foreign key "ownerId" -> "secure.owners" exists in the database, but its ' +
         'target schema is outside the introspected scope, so no relation field was generated. ' +
-        'If the target schema is described by an extension pack, add it to extensionPacks and ' +
+        'If the target schema is described by an extension pack, add it to extensions and ' +
         're-run infer.',
     );
   });
@@ -519,7 +519,7 @@ function buildExtensionWithPublicTable(
     roots: {},
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
     profileHash: profileHash('fixture-profile-v1'),
     storage: new SqlStorage({
@@ -559,7 +559,7 @@ function makeRealPostgresStack(
       targetId: TARGET,
       create: () => ({ familyId: TARGET_FAMILY, targetId: TARGET }),
     },
-    extensionPacks: extensions,
+    extensions: extensions,
   });
 }
 

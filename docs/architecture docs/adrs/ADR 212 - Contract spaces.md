@@ -204,7 +204,7 @@ Space identifiers are constrained to `[a-z][a-z0-9_-]{0,63}` (filesystem-safe an
 Three properties hold:
 
 1. **The marker is the truth-of-record** for the live database's per-space applied state.
-2. **The set of marker rows must equal the set of loaded spaces** (`'app'` plus every entry in `extensionPacks`). Mismatches surface as verifier errors with clear remediation.
+2. **The set of marker rows must equal the set of loaded spaces** (`'app'` plus every entry in `extensions`). Mismatches surface as verifier errors with clear remediation.
 3. **Marker writes are atomic with the migrations that produced them.** Multi-space `db apply` opens one outer transaction; either every marker advances or none does.
 
 ### Per-space planner, runner, verifier
@@ -261,7 +261,7 @@ $ rm -rf node_modules/@prisma-next/extension-cipherstash
 $ prisma-next db init     # ✓ reads only migrations/cipherstash/ on disk
 $ prisma-next db apply    # ✓ no migrations to apply
 $ prisma-next migrate     # ✗ MIGRATION.EXTENSION_DESCRIPTOR_NOT_FOUND
-                          #   cipherstash is in extensionPacks but the package
+                          #   cipherstash is in extensions but the package
                           #   isn't installed. Run: pnpm install
 ```
 
@@ -273,9 +273,9 @@ $ prisma-next migrate     # ✗ MIGRATION.EXTENSION_DESCRIPTOR_NOT_FOUND
 
 | Kind | Cause |
 |---|---|
-| `declaredButUnmigrated` | Extension declared in `extensionPacks` but no pinned `contract.json` on disk. |
-| `orphanMarker` | Marker row for a space not in `extensionPacks`. |
-| `orphanPinnedDir` | Pinned `migrations/<space-id>/` directory for a space not in `extensionPacks`. |
+| `declaredButUnmigrated` | Extension declared in `extensions` but no pinned `contract.json` on disk. |
+| `orphanMarker` | Marker row for a space not in `extensions`. |
+| `orphanPinnedDir` | Pinned `migrations/<space-id>/` directory for a space not in `extensions`. |
 | `hashMismatch` | Marker row's hash differs from pinned contract's hash (or descriptor's hash, depending on which side is being checked). |
 | `invariantsMismatch` | Pinned contract's required invariants are not all in the marker row's applied invariants set. |
 
@@ -364,7 +364,7 @@ The asymmetry between `migrate` (authoring) and the apply/verify path is what ma
 
 ### Non-goals (deferred)
 
-- **Extension removal semantics.** Removing an extension from `extensionPacks` while user schema still depends on extension-installed types (e.g. `Encrypted<String>` columns referencing `eql_v2_encrypted`). Until addressed, removal is unsupported and the verifier reports orphan marker rows as errors.
+- **Extension removal semantics.** Removing an extension from `extensions` while user schema still depends on extension-installed types (e.g. `Encrypted<String>` columns referencing `eql_v2_encrypted`). Until addressed, removal is unsupported and the verifier reports orphan marker rows as errors.
 - **Codec-id-changed lifecycle event.** When a user upgrades an extension in a way that changes a codec ID (`cipherstash:string@1` → `@2`), the codec needs a way to emit a "rotate" migration op. Cleanly extends the existing event vocabulary; deferred until needed.
 - **Cross-space dependencies as a first-class concept.** Convention-based ordering (extensions first, app-space second) is sufficient for v1 given the single-transaction property.
 - **Cross-space codec hooks.** Codec-emitted ops are app-space-bound by API shape — the hook signature has no parameter for cross-space context. See [ADR 213](./ADR%20213%20-%20Codec%20lifecycle%20hooks.md).

@@ -28,7 +28,7 @@ describe('postgres extensions', () => {
     const extensionPackId = 'test-pack';
     const pack = createTestExtensionPack(extensionPackId);
     const contract = createContract<SqlStorage>({
-      extensionPacks: {
+      extensions: {
         [extensionPackId]: { id: extensionPackId, version: '0.0.1' },
       },
     });
@@ -45,7 +45,7 @@ describe('postgres extensions', () => {
   it('throws when the contract requires an extension pack that is not provided', () => {
     const extensionPackId = 'test-pack';
     const contract = createContract<SqlStorage>({
-      extensionPacks: {
+      extensions: {
         [extensionPackId]: { id: extensionPackId, version: '0.0.1' },
       },
     });

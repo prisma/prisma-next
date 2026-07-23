@@ -83,7 +83,7 @@ describe('generic entities handle channel', () => {
       family: sqlFamilyPack,
       target: targetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { gadgetDemo: pack },
+      extensions: { gadgetDemo: pack },
       entities: [{ entityKind: 'gadget' }, { entityKind: 'gadget' }],
     });
 
@@ -115,7 +115,7 @@ describe('generic entities handle channel', () => {
       family: sqlFamilyPack,
       target: targetPack,
       createNamespace: createTestSqlNamespace,
-      extensionPacks: { gadgetDemo: pack },
+      extensions: { gadgetDemo: pack },
       namespaces: ['auth'],
       models: { Widget },
       entities: [{ entityKind: 'gadget', refs: { a: Widget, b: Foreign, c: Unknown } }],
@@ -161,7 +161,7 @@ describe('generic entities handle channel', () => {
         family: sqlFamilyPack,
         target: targetPack,
         createNamespace: createTestSqlNamespace,
-        extensionPacks: { gadgetDemo: pack },
+        extensions: { gadgetDemo: pack },
         entities: [{ entityKind: 'gadget' }],
       }),
     ).toThrow(/"gadget".*does not implement entity-handle lowering/);
@@ -182,7 +182,7 @@ describe('generic entities handle channel', () => {
         family: sqlFamilyPack,
         target: targetPack,
         createNamespace: createTestSqlNamespace,
-        extensionPacks: { gadgetDemo: pack },
+        extensions: { gadgetDemo: pack },
         entities: collidingHandles,
       }),
     ).toThrow(/two different "gadget" entities named "g" in namespace "public"/);

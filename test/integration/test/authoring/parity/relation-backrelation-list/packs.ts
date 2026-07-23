@@ -1,1 +1,1 @@
-export const extensionPacks = [] as const;
+export const extensions = [] as const;

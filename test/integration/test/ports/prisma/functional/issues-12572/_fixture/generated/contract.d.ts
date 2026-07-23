@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:10447586b2f9044f65aa01b6e4218e92638369f1212033988f1b34ca10106b98'>;
+  StorageHashBase<'3756ae1964e5d443cef3e5d22ab4cd59cae7dbfe06113f7d45e3e51e20a98c02'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:0d1b54e88800d92f261e1b87c35b52e848065b2b1a2cbd43331a1002754c91d0'>;
+  ExecutionHashBase<'4f90983b002c5bb55213593ad98599d703f7ee01b7e17f3cb8b52716c04effa5'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -46,7 +46,7 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 export type FieldOutputTypes = {
   readonly public: {
     readonly User: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
     };
@@ -55,7 +55,7 @@ export type FieldOutputTypes = {
 export type FieldInputTypes = {
   readonly public: {
     readonly User: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
     };
@@ -65,7 +65,7 @@ export type StorageColumnTypes = {
   readonly public: {
     readonly user: {
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
     };
   };
@@ -74,7 +74,7 @@ export type StorageColumnInputTypes = {
   readonly public: {
     readonly user: {
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
     };
   };
@@ -99,10 +99,9 @@ type ContractBase = Omit<
             readonly user: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
@@ -142,11 +141,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly createdAt: {
                 readonly nullable: false;
@@ -189,7 +184,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly execution: {
     readonly executionHash: ExecutionHash;
     readonly mutations: {

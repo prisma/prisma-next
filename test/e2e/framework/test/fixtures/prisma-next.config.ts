@@ -13,6 +13,6 @@ export default defineConfig({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
-  extensionPacks: [pgvector, arktypeJson],
+  extensions: [pgvector, arktypeJson],
   contract: typescriptContract(contract, 'generated/contract.json'),
 });

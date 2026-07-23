@@ -40,18 +40,18 @@ const testContract: Contract<SqlStorage> = {
       }),
     },
   }),
-  extensionPacks: {},
+  extensions: {},
   capabilities: {},
   meta: {},
 };
 
 function createStack(
-  extensionPacks: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>,
+  extensions: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>,
 ): SqlExecutionStack<'postgres'> {
   return {
     target: createTestTargetDescriptor(),
     adapter: createTestAdapterDescriptor(createStubAdapter()),
-    extensionPacks,
+    extensions,
   };
 }
 
@@ -250,7 +250,7 @@ describe('composed runtime mutation default generators', () => {
         stack: {
           target: createTestTargetDescriptor(),
           adapter: adapterWithoutMutationDefaultGenerators,
-          extensionPacks: [],
+          extensions: [],
         },
       }),
     ).toThrow(

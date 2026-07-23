@@ -25,7 +25,7 @@ const contract = new SqlContractSerializer().deserializeContract({
   profileHash: 'test-profile',
   roots: {},
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   storage: {
     storageHash: 'test-core',
@@ -54,8 +54,8 @@ const contract = new SqlContractSerializer().deserializeContract({
 // Compose a stack with pgvector on both planes so the runtime and control
 // adapters' codec lookups both contain `pg/vector@1`. The parity assertion
 // requires both sides to see the same codec set.
-const runtimeAdapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
-const controlAdapter = createComposedPostgresControlAdapter({ extensionPacks: [pgvectorControl] });
+const runtimeAdapter = createComposedPostgresAdapter({ extensions: [pgvectorRuntime] });
+const controlAdapter = createComposedPostgresControlAdapter({ extensions: [pgvectorControl] });
 
 function expectParity(ast: AnyQueryAst): void {
   const runtime = runtimeAdapter.lower(ast, { contract });

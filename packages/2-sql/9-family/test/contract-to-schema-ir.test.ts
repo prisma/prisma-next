@@ -52,7 +52,7 @@ function wrap(storage: SqlStorage): Contract<SqlStorage> {
     domain: applicationDomainOf({ models: {} }),
     roots: {},
     capabilities: {},
-    extensionPacks: {},
+    extensions: {},
     meta: {},
   };
 }

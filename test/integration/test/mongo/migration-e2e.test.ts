@@ -58,7 +58,7 @@ const emptyContract: MongoContract = {
     storageHash: coreHash('empty-contract'),
   },
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   profileHash: profileHash('test'),
   meta: {},
 };
@@ -98,7 +98,7 @@ const indexedContract: MongoContract = {
     storageHash: coreHash('indexed-contract'),
   },
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   profileHash: profileHash('test'),
   meta: {},
 };

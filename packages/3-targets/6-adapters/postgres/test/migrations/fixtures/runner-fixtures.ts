@@ -60,7 +60,7 @@ export const contract: Contract<SqlStorage> = {
   roots: {},
   domain: applicationDomainOf({ models: {} }),
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
 };
 
@@ -76,7 +76,7 @@ const controlStack = createControlStack({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
   driver: postgresDriverDescriptor,
-  extensionPacks: [],
+  extensions: [],
 });
 export const familyInstance = sqlFamilyDescriptor.create(controlStack);
 

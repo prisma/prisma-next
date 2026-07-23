@@ -34,7 +34,7 @@ const controlStack = createControlStack({
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresControlDriver,
-  extensionPacks: [],
+  extensions: [],
 });
 const familyInstance = sql.create(controlStack);
 
@@ -122,7 +122,7 @@ describe.sequential('ORM scalar-list round-trip', () => {
           stack: createSqlExecutionStack({
             target: postgresRuntimeTarget,
             adapter: postgresRuntimeAdapter,
-            extensionPacks: [],
+            extensions: [],
           }),
         });
         const db = orm({ runtime, context });

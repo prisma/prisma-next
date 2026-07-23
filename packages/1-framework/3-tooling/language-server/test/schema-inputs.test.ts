@@ -4,12 +4,12 @@ import { resolveSchemaInputs, type SchemaInputConfig } from '../src/schema-input
 
 function configWith(
   inputs: readonly string[] | undefined,
-  sourceFormat: string | null = 'psl',
+  format: string | null = 'psl',
 ): SchemaInputConfig {
   return {
     contract: {
       source: {
-        ...(sourceFormat ? { sourceFormat } : {}),
+        ...(format ? { format } : {}),
         ...(inputs ? { inputs } : {}),
       },
     },

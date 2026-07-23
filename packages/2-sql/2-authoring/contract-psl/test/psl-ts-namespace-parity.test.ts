@@ -158,7 +158,7 @@ namespace public {
       },
       storage: { storageHash: coreHash('test'), namespaces: {} },
       capabilities: {},
-      extensionPacks: {},
+      extensions: {},
       profileHash: profileHash('test-profile'),
       meta: {},
     });
@@ -181,7 +181,7 @@ namespace public {
       target: postgresTarget,
       scalarColumnDescriptors: postgresScalarTypeDescriptors,
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
-      composedExtensionPacks: ['supabase'],
+      composedExtensions: ['supabase'],
       composedExtensionContracts: new Map([['supabase', syntheticExtensionContract]]),
       createNamespace: createTestSqlNamespace,
       capabilities: { sql: { scalarList: true } },
@@ -215,7 +215,7 @@ namespace public {
     const tsContract = defineContract({
       family: { kind: 'family', id: 'sql', familyId: 'sql', version: '0.0.1' },
       target: postgresTarget,
-      extensionPacks: { supabase: supabaseExtensionPackRef },
+      extensions: { supabase: supabaseExtensionPackRef },
       models: { Profile },
       createNamespace: createTestSqlNamespace,
     });
@@ -252,7 +252,7 @@ namespace public {
       ...pslDocument,
       target: postgresTarget,
       scalarColumnDescriptors: postgresScalarTypeDescriptors,
-      composedExtensionPacks: ['supabase'],
+      composedExtensions: ['supabase'],
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
       capabilities: { sql: { scalarList: true } },

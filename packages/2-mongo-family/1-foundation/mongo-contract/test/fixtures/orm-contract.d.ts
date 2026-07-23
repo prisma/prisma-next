@@ -16,9 +16,9 @@ import type {
   StorageHashBase,
 } from '@prisma-next/contract/types';
 
-export type StorageHash = StorageHashBase<'undefined'>;
+export type StorageHash = StorageHashBase<'orm-storage'>;
 export type ExecutionHash = ExecutionHashBase<string>;
-export type ProfileHash = ProfileHashBase<'undefined'>;
+export type ProfileHash = ProfileHashBase<'orm-profile'>;
 
 export type CodecTypes = MongoCodecTypes;
 
@@ -29,8 +29,7 @@ export type FieldInputTypes = { readonly __unbound__: { readonly Address: { read
 export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;
 
 type ContractBase = Omit<
-  ContractType<
-{ readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__'; readonly kind: 'mongo-namespace'; readonly entries: { readonly collection: { readonly tasks: MongoCollection; readonly users: MongoCollection } } } }; readonly storageHash: StorageHash }>,
+  ContractType<{ readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__'; readonly kind: 'mongo-namespace'; readonly entries: { readonly collection: { readonly tasks: MongoCollection; readonly users: MongoCollection } } } }; readonly storageHash: StorageHash }>,
   'roots' | 'domain'
 > & {
   readonly target: 'mongo';
@@ -45,11 +44,10 @@ type ContractBase = Omit<
     };
   };
   readonly capabilities: {  };
-  readonly extensionPacks: {  };
+  readonly extensions: {  };
   readonly meta: {  };
   readonly valueObjects: { readonly HomeAddress: { readonly fields: { readonly city: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' } }; readonly country: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' } } } } };
   readonly profileHash: ProfileHash;
 };
-
 
 export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>;

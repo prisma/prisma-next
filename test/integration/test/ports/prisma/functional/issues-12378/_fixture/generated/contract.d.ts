@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:633c63354c0ff0884c172e9e1de509eb4341d957e5d6f9cacf06675fc36d18d3'>;
+  StorageHashBase<'3cb46c5a197d6fe75121fceb91da79b9f068d0e8a4ee68deb5a671e3a36ac2bc'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:08a8d8c784595deea72ea949b9e0371e21524cf0013add75eda2e16f3ac7221c'>;
+  ExecutionHashBase<'76e8de6943b39610db17f90049c224ca08d76d6e43ced947a1f53a97ad6c8a58'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -46,7 +46,7 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 export type FieldOutputTypes = {
   readonly public: {
     readonly User: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly email: CodecTypes['pg/text@1']['output'];
       readonly name: CodecTypes['pg/text@1']['output'] | null;
     };
@@ -54,13 +54,16 @@ export type FieldOutputTypes = {
       readonly userId: CodecTypes['pg/text@1']['output'];
       readonly workspaceId: CodecTypes['pg/text@1']['output'];
     };
-    readonly Workspace: { readonly id: Char<24>; readonly name: CodecTypes['pg/text@1']['output'] };
+    readonly Workspace: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+    };
   };
 };
 export type FieldInputTypes = {
   readonly public: {
     readonly User: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly email: CodecTypes['pg/text@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'] | null;
     };
@@ -69,7 +72,7 @@ export type FieldInputTypes = {
       readonly workspaceId: CodecTypes['pg/text@1']['input'];
     };
     readonly Workspace: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'];
     };
   };
@@ -78,21 +81,24 @@ export type StorageColumnTypes = {
   readonly public: {
     readonly user: {
       readonly email: CodecTypes['pg/text@1']['output'];
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly name: CodecTypes['pg/text@1']['output'] | null;
     };
     readonly usersOnWorkspaces: {
       readonly userId: CodecTypes['pg/text@1']['output'];
       readonly workspaceId: CodecTypes['pg/text@1']['output'];
     };
-    readonly workspace: { readonly id: Char<24>; readonly name: CodecTypes['pg/text@1']['output'] };
+    readonly workspace: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+    };
   };
 };
 export type StorageColumnInputTypes = {
   readonly public: {
     readonly user: {
       readonly email: CodecTypes['pg/text@1']['input'];
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'] | null;
     };
     readonly usersOnWorkspaces: {
@@ -100,7 +106,7 @@ export type StorageColumnInputTypes = {
       readonly workspaceId: CodecTypes['pg/text@1']['input'];
     };
     readonly workspace: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'];
     };
   };
@@ -125,10 +131,9 @@ type ContractBase = Omit<
             readonly user: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly email: {
                   readonly nativeType: 'text';
@@ -201,10 +206,9 @@ type ContractBase = Omit<
             readonly workspace: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly name: {
                   readonly nativeType: 'text';
@@ -243,11 +247,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly email: {
                 readonly nullable: false;
@@ -326,11 +326,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly name: {
                 readonly nullable: false;
@@ -380,7 +376,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly execution: {
     readonly executionHash: ExecutionHash;
     readonly mutations: {

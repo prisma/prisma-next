@@ -190,7 +190,7 @@ describe('contract builder normalization', () => {
         family: bareFamilyPack,
         target: postgresTargetPack,
         createNamespace: createTestSqlNamespace,
-        extensionPacks: { testIndexes: testIndexPack },
+        extensions: { testIndexes: testIndexPack },
       },
       ({ model, field }) => ({
         models: {

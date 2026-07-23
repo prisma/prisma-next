@@ -37,7 +37,7 @@ model Document {
     const namedTypeResult = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...namedTypeDocument,
-      composedExtensionPacks: ['pgvector'],
+      composedExtensions: ['pgvector'],
       authoringContributions: pgvectorAuthoringContributions,
     });
     expect(namedTypeResult.ok).toBe(false);
@@ -62,7 +62,7 @@ model Document {
     const fieldResult = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...fieldDocument,
-      composedExtensionPacks: ['pgvector'],
+      composedExtensions: ['pgvector'],
       authoringContributions: pgvectorAuthoringContributions,
     });
     expect(fieldResult.ok).toBe(false);
@@ -94,7 +94,7 @@ model Document {
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: ['pgvector'],
+      composedExtensions: ['pgvector'],
       authoringContributions: pgvectorAuthoringContributions,
     });
 
@@ -127,14 +127,14 @@ model Document {
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: ['pgvector'],
+      composedExtensions: ['pgvector'],
       composedExtensionPackRefs: [pgvectorExtensionPack],
       authoringContributions: pgvectorAuthoringContributions,
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.extensionPacks).toMatchObject({
+    expect(result.value.extensions).toMatchObject({
       pgvector: {
         version: pgvectorExtensionPack.version,
       },
@@ -208,7 +208,7 @@ model Document {
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: ['pgvector'],
+      composedExtensions: ['pgvector'],
       authoringContributions: {
         type: {
           sql: {
@@ -271,7 +271,7 @@ model Document {
     const result = interpretPslDocumentToSqlContract({
       ...baseInput,
       ...document,
-      composedExtensionPacks: ['pgvector'],
+      composedExtensions: ['pgvector'],
       authoringContributions: {
         type: {
           sql: {

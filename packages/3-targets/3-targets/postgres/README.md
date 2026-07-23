@@ -107,7 +107,7 @@ import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 export const contract = defineContract({
   family: sqlFamily,
   target: postgresPack,
-  extensionPacks: { pgvector },
+  extensions: { pgvector },
 });
 ```
 

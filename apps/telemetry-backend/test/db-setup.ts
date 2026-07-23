@@ -21,7 +21,7 @@ function createTestControlStack() {
     target: postgresTargetDescriptor,
     adapter: postgresAdapterDescriptor,
     driver: postgresDriverDescriptor,
-    extensionPacks: [],
+    extensions: [],
   });
 }
 
@@ -50,7 +50,7 @@ export async function resetTelemetrySchema(connectionString: string): Promise<vo
       frameworkComponents: [...frameworkComponents],
       migrationsDir,
       targetId: 'postgres',
-      extensionPacks: [],
+      extensions: [],
     });
 
     if (!result.ok) {

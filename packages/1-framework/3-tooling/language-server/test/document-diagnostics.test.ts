@@ -9,7 +9,7 @@ import { resolveSchemaInputs } from '../src/schema-inputs';
 
 const schemaUri = pathToFileURL('/abs/schema.psl').toString();
 const inputs = resolveSchemaInputs({
-  contract: { source: { sourceFormat: 'psl', inputs: ['/abs/schema.psl'] } },
+  contract: { source: { format: 'psl', inputs: ['/abs/schema.psl'] } },
 });
 
 const controlStack: PipelineInputs = {

@@ -154,7 +154,7 @@ const contractJson = {
     },
   },
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   profileHash: 'test-profile',
   meta: {},
 };

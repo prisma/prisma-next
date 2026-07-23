@@ -85,7 +85,7 @@ The single source of truth: read the envelope, find the row by `code` (or `meta.
 | `PN-CLI-4002` *Contract configuration missing* | `contract emit`, `db *` | Add `contract: { ... }` to `prisma-next.config.ts`. See `prisma-next-contract`. |
 | `PN-CLI-4003` *Contract validation failed* | `contract emit`, `db *` | Re-run `pnpm prisma-next contract emit` after fixing the contract source named in `where.path`. See `prisma-next-contract`. |
 | `PN-CLI-4005` *Database connection is required* | `db *`, `migrate`, `migration status` | Pass `--db <url>` or set `db.connection` in `prisma-next.config.ts`. |
-| `PN-CLI-4011` *Missing extension packs in config* | `contract emit` (e.g. contract uses `pgvector.Vector(...)` but config does not list the pgvector pack) | Add the descriptors named in `meta.missingExtensionPacks` to `extensionPacks` in `prisma-next.config.ts`. See `prisma-next-contract`. |
+| `PN-CLI-4011` *Missing extension packs in config* | `contract emit` (e.g. contract uses `pgvector.Vector(...)` but config does not list the pgvector pack) | Add the descriptors named in `meta.missingExtensions` to `extensions` in `prisma-next.config.ts`. See `prisma-next-contract`. |
 | `PN-CLI-4020` *Migration planning failed* | `db init`, `db update` | Inspect `meta.conflicts`. Recovery is per-conflict — chain to `prisma-next-migrations`. |
 | `PN-CLI-5002/5003/5004/…` *Init errors* | `prisma-next init` | Re-run with the missing/invalid flags listed in `meta.missingFlags` or `meta.allowed`. |
 | `PN-MIG-2001` *Unfilled migration placeholder* | `node migrations/app/<dir>/migration.ts` (self-emit) or `migrate` | Edit `migration.ts`, replace the named `placeholder("<slot>")` with a real query closure, self-emit. See `prisma-next-migrations`. |

@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'8eb02f3a90b8974e210142fc55d6ef0d00e74099d50c2ba9fc430b0e8274429a'>;
+  StorageHashBase<'59f0a637dfc885a07dcb54ba5c99e2926ba5ae286bb961bd9f040dd8aaf3ee89'>;
 export type ExecutionHash =
-  ExecutionHashBase<'a691ed4c6ad02663bcd11c7ea8b2491e67253cd7c1968687255f2e0accfdcff7'>;
+  ExecutionHashBase<'d5124fa06e1417dd4575e0b5a868a0216ec0ed912c7b5f652225db35e038dee4'>;
 export type ProfileHash =
-  ProfileHashBase<'9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -712,7 +712,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly execution: {
     readonly executionHash: ExecutionHash;
     readonly mutations: {
