@@ -59,10 +59,10 @@ description: ${longDescription}
 
   it('fails when an unquoted description contains a bare "key: value" sequence', () => {
     // Mirrors the PR #987 regression: an unquoted plain scalar describing
-    // `extensionPacks: [supabasePack]` reads as a nested YAML mapping, not text.
+    // `extensions: [supabasePack]` reads as a nested YAML mapping, not text.
     const broken = `---
 name: prisma-next-supabase
-description: Use Prisma Next with Supabase — wire extensionPacks: [supabasePack] into your db.
+description: Use Prisma Next with Supabase — wire extensions: [supabasePack] into your db.
 ---
 
 # Supabase
