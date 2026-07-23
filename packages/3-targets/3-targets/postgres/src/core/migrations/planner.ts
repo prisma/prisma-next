@@ -24,11 +24,11 @@ import type {
 import { issueOutcome } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { parseWireName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
-import { parseRlsPolicyWireName } from '../rls/wire-name';
 import { postgresNodeStorageCoordinate } from '../schema-ir/node-storage-coordinate';
 import { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
@@ -412,7 +412,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     if (allowsWidening) {
       const extrasByGroup = new Map<string, PolicyFinding[]>();
       for (const finding of extra) {
-        const parsed = parseRlsPolicyWireName(finding.node.name);
+        const parsed = parseWireName(finding.node.name);
         if (parsed === undefined) continue;
         const key = pairingKey(finding, parsed.hash);
         const group = extrasByGroup.get(key) ?? [];
@@ -427,7 +427,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         a.node.name < b.node.name ? -1 : a.node.name > b.node.name ? 1 : 0,
       );
       for (const missingFinding of sortedMissing) {
-        const parsed = parseRlsPolicyWireName(missingFinding.node.name);
+        const parsed = parseWireName(missingFinding.node.name);
         if (parsed === undefined) continue;
         const candidates = extrasByGroup.get(pairingKey(missingFinding, parsed.hash));
         const candidate = candidates?.shift();

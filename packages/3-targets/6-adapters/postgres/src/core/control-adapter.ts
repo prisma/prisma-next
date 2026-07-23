@@ -31,6 +31,7 @@ import type {
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
+import { parseWireName } from '@prisma-next/sql-schema-ir/naming';
 import type {
   PrimaryKeyInput,
   SqlCheckConstraintIRInput,
@@ -63,7 +64,6 @@ import type {
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
-import { parseRlsPolicyWireName } from '@prisma-next/target-postgres/rls-canonicalize';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
   PostgresDatabaseSchemaNode,
@@ -1283,7 +1283,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...new Set(parsePgNameArray(row.roles).map((r) => r.toLowerCase())),
       ].sort();
       const permissive = row.permissive.toUpperCase() === 'PERMISSIVE';
-      const prefix = parseRlsPolicyWireName(row.policyname)?.prefix ?? row.policyname;
+      const prefix = parseWireName(row.policyname)?.prefix ?? row.policyname;
       const policy = new PostgresPolicySchemaNode({
         name: row.policyname,
         prefix,
