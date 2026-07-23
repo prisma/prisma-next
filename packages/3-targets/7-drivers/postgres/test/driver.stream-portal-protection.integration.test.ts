@@ -8,7 +8,6 @@
  * Sync cannot end.
  */
 
-import { createServer } from 'node:net';
 import { PGlite } from '@electric-sql/pglite';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 import { timeouts } from '@prisma-next/test-utils';
@@ -16,60 +15,57 @@ import { Client } from 'pg';
 import { afterEach, describe, expect, it } from 'vitest';
 import postgresRuntimeDriverDescriptor from '../src/exports/runtime';
 
-async function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once('error', reject);
-    probe.listen(0, '127.0.0.1', () => {
-      const address = probe.address();
-      if (address === null || typeof address === 'string') {
-        probe.close();
-        reject(new Error('No port assigned'));
-        return;
-      }
-      probe.close(() => resolve(address.port));
-    });
-  });
-}
-
 interface SharedSessionHarness {
   readonly db: PGlite;
   readonly client: Client;
   readonly driver: ReturnType<typeof postgresRuntimeDriverDescriptor.create>;
   readonly recordedQueryTexts: string[];
+  // How many times a Submittable (a pg-cursor) was handed to client.query.
+  // Lets a test prove the streaming/cursor path was taken, so a future change
+  // that buffers the result can't quietly turn the regression into a no-op.
+  cursorSubmitCount(): number;
   close(): Promise<void>;
 }
 
 let harness: SharedSessionHarness | undefined;
 
-function recordQueryTexts(client: Client): string[] {
-  const recorded: string[] = [];
+interface QuerySpy {
+  readonly texts: string[];
+  cursorSubmits: number;
+}
+
+function installQuerySpy(client: Client): QuerySpy {
+  const spy: QuerySpy = { texts: [], cursorSubmits: 0 };
   const original = client.query.bind(client);
   const spied = (...args: unknown[]): unknown => {
     const first = args[0];
     if (typeof first === 'string') {
-      recorded.push(first);
-    } else if (
-      typeof first === 'object' &&
-      first !== null &&
-      'text' in first &&
-      typeof first.text === 'string'
-    ) {
-      recorded.push(first.text);
+      spy.texts.push(first);
+    } else if (typeof first === 'object' && first !== null) {
+      if ('text' in first && typeof (first as { text?: unknown }).text === 'string') {
+        spy.texts.push((first as { text: string }).text);
+      }
+      if ('submit' in first && typeof (first as { submit?: unknown }).submit === 'function') {
+        spy.cursorSubmits += 1;
+      }
     }
     return (original as (...inner: unknown[]) => unknown)(...args);
   };
   (client as unknown as { query: typeof spied }).query = spied;
-  return recorded;
+  return spy;
 }
 
 async function createSharedSessionHarness(options?: {
   readonly cursorBatchSize?: number;
 }): Promise<SharedSessionHarness> {
   const db = await PGlite.create();
-  const port = await freePort();
-  const server = new PGLiteSocketServer({ db, port, host: '127.0.0.1' });
+  // Bind to port 0 and read the port the OS actually assigned back from the
+  // server. Probing for a free port up front and reusing it races another
+  // listener grabbing it in the gap (a flake `prisma/prisma` hit in practice).
+  const server = new PGLiteSocketServer({ db, port: 0, host: '127.0.0.1' });
   await server.start();
+  const serverConn = server.getServerConn();
+  const port = Number(serverConn.slice(serverConn.lastIndexOf(':') + 1));
 
   const client = new Client({
     host: '127.0.0.1',
@@ -77,9 +73,13 @@ async function createSharedSessionHarness(options?: {
     database: 'postgres',
     user: 'postgres',
   });
+  // A dropped connection makes pg emit an asynchronous 'error' event; with no
+  // listener that becomes an unhandled error and fails the run. Connection
+  // drops are not expected here — the listener only keeps an incidental one
+  // from crashing the process; the awaited query/connect still rejects.
   client.on('error', () => {});
   await client.connect();
-  const recordedQueryTexts = recordQueryTexts(client);
+  const spy = installQuerySpy(client);
 
   const driver = postgresRuntimeDriverDescriptor.create({
     cursor: { batchSize: options?.cursorBatchSize ?? 10 },
@@ -90,7 +90,10 @@ async function createSharedSessionHarness(options?: {
     db,
     client,
     driver,
-    recordedQueryTexts,
+    recordedQueryTexts: spy.texts,
+    cursorSubmitCount: () => spy.cursorSubmits,
+    // Best-effort teardown: each close is independent, so one failure must not
+    // skip the others or replace the test's own result.
     close: async () => {
       await driver.close().catch(() => {});
       await server.stop().catch(() => {});
@@ -126,10 +129,12 @@ describe('streamed execute on a shared single-session backend', () => {
         sql: 'select id from items order by id',
       })) {
         rows.push(row);
+        // Inject exactly once, right after the first cursor batch completes
+        // (batchSize 10), so the portal is suspended mid-stream when the
+        // interleaved query lands. This simulates the prisma dev server's
+        // WAL-bridge drain: a direct PGlite query on the same backend session.
+        // Its Sync must not kill the stream.
         if (rows.length === 10) {
-          // Simulates the prisma dev server's WAL-bridge drain: a direct
-          // PGlite query on the same backend session while the portal is
-          // suspended between batch reads. Its Sync must not kill the stream.
           await h.db.query('select 1');
         }
       }
@@ -137,6 +142,9 @@ describe('streamed execute on a shared single-session backend', () => {
       expect(rows).toHaveLength(30);
       expect(rows[0]).toEqual({ id: 0 });
       expect(rows[29]).toEqual({ id: 29 });
+      // The race only exists while a cursor holds a suspended portal; assert a
+      // cursor was actually used so buffering can't turn this into a false pass.
+      expect(h.cursorSubmitCount()).toBeGreaterThan(0);
     },
     timeouts.spinUpDbServer,
   );
@@ -179,9 +187,7 @@ describe('streamed execute on a shared single-session backend', () => {
       expect(h.recordedQueryTexts.filter((text) => text === 'COMMIT')).toHaveLength(1);
       expect(h.db.isInTransaction()).toBe(false);
 
-      const after = await h.driver.query<{ n: string | number }>(
-        'select count(*)::int as n from items',
-      );
+      const after = await h.driver.query<{ n: number }>('select count(*)::int as n from items');
       expect(after.rows).toEqual([{ n: 25 }]);
     },
     timeouts.spinUpDbServer,
