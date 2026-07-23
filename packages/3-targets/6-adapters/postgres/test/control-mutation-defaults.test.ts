@@ -309,18 +309,19 @@ describe('postgresScalarAuthoringTypes', () => {
 });
 
 describe('postgresNativeAuthoringTypes', () => {
-  it('contributes all eleven native types as bare-eligible top-level constructors', () => {
+  it('contributes all native types as bare-eligible top-level constructors', () => {
     const derived = collectScalarTypeConstructors(postgresNativeAuthoringTypes);
 
     expect(Object.fromEntries(derived)).toEqual({
-      VarChar: { codecId: 'sql/varchar@1', nativeType: 'character varying' },
-      Char: { codecId: 'sql/char@1', nativeType: 'character' },
-      Numeric: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
-      Timestamp: { codecId: 'pg/timestamp@1', nativeType: 'timestamp' },
-      Timestamptz: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
-      Time: { codecId: 'pg/time@1', nativeType: 'time' },
-      Timetz: { codecId: 'pg/timetz@1', nativeType: 'timetz' },
+      VarChar: { codecId: 'sql/varchar@1', nativeType: 'character varying', typeParams: {} },
+      Char: { codecId: 'sql/char@1', nativeType: 'character', typeParams: {} },
+      Numeric: { codecId: 'pg/numeric@1', nativeType: 'numeric', typeParams: {} },
+      Timestamp: { codecId: 'pg/timestamp@1', nativeType: 'timestamp', typeParams: {} },
+      Timestamptz: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz', typeParams: {} },
+      Time: { codecId: 'pg/time@1', nativeType: 'time', typeParams: {} },
+      Timetz: { codecId: 'pg/timetz@1', nativeType: 'timetz', typeParams: {} },
       Uuid: { codecId: 'pg/uuid@1', nativeType: 'uuid' },
+      Inet: { codecId: 'pg/inet@1', nativeType: 'inet' },
       SmallInt: { codecId: 'pg/int2@1', nativeType: 'int2' },
       Real: { codecId: 'pg/float4@1', nativeType: 'float4' },
       Date: { codecId: 'pg/date@1', nativeType: 'date' },

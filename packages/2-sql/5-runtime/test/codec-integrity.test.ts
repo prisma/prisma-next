@@ -197,8 +197,8 @@ describe('createExecutionContext — column codec integrity', () => {
 
   it('accepts a non-parameterized codec column whose typeParams is an empty object (equivalent to missing)', () => {
     // M3b.2 substrate fix: `{}` and missing typeParams must be equivalent at
-    // the validator boundary. PSL emits `typeParams: {}` for `@db.X` named
-    // types whose body has no parameters; that empty form must round-trip
+    // the validator boundary. PSL emits `typeParams: {}` for bare native-type
+    // aliases with no arguments; that empty form must round-trip
     // through the runtime path against a non-parameterized codec descriptor
     // without tripping CODEC_PARAMETERIZATION_MISMATCH.
     const contract = contractWithColumn({
@@ -214,8 +214,8 @@ describe('createExecutionContext — column codec integrity', () => {
   });
 
   it('accepts a typeRef column whose typed instance carries empty-object typeParams against a non-parameterized codec', () => {
-    // M3b.2 substrate fix: PSL `types { Uuid = String @db.Uuid }` stores the
-    // alias as `{ codecId: 'pg/text@1', typeParams: {} }`. The codec-ref
+    // M3b.2 substrate fix: a zero-argument named type stores the alias with
+    // empty `typeParams`. The codec-ref
     // derived for a column whose `typeRef` points at that alias must compare
     // equal to "no typeParams" against the non-parameterized `pg/text@1`
     // descriptor.

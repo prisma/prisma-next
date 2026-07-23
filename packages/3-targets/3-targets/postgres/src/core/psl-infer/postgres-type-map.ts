@@ -22,6 +22,7 @@ const PRESERVED_NATIVE_TYPES: Record<string, string> = {
   char: 'Char',
   varchar: 'VarChar',
   uuid: 'Uuid',
+  inet: 'Inet',
   int2: 'SmallInt',
   smallint: 'SmallInt',
   float4: 'Real',

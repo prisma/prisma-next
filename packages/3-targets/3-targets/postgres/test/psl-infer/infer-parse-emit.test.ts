@@ -17,6 +17,7 @@ import { printPslFromFlat } from './fixtures';
 const authoringTypes = {
   Int: { kind: 'typeConstructor', output: { codecId: 'pg/int4@1', nativeType: 'int4' } },
   Uuid: { kind: 'typeConstructor', output: { codecId: 'pg/uuid@1', nativeType: 'uuid' } },
+  Inet: { kind: 'typeConstructor', output: { codecId: 'pg/inet@1', nativeType: 'inet' } },
   Numeric: {
     kind: 'typeConstructor',
     args: [
@@ -81,6 +82,7 @@ function parseAndEmit(source: string) {
     scalarColumnDescriptors: new Map([
       ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
       ['Uuid', { codecId: 'pg/uuid@1', nativeType: 'uuid' }],
+      ['Inet', { codecId: 'pg/inet@1', nativeType: 'inet' }],
       ['Json', { codecId: 'pg/json@1', nativeType: 'json' }],
       ['Jsonb', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
       ['Numeric', { codecId: 'pg/numeric@1', nativeType: 'numeric' }],
@@ -101,6 +103,7 @@ describe('Postgres PSL inference round trip', () => {
           columns: {
             id: { name: 'id', nativeType: 'int4', nullable: false },
             uuid_value: { name: 'uuid_value', nativeType: 'uuid', nullable: false },
+            ip_address: { name: 'ip_address', nativeType: 'inet', nullable: false },
             amount: { name: 'amount', nativeType: 'numeric(10,2)', nullable: false },
             bare_amount: { name: 'bare_amount', nativeType: 'numeric', nullable: false },
             json_value: { name: 'json_value', nativeType: 'json', nullable: false },
@@ -116,6 +119,7 @@ describe('Postgres PSL inference round trip', () => {
 
     const inferred = printPslFromFlat(schemaIR);
     expect(inferred).toContain('UuidValue = Uuid');
+    expect(inferred).toContain('IpAddress = Inet');
     expect(inferred).toContain('Amount = Numeric(10, 2)');
     expect(inferred).toContain('BareAmount = Numeric');
     expect(inferred).not.toContain('BareAmount = Numeric()');
@@ -140,6 +144,12 @@ describe('Postgres PSL inference round trip', () => {
                 nativeType: 'uuid',
                 nullable: false,
                 typeRef: 'UuidValue',
+              },
+              ip_address: {
+                codecId: 'pg/inet@1',
+                nativeType: 'inet',
+                nullable: false,
+                typeRef: 'IpAddress',
               },
               amount: {
                 codecId: 'pg/numeric@1',
@@ -179,6 +189,12 @@ describe('Postgres PSL inference round trip', () => {
           kind: 'codec-instance',
           codecId: 'pg/numeric@1',
           nativeType: 'numeric',
+          typeParams: {},
+        },
+        IpAddress: {
+          kind: 'codec-instance',
+          codecId: 'pg/inet@1',
+          nativeType: 'inet',
           typeParams: {},
         },
         JsonValue: {

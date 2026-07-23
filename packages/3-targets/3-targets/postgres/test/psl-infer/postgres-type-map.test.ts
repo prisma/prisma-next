@@ -26,7 +26,11 @@ describe('createPostgresTypeMap', () => {
       nativeType: 'uuid',
       useNamedType: true,
     });
-    expect(typeMap.resolve('inet')).toEqual({ unsupported: true, nativeType: 'inet' });
+    expect(typeMap.resolve('inet')).toEqual({
+      pslType: { name: 'Inet' },
+      nativeType: 'inet',
+      useNamedType: true,
+    });
   });
 
   it('maps alias types', () => {
