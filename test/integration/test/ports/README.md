@@ -9,7 +9,7 @@ Every in-scope upstream test lands in exactly one bucket (the accounting invaria
 
 1. **Ported & passing** — a vitest test here using the same schema, logically the same query through prisma-next's nearest public API, and the same assertions.
 2. **Ported & failing** — a faithful port that hits a real prisma-next gap: `test.fails` + an entry in the corpus `failing.md`.
-3. **Non-portable** — an individual line in the corpus `non-ported.md` (source location + what it tests + the specific reason it cannot be expressed).
+3. **Non-portable** — an individual line in the suite's `non-ported/<suite>/<suite>.md` (source location + what it tests + the specific reason it cannot be expressed).
 
 The per-test ledger is the checklist corpus at [`projects/port-all-tests/checklists/`](../../../../projects/port-all-tests/checklists/README.md); the reviewer checks a box only once its disposition is verified.
 
@@ -17,26 +17,31 @@ The per-test ledger is the checklist corpus at [`projects/port-all-tests/checkli
 
 ```
 ports/
-  _harness/        shared test harnesses (withPostgresPort, …)
-  _fixtures/       per-suite contract fixtures (contract.ts + config + emitted generated/)
-  prisma/          ports of prisma/prisma  (functional/, issues/, migrate/, cli/, legacy/)
-    non-ported.md
-    failing.md
-  engines/         ports of prisma/prisma-engines (queries/, writes/, migrations/, …)
-    non-ported.md
-    failing.md
+  _harness/        shared test harnesses (withPostgresPort, withMongoPort)
+  prisma/          ports of prisma/prisma
+    functional/
+      <suite>/                  one directory per ported suite
+        <suite>.test.ts         the port (runtime + inline type assertions)
+        _fixture/               co-located contract fixture
+          contract.prisma       faithful PSL translation of the upstream schema
+          prisma-next.config.ts
+          generated/            emitted contract.json + contract.d.ts
+    non-ported/
+      <suite>/<suite>.md        non-portable tests, one file per suite (mirrors functional/)
+    failing.md                  all test.fails entries (single file)
+  engines/         ports of prisma/prisma-engines (same shape)
 ```
 
-## Adding a fixture
+## Adding a suite
 
-Author the schema as **PSL** in `_fixtures/<suite>/contract.prisma` (faithful translation of the upstream `schema.prisma`) plus a `prisma-next.config.ts` (`@prisma-next/postgres/config`, `contract: './contract.prisma'`, `outputPath: 'generated'`). Then emit:
+Each suite is its own directory. Author the schema as **PSL** in `prisma/functional/<suite>/_fixture/contract.prisma` (faithful translation of the upstream `schema.prisma`) plus a `prisma-next.config.ts` (`@prisma-next/postgres/config`, `contract: './contract.prisma'`, `outputPath: 'generated'`). Then emit:
 
 ```bash
 node packages/1-framework/3-tooling/cli/dist/cli.js contract emit \
-  --config test/integration/test/ports/_fixtures/<suite>/prisma-next.config.ts
+  --config test/integration/test/ports/prisma/functional/<suite>/_fixture/prisma-next.config.ts
 ```
 
-Commit the generated `contract.json` + `contract.d.ts`. The test imports the typed `Contract` + the JSON and passes the JSON to `withPostgresPort`. **The harness pushes the contract into the database via prisma-next's own plan→apply path (the same mechanism `db init` uses) — no hand-written DDL.** Seed and query through the ORM (`ctx.db.public.<Model>...`); `ctx.runtime.query(sql)` is a raw escape hatch for inspection. See `_fixtures/distinct/` + `prisma/functional/distinct.test.ts` for the reference pattern.
+Commit the generated `contract.json` + `contract.d.ts`. The test (`prisma/functional/<suite>/<suite>.test.ts`) imports the typed `Contract` + JSON from `./_fixture/generated/…` and the harness from `../../../_harness/postgres`, and passes the JSON to `withPostgresPort`. **The harness builds the public `postgres(...)` facade over a PGlite dev database after pushing the contract via prisma-next's own plan→apply path (the same mechanism `db init` uses) — no hand-written DDL.** Seed and query through the ORM (`ctx.db.public.<Model>...`); interactive transactions use `ctx.transaction(async (tx) => tx.orm.public.<Model>...)`. See `prisma/functional/distinct/` for the reference pattern.
 
 Notes: prisma-next PSL lowercases table names (model `User` → table `user`) but keeps column names verbatim; scalar lists (`String[]`, `Int[]`) are supported and emit native pg arrays. MongoDB suites port against prisma-next's dedicated mongo ORM (`mongoOrm()`) with a `mongodb-memory-server` harness — not marked non-ported.
 

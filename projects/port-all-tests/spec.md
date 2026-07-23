@@ -30,7 +30,7 @@ Worked example of a faithful port (prisma/prisma functional test → prisma-next
 const users = await prisma.user.findMany({ distinct: ['name'], orderBy: { name: 'asc' } })
 expect(users).toEqual([{ id: expect.any(String), name: 'a' }, { id: expect.any(String), name: 'b' }])
 
-// port: test/integration/test/ports/prisma/functional/distinct.test.ts
+// port: test/integration/test/ports/prisma/functional/distinct/distinct.test.ts (test + its _fixture/ co-located)
 // same table shape authored via contract builders; same rows seeded; same assertion
 const users = await db.public.User.orderBy((u) => u.name).distinctOn('name').select('id', 'name').all()
 expect(users).toEqual([{ id: expect.any(String), name: 'a' }, { id: expect.any(String), name: 'b' }])
@@ -122,14 +122,14 @@ Faithfulness takes precedence over local test-style rules (e.g. the sql-orm-clie
 - **Checkbox protocol**: boxes start `[ ]`. The Opus reviewer sub-agent — and only the reviewer — checks `[x]`, and only once satisfied that the test is (a) faithfully ported and passing, (b) faithfully ported as `test.fails` with a `failing.md` entry, or (c) covered by a justified individual `non-ported.md` entry. Implementer sub-agents never check boxes. Roll-up totals live in `test/integration/test/ports/README.md`.
 - `non-ported.md` — one entry per test: exact source location (file path + test name), a one-line description of what it tests, and the specific reason it cannot be ported. No grouped or generalized entries.
 - `failing.md` — one entry per `test.fails` test: ported-test location and the reason for the failure (what prisma-next does instead / which gap it hits).
-- Locations: `test/integration/test/ports/prisma/{non-ported.md,failing.md}` and `test/integration/test/ports/engines/{non-ported.md,failing.md}` (Open question 2).
+- Locations: `non-ported` entries live one file per suite at `test/integration/test/ports/prisma/non-ported/<suite>/<suite>.md` (mirroring `functional/<suite>/`); `test.fails` entries live in the single `test/integration/test/ports/prisma/failing.md`. The engines corpus mirrors this under `test/integration/test/ports/engines/` (Open question 2).
 
 ### Corpus mechanics
 
-- Target tree: `test/integration/test/ports/{prisma,engines}/`, mirroring source-suite structure beneath (e.g. `ports/prisma/functional/…`, `ports/prisma/issues/…`, `ports/engines/queries/…`, `ports/engines/migrations/…`). The extra `test/` path segment vs. the originally stated `test/integration/ports/` is deliberate — it is what the package's vitest `include` picks up (Open question 1).
+- Target tree: `test/integration/test/ports/{prisma,engines}/`, mirroring source-suite structure beneath (e.g. `ports/prisma/functional/…`, `ports/prisma/issues/…`, `ports/engines/queries/…`). Each ported suite is its OWN directory `ports/prisma/functional/<suite>/` holding the `<suite>.test.ts` next to its co-located `_fixture/` (`contract.prisma` + `prisma-next.config.ts` + `generated/`); the test imports the contract from `./_fixture/generated/…` and the harness from `../../../_harness/…`. The extra `test/` path segment vs. the originally stated `test/integration/ports/` is deliberate — it is what the package's vitest `include` picks up (Open question 1).
 - Ported tests run under `pnpm test:integration`; given corpus scale, a dedicated vitest project/script (`pnpm test:ports`) may be split out for CI sharding, but the corpus must stay in CI either way.
 - Databases: Postgres tests run on PGlite, Mongo tests on `MongoMemoryReplSet`. For upstream provider-matrix suites, port the postgres entry (and the mongo entry when the suite's matrix includes mongo); provider-exclusive suites for unsupported databases go to `non-ported.md`.
-- Shared fixtures (contracts, seed helpers, schema translations reused across suites) live under `test/integration/test/ports/_fixtures/` and are built by dedicated fixture sub-agents *before* the batches that depend on them.
+- Fixtures are **co-located** with their test at `ports/prisma/functional/<suite>/_fixture/` (a suite needing several schemas nests them under `_fixture/<variant>/`). A schema genuinely shared by two suites is **duplicated** into each suite's `_fixture/` so every suite directory is self-contained — cross-suite fixture imports are avoided.
 
 ### Execution process (operator-mandated)
 
@@ -171,7 +171,7 @@ N/A — no architectural shift. The corpus location, accounting convention, and 
 ## Open Questions
 
 1. **Corpus path.** The request said `test/integration/ports/{prisma,engines}`; the package's vitest `include` is `test/**/*.test.ts`. Working position: `test/integration/test/ports/{prisma,engines}` so the corpus runs under the existing config without vitest changes.
-2. **Ledger file placement.** "`non-ported.md`" was stated as a single file. Working position: one `non-ported.md` + `failing.md` pair per corpus (`ports/prisma/`, `ports/engines/`) to keep files reviewable at this scale, with totals rolled up in `ports/README.md`.
+2. **Ledger file placement.** "`non-ported.md`" was stated as a single file. Resolved: `non-ported` entries are split one file per suite at `ports/{prisma,engines}/non-ported/<suite>/<suite>.md` (mirroring the co-located `functional/<suite>/` tree, so a suite's non-portable tests sit beside — or in place of — its port); `test.fails` entries stay in a single `ports/{prisma,engines}/failing.md`. Totals roll up in `ports/README.md`.
 3. **Unsupported-database-only tests.** Individually listing every MySQL/MSSQL/CockroachDB/Vitess/SQLite-only test will produce thousands of `non-ported.md` lines. Working position: yes, individual lines as instructed — generated per batch from the source's own connector tags (`_matrix.ts` entries, `only(...)`/`exclude(...)` attributes), which make the per-test reason precise.
 4. **Error assertions.** Upstream asserts Prisma error codes (`P2002`, `P4001`, …) prisma-next does not emit. Working position: assert the logically equivalent prisma-next error condition (e.g. unique-constraint violation error on the same operation); when no equivalent error surface exists, the test goes to `non-ported.md`.
 5. **Ordering of corpora.** Working position (final say in `plan.md`): highest-signal-first — prisma client functional (postgres) → engines query-engine `queries`/`writes`/`regressions` → migrations/JSON-RPC → CLI → mongo suites → introspection — so gap discovery front-loads onto the most-used surfaces.

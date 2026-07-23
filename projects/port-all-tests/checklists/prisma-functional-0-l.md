@@ -11,19 +11,19 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/0-legacy-ports/aggregations/tests.ts
 
-- [x] `min` — aggregate _min of age [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `max` — aggregate _max of age [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `sum` — aggregate _sum of age [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `count inline boolean` — aggregate _count with boolean true [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `count with _all` — aggregate _count with _all: true [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `avg` — aggregate _avg of age [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `multiple aggregations` — aggregate combining _min/_max/_sum/_count/_avg [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `multiple aggregations with where` — combined aggregations with a where filter [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `invalid min` — aggregate _min on non-existent field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `invalid max` — aggregate _max on non-existent field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `invalid sum` — aggregate _sum on non-numeric field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `invalid count` — aggregate _count on non-existent field rejects with error snapshot [providers: all] → test.fails: ports/prisma/functional/legacy-aggregations.test.ts
-- [x] `invalid avg` — aggregate _avg on non-numeric field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations.test.ts
+- [x] `min` — aggregate _min of age [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `max` — aggregate _max of age [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `sum` — aggregate _sum of age [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `count inline boolean` — aggregate _count with boolean true [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `count with _all` — aggregate _count with _all: true [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `avg` — aggregate _avg of age [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `multiple aggregations` — aggregate combining _min/_max/_sum/_count/_avg [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `multiple aggregations with where` — combined aggregations with a where filter [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `invalid min` — aggregate _min on non-existent field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `invalid max` — aggregate _max on non-existent field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `invalid sum` — aggregate _sum on non-numeric field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `invalid count` — aggregate _count on non-existent field rejects with error snapshot [providers: all] → test.fails: ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
+- [x] `invalid avg` — aggregate _avg on non-numeric field rejects with error snapshot [providers: all] → ports/prisma/functional/legacy-aggregations/legacy-aggregations.test.ts
 
 ### packages/client/tests/functional/0-legacy-ports/atomic-increment-decrement/tests.ts
 
@@ -52,12 +52,12 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/0-legacy-ports/json/tests.ts
 
-- [x] `create required json` — create resource with nested required JSON value [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json.test.ts
-- [x] `select required json` — findMany selecting requiredJson field [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json.test.ts
+- [x] `create required json` — create resource with nested required JSON value [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json/legacy-json.test.ts
+- [x] `select required json` — findMany selecting requiredJson field [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json/legacy-json.test.ts
 - [x] `select required json with where path` — filter by JSON path equals (mysql/sqlite string path, postgres/cockroach array path) (testIf: mysql/postgresql/cockroachdb/sqlite only) [providers: exclude:sqlserver] → non-ported
-- [x] `select required json with where equals` — filter JSON by whole-value equals [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json.test.ts
-- [x] `select required json with where not equals` — filter JSON by not-equals returns none [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json.test.ts
-- [x] `update required json with where equals` — update requiredJson to empty object [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json.test.ts
+- [x] `select required json with where equals` — filter JSON by whole-value equals [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json/legacy-json.test.ts
+- [x] `select required json with where not equals` — filter JSON by not-equals returns none [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json/legacy-json.test.ts
+- [x] `update required json with where equals` — update requiredJson to empty object [providers: exclude:sqlserver] → ports/prisma/functional/legacy-json/legacy-json.test.ts
 
 ### packages/client/tests/functional/0-legacy-ports/malformed-id/tests.ts
 
@@ -67,12 +67,12 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/0-legacy-ports/optional-relation-filters/tests.ts
 
-- [x] `filter existing optional relation with \`isNot: null\`` — findMany where relation isNot null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
-- [x] `filter empty optional relation with ` — findMany where relation is null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
-- [x] `filter empty optional relation with \`null\`` — findMany where relation equals null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
-- [x] `filter empty optional relation` — findMany where relation null returns single user (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
-- [x] `filter existing optional relation with empty field` — findMany where relation field is null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
-- [x] `filter existing optional relation with existing field` — findMany where relation field not null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters.test.ts
+- [x] `filter existing optional relation with \`isNot: null\`` — findMany where relation isNot null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters/legacy-optional-relation-filters.test.ts
+- [x] `filter empty optional relation with ` — findMany where relation is null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters/legacy-optional-relation-filters.test.ts
+- [x] `filter empty optional relation with \`null\`` — findMany where relation equals null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters/legacy-optional-relation-filters.test.ts
+- [x] `filter empty optional relation` — findMany where relation null returns single user (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters/legacy-optional-relation-filters.test.ts
+- [x] `filter existing optional relation with empty field` — findMany where relation field is null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters/legacy-optional-relation-filters.test.ts
+- [x] `filter existing optional relation with existing field` — findMany where relation field not null (testIf: non-mongodb) [providers: all] → ports/prisma/functional/legacy-optional-relation-filters/legacy-optional-relation-filters.test.ts
 
 ### packages/client/tests/functional/0-legacy-ports/query-raw/tests.ts
 
@@ -153,14 +153,14 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/blog-update/tests.ts
 
-- [x] `should create a user and update that field on that user` — create then update user email [providers: all] → ports/prisma/functional/blog-update.test.ts
-- [x] `should create a user and post and connect them together` — update user to connect an existing post [providers: all] → ports/prisma/functional/blog-update.test.ts
-- [x] `should create a user and post and disconnect them` — update user to disconnect a created post [providers: all] → ports/prisma/functional/blog-update.test.ts
+- [x] `should create a user and update that field on that user` — create then update user email [providers: all] → ports/prisma/functional/blog-update/blog-update.test.ts
+- [x] `should create a user and post and connect them together` — update user to connect an existing post [providers: all] → ports/prisma/functional/blog-update/blog-update.test.ts
+- [x] `should create a user and post and disconnect them` — update user to disconnect a created post [providers: all] → ports/prisma/functional/blog-update/blog-update.test.ts
 - [x] `should create a user with posts and a profile and update itself and nested connections setting fields to null` — nested update setting many fields/relations to null (skipTestIf: postgres+driverAdapter+relationJoins) [providers: all] → non-ported
 
 ### packages/client/tests/functional/bytes-upsert/tests.ts
 
-- [x] `bytes upsert should work correctly` — repeated upsert by bytes id is idempotent and record persists [providers: exclude:sqlserver] → test.fails: ports/prisma/functional/bytes-upsert.test.ts
+- [x] `bytes upsert should work correctly` — repeated upsert by bytes id is idempotent and record persists [providers: exclude:sqlserver] → test.fails: ports/prisma/functional/bytes-upsert/bytes-upsert.test.ts
 
 ### packages/client/tests/functional/chunking-query/tests.ts
 
@@ -186,8 +186,8 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 - [ ] `set` — create with contents set as list returns snapshot [providers: mongodb-only]
 - [ ] `set shorthand` — create with contents shorthand (no set) returns snapshot [providers: mongodb-only]
-- [x] `set null` — create with contents.set null rejects with `set` must not be null [providers: mongodb-only] → test.fails: ports/prisma/functional/composites-object-create.test.ts
-- [x] `set null shorthand` — create with contents null rejects with `contents` must not be null [providers: mongodb-only] → test.fails: ports/prisma/functional/composites-object-create.test.ts
+- [x] `set null` — create with contents.set null rejects with `set` must not be null [providers: mongodb-only] → test.fails: ports/prisma/functional/composites-object-create/composites-object-create.test.ts
+- [x] `set null shorthand` — create with contents null rejects with `contents` must not be null [providers: mongodb-only] → test.fails: ports/prisma/functional/composites-object-create/composites-object-create.test.ts
 - [ ] `set nested list` — create with nested upvotes list returns snapshot [providers: mongodb-only]
 
 ### packages/client/tests/functional/composites/list/createMany.ts
@@ -284,11 +284,11 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/composites/object/create.ts
 
-- [x] `set` — create with content set returns snapshot [providers: mongodb-only] → ports/prisma/functional/composites-object-create.test.ts
-- [x] `set shorthand` — create with content shorthand returns snapshot [providers: mongodb-only] → ports/prisma/functional/composites-object-create.test.ts
-- [x] `set null` — create content.set null: required rejects, optional returns null (branches on contentProperty) [providers: mongodb-only] → ports/prisma/functional/composites-object-create.test.ts (optional variant ported; required-variant runtime throw is enforced at compile time — content is non-nullable, so `null` is a type error)
-- [x] `set null shorthand` — create content null: required rejects, optional returns null (branches on contentProperty) [providers: mongodb-only] → ports/prisma/functional/composites-object-create.test.ts (optional variant ported; required-variant runtime throw is enforced at compile time)
-- [x] `set nested list` — create with content set nested upvotes list [providers: mongodb-only] → ports/prisma/functional/composites-object-create.test.ts
+- [x] `set` — create with content set returns snapshot [providers: mongodb-only] → ports/prisma/functional/composites-object-create/composites-object-create.test.ts
+- [x] `set shorthand` — create with content shorthand returns snapshot [providers: mongodb-only] → ports/prisma/functional/composites-object-create/composites-object-create.test.ts
+- [x] `set null` — create content.set null: required rejects, optional returns null (branches on contentProperty) [providers: mongodb-only] → ports/prisma/functional/composites-object-create/composites-object-create.test.ts (optional variant ported; required-variant runtime throw is enforced at compile time — content is non-nullable, so `null` is a type error)
+- [x] `set null shorthand` — create content null: required rejects, optional returns null (branches on contentProperty) [providers: mongodb-only] → ports/prisma/functional/composites-object-create/composites-object-create.test.ts (optional variant ported; required-variant runtime throw is enforced at compile time)
+- [x] `set nested list` — create with content set nested upvotes list [providers: mongodb-only] → ports/prisma/functional/composites-object-create/composites-object-create.test.ts
 
 ### packages/client/tests/functional/composites/object/createMany.ts
 
@@ -396,7 +396,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/create-default-date/test.ts
 
-- [x] `correctly creates a field with default date` — creating a record with no args populates a default date field as a Date [providers: sqlite,postgres,mysql,sqlserver] → ports/prisma/functional/create-default-date.test.ts
+- [x] `correctly creates a field with default date` — creating a record with no args populates a default date field as a Date [providers: sqlite,postgres,mysql,sqlserver] → ports/prisma/functional/create-default-date/create-default-date.test.ts
 
 ### packages/client/tests/functional/dataproxy-engine/version/tests.ts
 
@@ -404,42 +404,42 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/decimal/list/tests.ts
 
-- [x] `with decimal instances` — create record with a decimal list from numeric values [providers: postgres,cockroachdb] → ports/prisma/functional/decimal-list.test.ts
-- [x] `with numbers` — create record with a decimal list from numbers [providers: postgres,cockroachdb] → ports/prisma/functional/decimal-list.test.ts
-- [x] `create with strings` — create record with a decimal list from string values [providers: postgres,cockroachdb] → ports/prisma/functional/decimal-list.test.ts
+- [x] `with decimal instances` — create record with a decimal list from numeric values [providers: postgres,cockroachdb] → ports/prisma/functional/decimal-list/decimal-list.test.ts
+- [x] `with numbers` — create record with a decimal list from numbers [providers: postgres,cockroachdb] → ports/prisma/functional/decimal-list/decimal-list.test.ts
+- [x] `create with strings` — create record with a decimal list from string values [providers: postgres,cockroachdb] → ports/prisma/functional/decimal-list/decimal-list.test.ts
 
 ### packages/client/tests/functional/decimal/precision/tests.ts
 
-- [x] `decimals should not lose precision when written to db` — property test (fast-check) that decimals round-trip through the db without precision loss [providers: postgres,mysql,cockroachdb,sqlserver] → ports/prisma/functional/decimal-precision.test.ts
+- [x] `decimals should not lose precision when written to db` — property test (fast-check) that decimals round-trip through the db without precision loss [providers: postgres,mysql,cockroachdb,sqlserver] → ports/prisma/functional/decimal-precision/decimal-precision.test.ts
 
 ### packages/client/tests/functional/decimal/scalar/tests.ts
 
 - [x] `possible inputs > decimal as Decimal.js instance` — findFirst matching a Decimal.js instance returns the stored decimal [providers: exclude:mongodb] → non-ported
-- [x] `possible inputs > decimal as string` — findFirst matching a string value returns the stored decimal [providers: exclude:mongodb] → ports/prisma/functional/decimal-scalar.test.ts
-- [x] `possible inputs > decimal as number` — findFirst with numeric gt/lt filter returns the stored decimal [providers: exclude:mongodb] → ports/prisma/functional/decimal-scalar.test.ts
+- [x] `possible inputs > decimal as string` — findFirst matching a string value returns the stored decimal [providers: exclude:mongodb] → ports/prisma/functional/decimal-scalar/decimal-scalar.test.ts
+- [x] `possible inputs > decimal as number` — findFirst with numeric gt/lt filter returns the stored decimal [providers: exclude:mongodb] → ports/prisma/functional/decimal-scalar/decimal-scalar.test.ts
 - [x] `possible inputs > decimal as decimal.js-like object` — findFirst matching a decimal.js-like object returns the stored decimal [providers: exclude:mongodb] → non-ported
 
 ### packages/client/tests/functional/default-selection/tests.ts
 
-- [x] `includes scalars` — default selection includes scalar fields (id, value, otherId) [providers: all] → test.fails: test/ports/prisma/functional/default-selection.test.ts
-- [x] `does not include relations` — default selection excludes relation fields [providers: all] → test.fails: test/ports/prisma/functional/default-selection.test.ts
-- [x] `includes enums` — (non-sqlite/sqlserver) default selection includes enum field [providers: all] → test.fails: test/ports/prisma/functional/default-selection.test.ts
-- [x] `includes lists` — (postgres/cockroach/mongo) default selection includes list field [providers: all] → test.fails: test/ports/prisma/functional/default-selection.test.ts
-- [x] `includes enum lists` — (postgres/cockroach/mongo) default selection includes enum-list field [providers: all] → test.fails: test/ports/prisma/functional/default-selection.test.ts
+- [x] `includes scalars` — default selection includes scalar fields (id, value, otherId) [providers: all] → test.fails: test/ports/prisma/functional/default-selection/default-selection.test.ts
+- [x] `does not include relations` — default selection excludes relation fields [providers: all] → test.fails: test/ports/prisma/functional/default-selection/default-selection.test.ts
+- [x] `includes enums` — (non-sqlite/sqlserver) default selection includes enum field [providers: all] → test.fails: test/ports/prisma/functional/default-selection/default-selection.test.ts
+- [x] `includes lists` — (postgres/cockroach/mongo) default selection includes list field [providers: all] → test.fails: test/ports/prisma/functional/default-selection/default-selection.test.ts
+- [x] `includes enum lists` — (postgres/cockroach/mongo) default selection includes enum-list field [providers: all] → test.fails: test/ports/prisma/functional/default-selection/default-selection.test.ts
 - [ ] `includes composites` — (mongo only) default selection includes composite field [providers: all] → mongo-skip
 
 ### packages/client/tests/functional/distinct/tests.ts
 
-- [x] `distinct on firstName` — findMany distinct on firstName returns 2 rows [providers: all] → ports/prisma/functional/distinct.test.ts
-- [x] `distinct on firstName and lastName` — findMany distinct on firstName+lastName returns 3 rows [providers: all] → ports/prisma/functional/distinct.test.ts
-- [x] `distinct on id` — findMany distinct on id returns all 4 rows [providers: all] → ports/prisma/functional/distinct.test.ts
-- [x] `distinct on id and firstName` — findMany distinct on id+firstName returns 4 rows [providers: all] → ports/prisma/functional/distinct.test.ts
-- [x] `distinct on id and lastName` — findMany distinct on id+lastName returns 4 rows [providers: all] → ports/prisma/functional/distinct.test.ts
-- [x] `distinct on firstName and id` — findMany distinct on firstName+id returns 4 rows [providers: all] → ports/prisma/functional/distinct.test.ts
-- [x] `distinct on firstName and firstName` — findMany distinct on duplicated firstName returns 2 rows [providers: all] → ports/prisma/functional/distinct.test.ts
-- [x] `distinct on id and firstName and lastName` — findMany distinct on three fields returns 4 rows [providers: all] → ports/prisma/functional/distinct.test.ts
-- [x] `distinct on id shortcut` — findMany distinct with string shortcut 'id' returns 4 rows [providers: all] → ports/prisma/functional/distinct.test.ts
-- [x] `distinct on id and firstName shortcut` — findMany distinct with string shortcut 'firstName' returns 2 rows [providers: all] → ports/prisma/functional/distinct.test.ts
+- [x] `distinct on firstName` — findMany distinct on firstName returns 2 rows [providers: all] → ports/prisma/functional/distinct/distinct.test.ts
+- [x] `distinct on firstName and lastName` — findMany distinct on firstName+lastName returns 3 rows [providers: all] → ports/prisma/functional/distinct/distinct.test.ts
+- [x] `distinct on id` — findMany distinct on id returns all 4 rows [providers: all] → ports/prisma/functional/distinct/distinct.test.ts
+- [x] `distinct on id and firstName` — findMany distinct on id+firstName returns 4 rows [providers: all] → ports/prisma/functional/distinct/distinct.test.ts
+- [x] `distinct on id and lastName` — findMany distinct on id+lastName returns 4 rows [providers: all] → ports/prisma/functional/distinct/distinct.test.ts
+- [x] `distinct on firstName and id` — findMany distinct on firstName+id returns 4 rows [providers: all] → ports/prisma/functional/distinct/distinct.test.ts
+- [x] `distinct on firstName and firstName` — findMany distinct on duplicated firstName returns 2 rows [providers: all] → ports/prisma/functional/distinct/distinct.test.ts
+- [x] `distinct on id and firstName and lastName` — findMany distinct on three fields returns 4 rows [providers: all] → ports/prisma/functional/distinct/distinct.test.ts
+- [x] `distinct on id shortcut` — findMany distinct with string shortcut 'id' returns 4 rows [providers: all] → ports/prisma/functional/distinct/distinct.test.ts
+- [x] `distinct on id and firstName shortcut` — findMany distinct with string shortcut 'firstName' returns 2 rows [providers: all] → ports/prisma/functional/distinct/distinct.test.ts
 
 ### packages/client/tests/functional/driver-adapters/error-forwarding/tests.ts
 
@@ -461,15 +461,15 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/enum-array/tests.ts
 
-- [x] `can create data with an enum array` — create record with an enum array field [providers: postgres,mongodb,cockroachdb] → test.fails: test/ports/prisma/functional/enum-array.test.ts
-- [x] `can retrieve data with an enum array` — create then findFirstOrThrow returns the enum array with correct type [providers: postgres,mongodb,cockroachdb] → test.fails: test/ports/prisma/functional/enum-array.test.ts
+- [x] `can create data with an enum array` — create record with an enum array field [providers: postgres,mongodb,cockroachdb] → test.fails: test/ports/prisma/functional/enum-array/enum-array.test.ts
+- [x] `can retrieve data with an enum array` — create then findFirstOrThrow returns the enum array with correct type [providers: postgres,mongodb,cockroachdb] → test.fails: test/ports/prisma/functional/enum-array/enum-array.test.ts
 - [x] `can retrieve data with an enum array with a raw query and a custom parser` — (js_pg + client runtime only) createManyAndReturn + $queryRaw with custom userDefinedTypeParser parses enum arrays [providers: postgres,mongodb,cockroachdb] → non-ported
 
 ### packages/client/tests/functional/enums/tests.ts
 
-- [x] `can create data with an enum value` — create record with an enum scalar value [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → ports/prisma/functional/enums.test.ts
-- [x] `can retrieve data with an enum value` — create then findFirstOrThrow filtering by enum returns correct typed value [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → ports/prisma/functional/enums.test.ts
-- [x] `the enum type can be assigned its own values` — enum type accepts its own literal values with correct static type [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → ports/prisma/functional/enums.test.ts
+- [x] `can create data with an enum value` — create record with an enum scalar value [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → ports/prisma/functional/enums/enums.test.ts
+- [x] `can retrieve data with an enum value` — create then findFirstOrThrow filtering by enum returns correct typed value [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → ports/prisma/functional/enums/enums.test.ts
+- [x] `the enum type can be assigned its own values` — enum type accepts its own literal values with correct static type [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → ports/prisma/functional/enums/enums.test.ts
 - [x] `fails at runtime when an invalid entry is entered manually in SQLite` — (sqlite only) raw-inserted invalid enum value errors on read [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → non-ported
 - [ ] `fails at runtime when an invalid entry is entered manually in Mongo` — (mongo only) runCommandRaw-inserted invalid enum value errors on read [providers: postgres,mysql,mongodb,cockroachdb,sqlite] → mongo-skip
 
@@ -481,59 +481,59 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/extended-where/create.ts
 
-- [x] `create with connect 1 unique (PK)` — create profile connecting user by PK id [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `create with connect 1 unique (PK)` — create profile connecting user by PK id [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
 - [x] `create with connect 2 uniques (PK & non-PK)` — create profile connecting user by id + referralId [providers: all] → non-ported
-- [x] `create with connect 1 unique (non-PK)` — create profile connecting user by non-PK referralId [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `create with connect 1 unique (non-PK)` — create profile connecting user by non-PK referralId [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/delete.ts
 
-- [x] `delete with where 2 uniques (PK & non-PK)` — delete post by id + title [providers: all] → ports/prisma/functional/extended-where.test.ts
-- [x] `delete with where 1 unique (non-PK)` — delete post by non-PK title [providers: all] → ports/prisma/functional/extended-where.test.ts
-- [x] `delete with where 1 unique (PK)` — delete user by PK id [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `delete with where 2 uniques (PK & non-PK)` — delete post by id + title [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `delete with where 1 unique (non-PK)` — delete post by non-PK title [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `delete with where 1 unique (PK)` — delete user by PK id [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/findFirst.ts
 
-- [x] `findFirst with cursor 1 unique (PK)` — findFirst with cursor on PK id [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
-- [x] `findFirst with cursor 2 uniques (PK & non-PK)` — findFirst with cursor on id + title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
-- [x] `findFirst with cursor 1 unique (non-PK)` — findFirst with cursor on non-PK title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
+- [x] `findFirst with cursor 1 unique (PK)` — findFirst with cursor on PK id [providers: all] → test.fails: ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `findFirst with cursor 2 uniques (PK & non-PK)` — findFirst with cursor on id + title [providers: all] → test.fails: ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `findFirst with cursor 1 unique (non-PK)` — findFirst with cursor on non-PK title [providers: all] → test.fails: ports/prisma/functional/extended-where/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/findFirstOrThrow.ts
 
-- [x] `findFirstOrThrow with cursor 1 unique (PK)` — findFirstOrThrow with cursor on PK id [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
-- [x] `findFirstOrThrow with cursor 2 uniques (PK & non-PK)` — findFirstOrThrow with cursor on id + title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
-- [x] `findFirstOrThrow with cursor 1 unique (non-PK)` — findFirstOrThrow with cursor on non-PK title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
+- [x] `findFirstOrThrow with cursor 1 unique (PK)` — findFirstOrThrow with cursor on PK id [providers: all] → test.fails: ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `findFirstOrThrow with cursor 2 uniques (PK & non-PK)` — findFirstOrThrow with cursor on id + title [providers: all] → test.fails: ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `findFirstOrThrow with cursor 1 unique (non-PK)` — findFirstOrThrow with cursor on non-PK title [providers: all] → test.fails: ports/prisma/functional/extended-where/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/findMany.ts
 
-- [x] `findMany with cursor 1 unique (PK)` — findMany with cursor on PK id [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
-- [x] `findMany with cursor 2 uniques (PK & non-PK)` — findMany with cursor on id + title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
-- [x] `findMany with cursor 1 unique (non-PK)` — findMany with cursor on non-PK title [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
+- [x] `findMany with cursor 1 unique (PK)` — findMany with cursor on PK id [providers: all] → test.fails: ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `findMany with cursor 2 uniques (PK & non-PK)` — findMany with cursor on id + title [providers: all] → test.fails: ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `findMany with cursor 1 unique (non-PK)` — findMany with cursor on non-PK title [providers: all] → test.fails: ports/prisma/functional/extended-where/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/findUnique.ts
 
-- [x] `findUnique with where 1 unique (PK)` — findUnique user by PK id [providers: all] → ports/prisma/functional/extended-where.test.ts
-- [x] `findUnique with where 2 uniques (PK & non-PK)` — findUnique post by id + title [providers: all] → ports/prisma/functional/extended-where.test.ts
-- [x] `findUnique with where 1 unique (non-PK)` — findUnique post by non-PK title [providers: all] → ports/prisma/functional/extended-where.test.ts
-- [x] `findUnique with nested where on optional 1:1 not found` — nested where on payment relation yields null [providers: all] → ports/prisma/functional/extended-where.test.ts
-- [x] `findUnique with nested where on optional 1:1 found` — nested where on payment relation matches ccn [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `findUnique with where 1 unique (PK)` — findUnique user by PK id [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `findUnique with where 2 uniques (PK & non-PK)` — findUnique post by id + title [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `findUnique with where 1 unique (non-PK)` — findUnique post by non-PK title [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `findUnique with nested where on optional 1:1 not found` — nested where on payment relation yields null [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `findUnique with nested where on optional 1:1 found` — nested where on payment relation matches ccn [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/findUniqueOrThrow.ts
 
-- [x] `findUniqueOrThrow with where 1 unique (PK)` — findUniqueOrThrow user by PK id [providers: all] → ports/prisma/functional/extended-where.test.ts
-- [x] `findUniqueOrThrow with where 2 uniques (PK & non-PK)` — findUniqueOrThrow post by id + title [providers: all] → ports/prisma/functional/extended-where.test.ts
-- [x] `finUniqueOrThrow with where 1 unique (non-PK)` — findUniqueOrThrow post by non-PK title (sic title) [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `findUniqueOrThrow with where 1 unique (PK)` — findUniqueOrThrow user by PK id [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `findUniqueOrThrow with where 2 uniques (PK & non-PK)` — findUniqueOrThrow post by id + title [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `finUniqueOrThrow with where 1 unique (non-PK)` — findUniqueOrThrow post by non-PK title (sic title) [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/update.ts
 
-- [x] `update with where 1 unique (PK)` — update user by PK id [providers: all] → test.fails: ports/prisma/functional/extended-where.test.ts
-- [x] `update with where 2 uniques (PK & non-PK)` — update post by id + title [providers: all] → ports/prisma/functional/extended-where.test.ts
-- [x] `update with where 1 unique (non-PK)` — update post by non-PK title [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `update with where 1 unique (PK)` — update user by PK id [providers: all] → test.fails: ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `update with where 2 uniques (PK & non-PK)` — update post by id + title [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `update with where 1 unique (non-PK)` — update post by non-PK title [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/upsert.ts
 
-- [x] `upsert with where 1 unique (PK)` — upsert user by PK id [providers: all] → ports/prisma/functional/extended-where.test.ts
-- [x] `upsert with where 2 uniques (PK & non-PK)` — upsert post by id + title [providers: all] → ports/prisma/functional/extended-where.test.ts
-- [x] `upsert with where 1 unique (non-PK)` — upsert post by non-PK title [providers: all] → ports/prisma/functional/extended-where.test.ts
+- [x] `upsert with where 1 unique (PK)` — upsert user by PK id [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `upsert with where 2 uniques (PK & non-PK)` — upsert post by id + title [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
+- [x] `upsert with where 1 unique (non-PK)` — upsert post by non-PK title [providers: all] → ports/prisma/functional/extended-where/extended-where.test.ts
 
 ### packages/client/tests/functional/extended-where/validation.ts
 
@@ -759,14 +759,14 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/filter-count-relations/tests.ts
 
-- [x] `without condition` — _count select of posts relation with no filter [providers: all] → passing: test/ports/prisma/functional/filter-count-relations.test.ts
-- [x] `one-to-many > with simple equality condition` — _count posts filtered by published true [providers: all] → passing: test/ports/prisma/functional/filter-count-relations.test.ts
-- [x] `one-to-many > with > condition` — _count posts filtered by upvotes gt 100 [providers: all] → passing: test/ports/prisma/functional/filter-count-relations.test.ts
-- [x] `one-to-many > with multiple conditions` — _count posts filtered by published and upvotes gt [providers: all] → passing: test/ports/prisma/functional/filter-count-relations.test.ts
-- [x] `many-to-many > with simple equality condition` — _count users filtered by blocked true [providers: all] → test.fails: test/ports/prisma/functional/filter-count-relations.test.ts
-- [x] `many-to-many > with > condition` — _count users filtered by balance gt 20 [providers: all] → test.fails: test/ports/prisma/functional/filter-count-relations.test.ts
-- [x] `many-to-many > with multiple conditions` — _count users filtered by balance gt and blocked false [providers: all] → test.fails: test/ports/prisma/functional/filter-count-relations.test.ts
-- [x] `nested relation` — testIf(!dataProxy||provider!==mongodb): nested users select with filtered _count posts [providers: all] → passing: test/ports/prisma/functional/filter-count-relations.test.ts
+- [x] `without condition` — _count select of posts relation with no filter [providers: all] → passing: test/ports/prisma/functional/filter-count-relations/filter-count-relations.test.ts
+- [x] `one-to-many > with simple equality condition` — _count posts filtered by published true [providers: all] → passing: test/ports/prisma/functional/filter-count-relations/filter-count-relations.test.ts
+- [x] `one-to-many > with > condition` — _count posts filtered by upvotes gt 100 [providers: all] → passing: test/ports/prisma/functional/filter-count-relations/filter-count-relations.test.ts
+- [x] `one-to-many > with multiple conditions` — _count posts filtered by published and upvotes gt [providers: all] → passing: test/ports/prisma/functional/filter-count-relations/filter-count-relations.test.ts
+- [x] `many-to-many > with simple equality condition` — _count users filtered by blocked true [providers: all] → test.fails: test/ports/prisma/functional/filter-count-relations/filter-count-relations.test.ts
+- [x] `many-to-many > with > condition` — _count users filtered by balance gt 20 [providers: all] → test.fails: test/ports/prisma/functional/filter-count-relations/filter-count-relations.test.ts
+- [x] `many-to-many > with multiple conditions` — _count users filtered by balance gt and blocked false [providers: all] → test.fails: test/ports/prisma/functional/filter-count-relations/filter-count-relations.test.ts
+- [x] `nested relation` — testIf(!dataProxy||provider!==mongodb): nested users select with filtered _count posts [providers: all] → passing: test/ports/prisma/functional/filter-count-relations/filter-count-relations.test.ts
 
 ### packages/client/tests/functional/find-unique-or-throw-batching/tests.ts
 
@@ -946,8 +946,8 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/handle-int-overflow/tests.ts
 
-- [x] `integer overflow` — creating with 1e20 int throws 64-bit signed integer overflow error [providers: all] → passing: test/ports/prisma/functional/handle-int-overflow.test.ts
-- [x] `big float in exponent notation` — creating with Number.MAX_VALUE throws 64-bit signed integer overflow error [providers: all] → passing: test/ports/prisma/functional/handle-int-overflow.test.ts
+- [x] `integer overflow` — creating with 1e20 int throws 64-bit signed integer overflow error [providers: all] → passing: test/ports/prisma/functional/handle-int-overflow/handle-int-overflow.test.ts
+- [x] `big float in exponent notation` — creating with Number.MAX_VALUE throws 64-bit signed integer overflow error [providers: all] → passing: test/ports/prisma/functional/handle-int-overflow/handle-int-overflow.test.ts
 
 ### packages/client/tests/functional/interactive-transactions/tests.ts
 
@@ -1006,10 +1006,10 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/json-fields/tests.ts
 
-- [x] `simple object` — storing/reading a simple JSON object [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields.test.ts
-- [x] `empty object` — storing/reading an empty JSON object [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields.test.ts
-- [x] `object with no prototype` — JSON object created with no prototype (regression #14274/#14342) [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields.test.ts
-- [x] `object with .toJSON method` — JSON serialization honors toJSON and URL (regression #20192) [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields.test.ts
+- [x] `simple object` — storing/reading a simple JSON object [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields/json-fields.test.ts
+- [x] `empty object` — storing/reading an empty JSON object [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields/json-fields.test.ts
+- [x] `object with no prototype` — JSON object created with no prototype (regression #14274/#14342) [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields/json-fields.test.ts
+- [x] `object with .toJSON method` — JSON serialization honors toJSON and URL (regression #20192) [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields/json-fields.test.ts
 
 ### packages/client/tests/functional/json-list-push/tests.ts
 
@@ -1027,7 +1027,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/large-floats/tests.ts
 
-- [x] `floats` — large/negative floats and safe-integer bounds round-trip correctly [providers: all] → passing: test/ports/prisma/functional/large-floats.test.ts
+- [x] `floats` — large/negative floats and safe-integer bounds round-trip correctly [providers: all] → passing: test/ports/prisma/functional/large-floats/large-floats.test.ts
 
 ### packages/client/tests/functional/logging/tests.ts
 

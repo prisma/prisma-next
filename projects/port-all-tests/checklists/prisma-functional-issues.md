@@ -6,7 +6,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/4004/tests.ts
 
-- [x] `should not throw error when updating fields on a many to many join table` — updating scalar fields on an implicit m2m join model must not throw [providers: all] → ports/prisma/functional/issues-4004.test.ts
+- [x] `should not throw error when updating fields on a many to many join table` — updating scalar fields on an implicit m2m join model must not throw [providers: all] → ports/prisma/functional/issues-4004/issues-4004.test.ts
 
 ### packages/client/tests/functional/issues/5952-decimal-batch/tests.ts
 
@@ -71,8 +71,8 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/11974/tests.ts
 
-- [x] `should not throw an error when counting two relation fields using find` — selecting `_count` of two relations via find does not throw [providers: sql] → test.fails: ports/prisma/functional/issues-11974.test.ts
-- [x] `should not throw an error when aggregating two relation fields using aggregate` — counting two relations via aggregate does not throw [providers: sql] → ports/prisma/functional/issues-11974.test.ts
+- [x] `should not throw an error when counting two relation fields using find` — selecting `_count` of two relations via find does not throw [providers: sql] → test.fails: ports/prisma/functional/issues-11974/issues-11974.test.ts
+- [x] `should not throw an error when aggregating two relation fields using aggregate` — counting two relations via aggregate does not throw [providers: sql] → ports/prisma/functional/issues-11974/issues-11974.test.ts
 
 ### packages/client/tests/functional/issues/12003-order-by-self/tests.ts
 
@@ -82,15 +82,15 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/12378/tests.ts
 
-- [x] `issue 12378 > issue 12378` — create/connect/update across a m2m through-model with implicit relation works end to end [providers: postgres, mysql, cockroachdb, sqlserver] → ports/prisma/functional/issues-12378.test.ts
+- [x] `issue 12378 > issue 12378` — create/connect/update across a m2m through-model with implicit relation works end to end [providers: postgres, mysql, cockroachdb, sqlserver] → ports/prisma/functional/issues-12378/issues-12378.test.ts
 
 ### packages/client/tests/functional/issues/12557/tests.ts
 
-- [x] `issue 12557 > issue 12557` — `_count` on a relation stays correct after deleting a related record [providers: postgres, mysql] → test.fails: ports/prisma/functional/issues-12557.test.ts
+- [x] `issue 12557 > issue 12557` — `_count` on a relation stays correct after deleting a related record [providers: postgres, mysql] → test.fails: ports/prisma/functional/issues-12557/issues-12557.test.ts
 
 ### packages/client/tests/functional/issues/12572/tests.ts
 
-- [x] `should have equal dates on record creation for @default(now) and @updatedAt` — `@default(now())` and `@updatedAt` produce equal timestamps at creation [providers: all] → ports/prisma/functional/issues-12572.test.ts
+- [x] `should have equal dates on record creation for @default(now) and @updatedAt` — `@default(now())` and `@updatedAt` produce equal timestamps at creation [providers: all] → ports/prisma/functional/issues-12572/issues-12572.test.ts
 
 ### packages/client/tests/functional/issues/12862-errors-are-obfuscated-by-interactive-transactions/tests.ts
 
@@ -188,7 +188,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/16535-select-enum/tests.ts
 
-- [x] `allows to select enum field` — selecting an enum field returns its value [providers: postgres, mysql, cockroachdb] → ports/prisma/functional/issues-16535-select-enum.test.ts
+- [x] `allows to select enum field` — selecting an enum field returns its value [providers: postgres, mysql, cockroachdb] → ports/prisma/functional/issues-16535-select-enum/issues-16535-select-enum.test.ts
 
 ### packages/client/tests/functional/issues/17005-args-type-conflict/tests.ts
 
@@ -235,7 +235,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/18970-invalid-date/tests.ts
 
-- [x] `throws on invalid date (json)` — an invalid Date passed into a JSON field throws [providers: all] → passing: test/ports/prisma/functional/issues-18970-invalid-date.test.ts
+- [x] `throws on invalid date (json)` — an invalid Date passed into a JSON field throws [providers: all] → passing: test/ports/prisma/functional/issues-18970-invalid-date/issues-18970-invalid-date.test.ts
 
 ### packages/client/tests/functional/issues/19997-select-include-undefined/tests.ts
 
@@ -244,7 +244,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/20261-group-by-shortcut/tests.ts
 
-- [x] `works with a scalar in "by"` — groupBy accepts a scalar (string) shorthand for `by` [providers: all] → passing: test/ports/prisma/functional/issues-20261-group-by-shortcut.test.ts
+- [x] `works with a scalar in "by"` — groupBy accepts a scalar (string) shorthand for `by` [providers: all] → passing: test/ports/prisma/functional/issues-20261-group-by-shortcut/issues-20261-group-by-shortcut.test.ts
 - [x] `works with a scalar in "by" and no other selection` — groupBy with only a scalar `by` and no extra selection [providers: all] → non-ported
 - [x] `works with extended client` — groupBy scalar `by` shorthand works on an extended client [providers: all] → non-ported
 
