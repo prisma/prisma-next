@@ -131,6 +131,9 @@ class PostgresCodecDescriptorAdapter<D extends AnyCodecDescriptor> extends Postg
     value: JsonValue,
     side: 'output' | 'input',
   ) => string | undefined;
+  override readonly factory: (
+    params: DescriptorParams<D>,
+  ) => (ctx: CodecInstanceContext) => Codec<string, readonly CodecTrait[], unknown, unknown>;
 
   constructor(
     private readonly descriptor: D,
@@ -141,6 +144,7 @@ class PostgresCodecDescriptorAdapter<D extends AnyCodecDescriptor> extends Postg
     this.traits = descriptor.traits;
     this.targetTypes = descriptor.targetTypes;
     this.paramsSchema = descriptor.paramsSchema;
+    this.factory = (params) => descriptor.factory(params);
 
     if (descriptor.meta !== undefined) {
       Object.defineProperty(this, 'meta', {
@@ -172,12 +176,6 @@ class PostgresCodecDescriptorAdapter<D extends AnyCodecDescriptor> extends Postg
 
   override get isParameterized(): boolean {
     return this.descriptor.isParameterized;
-  }
-
-  override factory(
-    params: DescriptorParams<D>,
-  ): (ctx: CodecInstanceContext) => Codec<string, readonly CodecTrait[], unknown, unknown> {
-    return this.descriptor.factory(params);
   }
 
   protected override nativeType(params: DescriptorParams<D>): string {

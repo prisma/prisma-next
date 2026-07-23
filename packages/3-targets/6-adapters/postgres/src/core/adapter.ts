@@ -10,6 +10,8 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
+import type { PostgresCodecDescriptorRegistry } from '@prisma-next/target-postgres/codec-descriptor';
+import { postgresCodecDescriptorRegistry } from '@prisma-next/target-postgres/codecs';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
 import { adapterError } from './adapter-errors';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
@@ -44,10 +46,16 @@ class PostgresAdapterImpl
 
   readonly profile: AdapterProfile<'postgres'>;
   private readonly codecLookup: CodecRegistry;
+  private readonly codecDescriptorRegistry: PostgresCodecDescriptorRegistry;
 
   constructor(options?: PostgresAdapterOptions) {
     this.codecLookup = options?.codecLookup ?? createPostgresBuiltinCodecLookup();
-    const controlAdapter = new PostgresControlAdapter(this.codecLookup);
+    this.codecDescriptorRegistry =
+      options?.codecDescriptorRegistry ?? postgresCodecDescriptorRegistry;
+    const controlAdapter = new PostgresControlAdapter(
+      this.codecLookup,
+      this.codecDescriptorRegistry,
+    );
     this.profile = Object.freeze({
       id: options?.profileId ?? 'postgres/default@1',
       target: 'postgres',
@@ -82,7 +90,7 @@ class PostgresAdapterImpl
         { meta: { surface: 'runtime-adapter' } },
       );
     }
-    return renderLoweredSql(ast, context.contract, this.codecLookup);
+    return renderLoweredSql(ast, context.contract, this.codecDescriptorRegistry);
   }
 }
 

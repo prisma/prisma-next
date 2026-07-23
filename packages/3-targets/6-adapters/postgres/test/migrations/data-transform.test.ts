@@ -3,10 +3,14 @@ import { CliStructuredError } from '@prisma-next/errors/control';
 import { placeholder } from '@prisma-next/errors/migration';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type { Codec, CodecRegistry } from '@prisma-next/framework-components/codec';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { emptyCodecLookup, voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { ContractCodecRegistry, ProjectionExpr } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import {
+  buildPostgresCodecDescriptorRegistry,
+  postgresCodec,
+} from '@prisma-next/target-postgres/codec-descriptor';
 import { pgTable } from '@prisma-next/target-postgres/contract-free';
 import { dataTransform } from '@prisma-next/target-postgres/data-transform';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -231,6 +235,24 @@ const transformingLookup: CodecRegistry = {
   forColumn: () => undefined,
 };
 
+const transformingDescriptor = postgresCodec(
+  {
+    codecId: TEST_CODEC_ID,
+    traits: [] as const,
+    targetTypes: ['text'] as const,
+    paramsSchema: voidParamsSchema,
+    isParameterized: false,
+    factory: () => () => transformingCodec,
+  },
+  {
+    nativeType: () => 'text',
+    jsonProjection: (expression: ProjectionExpr) => expression,
+  },
+);
+const transformingDescriptorRegistry = buildPostgresCodecDescriptorRegistry([
+  transformingDescriptor,
+]);
+
 const testRegistry: ContractCodecRegistry = {
   forColumn: () => undefined,
   forCodecRef: (ref) => {
@@ -246,7 +268,7 @@ const testTable = pgTable(
   },
 );
 
-const testAdapter = new PostgresControlAdapter(transformingLookup);
+const testAdapter = new PostgresControlAdapter(transformingLookup, transformingDescriptorRegistry);
 
 describe('dataTransform — codec-encoded params via lowerToExecuteRequest', () => {
   it('execute step params carry the codec-encoded wire value (not raw JS value)', async () => {

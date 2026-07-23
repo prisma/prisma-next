@@ -1,8 +1,4 @@
-import type {
-  Codec,
-  CodecDescriptor,
-  CodecRegistry,
-} from '@prisma-next/framework-components/codec';
+import type { Codec, CodecRegistry } from '@prisma-next/framework-components/codec';
 import {
   CodecDescriptorImpl,
   emptyCodecLookup,
@@ -11,9 +7,16 @@ import {
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTableInput } from '@prisma-next/sql-contract/types';
-import type { ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { ContractCodecRegistry, ProjectionExpr } from '@prisma-next/sql-relational-core/ast';
 import { col, fn, lit } from '@prisma-next/sql-relational-core/contract-free';
-import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
+import {
+  buildPostgresCodecDescriptorRegistry,
+  postgresCodec,
+} from '@prisma-next/target-postgres/codec-descriptor';
+import {
+  postgresCodecDescriptorRegistry,
+  postgresCodecRegistry,
+} from '@prisma-next/target-postgres/codecs';
 import { jsonb, pgTable, text } from '@prisma-next/target-postgres/contract-free';
 import { PostgresCreateTable } from '@prisma-next/target-postgres/ddl';
 import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
@@ -47,6 +50,24 @@ const transformingLookup: CodecRegistry = {
   },
   forColumn: () => undefined,
 };
+
+const transformingDescriptor = postgresCodec(
+  {
+    codecId: 'test/transform@1',
+    traits: [] as const,
+    targetTypes: ['text'] as const,
+    paramsSchema: voidParamsSchema,
+    isParameterized: false,
+    factory: () => () => transformingCodec,
+  },
+  {
+    nativeType: () => 'text',
+    jsonProjection: (expression: ProjectionExpr) => expression,
+  },
+);
+const transformingDescriptorRegistry = buildPostgresCodecDescriptorRegistry([
+  transformingDescriptor,
+]);
 
 describe('PostgresControlAdapter.lowerToExecuteRequest — DDL literal defaults', () => {
   it('inlines a string default with single-quoting and ::nativeType cast on non-text columns', async () => {
@@ -175,7 +196,10 @@ describe('PostgresControlAdapter.lowerToExecuteRequest — guards', () => {
   });
 
   it('routes a codec-bearing literal default through codec.encode (not raw type-branching)', async () => {
-    const codecAdapter = new PostgresControlAdapter(transformingLookup);
+    const codecAdapter = new PostgresControlAdapter(
+      transformingLookup,
+      transformingDescriptorRegistry,
+    );
     const ast = new PostgresCreateTable({
       table: 'secrets',
       columns: [
@@ -240,7 +264,7 @@ const jsonbTable = pgTable(
   },
 );
 
-const codecAdapter = new PostgresControlAdapter(transformingLookup);
+const codecAdapter = new PostgresControlAdapter(transformingLookup, transformingDescriptorRegistry);
 
 describe('PostgresControlAdapter.lowerToExecuteRequest — query branch encoding', () => {
   it('codec-encodes a literal param bound to a transforming-codec column', async () => {
@@ -295,7 +319,10 @@ class ExtTransformDescriptor extends CodecDescriptorImpl<void> {
   }
 }
 
-const extTransformDescriptor = new ExtTransformDescriptor();
+const extTransformDescriptor = postgresCodec(new ExtTransformDescriptor(), {
+  nativeType: () => 'text',
+  jsonProjection: (expression: ProjectionExpr) => expression,
+});
 
 function buildExtContractAndTable() {
   const tableColumns: StorageTableInput['columns'] = {
@@ -333,17 +360,18 @@ function buildExtContractAndTable() {
 }
 
 describe('PostgresControlAdapter.lowerToExecuteRequest — extension codec end-to-end', () => {
-  const extDescriptors = [
-    ...Array.from(postgresCodecRegistry.values()),
-    extTransformDescriptor as unknown as CodecDescriptor<unknown>,
-  ];
+  const extDescriptors = [...Array.from(postgresCodecRegistry.values()), extTransformDescriptor];
   const extCodecLookup = extractCodecLookup([
     { id: 'ext-test-codecs', types: { codecTypes: { codecDescriptors: extDescriptors } } },
+  ]);
+  const extDescriptorRegistry = buildPostgresCodecDescriptorRegistry([
+    ...postgresCodecDescriptorRegistry.values(),
+    extTransformDescriptor,
   ]);
 
   it('encodes a query param through an extension codec when the adapter receives the descriptor', async () => {
     const { contract, table } = buildExtContractAndTable();
-    const extAdapter = new PostgresControlAdapter(extCodecLookup);
+    const extAdapter = new PostgresControlAdapter(extCodecLookup, extDescriptorRegistry);
 
     const ast = table.select(table.label).where(table.label.eq('plaintext')).build();
     const result = await extAdapter.lowerToExecuteRequest(ast, { contract });
