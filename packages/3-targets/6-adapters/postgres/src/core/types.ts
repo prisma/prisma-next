@@ -16,6 +16,7 @@ import type {
   SelectAst,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import type { PostgresCodecDescriptorRegistry } from '@prisma-next/target-postgres/codec-descriptor';
 
 export interface PostgresAdapterOptions {
   readonly profileId?: string;
@@ -29,6 +30,12 @@ export interface PostgresAdapterOptions {
    * lookup so extension codecs are visible to the renderer.
    */
   readonly codecLookup?: CodecRegistry;
+  /**
+   * Structurally validated PostgreSQL descriptor registry used for target-owned
+   * lowering behavior. Stack-aware factories assemble it from the same ordered
+   * target, adapter, and extension contributions as `codecLookup`.
+   */
+  readonly codecDescriptorRegistry?: PostgresCodecDescriptorRegistry;
 }
 
 export type { PostgresContract } from '@prisma-next/target-postgres/types';

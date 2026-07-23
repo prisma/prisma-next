@@ -41,6 +41,8 @@ import type {
   SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
 import { RelationalSchemaNodeKind } from '@prisma-next/sql-schema-ir/types';
+import type { PostgresCodecDescriptorRegistry } from '@prisma-next/target-postgres/codec-descriptor';
+import { postgresCodecDescriptorRegistry } from '@prisma-next/target-postgres/codecs';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -112,9 +114,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly targetId = 'postgres' as const;
 
   private readonly codecRegistry: CodecRegistry;
+  private readonly codecDescriptorRegistry: PostgresCodecDescriptorRegistry;
 
-  constructor(codecRegistry: CodecRegistry) {
+  constructor(
+    codecRegistry: CodecRegistry,
+    codecDescriptorRegistry: PostgresCodecDescriptorRegistry = postgresCodecDescriptorRegistry,
+  ) {
     this.codecRegistry = codecRegistry;
+    this.codecDescriptorRegistry = codecDescriptorRegistry;
   }
 
   /**
@@ -157,7 +164,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       blindCast<PostgresContract, 'caller must supply a matching PostgresContract'>(
         context.contract,
       ),
-      this.codecRegistry,
+      this.codecDescriptorRegistry,
     );
   }
 
@@ -181,7 +188,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const contract = blindCast<PostgresContract, 'Caller must supply matching contract'>(
       context?.contract,
     );
-    const lowered = renderLoweredSql(ast, contract, this.codecRegistry);
+    const lowered = renderLoweredSql(ast, contract, this.codecDescriptorRegistry);
     const codecRegistry = blindCast<
       ContractCodecRegistry,
       'framework CodecRegistry: its descriptors materialise SQL codecs; the framework Codec type erases to BaseCodec at this boundary'

@@ -6,6 +6,7 @@ import {
   quoteIdentifier,
   SqlEscapeError,
 } from '@prisma-next/target-postgres/sql-utils';
+import { assemblePostgresCodecDescriptorRegistry } from '../core/codec-lookup';
 import { PostgresControlAdapter } from '../core/control-adapter';
 import {
   createPostgresDefaultFunctionRegistry,
@@ -22,7 +23,13 @@ const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
     generatorDescriptors: createPostgresMutationDefaultGeneratorDescriptors(),
   },
   create(stack): SqlControlAdapter<'postgres'> {
-    return new PostgresControlAdapter(stack.codecLookup);
+    const components = [
+      stack.target,
+      ...(stack.adapter === undefined ? [] : [stack.adapter]),
+      ...stack.extensions,
+    ];
+    const codecDescriptorRegistry = assemblePostgresCodecDescriptorRegistry(components);
+    return new PostgresControlAdapter(stack.codecLookup, codecDescriptorRegistry);
   },
 };
 
