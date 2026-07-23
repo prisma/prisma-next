@@ -111,7 +111,10 @@ export interface PostgresCodecOptions<P> {
   readonly jsonArrayProjection?: (expression: ProjectionExpr, params: P) => ProjectionExpr;
 }
 
-export type AdaptedPostgresCodecDescriptor<D extends AnyCodecDescriptor> = D &
+export type AdaptedPostgresCodecDescriptor<D extends AnyCodecDescriptor> = Pick<
+  D,
+  keyof CodecDescriptor<DescriptorParams<D>>
+> &
   Pick<AnyPostgresCodecDescriptor, 'descriptorKind' | 'nativeTypeFor' | 'projectJson'>;
 
 class PostgresCodecDescriptorAdapter<D extends AnyCodecDescriptor> extends PostgresCodecDescriptor<
@@ -231,6 +234,10 @@ export function isPostgresCodecDescriptor(value: unknown): value is AnyPostgresC
     typeof value.paramsSchema === 'object' &&
     value.paramsSchema !== null &&
     '~standard' in value.paramsSchema &&
+    typeof value.paramsSchema['~standard'] === 'object' &&
+    value.paramsSchema['~standard'] !== null &&
+    'validate' in value.paramsSchema['~standard'] &&
+    typeof value.paramsSchema['~standard'].validate === 'function' &&
     'isParameterized' in value &&
     typeof value.isParameterized === 'boolean' &&
     'factory' in value &&
