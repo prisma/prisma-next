@@ -39,7 +39,7 @@ A faithful port reproduces the SAME upstream test: same schema, logically the sa
 
 ## Per-suite recipe
 1. Read the source `_matrix.ts`, `prisma/_schema.ts`, `tests.ts`. Determine provider applicability; port the **postgres** matrix entry. A suite exclusive to an unsupported DB (mysql/sqlserver/cockroachdb/sqlite) → `non-ported` lines (one per test). A **MongoDB**-applicable suite ports against the mongo ORM (`withMongoPort`) — do NOT mark mongo tests non-ported for being mongo.
-2. Author the fixture as **PSL** (not TS builders): `_fixtures/<suite>/contract.prisma` — a faithful translation of the upstream schema — plus `_fixtures/<suite>/prisma-next.config.ts`:
+2. Author the fixture as **PSL** (not TS builders): `_fixtures/<suite>/contract.prisma` — a faithful translation of the upstream `prisma/_schema.ts` (postgres branch). **The DB schema MUST match the original test exactly**: every model, field, scalar + native type (`@db.*`), nullability, list-ness, `@id`/`@@id`, `@unique`/`@@unique`, `@default`, `@map`/`@@map`, `@relation` (fields/references/onDelete/onUpdate), `@@index`, and enums. Do NOT drop or weaken any field/type/constraint/relation to dodge a prisma-next gap — if the faithful schema can't be authored or pushed, the affected tests are `non-ported`/`it.fails`, not a green on a simplified schema. Add `_fixtures/<suite>/prisma-next.config.ts`:
    `import { defineConfig } from '@prisma-next/postgres/config'; export default defineConfig({ contract: './contract.prisma', outputPath: 'generated' });`
    (mongo: `@prisma-next/mongo/config`, mongodb-provider PSL.) Emit:
    `node packages/1-framework/3-tooling/cli/dist/cli.js contract emit --config test/integration/test/ports/_fixtures/<suite>/prisma-next.config.ts`
