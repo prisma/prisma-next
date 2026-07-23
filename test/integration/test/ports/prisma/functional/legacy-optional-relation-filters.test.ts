@@ -101,6 +101,24 @@ describe('ports/prisma/functional/legacy-optional-relation-filters', () => {
     timeouts.spinUpPpgDev,
   );
 
+  // Upstream declares this `bio: null` case twice (tests.ts:98 and tests.ts:117)
+  // under different names; both are ported for one-to-one accounting parity.
+  it(
+    'filter empty optional relation',
+    () =>
+      withOptionalRelationFilters(async ({ db }) => {
+        const result = await db.public.User.where((u) => u.bio.none())
+          .select('id', 'email')
+          .all();
+
+        expect(result).toHaveLength(1);
+        expect(result).toEqual([
+          { id: '02d25579a73a72373fa4e846', email: 'Pete.Kassulke82520@fox-min.com' },
+        ]);
+      }),
+    timeouts.spinUpPpgDev,
+  );
+
   it(
     'filter existing optional relation with empty field',
     () =>

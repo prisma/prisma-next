@@ -24,9 +24,10 @@ import { timeouts, withPostgresPort } from '../../_harness/postgres';
 //   - String  → string   (same as Prisma)
 //
 // Non-portable tests (no $queryRaw):
-//   - 'shows differences between queryRaw and findMany'
-//   - '2 records, 1st with null, 2nd with values should succeed' (uses queryRaw comparison)
-// These are recorded in the inbox ledger.
+//   - 'shows differences between queryRaw and findMany' — the only test whose
+//     subject is the queryRaw-vs-findMany comparison itself; recorded in the ledger.
+// All other tests (including '2 records, 1st with null, 2nd with values should
+// succeed') are ported via findMany, which is their observable subject here.
 
 function withMultipleTypes(fn: Parameters<typeof withPostgresPort<Contract>>[1]) {
   return withPostgresPort<Contract>({ contractJson }, fn);

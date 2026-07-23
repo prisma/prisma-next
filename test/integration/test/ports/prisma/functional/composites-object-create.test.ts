@@ -221,8 +221,10 @@ describe('ports/prisma/functional/composites/object/create', () => {
             content: null,
           });
 
-          expect(comment.country).toBe('France');
-          expect(comment.content === null || comment.content === undefined).toBe(true);
+          expect(comment).toMatchObject({
+            country: 'France',
+            content: null,
+          });
         }),
       timeouts.spinUpMongoMemoryServer,
     );
