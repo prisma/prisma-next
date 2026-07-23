@@ -96,8 +96,8 @@ describe('printPsl', () => {
       // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
-        Email = String @db.VarChar(255)
-        Phone = String @db.Char(20)
+        Email = VarChar(255)
+        Phone = Char(20)
       }
 
       model Contact {
@@ -152,8 +152,8 @@ describe('printPsl', () => {
       // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
-        Value = Decimal @db.Numeric(10, 2)
-        Value2 = String @db.VarChar(255)
+        Value = Numeric(10, 2)
+        Value2 = VarChar(255)
       }
 
       model Price {
@@ -215,7 +215,7 @@ describe('printPsl', () => {
       // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
-        Email = String @db.VarChar(255)
+        Email = VarChar(255)
       }
 
       model Account {
@@ -267,8 +267,8 @@ describe('printPsl', () => {
       // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
-        String2 = String @db.VarChar(64)
-        User2 = String @db.VarChar(255)
+        String2 = VarChar(64)
+        User2 = VarChar(255)
       }
 
       model User {
@@ -349,7 +349,7 @@ describe('printPsl', () => {
       // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
-        Id = String @db.Uuid
+        Id = Uuid
       }
 
       model Item {
@@ -361,7 +361,7 @@ describe('printPsl', () => {
     `);
   });
 
-  it('preserves non-default native types through named type attributes', () => {
+  it('preserves non-default native types through named types', () => {
     const schemaIR = new SqlSchemaIR({
       tables: {
         schedule: {
@@ -403,11 +403,11 @@ describe('printPsl', () => {
       // Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       types {
-        BookedOn = DateTime @db.Date
-        Id = String @db.Uuid
-        Payload = Json @db.Json
-        Rating = Int @db.SmallInt
-        Slot = DateTime @db.Time(3)
+        BookedOn = Date
+        Id = Uuid
+        Payload = Json
+        Rating = SmallInt
+        Slot = Time(3)
       }
 
       model Schedule {
