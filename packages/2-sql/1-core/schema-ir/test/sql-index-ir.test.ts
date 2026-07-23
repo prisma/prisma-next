@@ -77,6 +77,19 @@ describe('SqlIndexIR', () => {
     });
   });
 
+  describe('partial', () => {
+    it('is readable, non-enumerable, and ignored by isEqualTo', () => {
+      const partialIdx = new SqlIndexIR({ columns: ['email'], unique: true, partial: true });
+      const totalIdx = new SqlIndexIR({ columns: ['email'], unique: true });
+      expect(partialIdx.partial).toBe(true);
+      expect(totalIdx.partial).toBeUndefined();
+      expect(Object.keys(partialIdx)).not.toContain('partial');
+      expect(JSON.parse(JSON.stringify(partialIdx))).not.toHaveProperty('partial');
+      expect(partialIdx.isEqualTo(totalIdx)).toBe(true);
+      expect(totalIdx.isEqualTo(partialIdx)).toBe(true);
+    });
+  });
+
   describe('dependsOn', () => {
     const dependsOn = [
       [

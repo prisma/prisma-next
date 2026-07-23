@@ -87,6 +87,122 @@ describe('inferRelations', () => {
     });
   });
 
+  it('detects 1:1 when FK columns exactly match a total unique index', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      profile: new SqlTableIR({
+        name: 'profile',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        uniques: [],
+        indexes: [{ columns: ['user_id'], unique: true, name: 'profile_user_id_idx' }],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['profile', 'Profile'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const userRelations = relationsByTable.get('user');
+    expect(userRelations).toHaveLength(1);
+    expect(userRelations![0]).toMatchObject({
+      optional: true,
+      list: false,
+    });
+  });
+
+  it('keeps a list back-relation when the only covering unique index is partial', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      draft: new SqlTableIR({
+        name: 'draft',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        uniques: [],
+        indexes: [
+          { columns: ['user_id'], unique: true, name: 'draft_active_user_idx', partial: true },
+        ],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['draft', 'Draft'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const userRelations = relationsByTable.get('user');
+    expect(userRelations).toHaveLength(1);
+    expect(userRelations![0]).toMatchObject({
+      optional: false,
+      list: true,
+    });
+  });
+
+  it('keeps a list back-relation when the unique index column set does not match the FK columns', () => {
+    // An expression unique index (e.g. ON handle (user_id, lower(name)))
+    // introspects with a null column name for the expression key, so the
+    // postgres adapter drops the whole index and the closest surviving shape
+    // is a unique index whose column set differs from the FK's — the
+    // set-equality match fails and the back-relation stays a list.
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      handle: new SqlTableIR({
+        name: 'handle',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+          name: { name: 'name', nativeType: 'text', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        uniques: [],
+        indexes: [{ columns: ['user_id', 'name'], unique: true, name: 'handle_user_name_idx' }],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['handle', 'Handle'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const userRelations = relationsByTable.get('user');
+    expect(userRelations).toHaveLength(1);
+    expect(userRelations![0]).toMatchObject({
+      optional: false,
+      list: true,
+    });
+  });
+
   it('detects 1:1 when FK columns match PK columns', () => {
     const tables: Record<string, SqlTableIR> = {
       user: new SqlTableIR({
