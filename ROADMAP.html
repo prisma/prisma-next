@@ -200,15 +200,15 @@
       <span class="item"><span class="k">Scoreboard</span> <span class="v link"><a href="https://github.com/prisma/prisma-next/pull/1000">450 proven · 500 unproven · 30 experimental · 250 not in 8.0</a></span></span>
     </div>
     <div class="progress">
-      <p class="cap">Work on this page: <b>34 tasks</b> — 1 done, 12 in flight, 21 not started</p>
-      <div class="bar" role="img" aria-label="34 tasks: 1 done, 12 in flight, 21 not started">
+      <p class="cap">Work on this page: <b>35 tasks</b> — 1 done, 12 in flight, 22 not started</p>
+      <div class="bar" role="img" aria-label="35 tasks: 1 done, 12 in flight, 22 not started">
         <div class="done" style="width: 3%"></div>
-        <div class="flight" style="width: 35%"></div>
+        <div class="flight" style="width: 34%"></div>
       </div>
       <div class="legend">
         <span><span class="dot" style="background: var(--good)"></span><b>1</b> done</span>
         <span><span class="dot" style="background: var(--accent)"></span><b>12</b> in flight</span>
-        <span><span class="dot" style="background: var(--open-bg); outline: 1px solid var(--line-strong); outline-offset: -1px;"></span><b>21</b> not started</span>
+        <span><span class="dot" style="background: var(--open-bg); outline: 1px solid var(--line-strong); outline-offset: -1px;"></span><b>22</b> not started</span>
       </div>
       <p class="cap" style="margin-top: 16px;"><a href="https://github.com/prisma/prisma-next/pull/1000">Feature scoreboard</a>: <b>~1,230 cells</b> (~326 features × 3 databases) — 450 proven, 500 unproven, 30 experimental, 250 not in 8.0</p>
       <div class="bar" role="img" aria-label="Scoreboard: about 450 cells proven, 500 unproven, 30 experimental, 250 not in 8.0">
@@ -254,7 +254,7 @@
       <li>
         <span class="n">4</span>
         <span class="what"><a href="#req4">The release's claims must be proven</a>
-          <span class="note">"It works" and "you can migrate incrementally" each need a runnable receipt.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="6 tasks: 1 done · 2 in flight · 3 not started"><span class="d" style="width: 16.7%"></span><span class="f" style="width: 33.3%"></span></span><span class="minicount">1 done · 2 in flight · 3 not started</span></span></span>
+          <span class="note">"It works" and "you can migrate incrementally" each need a runnable receipt.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="7 tasks: 1 done · 2 in flight · 4 not started"><span class="d" style="width: 14.3%"></span><span class="f" style="width: 28.6%"></span></span><span class="minicount">1 done · 2 in flight · 4 not started</span></span></span>
         <span class="owner">Everyone</span>
         <span class="pill flight">Scoreboard drafted</span>
       </li>
@@ -462,6 +462,22 @@
           <li><strong>Polymorphism in the TypeScript authoring path</strong> — schemas written in TypeScript (instead of PSL) can't declare inheritance yet; the PSL path can (<a href="https://linear.app/prisma-company/issue/TML-2228">TML-2228</a>, open). Until it lands, the scoreboard carries the asymmetry explicitly.</li>
         </ul>
         <p>Anything on this list that misses July 24 gets its cells stamped as they actually are — unproven, experimental, or not in 8.0 — rather than holding the freeze.</p>
+      </div>
+    </details>
+
+    <details class="task">
+      <summary><svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">Raw SQL query support — running an arbitrary SQL statement when the ORM and builder can't</span><span class="pill open">Not started</span></summary>
+      <div class="body">
+        <p>"Raw queries" is a headline row every Prisma 7 user will look for: hand a parameterized SQL string to the client and get rows back, or an affected-row count. Prisma 8 ships part of this today and has to settle the rest before the scoreboard freezes.</p>
+        <p>What already works is a raw SQL <em>fragment</em> inside the typed builder — <code>fns.raw`…`</code> for a function or operator the operation registry doesn't expose (<code>array_agg</code>, <code>ts_rank</code>, a vendor extension), composing with the rest of a built query. It's proven by tests on Postgres and SQLite, and MongoDB has its own raw-command escape hatch. What's missing is the <em>statement-level</em> path — running a whole SQL string on its own — and that's the work:</p>
+        <ul>
+          <li><strong>A public API for running an arbitrary SQL statement.</strong> The <code>$queryRaw</code>/<code>$executeRaw</code> parity surface: one call that takes a parameterized SQL string and returns rows, another that returns an affected-row count, issued straight to the driver rather than through the query compiler. The substrate all exists — the driver already exposes a <code>query(sql, params)</code> method, there is a raw execution-plan shape, and the guardrail evaluator already runs on it — but nothing surfaces it to users. A real app built on Prisma 8 had to hand-assemble an internal execution plan just to run a <code>truncate</code>, and casting around the missing type then crashed a guardrail (<a href="https://linear.app/prisma-company/issue/TML-2672">TML-2672</a>). The design is written down (<a href="docs/architecture%20docs/adrs/ADR%20012%20-%20Raw%20SQL%20Escape%20Hatch.md">ADR 012</a>); the helper is not built.</li>
+          <li><strong>Safe by construction, with an explicit unsafe door.</strong> Interpolated values always travel as bind parameters, never spliced into the SQL text. The rare case that genuinely needs a query string assembled at runtime gets a separate, clearly-named entry point — so the dangerous path is the one a user has to ask for by name.</li>
+          <li><strong>Read-versus-write intent the guardrails can see.</strong> A raw statement declares whether it reads or writes (and whether it carries a <code>WHERE</code>/<code>LIMIT</code>), so the existing lint and budget guardrails — mutation-needs-a-filter, result-size limits — apply to raw SQL too, and the missing-metadata crash above is gone. Core does no SQL parsing here by design; the caller states the intent.</li>
+          <li><strong>A decided answer for result typing and the composition helpers.</strong> Raw rows come back as the database sends them; a typed-results story (Prisma 7's TypedSQL) and the <code>Prisma.sql</code>/<code>Prisma.join</code>/<code>Prisma.raw</code>/<code>Prisma.empty</code> fragment-composition helpers are currently marked <em>not in 8.0</em>. Whichever way each lands, it gets named on the scoreboard rather than left ambiguous.</li>
+          <li><strong>One frozen-surface fix on the piece that already shipped.</strong> The builder's <code>fns.raw`…`</code> infers a value's database type from its JavaScript runtime type — a guess baked into a public API — so it's replaced with an explicit codec before the surface freezes (<a href="https://linear.app/prisma-company/issue/TML-2959">TML-2959</a>).</li>
+        </ul>
+        <p>The bar for July 24 is a verdict, not necessarily a finished feature: statement-level raw SQL either ships with a proving test or becomes a written-down "not in 8.0" absence — not a reachable-but-untested cell nobody can act on.</p>
       </div>
     </details>
 
