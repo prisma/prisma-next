@@ -21,6 +21,19 @@ const authoringTypes = {
   Int: { kind: 'typeConstructor', output: { codecId: 'pg/int4@1', nativeType: 'int4' } },
   Uuid: { kind: 'typeConstructor', output: { codecId: 'pg/uuid@1', nativeType: 'uuid' } },
   Inet: { kind: 'typeConstructor', output: { codecId: 'pg/inet@1', nativeType: 'inet' } },
+  Timestamptz: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
+  },
+  VarChar: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+    output: {
+      codecId: 'pg/text@1',
+      nativeType: 'varchar',
+      typeParams: { length: { kind: 'arg', index: 0 } },
+    },
+  },
   Numeric: {
     kind: 'typeConstructor',
     args: [
@@ -104,6 +117,8 @@ describe('Postgres PSL inference round trip', () => {
             bare_amount: { name: 'bare_amount', nativeType: 'numeric', nullable: false },
             json_value: { name: 'json_value', nativeType: 'json', nullable: false },
             jsonb_value: { name: 'jsonb_value', nativeType: 'jsonb', nullable: false },
+            occurred_at: { name: 'occurred_at', nativeType: 'timestamptz', nullable: false },
+            label: { name: 'label', nativeType: 'varchar(191)', nullable: false },
           },
           primaryKey: { columns: ['id'] },
           foreignKeys: [],
@@ -114,13 +129,16 @@ describe('Postgres PSL inference round trip', () => {
     });
 
     const inferred = printPslFromFlat(schemaIR);
-    expect(inferred).toContain('UuidValue = Uuid');
-    expect(inferred).toContain('IpAddress = Inet');
-    expect(inferred).toContain('Amount = Numeric(10, 2)');
-    expect(inferred).toContain('BareAmount = Numeric');
-    expect(inferred).not.toContain('BareAmount = Numeric()');
-    expect(inferred).toContain('JsonValue = Json');
-    expect(inferred).toContain('jsonbValue Jsonb');
+    expect(inferred).not.toContain('types {');
+    expect(inferred).toMatch(/uuidValue\s+Uuid/);
+    expect(inferred).toMatch(/ipAddress\s+Inet/);
+    expect(inferred).toMatch(/amount\s+Numeric\(10, 2\)/);
+    expect(inferred).toMatch(/bareAmount\s+Numeric/);
+    expect(inferred).not.toContain('bareAmount Numeric()');
+    expect(inferred).toMatch(/jsonValue\s+Json/);
+    expect(inferred).toMatch(/jsonbValue\s+Jsonb/);
+    expect(inferred).toMatch(/occurredAt\s+Timestamptz/);
+    expect(inferred).toMatch(/label\s+VarChar\(191\)/);
 
     const emitted = parseAndEmit(inferred);
     if (!emitted.ok) {
@@ -135,37 +153,28 @@ describe('Postgres PSL inference round trip', () => {
           sample: {
             columns: {
               id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              uuid_value: {
-                codecId: 'pg/uuid@1',
-                nativeType: 'uuid',
-                nullable: false,
-                typeRef: 'UuidValue',
-              },
-              ip_address: {
-                codecId: 'pg/inet@1',
-                nativeType: 'inet',
-                nullable: false,
-                typeRef: 'IpAddress',
-              },
+              uuid_value: { codecId: 'pg/uuid@1', nativeType: 'uuid', nullable: false },
+              ip_address: { codecId: 'pg/inet@1', nativeType: 'inet', nullable: false },
               amount: {
                 codecId: 'pg/numeric@1',
                 nativeType: 'numeric',
                 nullable: false,
-                typeRef: 'Amount',
+                typeParams: { precision: 10, scale: 2 },
               },
-              bare_amount: {
-                codecId: 'pg/numeric@1',
-                nativeType: 'numeric',
-                nullable: false,
-                typeRef: 'BareAmount',
-              },
-              json_value: {
-                codecId: 'pg/json@1',
-                nativeType: 'json',
-                nullable: false,
-                typeRef: 'JsonValue',
-              },
+              bare_amount: { codecId: 'pg/numeric@1', nativeType: 'numeric', nullable: false },
+              json_value: { codecId: 'pg/json@1', nativeType: 'json', nullable: false },
               jsonb_value: { codecId: 'pg/jsonb@1', nativeType: 'jsonb', nullable: false },
+              occurred_at: {
+                codecId: 'pg/timestamptz@1',
+                nativeType: 'timestamptz',
+                nullable: false,
+              },
+              label: {
+                codecId: 'pg/text@1',
+                nativeType: 'varchar',
+                nullable: false,
+                typeParams: { length: 191 },
+              },
             },
             primaryKey: { columns: ['id'] },
             uniques: [],
@@ -174,38 +183,7 @@ describe('Postgres PSL inference round trip', () => {
           },
         },
       },
-      types: {
-        Amount: {
-          kind: 'codec-instance',
-          codecId: 'pg/numeric@1',
-          nativeType: 'numeric',
-          typeParams: { precision: 10, scale: 2 },
-        },
-        BareAmount: {
-          kind: 'codec-instance',
-          codecId: 'pg/numeric@1',
-          nativeType: 'numeric',
-          typeParams: {},
-        },
-        IpAddress: {
-          kind: 'codec-instance',
-          codecId: 'pg/inet@1',
-          nativeType: 'inet',
-          typeParams: {},
-        },
-        JsonValue: {
-          kind: 'codec-instance',
-          codecId: 'pg/json@1',
-          nativeType: 'json',
-          typeParams: {},
-        },
-        UuidValue: {
-          kind: 'codec-instance',
-          codecId: 'pg/uuid@1',
-          nativeType: 'uuid',
-          typeParams: {},
-        },
-      },
+      types: undefined,
     });
   });
 });

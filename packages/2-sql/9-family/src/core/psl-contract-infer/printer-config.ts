@@ -11,7 +11,6 @@ export type PslTypeResolution =
       readonly pslType: PslTypeReference;
       readonly nativeType: string;
       readonly typeParams?: Record<string, unknown>;
-      readonly useNamedType?: boolean;
     }
   | {
       readonly unsupported: true;

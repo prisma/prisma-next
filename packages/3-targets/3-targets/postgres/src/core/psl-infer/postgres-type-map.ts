@@ -81,7 +81,6 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
             pslType: { name: typeName, args: splitTypeParameterList(params) },
             nativeType,
             typeParams: { baseType, params },
-            useNamedType: true,
           };
         }
       }
@@ -91,7 +90,6 @@ export function createPostgresTypeMap(enumTypeNames?: ReadonlySet<string>): PslT
         return {
           pslType: { name: preservedType },
           nativeType,
-          useNamedType: true,
         };
       }
 

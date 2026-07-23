@@ -22,7 +22,6 @@ export {
   toEnumName,
   toFieldName,
   toModelName,
-  toNamedTypeName,
 } from '../core/psl-contract-infer/name-transforms';
 export type {
   EnumInfo,
