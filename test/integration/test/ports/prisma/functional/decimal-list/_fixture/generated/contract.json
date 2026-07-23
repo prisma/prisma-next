@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "user": {
       "model": "User",
@@ -84,7 +84,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "fdb5ab6a4faebd69e85b71a24469fccc6e54e67fbd29ad25a21acb094d3f5418",
+    "storageHash": "0918505845664d9f6582900a179197052dde640479a136110aac46a40fb6e864",
     "types": {
       "D": {
         "codecId": "pg/numeric@1",
@@ -98,7 +98,7 @@
     }
   },
   "execution": {
-    "executionHash": "ae232bd1f1051df919925afd5e04406e14cc6a4c3c1dbbfbc8b8720ba8feb8ae",
+    "executionHash": "b3a0c7629738fce7d43a03a126ffc34990efca75f034d52cdd67a1adfada5ca4",
     "mutations": {
       "defaults": [
         {
@@ -132,7 +132,7 @@
       "scalarList": true
     }
   },
-  "extensionPacks": {},
+  "extensions": {},
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
