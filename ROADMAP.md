@@ -2,7 +2,7 @@
 
 Prisma Next — the contract-first rewrite of Prisma — ships as **Prisma 8**. On **July 31** we publish **`prisma@8.0.0-rc.1`** from the `prisma/prisma` repository: the same repository and the same npm package Prisma users already know. The release candidate is published under a pre-release tag, so `npm install prisma` keeps installing Prisma 7 until 8.0.0 final ships. Prisma 8 carries **PostgreSQL to general availability** — and that is all: **MongoDB ships in early access**, and **SQLite is a proof of concept** at this stage. A release candidate freezes the public API; it does not promise Prisma 7 feature parity. Its promise is different: **everything it ships works and is proven by a test**, everything experimental is labeled, and everything absent is named rather than silently missing.
 
-**Updated July 23 · Health: on track · Ships July 31 · Tasks: 3 done / 11 in flight / 20 not started · [Scoreboard](https://github.com/prisma/prisma-next/pull/1000): ~450 proven / ~500 unproven / ~30 experimental / ~250 not in 8.0**
+**Updated July 23 · Health: on track · Ships July 31 · Tasks: 5 done / 12 in flight / 17 not started · [Scoreboard](https://github.com/prisma/prisma-next/pull/1000): ~450 proven / ~500 unproven / ~30 experimental / ~250 not in 8.0**
 
 ## What needs to happen to release v8-RC1
 
@@ -10,7 +10,7 @@ Six things must be true on release day. Everything on this page belongs to one o
 
 1. **[Queries must return correct values](#1-queries-must-return-correct-values)** — *in progress · Alexey.* The main remaining defect: values read through relation-loading corrupt or fail.
 2. **[The schema language must reach its final form](#2-the-schema-language-must-reach-its-final-form)** — *in flight · Serhii.* Whatever syntax the RC ships is permanent for the life of v8; three language projects are running.
-3. **[Every name and format users depend on must be final](#3-every-name-and-format-users-depend-on-must-be-final)** — *in progress · Will.* The error-code consolidation and the migrations-folder snapshot store have landed; config keys, hashes, and the name sweep still to do.
+3. **[Every name and format users depend on must be final](#3-every-name-and-format-users-depend-on-must-be-final)** — *in progress · Will.* Error codes, hashes, and the migration snapshot layout are done; the config-key rename and the `prisma-next` name sweep remain.
 4. **[The release's claims must be proven](#4-the-releases-claims-must-be-proven)** — *scoreboard drafted, proofs open · everyone.* "It works" and "you can migrate incrementally" each need a runnable receipt.
 5. **[The code must move into prisma/prisma](#5-the-code-must-move-into-prismaprisma)** — *starting · Alexey.* Repository merge, publishing pipeline, and years of open v7 issues.
 6. **[The rough edges users hit on day one must be gone](#6-the-rough-edges-users-hit-on-day-one-must-be-gone)** — *not started · everyone.* Small fixes that would be embarrassing under announcement-day attention.
@@ -29,12 +29,12 @@ When a query loads a relation (say, a post together with its author), Postgres a
 
 The fix: every type codec gains an explicit *lossless* JSON form (big numbers travel as strings, for example), and the SQL we generate is changed to produce that form inside the database. It lands as four pull requests in strict sequence — foundations, per-database codec descriptors, the switch-over, then aggregate typing. The switch-over is a breaking change: users regenerate their contract files, and some aggregate result types change (a `count()` becomes a `bigint`, decimal sums become strings — precise instead of approximately convenient).
 
-Tracked as [TML-3060](https://linear.app/prisma-company/issue/TML-3060/plan-codec-json-projections); in flight now.
+Tracked as [TML-3060](https://linear.app/prisma-company/issue/TML-3060/plan-codec-json-projections); in flight now — the first of the four PRs, the explicit-JSON-projection AST foundations, has landed ([TML-3062](https://linear.app/prisma-company/issue/TML-3062), [#1023](https://github.com/prisma/prisma-next/pull/1023)).
 </details>
 
-<details><summary>⬜ <b>`date` columns fail at runtime when read through relation-loading</b></summary>
+<details><summary>✅ <b>`date` columns fail at runtime when read through relation-loading</b> · landed</summary>
 
-The codec that correctly handles Postgres `date` values exists and is strict (it rejects impossible dates like February 31st rather than silently normalizing them). But nothing connects the `date` column type to that codec yet, so reading a `date` column through `.include()` fails. The connection is a one-line change that deliberately waits for the schema-language work below (which reshapes how column types bind to codecs), and a failing test already pins the exact behavior — when the fix lands, that test flips from red to green.
+The codec that correctly handles Postgres `date` values exists and is strict (it rejects impossible dates like February 31st rather than silently normalizing them), but nothing connected the `date` column type to it — so reading a `date` column through `.include()` threw at decode time, because the column inherited the `timestamptz` codec, which rejects the bare `YYYY-MM-DD` that `json_agg` renders. `@db.Date` now binds to `pg/date@1`, and a test proves an included `date` column comes back as a `Date` ([TML-3086](https://linear.app/prisma-company/issue/TML-3086), landed as [#1038](https://github.com/prisma/prisma-next/pull/1038)).
 </details>
 
 <details><summary>⏳ <b>Binary columns read through relation-loading return hex text instead of bytes</b></summary>
@@ -83,7 +83,7 @@ Decided by the team on July 20; design in progress. Tracked as [TML-3055](https:
 
 Prisma 7 spelled database-native column types with attributes: `email String @db.VarChar(255)`. Prisma 8 replaces that spelling with the type written directly in the type position: `email VarChar(255)`, `id Uuid`, `payload Jsonb`. The type says what the column is; no attribute needed. All `@db.*` attribute support is deleted from the language before the freeze — shipping both spellings would freeze both forever.
 
-This has its own running project ("Remove `@db.*` attributes from PSL"): Postgres native types as bare PSL scalar types is in review ([TML-2986](https://linear.app/prisma-company/issue/TML-2986)), and the unification that makes every scalar type a zero-argument type constructor under one contribution mechanism is in progress ([TML-2985](https://linear.app/prisma-company/issue/TML-2985)). The `date`-column fix from section 1 lands here.
+This has its own running project ("Remove `@db.*` attributes from PSL"). The scalar-type unification — every scalar becomes a zero-argument type constructor under one contribution mechanism, with the Postgres native constructors exposed — has landed ([TML-2986](https://linear.app/prisma-company/issue/TML-2986), [#1022](https://github.com/prisma/prisma-next/pull/1022)). What remains is deleting the `@db.*` channel itself ([TML-2988](https://linear.app/prisma-company/issue/TML-2988)) so only the bare-type spelling survives the freeze.
 </details>
 
 <details><summary>⏳ <b>Relations get a directional spelling; `@relation(name:)` retires</b></summary>
@@ -122,14 +122,14 @@ Prisma 8 grew four separate error systems with two incompatible code formats —
 A simple rename with a deep reach: the key appears in user config files, in the schema of the generated contract document, and in the code that canonicalizes and hashes contracts — about 350 files. Breaking, so it happens now or never. While in there, the config format gets a sweep for any other key we'd regret freezing as-is. ([TML-2462](https://linear.app/prisma-company/issue/TML-2462))
 </details>
 
-<details><summary>⬜ <b>Hashes lose their `sha256:` prefix</b></summary>
+<details><summary>✅ <b>Hashes lose their `sha256:` prefix</b> · landed</summary>
 
-Prisma 8 identifies contracts and migrations by content hash, and today every hash is written with an algorithm prefix: `"storageHash": "sha256:9f49…"`. The prefix adds nothing (the algorithm isn't going to vary per hash) and it appears everywhere users see a hash — generated contract files, migration manifests, the bookkeeping tables Prisma maintains in the user's database. The textual form of hashes freezes at the RC, so the prefix is dropped now, in one sweep across roughly 368 source files plus regenerated examples.
+Prisma 8 identifies contracts and migrations by content hash, and every hash used to be written with an algorithm prefix: `"storageHash": "sha256:9f49…"`. The prefix added nothing (the algorithm isn't going to vary per hash) and it appeared everywhere users see a hash — generated contract files, migration manifests, the bookkeeping tables Prisma maintains in the user's database. The textual form of hashes freezes at the RC, so the prefix was dropped now, in one sweep across the source plus regenerated examples ([TML-2756](https://linear.app/prisma-company/issue/TML-2756), [#1033](https://github.com/prisma/prisma-next/pull/1033)).
 </details>
 
 <details><summary>✅ <b>Store each contract snapshot once instead of copying it into every migration</b> · landed</summary>
 
-Every migration folder used to carry full copies of the data contract it goes from and to — so a project with N migrations stored roughly 2N copies of N+1 distinct documents. They now live in a single `migrations/snapshots/` folder, one snapshot entry per distinct contract, addressed by its content hash ([TML-3059](https://linear.app/prisma-company/issue/TML-3059)); ref-paired snapshots fold into the same store ([TML-3072](https://linear.app/prisma-company/issue/TML-3072)). A migration's identity hash deliberately doesn't cover the snapshots, so no existing migration was invalidated, and a one-shot migrator converts existing projects' committed migration trees.
+Every migration folder used to carry full copies of the data contract it goes from and to — so a project with N migrations stored roughly 2N copies of N+1 distinct documents. They now live in a single `migrations/snapshots/<hash>/` store, one file per distinct contract, named by its content hash; migration folders already record which hashes they go from and to, so they need no new linking files. A migration's identity hash deliberately doesn't cover the snapshots, so converting the layout invalidated no existing migration ([TML-3059](https://linear.app/prisma-company/issue/TML-3059), [#1018](https://github.com/prisma/prisma-next/pull/1018)), and a one-shot migrator converts existing projects' committed migration trees. A follow-up folded the last full-contract copies — the ref-paired snapshots — into the same store, so a ref is now a pure `{hash, invariants}` pointer and "snapshot" is a single concept ([TML-3072](https://linear.app/prisma-company/issue/TML-3072), [#1024](https://github.com/prisma/prisma-next/pull/1024)). This closes the migrations-folder layout ahead of the freeze — users commit these folders to their repositories.
 </details>
 
 <details><summary>⬜ <b>Sweep out the old `prisma-next` name everywhere it's baked in</b></summary>
@@ -173,9 +173,9 @@ So we build it as a permanent test: one project with both versions installed, on
 Prisma 8 leans heavily on advanced TypeScript types, which is exactly the pattern that can make a big project's type-checking slow. We measure now — generated projects of 10, 100, and 500 models, checked with both today's TypeScript and the new Go-based TypeScript 7 compiler — because if the numbers are bad, the types can only be fixed while they're still allowed to change. Results publish to a public dashboard, and pull requests fail if they make type-checking meaningfully more expensive (measured by the compiler's deterministic work counters, not by flaky wall-clock time on shared CI runners).
 </details>
 
-<details><summary>⬜ <b>Port Prisma 7's accumulated edge-case tests against the unproven cells</b></summary>
+<details><summary>⏳ <b>Port Prisma 7's accumulated edge-case tests against the unproven cells</b></summary>
 
-Prisma 7's functional test suite encodes years of database and query edge cases. Converting it wholesale would take months and mostly port API details that no longer exist — so we mine it instead: for each scoreboard cell that says "works" without a proving test, find the Prisma 7 tests covering that feature and port just those scenarios. Where comparing against Prisma 7's behavior is cheaper than porting assertions, the side-by-side project doubles as the comparison harness. This is a stream, not a step; it continues past the RC, visibly, on the public scoreboard.
+Prisma 7's functional test suite encodes years of database and query edge cases. Converting it wholesale would take months and mostly port API details that no longer exist — so we mine it instead: for each scoreboard cell that says "works" without a proving test, find the Prisma 7 tests covering that feature and port just those scenarios. Where comparing against Prisma 7's behavior is cheaper than porting assertions, the side-by-side project doubles as the comparison harness. The port has started — a first pass accounting for 488 scenarios from the `prisma` and `prisma-engines` corpus landed ([#1035](https://github.com/prisma/prisma-next/pull/1035)). This is a stream, not a step; it continues past the RC, visibly, on the public scoreboard.
 </details>
 
 <details><summary>✅ <b>Adopting an existing database round-trips cleanly</b> · landed</summary>
@@ -260,12 +260,12 @@ Support statements that end up in the announcement get checked first: Windows, B
 ## Recently landed
 
 - **One error-code scheme, delivered end-to-end** — every published error is a structural envelope with a dotted code; the ORM and contract-authoring planes' codeless throws were swept onto it; the 221-code reference page ships with a CI check that keeps it complete (section 3).
-- **Migration folders moved to a content-addressed snapshot store** — each distinct contract stored once under `migrations/snapshots/` instead of copied into every migration, with a one-shot migrator for existing projects (section 3).
+- **Contract snapshots deduplicated into one content-addressed store** — migration folders stopped carrying full contract copies, ref-paired snapshots folded in too, closing the migrations-folder layout ahead of the freeze (section 3).
+- **Hashes lost their `sha256:` prefix** — the textual form of every content hash froze without the redundant algorithm tag (section 3).
+- **`date` columns read through `.include()` now decode correctly** — the `@db.Date` codec binding that had been missing (section 1).
+- **Scalar-type unification landed** — every scalar is a zero-argument type constructor, with Postgres native constructors exposed (section 2).
 - **Adopting an existing database round-trips cleanly** — seven defects fixed, proven against live databases (details in section 4).
-- **Polymorphism fixes narrowed to edge cases** — count-write scoping, field-selection restriction, relation-uniqueness validation (section 1).
-- **The last big contract-format changes landed ahead of the freeze** — foreign keys and indexes became first-class entities in the contract document, and migration operations are now ordered by a real dependency graph.
 - **The feature scoreboard draft is up** — 326 features enumerated and verdict-ed across all three databases ([PR #1000](https://github.com/prisma/prisma-next/pull/1000)).
-- **The Supabase integration shipped and closed out** — a first Supabase project works first-try, including row-level-security migrations.
 
 ---
 
